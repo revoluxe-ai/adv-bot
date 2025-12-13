@@ -400,11 +400,7 @@ class CoroutinesManager:
         ]
         if not advs:
             return None
-        advs_for_this_coroutine = copy.copy(advs)
-        # TODO: ТУт костыль, чтобы корутина применялась только к белому списку
-        for adv in advs_for_this_coroutine:
-            adv.keyword_getting_mode = KeywordGettingMode.ONLY_ACTIVE_KEYWORDS
-        await update_clusters_bid_manager.update_cluster_bids(advs_for_this_coroutine)
+        await update_clusters_bid_manager.update_cluster_bids(advs)
         return None
 
 

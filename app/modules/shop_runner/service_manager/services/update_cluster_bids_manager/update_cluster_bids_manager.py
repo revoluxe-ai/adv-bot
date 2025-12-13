@@ -4,6 +4,7 @@ import datetime
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
@@ -219,6 +220,7 @@ class UpdateClusterBidsManager:
         texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
 
         keywords = await adv.get_keywords()
+        keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
 
         keywords = [kw for kw in keywords if kw.text in texts_in_this_adv]
 
