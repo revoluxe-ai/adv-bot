@@ -44,9 +44,6 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
         _wb_data_container.wb_promotion_manager,
     )
 
-    bidder_update_manager = providers.Singleton(
-        WBDataManager,
-    )
     _cluster_bids_updater_container: providers.Container[ClusterBidsManagerContainer] = (
         providers.Container(
             ClusterBidsManagerContainer, shop_id=_shop_id, redis_client=_redis_wrapper
