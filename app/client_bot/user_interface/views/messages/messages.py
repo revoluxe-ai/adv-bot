@@ -372,24 +372,23 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             text += f"Ограничители не заданы!"
 
-        text += (f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
+        text += (
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
-            f"Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n"
-            f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
-            f"Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n"
-            f"Последнее обновление полной статистики: {self.full_stat_update_time}\n"
-            f"Последнее обновление ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
-            f"Последнее автоматическое добавление ключа в белый список:"
+            f"Посл. обнов. обобщенной статистики Ключей: {self.last_update_keyword_stat_str}\n"
+            f"Посл. обнов. минус-слов в авто: {self.keywords_status_last_update_auto_adv}\n"
+            f"Посл. обнов. минус-слов в аук.: {self.keywords_status_last_update_search_adv}\n"
+            f"Посл. обнов. полной статистики: {self.full_stat_update_time}\n"
+            f"Посл. обнов. ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
+            f"Посл. автом. добав. ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
-            f"Последнее автоматическое удаление ключа из белого списка:"
+            f"Посл. автом. удал. ключа из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"Последнее автоматическое повышение целевой позиции:"
+            f"Посл. авт. повыш. цел. позиции:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"Последнее автоматическое понижение целевой позиции:"
+            f"Посл. авт. пониж. целевой позиции:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"Последнее добавление верхнего ключа в БС:"
+            f"Посл. доб верхнего ключа в БС:"
             f" {self._update_informer.update_top_key_str}\n"
-            # f'Последнее обновление ставки: {self.bid_update_time}'
         )
 
         adv_stat = self.adv_stat
