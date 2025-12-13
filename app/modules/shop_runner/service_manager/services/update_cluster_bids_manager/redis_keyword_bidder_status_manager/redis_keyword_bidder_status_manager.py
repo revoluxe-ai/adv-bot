@@ -23,9 +23,8 @@ class RedisKeywordBidderStatusManager(BaseRedisManager):
 
     def _get_key(self, redis_command: RedisCommand) -> str:
         adv_id = redis_command.adv_id
-        nmid = redis_command.nmid
         text = redis_command.text
-        return f'{self.prefix}-{adv_id}-{nmid}-{text}'
+        return f'{self.prefix}-{adv_id}-{text}'
 
 
     async def update_statuses(self, update_bids_command: "UpdateBidsCommand") -> None:

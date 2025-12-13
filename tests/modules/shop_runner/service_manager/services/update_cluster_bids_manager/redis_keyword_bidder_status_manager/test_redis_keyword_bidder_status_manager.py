@@ -30,7 +30,7 @@ def redis_keyword_bidder_status_manager(redis_client_wrapper: RedisClient) -> Re
 @pytest.fixture
 def mock_redis_command() -> RedisCommand:
     """Мок для RedisCommand."""
-    return RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD)
+    return RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD)
 
 
 @pytest.fixture
@@ -85,15 +85,15 @@ class TestRedisKKeywordBidderStatusManager:
     @pytest.mark.asyncio
     async def test_get_key(self, redis_keyword_bidder_status_manager: RedisKeywordBidderStatusManager, mock_redis_command: RedisCommand):
         """Тест для метода _get_key - проверяет корректность генерации ключа."""
-        expected_key = f"{redis_keyword_bidder_status_manager.prefix}-{mock_redis_command.adv_id}-{mock_redis_command.nmid}-{mock_redis_command.text}"
+        expected_key = f"{redis_keyword_bidder_status_manager.prefix}-{mock_redis_command.adv_id}-{mock_redis_command.text}"
         key = redis_keyword_bidder_status_manager._get_key(mock_redis_command)
         assert key == expected_key
 
     @pytest.mark.asyncio
     async def test_get_key_different_values(self, redis_keyword_bidder_status_manager: RedisKeywordBidderStatusManager):
         """Тест для метода _get_key с различными входными значениями."""
-        redis_command = RedisCommand(adv_id=999, nmid=888, text="another_key", bidder_keyword_status=BidderKeywordStatus.BAD)
-        expected_key = f"{redis_keyword_bidder_status_manager.prefix}-{redis_command.adv_id}-{redis_command.nmid}-{redis_command.text}"
+        redis_command = RedisCommand(adv_id=999, text="another_key", bidder_keyword_status=BidderKeywordStatus.BAD)
+        expected_key = f"{redis_keyword_bidder_status_manager.prefix}-{redis_command.adv_id}-{redis_command.text}"
         key = redis_keyword_bidder_status_manager._get_key(redis_command)
         assert key == expected_key
 
@@ -106,9 +106,9 @@ class TestRedisKKeywordBidderStatusManager:
         """Тест для метода update_statuses - проверяет успешное обновление статусов."""
         mock_convertor = MagicMock()
         mock_redis_commands = [
-            RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD),
-            RedisCommand(adv_id=1, nmid=101, text="bad_keyword", bidder_keyword_status=BidderKeywordStatus.BAD),
-            RedisCommand(adv_id=1, nmid=102, text="none_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD),
+            RedisCommand(adv_id=1, text="bad_keyword", bidder_keyword_status=BidderKeywordStatus.BAD),
+            RedisCommand(adv_id=1, text="none_keyword", bidder_keyword_status=None)
         ]
         mock_convertor.update_bids_command_to_redis_command.return_value = mock_redis_commands
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
@@ -142,15 +142,15 @@ class TestRedisKKeywordBidderStatusManager:
                                 monkeypatch):
         """Тест для метода get_statuses - проверяет получение статусов и маппинг."""
         # Подготавливаем данные в Redis
-        key1 = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=None))
-        key2 = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, nmid=101, text="another_keyword", bidder_keyword_status=None))
+        key1 = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=None))
+        key2 = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, text="another_keyword", bidder_keyword_status=None))
         await fake_redis.set(key1, BidderKeywordStatus.GOOD.value)
         await fake_redis.set(key2, BidderKeywordStatus.BAD.value)
 
         mock_convertor = MagicMock()
         mock_redis_commands = [
-            RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=None),
-            RedisCommand(adv_id=1, nmid=101, text="another_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=None),
+            RedisCommand(adv_id=1, text="another_keyword", bidder_keyword_status=None)
         ]
         mock_convertor.dto_to_redis_commands.return_value = mock_redis_commands
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
@@ -171,7 +171,7 @@ class TestRedisKKeywordBidderStatusManager:
         """Тест для метода get_statuses с отсутствующими ключами в Redis - должен возвращать GOOD."""
         mock_convertor = MagicMock()
         mock_redis_commands = [
-            RedisCommand(adv_id=1, nmid=100, text="non_existent_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="non_existent_keyword", bidder_keyword_status=None)
         ]
         mock_convertor.dto_to_redis_commands.return_value = mock_redis_commands
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
@@ -196,15 +196,15 @@ class TestRedisKKeywordBidderStatusManager:
                                                    fake_redis: FakeRedis,
                                                    monkeypatch):
         """Тест для get_statuses со смешанными результатами (существующие и отсутствующие ключи)."""
-        key_existing = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, nmid=100, text="existing_keyword", bidder_keyword_status=None))
-        key_non_existing = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, nmid=100, text="non_existing_keyword", bidder_keyword_status=None))
+        key_existing = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, text="existing_keyword", bidder_keyword_status=None))
+        key_non_existing = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, text="non_existing_keyword", bidder_keyword_status=None))
 
         await fake_redis.set(key_existing, BidderKeywordStatus.BAD.value)
 
         mock_convertor = MagicMock()
         mock_redis_commands = [
-            RedisCommand(adv_id=1, nmid=100, text="existing_keyword", bidder_keyword_status=None),
-            RedisCommand(adv_id=1, nmid=100, text="non_existing_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="existing_keyword", bidder_keyword_status=None),
+            RedisCommand(adv_id=1, text="non_existing_keyword", bidder_keyword_status=None)
         ]
         mock_convertor.dto_to_redis_commands.return_value = mock_redis_commands
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
@@ -234,15 +234,15 @@ class TestRedisKKeywordBidderStatusManager:
         # Mock конвертеры
         mock_convertor = MagicMock()
         mock_redis_commands_for_update = [
-            RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD),
-            RedisCommand(adv_id=1, nmid=101, text="bad_keyword", bidder_keyword_status=BidderKeywordStatus.BAD),
-            RedisCommand(adv_id=1, nmid=102, text="none_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD),
+            RedisCommand(adv_id=1, text="bad_keyword", bidder_keyword_status=BidderKeywordStatus.BAD),
+            RedisCommand(adv_id=1, text="none_keyword", bidder_keyword_status=None)
         ]
         mock_convertor.update_bids_command_to_redis_command.return_value = mock_redis_commands_for_update
         mock_convertor.dto_to_redis_commands.return_value = [
-            RedisCommand(adv_id=1, nmid=100, text="test_keyword", bidder_keyword_status=None),
-            RedisCommand(adv_id=1, nmid=101, text="bad_keyword", bidder_keyword_status=None),
-            RedisCommand(adv_id=1, nmid=102, text="none_keyword", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="test_keyword", bidder_keyword_status=None),
+            RedisCommand(adv_id=1, text="bad_keyword", bidder_keyword_status=None),
+            RedisCommand(adv_id=1, text="none_keyword", bidder_keyword_status=None)
         ]
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
 
@@ -281,7 +281,7 @@ class TestRedisKKeywordBidderStatusManager:
         redis_keyword_bidder_status_manager.default_ttl = 1
         
         mock_convertor = MagicMock()
-        mock_redis_command = RedisCommand(adv_id=1, nmid=100, text="ttl_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD)
+        mock_redis_command = RedisCommand(adv_id=1, text="ttl_keyword", bidder_keyword_status=BidderKeywordStatus.GOOD)
         mock_convertor.update_bids_command_to_redis_command.return_value = [mock_redis_command]
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)
 
@@ -303,12 +303,12 @@ class TestRedisKKeywordBidderStatusManager:
                                                    fake_redis: FakeRedis,
                                                    monkeypatch):
         """Тест для get_statuses с некорректным значением enum в Redis - должен возвращать GOOD."""
-        key = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, nmid=100, text="invalid_enum", bidder_keyword_status=None))
+        key = redis_keyword_bidder_status_manager._get_key(RedisCommand(adv_id=1, text="invalid_enum", bidder_keyword_status=None))
         await fake_redis.set(key, "INVALID_STATUS") # Устанавливаем некорректное значение
 
         mock_convertor = MagicMock()
         mock_redis_commands = [
-            RedisCommand(adv_id=1, nmid=100, text="invalid_enum", bidder_keyword_status=None)
+            RedisCommand(adv_id=1, text="invalid_enum", bidder_keyword_status=None)
         ]
         mock_convertor.dto_to_redis_commands.return_value = mock_redis_commands
         monkeypatch.setattr("app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_keyword_bidder_status_manager.convertor", mock_convertor)

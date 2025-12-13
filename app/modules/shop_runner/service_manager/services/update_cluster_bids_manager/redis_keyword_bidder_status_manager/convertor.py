@@ -13,7 +13,6 @@ def update_bids_command_to_redis_command(update_bids_command: "UpdateBidsCommand
     redis_commands: list[RedisCommand] = []
     for bid in update_bids_command.new_bids:
         redis_command = RedisCommand(adv_id=bid.adv_id,
-                                     nmid=bid.nmid,
                                      text=bid.cluster,
                                      bidder_keyword_status=bid.bidder_keyword_status)
         redis_commands.append(redis_command)
@@ -23,11 +22,11 @@ def update_bids_command_to_redis_command(update_bids_command: "UpdateBidsCommand
 
 def dto_to_redis_commands(adv: ComplexAdv, texts: list[str]) -> list[RedisCommand]:
     redis_commands: list[RedisCommand] = []
-    for nmid in adv.nmids:
-        for text in texts:
-            redis_command = RedisCommand(adv_id=adv.adv_id,
-                                         nmid=nmid,
-                                         text=text,
-                                         bidder_keyword_status=None)
-            redis_commands.append(redis_command)
+    for text in texts:
+        redis_command = RedisCommand(
+            adv_id=adv.adv_id,
+            text=text,
+            bidder_keyword_status=None,
+        )
+        redis_commands.append(redis_command)
     return redis_commands
