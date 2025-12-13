@@ -277,7 +277,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         redis_manager_instance = wb_manager_hub.redis_keyword_bidder_status_manager
 
-        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance() .get_statuses( # pyright: ignore
+        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance() .get_statuses( # pyright: ignore # noqa
             complex_adv, texts)
         return statuses_map # pyright: ignore
 
