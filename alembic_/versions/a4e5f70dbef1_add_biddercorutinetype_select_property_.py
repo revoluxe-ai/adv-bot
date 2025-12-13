@@ -38,7 +38,7 @@ def upgrade() -> None:
         sa.Column(
             "bidder_coroutine_type",
             bidder_coroutine_type_enum,
-            server_default=sa.text("OLD_UPDATE_CPM_BIDDER"),
+            server_default=sa.text("'OLD_UPDATE_CPM_BIDDER'"),
             nullable=False,
             comment="Тип корутины для обработки биддера",
         ),
