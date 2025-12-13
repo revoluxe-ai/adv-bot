@@ -234,7 +234,8 @@ class UpdateClusterBidsManager:
                     max_cpm=adv.max_user_cpm,
                     target_position=adv.target_place,
                     step=adv.bid_cpm_step,
-                    auto_max_bid_cpm=kw.auto_max_bid_cpm if adv.bidder_mode else None,
+                    # TODO: Сделать проброс в само значение: если статус не активен, то просто возвращаем None из .auto_max_bid_cpm
+                    auto_max_bid_cpm=kw.auto_max_bid_cpm if adv.auto_max_bid_cpm_active else None,
                     current_cpm=current_cpm,
                 )
                 map_datas.add(map_data)

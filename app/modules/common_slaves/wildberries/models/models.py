@@ -438,7 +438,7 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm = mapped_column(Integer, nullable=True)
-    auto_max_cpm_mode = mapped_column(
+    auto_max_cpm_mode: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
     max_place: MappedColumn[int | None] = mapped_column(Integer, nullable=True)
