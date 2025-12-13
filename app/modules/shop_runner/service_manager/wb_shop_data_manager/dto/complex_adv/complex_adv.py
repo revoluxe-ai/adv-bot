@@ -4,7 +4,10 @@ from collections.abc import Callable, Awaitable
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
+    KeywordGettingMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 
 class _CPMs:
@@ -37,7 +40,7 @@ class ComplexAdv:
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
-        self._white_list_mode: bool = False
+        self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
 
     @property
     def auction_adv_id(self) -> int | None:
@@ -45,7 +48,6 @@ class ComplexAdv:
             return None
         else:
             return  self._search_adv.adv_id
-
 
     @property
     def bidder_mode(self) -> BidderMode:
@@ -55,14 +57,14 @@ class ComplexAdv:
 
 
     @property
-    def white_list_mode(self) -> bool:
-        return self._white_list_mode
+    def keyword_getting_mode(self) -> KeywordGettingMode:
+        return self._keyword_getting_mode
 
-    @white_list_mode.setter
-    def white_list_mode(self, value: bool):
-        if not isinstance(value, bool):
+    @keyword_getting_mode.setter
+    def keyword_getting_mode(self, value: KeywordGettingMode):
+        if not isinstance(value, KeywordGettingMode):
             raise ValueError()
-        self._white_list_mode = value
+        self._keyword_getting_mode = value
 
     @property
     def target_pay_for_order(self) -> float | None:
@@ -199,8 +201,8 @@ class ComplexAdv:
             if not self._get_keywords:
                 raise RuntimeError("_get_keywords not set")
             self._calculated_keywords = await self._get_keywords(self)
-        if self.white_list_mode:
-            keywords = [kw for kw in self._calculated_keywords if kw.hard_status == 2]
+        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
+            keywords = [kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD]
         else:
             keywords = self._calculated_keywords
         return keywords

@@ -32,6 +32,7 @@ from app.settings import settings
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
+from .wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import KeywordGettingMode
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -402,7 +403,7 @@ class CoroutinesManager:
         advs_for_this_coroutine = copy.copy(advs)
         # TODO: ТУт костыль, чтобы корутина применялась только к белому списку
         for adv in advs_for_this_coroutine:
-            adv.white_list_mode = True
+            adv.keyword_getting_mode = KeywordGettingMode.ONLY_ACTIVE_KEYWORDS
         await update_clusters_bid_manager.update_cluster_bids(advs_for_this_coroutine)
         return None
 
