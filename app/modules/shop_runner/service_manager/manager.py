@@ -121,7 +121,9 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         all_adv_ids: set[int] = set()
         for adv in advs:
-            all_adv_ids.update(adv.nmids)
+            all_adv_ids.add(adv.auto_adv_id)
+            if search_adv_id := adv.search_adv.adv_id:
+                all_adv_ids.add(search_adv_id)
         full_stats: list[FullAdvStat] = (
             await wb_data_getter.get_full_adv_stat_for_adv_ids(
                 wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
