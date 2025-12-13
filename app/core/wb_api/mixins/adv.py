@@ -349,7 +349,7 @@ class AdvMixin(WBAPIProtocol):
 
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] | None = None
-    ) -> list[FullAdvStat] | None:
+    ) -> list[FullAdvStat]:
         if not adv_ids:
             return []
 

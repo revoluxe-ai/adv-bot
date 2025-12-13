@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timezone
 from enum import IntEnum
 
 import factory
@@ -53,6 +53,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto 
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
     KeywordStat,
 )
+from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
 from tests.factories.custom_faker_providers import (
     KeywordStatusProvider,
     KeywordStatusReasonProvider,
@@ -198,12 +199,18 @@ class PreCalculatedKeywordFactory(factory.Factory):
     adv_id = factory.LazyFunction(lambda: fake.random_int(1, 100000))
     keyword_setting = factory.SubFactory(KeywordSettingDTOFactory)
     cluster_stat = factory.SubFactory(KeywordStatFactory)
+    target_pay_for_order = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=10.0, max_value=300.0), 2))
+    bidder_status = factory.LazyFunction(lambda: BidderKeywordStatus.GOOD)
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
         """Переопределяем создание для синхронизации text."""
         keyword_setting = kwargs.get('keyword_setting')
         cluster_stat = kwargs.get('cluster_stat')
+
+        # Backward compatibility: allow bidder_keyword_status alias from tests
+        if 'bidder_keyword_status' in kwargs and 'bidder_status' not in kwargs:
+            kwargs['bidder_status'] = kwargs.pop('bidder_keyword_status')
         
         # Если cluster_stat не передан, но есть keyword_setting, синхронизируем text
         if cluster_stat is None and keyword_setting is not None:
@@ -256,6 +263,8 @@ class CalculatedKeywordFactory(factory.Factory):
     keyword_setting = factory.SubFactory(KeywordSettingDTOFactory)
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     state = factory.SubFactory(KeywordStateFactory)
+    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(50, 500))
+    target_pay_for_order = factory.LazyFunction(lambda: fake.random_int(100, 1000))
 
     @factory.lazy_attribute
     def _sync_text(self):
@@ -315,6 +324,7 @@ class GoodKeywordFactory(CalculatedKeywordFactory):
         views=factory.LazyFunction(lambda: fake.random_int(500, 5000)),
         clicks=factory.LazyFunction(lambda: fake.random_int(50, 500)),
     )
+    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(100, 300))
 
 
 class BadKeywordFactory(CalculatedKeywordFactory):
@@ -335,6 +345,7 @@ class BadKeywordFactory(CalculatedKeywordFactory):
         views=factory.LazyFunction(lambda: fake.random_int(100, 500)),
         clicks=factory.LazyFunction(lambda: fake.random_int(1, 20)),
     )
+    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(50, 150))
 
 
 class TestingKeywordFactory(CalculatedKeywordFactory):
@@ -349,6 +360,7 @@ class TestingKeywordFactory(CalculatedKeywordFactory):
         status=KeywordStatus.VIEWS_IS_NOT_ENOUGH,
         reason=KeywordStatusReason.MORE_THEN_HARD_MIN_CTR,
     )
+    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(75, 200))
 
 
 class BestKeywordFactory(GoodKeywordFactory):
@@ -366,6 +378,7 @@ class BestKeywordFactory(GoodKeywordFactory):
         clicks=factory.LazyFunction(lambda: fake.random_int(200, 1000)),
         final_rating=factory.LazyFunction(lambda: round(fake.pyfloat(min_value=80.0, max_value=100.0), 2)),
     )
+    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(200, 400))
 
 
 # ============================================================================
@@ -408,6 +421,7 @@ def make_calculated_keyword(**kwargs) -> CalculatedKeyword:
         'status': 'state__status',
         'best_keyword_status': 'state__best_keyword_status',
         'reason': 'state__reason',
+        # auto_max_bid остается на верхнем уровне
     }
     
     for flat_key, nested_key in flat_to_nested.items():

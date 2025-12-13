@@ -12,7 +12,7 @@ class KeywordStat(BaseModel):
     add_to_cart: int = Field(alias="add_to_cart")
     orders: int = Field(alias="orders")
     spend: float = Field(alias="spend")
-    cpc: int = Field(alias="cpc")
+    cpc: float = Field(alias="cpc")
     cpm: float = Field(alias="cpm")
     base_cart_to_order_conv: float = Field(alias="base_cart_to_order_conv")
     expected_orders_from_cart: float = Field(alias="expected_orders_from_cart")

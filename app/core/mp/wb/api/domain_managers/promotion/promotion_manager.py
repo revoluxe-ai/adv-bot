@@ -1,14 +1,23 @@
-from typing import List
+from typing import List, TYPE_CHECKING
 import datetime
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
     NormqueryStatsDTO,
 )
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
+    NormqueryBidDTO,
+)
 from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases import (
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
+from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+
+if TYPE_CHECKING:
+    from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
+        SetNormqueryBidsCommandItem,
+    )
 
 
 class PromotionManager:
@@ -44,3 +53,35 @@ class PromotionManager:
                                                   date_from,
                                                   date_to)
         return result
+
+    async def get_normquery_bids(
+        self,
+        complex_advs: list[ComplexAdv],
+    ) -> List[NormqueryBidDTO] | None:
+        from .methods.get_current_bids import method
+
+        return await method.get_current_bids(
+            self._client.normquery_bids_adapter,
+            complex_advs,
+        )
+
+    async def get_min_bids_for_complex_adv(
+        self,
+        complex_advs: list[ComplexAdv],
+    ) -> AdvMinNmidsBids | None:
+        """Получить минимальные ставки CPM (auto + search) для переданных РК."""
+        from .methods.get_min_bids import method
+
+        result = await method.get_min_bids(
+            self._client.min_bids_adapter,
+            complex_advs,
+        )
+        return result
+
+    async def set_cluster_bids(
+        self,
+        bids: list["SetNormqueryBidsCommandItem"],
+    ) -> None:
+        from .methods.set_cluster_bids import set_cluster_bids as method
+
+        await method(self._client.normquery_bids_adapter, bids)

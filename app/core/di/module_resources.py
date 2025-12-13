@@ -41,7 +41,6 @@ class ModuleResources(containers.DeclarativeContainer):
         BidderContainer, _redis_client=redis_client_wrapper
     )
 
-    wb_manager_hub_factory_container = providers.Container(WBManagerHubFactoryContainer)
-
-    # Пример для будущих модулей:
-    # analytics = providers.Container(AnalyticsContainer, redis_client_wrapper=redis_client_wrapper)
+    wb_manager_hub_factory_container = providers.Container(WBManagerHubFactoryContainer,
+                                                           redis_client=redis_client_wrapper,
+                                                           )
