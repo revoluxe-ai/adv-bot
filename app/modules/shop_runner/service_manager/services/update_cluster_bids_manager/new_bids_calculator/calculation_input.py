@@ -11,5 +11,5 @@ class CalculationInput:
     target_position: int
     step: int
     max_bid: int
-    min_bid: int
+    min_bid: int | None
     auto_max_bid: float | None
