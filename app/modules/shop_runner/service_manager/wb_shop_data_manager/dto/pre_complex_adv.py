@@ -34,8 +34,3 @@ class PreComplexAdv:
     @property
     def nmids(self) -> list[int]:
         return self.auto_adv.nmids
-
-
-    @property
-    def original_adv_setting_id(self) -> int:
-        return self.auto_adv.id
