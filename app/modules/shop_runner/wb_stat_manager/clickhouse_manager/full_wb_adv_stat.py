@@ -91,16 +91,15 @@ async def get_daily_stats_by_last_days(
             SELECT 
                 adv_id,
                 date,
-                argMax(views, version) AS latest_views,
-                argMax(clicks, version) AS latest_clicks,
-                argMax(spend, version) AS latest_spend,
-                argMax(added_to_cart, version) AS latest_added_to_cart,
-                argMax(orders, version) AS latest_orders,
-                argMax(sum_price_orders, version) AS latest_sum_price_orders
-            FROM default_db.full_adv_wb_stat
+                views AS latest_views,
+                clicks AS latest_clicks,
+               spend AS latest_spend,
+                added_to_cart AS latest_added_to_cart,
+               orders AS latest_orders,
+               sum_price_orders  AS latest_sum_price_orders
+            FROM default_db.full_adv_wb_stat FINAL 
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
-            GROUP BY adv_id, date
         )
         GROUP BY date
         ORDER BY date
@@ -159,16 +158,15 @@ async def get_stats_by_last_days(
             SELECT 
                 adv_id,
                 date,
-                argMax(views, version) AS latest_views,
-                argMax(clicks, version) AS latest_clicks,
-                argMax(spend, version) AS latest_spend,
-                argMax(added_to_cart, version) AS latest_added_to_cart,
-                argMax(orders, version) AS latest_orders,
-                argMax(sum_price_orders, version) AS latest_sum_price_orders
-            FROM default_db.full_adv_wb_stat
+                views AS latest_views,
+                clicks AS latest_clicks,
+                spend AS latest_spend,
+                added_to_cart AS latest_added_to_cart,
+                orders AS latest_orders,
+                sum_price_orders AS latest_sum_price_orders
+            FROM default_db.full_adv_wb_stat FINAL
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s) 
             AND adv_id IN %(adv_ids)s
-            GROUP BY adv_id, date
         )
         """
         try:

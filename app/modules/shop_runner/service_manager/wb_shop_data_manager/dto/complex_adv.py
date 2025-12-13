@@ -38,8 +38,6 @@ class ComplexAdv:
         self._calculated_keywords: list[CalculatedKeyword] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._white_list_mode: bool = False
-        self._target_pay_for_order: float | None = target_pay_for_order
-        self._white_list_mode: bool = False
 
     @property
     def bidder_mode(self) -> BidderMode:
@@ -81,15 +79,6 @@ class ComplexAdv:
     def bid_cpm_step(self) -> int:
         return self._adv_setting.bidder_step
 
-    @property
-    def white_list_mode(self) -> bool:
-        return self._white_list_mode
-
-    @white_list_mode.setter
-    def white_list_mode(self, value: bool):
-        if not isinstance(value, bool):
-            raise ValueError()
-        self._white_list_mode = value
 
 
     @property
