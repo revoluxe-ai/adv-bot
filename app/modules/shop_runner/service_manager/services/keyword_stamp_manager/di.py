@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 from .click_house_manager import ClickHouseKeywordJamStatManager
-from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
+from app.core.di.wb_manager_hub import WBManagerHub
 from .keyword_stamp_manager import KeywordStampManager
 
 

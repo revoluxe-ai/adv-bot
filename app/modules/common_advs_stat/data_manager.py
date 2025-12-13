@@ -13,7 +13,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_man
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
-from app.modules.wb_adv_updater import phrases_processor
+
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
@@ -145,6 +145,7 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auto_adv.spend
             - spend_for_keywords_in_auto_adv
         )
+        from app.modules.wb_adv_updater import phrases_processor
         min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
         return CommonAdvsStatData(
             adv_setting=adv_setting,

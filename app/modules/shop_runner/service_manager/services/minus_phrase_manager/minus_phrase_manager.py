@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable
-from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
+from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )

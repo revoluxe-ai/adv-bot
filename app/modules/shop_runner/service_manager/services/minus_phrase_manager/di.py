@@ -1,5 +1,5 @@
 from dependency_injector import containers, providers
-from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
+from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from .minus_phrase_manager import MinusPhraseManager
 from .click_house_manager import ClickHouseManager

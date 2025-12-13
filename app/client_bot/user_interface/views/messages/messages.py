@@ -19,7 +19,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
-from app.client_bot import const
+from app.client_bot import const, utils
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.message_templates.templates import (
@@ -30,6 +30,7 @@ from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardPagination,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
@@ -53,7 +54,6 @@ from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason, KeywordStatus
-from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_update_state_manager import (
     AdvActiveKeywordUpdateStateManager,
     KeywordStatUpdateState,
@@ -61,6 +61,9 @@ from app.modules.wb_update_state_manager import (
 from app.utils import redis_manager
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
+    RedisClusterBidsTimestampManager,
+)
 
 if TYPE_CHECKING:
     pass
@@ -234,14 +237,23 @@ class ShopUpdateInfo(Text):
 class AdvSettingMenu(TextWithKeyboardAndImage):
     # parse_mode = ParseMode.HTML
 
+    @inject
     def __init__(
-        self, bot: Bot, chat_id: int, wb_user_cabinet: WBUserCabinet, adv: AdvSetting
+        self,
+        bot: Bot,
+        chat_id: int,
+        wb_user_cabinet: WBUserCabinet,
+        adv: AdvSetting,
+        redis_client: RedisClient = Provide["redis_client_wrapper"],
     ) -> None:
         super().__init__(bot, chat_id)
         self._bot = bot
         self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
+        self._redis_cluster_bids_timestamp_manager = RedisClusterBidsTimestampManager(
+            redis_client
+        )
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -267,7 +279,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._status_auction = "Не установлен"
         self._hard_min_ctr = self.adv.hard_min_ctr
-        keywords = await phrases_processor.get_good_bad_phrases(self.adv)
+        keywords = await utils.get_keywords_for_keyboard(self.adv)
         self._min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
@@ -328,6 +340,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
+        self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get()
         return await super().__call__()
 
     @property
@@ -365,6 +378,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
             f"Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n"
             f"Последнее обновление полной статистики: {self.full_stat_update_time}\n"
+            f"Последнее обновление ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
             f"Последнее автоматическое добавление ключа в белый список:"
             f" {self._update_informer.add_to_white_list_str}\n"
             f"Последнее автоматическое удаление ключа из белого списка:"
@@ -797,7 +811,7 @@ class SettingMinCTR(TextWithKeyboard):
         else:
             self._min_ctr_type = "direct"
 
-        keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
 
         keywords_with_rating = [kw for kw in keywords if kw.ctr > 0]
         keywords_with_rating.sort(key=lambda x: x.ctr, reverse=True)
@@ -871,7 +885,7 @@ class MaxCPCSetting(TextWithKeyboard):
 
         self._adv: AdvSetting = adv
 
-        keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
         keywords: list[CalculatedKeyword]   = [
             kw
             for kw in keywords
