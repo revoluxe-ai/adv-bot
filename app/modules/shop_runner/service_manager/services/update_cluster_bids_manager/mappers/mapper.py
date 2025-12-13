@@ -26,7 +26,7 @@ class Mapper:
     def get_target_position(map_data: AdvIdItemCalculateData) -> int:
         return map_data.target_position
 
-    def get_min_bid(self, map_data: AdvIdItemCalculateData) -> int:
+    def get_min_bid(self, map_data: AdvIdItemCalculateData) -> int | None:
         return self._min_bids_mapper.get_min_bid(map_data)
 
 
