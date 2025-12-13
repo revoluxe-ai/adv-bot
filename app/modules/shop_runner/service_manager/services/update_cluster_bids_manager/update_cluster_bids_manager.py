@@ -207,11 +207,15 @@ class UpdateClusterBidsManager:
         return inputs
 
     @staticmethod
-    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData]:
+    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData] | None:
         from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
             .click_house_manager.click_house_manager import ClickHouseManager
+        search_adv_id = adv.search_adv.adv_id
+        if search_adv_id is None:
+            logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
+            return None
         ch_manager = ClickHouseManager()
-        texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(adv.search_adv.adv_id))
+        texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
 
         keywords = await adv.get_keywords()
 
@@ -241,7 +245,8 @@ class UpdateClusterBidsManager:
         calculate_data_tasks: list[Awaitable[set[AdvIdItemCalculateData]]] = []
         for adv in advs:
             get_data_task = self.__get_calculate_data(adv)
-            calculate_data_tasks.append(get_data_task)
+            if get_data_task is not None:
+                calculate_data_tasks.append(get_data_task)
 
         results: list[ set[AdvIdItemCalculateData] | BaseException] \
             = await asyncio.gather(*calculate_data_tasks, return_exceptions=True)
