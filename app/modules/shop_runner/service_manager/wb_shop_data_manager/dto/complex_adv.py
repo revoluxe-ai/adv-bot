@@ -40,6 +40,14 @@ class ComplexAdv:
         self._white_list_mode: bool = False
 
     @property
+    def auction_adv_id(self) -> int | None:
+        if self._search_adv is None:
+            return None
+        else:
+            return  self._search_adv.adv_id
+
+
+    @property
     def bidder_mode(self) -> BidderMode:
         if self._adv_setting.bidder_mode is None:
             return BidderMode.BY_POSITIONS
