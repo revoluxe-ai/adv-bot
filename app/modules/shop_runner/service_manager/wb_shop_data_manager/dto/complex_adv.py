@@ -81,6 +81,10 @@ class ComplexAdv:
     def bid_cpm_step(self) -> int:
         return self._adv_setting.bidder_step
 
+    @property
+    def white_list_mode(self) -> bool:
+        return self._white_list_mode
+
     @white_list_mode.setter
     def white_list_mode(self, value: bool):
         if not isinstance(value, bool):
