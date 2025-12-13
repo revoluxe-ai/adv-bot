@@ -5,6 +5,8 @@ services:
       POSTGRES_DB: test_adv_bot_db
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
+    volumes:
+      - .\tests\postgres-init:/docker-entrypoint-initdb.d # добавляем init-скрипты для pg_hba.conf
     ports:
       - "5433:5432" # Используем другой порт, чтобы избежать конфликтов с основной БД
     healthcheck:

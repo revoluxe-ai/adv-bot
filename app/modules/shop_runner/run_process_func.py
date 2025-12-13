@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
-from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+from app.core.di.wb_manager_hub import WBManagerHubFactory
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi

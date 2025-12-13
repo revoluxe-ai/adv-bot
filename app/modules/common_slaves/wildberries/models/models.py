@@ -26,7 +26,6 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
@@ -58,6 +57,13 @@ logger = logging.getLogger(__name__)
 class PredictCTRMode(Enum):
     V1 = "v1"
     V2 = "v2"
+
+
+class BidderCoroutineType(str, Enum):
+    """Тип корутины для обработки биддера."""
+
+    OLD_UPDATE_CPM_BIDDER = "OLD_UPDATE_CPM_BIDDER"
+    UPDATE_CLUSTER_BIDS = "UPDATE_CLUSTER_BIDS"
 
 
 _sm = get_async_session_maker
@@ -432,7 +438,7 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm = mapped_column(Integer, nullable=True)
-    auto_max_cpm_mode = mapped_column(
+    auto_max_cpm_mode: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
     max_place: MappedColumn[int | None] = mapped_column(Integer, nullable=True)
@@ -447,6 +453,18 @@ class AdvSetting(BaseTable):
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
     hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
+    bidder_coroutine_type: Mapped[BidderCoroutineType] = mapped_column(
+        SAEnum(
+            BidderCoroutineType,
+            name="bidder_coroutine_type",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=False,
+        default=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        server_default=text("'OLD_UPDATE_CPM_BIDDER'"),
+        comment="Тип корутины для обработки биддера",
+    )
     target_ctr_mode_strategy = mapped_column(
         String, nullable=True, default="forward"
     )  # forward, keep

@@ -81,6 +81,8 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
         cpc=0.5,
         avg_pos=3.0,
     )
+
+    # TODO: Переделать запрос рейтинга ключей, чтобы брал превентивные данные более широко
     mock_response_item = V0GetNormQueryStatsItem(
         advert_id=123,
         nm_id=456,

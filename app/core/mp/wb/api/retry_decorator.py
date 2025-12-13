@@ -113,7 +113,6 @@ def retry_decorator(
                             )
 
                     except (
-                        BadRequestError,
                         UnknownApiRequestError,
                         HttpTimeOutError,
                     ) as e:
@@ -127,8 +126,7 @@ def retry_decorator(
                         state["_current_pause"] = min(
                             max(state["_current_pause"], 1.0) * 2, float(max_delay)
                         )
-
-                    except Exception as e:
+                    except BadRequestError as e:
                         raise e
 
         return cast(F, wrapper)

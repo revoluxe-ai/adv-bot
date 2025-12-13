@@ -7,6 +7,7 @@
 """
 
 from .adv_factory import AdvSettingFactory, KeywordSettingFactory
+from .complex_adv import ComplexAdvSeed, create_complex_adv_seed
 from .keyword_pipeline import (
     # Enum
     HardStatus,
@@ -54,6 +55,9 @@ __all__ = [
     "BestKeywordFactory",
     # Enum
     "HardStatus",
+    # Complex adv helper
+    "ComplexAdvSeed",
+    "create_complex_adv_seed",
     # Legacy functions
     "make_calculated_keyword",
     "make_keyword_setting_dto",

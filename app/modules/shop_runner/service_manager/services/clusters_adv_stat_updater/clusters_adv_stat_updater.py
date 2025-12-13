@@ -13,7 +13,7 @@ from app.modules.relevant_phrase_manager.not_relevante_template import NotReleva
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
-from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
+    from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from .click_house_clusters_stat_manager import click_house_clusters_stat_manager as ch
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClustersAdvStatUpdater:
-    def __init__(self, wb_manager_hub: WBManagerHub):
+    def __init__(self, wb_manager_hub: "WBManagerHub"):
         self._wb_manager_hub = wb_manager_hub
 
     async def update_today_stats(self, complex_advs: list[ComplexAdv]) -> None:
@@ -74,9 +74,9 @@ class ClustersAdvStatUpdater:
                 len(all_stats),
                 len(missing_dates_map)
             )
-
+    @staticmethod
     async def _get_missing_dates_map(
-        self, complex_advs: list[ComplexAdv], for_last_days: int
+        complex_advs: list[ComplexAdv], for_last_days: int
     ) -> dict[date, list[ComplexAdv]]:
         """
         Возвращает словарь {дата: список ComplexAdv без статистики за эту дату}.

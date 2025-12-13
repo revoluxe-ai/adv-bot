@@ -26,13 +26,19 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.common_slaves.wildberries.models.models import (
+    BidderCoroutineType,
+    PredictCTRMode,
+)
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
+)
+from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
+    BidderCoroutineTypeToggle,
 )
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
@@ -42,7 +48,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
     RelevantKeywordStatusSetting,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -69,6 +75,22 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    if adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
+        bidder_text = "Переключить на кластерный биддер"
+        new_bidder_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    else:
+        bidder_text = "Переключить на стандартный биддер (CPM)"
+        new_bidder_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+
+    bidder_callback = BidderCoroutineTypeToggle(
+        new_type=new_bidder_type.value,
+        adv_setting_original_id=adv_setting.id,
+    ).pack()
+    bidder_button = InlineKeyboardButton(
+        text=bidder_text, callback_data=bidder_callback
+    )
+    _ = builder.row(bidder_button)
 
     if adv_setting.bot_active:
         _ = builder.row(
@@ -530,6 +552,7 @@ def get_keywords_setting_keyboard(
     sort_mode: str = "default",
     image_mode: str = "graphic",
 ):
+    from . import keyword_statuses_util as k_util
     def sorting_keywords(
         kws_: list[CalculatedKeyword], sort_mode_: str
     ) -> list[CalculatedKeyword]:
@@ -563,22 +586,6 @@ def get_keywords_setting_keyboard(
         clicks = keyword.clicks
         views = keyword.views
         ctr = keyword.ctr
-        if keyword.reason == KeywordStatusReason.MAX_POSITION:
-            message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status += "ЦП"
-        elif keyword.hard_status == BLACK_LIST:
-            message_status = "НРФ"
-        elif keyword.reason == KeywordStatusReason.MAX_CPC:
-            message_status = "МС"
-        elif keyword.hard_status == TURN_OFF:
-            message_status = "О"
-        elif keyword.hard_status == WHITE_LIST:
-            message_status = "БС"
-        elif keyword.hard_status == AUTO_MODE:
-            message_status = "А"
-        else:
-            raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
-
         turn_on = "✅" if keyword.status == KeywordStatus.GOOD else "❌"
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
@@ -599,7 +606,7 @@ def get_keywords_setting_keyboard(
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
         cpm = int(keyword.cpm + 0.5) # плата за показы
         text += f"({cpm})"
-        text += f"{turn_on}({message_status}) {keyword.text}"
+        text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
 
         text += f"({round(keyword.rating_by_orders * 1000, 2)})"
 

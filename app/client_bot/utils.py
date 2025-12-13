@@ -6,7 +6,8 @@ from sqlalchemy import and_, select
 
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
@@ -31,7 +32,27 @@ _sm = get_async_session_maker
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
+    # Получаем shop_id через join с WBCabinet
+    stmt = select(WBCabinet.shop_id).join(WBCabinet.adv_settings)\
+    .where(AdvSetting.id == adv_setting.id)
+
+    async with _sm(read_only=True) as session:
+        result = await session.execute(stmt)
+        shop_id = result.scalar_one()
+
+    search_adv = None  # Инициализация
+    search_adv_id = adv_setting.search_adv_id
+    if search_adv_id:
+        stmt = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
+        async with _sm(read_only=True) as session:
+            result = await session.execute(stmt)
+            search_adv = result.scalar_one()
+    complex_adv = ComplexAdv(
+        shop_id=shop_id,
+        adv_setting=adv_setting,
+        search_adv=search_adv,
+    )
+    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(complex_adv)
     return all_phrases
 
 

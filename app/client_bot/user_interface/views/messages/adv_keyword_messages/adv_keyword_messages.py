@@ -9,6 +9,7 @@ from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if typing.TYPE_CHECKING:
@@ -290,7 +291,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"\nСтавка из Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
         )
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
-        text += f"Ставка из Аукциона: {self.auction_cpm}\n"
+        if self._adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
+            text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         max_cpm_str = (
             str(self._adv_setting.max_cpm)

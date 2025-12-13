@@ -18,7 +18,10 @@
     "app/modules/wb_adv_updater/position_history_manager",
     "app/utils/graphic_positions_creator/graphic_positions_creator.py",
     "app/client_bot/user_interface/views/messages/messages.py",
-    "app/client_bot/user_interface/handlers/keyword_settings.py"
+    "app/client_bot/user_interface/handlers/keyword_settings.py",
+    "app/modules/shop_runner/service_manager/services/update_cluster_bids_manager",
+    "app/modules/wb_adv_updater/calculated_keywords_manager",
+    "app/modules/shop_runner/service_manager/manager.py"
   ],
 
   "exclude": [
