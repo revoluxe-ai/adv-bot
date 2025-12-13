@@ -18,19 +18,20 @@ def get_hard_status(keyword: CalculatedKeyword) -> str:
 def get_dynamic_status(keyword: CalculatedKeyword) -> str:
     reason = keyword.reason
     if reason == KeywordStatusReason.BIDDER_BAD_STATUS:
-        status = 'Б'
+        status = '(Б)'
     elif reason == KeywordStatusReason.MAX_CPC:
-        status = 'МС'
+        status = '(МС)'
     elif reason == KeywordStatusReason.MORE_THEN_HARD_MIN_CTR:
-        status = 'ВР'
+        status = '(ВР)'
     elif reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS:
-        status = "НР"
+        status = "(НР)"
     elif reason == KeywordStatusReason.WHITE_LIST:
         status = ""
+    elif reason == KeywordStatusReason.MAX_POSITION:
+        status = "(ЦП)"
     else:
         status = ""
-
-    return f'-({status})'
+    return status
 
 
 
