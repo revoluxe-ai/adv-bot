@@ -399,7 +399,7 @@ class CoroutinesManager:
         ]
         if not advs:
             return None
-        advs_for_this_coroutine = copy.deepcopy(advs)
+        advs_for_this_coroutine = copy.copy(advs)
         # TODO: ТУт костыль, чтобы корутина применялась только к белому списку
         for adv in advs_for_this_coroutine:
             adv.white_list_mode = True
