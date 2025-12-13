@@ -207,13 +207,13 @@ class UpdateClusterBidsManager:
         return inputs
 
     @staticmethod
-    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData] | None:
+    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData]:
         from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
             .click_house_manager.click_house_manager import ClickHouseManager
         search_adv_id = adv.search_adv.adv_id
         if search_adv_id is None:
             logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
-            return None
+            return set()
         ch_manager = ClickHouseManager()
         texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
 
@@ -245,8 +245,7 @@ class UpdateClusterBidsManager:
         calculate_data_tasks: list[Awaitable[set[AdvIdItemCalculateData]]] = []
         for adv in advs:
             get_data_task = self.__get_calculate_data(adv)
-            if get_data_task is not None:
-                calculate_data_tasks.append(get_data_task)
+            calculate_data_tasks.append(get_data_task)
 
         results: list[ set[AdvIdItemCalculateData] | BaseException] \
             = await asyncio.gather(*calculate_data_tasks, return_exceptions=True)
@@ -254,7 +253,7 @@ class UpdateClusterBidsManager:
         for result in results:
             if isinstance(result, BaseException):
                 logger.error('Ошибка получения данных для расчета новой ставки: %s', result)
-            else:
+            elif result:
                 datas.update(result)
         return datas
 
