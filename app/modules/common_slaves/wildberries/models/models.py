@@ -28,7 +28,6 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import BidderCoroutineTypeToggle
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from .bidder_mode import BidderMode
