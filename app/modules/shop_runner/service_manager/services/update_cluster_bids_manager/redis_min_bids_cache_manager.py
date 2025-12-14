@@ -12,7 +12,7 @@ class MinBidsCacheMixin:
     """Mixin для кэширования минимальных ставок по nmid."""
 
     prefix = "min_bids:nmid"
-    default_ttl = 300  # 5 минут
+    default_ttl = 60 * 60 * 24 * 7  # Неделя
 
     def _get_key(self: "BaseRedisManagerProtocol", nmid: int) -> str:
         """Генерирует ключ для nmid."""
