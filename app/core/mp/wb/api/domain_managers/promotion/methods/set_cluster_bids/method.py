@@ -18,7 +18,7 @@ async def set_cluster_bids(
 ) -> None:
     if not bids:
         return None
-    batch_len = 1
+    batch_len = 100
     offset = 0
     while offset < len(bids):
         batch = bids[offset:offset + batch_len]
@@ -27,5 +27,6 @@ async def set_cluster_bids(
             await normquery_bids_adapter.post_adv_v0_normquery_bids(command)
         except BadRequestError as e:
             logger.error("Ошибка обновления ставки кластера: %s, %s", command.bids, e)
+            raise e
         offset += batch_len
     return None
