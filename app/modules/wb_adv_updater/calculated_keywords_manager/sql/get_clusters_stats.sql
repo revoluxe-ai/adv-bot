@@ -207,20 +207,19 @@ WITH
         WHERE date >= today() - 14
     ),
 
-    priors AS (
-        SELECT
-            -- сколько показов на 1 клик
-            c7.views_total / (c7.clicks_total + 1) AS prior_views,
-            -- сколько кликов на 1 корзину
-            if(
-                c7.clicks_total > 0,
-                c7.clicks_total / c7.carts_total ,
-                0) AS prior_clicks,
-            if(c7.carts_total > 0,
-                c7.carts_total / c7.orders_total, 0) AS prior_carts
-        FROM campaign_7d  AS c7
-        CROSS JOIN campaign_14d AS c14
-    ),
+ priors AS (
+    SELECT
+        -- показы → клики (7 дней)
+        c7.views_total  / (c7.clicks_total + 1)  AS prior_views,
+
+        -- клики → корзины (7 дней)
+        c7.clicks_total / (c7.carts_total  + 1)  AS prior_clicks,
+
+        -- корзины → заказы (14 дней)
+        c14.carts_total / (c14.orders_total + 1) AS prior_carts
+    FROM campaign_7d  AS c7
+    CROSS JOIN campaign_14d AS c14
+),
 
     ------------------------------------------------------------------
     -- 6. Окно для CTR (отдельный поток на daily_last)
