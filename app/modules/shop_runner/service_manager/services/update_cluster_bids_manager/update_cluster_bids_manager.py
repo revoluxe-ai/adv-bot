@@ -85,7 +85,7 @@ class UpdateClusterBidsManager:
          new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
          await self._apply_command(new_bids_command)
          for adv in advs: # TODO: Тут накостылил, чтобы быстрее в прод выложить
-             await self._redis_cluster_bids_timestamp_manager.set(adv, datetime.datetime.now())
+             await self._redis_cluster_bids_timestamp_manager.set(adv)
 
     async def _get_bidder_update_data(
         self,

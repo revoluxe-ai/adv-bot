@@ -18,9 +18,9 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
         value_dt = datetime.datetime.fromisoformat(value)
         return value_dt
 
-    async def set(self, adv: AdvProtocol, timestamp: datetime.datetime) -> None:
+    async def set(self, adv: AdvProtocol) -> None:
         key: str = self._get_key(adv)
-        value_str = timestamp.astimezone(datetime.timezone.utc).isoformat()
+        value_str = datetime.datetime.now().isoformat()
         _ = await self._client.set(key, value_str)
         return None
 
