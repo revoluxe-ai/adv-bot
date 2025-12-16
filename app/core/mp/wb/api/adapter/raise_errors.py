@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
-
+import logging
 import httpx
 
 from app.core.mp.wb.api import AuthenticatedCastClient
@@ -15,6 +15,8 @@ from app.core.mp.wb.api.excs import (
 
 from app.core.mp.wb.api.utils import parse_too_many_requests_error
 
+
+logger = logging.getLogger(__name__)
 
 class ResponseProtocol(Protocol):
     status_code: int
@@ -37,7 +39,7 @@ async def with_raise_errors(
 
     if 200 <= status < 300:
         return result
-    elif status == 400:
+    elif status in [400, 404]:
         detail = result.content.decode()
         raise BadRequestError(detail)
     elif status in [401, 403]:

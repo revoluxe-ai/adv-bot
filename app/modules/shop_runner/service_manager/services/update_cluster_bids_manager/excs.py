@@ -1,0 +1,7 @@
+
+
+
+
+
+class ClusterBidsUpdateError(Exception):
+    pass

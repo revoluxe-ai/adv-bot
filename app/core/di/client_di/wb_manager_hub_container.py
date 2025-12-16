@@ -4,15 +4,25 @@ from dependency_injector import containers, providers
 from dependency_injector.providers import Provider
 
 from app.core.di.client_di.wb_data_container import WBDataContainer
+from ..wb_manager_hub.wb_manager_hub import WBManagerHub
 from ...mp.wb.api.auth_client_handler import AuthClientHandler
 from ...mp.wb.api.httpx_client_handler import HttpxClientHandler
 from ...mp.wb.api.managers import WBDataManager, WBModifier
-from ...mp.wb.api.wb_manager_hub import WBManagerHub
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager import (
+    ClusterBidsManagerContainer,
+    UpdateClusterBidsManager,
+)
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
+    RedisKeywordBidderStatusManager,
+)
+from ...redis_manager_v2.redis_client import RedisClient
 
 
 class WBManagerHubContainer(containers.DeclarativeContainer):
     _shop_id = providers.Dependency(instance_of=str)
     _httpx_client_handler = providers.Dependency(instance_of=HttpxClientHandler)
+
+    _redis_wrapper = providers.Dependency(instance_of=RedisClient)
 
     _auth_client_handler = providers.Singleton(
         AuthClientHandler,
@@ -34,8 +44,26 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
         _wb_data_container.wb_promotion_manager,
     )
 
+    _cluster_bids_updater_container: providers.Container[ClusterBidsManagerContainer] = (
+        providers.Container(
+            ClusterBidsManagerContainer, shop_id=_shop_id, redis_client=_redis_wrapper
+        )
+    )
+    _update_cluster_bids_manager: Provider[UpdateClusterBidsManager] = cast(
+        Provider[UpdateClusterBidsManager],
+        _cluster_bids_updater_container.provided.update_cluster_bids_manager,
+    )
+    _redis_keyword_bidder_status_manager: Provider[RedisKeywordBidderStatusManager] = cast(
+        Provider[RedisKeywordBidderStatusManager],
+        _cluster_bids_updater_container.provided.redis_keyword_bidder_status_manager,
+    )
+
     wb_manager_hub = providers.Singleton(
         WBManagerHub,
         wb_data_manager=_wb_data_manager,
         wb_promotion_manager=_wb_promotion_manager,
+        cluster_bids_update_manager=_update_cluster_bids_manager,
+        redis_client_wrapper=_redis_wrapper,
+        redis_keyword_bidder_status_manager=_redis_keyword_bidder_status_manager
+
     )

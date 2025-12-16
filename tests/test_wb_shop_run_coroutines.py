@@ -32,12 +32,11 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.update_keywords_stamp = AsyncMock()
-    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
     coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
     coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
     coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
     coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
+    coroutines_manager_mock.update_cluster_bids = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -62,12 +61,11 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.update_keywords_stamp.assert_called_once()
-            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
             coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
             coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
+            coroutines_manager_mock.update_cluster_bids.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
@@ -94,12 +92,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.update_keywords_stamp = AsyncMock()
-    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
     coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
     coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
     coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
     coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
+    coroutines_manager_mock.update_cluster_bids = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -120,10 +117,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # 14 корутин: 1 (_alive_worker_run) + 13 из CoroutinesManager
+            # 13 корутин: 1 (_alive_worker_run) + 12 из CoroutinesManager
             assert (
-                len(call_args) == 14
-            ), f"asyncio.gather должен быть вызван с 14 аргументами, получено {len(call_args)}"
+                len(call_args) == 13
+            ), f"asyncio.gather должен быть вызван с 13 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
@@ -133,9 +130,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.update_keywords_stamp.assert_called_once()
-            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
             coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
             coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
+            coroutines_manager_mock.update_cluster_bids.assert_called_once()

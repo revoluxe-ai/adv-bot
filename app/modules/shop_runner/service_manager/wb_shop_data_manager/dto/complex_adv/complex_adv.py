@@ -2,7 +2,12 @@ from collections.abc import Callable, Awaitable
 
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
+    KeywordGettingMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 
 class _CPMs:
@@ -24,6 +29,7 @@ class ComplexAdv:
         self,
         adv_setting: AdvSetting,
         search_adv: AdvSetting | None = None,
+        target_pay_for_order: float | None = None,
         shop_id: str | None = None,
         get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]] | None = None,
     ):
@@ -33,12 +39,72 @@ class ComplexAdv:
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+        self._target_pay_for_order: float | None = target_pay_for_order
+        self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+
+    @property
+    def auto_max_bid_cpm_active(self) -> bool:
+        if self._adv_setting.auto_max_cpm_mode is None:
+            return False
+        return self._adv_setting.auto_max_cpm_mode
+
+
+    @property
+    def auction_adv_id(self) -> int | None:
+        if self._search_adv is None:
+            return None
+        else:
+            return  self._search_adv.adv_id
+
+    @property
+    def bidder_mode(self) -> BidderMode:
+        if self._adv_setting.bidder_mode is None:
+            return BidderMode.BY_POSITIONS
+        return self._adv_setting.bidder_mode
+
+
+    @property
+    def keyword_getting_mode(self) -> KeywordGettingMode:
+        return self._keyword_getting_mode
+
+    @keyword_getting_mode.setter
+    def keyword_getting_mode(self, value: KeywordGettingMode):
+        if not isinstance(value, KeywordGettingMode):
+            raise ValueError()
+        self._keyword_getting_mode = value
+
+    @property
+    def target_pay_for_order(self) -> float | None:
+        return self._target_pay_for_order
+
+    @property
+    def auto_update_white_list(self) -> bool:
+        if self._adv_setting.auto_update_white_list is None:
+            return True
+        return self._adv_setting.auto_update_white_list
+
+
+    @property
+    def bidder_active(self) -> bool:
+        return self._adv_setting.bidder_active
+
+    @property
+    def bidder_coroutine_type(self) -> BidderCoroutineType:
+        return self._adv_setting.bidder_coroutine_type
+
+    @property
+    def bid_cpm_step(self) -> int:
+        return self._adv_setting.bidder_step
+
 
 
     @property
     def all_adv_ids(self) -> set[int]:
-        return {self._adv_setting.adv_id,
-                self._search_adv.adv_id}
+        adv_ids: set[int] = set()
+        adv_ids.add(self._adv_setting.adv_id)
+        if self._search_adv:
+            adv_ids.add(self._search_adv.adv_id)
+        return adv_ids
 
     @property
     def hard_min_ctr(self) -> int | None:
@@ -73,6 +139,13 @@ class ComplexAdv:
         if self._search_adv and self._search_adv.active_status == "started":
             return True
         return False
+
+    @property
+    def auto_adv_active_status(self) -> bool:
+        if self._adv_setting.active_status == "started":
+            return True
+        return False
+
 
     @property
     def shop_id(self) -> str:
@@ -134,8 +207,12 @@ class ComplexAdv:
         if not self._calculated_keywords:
             if not self._get_keywords:
                 raise RuntimeError("_get_keywords not set")
-            self._calculated_keywords = await self._get_keywords(self._adv_setting)
-        return self._calculated_keywords
+            self._calculated_keywords = await self._get_keywords(self)
+        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
+            keywords = [kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD]
+        else:
+            keywords = self._calculated_keywords
+        return keywords
 
     @property
     def exponet_predict_ctr(self) -> float:

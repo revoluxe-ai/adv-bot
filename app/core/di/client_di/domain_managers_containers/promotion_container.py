@@ -3,6 +3,8 @@ from dependency_injector import containers, providers
 from app.core.mp.wb.api.adapter.promotion_client import (
     MinusPhrasesAdapter,
     NormqueryStatsAdapter,
+    NormqueryBidsAdapter,
+    MinBidsAdapter,
     PromotionClient,
 )
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
@@ -29,10 +31,26 @@ class PromotionContainer(containers.DeclarativeContainer):
         request_limit_manager=_request_limit_manager,
     )
 
+    _normquery_bids_adapter = providers.Singleton(
+        NormqueryBidsAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
+    _min_bids_adapter = providers.Singleton(
+        MinBidsAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
     _promotion_client = providers.Singleton(
         PromotionClient,
         minus_phrases_adapter=_minus_phrases_adapter,
         normquery_stats_adapter=_normquery_stats_adapter,
+        normquery_bids_adapter=_normquery_bids_adapter,
+        min_bids_adapter=_min_bids_adapter,
     )
 
     promotion_domain_manager = providers.Singleton(

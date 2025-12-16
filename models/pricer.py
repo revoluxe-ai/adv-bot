@@ -82,7 +82,7 @@ def get_adv_costs(adv_setting, start_date, end_date):
         # Для каждого дня рассчитываем сумму затрат
         day_sum = sum(
             [
-                keyword.bid * np.random.randint(5, 20) / 100
+                keyword.cpm_bid * np.random.randint(5, 20) / 100
                 for keyword in adv_setting.keyword_settings
             ]
         )

@@ -34,12 +34,12 @@ class WBShop:
             coroutines_manager.update_full_adv_stat(),
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
-            coroutines_manager.update_keywords_stamp(),
-            coroutines_manager.update_keywords_positions_history(),
+            # # # # TODO: Отключил обновление Джема, т.к. выкидывает ошибку и мешает работе тем юзерам, у которых джема нет.
             coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr(),
             coroutines_manager.update_minus_phrases_in_advs(),
             coroutines_manager.update_clusters_adv_stats_today(),
-            coroutines_manager.update_clusters_adv_stats_history()
+            coroutines_manager.update_clusters_adv_stats_history(),
+            coroutines_manager.update_cluster_bids()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск

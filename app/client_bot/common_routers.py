@@ -64,6 +64,9 @@ from .user_interface.handlers import (
     strategy_setting,
     rec_system_mode_toggle,
 )
+from .user_interface.handlers.bidder_coroutine_type_toggle import (
+    router as bidder_coroutine_type_toggle_router,
+)
 from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
 
 common_router = Router()
@@ -94,6 +97,7 @@ common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(HideZeroViewsToggleRouter)
+common_router.include_routers(bidder_coroutine_type_toggle_router)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
 common_router.include_routers(rec_system_mode_toggle.router)

@@ -1,7 +1,8 @@
 import asyncio
+import copy
 import logging
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable, Sequence
+from collections.abc import  Awaitable, Coroutine, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
@@ -9,12 +10,13 @@ from typing import (
 )
 
 
-from app.core.wb_api.http_request import try_except_decorator
+
 from app.core.wb_api.ping_manager import PingManager
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -26,9 +28,11 @@ from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager im
 
 from app.settings import settings
 
+
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
+from .wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import KeywordGettingMode
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -56,24 +60,31 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
-        adv_settings = await self._wb_shop_data_manager.get_active_advs()
-        if not adv_settings:
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
             return None
-        adv_settings = [adv for adv in adv_settings if adv.bidder_active]
-        if not adv_settings:
+        advs = [adv for adv in advs if adv.bidder_active]
+        if not advs:
+            return None
+        advs = [
+            adv
+            for adv in advs
+            if adv.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        ]
+        if not advs:
             return None
         logger.debug("Обновляю ставки для магазина %s", self.shop_id)
         results = await asyncio.gather(
             *[
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
-                for adv in adv_settings
+                for adv in advs
             ],
             return_exceptions=True,
         )
 
-        for index, result in enumerate(results):
+        for i, result in enumerate(results):
             if isinstance(result, Exception):
-                adv_setting = adv_settings[index]
+                adv_setting = advs[i]
                 logger.error(
                     "Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
                     result,
@@ -84,10 +95,10 @@ class CoroutinesManager:
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
-    async def __run_bidder_process_for_adv(
-        self, adv_setting: AdvSetting, wb_api: WBApi
-    ) -> None:
-        keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
+    @staticmethod
+    async def __run_bidder_process_for_adv(complex_adv:  ComplexAdv, wb_api: WBApi) -> None:
+        adv_setting: AdvSetting = complex_adv.adv_setting
+        keywords = await complex_adv.get_keywords()
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
     @while_coroutine_decorator(5 * 60)
@@ -96,7 +107,7 @@ class CoroutinesManager:
         ping_manager = PingManager(wb_api.access, self._session)
         await ping_manager.ping_analytics_rights_and_connect()
         wb_stat_manager = WBCommonStatManager(wb_api)
-        advs = await self._wb_shop_data_manager.get_active_advs()
+        advs = await self._wb_shop_data_manager.get_complex_advs()
         active_nmids = [adv.nmids[0] for adv in advs]
         await wb_stat_manager.update_common_statistic(active_nmids)
 
@@ -108,14 +119,12 @@ class CoroutinesManager:
     async def update_full_adv_stat(self) -> None:
         from app.modules.wb_adv_updater import data_manager
         wb_api = self._wb_api
-        auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
-
-        all_adv_ids = set()
-        for adv in auto_advs:
-            all_adv_ids.add(adv.adv_id)
-            if auction_adv_id := adv.search_adv_id:
-                all_adv_ids.add(auction_adv_id)
-
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        all_adv_ids: set[int] = set()
+        for adv in advs:
+            all_adv_ids.add(adv.auto_adv_id)
+            if search_adv_id := adv.search_adv.adv_id:
+                all_adv_ids.add(search_adv_id)
         full_stats: list[FullAdvStat] = (
             await wb_data_getter.get_full_adv_stat_for_adv_ids(
                 wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
@@ -139,26 +148,6 @@ class CoroutinesManager:
         from app.modules.wb_adv_updater import data_manager
         await data_manager.update_advs_data_from_wb_to_pg(self._wb_api)
 
-    @staticmethod
-    async def _async_zip_longest(
-        *async_gens, fillvalue=None
-    ) -> AsyncGenerator[tuple[Any, ...], None]:
-        iterators = [gen.__aiter__() for gen in async_gens]
-        finished = [False] * len(iterators)
-
-        while not all(finished):
-            row = []
-            for i, it in enumerate(iterators):
-                if finished[i]:
-                    row.append(fillvalue)
-                    continue
-                try:
-                    item = await it.__anext__()
-                    row.append(item)
-                except StopAsyncIteration:
-                    finished[i] = True
-                    row.append(fillvalue)
-            yield tuple(row)
 
     @while_coroutine_decorator(60 * 15)
     async def update_cards_data_from_wb_to_pg(self) -> None:
@@ -174,8 +163,8 @@ class CoroutinesManager:
         )
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
-        advs = [adv for adv in advs if adv.search_adv_active_status]
-        update_tasks = []
+        advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
+        update_tasks: list[asyncio.Task[None] | Awaitable[None]] = []
         last_days_for_analyze = 2
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
@@ -207,19 +196,17 @@ class CoroutinesManager:
             FirstKeyUpdater,
         )
 
-        all_active_advs: list[AdvSetting] = (
-            await self._wb_shop_data_manager.get_active_advs()
+        advs: list[ComplexAdv] = (
+            await self._wb_shop_data_manager.get_complex_advs()
         )
-        tasks = []
-        for adv in all_active_advs:
+        tasks: list[asyncio.Task[None]] = []
+        for adv in advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[list[CalculatedKeyword]] = (
-                self._wb_shop_data_manager.get_calculated_keywords(adv)
-            )
-            updater = FirstKeyUpdater(adv)
+            adv_setting = adv.adv_setting
+            updater = FirstKeyUpdater(adv_setting)
             update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
-                keywords
+                adv
             )
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
@@ -230,43 +217,6 @@ class CoroutinesManager:
             except FirstKeyUpdaterError as exc:
                 logger.error("Ошибка обновления верхнего ключа: %s", exc, exc_info=True)
                 raise exc
-
-    @while_coroutine_decorator(60, 10)
-    async def update_predict_ctr(self) -> None:
-        """Обновление прогнозов CTR для всех активных кампаний"""
-        from .services.predict_ctr_update_manager import PredictCTRUpdateManager
-
-        advs = await self._wb_shop_data_manager.get_active_advs()
-
-        if not advs:
-            logger.debug("Нет активных кампаний для магазина %s", self.shop_id)
-            return
-
-        predict_ctr_manager = PredictCTRUpdateManager()
-
-        try:
-            all_coroutines = []
-
-            logger.info(
-                "Начинаем обновление прогнозов CTR для %s кампаний магазина %s",
-                len(advs),
-                self.shop_id,
-            )
-
-            # Собираем корутины для всех кампаний
-            for adv in advs:
-                # Получаем корутину для ключевых слов (не await!)
-                keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
-
-                # Создаем корутину обновления прогнозов CTR
-                update_coro = predict_ctr_manager.update_predict_ctr(adv, keywords_coro)
-                all_coroutines.append(update_coro)
-
-            await asyncio.gather(*all_coroutines)
-
-        finally:
-            # Закрываем соединения
-            await predict_ctr_manager.close()
 
     @while_coroutine_decorator(15, 60)
     async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
@@ -284,17 +234,17 @@ class CoroutinesManager:
             and adv.is_white_list_control_enabled
         ]
 
-        tasks = []
+        tasks: list[Awaitable[None]] = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
             task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
             tasks.append(task)
 
-        results: Sequence[None | Exception] = await asyncio.gather(
+        results: Sequence[None | BaseException] = await asyncio.gather(
             *tasks, return_exceptions=True
         )
 
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)",
                     self.shop_id,
@@ -305,7 +255,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
-        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -322,17 +272,17 @@ class CoroutinesManager:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
-        update_tasks = []
+        update_tasks: list[Awaitable[None]] = []
         for adv in advs:
             task = keyword_stamp_manager.update_keywords_position_stamp(adv)
             update_tasks.append(task)
 
-        results: list[Exception | None] = await asyncio.gather(
+        results: list[BaseException | None] = await asyncio.gather(
             *update_tasks, return_exceptions=True
         )
 
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка обновления позиций из Api: %s", result, exc_info=True
                 )
@@ -341,7 +291,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
     async def update_keywords_positions_history(self) -> None:
-        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -363,7 +313,7 @@ class CoroutinesManager:
             task = keyword_stamp_manager.update_keyword_history(adv)
             update_tasks.append(task)
 
-        results: list[Exception | None] = await asyncio.gather(
+        results: list[BaseException | None] = await asyncio.gather(
             *update_tasks, return_exceptions=True
         )
 
@@ -375,10 +325,10 @@ class CoroutinesManager:
 
         return None
 
-    @try_except_decorator(60 * 15, 60)
+    @while_coroutine_decorator(60 * 15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
-        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
@@ -402,13 +352,14 @@ class CoroutinesManager:
                     result,
                     exc_info=True,
                 )
+        return None
 
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
         
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -421,7 +372,7 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_history(self) -> None:
         """Обновление статистики кластеров за прошлые дни."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
         
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -430,7 +381,30 @@ class CoroutinesManager:
 
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
+    @while_coroutine_decorator(60 * 15, 60)
+    async def update_cluster_bids(self) -> None:
+        from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        container = ClusterBidsManagerContainer(
+            shop_id=self.shop_id,
+            redis_client=wb_manager_hub.redis_client_wrapper,
+        )
+        update_clusters_bid_manager = container.update_cluster_bids_manager()
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs = [
+            adv
+            for adv in advs
+            if adv.bidder_active
+               and adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
+        ]
+        if not advs:
+            return None
+        await update_clusters_bid_manager.update_cluster_bids(advs)
+        return None
 
 
+
+# TODO: Переделать граф зависимостей
 
 # TODO: Частая ошибка - остановка РК в период раскрутки - сделать статью
