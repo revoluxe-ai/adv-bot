@@ -81,3 +81,4 @@ model/model.json
 .wb_profile/
 invates/
 invited_users.txt
+clickhouse-data/
