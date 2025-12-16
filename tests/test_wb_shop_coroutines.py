@@ -127,7 +127,7 @@ async def test_adv_settings_auto_update(
         # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
         # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
         # чтобы выполнить её один раз и не зависнуть.
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,7 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
         return_value=mock_context,
     ):
         manager = CalculatedKeywordsManager()
-        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(
+        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(  # noqa
             nmid=nmid,
             min_days=2,
             min_views=0,
