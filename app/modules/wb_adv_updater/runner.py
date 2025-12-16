@@ -38,7 +38,7 @@ async def run_update_all_keywords_on_wb() -> None:
             while True:
                 try:
                     await wb_manager.update_all_keywords_on_wb(client_session)
-                except Exception:
+                except Exception: # noqa
                     logger.error("Ошибка обновления фраз", exc_info=True)
                 await asyncio.sleep(5)
 
