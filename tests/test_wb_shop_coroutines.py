@@ -1,10 +1,7 @@
-from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from typing import Awaitable, Callable, List, cast
+from datetime import date, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
@@ -19,13 +16,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
-    KeywordStat,
-)
-from conftest import complex_adv_mock
 from tests.factories.clickhouse_factory import (
     CLUSTERS_ADV_STATS_COLUMNS,
-    ClustersAdvStatsDTO,
     ClustersAdvStatsFactory,
     build_clusters_adv_stats_rows,
 )
