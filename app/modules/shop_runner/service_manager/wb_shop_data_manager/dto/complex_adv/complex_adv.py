@@ -189,7 +189,6 @@ class ComplexAdv:
                 [
                     adv.auto_update_white_list,
                     adv.auto_update_target_place,
-                    adv.auto_update_exponent,
                 ]
             )
         else:
