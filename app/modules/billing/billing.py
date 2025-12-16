@@ -305,7 +305,7 @@ async def __process_single_cabinet(
         # Флаг в Redis (best-effort)
         try:
             await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa
             logger.warning(
                 "Cabinet %s: commit успешен, но Redis-флаг не установлен (повтор допустим)",
                 cabinet_id,
