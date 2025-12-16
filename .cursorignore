@@ -1,0 +1,16 @@
+.venv
+**/__pycache__/
+htmlcov/
+logs/
+redis-data/
+data-redis/
+clickhouse-data/
+work_folder/
+memory-bank/
+docs/
+stubs/
+scripts/
+**/node_modules/
+*.sqlite
+*.tar.gz*
+*.b64

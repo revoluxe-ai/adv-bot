@@ -123,7 +123,9 @@ class KeywordStampManager:
             cpms.append(complex_adv.current_cpms.auto_cpm)
         if search_adv := complex_adv.search_adv:
             if search_adv.active_status == "started":
-                cpms.append(complex_adv.current_cpms.search_cpm)
+                search_cpm = complex_adv.current_cpms.search_cpm
+                if search_cpm is not None:
+                    cpms.append(search_cpm)
         if not cpms:
             return 0
         else:
