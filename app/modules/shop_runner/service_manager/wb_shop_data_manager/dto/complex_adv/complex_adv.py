@@ -20,7 +20,7 @@ class _CPMs:
         return self._auto_cpm
 
     @property
-    def search_cpm(self) -> int:
+    def search_cpm(self) -> int | None:
         return self._search_cpm
 
 
@@ -152,7 +152,7 @@ class ComplexAdv:
         return self._shop_id
 
     @property
-    def search_adv(self) -> AdvSetting:
+    def search_adv(self) -> AdvSetting | None:
         return self._search_adv
 
     @property
