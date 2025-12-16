@@ -136,10 +136,14 @@ atexit.register(_emergency_cleanup)
 
 @pytest.fixture(scope="session")
 def docker_compose_cmd() -> list[str]:
-    """Определяет команду для запуска Docker Compose и скипает, если недоступна."""
+    """Определяет команду для запуска Docker Compose и падает ошибкой, если недоступна."""
     cmd = _detect_compose_cmd()
     if not cmd:
-        pytest.skip("Docker Compose не найден в системе — скипаем интеграционные тесты БД")
+        raise RuntimeError(
+            "Docker Compose не найден в системе. Установите Docker Desktop/Engine "
+            "и убедитесь, что доступны команды `docker compose` или `docker-compose`, "
+            "затем перезапустите pytest."
+        )
     _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
     return cmd
 
