@@ -1,7 +1,5 @@
 import asyncio
 from collections.abc import Awaitable
-import datetime
-
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -230,7 +228,7 @@ class UpdateClusterBidsManager:
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
                 map_data = AdvIdItemCalculateData(
-                    adv_id=adv.search_adv.adv_id,
+                    adv_id=search_adv_id,
                     nmid=nmid,
                     cluster=kw.text,
                     current_position=kw.position,
