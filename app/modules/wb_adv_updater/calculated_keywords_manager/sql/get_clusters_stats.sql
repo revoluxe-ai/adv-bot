@@ -279,20 +279,35 @@ WITH
     -- 9. Байесовский расчёт по воронке
     ------------------------------------------------------------------
     baes AS (
-        SELECT
-            t.text AS text,
-            (c.ctr_clicks + 1) / (c.ctr_views - c.ctr_clicks + p.prior_views) AS ctr_eff,
-            (c7.carts7 + 1) / (c7.clicks7 - c7.carts7 + p.prior_clicks)  AS cart_eff,
-             (o14.orders14 + 1) / (o14.carts14 - o14.orders14 + p.prior_carts) AS order_eff
-        FROM agg_stats AS t
-        LEFT JOIN ctr_cut   AS c
-            ON c.text = t.text
-        LEFT JOIN cart_7d   AS c7
-            ON c7.text = t.text
-        LEFT JOIN order_14d AS o14
-            ON o14.text = t.text
-        CROSS JOIN priors   AS p
-    )
+    SELECT
+        t.text AS text,
+
+        -- ctr
+        (ifNull(c.ctr_clicks, 0) + 1)
+        / greatest(
+            ifNull(c.ctr_views, 0) - ifNull(c.ctr_clicks, 0) + greatest(p.prior_views, 1),
+            1e-9
+          ) AS ctr_eff,
+
+        -- click -> cart
+        (ifNull(c7.carts7, 0) + 1)
+        / greatest(
+            ifNull(c7.clicks7, 0) - ifNull(c7.carts7, 0) + greatest(p.prior_clicks, 1),
+            1e-9
+          ) AS cart_eff,
+
+        -- cart -> order
+        (ifNull(o14.orders14, 0) + 1)
+        / greatest(
+            ifNull(o14.carts14, 0) - ifNull(o14.orders14, 0) + greatest(p.prior_carts, 1),
+            1e-9
+          ) AS order_eff
+    FROM agg_stats AS t
+    LEFT JOIN ctr_cut   AS c  ON c.text  = t.text
+    LEFT JOIN cart_7d   AS c7 ON c7.text = t.text
+    LEFT JOIN order_14d AS o14 ON o14.text = t.text
+    CROSS JOIN priors   AS p
+)
 ----------------------------------------------------------------------
 -- 10. Финал
 ----------------------------------------------------------------------
