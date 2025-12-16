@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -128,7 +128,8 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
 
     nmid = 987_654_321
     base_date = date.today()
-    now_dt = datetime.utcnow()
+    # TODO: Перевести проект на работу с датой в utc
+    now_dt = datetime.now(timezone.utc)
 
     records = [
         ClustersAdvStatsFactory.build(
