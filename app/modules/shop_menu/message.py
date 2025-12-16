@@ -6,6 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -21,7 +22,8 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnWhiteListUpdate,
 )
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
-from app.modules.billing.pricer import Pricer
+from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
+from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
@@ -32,6 +34,7 @@ from app.modules.token_monitoring.services.token_info_service import (
     TokenInfoService,
     TokenStatusReport,
 )
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
@@ -42,19 +45,24 @@ logger = logging.getLogger(__name__)
 class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
+    @inject
     def __init__(
         self,
         bot: Bot,
         chat_id: int,
         state: FSMContext,
         wb_user_cabinet_original_id: int,
+        redis_client: RedisClient | None = Provide["redis_client_wrapper"],
     ):
         self._user_telegram_id = chat_id
         self._state = state
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        from app.modules.billing.pricer import Pricer
-
         self._pricer = Pricer()
+        self._tariff_details: TariffDetails | None = None
+        self._last_charge_at: datetime | None = None
+        self._billing_redis_manager: BillingRedisManager | None = None
+        if isinstance(redis_client, RedisClient):
+            self._billing_redis_manager = BillingRedisManager(redis_client=redis_client)
 
         # Initialize token status attributes
         self._token_status: TokenStatusReport | None = None
@@ -144,20 +152,20 @@ class ShopMenu(TextWithKeyboard):
 
         # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
         shop_id = self._wb_cabinet.shop_id
-        pricer = Pricer()
         async with sm() as session:
-            self._total_active_advs_count: int = (
-                await pricer.get_active_complex_advs_count(session, shop_id)
+            self._tariff_details = await self._pricer.get_tariff_details(
+                session, shop_id
             )
-            self._base_tariff: int | float = (
-                pricer.get_price_for_count_advs_in_cabinet_for_month(
-                    self._total_active_advs_count
+        self._total_active_advs_count = (
+            self._tariff_details.count if self._tariff_details else 0
+        )
+        if self._billing_redis_manager:
+            try:
+                self._last_charge_at = await self._billing_redis_manager.get_last_charge_at(
+                    shop_id
                 )
-            )
-            self._automatic_tariff: int = await pricer.get_automactic_tariff(
-                session, shop_id, self._total_active_advs_count
-            )
-            self._total_tariff_for_month = self._base_tariff + self._automatic_tariff
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Не удалось получить last_charge_at из Redis: %s", exc)
 
         return True
 
@@ -296,23 +304,40 @@ class ShopMenu(TextWithKeyboard):
         balance = self._balance
         bonus = self._bonus
         count_active_advs = self._total_active_advs_count
-
         total_money = balance + bonus
+
+        details = self._tariff_details
+        if details:
+            tariff_label = (
+                "Новый тариф (Авто)" if details.mode == TariffMode.AUTO else "Старый тариф"
+            )
+            price_per_adv = details.price_per_adv
+            monthly_tariff = details.total_per_month
+            daily_tariff = details.total_per_day
+        else:
+            tariff_label = "Нет активных кампаний"
+            price_per_adv = 0.0
+            monthly_tariff = 0.0
+            daily_tariff = 0.0
 
         # 💰 MONEY SECTION - All financial information grouped together
         text = (
+            f"⚙️ <b>Тариф:</b> {tariff_label}\n"
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
-            f" Базовый тариф: {self._base_tariff:.2f} р. в месяц\n"
-            f" Доплата за автонастройку РК: {self._automatic_tariff:.2f} р. в месяц\n"
-            f"""Итоговая плата: {self._total_tariff_for_month:.2f} в месяц"""
-            f"(больше РК -> ниже цена, тарифы -> {const.SUPPORT_LINK})\n"
-            f"💸 <b>Расход в сутки</b>: {self._total_tariff_for_month/30:.2f} р.\n"
+            f"💵 <b>Цена за кампанию</b>: {price_per_adv:.2f} р./мес "
+            f"(детали -> {const.SUPPORT_LINK})\n"
+            f"💰 <b>Расход в месяц</b>: {monthly_tariff:.2f} р.\n"
+            f"💸 <b>Расход в сутки</b>: {daily_tariff:.2f} р.\n"
         )
+        if self._last_charge_at:
+            text += f"🕒 <b>Последнее списание</b>: {self._last_charge_at.strftime('%d.%m.%Y %H:%M:%S')}\n"
+        else:
+            text += "🕒 <b>Последнее списание</b>: нет данных\n"
 
-        if self._total_tariff_for_month == 0:
+        if monthly_tariff == 0:
             last_for_days = "ထ"
         else:
-            last_for_days = int(total_money / self._total_tariff_for_month * 30)
+            last_for_days = int(total_money / monthly_tariff * 30)
 
         # Money status with appropriate warnings
         if isinstance(last_for_days, int):
