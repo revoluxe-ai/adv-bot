@@ -230,6 +230,8 @@ async def process_payment_with_bonus(
     if bonus_percent < 0:
         raise InvalidAmountError("Процент бонуса не может быть отрицательным")
 
+    # TODO(money): суммы/баланс должны быть Decimal (денежные расчеты),
+    # float здесь временно; допускаем погрешность в тестах только как временную меру.
     bonus_amount = amount * (bonus_percent / 100) if bonus_percent > 0 else 0
 
     # Создаем запись о пополнении баланса
