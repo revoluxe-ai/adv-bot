@@ -19,7 +19,7 @@ def declension(number: int) -> str:
 text = f"""
 Актуальный прайс  -> {const.PRICE_LINK}
 
-Минимальная сумма пополнения: {settings.MIN_SUM} р.
+Минимальная сумма пополнения: {settings.MIN_SUM} р.\n
 
 """
 text = text.strip()
