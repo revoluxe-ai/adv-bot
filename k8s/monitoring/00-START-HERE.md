@@ -30,6 +30,10 @@
    - Самые используемые команды
    - On-call workflow
 
+2. **Pending / Insufficient cpu (однонодовый кластер)**:
+   - Runbook: `CPU_INSUFFICIENT_RUNBOOK.md`
+   - Скрипт: `diagnose-cpu-scheduling.ps1`
+
 2. **Срочная проверка** (30 сек):
    ```bash
    ./pod-error-checker.sh default
