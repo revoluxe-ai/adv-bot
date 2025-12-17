@@ -298,7 +298,7 @@ class Settings:
         """Процент бонуса при пополнении баланса через Telegram (по умолчанию 200%)."""
         value = os.getenv("BALANCE_TOPUP_BONUS_PERCENT")
         if value is None:
-            return 200.0
+            return 100.0
         return float(value)
 
     @property
