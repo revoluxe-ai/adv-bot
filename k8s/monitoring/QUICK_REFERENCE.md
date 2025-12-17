@@ -115,6 +115,19 @@ kubectl get pods -n default --field-selector=status.phase=Pending
 kubectl describe pod -n default POD_NAME
 ```
 
+### Pending (Insufficient cpu) — PowerShell
+```powershell
+# Быстро увидеть Pending во всём кластере
+kubectl get pods -A --field-selector=status.phase=Pending -o wide
+
+# Посмотреть Allocated resources (requests vs allocatable) на ноде
+$node = kubectl get nodes -o jsonpath='{.items[0].metadata.name}'
+kubectl describe node $node | Select-String -Pattern "^Allocated resources:" -Context 0,16
+
+# Топ по cpu requests + фактическое потребление
+.\k8s\monitoring\diagnose-cpu-scheduling.ps1 -Top 30
+```
+
 ---
 
 ## 📈 Metрики в Prometheus
