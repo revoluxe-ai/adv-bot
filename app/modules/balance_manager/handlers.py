@@ -208,8 +208,8 @@ async def successful_payment_handler(
 
     # Используем новый сервис для обработки платежа
     (
-        balance_payment,
-        bonus_payment,
+        _,
+        _,
         amount,
         bonus_amount,
     ) = await process_payment_with_bonus(
