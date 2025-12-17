@@ -230,7 +230,10 @@ async def successful_payment_handler(
             .where(WBCabinet.id == wb_cabinet_original_id)
         )
         wb_user_cabinet_id_result = await session.execute(stmt)
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars().first()
+        wb_user_cabinet_id: int | None = wb_user_cabinet_id_result.scalars().first()
+    if wb_user_cabinet_id is None:
+        raise ValueError('Кабинет не найден')
+
 
     logger.debug("wb_user_cabinet_id: %s", wb_user_cabinet_id)
     await asyncio.sleep(1)
