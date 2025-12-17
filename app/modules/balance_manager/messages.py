@@ -23,9 +23,7 @@ class WaitingForAmount(Text):
 
     @property
     def text(self):
-        text = self._pricer.text
-        # Добавляем информацию о текущем балансе, если она доступна
-        text += f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
+        text = f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
 
         if self.current_bonus > 0:
             text += f"🎁 Текущие бонусы: {self.current_bonus:.0f} руб.\n"
