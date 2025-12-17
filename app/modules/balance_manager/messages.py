@@ -10,10 +10,10 @@ class WaitingForAmount(Text):
     def __init__(
         self,
         bot: Bot,
-        chat_id,
+        chat_id: int,
         master_sum: float,
-        current_balance: float = None,
-        current_bonus: float = None,
+        current_balance: float,
+        current_bonus: float,
     ):
         super().__init__(bot, chat_id)
         self.master_sum = master_sum
