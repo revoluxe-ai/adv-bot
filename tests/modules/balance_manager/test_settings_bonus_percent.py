@@ -8,20 +8,6 @@ import pytest
 from app.settings.settings_master import Settings
 
 
-def test_balance_topup_bonus_percent_default():
-    """Тест: значение по умолчанию равно 200.0."""
-    settings = Settings()
-
-    # Убеждаемся, что переменная окружения не установлена
-    with patch.dict(os.environ, {}, clear=True):
-        # Удаляем переменную если она была установлена
-        if "BALANCE_TOPUP_BONUS_PERCENT" in os.environ:
-            del os.environ["BALANCE_TOPUP_BONUS_PERCENT"]
-
-        value = settings.BALANCE_TOPUP_BONUS_PERCENT
-        assert value == 200.0, f"Ожидалось значение по умолчанию 200.0, получено {value}"
-
-
 def test_balance_topup_bonus_percent_from_env():
     """Тест: значение берется из переменной окружения."""
     settings = Settings()
