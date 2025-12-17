@@ -114,3 +114,4 @@ pytest tests/modules/balance_manager/ tests/integration/balance_manager/ -v
 Все тесты готовы к использованию и обеспечивают надежную проверку функционала начисления бонусов при пополнении баланса.
 
 
+
