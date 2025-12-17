@@ -156,7 +156,7 @@ async def waiting_for_amount(
 
     user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
-    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))]
+    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))] # pyright: ignore # noqa
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
