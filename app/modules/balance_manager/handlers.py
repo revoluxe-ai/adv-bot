@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from datetime import date
 import json
 import logging
 
@@ -199,6 +200,12 @@ async def successful_payment_handler(
             )
             return
 
+    # Определяем процент бонуса: начисляем только до конца 2025 года
+    bonus_percent = 0.0
+    if date.today() <= date(2025, 12, 31):
+        bonus_percent = settings.BALANCE_TOPUP_BONUS_PERCENT
+
+
     # Используем новый сервис для обработки платежа
     (
         balance_payment,
@@ -209,7 +216,7 @@ async def successful_payment_handler(
         user_id=user_id,
         cabinet_id=wb_cabinet_original_id,
         amount=float(cost),
-        bonus_percent=0,  # Пока без бонусов
+        bonus_percent=bonus_percent,
         description="Пополнение баланса через Telegram",
     )
 
