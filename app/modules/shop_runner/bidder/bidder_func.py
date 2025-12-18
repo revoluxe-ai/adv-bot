@@ -100,7 +100,7 @@ async def __get_new_cpm_by_position(
     min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
     new_cpm = max(min(new_cpm, max_cpm), min_cpm)
 
-    if new_cpm >= max_cpm and adv_setting.reset_place:
+    if new_cpm == max_cpm and adv_setting.reset_place:
         async with sm(read_only=False) as session:
             assert adv_setting
             adv_setting_for_update: AdvSetting | None = await session.get(
