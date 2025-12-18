@@ -441,7 +441,11 @@ class AdvSetting(BaseTable):
     auto_max_cpm_mode: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place: MappedColumn[int | None] = mapped_column(Integer, nullable=True)
+    max_place: MappedColumn[int ] = mapped_column(Integer,
+                                                  nullable=False,
+                                                default=1,
+                                                  server_default=text("1")
+                                                  )
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
