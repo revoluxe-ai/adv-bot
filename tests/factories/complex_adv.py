@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatusReason,
 )
 from tests.factories import adv_factory
-from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
+from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory, WBCabinetFactory
 from tests.factories.keyword_pipeline import HardStatus, make_calculated_keyword
 
 
@@ -198,8 +198,15 @@ def build_calculated_keywords(
 
 async def create_complex_adv_seed(session: AsyncSession) -> ComplexAdvSeed:
     """Создаёт тот же набор объектов, который раньше строился прямо в conftest."""
+    # Создаем WBCabinet перед AdvSetting, чтобы удовлетворить внешний ключ
+    wb_cabinet = WBCabinetFactory.build(id=1, shop_id="test_shop_id", active=True, balance=0.0, bonus=0.0, demo=True, expiration_time=datetime.now() + timedelta(days=7))
+    session.add(wb_cabinet)
+    await session.flush()
+    await session.refresh(wb_cabinet)
+
     adv_setting = AdvSettingFactory.build(
         adv_id=123,
+        wb_cabinet_id=wb_cabinet.id, # Используем ID созданного WBCabinet
         nmids=[456],
         auto_update_white_list=True,
         auto_update_target_place=True,
