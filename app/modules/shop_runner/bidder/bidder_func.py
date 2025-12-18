@@ -61,34 +61,19 @@ async def _update_and_get_advs_from_wb(
     return advs
 
 
-@inject
+
 async def __get_new_cpm_by_position(
     adv_setting: AdvSetting,
     wb_api: WBApi,
-    keywords: list[CalculatedKeyword],
     best_keyword: CalculatedKeyword,
     cpm_now: int,
-    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
-        AutoMaxCpmContainer.auto_max_cpm_bid_manager
-    ],
 ) -> int | None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
 
-    max_user_cpm = adv_setting.max_cpm
-    if adv_setting.auto_max_cpm_mode:
-        auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
-            adv_setting, keywords, max_user_cpm
-        )
-        if not auto_max_cpm:
-            return None
-
-        if auto_max_cpm < max_user_cpm:
-            max_cpm = auto_max_cpm
-        else:
-            max_cpm = max_user_cpm
-    else:
-        max_cpm = max_user_cpm
+    max_cpm = adv_setting.max_cpm
+    if max_cpm is None:
+        return None
     step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place
     promo_position: float = best_keyword.position
@@ -167,7 +152,6 @@ async def run_bidder_process_for_adv(
         new_cpm = await __get_new_cpm_by_position(
             adv_setting,
             wb_api,
-            keywords,
             best_keyword,
             cpm_now,
         )
