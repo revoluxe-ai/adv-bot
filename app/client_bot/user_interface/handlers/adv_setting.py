@@ -166,7 +166,7 @@ async def adv_handler(
                 )
             )
             result = await session.execute(stmt)
-            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
+            wb_user_cabinet = result.scalar_one()  # Извлекаем первую строку
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
