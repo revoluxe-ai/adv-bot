@@ -558,12 +558,12 @@ SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
 def clean_db():
     """Синхронно очищает ключевые таблицы до и после каждого теста."""
     with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
 
     yield
 
     with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture(scope='function')
