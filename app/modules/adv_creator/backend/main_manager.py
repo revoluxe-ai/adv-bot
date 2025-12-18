@@ -115,7 +115,7 @@ class MainAdvManager:
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
                 "active_status": "created_by_bot",
-                "type": 8,
+                "type": 9,
                 "nmids": [nmid],
                 "hard_min_ctr": 0.1,
             }
