@@ -91,10 +91,6 @@ async def __get_new_cpm_by_position(
         max_cpm = max_user_cpm
     step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place
-    if max_position is None:
-        logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
-        return None
-
     promo_position: float = best_keyword.position
     if 0 < promo_position <= max_position:
         new_cpm: int = cpm_now - step
