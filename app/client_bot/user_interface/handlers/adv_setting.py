@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 
 from .. import states
 from ..views import callbacks, messages
@@ -257,6 +258,7 @@ async def turn_adv_on(
             return
         await bot.send_message(callback.message.chat.id, "Включаю бота")
         adv.bot_active = True
+        apply_defaults_to_adv_setting(adv)
         await session.commit()
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
@@ -268,6 +270,49 @@ async def turn_adv_on(
         result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = result.scalar_one()
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+    return
+
+
+@router.callback_query(callbacks.TurnBot.filter(F.action == "on_all"))
+async def turn_adv_on_all(
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    callback_data: callbacks.TurnBot,
+    bot: aiogram.Bot,
+):
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+
+    chat_id = callback.message.chat.id
+    await bot.send_message(callback.message.chat.id, "Включаю бота для всех кампаний (с дефолтами)")
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    async with sm(read_only=False) as session:
+        # Получаем все кампании магазина через ORM
+        stmt = (
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+        
+        # Применяем дефолты через ORM для каждой кампании
+        updated_count = 0
+        for adv_setting in adv_settings:
+            adv_setting.bot_active = True
+            apply_defaults_to_adv_setting(adv_setting)
+            updated_count += 1
+        
+        await session.commit()
+
+    await bot.send_message(
+        chat_id,
+        f"Бот включен для {updated_count} кампаний, дефолтные настройки применены.",
+    )
+
+    chat_id = callback.message.chat.id
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return
 
 
@@ -359,23 +404,84 @@ async def turn_on_auto_min_ctr(
     await messages.SettingMinCTR(bot, chat_id)(adv_setting_original_id)
 
 
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_off_auto_min_ctr")
-)
-async def turn_off_auto_min_ctr(
+@router.callback_query(callbacks.ApplyCampaignDefaults.filter())
+async def apply_campaign_defaults(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChangeAutoMinCTR,
-    bot: Bot,
-):
-    adv_setting_original_id = callback_data.adv_setting_original_id
+    callback_data: callbacks.ApplyCampaignDefaults,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id = callback.message.chat.id
 
-    stmt = (
-        update(AdvSetting)
-        .where(AdvSetting.id == adv_setting_original_id)
-        .values({AdvSetting.new_auto_min_ctr_mode: False})
-    )
+    adv_original_id = callback_data.adv_setting_original_id
+    async with sm(read_only=False) as session:
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
+        adv_setting: AdvSetting = result.scalar_one()
+
+        # Применяем дефолты через ORM
+        apply_defaults_to_adv_setting(adv_setting)
+        await session.commit()
+
+        await bot.send_message(
+            chat_id, "Дефолтные настройки применены успешно!"
+        )
+
+        # Обновить меню кампании
+        data = await state.get_data()
+        wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
+        async with sm() as session_read:
+            wb_user_cabinet = await session_read.execute(
+                select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            )
+            wb_user_cabinet = wb_user_cabinet.scalar()
+
+        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+    return
+
+
+@router.callback_query(callbacks.ApplyDefaultsForShop.filter())
+async def apply_defaults_for_shop(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ApplyDefaultsForShop,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id: int = callback.message.chat.id
 
     async with sm(read_only=False) as session:
-        await session.execute(stmt)
+        # Получаем только активные кампании магазина через ORM
+        stmt = (
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .where(AdvSetting.bot_active.is_(True))
+        )
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+        
+        # Применяем дефолты через ORM для каждой активной кампании
+        updated_count = 0
+        for adv_setting in adv_settings:
+            apply_defaults_to_adv_setting(adv_setting)
+            updated_count += 1
+        
         await session.commit()
-    await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_setting_original_id)
+
+    await bot.send_message(
+        chat_id,
+        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина.",
+    )
+
+    # Вернуть пользователя в меню магазина
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
+
+    return
