@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+from app.client_bot.modules.default_settings import (
+    apply_defaults_to_adv_setting,
+)
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
@@ -36,35 +39,39 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
             advs_to_process.append(adv)
             seen_adv_ids.add(adv.advertId)
 
-    # Преобразуем в список словарей
-    adv_data = [
-        {
-            "adv_id": adv.advertId,
-            "name": adv.name,
-            "wb_cabinet_id": wb_cabinet_id,
-            "nmids": adv.nmids,
-            "active_status": adv.status_native,
-            "type": adv.type,
-            "cpm": adv.cpm,
-        }
-        for adv in advs_to_process
-    ]
-
-    # Выполняем UPSERT
-    stmt = insert(AdvSetting).values(adv_data)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["adv_id"],  # Указываем, по какому полю искать дубликаты
-        set_={
-            "name": stmt.excluded.name,
-            "wb_cabinet_id": stmt.excluded.wb_cabinet_id,
-            "nmids": stmt.excluded.nmids,
-            "active_status": stmt.excluded.active_status,
-            "type": stmt.excluded.type,
-            "cpm": stmt.excluded.cpm,
-        },
-    )
-    async with _sm() as session:
-        await session.execute(stmt)
+    async with _sm(read_only=False) as session:
+        # Получаем существующие записи по adv_id
+        adv_ids = [adv.advertId for adv in advs_to_process]
+        existing_stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
+        existing_result = await session.execute(existing_stmt)
+        existing_adv_settings = {adv.adv_id: adv for adv in existing_result.scalars().all()}
+        
+        # Обрабатываем каждую кампанию
+        for adv in advs_to_process:
+            if adv.advertId in existing_adv_settings:
+                # Обновляем существующую запись через ORM
+                adv_setting = existing_adv_settings[adv.advertId]
+                adv_setting.name = adv.name
+                adv_setting.wb_cabinet_id = wb_cabinet_id
+                adv_setting.nmids = adv.nmids
+                adv_setting.active_status = adv.status_native
+                adv_setting.type = adv.type
+                adv_setting.cpm = adv.cpm
+            else:
+                # Создаем новую запись через ORM
+                adv_setting = AdvSetting(
+                    adv_id=adv.advertId,
+                    name=adv.name,
+                    wb_cabinet_id=wb_cabinet_id,
+                    nmids=adv.nmids,
+                    active_status=adv.status_native,
+                    type=adv.type,
+                    cpm=adv.cpm,
+                )
+                # Применяем дефолты через ORM
+                apply_defaults_to_adv_setting(adv_setting)
+                session.add(adv_setting)
+        
         await session.commit()
 
 
