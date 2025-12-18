@@ -1,10 +1,7 @@
-from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from typing import Awaitable, Callable, List, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
@@ -19,13 +16,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
-    KeywordStat,
-)
-from conftest import complex_adv_mock
 from tests.factories.clickhouse_factory import (
     CLUSTERS_ADV_STATS_COLUMNS,
-    ClustersAdvStatsDTO,
     ClustersAdvStatsFactory,
     build_clusters_adv_stats_rows,
 )
@@ -127,7 +119,7 @@ async def test_adv_settings_auto_update(
         # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
         # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
         # чтобы выполнить её один раз и не зависнуть.
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
 
 
 @pytest.mark.asyncio
@@ -136,7 +128,8 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
 
     nmid = 987_654_321
     base_date = date.today()
-    now_dt = datetime.utcnow()
+    # TODO: Перевести проект на работу с датой в utc
+    now_dt = datetime.now(timezone.utc)
 
     records = [
         ClustersAdvStatsFactory.build(
@@ -188,7 +181,7 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
         return_value=mock_context,
     ):
         manager = CalculatedKeywordsManager()
-        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(
+        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(  # noqa
             nmid=nmid,
             min_days=2,
             min_views=0,

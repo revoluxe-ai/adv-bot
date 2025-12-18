@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import logging
 from collections import defaultdict
 from collections.abc import  Awaitable, Coroutine, Iterable, Sequence
@@ -32,7 +31,6 @@ from app.settings import settings
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
-from .wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import KeywordGettingMode
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -122,9 +120,7 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         all_adv_ids: set[int] = set()
         for adv in advs:
-            all_adv_ids.add(adv.auto_adv_id)
-            if search_adv_id := adv.search_adv.adv_id:
-                all_adv_ids.add(search_adv_id)
+            all_adv_ids.update(adv.all_adv_ids)
         full_stats: list[FullAdvStat] = (
             await wb_data_getter.get_full_adv_stat_for_adv_ids(
                 wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES

@@ -87,7 +87,10 @@ class MinusPhraseManager:
 
 
     async def _update_minuses_in_search_adv(self, complex_adv: ComplexAdv, bad_keywords: list[str]) -> None:
-        adv_id = complex_adv.search_adv.adv_id
-        nmids = complex_adv.search_adv.nmids
+        search_adv = complex_adv.search_adv
+        if not search_adv:
+            return None
+        adv_id = search_adv.adv_id
+        nmids = search_adv.nmids
         await self.__update_minus_phrases(adv_id, nmids, bad_keywords)
         return None
