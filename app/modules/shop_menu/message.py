@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views.callbacks import AddNewToken
+from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
@@ -491,6 +491,15 @@ class ShopMenu(TextWithKeyboard):
                 ).pack(),
             )
 
+        builder.row(button)
+
+        # Добавляем кнопку "Применить дефолты всем кампаниям"
+        button = InlineKeyboardButton(
+            text="Применить дефолты всем кампаниям",
+            callback_data=ApplyDefaultsForShop(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
         builder.row(button)
 
         button = InlineKeyboardButton(
