@@ -355,7 +355,7 @@ class TokenInfoService:
                 token_expires = _to_aware_utc(token.expires)
 
                 # Filter tokens that expire within the timeframe but haven't expired yet
-                if token_expires <= cutoff_date and token_expires > now:
+                if cutoff_date >= token_expires > now:
                     token_info = TokenInfo.from_wb_token(token)
                     if token_info.is_valid and not token_info.is_read_only:
                         days_until_expiry = (token_expires - now).days
