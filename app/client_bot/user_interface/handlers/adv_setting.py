@@ -1,11 +1,12 @@
 import logging
 import aiogram
+from typing import Sequence
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import Result, update
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
@@ -258,7 +259,7 @@ async def turn_adv_on(
             return
         await bot.send_message(callback.message.chat.id, "Включаю бота")
         adv.bot_active = True
-        apply_defaults_to_adv_setting(adv)
+        apply_defaults_to_adv_setting(adv, wb_cabinet)
         await session.commit()
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
@@ -292,16 +293,17 @@ async def turn_adv_on_all(
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
+            .options(joinedload(AdvSetting.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        adv_settings: Sequence[AdvSetting] = result.scalars().all()
         
         # Применяем дефолты через ORM для каждой кампании
         updated_count = 0
         for adv_setting in adv_settings:
             adv_setting.bot_active = True
-            apply_defaults_to_adv_setting(adv_setting)
+            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
             updated_count += 1
         
         await session.commit()
@@ -418,12 +420,14 @@ async def apply_campaign_defaults(
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
         result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+            select(AdvSetting)
+            .options(joinedload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv_original_id)
         )
         adv_setting: AdvSetting = result.scalar_one()
 
         # Применяем дефолты через ORM
-        apply_defaults_to_adv_setting(adv_setting)
+        apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
         await session.commit()
 
         await bot.send_message(
@@ -462,16 +466,18 @@ async def apply_defaults_for_shop(
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
+            .options(selectinload(AdvSetting.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
             .where(AdvSetting.bot_active.is_(True))
         )
-        result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        result: Result[tuple[AdvSetting]] = await session.execute(stmt)
+        adv_settings: Sequence[AdvSetting] = result.scalars().all()
         
         # Применяем дефолты через ORM для каждой активной кампании
         updated_count = 0
         for adv_setting in adv_settings:
-            apply_defaults_to_adv_setting(adv_setting)
+            apply_defaults_to_adv_setting(adv_setting,
+                                         adv_setting.wb_cabinet)
             updated_count += 1
         
         await session.commit()
