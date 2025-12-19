@@ -312,16 +312,16 @@ class TokenInfoService:
             return await self._get_expiring_tokens(
                 session, shop_id, shop_name, days_ahead
             )
-
-    async def _get_shop_tokens(
-        self, session: AsyncSession, shop_id: str
+    @staticmethod
+    async def _get_shop_tokens( session: AsyncSession, shop_id: str
     ) -> list[WBToken]:
         """Get all tokens for a shop."""
         stmt = select(WBToken).where(WBToken.shop_id == shop_id)
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_shop_name(self, session: AsyncSession, shop_id: str) -> str:
+    @staticmethod
+    async def _get_shop_name(session: AsyncSession, shop_id: str) -> str:
         """Get shop name from WBUserCabinet."""
         stmt = (
             select(WBUserCabinet.name)
@@ -333,8 +333,9 @@ class TokenInfoService:
         shop_name = result.scalar()
         return shop_name or f"Магазин {shop_id}"
 
+    @staticmethod
     async def _get_expiring_tokens(
-        self, session: AsyncSession, shop_id: str, shop_name: str, days_ahead: int = 14
+        session: AsyncSession, shop_id: str, shop_name: str, days_ahead: int = 14
     ) -> list[ExpiringToken]:
         """Get tokens expiring within specified days."""
         cutoff_date = now_moscow() + datetime.timedelta(days=days_ahead)
