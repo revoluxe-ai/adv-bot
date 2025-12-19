@@ -85,26 +85,36 @@ async def process_payment_for_advs() -> None:
     )
 
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-        """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
+        """Запуск раз в сутки после 12:00 по МСК."""
         while True:
             now = now_moscow()
+
+            # ближайшие 12:00
+            next_run = now.replace(hour=12, minute=0, second=0, microsecond=0)
+
+            # если сегодняшние 12:00 уже прошли — переносим на завтра
+            if next_run <= now:
+                next_run += timedelta(days=1)
+
+            sleep_seconds = (next_run - now).total_seconds()
+            logger.info(
+                f"Следующий запуск платежей: {next_run} "
+                f"(через {sleep_seconds/3600:.2f} ч)"
+            )
+
+            await asyncio.sleep(sleep_seconds)
+
+            # выполняем списание
             try:
+                start = now_moscow()
+                logger.info(f"Старт обработки платежей: {start}")
                 await billing_process_payment_for_advs(global_ttl=900)
                 logger.info("Обработка платежей завершена успешно")
             except Exception as e:
                 logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
+                # если упали — дёрнем еще раз через минуту и потом снова по расписанию
                 await asyncio.sleep(60)
                 continue
-            # Вычисляем следующие 3:00
-            next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
-            if now.hour >= 3:
-                next_run += timedelta(days=1)
-            # Спим до 3:00
-            sleep_seconds = (next_run - now).total_seconds()
-            logger.info(
-                f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
-            )
-            await asyncio.sleep(sleep_seconds)
 
 
 async def run_update_vectors_in_redis() -> None:
