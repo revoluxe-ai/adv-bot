@@ -1,13 +1,10 @@
+from __future__ import annotations
 import datetime
 import json
 import logging
 import re
-
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy.orm.properties import MappedColumn
 import typing
 from enum import Enum
-from typing import cast
 
 import jwt
 from jwt import DecodeError
@@ -201,7 +198,7 @@ class WBToken(BaseTable):
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if not isinstance(result, dict):
                 raise NotValidTokenError
-            return cast(dict[str, object], result)
+            return  result
         except Exception:
             raise NotValidTokenError
 
@@ -331,7 +328,7 @@ class WBCard(BaseTable):
             return {}
         data = json.loads(raw)
         if isinstance(data, dict):
-            return cast(dict[str, object], data)
+            return  data
         return {}
 
     @property
@@ -437,11 +434,11 @@ class AdvSetting(BaseTable):
     bidder_active: Mapped[bool | None] = mapped_column(
         Boolean, default=False, nullable=True
     )
-    max_cpm = mapped_column(Integer, nullable=True)
+    max_cpm: Mapped[int | None] = mapped_column(Integer, nullable=True) # Максимальная ставка
     auto_max_cpm_mode: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place: MappedColumn[int ] = mapped_column(Integer,
+    max_place: Mapped[int ] = mapped_column(Integer,
                                                   nullable=False,
                                                 default=1,
                                                   server_default=text("1")
@@ -522,10 +519,10 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=0, server_default="0"
     )
 
-    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(
+    auto_adv_target_status: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=None
     )
-    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(
+    auction_adv_target_status: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=None
     )
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
