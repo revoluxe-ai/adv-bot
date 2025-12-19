@@ -30,6 +30,23 @@ REQUIRED_RIGHTS = {
 from app.utils.timezone import ensure_moscow, now_moscow
 
 
+def utcnow() -> datetime.datetime:
+    """Return current time as timezone-aware UTC datetime."""
+    return datetime.datetime.now(datetime.UTC)
+
+
+def _to_aware_utc(dt: datetime.datetime) -> datetime.datetime:
+    """Convert any datetime to timezone-aware UTC.
+
+    Assumptions:
+    - If datetime is naive (no tzinfo), it's treated as UTC.
+    - If datetime is tz-aware, it's converted to UTC.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.UTC)
+    return dt.astimezone(datetime.UTC)
+
+
 @dataclass
 class TokenInfo:
     """Information about a single token."""
