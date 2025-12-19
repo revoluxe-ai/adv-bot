@@ -5,15 +5,17 @@ from typing import Any
 from app.client_bot.modules.default_settings.default_models.common_default import (
     CampaignDefaultsV1,
 )
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
-def apply_defaults_to_adv_setting(adv_setting: AdvSetting) -> None:
+def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet) -> None:
     """
     Применяет дефолтные настройки к объекту AdvSetting через прямой маппинг свойств.
     Использует явное присваивание свойство в свойство для безопасности типизации.
     
     Args:
         adv_setting: Объект AdvSetting, к которому применяются дефолтные настройки
+        wb_cabinet: Объект WBCabinet, из которого берем дефолтные настройки
     """
     defaults_v1 = CampaignDefaultsV1()
     
@@ -32,9 +34,12 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting) -> None:
     adv_setting.reset_place = defaults_v1.reset_place
     adv_setting.auto_max_cpm_mode = defaults_v1.auto_max_cpm_mode
     
-    # Если max_place не установлен (None), устанавливаем в 1
     if adv_setting.max_place is None:
         adv_setting.max_place = 1
+    
+    if adv_setting.max_cpm is None:
+        if adv_setting.wb_cabinet and adv_setting.wb_cabinet.default_max_cpm is not None:
+            adv_setting.max_cpm = wb_cabinet.default_max_cpm
 
 def get_adv_setting_defaults() -> dict[str, Any]:
     """
