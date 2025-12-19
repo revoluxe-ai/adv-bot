@@ -97,7 +97,7 @@ async def waiting_for_keywords_for_filter(
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
     )()
-    return
+    return None
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
