@@ -55,23 +55,25 @@ async def sender_message_to_not_pay_users():
 
 
 async def process_token_expiration_check() -> None:
-    """Запуск проверки истекающих токенов один раз в сутки в 9:00"""
+    """Запуск проверки истекающих токенов один раз в сутки в 9:00 по МСК"""
     while True:
         now = now_moscow()
 
-        # Вычисляем следующие 9:00
+        # ближайшие 09:00
         next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        if now.hour >= 9:
+
+        # если сегодняшние 9:00 уже прошли — переносим на завтра
+        if next_run <= now:
             next_run += timedelta(days=1)
 
-        # Спим до 9:00
         sleep_seconds = (next_run - now).total_seconds()
         logger.info(
-            f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
+            f"Следующая проверка токенов: {next_run} "
+            f"(через {sleep_seconds/3600:.1f} часов)"
         )
+
         await asyncio.sleep(sleep_seconds)
 
-        # Выполняем проверку токенов
         try:
             stats = await run_token_expiration_check()
             logger.info(f"Проверка токенов завершена: {stats}")
