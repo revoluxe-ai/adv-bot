@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from app.modules.token_monitoring.services.token_expiration_service import (
@@ -11,6 +11,7 @@ from app.modules.token_monitoring.services.token_expiration_service import (
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
 )
+from app.utils.timezone import MOSCOW_TZ, now_moscow
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +79,13 @@ class TokenMonitoringScheduler:
         while self._running:
             try:
                 # Calculate seconds until next check time
-                now = datetime.now()
-                next_check = datetime.combine(now.date(), check_time)
+                now = now_moscow()
+                next_check = datetime.combine(now.date(), check_time, tzinfo=MOSCOW_TZ)
 
                 # If check time has passed today, schedule for tomorrow
                 if next_check <= now:
-                    next_check = datetime.combine(
-                        now.date().replace(day=now.day + 1), check_time
-                    )
+                    tomorrow = (now + timedelta(days=1)).date()
+                    next_check = datetime.combine(tomorrow, check_time, tzinfo=MOSCOW_TZ)
 
                 sleep_seconds = (next_check - now).total_seconds()
 
@@ -115,7 +115,7 @@ class TokenMonitoringScheduler:
             logger.info(f"Completed token expiration check: {stats}")
 
             # Optional: Clean up old resolved notifications (weekly)
-            if datetime.now().weekday() == 0:  # Monday
+            if now_moscow().weekday() == 0:  # Monday
                 try:
                     cleaned = (
                         await self.expiration_service.cleanup_resolved_notifications(30)

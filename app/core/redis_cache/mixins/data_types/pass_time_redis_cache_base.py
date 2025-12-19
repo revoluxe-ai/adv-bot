@@ -1,6 +1,7 @@
 import datetime
 from abc import ABC
 
+from app.utils.timezone import ensure_moscow, now_moscow
 from ..mixins_protocol import RedisCacheMixinsProtocol
 
 
@@ -9,14 +10,14 @@ class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
         timestamp = await self.get()
         if not timestamp:
             return True
-        now = datetime.datetime.now()
+        now = now_moscow()
         if timestamp + datetime.timedelta(seconds=pass_time_sec) <= now:
             return True
         else:
             return False
 
     async def set(self) -> None:
-        now = datetime.datetime.now()
+        now = now_moscow()
         timestamp = now.isoformat()
         await self.client.set(self._key, timestamp)
 
@@ -28,5 +29,5 @@ class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
             value = value_bytes.decode()
         else:
             value = value_bytes
-        timestamp = datetime.datetime.fromisoformat(value)
+        timestamp = ensure_moscow(datetime.datetime.fromisoformat(value))
         return timestamp

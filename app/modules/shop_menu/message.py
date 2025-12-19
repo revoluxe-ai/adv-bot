@@ -38,6 +38,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
+from app.utils.timezone import now_moscow
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ class ShopMenu(TextWithKeyboard):
 
     async def _load_all_data(self) -> bool:
         """Оптимизированная загрузка всех данных в одной транзакции"""
-        start_time = datetime.now()
+        start_time = now_moscow()
         logger.debug(
             "Начало оптимизированной загрузки данных для кабинета %s",
             self._wb_user_cabinet_original_id,
@@ -129,7 +130,7 @@ class ShopMenu(TextWithKeyboard):
             self._wb_cabinet = self._wb_user_cabinet.wb_cabinet
 
             # 3. Расчет метрик кабинета
-            self._now = datetime.now()
+            self._now = now_moscow()
             self._expiration_time = self._wb_cabinet.expiration_time
             self._expiration_time_str = self._expiration_time.strftime("%d-%m-%Y-%H:%M")
             self.days_left = (self._expiration_time - self._now).days + 1
@@ -147,7 +148,7 @@ class ShopMenu(TextWithKeyboard):
             )
 
             logger.debug(
-                f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
+                f"Данные успешно загружены за {(now_moscow() - start_time).total_seconds():.2f} сек"
             )
 
         # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
@@ -182,7 +183,7 @@ class ShopMenu(TextWithKeyboard):
 
         # Оптимизированная загрузка токенов - фильтруем сразу на уровне SQL
         try:
-            token_start_time = datetime.now()
+            token_start_time = now_moscow()
             async with sm(read_only=True) as session:
                 # Сразу фильтруем токены для конкретного магазина
                 stmt = select(WBToken).where(WBToken.shop_id == shop_id)
@@ -191,7 +192,7 @@ class ShopMenu(TextWithKeyboard):
                 logger.debug(
                     f"Найдено токенов для магазина {shop_id}:"
                     f" {len(work_tokens)} (запрос выполнен за "
-                    f"{(datetime.now() - token_start_time).total_seconds():.2f} сек)"
+                    f"{(now_moscow() - token_start_time).total_seconds():.2f} сек)"
                 )
         except Exception as e:
             logger.error(f"Ошибка при загрузке токенов из БД: {e}", exc_info=True)
@@ -203,7 +204,7 @@ class ShopMenu(TextWithKeyboard):
             # Для админов делаем исключение
             if user.user_telegram_id in const.ADMINS:
                 logger.debug(f"Админ {user.user_telegram_id} получает временный токен")
-                expiration_time = datetime.now() + timedelta(days=30)
+                expiration_time = now_moscow() + timedelta(days=30)
                 self.expiration_time = expiration_time
                 self.last_days_for_token = 30
                 return True
@@ -215,16 +216,16 @@ class ShopMenu(TextWithKeyboard):
                 return False
 
         # Сортировка токенов по сроку действия
-        sort_start_time = datetime.now()
+        sort_start_time = now_moscow()
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token: token.expires, reverse=True)
         logger.debug(
-            f"Сортировка токенов выполнена за {(datetime.now() - sort_start_time).total_seconds():.2f} сек"
+            f"Сортировка токенов выполнена за {(now_moscow() - sort_start_time).total_seconds():.2f} сек"
         )
 
         # Определение срока действия
         if user.user_telegram_id in const.ADMINS:
-            expiration_time = datetime.now() + timedelta(days=30)
+            expiration_time = now_moscow() + timedelta(days=30)
             logger.debug(
                 "Пользователь - админ, установлен временный срок действия токена"
             )
@@ -241,7 +242,7 @@ class ShopMenu(TextWithKeyboard):
 
         # Проверка на истечение срока действия
         if (
-            expiration_time < datetime.now()
+            expiration_time < now_moscow()
             and user.user_telegram_id not in const.ADMINS
         ):
             await self.bot.send_message(
@@ -254,11 +255,11 @@ class ShopMenu(TextWithKeyboard):
         # Сохранение срока действия для дальнейшего использования
         if user.user_telegram_id in const.ADMINS:
             # Для админов устанавливаем временное значение
-            self.expiration_time = datetime.now() + timedelta(days=30)
+            self.expiration_time = now_moscow() + timedelta(days=30)
             self.last_days_for_token = 30
         else:
             self.expiration_time = expiration_time
-            self.last_days_for_token = (expiration_time - datetime.now()).days
+            self.last_days_for_token = (expiration_time - now_moscow()).days
 
         logger.debug(
             "Обработка токенов успешно завершена, установлен срок действия %s дней",
@@ -268,7 +269,7 @@ class ShopMenu(TextWithKeyboard):
 
     async def __call__(self):
         """Оптимизированный метод для отображения меню магазина"""
-        start_time = datetime.now()
+        start_time = now_moscow()
         logger.debug(f"Вызов ShopMenu для кабинета {self._wb_user_cabinet_original_id}")
 
         # Единый метод загрузки всех данных вместо трех отдельных
@@ -283,16 +284,16 @@ class ShopMenu(TextWithKeyboard):
         #         return
 
         # Отображение меню магазина
-        display_start_time = datetime.now()
+        display_start_time = now_moscow()
         logger.debug("Отображение меню магазина (вызов родительского метода __call__)")
 
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
 
         logger.debug(
             "Меню магазина отображено" " за %s сек",
-            round((datetime.now() - display_start_time).total_seconds(), 2),
+            round((now_moscow() - display_start_time).total_seconds(), 2),
         )
-        total_time = (datetime.now() - start_time).total_seconds()
+        total_time = (now_moscow() - start_time).total_seconds()
         logger.debug(
             f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек"
         )

@@ -1,4 +1,5 @@
 import datetime
+from app.utils.timezone import now_moscow, today_moscow
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
@@ -19,7 +20,7 @@ class CommonStatDataManager:
 
         # Получаем показы авто-РК и показы по ключевым словам по дням
         auto_adv_id = adv_setting.adv_id
-        end_date = datetime.datetime.now()
+        end_date = now_moscow()
         start_date = end_date - datetime.timedelta(days=last_days)
 
         auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
@@ -55,7 +56,7 @@ class CommonStatDataManager:
         auto_adv_id = adv_setting.adv_id
         auction_adv_id = adv_setting.search_adv_id
 
-        end_date = datetime.datetime.now()
+        end_date = now_moscow()
         start_date = end_date - datetime.timedelta(days=last_days)
 
         auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
@@ -97,7 +98,7 @@ class CommonStatDataManager:
         }
 
         text = ""
-        today_date = datetime.datetime.now().date()
+        today_date = today_moscow()
         for stat in concatenated_adv_stat_result:
             date = stat.date
             date_str = date.strftime("%d.%m.%Y")
@@ -110,7 +111,7 @@ class CommonStatDataManager:
             mean_pay_for_order = stat.spend / (orders if orders else 1)
 
             if date == today_date:
-                now = datetime.datetime.now()
+                now = now_moscow()
                 hours_passed = now.hour + now.minute / 60 + now.second / 3600
                 fraction_of_day = hours_passed / 24
                 mean_orders_for_fraction_day = int(round(orders / fraction_of_day, 0))

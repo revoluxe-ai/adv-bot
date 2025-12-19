@@ -22,6 +22,7 @@ from app.utils import redis_manager, text_cleaner
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
+from app.utils.timezone import now_moscow
 # from .ML import Predictor
 from .wb_adv_api import WBAdvAPI
 from ..billing import AdvPayment
@@ -93,7 +94,7 @@ async def update_vectors_in_redis() -> None:
 
 
 async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
-    new_version = int(datetime.datetime.now().timestamp())
+    new_version = int(now_moscow().timestamp())
 
     buffer = io.StringIO()
     writer = csv.writer(
@@ -391,11 +392,11 @@ class MessageCounter:
     _period = datetime.timedelta(minutes=10)
 
     def add_send(self):
-        time = datetime.datetime.now()
+        time = now_moscow()
         self._last_time_send = time
 
     def check_last_time(self):
-        now = datetime.datetime.now()
+        now = now_moscow()
         if self._last_time_send is None:
             return True
         if now - self._last_time_send > self._period:  # noqa

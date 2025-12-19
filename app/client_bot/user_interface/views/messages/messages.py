@@ -18,6 +18,7 @@ from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
+from app.utils.timezone import now_moscow
 
 from app.client_bot import const, utils
 from app.client_bot.const import DEFAULT_BIDDER_STEP
@@ -1317,7 +1318,7 @@ async def process_cabinet_balance_topup(
             wb_cabinet_id=cabinet_id,
             amount=amount,
             description=f"Пополнение баланса пользователем {user.username or user.user_telegram_id}",
-            transaction_date_time=datetime.now(),
+            transaction_date_time=now_moscow(),
         )
         session.add(payment)
         await session.commit()

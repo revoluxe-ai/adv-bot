@@ -2,11 +2,12 @@ import datetime
 from abc import ABC
 
 from app.core.redis_cache.mixins.mixins_protocol import RedisCacheMixinsProtocol
+from app.utils.timezone import ensure_moscow, now_moscow
 
 
 class SimpleTimeStamp(ABC, RedisCacheMixinsProtocol):
     async def set_timestamp(self) -> None:
-        now = datetime.datetime.now()
+        now = now_moscow()
         value = now.isoformat()
         await self._client.set(self._key, value)
 
@@ -18,5 +19,5 @@ class SimpleTimeStamp(ABC, RedisCacheMixinsProtocol):
             value = value_bytes.decode()
         else:
             value = value_bytes
-        timestamp = datetime.datetime.fromisoformat(value)
+        timestamp = ensure_moscow(datetime.datetime.fromisoformat(value))
         return timestamp

@@ -2,6 +2,7 @@ import datetime
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.utils.timezone import ensure_moscow, now_moscow
 
 __all__ = ["MainRedisManager"]
 
@@ -35,11 +36,11 @@ class LastDateTimeDeleteWhiteListRedisManager(BaseRedis):
         value = await self.client.get(key)
         if value:
             # Assuming the datetime is stored in ISO format
-            return datetime.datetime.fromisoformat(value.decode())
+            return ensure_moscow(datetime.datetime.fromisoformat(value.decode()))
         return None
 
     async def set_last_delete_datetime(self, adv: AdvSetting) -> None:
-        now = datetime.datetime.now()
+        now = now_moscow()
         key = self._get_key(adv)
         # Store datetime in ISO format
         await self.client.set(key, now.isoformat())
@@ -58,7 +59,7 @@ class LastAddingToWhiteListRedisData(BaseRedis):
         if not value:
             return None
         try:
-            date = datetime.datetime.fromisoformat(value)
+            date = ensure_moscow(datetime.datetime.fromisoformat(value))
         except ValueError:
             return None
         return date

@@ -11,6 +11,7 @@ from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.content import ContentMixin
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+from app.utils.timezone import MOSCOW_TZ, now_moscow
 
 from .. import api_rights
 from ..ABC_WB_API import ABC_WB_API
@@ -202,8 +203,8 @@ class AdvertApi(ABC_WB_API):
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
         keywords = []
         # Используем дату по московскому времени (UTC+3)
-        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
-        date_now_msk = datetime.datetime.now(moscow_tz)
+        moscow_tz = MOSCOW_TZ
+        date_now_msk = now_moscow()
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
@@ -212,7 +213,7 @@ class AdvertApi(ABC_WB_API):
             self.session, "GET", url, headers=self.headers.standart
         )
         answer = json.loads(response_text)
-        update_timestamp = datetime.datetime.now()
+        update_timestamp = now_moscow()
         if not answer:
             logger.debug("Нет данных по ключевым словам: %s", adv_id)
             return []
@@ -245,7 +246,7 @@ class AdvertApi(ABC_WB_API):
 
         response_text = escape_special_characters(response_text)
         answer = json.loads(response_text)
-        update_timestamp = datetime.datetime.now()
+        update_timestamp = now_moscow()
         if not answer:
             logger.debug("Нет данных по ключевым словам: %s", adv_setting.name)
             return []

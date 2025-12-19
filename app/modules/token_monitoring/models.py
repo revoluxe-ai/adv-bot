@@ -79,4 +79,6 @@ class TokenNotificationTracker(BaseTable):
 
     def mark_resolved(self) -> None:
         """Mark this notification as resolved."""
-        self.resolved_at = datetime.datetime.utcnow()
+        from app.utils.timezone import now_moscow
+
+        self.resolved_at = now_moscow()

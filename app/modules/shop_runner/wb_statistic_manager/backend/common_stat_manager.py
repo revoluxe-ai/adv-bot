@@ -1,11 +1,12 @@
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.utils.click_house.client import get_clickhouse_client
+from app.utils.timezone import now_moscow
 from .types.common_card_stat import CommonCardStat
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ async def get_stats_for_last_period(nmid: int, days: int) -> CommonCardStat | No
     :return: Объект CommonCardStat с последними данными.
     """
     # Вычисляем дату начала периода (сегодня - количество дней)
-    end_date = datetime.now()
+    end_date = now_moscow()
     start_date = end_date - timedelta(days=days)
 
     # Формируем запрос для получения данных с параметрами
@@ -74,7 +75,7 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
     Returns:
         list[CommonCardStat]: статистика по дням
     """
-    end_date = datetime.now()
+    end_date = now_moscow()
     start_date = end_date - timedelta(days=last_days)
 
     query = """

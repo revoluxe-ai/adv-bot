@@ -8,12 +8,13 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat import (
     get_daily_stats_by_last_days,
 )
+from app.utils.timezone import now_moscow
 
 
 @pytest.mark.skip("Временно отключен для отладки")
 @pytest.mark.asyncio
 async def test_concatenate_stats():
-    today = datetime.datetime.now().date()
+    today = now_moscow().date()
     yesterday = today - datetime.timedelta(days=1)
 
     # Создаем тестовые данные для авто-рекламы
@@ -93,7 +94,7 @@ async def test_concatenate_stats():
 @pytest.mark.asyncio
 async def test_get_daily_stats_by_last_days():
     test_adv_id = 25040169
-    today = datetime.datetime.now()
+    today = now_moscow()
     yesterday = today - datetime.timedelta(days=1)
 
     # Создаем мок для результата запроса к ClickHouse

@@ -1,4 +1,5 @@
 import datetime
+from app.utils.timezone import now_moscow
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -1009,7 +1010,7 @@ def get_shop_menu_keyboard(
 ):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
-    now = datetime.datetime.now()
+    now = now_moscow()
     balance = wb_cabinet.balance or 0
     bonus = wb_cabinet.bonus or 0
     builder = InlineKeyboardBuilder()

@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.utils.timezone import ensure_moscow, now_moscow
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
 
@@ -21,7 +22,7 @@ class KeywordStatUpdateState(BaseRedis):
         :param update_time_stamp: Момент времени обновления.
         """
         key = self._get_key(adv_id)
-        update_time_stamp = datetime.now()
+        update_time_stamp = now_moscow()
         datetime_str = update_time_stamp.strftime(
             self.time_str_format
         )  # Преобразование в строку
@@ -40,7 +41,7 @@ class KeywordStatUpdateState(BaseRedis):
             return None  # Если значение отсутствует, возвращаем None
         datetime_str = datetime_bytes.decode("utf-8")
         try:
-            dt = datetime.strptime(datetime_str, self.time_str_format)
+            dt = ensure_moscow(datetime.strptime(datetime_str, self.time_str_format))
         except:
             return None
         return dt

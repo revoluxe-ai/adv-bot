@@ -1,6 +1,7 @@
 import datetime
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
+from app.utils.timezone import ensure_moscow, now_moscow
 
 from .adv_protocol import AdvProtocol
 
@@ -16,11 +17,11 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
         if value is None:
             return None
         value_dt = datetime.datetime.fromisoformat(value)
-        return value_dt
+        return ensure_moscow(value_dt)
 
     async def set(self, adv: AdvProtocol) -> None:
         key: str = self._get_key(adv)
-        value_str = datetime.datetime.now().isoformat()
+        value_str = now_moscow().isoformat()
         _ = await self._client.set(key, value_str)
         return None
 

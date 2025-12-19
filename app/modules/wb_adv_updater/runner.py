@@ -1,13 +1,14 @@
 """Runner coroutines for periodic WB updater tasks."""
 
 import asyncio
-import datetime
 import logging
+from datetime import timedelta
 
 from aiohttp import ClientSession
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
+from app.utils.timezone import now_moscow
 
 # Import token monitoring for expiration checks
 from app.modules.token_monitoring.services.token_expiration_service import (
@@ -56,12 +57,12 @@ async def sender_message_to_not_pay_users():
 async def process_token_expiration_check() -> None:
     """Запуск проверки истекающих токенов один раз в сутки в 9:00"""
     while True:
-        now = datetime.datetime.now()
+        now = now_moscow()
 
         # Вычисляем следующие 9:00
         next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
         if now.hour >= 9:
-            next_run += datetime.timedelta(days=1)
+            next_run += timedelta(days=1)
 
         # Спим до 9:00
         sleep_seconds = (next_run - now).total_seconds()
@@ -86,7 +87,7 @@ async def process_payment_for_advs() -> None:
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
         while True:
-            now = datetime.datetime.now()
+            now = now_moscow()
             try:
                 await billing_process_payment_for_advs(global_ttl=900)
                 logger.info("Обработка платежей завершена успешно")
@@ -97,7 +98,7 @@ async def process_payment_for_advs() -> None:
             # Вычисляем следующие 3:00
             next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
             if now.hour >= 3:
-                next_run += datetime.timedelta(days=1)
+                next_run += timedelta(days=1)
             # Спим до 3:00
             sleep_seconds = (next_run - now).total_seconds()
             logger.info(

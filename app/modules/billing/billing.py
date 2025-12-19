@@ -1,8 +1,9 @@
 """Billing per-cabinet daily charges with Redis/DB dedup and Redis locks (без pg_advisory_lock)."""
 
 import asyncio
+import datetime
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
@@ -18,6 +19,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.utils.timezone import now_moscow
 from .models import AdvPayment
 from .redis_lock import RedisLock
 from .redis_manager import RedisManager
@@ -224,7 +226,7 @@ async def __process_single_cabinet(
                     amount=-amt,
                     description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {day}",
                     operation_type="auto_subtract",
-                    transaction_date_time=datetime.now(),
+                    transaction_date_time=now_moscow(),
                     wb_cabinet=wb_cabinet,
                 )
             )
@@ -235,7 +237,7 @@ async def __process_single_cabinet(
                     amount=-amt,
                     description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {day}",
                     operation_type="auto_subtract",
-                    transaction_date_time=datetime.now(),
+                    transaction_date_time=now_moscow(),
                     wb_cabinet=wb_cabinet,
                 )
             )
@@ -344,7 +346,7 @@ async def process_payment_for_advs(
       2. _process_payment_for_advs()
       3. release_lock()
     """
-    current_dt = datetime.now()
+    current_dt = now_moscow()
     acquired = False
     pricer = Pricer()
     try:

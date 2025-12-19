@@ -36,6 +36,7 @@ from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
+from app.utils.timezone import now_moscow, today_moscow
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
@@ -59,7 +60,7 @@ async def get_keyword_statistic_clickhouse(
     Таблица хранит агрегаты вида argMaxState(...), которые нужно раскрывать через argMaxMerge().
     """
 
-    today = datetime.now().date()
+    today = today_moscow()
     start_date_clause = ""
     if pass_days:
         start_date = today - timedelta(days=pass_days)
@@ -568,7 +569,7 @@ async def clear_keywords(need_keywords: list[str]) -> None:
 
 
 async def get_expired_cabinets(session: AsyncSession) -> list[WBCabinet]:
-    delete_expired_time = datetime.now() - timedelta(days=30)
+    delete_expired_time = now_moscow() - timedelta(days=30)
     stmt = (
         select(WBCabinet)
         .options(selectinload(WBCabinet.adv_settings))
@@ -629,7 +630,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(),  # noqa
+                    date=today_moscow(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -713,7 +714,7 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(),  # noqa
+                    date=today_moscow(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(

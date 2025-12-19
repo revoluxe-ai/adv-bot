@@ -37,6 +37,7 @@ from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from app.utils.timezone import ensure_moscow, now_moscow
 
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
@@ -267,8 +268,7 @@ class WBToken(BaseTable):
     def is_expired(self) -> bool:
         """Проверяет, истёк ли токен"""
         try:
-            # Compare using timezone-aware UTC now
-            return datetime.datetime.now(datetime.UTC) >= self.__expires
+            return now_moscow() >= ensure_moscow(self.__expires)
         except Exception:  # noqa
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным

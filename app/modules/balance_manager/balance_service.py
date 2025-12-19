@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.utils.timezone import now_moscow
 
 from sqlalchemy.orm import selectinload
 
@@ -64,7 +65,7 @@ async def add_balance(
             wb_cabinet_id=cabinet_id,
             amount=amount,
             description=description,
-            transaction_date_time=datetime.now(),
+            transaction_date_time=now_moscow(),
         )
         session.add(payment)
         await session.commit()
@@ -117,7 +118,7 @@ async def add_bonus(
             wb_cabinet_id=cabinet_id,
             amount=amount,
             description=description,
-            transaction_date_time=datetime.now(),
+            transaction_date_time=now_moscow(),
             operation_type="add",
         )
         session.add(bonus_payment)

@@ -25,24 +25,9 @@ REQUIRED_RIGHTS = {
 
 # TODO: Подписать РК где Авто, где Аукцион
 
-# --- Time helpers (ensure timezone-aware UTC) ---
+# --- Time helpers (ensure timezone-aware Europe/Moscow) ---
 
-
-def utcnow() -> datetime.datetime:
-    """Return current time as timezone-aware UTC datetime."""
-    return datetime.datetime.now(datetime.UTC)
-
-
-def _to_aware_utc(dt: datetime.datetime) -> datetime.datetime:
-    """Convert any datetime to timezone-aware UTC.
-
-    Assumptions:
-    - If datetime is naive (no tzinfo), it's treated as UTC.
-    - If datetime is tz-aware, it's converted to UTC.
-    """
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=datetime.UTC)
-    return dt.astimezone(datetime.UTC)
+from app.utils.timezone import ensure_moscow, now_moscow
 
 
 @dataclass
@@ -62,18 +47,18 @@ class TokenInfo:
     @classmethod
     def from_wb_token(cls, wb_token: WBToken) -> "TokenInfo":
         """Create TokenInfo from WBToken model."""
-        now = utcnow()
-        expires_utc = _to_aware_utc(wb_token.expires)
+        now = now_moscow()
+        expires_moscow = ensure_moscow(wb_token.expires)
         return cls(
             id=wb_token.id,
             api_key=wb_token.api_key,
             user_id=wb_token.user_id,
             shop_id=wb_token.shop_id or "",
-            expires=expires_utc,
+            expires=expires_moscow,
             categories=wb_token.categories,
             is_read_only=wb_token.read_only,
             is_valid=wb_token.check_valid(),
-            is_expired=expires_utc <= now,
+            is_expired=expires_moscow <= now,
         )
 
 
@@ -174,7 +159,7 @@ class TokenStatusReport:
         """
         expiration_date = self.service_expiration_date
         if expiration_date:
-            days = (expiration_date - utcnow()).days
+            days = (expiration_date - now_moscow()).days
             return max(0, days)  # Don't return negative days
         return None
 
@@ -335,8 +320,8 @@ class TokenInfoService:
         self, session: AsyncSession, shop_id: str, shop_name: str, days_ahead: int = 14
     ) -> list[ExpiringToken]:
         """Get tokens expiring within specified days."""
-        cutoff_date = utcnow() + datetime.timedelta(days=days_ahead)
-        now = utcnow()
+        cutoff_date = now_moscow() + datetime.timedelta(days=days_ahead)
+        now = now_moscow()
 
         # Query all tokens for the shop (can't use .expires in WHERE clause since it's a property)
         stmt = select(WBToken).where(WBToken.shop_id == shop_id)

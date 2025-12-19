@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from .click_house_clusters_stat_manager import click_house_clusters_stat_manager as ch
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.utils.timezone import today_moscow
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class ClustersAdvStatUpdater:
         if not complex_advs:
             return
         
-        today = date.today()
+        today = today_moscow()
         stats = await self._get_stats_for_day(complex_advs, today)
         if stats:
             await ch.update_clusters_adv_stats(stats)
@@ -86,7 +87,7 @@ class ClustersAdvStatUpdater:
         if not complex_advs:
             return {}
         
-        today = date.today()
+        today = today_moscow()
         yesterday = today - timedelta(days=1)
         start_date = today - timedelta(days=for_last_days)
         

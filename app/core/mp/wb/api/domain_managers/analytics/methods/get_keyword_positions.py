@@ -5,6 +5,7 @@ from app.core.mp.wb.api.adapter.analitika_i_dannye_client.poiskovye_zaprosy_po_v
     GetKeywordPositionsCommand,
 )
 from app.core.mp.wb.dto import KeywordPosition
+from app.utils.timezone import now_moscow
 
 
 async def request(
@@ -14,7 +15,7 @@ async def request(
     for_last_days: int,
 ) -> list[KeywordPosition]:
     """Обычный тариф - макс 30 ключей за раз, продвинутый - 100"""
-    today = datetime.datetime.now(datetime.timezone.utc).date()
+    today = now_moscow().date()
     from_date = today - datetime.timedelta(days=for_last_days - 1)
     result: list[KeywordPosition] = []
     batch_len = 30

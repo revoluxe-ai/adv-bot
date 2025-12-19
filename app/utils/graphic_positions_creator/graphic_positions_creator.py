@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import random
 from io import BytesIO
+from app.utils.timezone import today_moscow
 
 import matplotlib
 import pandas as pd
@@ -58,7 +59,7 @@ async def get_keyword_history_graphic(
             key=lambda x: min([pos.position for pos in x.positions])  # type: ignore[type-var]
         )
         common_keywords = common_keywords[:5]
-        end_date = datetime.date.today()
+        end_date = today_moscow()
         start_date = end_date - datetime.timedelta(days=7)
         date_range = pd.date_range(start=start_date, end=end_date)
         frames = []

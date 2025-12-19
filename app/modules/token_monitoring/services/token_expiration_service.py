@@ -19,6 +19,7 @@ from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
 )
 from app.utils.db.session_maker import get_async_session_maker
+from app.utils.timezone import ensure_moscow, now_moscow
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +114,13 @@ class TokenExpirationService:
             return
 
         # Calculate days until expiry
-        now = datetime.datetime.now()
-        if token.expires <= now:
+        now = now_moscow()
+        expires = ensure_moscow(token.expires)
+        if expires <= now:
             logger.debug(f"Token {token.id} already expired, skipping")
             return
 
-        days_until_expiry = (token.expires - now).days
+        days_until_expiry = (expires - now).days
 
         # Check if this is a warning stage
         if days_until_expiry not in self.WARNING_STAGES:
@@ -148,7 +150,7 @@ class TokenExpirationService:
             await self.notification_manager.notify_token_issue(
                 shop_id=token.shop_id,
                 notification_type=notification_type,
-                expiry_date=token.expires,
+                expiry_date=expires,
             )
 
             stats["notifications_sent"] += 1
@@ -169,7 +171,7 @@ class TokenExpirationService:
         self, session: AsyncSession
     ) -> list[WBToken]:
         """Get all active tokens that have expiration dates."""
-        now = datetime.datetime.now()
+        now = now_moscow()
         max_check_ahead = datetime.timedelta(days=max(self.WARNING_STAGES))
         cutoff_date = now + max_check_ahead
 
@@ -210,7 +212,7 @@ class TokenExpirationService:
             Dictionary with expiring tokens summary
         """
         async with self.session_maker() as session:
-            now = datetime.datetime.now()
+            now = now_moscow()
             cutoff_date = now + datetime.timedelta(days=days_ahead)
 
             stmt = (
@@ -232,26 +234,27 @@ class TokenExpirationService:
             }
 
             for token in expiring_tokens:
-                days_until_expiry = (token.expires - now).days
+                expires = ensure_moscow(token.expires)
+                days_until_expiry = (expires - now).days
                 shop_id = token.shop_id
 
                 # Add to shop summary
                 if shop_id not in summary["by_shop"]:
                     summary["by_shop"][shop_id] = {  # type: ignore[index]
                         "tokens": [],
-                        "earliest_expiry": token.expires,
+                        "earliest_expiry": expires,
                     }
 
                 summary["by_shop"][shop_id]["tokens"].append(  # type: ignore[index]
                     {  # type: ignore[index]
                         "token_id": token.id,
-                        "expires": token.expires,
+                        "expires": expires,
                         "days_until_expiry": days_until_expiry,
                     }
                 )
 
-                if token.expires < summary["by_shop"][shop_id]["earliest_expiry"]:  # type: ignore[index]
-                    summary["by_shop"][shop_id]["earliest_expiry"] = token.expires  # type: ignore[index]
+                if expires < summary["by_shop"][shop_id]["earliest_expiry"]:  # type: ignore[index]
+                    summary["by_shop"][shop_id]["earliest_expiry"] = expires  # type: ignore[index]
 
                 # Add to days summary
                 if days_until_expiry <= 1:
@@ -278,9 +281,7 @@ class TokenExpirationService:
             Number of notifications cleaned up
         """
         async with self.session_maker(read_only=False) as session:
-            cutoff_date = datetime.datetime.utcnow() - datetime.timedelta(
-                days=older_than_days
-            )
+            cutoff_date = now_moscow() - datetime.timedelta(days=older_than_days)
 
             # Find old resolved notifications
             stmt = (

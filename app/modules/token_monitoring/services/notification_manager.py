@@ -15,6 +15,7 @@ from app.modules.token_monitoring.models import (
     NotificationType,
     TokenNotificationTracker,
 )
+from app.utils.timezone import now_moscow
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -162,7 +163,7 @@ class NotificationManager:
                 user_telegram_id=user_telegram_id,
                 notification_type=notification_type,
                 token_expiry_date=expiry_date,
-                sent_at=datetime.datetime.utcnow(),
+                sent_at=now_moscow(),
             )
 
             session.add(notification)

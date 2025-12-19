@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
+from app.utils.timezone import now_moscow
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
@@ -128,7 +129,7 @@ class CoroutinesManager:
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
-            date_time = datetime.now()
+            date_time = now_moscow()
             for stat in full_stats:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None

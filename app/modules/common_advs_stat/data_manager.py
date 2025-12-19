@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from . import clickhouse_manager
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -16,6 +16,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.utils.timezone import now_moscow
 
 _sm = get_async_session_maker
 
@@ -62,7 +63,7 @@ class CommonAdvsStatDataManager:
                 auction_cpm = result.scalar_one_or_none()
 
         pass_days = last_days - 1
-        end_date = datetime.now()
+        end_date = now_moscow()
         start_date = end_date - timedelta(days=pass_days)
 
         # Статистика для авто-рекламы
@@ -198,7 +199,7 @@ class CommonAdvsStatDataManager:
     def _get_predict_order_for_fractation_day(
         base_predict_orders: float, pass_days: int
     ) -> float:
-        now = datetime.now()
+        now = now_moscow()
         hours_passed = now.hour + now.minute / 60 + now.second / 3600
         fraction_of_day = hours_passed / 24 + pass_days
         predict_orders_for_days = base_predict_orders / fraction_of_day

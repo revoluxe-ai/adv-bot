@@ -6,6 +6,7 @@ import logging
 import aiohttp
 
 from app.core.wb_api.http_request import requests, try_except_decorator
+from app.utils.timezone import MOSCOW_TZ, now_moscow
 
 from . import api_rights
 from .ABC_WB_API import ABC_WB_API
@@ -122,8 +123,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
         keywords = []
-        moscow_tz = datetime.timezone(datetime.timedelta())
-        date_now_msk = datetime.datetime.now(moscow_tz)
+        date_now_msk = now_moscow()
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
@@ -131,7 +131,7 @@ class AdvertApi(ABC_WB_API):
             self.session, "GET", url, headers=self.headers.standart
         )
         answer = json.loads(response_text)
-        update_timestamp = datetime.datetime.now()
+        update_timestamp = now_moscow()
         if not answer:
             logger.debug("Нет данных по ключевым словам: %s", adv_id)
             return []
@@ -163,7 +163,7 @@ class AdvertApi(ABC_WB_API):
 
         response_text = escape_special_characters(response_text)
         answer = json.loads(response_text)
-        update_timestamp = datetime.datetime.now()
+        update_timestamp = now_moscow()
         if not answer:
             logger.debug("Нет данных по ключевым словам: %s", adv_setting.name)
             return []

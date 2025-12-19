@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from app.utils.timezone import today_moscow
 
 from app.core.wb_api.http_request import requests, try_except_decorator
 
@@ -25,7 +26,7 @@ class CommonStatMinix(WBAPIProtocol):
         assert len(nmIDs) <= 20  # Ограничение по количеству товаров
 
         # Определим дату начала и окончания для периода
-        end_date = datetime.today().date()
+        end_date = today_moscow()
         start_date = end_date - timedelta(days=pass_days)
 
         data_for_req = {

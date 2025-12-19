@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.utils.timezone import now_moscow, today_moscow
 
 from .plan_fact_change_redis_caches import ChangePlanFact
 from .update_adv_setting import update_adv_setting
@@ -142,10 +143,10 @@ class AdvSettingAutoUpdater:
         assert len(stat_data) > 1, "Должно быть данных больше, чем за 2 дня"
         stat_data = stat_data[:2]
         stat_with_views = [stat for stat in stat_data if stat.views > 0]
-        today_date = datetime.datetime.now().date()
+        today_date = today_moscow()
         stat_data.sort(key=lambda stat: stat.date, reverse=True)
         assert stat_data[0].date == today_date, "первая стата должна быть за сегодня"
-        now = datetime.datetime.now()
+        now = now_moscow()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         seconds_passed_for_last_day = (now - start_of_day).total_seconds() + len(
             stat_with_views

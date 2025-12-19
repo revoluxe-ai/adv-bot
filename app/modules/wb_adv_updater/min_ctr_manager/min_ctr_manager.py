@@ -1,7 +1,7 @@
 import logging
 from dependency_injector.wiring import inject, Provide
 import typing
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
     PredictCTRManagerContainer,
@@ -15,6 +15,7 @@ if typing.TYPE_CHECKING:
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.utils.timezone import now_moscow
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ class MinCtrManager:
         adv = self._adv
         adv_id = adv.adv_id
         days = 2  # Последние 2 дня
-        end_date = datetime.now()
+        end_date = now_moscow()
         start_date = end_date - timedelta(days=days - 1)
 
         # Получаем общую статистику по авто-кампании

@@ -17,6 +17,7 @@ from app.utils.redis_manager.exc import DataNotFoundError
 from app.utils.text_cleaner import clear
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.settings import settings
+from app.utils.timezone import MOSCOW_TZ, now_moscow
 
 from typing import cast
 
@@ -641,16 +642,14 @@ async def get_max_bet(text: str) -> int | None:
 
 async def set_last_bid_update(adv_id: str) -> None:
     key = f"last_bid_update:{adv_id}"
-    now = datetime.datetime.now()
-    now = now.timestamp()
-    await redis_master_client.set(key, now)
+    timestamp = now_moscow().timestamp()
+    await redis_master_client.set(key, timestamp)
 
 
 async def set_last_user_use_time(user_telegram_id: int) -> None:
     key = "last_user_use_time:" + str(user_telegram_id)
-    now = datetime.datetime.now()
-    now = str(now.timestamp())
-    await redis_master_client.set(key, now)
+    timestamp = str(now_moscow().timestamp())
+    await redis_master_client.set(key, timestamp)
 
 
 async def get_last_user_use_time(user_telegram_id: int) -> datetime.datetime | None:
@@ -660,7 +659,7 @@ async def get_last_user_use_time(user_telegram_id: int) -> datetime.datetime | N
         return None
     value = value.decode("utf-8")
     value = float(value)
-    datetime_object = datetime.datetime.fromtimestamp(value)
+    datetime_object = datetime.datetime.fromtimestamp(value, tz=MOSCOW_TZ)
     return datetime_object
 
 
