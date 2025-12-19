@@ -1008,9 +1008,13 @@ def get_return_for_your_ref_links() -> InlineKeyboardMarkup:
 def get_shop_menu_keyboard(
     wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: bool
 ):
+    UTC = ZoneInfo("UTC")
+    MSK = ZoneInfo("Europe/Moscow")
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
-    now = now_moscow()
+    expiration_time = expiration_time.replace(tzinfo=MSK)
+    expiration_time = expiration_time.astimezone(UTC)
+    now = datetime.now(UTC)
     balance = wb_cabinet.balance or 0
     bonus = wb_cabinet.bonus or 0
     builder = InlineKeyboardBuilder()
