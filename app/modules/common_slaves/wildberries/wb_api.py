@@ -6,7 +6,7 @@ import logging
 import aiohttp
 
 from app.core.wb_api.http_request import requests, try_except_decorator
-from app.utils.timezone import MOSCOW_TZ, now_moscow
+from app.utils.timezone import now_moscow
 
 from . import api_rights
 from .ABC_WB_API import ABC_WB_API
