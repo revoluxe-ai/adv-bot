@@ -203,7 +203,6 @@ class AdvertApi(ABC_WB_API):
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
         keywords = []
         # Используем дату по московскому времени (UTC+3)
-        moscow_tz = MOSCOW_TZ
         date_now_msk = now_moscow()
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
