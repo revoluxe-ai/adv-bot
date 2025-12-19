@@ -309,6 +309,7 @@ async def process_cabinet_api(
             wb_cabinet.shop_id = shop_id
             wb_cabinet.balance = 0
             wb_cabinet.bonus = 0
+            wb_cabinet.default_max_cpm = settings.DEFAULT_MAX_CPM
             session.add(wb_cabinet)
             await session.flush()  # получаем wb_cabinet.id
             wb_user_cabinet = WBUserCabinet()
