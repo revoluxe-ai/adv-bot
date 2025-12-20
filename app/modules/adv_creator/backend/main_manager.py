@@ -5,10 +5,12 @@ from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert  # Добавляем импорт insert
-from sqlalchemy.orm import load_only
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, selectinload
 
 from app.client_bot import const
 from app.core.wb_api.data_classes.advs.other_classes import Balances
+from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 from app.core.wb_api.mixins.excs import (
     CardNotFoundInWB,
 )
@@ -45,7 +47,32 @@ class MainAdvManager:
     async def _create_auto_adv(self, name: str, nmids: list[int]) -> int:
         return await self.wb_api.create_auto_adv(nmids, name)
 
-    async def __create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
+    @staticmethod
+    async def _apply_default_settings_to_adv(adv_id: int) -> None:
+        async with sm(read_only=False) as session:
+            stmt = select(AdvSetting).options(selectinload(AdvSetting.wb_cabinet))\
+                .where(AdvSetting.adv_id == adv_id).with_for_update()
+            adv_setting: AdvSetting = (await session.execute(stmt)).scalar_one()
+            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+            await session.commit()
+
+    @staticmethod
+    async def _get_wb_cabinet_from_session(session: AsyncSession, wb_cabinet_id: int) -> WBCabinet:
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
+        wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar_one()
+        return wb_cabinet
+
+    @staticmethod
+    async def _perform_adv_setting_upsert(session: AsyncSession, adv_data: dict) -> None:
+        insert_stmt = insert(AdvSetting).values(adv_data)
+        on_conflict_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=["adv_id"],
+            set_={k: v for k, v in adv_data.items() if k != "adv_id"},
+        )
+        await session.execute(on_conflict_stmt)
+        await session.commit()
+
+    async def _create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
 
         balances = await self.wb_api.get_adv_balances()
         try:
@@ -96,8 +123,7 @@ class MainAdvManager:
         async with sm(read_only=False) as session:
             assert self.access.wb_cabinet is not None
             wb_cabinet_original_id: int = self.access.wb_cabinet.id
-            stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
-            wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
+            wb_cabinet = await self._get_wb_cabinet_from_session(session, wb_cabinet_original_id)
 
             # Подготавливаем данные для upsert
             adv_data = {
@@ -119,20 +145,9 @@ class MainAdvManager:
                 "nmids": [nmid],
                 "hard_min_ctr": 0.1,
             }
+            await self._perform_adv_setting_upsert(session, adv_data)
 
-            # Используем INSERT ... ON CONFLICT DO UPDATE
-            insert_stmt = insert(AdvSetting).values(adv_data)
-            on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                index_elements=[
-                    "adv_id"
-                ],  # Уникальный индекс, по которому определяется конфликт
-                set_={
-                    k: v for k, v in adv_data.items() if k != "adv_id"
-                },  # Обновляем все поля, КРОМЕ adv_id
-            )
-
-            await session.execute(on_conflict_stmt)
-            await session.commit()
+        await self._apply_default_settings_to_adv(auto_adv_id)
 
         task_update_cpm_auto = self.wb_api.update_cpm(
             auto_adv_id,
@@ -175,7 +190,7 @@ class MainAdvManager:
 
         # Кампаний не найдено - создавать новую
         auto_adv_id, search_adv_id, update_cpm_status = (
-            await self.__create_complex_advs(nmid)
+            await self._create_complex_advs(nmid)
         )
         if not update_cpm_status:
             await bot.send_message(
