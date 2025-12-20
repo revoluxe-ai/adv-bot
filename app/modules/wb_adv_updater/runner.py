@@ -87,34 +87,37 @@ async def process_payment_for_advs() -> None:
     )
 
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-        """Запуск раз в сутки после 12:00 по МСК."""
         while True:
             now = now_moscow()
+            today_12 = now.replace(hour=12, minute=0, second=0, microsecond=0)
 
-            # ближайшие 12:00
-            next_run = now.replace(hour=12, minute=0, second=0, microsecond=0)
+            # если ещё не 12 — ждём до 12
+            if now < today_12:
+                sleep_seconds = (today_12 - now).total_seconds()
+                logger.info(f"Ждём до {today_12} ({sleep_seconds / 3600:.2f} ч)")
+                try:
+                    await asyncio.sleep(sleep_seconds)
+                except asyncio.CancelledError:
+                    logger.warning("billing loop cancelled")
+                    return
 
-            # если сегодняшние 12:00 уже прошли — переносим на завтра
-            if next_run <= now:
-                next_run += timedelta(days=1)
-
-            sleep_seconds = (next_run - now).total_seconds()
-            logger.info(
-                f"Следующий запуск платежей: {next_run} "
-                f"(через {sleep_seconds/3600:.2f} ч)"
-            )
-
-            await asyncio.sleep(sleep_seconds)
-
-            # выполняем списание
+            # выполняем списания
             try:
-                start = now_moscow()
-                logger.info(f"Старт обработки платежей: {start}")
+                logger.info(f"Старт списаний {now_moscow()}")
                 await billing_process_payment_for_advs(global_ttl=900)
-                logger.info("Обработка платежей завершена успешно")
+                logger.info("Списания успешно завершены")
+
+                now = now_moscow()
+                tomorrow_12 = now.replace(
+                    hour=12, minute=0, second=0, microsecond=0
+                ) + timedelta(days=1)
+
+                sleep_seconds = (tomorrow_12 - now).total_seconds()
+                logger.info(f"Следующий запуск в {tomorrow_12}")
+                await asyncio.sleep(sleep_seconds)
+
             except Exception as e:
-                logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
-                # если упали — дёрнем еще раз через минуту и потом снова по расписанию
+                logger.critical(f"Ошибка списаний: {e}", exc_info=True)
                 await asyncio.sleep(60)
                 continue
 
