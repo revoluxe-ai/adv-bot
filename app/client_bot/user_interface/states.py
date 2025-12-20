@@ -10,10 +10,6 @@ class CabinetRegistration(StatesGroup):
     api = State()
 
 
-class ChangeMinCTR(StatesGroup):
-    waiting_for_new_min_ctr = State()
-
-
 class AddNewToken(StatesGroup):
     token = State()
 
