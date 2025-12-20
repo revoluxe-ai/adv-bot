@@ -267,7 +267,6 @@ async def turn_adv_on(
             return
         await bot.send_message(callback.message.chat.id, "Включаю бота")
         adv.bot_active = True
-        apply_defaults_to_adv_setting(adv, wb_cabinet)
         await session.commit()
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
