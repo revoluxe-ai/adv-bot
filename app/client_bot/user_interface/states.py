@@ -74,5 +74,9 @@ class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
 
 
+class ShopDefaultMaxCPM(StatesGroup):
+    waiting_for_new_default_max_cpm = State()
+
+
 class ShopMenuState(StatesGroup):
     shop_menu = State()
