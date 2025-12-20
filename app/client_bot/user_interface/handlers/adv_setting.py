@@ -233,8 +233,11 @@ async def turn_adv_on(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result_for_wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar()
-        assert wb_user_cabinet
+        wb_user_cabinet: WBUserCabinet | None = result_for_wb_user_cabinet.scalar()
+        if wb_user_cabinet is None:
+            raise ValueError(
+                f"WBUserCabinet with id {wb_user_cabinet_original_id} not found",
+            )
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.payments))
