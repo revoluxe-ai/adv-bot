@@ -213,74 +213,26 @@ async def _get_engine(read_only: bool) -> AsyncEngine:
             _read_write_engine = _make_engine(read_write_db_connector)
         return _read_write_engine
 
-
-async def _get_session_maker(read_only: bool) -> async_sessionmaker[AnalyticAsyncSession]:
-    """Lazily build session makers, кэшируя их для эффективности."""
+async def _get_session_maker(read_only: bool):
     global _read_only_session_maker, _read_write_session_maker
-    
-    async with _engine_init_lock:
-        if read_only:
-            if _read_only_session_maker is None:
-                engine = await _get_engine(read_only=True)
-                _read_only_session_maker = async_sessionmaker(
-                    bind=engine,
-                    expire_on_commit=False,
-                    class_=AnalyticAsyncSession,
-                )
-            return _read_only_session_maker
 
-        if _read_write_session_maker is None:
-            engine = await _get_engine(read_only=False)
-            _read_write_session_maker = async_sessionmaker(
+    maker = _read_only_session_maker if read_only else _read_write_session_maker
+    if maker is not None:
+        return maker
+
+    engine = await _get_engine(read_only)
+
+    async with _engine_init_lock:
+        maker = _read_only_session_maker if read_only else _read_write_session_maker
+        if maker is None:
+            maker = async_sessionmaker(
                 bind=engine,
                 expire_on_commit=False,
                 class_=AnalyticAsyncSession,
             )
-        return _read_write_session_maker
+            if read_only:
+                _read_only_session_maker = maker
+            else:
+                _read_write_session_maker = maker
 
-
-@asynccontextmanager
-async def get_async_session_maker(
-    read_only: bool = False,
-) -> AsyncGenerator[AsyncSession, None]:
-    session_start = time()
-    current_task = asyncio.current_task()
-
-    semaphore = global_semaphore
-
-    # Выбор нужной фабрики сессий
-    session_maker = await _get_session_maker(read_only=read_only)
-
-    try:
-        async with semaphore:
-            async with session_maker() as session:
-                try:
-                    yield session
-                finally:
-                    hold_time = time() - session_start
-                    if hold_time > 1.0:
-                        if current_task is not None:
-                            try:
-                                task_name = current_task.get_name()
-                            except Exception:
-                                task_name = "unknown"
-                        else:
-                            task_name = "unknown"
-                        logger.warning(
-                            f"Session held for too long: {hold_time:.2f}s by task {task_name}"
-                        )
-    except Exception as e:
-        if current_task is not None:
-            try:
-                task_name = current_task.get_name()
-            except Exception:
-                task_name = "unknown"
-        else:
-            task_name = "unknown"
-        logger.error(
-            f"Session error after {time() - session_start:.3f}s:\n"
-            f"Task: {task_name}\n"
-            f"Error: {str(e)}",
-            exc_info=True,
-        )
-        raise
+        return maker
