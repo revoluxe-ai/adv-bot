@@ -1,0 +1,710 @@
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from aiogram.types import CallbackQuery, User as TelegramUser, Message, Chat
+
+from app.client_bot.modules.default_settings.default_models.common_default import CampaignDefaultsV1
+from app.client_bot.modules.default_settings import get_adv_setting_defaults
+from app.client_bot.user_interface.handlers.adv_setting import (
+    apply_campaign_defaults,  # Хэндлер для одной кампании
+    turn_adv_on,  # Хэндлер для включения одной кампании
+    turn_adv_on_all,  # Хэндлер для включения всех кампаний
+    apply_defaults_for_shop, # Хэндлер для всех кампаний магазина
+)
+from app.client_bot.user_interface.views.callbacks import (
+    ApplyCampaignDefaults,
+    ApplyDefaultsForShop,
+    TurnBot,
+)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
+
+# Импортируем фабрики для создания тестовых данных
+from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory, WBUserCabinetFactory
+
+
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+
+
+class MockSessionMaker:
+    """Мок для session maker, чтобы хэндлеры использовали тестовую сессию"""
+    def __init__(self, session):
+        self.session = session
+    def __call__(self, read_only=False):
+        return self
+    async def __aenter__(self):
+        return self.session
+    async def __aexit__(self, *args):
+        pass
+
+
+@pytest.fixture
+def mock_bot():
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_state():
+    state = AsyncMock()
+    state.update_data = AsyncMock()
+    state.get_data = AsyncMock(return_value={"last_wb_user_cabinet_original_id": 1})
+    return state
+
+
+@pytest.fixture
+async def setup_adv_data(async_session: AsyncSession):
+    # Создаем тестового пользователя
+    user = User(user_telegram_id=12345, username="test_user")
+    async_session.add(user)
+    await async_session.commit()
+    await async_session.refresh(user)
+
+    # Создаем тестовый WBCabinet и WBUserCabinet через фабрику (build + ручное добавление)
+    wb_cabinet = WBCabinetFactory.build()
+    async_session.add(wb_cabinet)
+    await async_session.flush()
+
+    wb_user_cabinet = WBUserCabinetFactory.build(user=user, wb_cabinet=wb_cabinet)
+    async_session.add(wb_user_cabinet)
+    await async_session.flush()
+
+    # Создаем AdvSetting с недефолтными значениями
+    adv_setting = AdvSettingFactory.build(
+        adv_id=1000,
+        name="Test Campaign 1",
+        wb_cabinet=wb_cabinet,
+        bot_active=True,  # Активная кампания
+        bidder_active=False, # Недефолтное значение
+        automatic_version=1, # Недефолтное значение
+        auto_update_white_list=False, # Недефолтное значение
+    )
+    async_session.add(adv_setting)
+    await async_session.flush()
+
+    adv_setting_inactive = AdvSettingFactory.build(
+        adv_id=1001,
+        name="Test Campaign Inactive",
+        wb_cabinet=wb_cabinet,
+        bot_active=False,  # Неактивная кампания
+        bidder_active=False, # Недефолтное значение
+        automatic_version=1, # Недефолтное значение
+        auto_update_white_list=False, # Недефолтное значение
+    )
+    async_session.add(adv_setting_inactive)
+    await async_session.flush()
+
+    return {
+        "user": user,
+        "wb_cabinet": wb_cabinet,
+        "wb_user_cabinet": wb_user_cabinet,
+        "adv_setting": adv_setting,
+        "adv_setting_inactive": adv_setting_inactive,
+    }
+
+
+@pytest.fixture
+async def setup_multiple_advs_data(async_session: AsyncSession):
+    user = User(user_telegram_id=45678, username="test_user_multi")
+    async_session.add(user)
+    await async_session.commit()
+    await async_session.refresh(user)
+
+    # Создаем тестовый WBCabinet и WBUserCabinet через фабрику (build + ручное добавление)
+    wb_cabinet = WBCabinetFactory.build()
+    async_session.add(wb_cabinet)
+    await async_session.flush()
+
+    wb_user_cabinet = WBUserCabinetFactory.build(user=user, wb_cabinet=wb_cabinet, id=2)
+    async_session.add(wb_user_cabinet)
+    await async_session.flush()
+
+    # Активные кампании с недефолтными значениями
+    adv_active_1 = AdvSettingFactory.build(
+        adv_id=2000,
+        name="Multi Adv Active 1",
+        wb_cabinet=wb_cabinet,
+        bot_active=True,
+        bidder_active=False,
+        automatic_version=1,
+    )
+    adv_active_2 = AdvSettingFactory.build(
+        adv_id=2001,
+        name="Multi Adv Active 2",
+        wb_cabinet=wb_cabinet,
+        bot_active=True,
+        bidder_active=False,
+        automatic_version=1,
+    )
+    # Неактивная кампания
+    adv_inactive_1 = AdvSettingFactory.build(
+        adv_id=2002,
+        name="Multi Adv Inactive 1",
+        wb_cabinet=wb_cabinet,
+        bot_active=False,
+        bidder_active=True, # Недефолтное значение, но не должно быть изменено
+        automatic_version=1,
+    )
+    async_session.add_all([adv_active_1, adv_active_2, adv_inactive_1])
+    await async_session.flush()
+
+    return {
+        "user": user,
+        "wb_cabinet": wb_cabinet,
+        "wb_user_cabinet": wb_user_cabinet,
+        "adv_active_1": adv_active_1,
+        "adv_active_2": adv_active_2,
+        "adv_inactive_1": adv_inactive_1,
+    }
+
+
+@pytest.mark.integration
+async def test_apply_campaign_defaults_single_active_campaign(
+    mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
+):
+    adv_setting = setup_adv_data["adv_setting"]
+    wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
+
+    # Проверяем, что начальные значения отличаются от дефолтных
+    initial_defaults = CampaignDefaultsV1()
+    expected_defaults_dict = get_adv_setting_defaults()
+    
+    # Явно устанавливаем отличающиеся значения для тестовой кампании
+    # Для булевых полей инвертируем значение
+    adv_setting.bidder_active = not initial_defaults.bidder_active
+    adv_setting.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting.auto_update_target_place = not initial_defaults.auto_update_target_place
+    adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
+    adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
+    adv_setting.reset_place = not initial_defaults.reset_place
+    adv_setting.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
+    
+    # Для полей типа Enum выбираем другое валидное значение, если оно есть
+    if initial_defaults.automatic_version == 2:
+        adv_setting.automatic_version = 1
+    else:
+        adv_setting.automatic_version = 2
+
+    # bidder_coroutine_type
+    if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
+        adv_setting.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+    else:
+        adv_setting.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    
+    # bidder_mode
+    if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
+        adv_setting.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
+    else:
+        adv_setting.bidder_mode = BidderMode.BY_POSITIONS
+    
+    # orders_source_for_auto_mode
+    if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
+        adv_setting.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
+    else:
+        adv_setting.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
+
+    # sales_predict_method
+    if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
+        adv_setting.sales_predict_method = FactMethods.DIRECT_SALES
+    else:
+        adv_setting.sales_predict_method = FactMethods.BY_CARTS
+    
+
+    await async_session.commit() # Сохраняем измененные значения
+    await async_session.refresh(adv_setting)
+
+    # Вызываем хэндлер
+    callback_data = ApplyCampaignDefaults(adv_setting_original_id=adv_setting.id)
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="123",
+        from_user=telegram_user,
+        chat_instance="some_id",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    mock_menu_instance = AsyncMock()
+    mock_menu_instance.return_value = None
+    
+    # Мокаем session maker чтобы хэндлер использовал тестовую сессию
+    class MockSessionMaker:
+        def __init__(self, session):
+            self.session = session
+        def __call__(self, read_only=False):
+            return self
+        async def __aenter__(self):
+            return self.session
+        async def __aexit__(self, *args):
+            pass
+    
+    with (
+        patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
+        patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+    ):
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+
+    # Проверяем, что дефолтные значения применились
+    # Нужно начать новую транзакцию, так как хэндлер использует свою сессию
+    await async_session.commit()  # Коммитим изменения из хэндлера
+    updated_adv_setting = await async_session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_setting.id)
+    )
+    updated_adv_setting = updated_adv_setting.scalar_one()
+
+    expected_defaults = CampaignDefaultsV1()
+    
+    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
+    default_fields = [
+        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
+        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+    ]
+
+    for key in default_fields:
+        assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
+        assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
+
+
+@pytest.mark.integration
+async def test_apply_campaign_defaults_single_inactive_campaign(
+    mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
+):
+    adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
+    wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
+
+    # Сохраняем исходные значения AdvSetting, чтобы проверить те поля,
+    # которые не затрагиваются дефолтными настройками
+    initial_adv_setting_state = {key: getattr(adv_setting_inactive, key) for key in adv_setting_inactive.__table__.columns.keys()}
+
+    # Вызываем хэндлер для неактивной кампании
+    callback_data = ApplyCampaignDefaults(adv_setting_original_id=adv_setting_inactive.id)
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="124",
+        from_user=telegram_user,
+        chat_instance="some_id_inactive",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    # Коммитим изменения перед вызовом хэндлера
+    await async_session.commit()
+    
+    mock_menu_instance = AsyncMock()
+    with (
+        patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
+        patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+    ):
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+
+    # Проверяем, что настройки изменились согласно дефолтам
+    # А те, что не должны были измениться, остались прежними
+    await async_session.commit()  # Коммитим изменения из хэндлера
+    updated_adv_setting = await async_session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_inactive.id)
+    )
+    updated_adv_setting = updated_adv_setting.scalar_one()
+
+    defaults_v1 = CampaignDefaultsV1()
+
+    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
+    default_fields = [
+        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
+        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+    ]
+
+    for key in default_fields:
+        assert getattr(updated_adv_setting, key) == getattr(defaults_v1, key), f"Mismatch for {key} (expected default)"
+
+
+@pytest.mark.integration
+async def test_turn_adv_on_applies_defaults(
+    mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
+):
+    adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
+    wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
+
+    # Проверяем, что изначально бот неактивен
+    assert not adv_setting_inactive.bot_active
+
+    # Сохраняем недефолтные значения
+    initial_defaults = CampaignDefaultsV1()
+    # Явно устанавливаем отличающиеся значения для тестовой кампании
+    # Для булевых полей инвертируем значение
+    adv_setting_inactive.bidder_active = not initial_defaults.bidder_active
+    adv_setting_inactive.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting_inactive.auto_update_target_place = not initial_defaults.auto_update_target_place
+    adv_setting_inactive.target_ctr_mode = not initial_defaults.target_ctr_mode
+    adv_setting_inactive.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
+    adv_setting_inactive.reset_place = not initial_defaults.reset_place
+    adv_setting_inactive.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
+    
+    # Для полей типа Enum выбираем другое валидное значение, если оно есть
+    if initial_defaults.automatic_version == 2:
+        adv_setting_inactive.automatic_version = 1
+    else:
+        adv_setting_inactive.automatic_version = 2
+
+    # bidder_coroutine_type
+    if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
+        adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+    else:
+        adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    
+    # bidder_mode
+    if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
+        adv_setting_inactive.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
+    else:
+        adv_setting_inactive.bidder_mode = BidderMode.BY_POSITIONS
+    
+    # orders_source_for_auto_mode
+    if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
+        adv_setting_inactive.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
+    else:
+        adv_setting_inactive.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
+
+    # sales_predict_method
+    if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
+        adv_setting_inactive.sales_predict_method = FactMethods.DIRECT_SALES
+    else:
+        adv_setting_inactive.sales_predict_method = FactMethods.BY_CARTS
+    
+    await async_session.commit()
+    await async_session.refresh(adv_setting_inactive)
+
+    # Вызываем хэндлер turn_adv_on
+    callback_data = TurnBot(
+        action="on",
+        adv_original_id=adv_setting_inactive.id,
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+    )
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="125",
+        from_user=telegram_user,
+        chat_instance="some_id_turn_on",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    # Mock Pricer.get_price_for_day_for_shop and balance_manager.get_cabinet_balance_and_bonuses
+    with (
+        patch("app.modules.billing.pricer.Pricer.get_price_for_day_for_shop", new_callable=AsyncMock) as mock_get_price,
+        patch("app.modules.billing.pricer.Pricer.get_tariff_for_day", return_value=100) as mock_get_tariff,
+        patch("app.modules.balance_manager.get_cabinet_balance_and_bonuses", new_callable=AsyncMock) as mock_get_balance,
+    ):
+        mock_get_price.return_value = 100
+        mock_get_balance.return_value = (1000, 0) # Достаточно средств
+
+        mock_menu_instance = AsyncMock()
+        with (
+            patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
+            patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+        ):
+            await turn_adv_on(callback_query, mock_state, callback_data, mock_bot)
+
+    # Проверяем, что бот активен и дефолты применились
+    updated_adv_setting = await async_session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_inactive.id)
+    )
+    updated_adv_setting = updated_adv_setting.scalar_one()
+
+    assert updated_adv_setting.bot_active
+
+    expected_defaults = CampaignDefaultsV1()
+    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
+    default_fields = [
+        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
+        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+    ]
+
+    for key in default_fields:
+        assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
+        assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
+
+
+@pytest.mark.integration
+async def test_apply_defaults_for_shop_multiple_campaigns(
+    mock_bot, mock_state, async_session: AsyncSession, setup_multiple_advs_data
+):
+    wb_user_cabinet = setup_multiple_advs_data["wb_user_cabinet"]
+    adv_active_1 = setup_multiple_advs_data["adv_active_1"]
+    adv_active_2 = setup_multiple_advs_data["adv_active_2"]
+    adv_inactive_1 = setup_multiple_advs_data["adv_inactive_1"]
+
+    # Проверяем, что начальные значения отличаются от дефолтных для активных кампаний
+    initial_defaults = CampaignDefaultsV1()
+    expected_defaults_dict = get_adv_setting_defaults()
+    for adv in [adv_active_1, adv_active_2]:
+        # Явно устанавливаем отличающиеся значения для тестовой кампании
+        # Для булевых полей инвертируем значение
+        adv.bidder_active = not initial_defaults.bidder_active
+        adv.auto_update_white_list = not initial_defaults.auto_update_white_list
+        adv.auto_update_target_place = not initial_defaults.auto_update_target_place
+        adv.target_ctr_mode = not initial_defaults.target_ctr_mode
+        adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
+        adv.reset_place = not initial_defaults.reset_place
+        adv.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
+        
+        # Для полей типа Enum выбираем другое валидное значение, если оно есть
+        if initial_defaults.automatic_version == 2:
+            adv.automatic_version = 1
+        else:
+            adv.automatic_version = 2
+
+        # bidder_coroutine_type
+        if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
+            adv.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        else:
+            adv.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+        
+        # bidder_mode
+        if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
+            adv.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
+        else:
+            adv.bidder_mode = BidderMode.BY_POSITIONS
+        
+        # orders_source_for_auto_mode
+        if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
+            adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
+        else:
+            adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
+
+        # sales_predict_method
+        if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
+            adv.sales_predict_method = FactMethods.DIRECT_SALES
+        else:
+            adv.sales_predict_method = FactMethods.BY_CARTS
+
+    await async_session.commit()
+    await async_session.refresh(adv_active_1)
+    await async_session.refresh(adv_active_2)
+
+    # Сохраняем исходные значения для неактивной кампании
+    # Для неактивной кампании мы НЕ должны проверять сохранность значений, так как дефолты теперь применяются ко всем РК
+    # Но в apply_defaults_for_shop есть фильтр .where(AdvSetting.bot_active.is_(True))
+    original_inactive_values = {key: getattr(adv_inactive_1, key) for key in expected_defaults_dict.keys() if hasattr(adv_inactive_1, key)}
+
+    # Вызываем хэндлер для магазина
+    callback_data = ApplyDefaultsForShop(wb_user_cabinet_original_id=wb_user_cabinet.id)
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="126",
+        from_user=telegram_user,
+        chat_instance="some_id_shop_defaults",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    mock_shop_menu = AsyncMock()
+    with (
+        patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
+        patch("app.client_bot.user_interface.handlers.adv_setting.ShopMenu", return_value=mock_shop_menu),
+    ):
+        await apply_defaults_for_shop(callback_query, callback_data, mock_bot, mock_state)
+
+    # Проверяем активные кампании
+    updated_adv_active_1 = await async_session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_active_1.id)
+    )
+    updated_adv_active_1 = updated_adv_active_1.scalar_one()
+    
+    expected_defaults = CampaignDefaultsV1()
+    default_fields = [
+        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
+        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+    ]
+
+    for key in default_fields:
+        assert hasattr(updated_adv_active_1, key), f"AdvSetting missing attribute {key}"
+        assert getattr(updated_adv_active_1, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_1"
+
+    updated_adv_active_2 = await async_session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_active_2.id)
+    )
+    updated_adv_active_2 = updated_adv_active_2.scalar_one()
+    for key in default_fields:
+        assert hasattr(updated_adv_active_2, key), f"AdvSetting missing attribute {key}"
+        assert getattr(updated_adv_active_2, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_2"
+
+
+@pytest.mark.integration
+async def test_turn_on_all_applies_defaults(
+    mock_bot, mock_state, async_session: AsyncSession, setup_multiple_advs_data
+):
+    wb_user_cabinet = setup_multiple_advs_data["wb_user_cabinet"]
+    adv_active_1 = setup_multiple_advs_data["adv_active_1"]
+    adv_active_2 = setup_multiple_advs_data["adv_active_2"]
+    adv_inactive_1 = setup_multiple_advs_data["adv_inactive_1"]
+
+    # Проверяем, что изначально adv_inactive_1 неактивна
+    assert not adv_inactive_1.bot_active
+
+    # Сохраняем недефолтные значения для всех кампаний
+    initial_defaults = CampaignDefaultsV1()
+    expected_defaults_dict = get_adv_setting_defaults()
+    for adv in [adv_active_1, adv_active_2, adv_inactive_1]:
+        # Явно устанавливаем отличающиеся значения для тестовой кампании
+        # Для булевых полей инвертируем значение
+        adv.bidder_active = not initial_defaults.bidder_active
+        adv.auto_update_white_list = not initial_defaults.auto_update_white_list
+        adv.auto_update_target_place = not initial_defaults.auto_update_target_place
+        adv.target_ctr_mode = not initial_defaults.target_ctr_mode
+        adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
+        adv.reset_place = not initial_defaults.reset_place
+        adv.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
+        
+        # Для полей типа Enum выбираем другое валидное значение, если оно есть
+        if initial_defaults.automatic_version == 2:
+            adv.automatic_version = 1
+        else:
+            adv.automatic_version = 2
+
+        # bidder_coroutine_type
+        if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
+            adv.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        else:
+            adv.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+        
+        # bidder_mode
+        if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
+            adv.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
+        else:
+            adv.bidder_mode = BidderMode.BY_POSITIONS
+        
+        # orders_source_for_auto_mode
+        if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
+            adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
+        else:
+            adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
+
+        # sales_predict_method
+        if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
+            adv.sales_predict_method = FactMethods.DIRECT_SALES
+        else:
+            adv.sales_predict_method = FactMethods.BY_CARTS
+
+    await async_session.commit()
+    await async_session.refresh(adv_active_1)
+    await async_session.refresh(adv_active_2)
+    await async_session.refresh(adv_inactive_1)
+
+    # Вызываем хэндлер turn_adv_on_all
+    callback_data = TurnBot(
+        action="on_all",
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+    )
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="127",
+        from_user=telegram_user,
+        chat_instance="some_id_turn_on_all",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    # Mock Pricer.get_price_for_day_for_shop and balance_manager.get_cabinet_balance_and_bonuses
+    with (
+        patch("app.modules.billing.pricer.Pricer.get_price_for_day_for_shop", new_callable=AsyncMock) as mock_get_price,
+        patch("app.modules.billing.pricer.Pricer.get_tariff_for_day", return_value=100) as mock_get_tariff,
+        patch("app.modules.balance_manager.get_cabinet_balance_and_bonuses", new_callable=AsyncMock) as mock_get_balance,
+    ):
+        mock_get_price.return_value = 100
+        mock_get_balance.return_value = (1000, 0) # Достаточно средств
+
+        mock_shop_menu = AsyncMock()
+        with (
+            patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
+            patch("app.client_bot.user_interface.handlers.adv_setting.ShopMenu", return_value=mock_shop_menu),
+        ):
+            await turn_adv_on_all(callback_query, mock_state, callback_data, mock_bot)
+
+    # Проверяем, что бот активен и дефолты применились для всех кампаний
+    updated_advs = (
+        await async_session.execute(
+            select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_user_cabinet.wb_cabinet.id)
+        )
+    ).scalars().all()
+
+    expected_defaults = CampaignDefaultsV1()
+    default_fields = [
+        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
+        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+    ]
+
+    for adv in updated_advs:
+        assert adv.bot_active
+        for key in default_fields:
+            assert hasattr(adv, key), f"AdvSetting missing attribute {key}"
+            assert getattr(adv, key) == getattr(expected_defaults, key), f"Mismatch for {key} in adv {adv.id}"
