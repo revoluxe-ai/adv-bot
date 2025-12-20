@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop
+from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
@@ -260,10 +260,6 @@ class ShopMenu(TextWithKeyboard):
             self.expiration_time = expiration_time
             self.last_days_for_token = (expiration_time - datetime.now()).days
 
-        logger.debug(
-            "Обработка токенов успешно завершена, установлен срок действия %s дней",
-            self.last_days_for_token,
-        )
         return True
 
     async def __call__(self):
@@ -497,6 +493,17 @@ class ShopMenu(TextWithKeyboard):
                 ).pack(),
             )
 
+        builder.row(button)
+
+        builder.row(button)
+
+        # Добавляем кнопку для настройки дефолтной максимальной ставки (CPM)
+        button = InlineKeyboardButton(
+            text=f"Дефолтная максимальная ставка (CPM) ({wb_cabinet.default_max_cpm})",
+            callback_data=ChangeShopDefaultMaxCPM(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
         builder.row(button)
 
         # Добавляем кнопку "Применить дефолты всем кампаниям"
