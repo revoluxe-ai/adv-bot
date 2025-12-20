@@ -524,11 +524,6 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     await async_session.refresh(adv_active_1)
     await async_session.refresh(adv_active_2)
 
-    # Сохраняем исходные значения для неактивной кампании
-    # Для неактивной кампании мы НЕ должны проверять сохранность значений, так как дефолты теперь применяются ко всем РК
-    # Но в apply_defaults_for_shop есть фильтр .where(AdvSetting.bot_active.is_(True))
-    original_inactive_values = {key: getattr(adv_inactive_1, key) for key in expected_defaults_dict.keys() if hasattr(adv_inactive_1, key)}
-
     # Вызываем хэндлер для магазина
     callback_data = ApplyDefaultsForShop(wb_user_cabinet_original_id=wb_user_cabinet.id)
     telegram_user = TelegramUser(
