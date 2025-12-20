@@ -24,10 +24,9 @@
     "app/modules/shop_runner/service_manager/manager.py",
     "app/client_bot/user_interface/handlers/adv_setting.py",
     "app/modules/balance_manager",
-    "app/modules/shop_runner/service_manager/manager.py",
-    "app/client_bot/user_interface/handlers/adv_setting.py",
     "app/modules/common_slaves/wildberries/wb_db_manager.py",
-    "app/client_bot/common_routers.py"
+    "app/client_bot/common_routers.py",
+    "app/modules/shop_runner/service_manager/manager.py",
   ],
 
   "exclude": [
