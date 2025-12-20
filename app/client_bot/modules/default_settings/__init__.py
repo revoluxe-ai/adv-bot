@@ -41,27 +41,3 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     
     if adv_setting.max_cpm is None:
         adv_setting.max_cpm = wb_cabinet.default_max_cpm
-
-def get_adv_setting_defaults() -> dict[str, Any]:
-    """
-    Возвращает словарь с дефолтными значениями для полей AdvSetting из CampaignDefaultsV1.
-    """
-    defaults_v1 = CampaignDefaultsV1()
-    default_values = {}
-
-    # Получаем все поля dataclass CampaignDefaultsV1
-    for field_name, field_type in inspect.getmembers(CampaignDefaultsV1):
-        if not field_name.startswith('__') and not callable(field_type) and not isinstance(field_type, staticmethod):
-            # Проверяем, есть ли такое поле в AdvSetting
-            if hasattr(AdvSetting, field_name):
-                # Исключаем поля, которые не должны быть установлены по дефолту (например, деньги, планы)
-                if field_name not in [
-                    "max_cpm",
-                    "plan_for_sales_for_day",
-                    "target_price_for_order",
-                    "max_price_for_order",
-                    "cpm",
-                ]:
-                    default_values[field_name] = getattr(defaults_v1, field_name)
-
-    return default_values
