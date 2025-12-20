@@ -155,7 +155,8 @@ def setup_test_database(docker_compose_cmd):
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
-    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", timeout=180)
+    # Используем --force-recreate чтобы гарантировать выполнение init скриптов
+    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", "--force-recreate", timeout=180)
     if rc != 0:
         raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
