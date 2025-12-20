@@ -274,50 +274,6 @@ async def turn_adv_on(
     return
 
 
-@router.callback_query(callbacks.TurnBot.filter(F.action == "on_all"))
-async def turn_adv_on_all(
-    callback: types.CallbackQuery,
-    state: FSMContext,
-    callback_data: callbacks.TurnBot,
-    bot: aiogram.Bot,
-):
-    if callback.message is None:
-        raise ValueError('Нет сообщения')
-
-    chat_id = callback.message.chat.id
-    await bot.send_message(callback.message.chat.id, "Включаю бота для всех кампаний (с дефолтами)")
-    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    async with sm(read_only=False) as session:
-        # Получаем все кампании магазина через ORM
-        stmt = (
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        )
-        result = await session.execute(stmt)
-        adv_settings: Sequence[AdvSetting] = result.scalars().all()
-        
-        # Применяем дефолты через ORM для каждой кампании
-        updated_count = 0
-        for adv_setting in adv_settings:
-            adv_setting.bot_active = True
-            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
-            updated_count += 1
-        
-        await session.commit()
-
-    await bot.send_message(
-        chat_id,
-        f"Бот включен для {updated_count} кампаний, дефолтные настройки применены.",
-    )
-
-    chat_id = callback.message.chat.id
-    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
-    return
-
-
 @router.callback_query(callbacks.TurnBot.filter(F.action == "off_all"))
 async def turn_adv_off_all(
     callback: types.CallbackQuery,
