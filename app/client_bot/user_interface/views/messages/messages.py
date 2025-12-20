@@ -79,6 +79,16 @@ logger = logging.getLogger(__name__)
 #         raise ValueError("Неправильный формат даты. Ожидается 'дата-месяц-год'.")
 
 
+class ChangeShopDefaultMaxCPMMessage(Text):
+    def __init__(self, bot: Bot, chat_id: int, current_max_cpm: int):
+        super().__init__(bot, chat_id)
+        self._current_max_cpm = current_max_cpm
+
+    @property
+    def text(self) -> str:
+        return f"Введите новое дефолтное значение максимальной ставки (CPM). Текущее значение: {self._current_max_cpm}."
+
+
 class ShopNameGet(Text):
     def __init__(self, bot: Bot, chat_id: int):
         super().__init__(bot, chat_id)
