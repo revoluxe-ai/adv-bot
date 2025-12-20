@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.settings import settings
 from app.utils.db.base import BaseTable
 
 if typing.TYPE_CHECKING:
@@ -56,6 +57,10 @@ class WBCabinet(BaseTable):
     bonus_payments: Mapped[list[WBBonusPayment]] = relationship(
         "WBBonusPayment", back_populates="wb_cabinet", uselist=True
     )
+    default_max_cpm: Mapped[int] = mapped_column(Integer,
+                                                 nullable=False,
+                                                 default=settings.DEFAULT_MAX_CPM,
+                                                 server_default=text(str(settings.DEFAULT_MAX_CPM)))
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),

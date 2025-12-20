@@ -96,11 +96,6 @@ class Start(CallbackData, prefix="start"):
     pass
 
 
-class ChangeMinCTR(CallbackData, prefix="change_min_ctr"):
-    action: str
-    adv_original_id: int
-
-
 class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
@@ -269,3 +264,15 @@ class ChangeAuctionBidderActiveStatus(
     adv_id: int
     wb_user_cabinet_original_id: int
     new_status: bool
+
+
+class ApplyCampaignDefaults(CallbackData, prefix="apply_adv_defaults"):
+    adv_setting_original_id: int
+
+
+class ChangeShopDefaultMaxCPM(CallbackData, prefix="change_shop_default_max_cpm"):
+    wb_user_cabinet_original_id: int
+
+
+class ApplyDefaultsForShop(CallbackData, prefix="apply_shop_defaults"):
+    wb_user_cabinet_original_id: int

@@ -1,4 +1,3 @@
-from aiogram.filters.state import State, StatesGroup
 from aiogram.fsm.state import State, StatesGroup
 
 
@@ -9,10 +8,6 @@ class GlobalState(StatesGroup):
 class CabinetRegistration(StatesGroup):
     cabinet_name = State()
     api = State()
-
-
-class ChangeMinCTR(StatesGroup):
-    waiting_for_new_min_ctr = State()
 
 
 class AddNewToken(StatesGroup):
@@ -72,6 +67,10 @@ class AddRelevantPhrases(StatesGroup):
 
 class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
+
+
+class ShopDefaultMaxCPM(StatesGroup):
+    waiting_for_new_default_max_cpm = State()
 
 
 class ShopMenuState(StatesGroup):

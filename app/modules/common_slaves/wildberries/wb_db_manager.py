@@ -1,9 +1,13 @@
 import json
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+from app.client_bot.modules.default_settings import (
+    apply_defaults_to_adv_setting,
+)
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
@@ -29,42 +33,52 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
     """TODO Была ошибка, когда пытаемся добавить две одинаковых РК. Вообще, такого быть не должно
     но есть, если юзеры не правильно прописывают в названии артикул Аукциона
     """
-    advs_to_process = []
-    seen_adv_ids = set()
+    stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
+    async with _sm(read_only=False) as session:
+        result = await session.execute(stmt)
+        wb_cabinet: WBCabinet = result.scalar_one()
+
+
+    advs_to_process: list[AuctionAdv] = []
+    seen_adv_ids: set[int] = set()
     for adv in advs:
         if adv.advertId not in seen_adv_ids:
             advs_to_process.append(adv)
             seen_adv_ids.add(adv.advertId)
 
-    # Преобразуем в список словарей
-    adv_data = [
-        {
-            "adv_id": adv.advertId,
-            "name": adv.name,
-            "wb_cabinet_id": wb_cabinet_id,
-            "nmids": adv.nmids,
-            "active_status": adv.status_native,
-            "type": adv.type,
-            "cpm": adv.cpm,
-        }
-        for adv in advs_to_process
-    ]
-
-    # Выполняем UPSERT
-    stmt = insert(AdvSetting).values(adv_data)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["adv_id"],  # Указываем, по какому полю искать дубликаты
-        set_={
-            "name": stmt.excluded.name,
-            "wb_cabinet_id": stmt.excluded.wb_cabinet_id,
-            "nmids": stmt.excluded.nmids,
-            "active_status": stmt.excluded.active_status,
-            "type": stmt.excluded.type,
-            "cpm": stmt.excluded.cpm,
-        },
-    )
-    async with _sm() as session:
-        await session.execute(stmt)
+    async with _sm(read_only=False) as session:
+        # Получаем существующие записи по adv_id
+        adv_ids = [adv.advertId for adv in advs_to_process]
+        existing_stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
+        existing_result = await session.execute(existing_stmt)
+        existing_adv_settings = {adv.adv_id: adv for adv in existing_result.scalars().all()}
+        
+        # Обрабатываем каждую кампанию
+        for adv in advs_to_process:
+            if adv.advertId in existing_adv_settings:
+                # Обновляем существующую запись через ORM
+                adv_setting = existing_adv_settings[adv.advertId]
+                adv_setting.name = adv.name
+                adv_setting.wb_cabinet_id = wb_cabinet_id
+                adv_setting.nmids = adv.nmids
+                adv_setting.active_status = adv.status_native
+                adv_setting.type = adv.type
+                adv_setting.cpm = adv.cpm
+            else:
+                # Создаем новую запись через ORM
+                adv_setting = AdvSetting(
+                    adv_id=adv.advertId,
+                    name=adv.name,
+                    wb_cabinet_id=wb_cabinet_id,
+                    nmids=adv.nmids,
+                    active_status=adv.status_native,
+                    type=adv.type,
+                    cpm=adv.cpm,
+                )
+                # Применяем дефолты через ORM
+                apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
+                session.add(adv_setting)
+        
         await session.commit()
 
 
@@ -86,8 +100,8 @@ async def _update_cards_in_db(
         return
 
     # Удаляем дубликаты по nmid
-    pass_nmids = set()
-    clear_cards = []
+    pass_nmids: set[int] = set()
+    clear_cards: list[CardFromWB] = []
     for card in cards:
         if card.nmid not in pass_nmids:
             clear_cards.append(card)
@@ -95,13 +109,13 @@ async def _update_cards_in_db(
     cards = clear_cards
 
     # Получаем уникальные имена категорий
-    category_names = {card.wb_category_name for card in cards}
+    category_names: set[str] = {card.wb_category_name for card in cards}
 
     async with _sm(read_only=False) as session:
         # Получаем уже существующие категории
         stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
         result = await session.execute(stmt)
-        existing_categories = {
+        existing_categories: dict[str, WBCategory] = {
             category.wb_category_name: category for category in result.scalars().all()
         }
 
@@ -115,7 +129,7 @@ async def _update_cards_in_db(
         await session.flush()
 
         # Подготавливаем данные для UPSERT
-        card_values = [
+        card_values: list[dict[str, Any]] = [
             {
                 "nmid": card.nmid,
                 "name": card.name,
@@ -126,7 +140,7 @@ async def _update_cards_in_db(
         ]
 
         # Выполняем UPSERT
-        stmt_for_insert_cards = insert(WBCard).values(card_values)
+        stmt_for_insert_cards = insert(WBCard).values(card_values) # pyright: ignore
         stmt_on_conflict = stmt_for_insert_cards.on_conflict_do_update(
             index_elements=["nmid"],
             set_={

@@ -1,0 +1,1 @@
+﻿[{"log":"ERROR: ingest test meta","kubernetes_namespace_name":"prod-adv-bot","kubernetes_pod_name":"test-pod","kubernetes_container_name":"test-container"}]

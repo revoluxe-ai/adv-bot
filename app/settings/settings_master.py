@@ -547,5 +547,14 @@ class Settings:
         return float(value)
 
 
+    @property
+    def DEFAULT_MAX_CPM(self) -> int:
+        value = os.getenv("DEFAULT_MAX_CPM")
+        if not value:
+            return 3000
+        else:
+            return int(value)
+
+
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

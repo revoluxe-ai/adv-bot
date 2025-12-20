@@ -76,6 +76,16 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(button)
 
+    # Кнопка для применения дефолтных настроек
+    if adv_setting.bot_active:
+        button = InlineKeyboardButton(
+            text="Применить дефолтные настройки",
+            callback_data=callbacks.ApplyCampaignDefaults(
+                adv_setting_original_id=adv_setting.id
+            ).pack(),
+        )
+        _ = builder.row(button)
+
     if adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
         bidder_text = "Переключить на кластерный биддер"
         new_bidder_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
@@ -253,6 +263,7 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
+
     button = InlineKeyboardButton(
         text="Управление ставкой",
         callback_data=callbacks.CPMSettingMenu(
@@ -303,26 +314,6 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
-
-    if adv_setting.hard_min_ctr is not None and adv_setting.hard_min_ctr:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Изменить минимальный CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
-
-    else:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Режим управления CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
 
     button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
@@ -1066,33 +1057,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
             text="К списку магазинов", callback_data=callbacks.Start().pack()
         )
     )
-
-    return builder.as_markup()
-
-
-def get_setting_min_ctr_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
-    )
-    if adv.new_auto_min_ctr_mode is not None and adv.new_auto_min_ctr_mode:
-        button = InlineKeyboardButton(
-            text="Выключить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_off_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Включить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_on_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-
-    _ = builder.row(button)
 
     return builder.as_markup()
 
