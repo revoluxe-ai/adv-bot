@@ -172,7 +172,6 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     # Проверяем, что начальные значения отличаются от дефолтных
     initial_defaults = CampaignDefaultsV1()
-    expected_defaults_dict = get_adv_setting_defaults()
     
     # Явно устанавливаем отличающиеся значения для тестовой кампании
     # Для булевых полей инвертируем значение
