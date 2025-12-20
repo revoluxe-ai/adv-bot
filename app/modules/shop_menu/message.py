@@ -495,8 +495,6 @@ class ShopMenu(TextWithKeyboard):
 
         builder.row(button)
 
-        builder.row(button)
-
         # Добавляем кнопку для настройки дефолтной максимальной ставки (CPM)
         button = InlineKeyboardButton(
             text=f"Дефолтная максимальная ставка (CPM) ({wb_cabinet.default_max_cpm})",
