@@ -315,26 +315,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-    if adv_setting.hard_min_ctr is not None and adv_setting.hard_min_ctr:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Изменить минимальный CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
-
-    else:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Режим управления CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
-
     button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
         callback_data=callbacks.ChangeMaxCPC(
