@@ -185,33 +185,58 @@ def _make_engine(db_url: str):
 
 _read_only_engine: AsyncEngine | None = None
 _read_write_engine: AsyncEngine | None = None
+_read_only_session_maker: async_sessionmaker[AnalyticAsyncSession] | None = None
+_read_write_session_maker: async_sessionmaker[AnalyticAsyncSession] | None = None
+_engine_init_lock = asyncio.Lock()
 
 
-def _get_engine(read_only: bool) -> AsyncEngine:
+async def _get_engine(read_only: bool) -> AsyncEngine:
     """Lazily build engines so test detection works reliably.
 
     Important: `PYTEST_CURRENT_TEST` is set by pytest during test execution, not at import
     time. If we eagerly create engines at import time, we may end up with pooled asyncpg
     connections being reused across different event loops (function-scoped loops), causing
     `RuntimeError: Event loop is closed` on Windows.
+    
+    Thread-safe: использует asyncio.Lock для предотвращения создания нескольких движков
+    при одновременных вызовах.
     """
     global _read_only_engine, _read_write_engine
-    if read_only:
-        if _read_only_engine is None:
-            _read_only_engine = _make_engine(read_only_db_connector)
-        return _read_only_engine
+    
+    async with _engine_init_lock:
+        if read_only:
+            if _read_only_engine is None:
+                _read_only_engine = _make_engine(read_only_db_connector)
+            return _read_only_engine
 
-    if _read_write_engine is None:
-        _read_write_engine = _make_engine(read_write_db_connector)
-    return _read_write_engine
+        if _read_write_engine is None:
+            _read_write_engine = _make_engine(read_write_db_connector)
+        return _read_write_engine
 
-def _get_session_maker(read_only: bool) -> async_sessionmaker[AnalyticAsyncSession]:
-    engine = _get_engine(read_only=read_only)
-    return async_sessionmaker(
-        bind=engine,
-        expire_on_commit=False,
-        class_=AnalyticAsyncSession,
-    )
+
+async def _get_session_maker(read_only: bool) -> async_sessionmaker[AnalyticAsyncSession]:
+    """Lazily build session makers, кэшируя их для эффективности."""
+    global _read_only_session_maker, _read_write_session_maker
+    
+    async with _engine_init_lock:
+        if read_only:
+            if _read_only_session_maker is None:
+                engine = await _get_engine(read_only=True)
+                _read_only_session_maker = async_sessionmaker(
+                    bind=engine,
+                    expire_on_commit=False,
+                    class_=AnalyticAsyncSession,
+                )
+            return _read_only_session_maker
+
+        if _read_write_session_maker is None:
+            engine = await _get_engine(read_only=False)
+            _read_write_session_maker = async_sessionmaker(
+                bind=engine,
+                expire_on_commit=False,
+                class_=AnalyticAsyncSession,
+            )
+        return _read_write_session_maker
 
 
 @asynccontextmanager
@@ -224,7 +249,7 @@ async def get_async_session_maker(
     semaphore = global_semaphore
 
     # Выбор нужной фабрики сессий
-    session_maker = _get_session_maker(read_only=read_only)
+    session_maker = await _get_session_maker(read_only=read_only)
 
     try:
         async with semaphore:
@@ -245,9 +270,16 @@ async def get_async_session_maker(
                             f"Session held for too long: {hold_time:.2f}s by task {task_name}"
                         )
     except Exception as e:
+        if current_task is not None:
+            try:
+                task_name = current_task.get_name()
+            except Exception:
+                task_name = "unknown"
+        else:
+            task_name = "unknown"
         logger.error(
             f"Session error after {time() - session_start:.3f}s:\n"
-            f"Task: {current_task.get_name()}\n"
+            f"Task: {task_name}\n"
             f"Error: {str(e)}",
             exc_info=True,
         )
