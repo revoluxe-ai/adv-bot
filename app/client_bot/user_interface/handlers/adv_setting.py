@@ -4,7 +4,7 @@ from typing import Sequence
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result, update
+from sqlalchemy import Result
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -381,30 +381,6 @@ async def turn_adv_off(
         wb_user_cabinet,
         adv_setting,
     )()
-
-
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr")
-)
-async def turn_on_auto_min_ctr(
-    callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR
-):
-    if callback.message is None:
-        raise ValueError('Нет сообщения')
-    chat_id = callback.message.chat.id
-
-    adv_setting_original_id = callback_data.adv_setting_original_id
-    stmt = (
-        update(AdvSetting)
-        .where(AdvSetting.id == callback_data.adv_setting_original_id)
-        .values({AdvSetting.new_auto_min_ctr_mode: True})
-    )
-
-    async with sm(read_only=False) as session:
-        await session.execute(stmt)
-        await session.commit()
-    await messages.SettingMinCTR(bot, chat_id)(adv_setting_original_id)
-
 
 @router.callback_query(callbacks.ApplyCampaignDefaults.filter())
 async def apply_campaign_defaults(
