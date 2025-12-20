@@ -4,9 +4,7 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from aiogram.types import CallbackQuery, User as TelegramUser, Message, Chat
-
 from app.client_bot.modules.default_settings.default_models.common_default import CampaignDefaultsV1
-from app.client_bot.modules.default_settings import get_adv_setting_defaults
 from app.client_bot.user_interface.handlers.adv_setting import (
     apply_campaign_defaults,  # Хэндлер для одной кампании
     turn_adv_on,  # Хэндлер для включения одной кампании
@@ -476,7 +474,6 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
 
     # Проверяем, что начальные значения отличаются от дефолтных для активных кампаний
     initial_defaults = CampaignDefaultsV1()
-    expected_defaults_dict = get_adv_setting_defaults()
     for adv in [adv_active_1, adv_active_2]:
         # Явно устанавливаем отличающиеся значения для тестовой кампании
         # Для булевых полей инвертируем значение
