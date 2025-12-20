@@ -206,6 +206,11 @@ async def adv_handler(
         )
         wb_user_cabinet = wb_user_cabinet.scalar()
 
+    if not wb_user_cabinet:
+        await bot.send_message(
+            chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
 
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
@@ -326,6 +331,12 @@ async def turn_adv_off(
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
 
+    if not wb_user_cabinet:
+        await bot.send_message(
+            chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
+
     async with sm(read_only=False) as session:
         result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
@@ -377,6 +388,12 @@ async def apply_campaign_defaults(
                 select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
             )
             wb_user_cabinet = wb_user_cabinet.scalar()
+
+        if not wb_user_cabinet:
+            await bot.send_message(
+                chat_id, "Кабинет не найден, попробуйте еще раз"
+            )
+            return
 
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
