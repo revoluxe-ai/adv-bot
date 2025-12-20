@@ -23,7 +23,6 @@ from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker
 
 # Импортируем фабрики для создания тестовых данных
 from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory, WBUserCabinetFactory
