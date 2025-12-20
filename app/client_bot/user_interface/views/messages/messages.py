@@ -79,6 +79,16 @@ logger = logging.getLogger(__name__)
 #         raise ValueError("Неправильный формат даты. Ожидается 'дата-месяц-год'.")
 
 
+class ChangeShopDefaultMaxCPMMessage(Text):
+    def __init__(self, bot: Bot, chat_id: int, current_max_cpm: int):
+        super().__init__(bot, chat_id)
+        self._current_max_cpm = current_max_cpm
+
+    @property
+    def text(self) -> str:
+        return f"Введите новое дефолтное значение максимальной ставки (CPM). Текущее значение: {self._current_max_cpm}."
+
+
 class ShopNameGet(Text):
     def __init__(self, bot: Bot, chat_id: int):
         super().__init__(bot, chat_id)
@@ -780,97 +790,6 @@ class ExpiredSubscription(TextWithKeyboard):
         return keyboards.get_payment_keyboard(
             wb_cabinet_original_id=cabinet_id,
         )
-
-
-class SettingMinCTR(TextWithKeyboard):
-    def __init__(self, bot: Bot, chat_id: int):
-        super().__init__(bot, chat_id)
-        self._min_ctr = None
-        self._min_ctr_type = None
-        self.__adv: AdvSetting | None = None
-
-    @property
-    def _adv(self) -> AdvSetting:
-        if self.__adv is None:
-            raise ValueError('Not found adv')
-        return self.__adv
-
-    async def __call__(self, adv_original_id: int):
-        async with sm() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
-            adv: AdvSetting | None = result.scalar()
-            if adv is None:
-                raise ValueError('Not found adv')
-        self.__adv = adv
-        self.__hard_min_ctr: float = adv.hard_min_ctr if adv.hard_min_ctr else 0
-        if adv.new_auto_min_ctr_mode:
-            self._min_ctr_type = "auto"
-        else:
-            self._min_ctr_type = "direct"
-
-        keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
-
-        keywords_with_rating = [kw for kw in keywords if kw.ctr > 0]
-        keywords_with_rating.sort(key=lambda x: x.ctr, reverse=True)
-        keywords_without_rating = [
-            kw for kw in keywords if kw.ctr == 0
-        ]
-        keywords_with_rating.sort(key=lambda x: x.ctr, reverse=True)
-        keywords = keywords_with_rating + keywords_without_rating
-
-        goods: list[CalculatedKeyword] = []
-        bads: list[CalculatedKeyword] = []
-        min_ctr = self.__hard_min_ctr
-        assert (
-            min_ctr is not None
-        )  # Добавлена проверка на None, так как min_ctr может быть None
-        for kw in keywords:
-            ctr = kw.ctr
-            if ctr >= min_ctr:
-                goods.append(kw)
-            else:
-                bads.append(kw)
-
-        goods = goods[-10:]
-        bads = bads[:10]
-        self._goods: list[CalculatedKeyword] = goods
-        self._bads: list[CalculatedKeyword] = bads
-        return await super().__call__()
-
-    @property
-    def text(self):
-        text = (
-            f"Минимальный CTR для кампании {self._adv.name}"
-            f" равен {round(self.__hard_min_ctr * 100, 1)} %,"
-            f"""тип минимального CTR: {
-            "Задан в ручную" if not self._adv.new_auto_min_ctr_mode else "Определен автоматически"
-            }\n"""
-        )
-
-        # keywords = self._goods + self._bads
-        goods = self._goods
-        bads = self._bads
-        goods.sort(key=lambda x: x.ctr, reverse=True)
-        bads.sort(key=lambda x: x.ctr, reverse=True)
-        for good in goods:
-            ctr = good.ctr
-            text += f"{good.text} - {round(ctr * 100, 1)}  % ✅\n"
-        text += f"================== {round(self.__hard_min_ctr * 100, 1)}\n"
-        for bad in self._bads:
-            ctr = bad.ctr
-            text += f"{bad.text} - {round(ctr * 100, 1)}  % ❌\n"
-
-        text += "\n\n"
-
-        text += "Введите новый CTR:"
-        return text
-
-    @property
-    def keyboard(self):
-        return keyboards.get_setting_min_ctr_keyboard(self._adv)
-
 
 class MaxCPCSetting(TextWithKeyboard):
     async def __call__(self, adv_original_id: int):

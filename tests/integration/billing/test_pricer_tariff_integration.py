@@ -4,10 +4,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.pricer.pricer import Pricer, TariffMode
 from app.modules.billing.pricer.tariffs import tariffs, tariffs_for_auto_setting
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from tests.factories.adv_factory import WBCabinetFactory
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+
+
+@pytest.fixture
+async def wb_cabinet(async_session: AsyncSession) -> WBCabinet:
+    """Создаёт WBCabinet с id=1 для использования в тестах через factory."""
+    wb_cabinet = WBCabinetFactory.build(id=1, shop_id="test_shop_id", active=True, balance=0.0, bonus=0.0, demo=True)
+    async_session.add(wb_cabinet)
+    await async_session.flush()
+    return wb_cabinet
 
 
 def _make_search_adv(*, adv_id: int, wb_cabinet_id: int) -> AdvSetting:
@@ -44,8 +54,8 @@ def _make_auto_adv(
 
 async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
     async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
 ):
-    # В conftest.py уже создаётся WBCabinet(id=1, shop_id="test_shop_id")
     wb_cabinet_id = 1
     shop_id = "test_shop_id"
 
@@ -72,6 +82,7 @@ async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
 
 async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
     async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
 ):
     wb_cabinet_id = 1
     shop_id = "test_shop_id"
@@ -100,6 +111,7 @@ async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
 
 async def test_count_is_zero_when_search_campaign_not_started(
     async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
 ):
     wb_cabinet_id = 1
     shop_id = "test_shop_id"
@@ -130,6 +142,7 @@ async def test_count_is_zero_when_search_campaign_not_started(
 
 async def test_auto_tariff_thresholds_apply_to_total_count(
     async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
 ):
     wb_cabinet_id = 1
     shop_id = "test_shop_id"

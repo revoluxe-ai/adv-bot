@@ -155,7 +155,8 @@ def setup_test_database(docker_compose_cmd):
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
-    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", timeout=180)
+    # Используем --force-recreate чтобы гарантировать выполнение init скриптов
+    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", "--force-recreate", timeout=180)
     if rc != 0:
         raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
@@ -558,12 +559,12 @@ SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
 def clean_db():
     """Синхронно очищает ключевые таблицы до и после каждого теста."""
     with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
 
     yield
 
     with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture(scope='function')

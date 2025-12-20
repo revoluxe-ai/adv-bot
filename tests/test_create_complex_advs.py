@@ -8,7 +8,6 @@ from app.core.wb_api.data_classes.advs.base_adv import Adv
 from app.core.wb_api.data_classes.advs.other_classes import Balances
 from app.modules.adv_creator.backend import MainAdvManager
 from app.modules.adv_creator.backend.exc import (
-    ComplexAdvsExistsError,
     AdvExistsForNmidError,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -158,7 +157,7 @@ async def test_create_complex_advs_when_exists(
     with patch(
         "app.modules.adv_creator.backend.main_manager.WBApi"
     ) as WBAPI_mock_class:
-        WBAPI_mock_instance = AsyncMock(return_value=None)
+        WBAPI_mock_instance = AsyncMock(return_value=None) # noqa
         WBAPI_mock_class.return_value = WBAPI_mock_instance
 
         manager = MainAdvManager(access_mock, client_session_mock)
@@ -170,3 +169,9 @@ async def test_create_complex_advs_when_exists(
             await manager.create_complex_advs(
                 bot_mock, user_telegram_id, nmid, hard_mode=False
             )
+
+
+
+
+
+

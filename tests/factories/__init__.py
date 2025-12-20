@@ -6,7 +6,7 @@
 - GoodKeywordFactory, BadKeywordFactory, TestingKeywordFactory - специализированные фабрики
 """
 
-from .adv_factory import AdvSettingFactory, KeywordSettingFactory
+from .adv_factory import AdvSettingFactory, KeywordSettingFactory, WBCabinetFactory
 from .complex_adv import ComplexAdvSeed, create_complex_adv_seed
 from .keyword_pipeline import (
     # Enum
@@ -43,6 +43,7 @@ __all__ = [
     # ORM Factories
     "AdvSettingFactory",
     "KeywordSettingFactory",
+    "WBCabinetFactory",
     # DTO Factories
     "CalculatedKeywordFactory",
     "KeywordSettingDTOFactory",

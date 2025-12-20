@@ -1,8 +1,8 @@
-import asyncio
-from typing import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from absl.testing.absltest import skip
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,17 +15,17 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 
 @pytest.fixture(name="access_mock")
-def _access_mock():
+def _access_mock():  # pyright: ignore[reportUnusedFunction]
     mock = MagicMock()
     mock.wb_cabinet = MagicMock(spec=WBCabinet)
-    mock.wb_cabinet.id = 1
     mock.wb_cabinet.shop_id = "test_shop_id"
     return mock
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+
 async def test_create_complex_advs_upsert_logic(
-    access_mock, async_session: AsyncSession
+    access_mock: Any, async_session: AsyncSession
 ):
     nmid = 518129892
     auto_adv_id_from_wb = 29918589
@@ -77,9 +77,15 @@ async def test_create_complex_advs_upsert_logic(
             new=mock_get_async_session_maker,
         ):
             manager = MainAdvManager(access_mock, MagicMock())
+            # Seed WBCabinet in test DB so __create_complex_advs can select it by id.
+            wb_cabinet_db = WBCabinet(shop_id=access_mock.wb_cabinet.shop_id)
+            async_session.add(wb_cabinet_db)
+            await async_session.flush()
+            access_mock.wb_cabinet.id = wb_cabinet_db.id
+            await async_session.commit()
 
             # # 1. Первый запуск: кампания ещё не существует в БД
-            await manager._MainAdvManager__create_complex_advs(nmid)  # type: ignore[attr-defined]
+            await manager._create_complex_advs(nmid)  # type: ignore[attr-defined]
 
             # Проверяем, что запись была добавлена
             inserted_adv = await async_session.execute(
@@ -93,6 +99,9 @@ async def test_create_complex_advs_upsert_logic(
             )  # Имя может измениться, но должно быть на основе nmid и типа
             assert adv_from_db.active_status == "created_by_bot"
             assert adv_from_db.wb_cabinet.id == access_mock.wb_cabinet.id
+            # Проверяем, что дефолтные настройки были применены
+            assert adv_from_db.bidder_active is True
+            assert adv_from_db.max_place == 1
 
             # # 2. Имитируем ситуацию, когда фоновый процесс уже добавил запись
             # (что произойдет после первого вызова MainAdvManager.__create_complex_advs)
@@ -115,7 +124,7 @@ async def test_create_complex_advs_upsert_logic(
             # ]
 
             # Второй запуск: кампания уже существует, ожидаем UPDATE
-            await manager._MainAdvManager__create_complex_advs(nmid)  # type: ignore[attr-defined]
+            await manager._create_complex_advs(nmid)
 
             # Проверяем, что запись ОБНОВИЛАСЬ, а не создалась новая
             updated_adv = await async_session.execute(
@@ -143,3 +152,4 @@ async def test_create_complex_advs_upsert_logic(
             )
             count_result = await async_session.execute(count_stmt)
             assert count_result.scalar_one() == 1
+
