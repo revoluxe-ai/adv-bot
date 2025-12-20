@@ -294,6 +294,14 @@ class Settings:
         return value
 
     @property
+    def BALANCE_TOPUP_BONUS_PERCENT(self) -> float:
+        """Процент бонуса при пополнении баланса через Telegram (по умолчанию 100%)."""
+        value = os.getenv("BALANCE_TOPUP_BONUS_PERCENT")
+        if value is None:
+            return 100.0
+        return float(value)
+
+    @property
     def SHOP_FILTER_LIST(self) -> list[str]:
         value = os.getenv("SHOP_FILTER_LIST")
         if value:

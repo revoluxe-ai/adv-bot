@@ -29,6 +29,9 @@ os.environ.setdefault("BOT_TOKEN", "test_token_123")
 os.environ.setdefault("WEBHOOK_SECRET", "test_secret")
 os.environ.setdefault("YOOKASSA_TOKEN", "test_yookassa")
 os.environ.setdefault("MIN_SUM", "0")
+os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
+os.environ.setdefault("PG_POOL_SIZE", "5")
+os.environ.setdefault("PG_MAX_OVERFLOW", "10")
 
 TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL

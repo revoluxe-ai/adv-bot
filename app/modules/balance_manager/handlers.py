@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from datetime import date
 import json
 import logging
 
@@ -156,7 +157,7 @@ async def waiting_for_amount(
 
     user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
-    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))]
+    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))] # pyright: ignore # noqa
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
@@ -199,17 +200,23 @@ async def successful_payment_handler(
             )
             return
 
+    # Определяем процент бонуса: начисляем только до конца 2025 года
+    bonus_percent = 0.0
+    if date.today() <= date(2025, 12, 31):
+        bonus_percent = settings.BALANCE_TOPUP_BONUS_PERCENT
+
+
     # Используем новый сервис для обработки платежа
     (
-        balance_payment,
-        bonus_payment,
+        _,
+        _,
         amount,
         bonus_amount,
     ) = await process_payment_with_bonus(
         user_id=user_id,
         cabinet_id=wb_cabinet_original_id,
         amount=float(cost),
-        bonus_percent=0,  # Пока без бонусов
+        bonus_percent=bonus_percent,
         description="Пополнение баланса через Telegram",
     )
 
@@ -223,7 +230,10 @@ async def successful_payment_handler(
             .where(WBCabinet.id == wb_cabinet_original_id)
         )
         wb_user_cabinet_id_result = await session.execute(stmt)
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars().first()
+        wb_user_cabinet_id: int | None = wb_user_cabinet_id_result.scalars().first()
+    if wb_user_cabinet_id is None:
+        raise ValueError('Кабинет не найден')
+
 
     logger.debug("wb_user_cabinet_id: %s", wb_user_cabinet_id)
     await asyncio.sleep(1)
