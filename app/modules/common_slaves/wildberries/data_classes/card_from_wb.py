@@ -40,7 +40,7 @@ class CardFromWB:
         return self._data
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.data["title"]
 
     @property
@@ -83,7 +83,7 @@ class CardFromWB:
         return self.data["updatedAt"]
 
     @property
-    def wb_category_name(self):
+    def wb_category_name(self) -> str:
         return self.data["subjectName"]
 
     @property
