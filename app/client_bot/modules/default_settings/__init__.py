@@ -8,6 +8,8 @@ from app.client_bot.modules.default_settings.default_models.common_default impor
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
+
+# TODO: Тут не совершенная логика, есть риск передачи не того кабинета. Сделал, так, чтобы не забывали передать в функцию wb_cabinet (подгружать из базы)
 def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet) -> None:
     """
     Применяет дефолтные настройки к объекту AdvSetting через прямой маппинг свойств.
@@ -38,8 +40,7 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
         adv_setting.max_place = 1
     
     if adv_setting.max_cpm is None:
-        if adv_setting.wb_cabinet and adv_setting.wb_cabinet.default_max_cpm is not None:
-            adv_setting.max_cpm = wb_cabinet.default_max_cpm
+        adv_setting.max_cpm = wb_cabinet.default_max_cpm
 
 def get_adv_setting_defaults() -> dict[str, Any]:
     """
