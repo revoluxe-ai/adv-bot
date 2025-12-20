@@ -59,7 +59,6 @@ from .user_interface.handlers import (
     auto_update_exponent_toggle,
     auto_add_only_relevant_phrase_toggle,
     reset_place_setting,
-    setting_min_ctr,
     shop_settings,
     strategy_setting,
     rec_system_mode_toggle,
@@ -116,7 +115,6 @@ common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
-common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defined]
