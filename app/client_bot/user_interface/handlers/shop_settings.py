@@ -64,9 +64,7 @@ async def change_shop_default_max_cpm(
         .where(WBCabinet.wb_user_cabinets.any(WBUserCabinet.id == wb_user_cabinet_original_id))
     )
     async with sm(read_only=True) as session:
-        result = await session.execute(stmt
-
-        )
+        result = await session.execute(stmt)
         wb_cabinet = result.scalar_one()
     
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
