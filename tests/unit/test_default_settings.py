@@ -1,3 +1,5 @@
+import pytest
+
 from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 from app.client_bot.modules.default_settings.default_models.common_default import CampaignDefaultsV1
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
@@ -5,6 +7,10 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType, BidderMode
+
+
+pytestmark = pytest.mark.unit
+
 
 def test_apply_defaults_to_adv_setting():
     # Создаем объект AdvSetting с отличными от дефолтных значениями
