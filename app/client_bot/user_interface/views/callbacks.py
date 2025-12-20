@@ -96,11 +96,6 @@ class Start(CallbackData, prefix="start"):
     pass
 
 
-class ChangeMinCTR(CallbackData, prefix="change_min_ctr"):
-    action: str
-    adv_original_id: int
-
-
 class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
