@@ -1081,33 +1081,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_setting_min_ctr_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
-    )
-    if adv.new_auto_min_ctr_mode is not None and adv.new_auto_min_ctr_mode:
-        button = InlineKeyboardButton(
-            text="Выключить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_off_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Включить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_on_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-
-    _ = builder.row(button)
-
-    return builder.as_markup()
-
-
 def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
     adv_original_id = adv.id
     builder = InlineKeyboardBuilder()
