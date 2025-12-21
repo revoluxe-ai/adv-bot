@@ -18,7 +18,10 @@ def convert(raw_response: Response[Any]) -> list[CommonSaleStatRow]:
     # Ответ: список объектов [{ product: {...}, history: [...] }, ...]
     for item in content:
         product = item.get("product", {})
-        nmid = int(product.get("nmId"))
+        nmid = product.get("nmid")
+        if not nmid:
+            continue
+        nmid = int(nmid)
         history = item.get("history", [])
         for h in history:
             day = date.fromisoformat(h.get("date"))
