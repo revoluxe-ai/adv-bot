@@ -238,11 +238,7 @@ async def turn_adv_on(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result_for_wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet | None = result_for_wb_user_cabinet.scalar()
-        if wb_user_cabinet is None:
-            raise ValueError(
-                f"WBUserCabinet with id {wb_user_cabinet_original_id} not found",
-            )
+        wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar_one()
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.payments))
@@ -250,7 +246,7 @@ async def turn_adv_on(
         )
         result_for_adv_setting = await session.execute(stmt)
         adv: AdvSetting = result_for_adv_setting .scalar_one()
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet  # type: ignore[attr-defined]
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
             session, wb_cabinet.shop_id
         )
