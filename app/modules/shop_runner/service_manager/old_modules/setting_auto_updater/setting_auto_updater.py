@@ -100,16 +100,19 @@ class AdvSettingAutoUpdater:
     @staticmethod
     def get_plan_data(adv: AdvSetting) -> PlanData | None:
         plan_orders = adv.plan_for_sales_for_day
-        max_pay_for_order = adv.max_price_for_order
+        max_pay_for_order: float | None = adv.max_price_for_order
         target_pay_for_order = adv.target_price_for_order
-        if not any([plan_orders, target_pay_for_order, max_pay_for_order]):
+        if any([not plan_orders, not target_pay_for_order, not max_pay_for_order]):
             return None
-
-        plan = PlanData(
-            orders=plan_orders,
-            target_pay_for_order=target_pay_for_order,  # noqa
-            max_pay_for_order=max_pay_for_order,  # noqa
-        )
+        try:
+            plan = PlanData(
+                orders=plan_orders,
+                target_pay_for_order=target_pay_for_order, # noqa
+                max_pay_for_order=max_pay_for_order, # noqa
+            )
+        except Exception as exc:
+            logger.exception('Ошибка получения плана')
+            raise exc
 
         return plan
 
