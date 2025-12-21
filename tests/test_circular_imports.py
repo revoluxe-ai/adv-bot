@@ -16,7 +16,6 @@ ENTRY_POINTS = [
     "new_wb_shop_update_run.py",  # Новый модуль обновления магазинов Wildberries
     "run_send_info_message_to_users_process.py",  # Отправка сообщений
     "run_update_keyword_vectors_in_redis.py",  # Обновление векторов ключевых слов
-    "keyword_sending_to_neo4j.py",  # Отправка ключевых слов в Neo4j
     "trunc_system_log_in_clickhouse.py",  # Очистка системных логов
     "client_bot_run.py",  # Клиентский бот
 ]
