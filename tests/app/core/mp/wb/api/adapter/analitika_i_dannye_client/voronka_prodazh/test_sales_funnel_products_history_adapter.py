@@ -11,6 +11,11 @@ from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_s
     SalesFunnelProductsHistoryCommand,
     command_to_body,
 )
+from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import (
+    History,
+    ProductHistoryResponseItem,
+    ProductHistoryResponseItemProduct,
+)
 from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
 
 
@@ -49,11 +54,39 @@ async def test_post_sales_funnel_products_history(voronka_adapter, mock_auth_cli
     mock_client = AsyncMock()
     mock_auth_client_handler.get_proxy_client = AsyncMock(return_value=mock_client)
 
-    api_json = (
-        b'[{"product":{"nmId":111},"history":[{"date":"2025-12-21","openCount":5,'
-        b'"cartCount":2,"orderCount":1,"orderSum":100,"buyoutCount":1}]}]'
+    # Создаём типизированные объекты как в реальном API
+    product = ProductHistoryResponseItemProduct(
+        nm_id=111,
+        title="Test Product",
+        vendor_code="TEST123",
+        brand_name="Test Brand",
+        subject_id=1,
+        subject_name="Test Subject",
     )
-    mock_response_from_api = SimpleNamespace(status_code=200, content=api_json)
+    history_item = History(
+        date=datetime.date(2025, 12, 21),
+        open_count=5,
+        cart_count=2,
+        order_count=1,
+        order_sum=100,
+        buyout_count=1,
+        buyout_sum=100,
+        buyout_percent=100,
+        add_to_cart_conversion=40,
+        cart_to_order_conversion=50,
+        add_to_wishlist_count=0,
+    )
+    parsed_response = [
+        ProductHistoryResponseItem(
+            product=product,
+            history=[history_item],
+        )
+    ]
+
+    mock_response_from_api = SimpleNamespace(
+        status_code=200,
+        parsed=parsed_response,
+    )
 
     with patch(
         "app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.adapter.asyncio_detailed",
