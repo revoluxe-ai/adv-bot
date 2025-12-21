@@ -419,14 +419,14 @@ async def apply_defaults_for_shop(
         )
         result: Result[tuple[AdvSetting]] = await session.execute(stmt)
         adv_settings: Sequence[AdvSetting] = result.scalars().all()
-        
+
         # Применяем дефолты через ORM для каждой активной кампании
         updated_count = 0
         for adv_setting in adv_settings:
             apply_defaults_to_adv_setting(adv_setting,
                                          adv_setting.wb_cabinet)
             updated_count += 1
-        
+
         await session.commit()
 
     await bot.send_message(
