@@ -385,9 +385,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text += (
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
             f"Посл. обнов. обобщенной статистики Ключей: {self.last_update_keyword_stat_str}\n"
+            f"Посл. обнов. полной рек.стат.: {self.full_stat_update_time}\n"
             f"Посл. обнов. минус-слов в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"Посл. обнов. минус-слов в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"Посл. обнов. полной статистики: {self.full_stat_update_time}\n"
             f"Посл. обнов. ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
             f"Посл. автом. добав. ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
