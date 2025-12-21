@@ -758,6 +758,23 @@ async def clickhouse_client(setup_test_database):
         SETTINGS index_granularity = 8192
     """)
 
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.wb_common_stat (
+            nmid UInt64,
+            date Date,
+            open_card UInt32,
+            add_to_cart UInt32,
+            orders UInt32,
+            orders_sum Float64,
+            buy_outs UInt32,
+            version Float64,
+            INDEX idx_wb_common_stat_date date TYPE minmax GRANULARITY 1
+        )
+        ENGINE = ReplacingMergeTree(version)
+        ORDER BY (nmid, date)
+        SETTINGS index_granularity = 8192
+    """)
+
     print("[OK] ClickHouse tables created/checked")
 
     yield client

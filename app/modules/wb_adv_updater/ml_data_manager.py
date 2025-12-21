@@ -1,10 +1,8 @@
-import asyncio
 import logging
 from typing import Any
 
 
 from app.utils.image_master.image_master2 import ImageMaster
-from .update_wb_adv_phrases_in_neo import update_wb_adv_phrases_in_neo
 
 logger = logging.getLogger(__name__)
 
@@ -153,22 +151,6 @@ def is_number(s: Any) -> bool:
 #     await fit_and_save_model()
 #     logger.debug("Устанавливаю сет, разрешаю обновление ключей")
 
-
-async def update_wb_adv_phrase_in_neo_small_cycle():
-    try:
-        await update_wb_adv_phrases_in_neo()
-    except:
-        logger.error("Ошибка обновления фраз в neo", exc_info=True)
-        raise
-
-
-async def update_wb_adv_phrase_in_neo4j() -> None:
-    while True:
-        try:
-            await update_wb_adv_phrase_in_neo_small_cycle()
-        except:
-            logger.error("Ошибка обновления фраз в neo", exc_info=True)
-        await asyncio.sleep(0)
 
 
 index = None

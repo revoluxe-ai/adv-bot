@@ -19,10 +19,8 @@ from app.modules.common_slaves.wildberries.wb_api import WBApi
 
 from app.my_types import KeywordStat
 from app.utils import redis_manager, text_cleaner
-from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
-# from .ML import Predictor
 from .wb_adv_api import WBAdvAPI
 from ..billing import AdvPayment
 from ..common_slaves.wildberries import super_cabinet_manager
@@ -34,8 +32,6 @@ from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
 
 logger = logging.getLogger(__name__)
-
-gds = DataScience()
 
 sm = get_async_session_maker
 
@@ -87,9 +83,6 @@ async def check_adv_payment(
 #             del exc
 #         await asyncio.sleep(0)
 
-
-async def update_vectors_in_redis() -> None:
-    await gds.update_vectors_in_redis()
 
 
 async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
@@ -189,13 +182,6 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
         result = await session.execute(stmt)
         existing_keyword_settings: list[KeywordSetting] = result.scalars().all()
     return {ks.text for ks in existing_keyword_settings}
-
-
-async def update_predict_ctr() -> None:
-    while True:
-        logger.debug("Начинаю прогноз CTR")
-        predictor = Predictor()
-        await predictor.predict_ctr_for_keywords()
 
 
 async def update_all_keyword_data(

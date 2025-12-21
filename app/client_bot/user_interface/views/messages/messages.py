@@ -64,6 +64,9 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
     RedisClusterBidsTimestampManager,
 )
+from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
+    RedisCommonStatTimestampManager,
+)
 
 if TYPE_CHECKING:
     pass
@@ -264,6 +267,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_cluster_bids_timestamp_manager = RedisClusterBidsTimestampManager(
             redis_client
         )
+        self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
+            redis_client
+        )
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -320,6 +326,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
         else:
             self.last_update_keyword_stat_str = "Нет данных"
+
+        last_update_common_stat: datetime | None = (
+            await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
+        )
+        if last_update_common_stat:
+            self.last_update_common_stat_str = last_update_common_stat.strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
+        else:
+            self.last_update_common_stat_str = "Нет данных"
 
         self.keywords_status_last_update_auto_adv = (
             await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
@@ -385,6 +401,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text += (
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
             f"Посл. обнов. обобщенной статистики Ключей: {self.last_update_keyword_stat_str}\n"
+            f"Посл. обнов. обобщенной статистики: {self.last_update_common_stat_str}\n"
             f"Посл. обнов. полной рек.стат.: {self.full_stat_update_time}\n"
             f"Посл. обнов. минус-слов в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"Посл. обнов. минус-слов в аук.: {self.keywords_status_last_update_search_adv}\n"

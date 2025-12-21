@@ -27,11 +27,6 @@ logger = logging.getLogger(__name__)
 
 # TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
 
-
-async def run_update_predict_ctr() -> None:
-    await wb_manager.update_predict_ctr()
-
-
 async def run_update_all_keywords_on_wb() -> None:
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         async with ClientSession() as client_session:
@@ -104,25 +99,6 @@ async def process_payment_for_advs() -> None:
                 f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
             )
             await asyncio.sleep(sleep_seconds)
-
-
-async def run_update_vectors_in_redis() -> None:
-    await wb_manager.update_vectors_in_redis()
-
-
-# async def run_vector_update_in_neo4j() -> None:
-#     await wb_manager.update_vectors_update_in_graph()
-#
-
-# async def run_update_model():
-#     while True:
-#         try:
-#             await update_model()
-#         except Exception as e:
-#             logger.error(f"Ошибка обновления модели {e}", exc_info=True)
-#             del e
-#         await asyncio.sleep(0)
-
 
 async def main_loop() -> None:
     await asyncio.gather(
