@@ -29,6 +29,9 @@ os.environ.setdefault("BOT_TOKEN", "test_token_123")
 os.environ.setdefault("WEBHOOK_SECRET", "test_secret")
 os.environ.setdefault("YOOKASSA_TOKEN", "test_yookassa")
 os.environ.setdefault("MIN_SUM", "0")
+os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
+os.environ.setdefault("PG_POOL_SIZE", "5")
+os.environ.setdefault("PG_MAX_OVERFLOW", "10")
 
 TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
@@ -148,7 +151,10 @@ def docker_compose_cmd() -> list[str]:
     return cmd
 
 
-@pytest.fixture(scope="session", autouse=True)
+_TEST_DB_READY = False
+
+
+@pytest.fixture(scope="session")
 def setup_test_database(docker_compose_cmd):
     from app.modules.common_slaves.wildberries.models import WBCabinet
     """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
@@ -162,19 +168,56 @@ def setup_test_database(docker_compose_cmd):
 
     # --- Ожидание запуска контейнера ---
     container_id: str = ""
-    max_retries = 30
+    # На Windows/Docker Desktop первый старт (pull + initdb) может занимать заметно больше минуты.
+    # Делаем запас, плюс выводим текущий статус для диагностики.
+    max_retries = 120
     for i in range(max_retries):
         rc, cid_out, _ = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10)
         container_id = cid_out.strip()
         if container_id:
             _DOCKER_CLEANUP_STATE["container_id"] = container_id  # Сохраняем для emergency cleanup
-            rc, health, _ = _sync_run(
-                "docker", "inspect", "--format", "{{.State.Health.Status}}", container_id, timeout=10
+            rc, status_out, _ = _sync_run(
+                "docker",
+                "inspect",
+                "--format",
+                "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
+                container_id,
+                timeout=10,
             )
-            if rc == 0 and health.strip() == "healthy":
+            status = status_out.strip() if rc == 0 else "unknown"
+
+            if status.endswith(" healthy"):
                 print("[OK] Test database is healthy.")
                 break
-        print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries}")
+
+            # Fallback: если healthcheck по какой-то причине не работает/не успевает,
+            # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
+            try:
+                loop_probe = asyncio.new_event_loop()
+
+                async def _probe() -> bool:
+                    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+                    try:
+                        async with engine.connect() as conn:
+                            await conn.execute(text("SELECT 1;"))
+                        return True
+                    finally:
+                        await engine.dispose()
+
+                if loop_probe.run_until_complete(_probe()):
+                    print("[OK] Test database is reachable (probe SELECT 1).")
+                    break
+            except Exception:
+                pass
+            finally:
+                try:
+                    loop_probe.close()
+                except Exception:
+                    pass
+
+            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: {status})")
+        else:
+            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: no container yet)")
         time.sleep(2)
     else:
         # Если так и не дождались health=healthy — покажем статус и логи для диагностики
@@ -185,62 +228,97 @@ def setup_test_database(docker_compose_cmd):
 
     print("[DB] Resetting PostgreSQL schema for tests...")
 
+    # --- Ensure pg_hba.conf allows host connections (Windows/Docker Desktop often shows as 172.* gateway) ---
+    # Иногда init-скрипты в /docker-entrypoint-initdb.d не применяются (например, если volume не пересоздался),
+    # и тогда asyncpg получает: "no pg_hba.conf entry ... no encryption".
+    # Патчим pg_hba.conf прямо в контейнере и делаем reload конфигурации.
+    if container_id:
+        hba_patch_cmd = (
+            'set -e; '
+            'HBA="$PGDATA/pg_hba.conf"; '
+            'MARKER="# added by pytest conftest (allow host connections for tests)"; '
+            'if ! grep -q "$MARKER" "$HBA"; then '
+            '  printf "\\n%s\\n" "$MARKER" >> "$HBA"; '
+            '  printf "host    all             all             0.0.0.0/0               trust\\n" >> "$HBA"; '
+            '  printf "host    all             all             ::/0                    trust\\n" >> "$HBA"; '
+            '  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select pg_reload_conf();" >/dev/null; '
+            'fi'
+        )
+        _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
+
     # Добавим небольшую задержку перед манипуляциями со схемой
     time.sleep(5)
 
-    sync_engine = create_engine(TEST_DB_POSTGRES_URL)
-
-    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
-    with sync_engine.connect() as conn:
-        conn.execution_options(isolation_level="AUTOCOMMIT")
-        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
-
-    # Создаём необходимые расширения PostgreSQL в новой схеме
-    with sync_engine.connect() as conn:
-        conn.execution_options(isolation_level="AUTOCOMMIT")
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-
-    print("[DB] Creating tables from SQLAlchemy metadata...")
-    Base.metadata.create_all(sync_engine)
-    print("[OK] Tables created successfully from models metadata.")
-
-    sync_engine.dispose()
-
-    # --- Базовые данные (async) ---
-    # Создаём минимальный event loop только для этой задачи
+    # --- Подготовка схемы и таблиц через asyncpg (без psycopg2) ---
+    # Важно: после выполнения НЕ оставлять закрытый event loop установленным как current loop,
+    # иначе pytest-asyncio/asyncpg могут начать использовать "закрытый" loop.
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        async def insert_initial_data():
-            engine = create_async_engine(TEST_DB_URL)
-            async with engine.begin() as conn:
-                initial_wb_cabinet_data = {
-                    "id": 1,
-                    "shop_id": "test_shop_id",
-                    "active": True,
-                    "expiration_time": datetime.now() + timedelta(days=7),
-                    "balance": 0.0,
-                    "bonus": 0.0,
-                    "demo": True,
-                    "expiration_alarm_days_pass": None,
-                    "white_list_update_active": False,
-                }
-                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                    index_elements=["id"],
-                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-                )
-                await conn.execute(on_conflict_stmt)
-                await conn.commit()
-            await engine.dispose()
+        async def init_schema_and_seed():
+            engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+            try:
+                async with engine.begin() as conn:
+                    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
+                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+                    # Расширения
+                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                    # Таблицы
+                    await conn.run_sync(Base.metadata.create_all)
 
-        loop.run_until_complete(insert_initial_data())
+                    # Базовые данные
+                    initial_wb_cabinet_data = {
+                        "id": 1,
+                        "shop_id": "test_shop_id",
+                        "active": True,
+                        "expiration_time": datetime.now() + timedelta(days=7),
+                        "balance": 0.0,
+                        "bonus": 0.0,
+                        "demo": True,
+                        "expiration_alarm_days_pass": None,
+                        "white_list_update_active": False,
+                    }
+                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                    )
+                    await conn.execute(on_conflict_stmt)
+                    # При явной вставке id sequence может остаться на 1 -> следующий INSERT даст id=1.
+                    # Проставляем sequence в max(id), чтобы новые кабинеты получали id=2,3,...
+                    await conn.execute(
+                        text(
+                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                        )
+                    )
+            finally:
+                await engine.dispose()
+
+        # Docker Desktop иногда даёт "connection was closed..." сразу после health=healthy.
+        # Делаем несколько попыток инициализации схемы, чтобы интеграционные тесты были стабильными.
+        max_init_retries = 5
+        for attempt in range(1, max_init_retries + 1):
+            try:
+                loop.run_until_complete(init_schema_and_seed())
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= max_init_retries:
+                    raise
+                print(
+                    f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
+                    f"Retry {attempt}/{max_init_retries}..."
+                )
+                time.sleep(2)
     finally:
         loop.close()
+        # После закрытия временного цикла событий являем новый дефолтный event loop для тестов
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
     print("[OK] Test database setup complete.")
 
+    global _TEST_DB_READY
+    _TEST_DB_READY = True
     yield
 
     # --- TEARDOWN ---
@@ -269,13 +347,15 @@ def setup_test_database(docker_compose_cmd):
     if container_id:
         _sync_run("docker", "rm", "-f", container_id, timeout=10)
         _DOCKER_CLEANUP_STATE["container_id"] = None
+    # Если нормальный teardown прошёл — emergency cleanup больше не нужен
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
 
     print("[OK] Cleanup complete.")
 
 
 
 @pytest.fixture(scope="function", name="async_engine")
-async def _async_engine():
+async def _async_engine(setup_test_database):
     """Создаёт async движок для каждого теста."""
     engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
     yield engine
@@ -483,7 +563,7 @@ async def fake_redis():
     redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield redis
     await redis.flushall()  # очищаем после теста
-    await redis.close()
+    await redis.aclose()
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
@@ -551,20 +631,33 @@ async def sm_generator(postgres_session):
     return _FakeSessionMaker()
 
 
-SYNC_TEST_DB_URL = TEST_DB_URL.replace("postgresql+asyncpg", "postgresql")
-SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
-
-
 @pytest.fixture(autouse=True)
-def clean_db():
-    """Синхронно очищает ключевые таблицы до и после каждого теста."""
-    with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
+async def clean_db():
+    """Очищает ключевые таблицы до и после каждого теста (не трогая event loop).
 
+    Для unit-тестов без поднятой Docker-БД — no-op.
+    """
+    if not _TEST_DB_READY:
+        yield
+        return
+
+    truncate_sql = text(
+        # Чистим данные, которые часто создаются тестами.
+        # Включаем wbcabinet, чтобы тесты могли стабильно создавать кабинет с id=1
+        # (иначе возможны UniqueViolation на pkey при сидировании).
+        'TRUNCATE "user", wbcabinet, wbusercabinet, wbbalancepayment, wbbonuspayment, '
+        "payment, keywordsetting, advsetting RESTART IDENTITY CASCADE"
+    )
+
+    async def _truncate() -> None:
+        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        async with engine.begin() as conn:
+            await conn.execute(truncate_sql)
+        await engine.dispose()
+
+    await _truncate()
     yield
-
-    with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting, \"user\", wbusercabinet, wbcabinet RESTART IDENTITY CASCADE"))
+    await _truncate()
 
 
 @pytest.fixture(scope='function')
