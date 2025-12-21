@@ -4,12 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_calls_all_coroutines() -> None:
+async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     """
     Тест проверяет, что метод run класса WBShop запускает необходимые корутины
     """
@@ -21,7 +22,8 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     # Создаем экземпляр WBShop
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -68,7 +70,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             coroutines_manager_mock.update_cluster_bids.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
+async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> None:
     """
     Тест проверяет, что метод run класса WBShop передает правильное количество
     корутин в asyncio.gather
@@ -81,7 +83,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     # Создаем экземпляр WBShop
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()

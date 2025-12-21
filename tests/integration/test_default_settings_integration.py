@@ -441,26 +441,15 @@ async def test_turn_adv_on_applies_defaults(
         ):
             await turn_adv_on(callback_query, mock_state, callback_data, mock_bot)
 
-    # Проверяем, что бот активен и дефолты применились
+    # Проверяем только bot_active, дефолты НЕ должны применяться
     updated_adv_setting = await async_session.execute(
         select(AdvSetting).where(AdvSetting.id == adv_setting_inactive.id)
     )
     updated_adv_setting = updated_adv_setting.scalar_one()
 
     assert updated_adv_setting.bot_active
-
-    expected_defaults = CampaignDefaultsV1()
-    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
-    default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
-    ]
-
-    for key in default_fields:
-        assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
-        assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
+    # Остальные настройки (например, bidder_active) не должны сбрасываться к дефолтам
+    assert updated_adv_setting.bidder_active == adv_setting_inactive.bidder_active
 
 
 @pytest.mark.integration

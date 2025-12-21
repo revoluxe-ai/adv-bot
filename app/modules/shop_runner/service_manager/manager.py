@@ -10,7 +10,7 @@ from typing import (
 
 
 
-from app.core.wb_api.ping_manager import PingManager
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -21,8 +21,8 @@ from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import (
-    WBCommonStatManager,
+from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
+    RedisCommonStatTimestampManager,
 )
 
 from app.settings import settings
@@ -41,7 +41,7 @@ T = TypeVar("T")
 
 
 class CoroutinesManager:
-    def __init__(self, wb_api: WBApi):
+    def __init__(self, wb_api: WBApi, redis_client_wrapper: RedisClient):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
@@ -55,6 +55,9 @@ class CoroutinesManager:
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
+        self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
+            redis_client=redis_client_wrapper
+        )
 
     @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
@@ -90,7 +93,7 @@ class CoroutinesManager:
                     self.shop_id,
                 )
 
-        logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
+        logger.debug("Все ставки обновлены для магазина %s", self.shop_id)
         return None
 
     @staticmethod
@@ -99,15 +102,26 @@ class CoroutinesManager:
         keywords = await complex_adv.get_keywords()
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(5 * 60)
+    @while_coroutine_decorator(60 * 15)
     async def update_common_sale_stat(self) -> None:
-        wb_api = self._wb_api
-        ping_manager = PingManager(wb_api.access, self._session)
-        await ping_manager.ping_analytics_rights_and_connect()
-        wb_stat_manager = WBCommonStatManager(wb_api)
         advs = await self._wb_shop_data_manager.get_complex_advs()
-        active_nmids = [adv.nmids[0] for adv in advs]
-        await wb_stat_manager.update_common_statistic(active_nmids)
+        if not advs:
+            return None
+        from .services.common_sale_stat_updater import (
+            CommonSaleStatUpdater,
+            CommonSaleStatUpdaterContainer,
+        )
+        from app.core.di.wb_manager_hub import WBManagerHubFactory
+
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
+        updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
+
+        await updater.update_last_week_stats(advs)
+        for adv in advs:
+            for adv_id in adv.all_adv_ids:
+                await self._redis_common_stat_timestamp_manager.set(adv_id)
+        return None
 
     @staticmethod
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:

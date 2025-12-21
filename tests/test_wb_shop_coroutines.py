@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
@@ -39,7 +40,13 @@ def client_session_mock():
 )
 @pytest.mark.asyncio
 async def test_adv_settings_auto_update(
-    access_mock, adv_setting_mock, keywords_mocks, client_session_mock, fact_method, get_async_session_mock
+    access_mock,
+    adv_setting_mock,
+    keywords_mocks,
+    client_session_mock,
+    fact_method,
+    get_async_session_mock,
+    fake_redis,
 ):
     adv_setting_mock.auto_update_white_list = True
     adv_setting_mock.auto_update_target_place = True
@@ -112,7 +119,8 @@ async def test_adv_settings_auto_update(
             return_value=mock_change_plan_fact,
         ),
     ):
-        manager = CoroutinesManager(wb_api)
+        redis_client_wrapper = RedisClient(redis_client=fake_redis)
+        manager = CoroutinesManager(wb_api, redis_client_wrapper)
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]
         manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}

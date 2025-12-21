@@ -10,7 +10,7 @@ from app.modules.balance_manager.balance_service import sm
 from app.modules.common_slaves.wildberries.models import WBCabinet
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 async def test_session_factory(async_engine: AsyncEngine):
     """Фабрика сессий для интеграционных тестов.
 
@@ -28,7 +28,13 @@ async def test_session_factory(async_engine: AsyncEngine):
         async with async_session_maker() as session:
             yield session
 
-    with patch("app.modules.balance_manager.balance_service.sm", get_test_session):
+    with patch(
+        "app.modules.balance_manager.balance_service.sm",
+        get_test_session,
+    ), patch(
+        "app.modules.balance_manager.handlers.sm",
+        get_test_session,
+    ):
         yield get_test_session
 
 

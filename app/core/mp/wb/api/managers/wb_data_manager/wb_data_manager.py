@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 
 if typing.TYPE_CHECKING:
     from app.core.mp.wb.api.domain_managers import AnalyticsManager, PromotionManager
+    from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_sales_funnel_products_history.dto import (
+        CommonSaleStatRow,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,18 @@ class WBDataManager:
         )
 
         return positions
+
+    async def get_sales_funnel_products_history(
+        self,
+        nmids: list[int],
+        start: datetime.date,
+        end: datetime.date,
+    ) -> list["CommonSaleStatRow"]:
+        return await self._analytics_manager.get_sales_funnel_products_history(
+            nmids=nmids,
+            start=start,
+            end=end,
+        )
 
 
     async def get_norn_query_stat_for_date_range(
