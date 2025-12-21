@@ -93,7 +93,7 @@ class CoroutinesManager:
                     self.shop_id,
                 )
 
-        logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
+        logger.debug("Все ставки обновлены для магазина %s", self.shop_id)
         return None
 
     @staticmethod
