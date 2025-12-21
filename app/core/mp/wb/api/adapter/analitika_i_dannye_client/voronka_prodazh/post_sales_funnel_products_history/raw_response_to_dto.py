@@ -24,7 +24,10 @@ def convert(raw_response: Response[Any]) -> list[CommonSaleStatRow]:
         nmid = int(nmid)
         history = item.get("history", [])
         for h in history:
-            day = date.fromisoformat(h.get("date"))
+            date_str = h.get("date")
+            if not date_str:
+                continue
+            day = date.fromisoformat(date_str)
             row = CommonSaleStatRow(
                 nmid=nmid,
                 day=day,
