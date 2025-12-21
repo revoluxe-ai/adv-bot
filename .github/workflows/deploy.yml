@@ -27,7 +27,7 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: |
           echo "Checking access to GHCR..."
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.GHCR_REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.GHCR_REGISTRY }} -u ${{ github.actor }} --password-stdin
           # Попробуем выполнить pull, но не прерываем пайплайн, если репозиторий еще не существует.
           if ! docker pull ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:latest; then
             echo "Warning: Repository not found or access denied (Invalid token or insufficient permissions). Continuing with build process."
@@ -35,7 +35,7 @@ jobs:
 
       - name: Check available tags in GHCR
         run: |
-          curl -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           https://ghcr.io/v2/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}/tags/list
 
       - name: Set up Docker Buildx
