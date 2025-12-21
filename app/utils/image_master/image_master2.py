@@ -1,17 +1,13 @@
 import logging
 import os
 
-import faiss
 import numpy as np
 from PIL import Image as PilImg
 from tqdm import tqdm
 
-from app.utils.faiss_manager.faiss_index import Index
-from app.utils.faiss_manager.faiss_index_manager import FaissManager
 from app.utils.image_master import image_tools
 from app.utils.image_master.database.model import Image
-from keras.applications.vgg19 import VGG19, preprocess_input
-from keras.preprocessing.image import img_to_array
+
 
 from .database import model
 
@@ -37,9 +33,6 @@ class ImageMaster:
         self._im_tools = im_tools
         current_folder = os.path.dirname(os.path.abspath(__file__))
         self._images_folder = os.path.join(current_folder, "image_sources")
-        if load_indexes:
-            self._indexes = FaissManager()
-        self._model = VGG19(include_top=False)
         # self._alchemy_session_maker = get_session_maker()
 
     def __enter__(self):
@@ -49,29 +42,6 @@ class ImageMaster:
         if hasattr(self, "_indexes"):
             self._indexes.save_indexes()
 
-    @property
-    def indexes(self):
-        return self._indexes
-
-    def get_vector(self, img: PilImg) -> Image:
-        # Ensure the image is in RGB mode
-
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-
-        # Ensure the tensor has three channels
-        img = img.resize((224, 224))
-        x = img_to_array(img)
-        assert x.shape[-1] == 3, "Image tensor does not have 3 channels!"
-
-        x = np.expand_dims(x, axis=0)
-        x = preprocess_input(x)
-        model = self._model
-        features = model.predict(x)
-        vector = features.flatten()
-        vector = np.expand_dims(vector, axis=0)
-        faiss.normalize_L2(vector)
-        return vector[0]
 
     def _add_image_common(
         self,
@@ -164,15 +134,6 @@ class ImageMaster:
             return False, distance, indexes[0][0]
         else:
             return True, distance, indexes[0][0]
-
-    def search_all_for_one(self, vector, index: Index) -> (list[float], list[object]):
-        vector = vector.reshape(1, -1)
-        assert self.is_normalized_l2(vector)
-        assert index.index.ntotal > 0
-        distances, indexes = index.index.search(vector, k=index.index.ntotal)
-        distances = distances**1 / 2
-        objects = [index.id_to_object[int(i)] for i in indexes[0]]
-        return distances, objects
 
     def search_one(self, vector, index) -> (float, Image):
         vector = vector.reshape(1, -1)
