@@ -6,8 +6,7 @@ services:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
     volumes:
-      # compose-файл находится в ./tests, поэтому относительные пути считаются от этой папки
-      - ./postgres-init:/docker-entrypoint-initdb.d # добавляем init-скрипты для pg_hba.conf
+      - .\tests\postgres-init:/docker-entrypoint-initdb.d # добавляем init-скрипты для pg_hba.conf
     ports:
       - "5433:5432" # Используем другой порт, чтобы избежать конфликтов с основной БД
     healthcheck:
@@ -39,8 +38,7 @@ services:
     # volumes:
     #   - ./ch_data_test:/var/lib/clickhouse
     volumes:
-      # compose-файл находится в ./tests, поэтому относительные пути считаются от этой папки
-      - ./clickhouse-config:/etc/clickhouse-server/users.d/
+      - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
 
 
 #  test_redis:
