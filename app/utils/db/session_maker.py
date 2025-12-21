@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import ssl
 import traceback
 from collections.abc import AsyncGenerator
@@ -9,13 +8,7 @@ from time import time
 from typing import Any
 
 from sqlalchemy import Result
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    create_async_engine,
-    async_sessionmaker,
-)
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from app.settings import settings
 
@@ -151,88 +144,75 @@ ssl_ctx = get_ssl_context(
     getattr(settings, "ssl_mode", None),
 )
 
-def _is_pytest() -> bool:
-    """True when running under pytest.
+read_only_engine = create_async_engine(
+    read_only_db_connector,
+    echo=False,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_recycle=180,
+    pool_pre_ping=True,
+    connect_args={"ssl": ssl_ctx},
+)
 
-    Important: in our test suite event loop is often function-scoped; asyncpg connections
-    are bound to the loop they were created in. If we keep a pooled connection across tests,
-    the next test will run on a new loop and will crash with 'Event loop is closed'.
-    """
-    return "PYTEST_CURRENT_TEST" in os.environ
+read_write_engine = create_async_engine(
+    read_write_db_connector,
+    echo=False,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_recycle=180,
+    pool_pre_ping=True,
+    connect_args={"ssl": ssl_ctx},
+)
+
+# Фабрики сессий
+read_only_session_maker = async_sessionmaker(
+    bind=read_only_engine,
+    expire_on_commit=False,
+    class_=AnalyticAsyncSession,
+)
+
+read_write_session_maker = async_sessionmaker(
+    bind=read_write_engine,
+    expire_on_commit=False,
+    class_=AnalyticAsyncSession,
+)
 
 
-def _make_engine(db_url: str):
-    if _is_pytest():
-        # No pooling in tests to avoid cross-event-loop reuse of asyncpg connections.
-        return create_async_engine(
-            db_url,
-            echo=False,
-            poolclass=NullPool,
-            pool_pre_ping=True,
-            connect_args={"ssl": ssl_ctx},
+@asynccontextmanager
+async def get_async_session_maker(
+    read_only: bool = False,
+) -> AsyncGenerator[AsyncSession, None]:
+    session_start = time()
+    current_task = asyncio.current_task()
+
+    semaphore = global_semaphore
+
+    # Выбор нужной фабрики сессий
+    session_maker = read_only_session_maker if read_only else read_write_session_maker
+
+    try:
+        async with semaphore:
+            async with session_maker() as session:
+                try:
+                    yield session
+                finally:
+                    hold_time = time() - session_start
+                    if hold_time > 1.0:
+                        if current_task is not None:
+                            try:
+                                task_name = current_task.get_name()
+                            except Exception:
+                                task_name = "unknown"
+                        else:
+                            task_name = "unknown"
+                        logger.warning(
+                            f"Session held for too long: {hold_time:.2f}s by task {task_name}"
+                        )
+    except Exception as e:
+        logger.error(
+            f"Session error after {time() - session_start:.3f}s:\n"
+            f"Task: {current_task.get_name()}\n"
+            f"Error: {str(e)}",
+            exc_info=True,
         )
-
-    return create_async_engine(
-        db_url,
-        echo=False,
-        pool_size=pool_size,
-        max_overflow=max_overflow,
-        pool_recycle=180,
-        pool_pre_ping=True,
-        connect_args={"ssl": ssl_ctx},
-    )
-
-
-_read_only_engine: AsyncEngine | None = None
-_read_write_engine: AsyncEngine | None = None
-_read_only_session_maker: async_sessionmaker[AnalyticAsyncSession] | None = None
-_read_write_session_maker: async_sessionmaker[AnalyticAsyncSession] | None = None
-_engine_init_lock = asyncio.Lock()
-
-
-async def _get_engine(read_only: bool) -> AsyncEngine:
-    """Lazily build engines so test detection works reliably.
-
-    Important: `PYTEST_CURRENT_TEST` is set by pytest during test execution, not at import
-    time. If we eagerly create engines at import time, we may end up with pooled asyncpg
-    connections being reused across different event loops (function-scoped loops), causing
-    `RuntimeError: Event loop is closed` on Windows.
-    
-    Thread-safe: использует asyncio.Lock для предотвращения создания нескольких движков
-    при одновременных вызовах.
-    """
-    global _read_only_engine, _read_write_engine
-    
-    async with _engine_init_lock:
-        if read_only:
-            if _read_only_engine is None:
-                _read_only_engine = _make_engine(read_only_db_connector)
-            return _read_only_engine
-
-        if _read_write_engine is None:
-            _read_write_engine = _make_engine(read_write_db_connector)
-        return _read_write_engine
-
-async def _get_session_maker(read_only: bool):
-    global _read_only_session_maker, _read_write_session_maker
-
-    maker = _read_only_session_maker if read_only else _read_write_session_maker
-    if maker is not None:
-        return maker
-
-    engine = await _get_engine(read_only)
-
-    async with _engine_init_lock:
-        maker = _read_only_session_maker if read_only else _read_write_session_maker
-        if maker is None:
-            maker = async_sessionmaker(
-                bind=engine,
-                expire_on_commit=False,
-                class_=AnalyticAsyncSession,
-            )
-            if read_only:
-                _read_only_session_maker = maker
-            else:
-                _read_write_session_maker = maker
-
-        return maker
+        raise
