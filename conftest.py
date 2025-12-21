@@ -50,7 +50,6 @@ import fakeredis
 import typing
 if typing.TYPE_CHECKING:
     from app.core.di.app_container import AppContainer
-    from app.modules.common_slaves.wildberries.models import WBCabinet
 
 import sys
 from pathlib import Path
@@ -72,7 +71,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text, create_engine
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
@@ -156,7 +155,6 @@ _TEST_DB_READY = False
 
 @pytest.fixture(scope="session")
 def setup_test_database(docker_compose_cmd):
-    from app.modules.common_slaves.wildberries.models import WBCabinet
     """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
@@ -212,6 +210,8 @@ def setup_test_database(docker_compose_cmd):
             finally:
                 try:
                     loop_probe.close()
+                    # После закрытия временного цикла событий создаём новый дефолтный event loop
+                    asyncio.set_event_loop(asyncio.new_event_loop())
                 except Exception:
                     pass
 
@@ -358,8 +358,10 @@ def setup_test_database(docker_compose_cmd):
 async def _async_engine(setup_test_database):
     """Создаёт async движок для каждого теста."""
     engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
-    yield engine
-    await engine.dispose()
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture(name="async_session")
@@ -428,8 +430,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto 
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
     KeywordStat,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBToken
-
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken, WBCabinet
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
