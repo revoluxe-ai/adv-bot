@@ -11,7 +11,6 @@ from typing import (
 
 
 from app.core.redis_manager_v2.redis_client import RedisClient
-from app.core.wb_api.ping_manager import PingManager
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
