@@ -211,7 +211,7 @@ async def get_async_session_maker(
     except Exception as e:
         logger.error(
             f"Session error after {time() - session_start:.3f}s:\n"
-            f"Task: {current_task.get_name()}\n"
+            f"Task: {current_task.get_name() if current_task else 'Не известная задача'}\n"
             f"Error: {str(e)}",
             exc_info=True,
         )
