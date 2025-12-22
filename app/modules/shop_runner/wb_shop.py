@@ -46,7 +46,8 @@ class WBShop:
             coroutines_manager.update_minus_phrases_in_advs(),
             coroutines_manager.update_clusters_adv_stats_today(),
             coroutines_manager.update_clusters_adv_stats_history(),
-            coroutines_manager.update_cluster_bids()
+            coroutines_manager.update_cluster_bids(),
+            coroutines_manager.update_plan_fact_stats()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск
