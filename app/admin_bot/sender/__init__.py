@@ -27,7 +27,8 @@ class RedisManager:
             await redis_master_client.close()
         except Exception:
             pass
-        try:
+        try: 
+            # TODO: Это не должно попасть в основной код - закрывает глобальный редис 
             await redis_replica_client.close()
         except Exception:
             pass
