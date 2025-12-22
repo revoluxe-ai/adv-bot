@@ -58,10 +58,5 @@ class PlanFactManager:
         # Записываем в ClickHouse батчем
         if plan_fact_stats:
             await self._clickhouse_manager.insert_plan_fact_stats(plan_fact_stats)
-            logger.debug(
-                "Записано %d записей план-факта для shop_id=%s",
-                len(plan_fact_stats),
-            )
-
         return None
 
