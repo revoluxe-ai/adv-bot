@@ -43,7 +43,7 @@ class RedisManager:
             user_id: ID пользователя Telegram
         """
         key = self._get_key(message_hash, user_id, bot_id)
-        await redis_master_client.set(key, "1")
+        await redis_master_client.set(key, "1", ex=60*60*24)
 
     @staticmethod
     def _get_key(message_hash: str, user_id: int, bot_id: int):
