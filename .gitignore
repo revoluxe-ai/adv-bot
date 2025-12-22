@@ -82,3 +82,5 @@ model/model.json
 invates/
 invited_users.txt
 clickhouse-data/
+k8s/xray-client/config.json
+k8s/xray-client/README.md

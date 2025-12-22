@@ -413,6 +413,19 @@ class CoroutinesManager:
         await update_clusters_bid_manager.update_cluster_bids(advs)
         return None
 
+    @while_coroutine_decorator(5 * 60, 60)
+    async def update_plan_fact_stats(self) -> None:
+        """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
+        from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
+
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+
+        manager = PlanFactManager()
+        await manager.process_and_save(advs)
+        return None
+
 
 
 # TODO: Переделать граф зависимостей

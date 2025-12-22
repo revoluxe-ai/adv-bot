@@ -436,7 +436,7 @@ class Settings:
     def PG_POOL_SIZE(self) -> int:
         value = os.getenv("PG_POOL_SIZE")
         if not value:
-            return 5
+            return 30
         else:
             return int(value)
 
@@ -444,7 +444,7 @@ class Settings:
     def PG_MAX_OVERFLOW(self) -> int:
         value = os.getenv("PG_MAX_OVERFLOW")
         if not value:
-            return 10
+            return 50
         else:
             return int(value)
 
