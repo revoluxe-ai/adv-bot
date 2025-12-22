@@ -402,7 +402,6 @@ class CoroutinesManager:
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        advs = [adv for adv in advs if adv.search_adv_active_status]
         advs = [
             adv
             for adv in advs
