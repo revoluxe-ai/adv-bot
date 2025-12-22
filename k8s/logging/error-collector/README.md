@@ -187,3 +187,4 @@ kubectl rollout status deployment/error-collector -n logging
 
 
 
+
