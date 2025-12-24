@@ -217,3 +217,5 @@ async def test_fact_without_fact_method():
     # fact_method должен быть установлен, так как он есть в FactData
     assert dto.fact_method == "DIRECT_SALES"
 
+
+

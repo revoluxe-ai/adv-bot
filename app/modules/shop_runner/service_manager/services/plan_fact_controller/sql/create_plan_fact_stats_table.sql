@@ -16,3 +16,5 @@ PARTITION BY toYYYYMM(date)
 ORDER BY (adv_id, date, timestamp)
 SETTINGS index_granularity = 8192;
 
+
+
