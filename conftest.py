@@ -795,6 +795,147 @@ async def clickhouse_client(setup_test_database):
         SETTINGS index_granularity = 8192
     """)
 
+    # Создаём таблицу advkeyword (источник для Materialized Views)
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.advkeyword (
+            adv_id UInt64,
+            date Date,
+            text String,
+            views UInt32,
+            clicks UInt32,
+            spend Float64,
+            version UInt64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, text, version)
+        SETTINGS index_granularity = 8192
+    """)
+
+    # Создаём Materialized View: advkeyword_daily_mv
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.advkeyword_daily_mv
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.advkeyword_daily_mv
+        (
+            `adv_id` UInt64,
+            `date` Date,
+            `text` String,
+            `clicks` AggregateFunction(argMax, UInt32, UInt64),
+            `views` AggregateFunction(argMax, UInt32, UInt64),
+            `spend` AggregateFunction(argMax, Float64, UInt64)
+        )
+        ENGINE = AggregatingMergeTree
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, text)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT 
+            adv_id,
+            date,
+            text,
+            argMaxState(clicks, version) AS clicks,
+            argMaxState(views, version) AS views,
+            argMaxState(spend, version) AS spend
+        FROM default_db.advkeyword
+        GROUP BY adv_id, date, text
+    """)
+
+    # Создаём Materialized View: cumulative_views
+    # ВАЖНО: SummingMergeTree автоматически суммирует числовые колонки, поэтому НЕ используем sum() в SELECT
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.cumulative_views
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.cumulative_views
+        (
+            `adv_id` UInt64,
+            `text` String,
+            `date` Date,
+            `total_views` UInt64,
+            `total_clicks` UInt64,
+            `total_spend` Float64
+        )
+        ENGINE = SummingMergeTree
+        ORDER BY (adv_id, text, date)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT 
+            adv_id,
+            text,
+            date,
+            views AS total_views,
+            clicks AS total_clicks,
+            spend AS total_spend
+        FROM default_db.advkeyword
+    """)
+
+    # Создаём Materialized View: mv_clusters_daily
+    # Агрегирует данные из clusters_adv_stats по дням с использованием AggregatingMergeTree
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.mv_clusters_daily
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily
+        (
+            `nmid` UInt64,
+            `text` LowCardinality(String),
+            `date` Date,
+            `views_state` AggregateFunction(argMax, UInt32, DateTime),
+            `clicks_state` AggregateFunction(argMax, UInt32, DateTime),
+            `add_to_cart_state` AggregateFunction(argMax, UInt32, DateTime),
+            `orders_state` AggregateFunction(argMax, UInt32, DateTime),
+            `cpm_state` AggregateFunction(argMax, Float64, DateTime),
+            `cpc_state` AggregateFunction(argMax, Float64, DateTime),
+            `ts_state` AggregateFunction(max, DateTime)
+        )
+        ENGINE = AggregatingMergeTree
+        ORDER BY (nmid, text, date)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT nmid,
+               norm_query AS text,
+               date,
+               argMaxState(views, timestamp) AS views_state,
+               argMaxState(clicks, timestamp) AS clicks_state,
+               argMaxState(add_to_cart, timestamp) AS add_to_cart_state,
+               argMaxState(orders, timestamp) AS orders_state,
+               argMaxState(cpm, timestamp) AS cpm_state,
+               argMaxState(cpc, timestamp) AS cpc_state,
+               maxState(timestamp) AS ts_state
+        FROM default_db.clusters_adv_stats
+        GROUP BY nmid, text, date
+    """)
+
+    # Создаём Materialized View: mv_clusters_last_state
+    # Хранит последнее состояние для каждого nmid + text
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.mv_clusters_last_state
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_last_state
+        (
+            `nmid` UInt64,
+            `text` LowCardinality(String),
+            `last_avg_pos_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_cpc_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_cpm_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_ts_state` AggregateFunction(max, DateTime)
+        )
+        ENGINE = AggregatingMergeTree
+        ORDER BY (nmid, text)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT nmid,
+               norm_query AS text,
+               argMaxState(avr_pos, timestamp) AS last_avg_pos_state,
+               argMaxState(cpc, timestamp) AS last_cpc_state,
+               argMaxState(cpm, timestamp) AS last_cpm_state,
+               maxState(timestamp) AS last_ts_state
+        FROM default_db.clusters_adv_stats
+        GROUP BY nmid, norm_query
+    """)
+
     print("[OK] ClickHouse tables created/checked")
 
     yield client
