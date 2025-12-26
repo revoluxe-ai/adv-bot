@@ -38,7 +38,7 @@ class AutoMaxBidManager:
                 result_max_cpm = user_max_cpm
             else:
                 result_max_cpm = min(int(max_cpm), user_max_cpm)
-        if result_max_cpm:
+        if result_max_cpm is not None:
             await self._max_cpm_status_manager.set(adv, result_max_cpm)
         return result_max_cpm
 
