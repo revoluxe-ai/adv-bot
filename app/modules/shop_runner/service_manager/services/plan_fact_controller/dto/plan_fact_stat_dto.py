@@ -50,12 +50,7 @@ class PlanFactStatDTO(BaseModel):
             fact_original_orders=fact.original_orders if fact else None,
             fact_pay_for_order=fact.pay_for_order if fact else None,
             fact_method=(
-                str(fact.fact_method.value)
-                if fact
-                and fact.fact_method
-                else str(fact.fact_method)
-                if fact and fact.fact_method
-                else None
+                str(fact.fact_method) if fact and fact.fact_method else None
             ),
             version=version,
         )
