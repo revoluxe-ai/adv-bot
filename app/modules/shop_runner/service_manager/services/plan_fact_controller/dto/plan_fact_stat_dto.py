@@ -2,8 +2,6 @@ from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel
-
-from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -52,13 +50,7 @@ class PlanFactStatDTO(BaseModel):
             fact_original_orders=fact.original_orders if fact else None,
             fact_pay_for_order=fact.pay_for_order if fact else None,
             fact_method=(
-                str(fact.fact_method.value)
-                if fact
-                and fact.fact_method
-                and isinstance(fact.fact_method, FactMethods)
-                else str(fact.fact_method)
-                if fact and fact.fact_method
-                else None
+                str(fact.fact_method) if fact and fact.fact_method else None
             ),
             version=version,
         )

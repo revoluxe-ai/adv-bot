@@ -38,7 +38,8 @@ class AutoMaxBidManager:
                 result_max_cpm = user_max_cpm
             else:
                 result_max_cpm = min(int(max_cpm), user_max_cpm)
-        await self._max_cpm_status_manager.set(adv, result_max_cpm)
+        if result_max_cpm is not None:
+            await self._max_cpm_status_manager.set(adv, result_max_cpm)
         return result_max_cpm
 
     async def _get_max_cpm(
@@ -82,10 +83,12 @@ class AutoMaxBidManager:
         # TODO: тут логика завязана на 1 артикул в РК
         # Смотрим только по одной РК, чтобы точно узнать конверсию из показов ключей в заказы
         # TODO: Ошибка в проде: смотрели Автокампанию для определения конверсии в ключах
-        adv_ids = [
-            adv.search_adv_id,
-        ]
-        clicks_to_order_ratio: float = (
+        adv_ids: list[int] = []
+        if search_adv_id := adv.search_adv_id:
+            adv_ids.append(search_adv_id)
+        if not adv_ids:
+            return None
+        clicks_to_order_ratio: float | None= (
             await clickhouse_manager.get_clicks_to_orders_ration_on_phrases(
                 adv_ids, period_days
             )
@@ -101,7 +104,9 @@ class AutoMaxBidManager:
         )
 
         plan_fact_getter = PlanFactGetter(adv, 2)
-        plan_data: PlanData = plan_fact_getter.get_plan_data(adv)
+        plan_data: PlanData | None = plan_fact_getter.get_plan_data(adv)
+        if not plan_data:
+            return None
         if not plan_data.full_settings:
             return None
         fact_data: FactData = await plan_fact_getter.get_fact_data(keywords)

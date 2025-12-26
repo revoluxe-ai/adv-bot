@@ -95,7 +95,7 @@ async def send_message_to_users():
 
     await asyncio.gather(*send_tasks)
     try:
-        [await bot.session.close() for bot in bots]
+        _ = [await bot.session.close() for bot in bots]
     except Exception as e:
         logger.warning(f"Bot session close failed: {e}")
 
