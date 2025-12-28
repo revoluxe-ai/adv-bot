@@ -46,10 +46,11 @@ async def get_max_cpm(
     main_adv_setting = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
     max_user_cpm = complex_adv.max_user_cpm
-    max_cpm: int | None = await auto_max_bid_manager.get_max_cpm(
-        main_adv_setting, keywords, max_user_cpm
-    )
-    return max_cpm
+    if complex_adv.auto_max_bid_cpm_active:
+        return await auto_max_bid_manager.get_max_cpm(
+            main_adv_setting, keywords, max_user_cpm
+        )
+    return max_user_cpm
 
 
 async def get_best_keyword(complex_adv: ComplexAdv) -> CalculatedKeyword | None:
