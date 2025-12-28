@@ -294,7 +294,7 @@ SELECT
     (ifNull(agg.clicks_sum, 0) / nullIf(ifNull(agg.views_sum, 0), 0)) AS ctr,
 
     b.ctr_eff * if(b.cart_eff = 0, 1, b.cart_eff) * if(b.order_eff = 0, 1, b.order_eff)
-        /ls.last_cpm
+        /ls.last_cpm * 100
         AS final_rating,
 
     ifNull(ata.views_all_time, 0)      AS views_all_time,
