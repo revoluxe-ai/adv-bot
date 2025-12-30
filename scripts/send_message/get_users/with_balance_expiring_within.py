@@ -1,8 +1,10 @@
 from sqlalchemy import select
-
+from sqlalchemy.orm import selectinload
+from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.billing.pricer import Pricer
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.models import User
-
+from app.modules.balance_manager.balance_service import get_cabinet_balance
 
 async def get_users_with_balance_expiring_within(days: int):
     pricer = Pricer()
@@ -30,7 +32,7 @@ async def get_users_with_balance_expiring_within(days: int):
                     continue  # Нет активных кампаний, пропускаем кабинет
 
                 # Получаем баланс и бонусы
-                balance, bonus = await get_cabinet_balance_and_bonuses(
+                balance, bonus = await get_cabinet_balance (
                     wb_cabinet.id
                 )
                 total_money = balance + bonus
