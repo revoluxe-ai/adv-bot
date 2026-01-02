@@ -827,7 +827,7 @@ class MaxCPCSetting(TextWithKeyboard):
             if str(kw.status) == KeywordStatus.GOOD
             or kw.reason == KeywordStatusReason.MAX_CPC
         ]
-        keywords.sort(key=lambda x: x.cpc, reverse=True)
+        keywords.sort(key=lambda x: x.cpc if x.cpc else 0, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
             down_kw_list = keywords
@@ -835,7 +835,10 @@ class MaxCPCSetting(TextWithKeyboard):
             top_kw_list: list[CalculatedKeyword] = []
             down_kw_list: list[CalculatedKeyword] = []
             for keyword in keywords:
-                if keyword.cpc > self._adv.max_cpc:
+                cpc = keyword.cpc
+                if cpc is None:
+                    continue
+                if cpc > self._adv.max_cpc:
                     top_kw_list.append(keyword)
                 else:
                     down_kw_list.append(keyword)
@@ -847,12 +850,18 @@ class MaxCPCSetting(TextWithKeyboard):
     def text(self):
         text = f"""Максимальная цена клика {"для кампании " + self._adv.name + " равна " + str(round(self._adv.max_cpc, 2)) + " р." if self._adv.max_cpc else "не задана"}\n"""
         for keyword in self._top_kw_list:
-            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ❌\n"""
+            cpc = keyword.cpc
+            if cpc is None:
+                continue
+            text += f"""{keyword.text} - {round(cpc, 2)} р. ❌\n"""
 
         text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
         print("============")
         for keyword in self._down_kw_list:
-            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ✅\n"""
+            cpc = keyword.cpc
+            if cpc is None:
+                continue
+            text += f"""{keyword.text} - {round(cpc, 2)} р. ✅\n"""
 
         text += "Введите новую максимальную цену клика для кампании:"
         return text
