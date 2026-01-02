@@ -31,6 +31,9 @@ class CalculatedKeyword(BaseModel):
         return int(pay_for_1000_views + 0.5)
 
 
+    @property
+    def cpc(self) -> float:
+        return self.spend / self.clicks
 
     @property
     def pay_for_order_by_current_cpm(self) -> float:
@@ -66,10 +69,6 @@ class CalculatedKeyword(BaseModel):
     @property
     def spend(self) -> float:
         return self.cluster_stat.spend
-
-    @property
-    def cpc(self) -> float:
-        return self.cluster_stat.cpc
 
     @property
     def ctr(self) -> float:

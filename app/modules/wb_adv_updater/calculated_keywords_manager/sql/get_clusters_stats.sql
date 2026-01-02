@@ -1,6 +1,6 @@
 WITH
 /* ================================================================
-   1) DAILY_LAST — восстанавливаем дневные значения из Aggregating MV
+   1) DAILY_LAST — CPM-only
    ================================================================ */
 daily_last AS (
     SELECT
@@ -11,13 +11,10 @@ daily_last AS (
         argMaxMerge(add_to_cart_state)  AS add_to_cart,
         argMaxMerge(orders_state)       AS orders,
         argMaxMerge(cpm_state)          AS cpm,
-        argMaxMerge(cpc_state)          AS cpc,
         maxMerge(ts_state)              AS last_ts_day
     FROM default_db.mv_clusters_daily
     WHERE nmid = {nmid: UInt64}
-    GROUP BY
-        text,
-        date
+    GROUP BY text, date
 ),
 
 /* ================================================================
@@ -33,13 +30,12 @@ all_time_agg AS (
 ),
 
 /* ================================================================
-   3) LAST STATE — как в старом контракте (timestamp/cpc/cpm/avg_pos)
+   3) LAST STATE — CPM-only
    ================================================================ */
 last_state AS (
     SELECT
         text,
         argMaxMerge(last_avg_pos_state) AS last_avg_pos,
-        argMaxMerge(last_cpc_state)     AS cpc_last,
         argMaxMerge(last_cpm_state)     AS last_cpm,
         maxMerge(last_ts_state)         AS last_ts
     FROM default_db.mv_clusters_last_state
@@ -48,7 +44,7 @@ last_state AS (
 ),
 
 /* ================================================================
-   4) REAL POSITION — оставляем из clusters_adv_stats (как было)
+   4) REAL POSITION
    ================================================================ */
 data_pos AS (
     SELECT
@@ -119,13 +115,13 @@ final_pos_real AS (
         if(
             views1 = views2,
             pos1,
-            abs((pos1 * views1 - pos2 * views2) / (views1 - views2))
+            abs((pos1 * views1 - pos2 * views2) / nullIf(views1 - views2, 0))
         ) AS pos_real
     FROM pos_real_calc
 ),
 
 /* ================================================================
-   5) CART → ORDER (контрактный блок)
+   5) CART → ORDER
    ================================================================ */
 cart_conv_base AS (
     SELECT
@@ -133,7 +129,7 @@ cart_conv_base AS (
         sum(orders)      AS orders_sum,
         if(
             sum(add_to_cart) > 0,
-            sum(orders) / sum(add_to_cart),
+            sum(orders) / nullIf(sum(add_to_cart), 0),
             0.0
         ) AS cart_to_order_conv
     FROM daily_last
@@ -141,7 +137,7 @@ cart_conv_base AS (
 ),
 
 /* ================================================================
-   6) 7-DAY AGG (как в исходном: spend = cpm*views/1000 + cpc*clicks)
+   6) 7-DAY AGG — CPM-only spend
    ================================================================ */
 agg_stats AS (
     SELECT
@@ -150,7 +146,7 @@ agg_stats AS (
         sum(clicks)      AS clicks_sum,
         sum(add_to_cart) AS add_to_cart_sum,
         sum(orders)      AS orders_sum,
-        sum((cpm * views) / 1000.0 + (cpc * clicks)) AS spend_sum
+        sum((cpm * views) / 1000.0) AS spend_sum
     FROM daily_last
     WHERE date >= today() - 7
     GROUP BY text
@@ -187,7 +183,7 @@ priors AS (
 ),
 
 /* ================================================================
-   8) CTR WINDOW (500 views)
+   8) CTR WINDOW
    ================================================================ */
 ctr_window AS (
     SELECT
@@ -235,7 +231,7 @@ order_14d AS (
 ),
 
 /* ================================================================
-   9) BAES — ВАЖНО: t.text AS text (чтобы b.text точно существовал)
+   9) BAES
    ================================================================ */
 baes AS (
     SELECT
@@ -267,7 +263,7 @@ baes AS (
 )
 
 /* ================================================================
-   10) FINAL — контракт 1:1 со старым запросом
+   10) FINAL — CPM-only
    ================================================================ */
 SELECT
     agg.text AS norm_query,
@@ -282,8 +278,7 @@ SELECT
     cb.cart_to_order_conv AS base_cart_to_order_conv,
 
     greatest(ifNull(agg.add_to_cart_sum, 0) - ifNull(agg.orders_sum, 0), 0)
-        * cb.cart_to_order_conv
-      AS expected_orders_from_cart,
+        * cb.cart_to_order_conv AS expected_orders_from_cart,
 
     (
         ifNull(agg.orders_sum, 0)
@@ -291,27 +286,28 @@ SELECT
             * cb.cart_to_order_conv
     ) AS expected_orders,
 
-    ifNull(
-    (
-        b.ctr_eff
-        * if(ifNull(b.cart_eff, 0) = 0, 1, b.cart_eff)
-        * if(ifNull(b.order_eff, 0) = 0, 1, b.order_eff)
-    )
-    / nullIf(pfr.price, 0)
-    * 100,
-    0
-) AS final_rating,
+    if(
+        ifNull(ls.last_cpm, 0) > 0
+        AND b.ctr_eff IS NOT NULL,
+        (
+            b.ctr_eff
+            * if(ifNull(b.cart_eff, 0) = 0, 1, b.cart_eff)
+            * if(ifNull(b.order_eff, 0) = 0, 1, b.order_eff)
+        )
+        / ls.last_cpm
+        * 100,
+        0
+    ) AS final_rating,
 
-    ifNull(ata.views_all_time, 0)      AS views_all_time,
-    ifNull(ata.orders_all_time, 0)     AS orders_all_time,
-    ifNull(ls.last_ts, toDateTime(0))  AS timestamp,
-    ifNull(ls.cpc_last, 0.0)           AS cpc,
-    ifNull(ls.last_cpm, 0.0)           AS cpm
+    ifNull(ata.views_all_time, 0)     AS views_all_time,
+    ifNull(ata.orders_all_time, 0)    AS orders_all_time,
+    ifNull(ls.last_ts, toDateTime(0)) AS timestamp,
+    ifNull(ls.last_cpm, 0.0)          AS cpm
 
 FROM agg_stats AS agg
-LEFT JOIN baes            AS b   ON b.text = agg.text
-LEFT JOIN last_state      AS ls  ON ls.text = agg.text
-LEFT JOIN final_pos_real  AS fpr ON fpr.text = agg.text
-LEFT JOIN all_time_agg    AS ata ON ata.text = agg.text
+LEFT JOIN baes           AS b   ON b.text = agg.text
+LEFT JOIN last_state     AS ls  ON ls.text = agg.text
+LEFT JOIN final_pos_real AS fpr ON fpr.text = agg.text
+LEFT JOIN all_time_agg   AS ata ON ata.text = agg.text
 CROSS JOIN cart_conv_base AS cb
 ORDER BY final_rating DESC
