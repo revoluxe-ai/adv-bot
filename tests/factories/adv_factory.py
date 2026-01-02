@@ -1,15 +1,42 @@
 import factory
 from factory.alchemy import SQLAlchemyModelFactory
 from faker import Faker
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet
 
 
 fake = Faker("ru_RU")
 
 
+class WBCabinetFactory(SQLAlchemyModelFactory):
+    class Meta:
+        model = WBCabinet
+        sqlalchemy_session = None
+
+    id = factory.Sequence(lambda n: n + 1)
+    shop_id = factory.LazyFunction(lambda: fake.uuid4())
+    active = True
+    expiration_time = factory.LazyFunction(lambda: fake.date_time_between(start_date="now", end_date="+30d"))
+    balance = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0, max_value=1000), 2))
+    bonus = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0, max_value=100), 2))
+    demo = False
+    expiration_alarm_days_pass = None
+    white_list_update_active = False
+
+
+class WBUserCabinetFactory(SQLAlchemyModelFactory):
+    class Meta:
+        model = WBUserCabinet
+        sqlalchemy_session = None
+
+    id = factory.Sequence(lambda n: n + 1)
+    name = factory.LazyFunction(lambda: fake.company())
+    wb_cabinet = factory.SubFactory(WBCabinetFactory)
+
+
 class AdvSettingFactory(SQLAlchemyModelFactory):
     class Meta:
         model = AdvSetting
+        sqlalchemy_session = None
 
     max_place = factory.LazyFunction(lambda: fake.random_int(5, 100))
 
@@ -38,6 +65,7 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
 class KeywordSettingFactory(SQLAlchemyModelFactory):
     class Meta:
         model = KeywordSetting
+        sqlalchemy_session = None
 
     adv_setting_id = None
     text = factory.LazyFunction(lambda: fake.unique.word())

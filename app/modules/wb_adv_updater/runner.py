@@ -16,7 +16,6 @@ from app.modules.token_monitoring.services.token_expiration_service import (
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
-from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
 
 set_config()
@@ -28,18 +27,13 @@ logger = logging.getLogger(__name__)
 
 # TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
 
-
-async def run_update_predict_ctr() -> None:
-    await wb_manager.update_predict_ctr()
-
-
 async def run_update_all_keywords_on_wb() -> None:
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         async with ClientSession() as client_session:
             while True:
                 try:
                     await wb_manager.update_all_keywords_on_wb(client_session)
-                except Exception:
+                except Exception: # noqa
                     logger.error("Ошибка обновления фраз", exc_info=True)
                 await asyncio.sleep(5)
 
@@ -106,32 +100,12 @@ async def process_payment_for_advs() -> None:
             )
             await asyncio.sleep(sleep_seconds)
 
-
-async def run_update_vectors_in_redis() -> None:
-    await wb_manager.update_vectors_in_redis()
-
-
-async def run_vector_update_in_neo4j() -> None:
-    await wb_manager.update_vectors_update_in_graph()
-
-
-async def run_update_model():
-    while True:
-        try:
-            await update_model()
-        except Exception as e:
-            logger.error(f"Ошибка обновления модели {e}", exc_info=True)
-            del e
-        await asyncio.sleep(0)
-
-
 async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
         # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
+        # TODO: Не понятно эта функция вообще работает или нет
         process_token_expiration_check(),
-        run_update_vectors_in_redis(),
-        run_vector_update_in_neo4j(),
     )
 
 

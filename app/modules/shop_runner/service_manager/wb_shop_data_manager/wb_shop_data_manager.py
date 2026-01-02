@@ -1,21 +1,17 @@
-from collections.abc import Sequence, Callable
-from collections.abc import Awaitable
+from collections.abc import Sequence
 from typing import cast
-
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
-
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -26,20 +22,20 @@ class WBShopDataManager:
         self.shop_id: str = wb_cabinet.shop_id
 
     @single_run()
-    async def get_calculated_keywords(self, adv: AdvSetting) -> list[CalculatedKeyword]:
+    async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
         from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
-        if not adv:
+        if not complex_adv:
             raise RuntimeError("Сначала обновить модели")
         try:
-            keywords = await get_good_bad_phrases(adv)
+            keywords = await get_good_bad_phrases(complex_adv)
         except Exception as exc:
             raise exc
 
         return keywords
 
     @single_run()
-    async def get_active_advs(self) -> list[AdvSetting]:
+    async def _get_active_advs(self) -> list[AdvSetting]:
         shop_id = self.shop_id
         stmt = (
             select(AdvSetting)
@@ -68,7 +64,7 @@ class WBShopDataManager:
     @single_run()
     async def get_complex_advs(self) -> list["ComplexAdv"]:
         adv_settings: list[AdvSetting] = cast(
-            list[AdvSetting], await self.get_active_advs()
+            list[AdvSetting], await self._get_active_advs()
         )
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
@@ -81,11 +77,14 @@ class WBShopDataManager:
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
                 adv_setting=adv,
-                get_keywords_func=self.get_calculated_keywords,
+                get_keywords_func=self.__get_calculated_keywords,
                 search_adv=search_adv_idv.get(adv.search_adv_id),
             )
             complex_advs.append(complex_adv)
         return complex_advs
+
+
+
 
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

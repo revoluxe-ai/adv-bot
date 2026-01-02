@@ -290,16 +290,18 @@ The decorator supports various usage patterns:
 ```python
 @while_coroutine_decorator(60, 60)  # 1-minute success, 1-minute error pause
 async def update_cpm_bid(self) -> None:
-    adv_settings = await self._wb_shop_data_manager.get_active_advs()
+    adv_settings = await self._wb_shop_data_manager._get_active_advs()
     if not adv_settings:
         return None
     # Business logic here
     return None
 
+
 @while_coroutine_decorator(5 * 60)  # 5-minute pause on success
 async def update_common_sale_stat(self) -> None:
     # Analytics update logic
     pass
+
 
 @while_coroutine_decorator(60, 1)  # 1-second pause on error
 async def update_advs_data_from_wb_to_pg(self) -> None:
@@ -353,7 +355,7 @@ The data processing pipeline handles multiple concurrent operations:
 ```python
 async def update_full_adv_stat(self) -> None:
     wb_api = self._wb_api
-    auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
+    auto_advs: list[AdvSetting] = await self._wb_shop_data_manager._get_active_advs()
 
     all_adv_ids = set()
     for adv in auto_advs:
@@ -364,7 +366,7 @@ async def update_full_adv_stat(self) -> None:
     full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
         wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
     )
-    
+
     if full_stats:
         await self._update_full_stat_in_click_house(full_stats)
         date_time = datetime.now()

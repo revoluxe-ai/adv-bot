@@ -1,15 +1,12 @@
 from datetime import datetime
-
-from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
+from app.core.di.wb_manager_hub import WBManagerHub
 from app.core.mp.wb.dto import KeywordPosition
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    KeywordStatus,
-    CalculatedKeyword,
-)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-from .click_house_manager import ClickHouseKeywordStampManager
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from .click_house_manager import ClickHouseKeywordJamStatManager
 from .keyword_stamp import KeywordStamp
 from zoneinfo import ZoneInfo
 from typing import Sequence
@@ -27,7 +24,7 @@ class KeywordStampManager:
     def __init__(
         self,
         wb_api_manager_hub: WBManagerHub,
-        click_house_manager: ClickHouseKeywordStampManager,
+        click_house_manager: ClickHouseKeywordJamStatManager,
     ):
         self._click_house = click_house_manager
         self._wb_api = wb_api_manager_hub
@@ -126,7 +123,9 @@ class KeywordStampManager:
             cpms.append(complex_adv.current_cpms.auto_cpm)
         if search_adv := complex_adv.search_adv:
             if search_adv.active_status == "started":
-                cpms.append(complex_adv.current_cpms.search_cpm)
+                search_cpm = complex_adv.current_cpms.search_cpm
+                if search_cpm is not None:
+                    cpms.append(search_cpm)
         if not cpms:
             return 0
         else:

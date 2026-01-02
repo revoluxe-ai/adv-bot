@@ -294,6 +294,14 @@ class Settings:
         return value
 
     @property
+    def BALANCE_TOPUP_BONUS_PERCENT(self) -> float:
+        """Процент бонуса при пополнении баланса через Telegram (по умолчанию 100%)."""
+        value = os.getenv("BALANCE_TOPUP_BONUS_PERCENT")
+        if value is None:
+            return 100.0
+        return float(value)
+
+    @property
     def SHOP_FILTER_LIST(self) -> list[str]:
         value = os.getenv("SHOP_FILTER_LIST")
         if value:
@@ -428,7 +436,7 @@ class Settings:
     def PG_POOL_SIZE(self) -> int:
         value = os.getenv("PG_POOL_SIZE")
         if not value:
-            return 5
+            return 30
         else:
             return int(value)
 
@@ -436,7 +444,7 @@ class Settings:
     def PG_MAX_OVERFLOW(self) -> int:
         value = os.getenv("PG_MAX_OVERFLOW")
         if not value:
-            return 10
+            return 50
         else:
             return int(value)
 
@@ -537,6 +545,15 @@ class Settings:
         if not value:
             return 0.1
         return float(value)
+
+
+    @property
+    def DEFAULT_MAX_CPM(self) -> int:
+        value = os.getenv("DEFAULT_MAX_CPM")
+        if not value:
+            return 3000
+        else:
+            return int(value)
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

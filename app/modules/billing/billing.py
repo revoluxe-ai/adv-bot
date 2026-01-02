@@ -288,10 +288,24 @@ async def __process_single_cabinet(
         if not await _safe_commit(session, result, cabinet_id):
             return result
 
+        # Отметка времени последнего успешного списания (best-effort, по shop_id)
+        if payment_successful:
+            try:
+                await redis_manager.set_last_charge_at(
+                    wb_cabinet.shop_id,  # type: ignore[arg-type]
+                    current_dt,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Cabinet %s: не удалось записать last_charge_at в Redis: %s",
+                    cabinet_id,
+                    exc,
+                )
+
         # Флаг в Redis (best-effort)
         try:
             await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa
             logger.warning(
                 "Cabinet %s: commit успешен, но Redis-флаг не установлен (повтор допустим)",
                 cabinet_id,

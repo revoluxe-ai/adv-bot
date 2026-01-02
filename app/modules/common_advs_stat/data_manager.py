@@ -2,10 +2,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from . import clickhouse_manager
 from sqlalchemy import select
-
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
@@ -17,8 +13,9 @@ from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_man
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
-from app.modules.wb_adv_updater import data_manager
+
 from app.utils.db.session_maker import get_async_session_maker
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 _sm = get_async_session_maker
 
@@ -32,7 +29,8 @@ class CommonAdvsStatData:
 
     adv_setting: AdvSetting
     keywords: list[CalculatedKeyword]
-    min_ctr: float
+    min_rating_by_orders: float | None
+    hard_min_ctr: float | None
     auto_cpm: int
     auction_cpm: int | None
     total_spend: float
@@ -55,11 +53,8 @@ class CommonAdvsStatDataManager:
     ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
-        # Получаем min_ctr
-        min_ctr = await data_manager.get_min_ctr(adv_setting)
-
         # Получаем CPM для аукциона
-        auction_cpm = None
+        auction_cpm: int | None = None
         if search_adv_id := adv_setting.search_adv_id:
             stmt = select(AdvSetting.cpm).where(AdvSetting.adv_id == search_adv_id)
             async with _sm() as session:
@@ -129,14 +124,16 @@ class CommonAdvsStatDataManager:
         if base_common_carts == 0:
             base_common_carts = 0.2
         predict_orders_for_days = await self._get_predict_orders_for_day(
-            adv_setting, base_common_orders, base_common_carts, pass_days
+            adv_setting, base_common_orders, base_common_carts,
         )
         predict_orders_for_fraction_day = self._get_predict_order_for_fractation_day(
             predict_orders_for_days, pass_days
         )
 
+        # Исправлено: используем реальные заказы вместо прогнозируемых с дробной частью дня
+        # для корректного расчета средней себестоимости заказа
         mean_price_for_order = (
-            spend_for_inner_advs_for_days / predict_orders_for_fraction_day
+            spend_for_inner_advs_for_days / max(base_common_orders, 1)
         )
 
         # Получаем расходы на ключевые слова
@@ -148,11 +145,13 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auto_adv.spend
             - spend_for_keywords_in_auto_adv
         )
-
+        from app.modules.wb_adv_updater import phrases_processor
+        min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
         return CommonAdvsStatData(
             adv_setting=adv_setting,
             keywords=keywords,
-            min_ctr=min_ctr,
+            min_rating_by_orders=min_rating_by_orders,
+            hard_min_ctr=adv_setting.hard_min_ctr,
             auto_cpm=adv_setting.cpm,
             auction_cpm=auction_cpm,
             total_spend=full_spend_for_all_advs,
@@ -172,9 +171,9 @@ class CommonAdvsStatDataManager:
         adv: AdvSetting,
         base_common_orders: int,
         base_common_carts: int,
-        pass_days: int,
-    ) -> float:
 
+    ) -> float:
+        # TODO: Переделать вычисление, где будет не только конвертация в корзину, но и
         if adv.sales_predict_method == FactMethods.DIRECT_SALES:
             return base_common_orders
         elif adv.sales_predict_method == FactMethods.BY_CARTS:
@@ -185,9 +184,9 @@ class CommonAdvsStatDataManager:
             raise NotImplementedError(
                 f"Неизвестный метод прогноза заказов: {adv.sales_predict_method}"
             )
-
+    @staticmethod
     async def _get_cart_to_order_ratio(
-        self, adv: AdvSetting, pass_days: int = 7
+    adv: AdvSetting, pass_days: int = 7
     ) -> float:
         ch = clickhouse_manager
         ratio = await ch.get_cart_to_order_ratio_from_common_items_stat(adv, pass_days)
@@ -195,9 +194,9 @@ class CommonAdvsStatDataManager:
             # TODO: Ошибка в прод ушла = сделать тест
             ratio = 1.0
         return ratio
-
+    @staticmethod
     def _get_predict_order_for_fractation_day(
-        self, base_predict_orders: float, pass_days: int
+        base_predict_orders: float, pass_days: int
     ) -> float:
         now = datetime.now()
         hours_passed = now.hour + now.minute / 60 + now.second / 3600

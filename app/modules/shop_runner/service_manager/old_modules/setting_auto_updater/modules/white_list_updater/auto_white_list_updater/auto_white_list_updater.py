@@ -2,11 +2,9 @@ from typing import TypeVar
 
 from sqlalchemy import update
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .redis_cache.redis_cache import AdvSettingRedisCache
@@ -47,7 +45,7 @@ class WhiteListUpdateManager:
         white_keywords: list[CalculatedKeyword] = [
             kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
         ]
-        white_keywords.sort(key=lambda kw: kw.baes_ctr, reverse=True)
+        white_keywords.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
         white_keywords = white_keywords[1:]
         if not white_keywords:
             return False, True
@@ -99,7 +97,7 @@ class WhiteListUpdateManager:
         if not keywords_for_adding:
             return False, True
 
-        keywords_for_adding.sort(key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
+        keywords_for_adding.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
         keyword_for_adding = keywords_for_adding[0]
 
         async with sm() as session:

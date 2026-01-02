@@ -14,13 +14,10 @@ from app.client_bot.user_interface.views.callbacks import (
     SalesPredictMethodToggle,
     AutoUpdaterVersionToggle,
     ChangeAutoUpdateExponentStatus,
+    ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeRecSystemModeStatus,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -29,13 +26,19 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.common_slaves.wildberries.models.models import (
+    BidderCoroutineType,
+    PredictCTRMode,
+)
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
+)
+from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
+    BidderCoroutineTypeToggle,
 )
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
@@ -44,13 +47,14 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
     AutoUpdateWhiteListSetting,
     RelevantKeywordStatusSetting,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
 
 
 def get_adv_setting_keyboard(
-    chat_id: int,
     wb_user_cabinet: WBUserCabinet,
     adv_setting: AdvSetting,
     in_favorites: bool,
@@ -71,6 +75,32 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    # Кнопка для применения дефолтных настроек
+    if adv_setting.bot_active:
+        button = InlineKeyboardButton(
+            text="Применить дефолтные настройки",
+            callback_data=callbacks.ApplyCampaignDefaults(
+                adv_setting_original_id=adv_setting.id
+            ).pack(),
+        )
+        _ = builder.row(button)
+
+    if adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
+        bidder_text = "Переключить на кластерный биддер"
+        new_bidder_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    else:
+        bidder_text = "Переключить на стандартный биддер (CPM)"
+        new_bidder_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+
+    bidder_callback = BidderCoroutineTypeToggle(
+        new_type=new_bidder_type.value,
+        adv_setting_original_id=adv_setting.id,
+    ).pack()
+    bidder_button = InlineKeyboardButton(
+        text=bidder_text, callback_data=bidder_callback
+    )
+    _ = builder.row(bidder_button)
 
     if adv_setting.bot_active:
         _ = builder.row(
@@ -141,6 +171,24 @@ def get_adv_setting_keyboard(
         )
         _ = builder.row(exponent_button)
 
+        # Кнопка для auto_add_only_relevant_phrase
+        if adv_setting.auto_add_only_relevant_phrase:
+            relevant_text = "Выключить добавление только релевантных фраз"
+            relevant_new_status = False
+        else:
+            relevant_text = "Включить добавление только релевантных фраз"
+            relevant_new_status = True
+
+        relevant_callback = ChangeAutoAddOnlyRelevantPhraseStatus(
+            adv_id=adv_setting.adv_id,
+            wb_user_cabinet_original_id=wb_user_cabinet.id,
+            new_status=relevant_new_status,
+        ).pack()
+        relevant_button = InlineKeyboardButton(
+            text=relevant_text, callback_data=relevant_callback
+        )
+        _ = builder.row(relevant_button)
+
     # Новая кнопка для режима раскрутки РС (полок)
     if adv_setting.rec_system_mode:
         rec_text = "Выключить режим раскрутки РС (полок)"
@@ -168,7 +216,7 @@ def get_adv_setting_keyboard(
         new_source = OrdersSourceForAutoMode.ADV_SUM.value  # Use .value for string
 
     callback = OrdersSourceToggle(
-        new_source=new_source, adv_setting_original_id=adv_setting.id
+        new_source=new_source, adv_setting_original_id=adv_setting.id  # type:ignore
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
@@ -214,6 +262,7 @@ def get_adv_setting_keyboard(
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
+
 
     button = InlineKeyboardButton(
         text="Управление ставкой",
@@ -265,26 +314,6 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
-
-    if adv_setting.hard_min_ctr is not None and adv_setting.hard_min_ctr:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Изменить минимальный CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
-
-    else:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Режим управления CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
-            )
-        )
 
     button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
@@ -417,7 +446,7 @@ def get_advs_keyboard_with_paginator(
     adv_settings = active_part_advs + not_active_part_advs
 
     assert page > 0
-    keyboard_buttons = []
+    keyboard_buttons: list[list[InlineKeyboardButton]] = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
     for adv in adv_settings[start_index:end_index]:
@@ -506,111 +535,72 @@ def get_advs_keyboard_with_paginator(
 def get_keywords_setting_keyboard(
     keywords: list[CalculatedKeyword],
     adv_setting: AdvSetting,
-    adv_choice_last_page: int,
     wb_user_cabinet_original_id: int,
     page: int,
     return_from_filter_bottom: bool,
     on_page: int,
-    min_ctr: float | None,
     hide_keywords_is_not_relevant: bool,
     sort_mode: str = "default",
     image_mode: str = "graphic",
 ):
+    from . import keyword_statuses_util as k_util
     def sorting_keywords(
-        keywords: list[CalculatedKeyword], sort_mode: str
+        kws_: list[CalculatedKeyword], sort_mode_: str
     ) -> list[CalculatedKeyword]:
-        if sort_mode in ["by_adv", "only_out_index"]:
-            keywords_with_rating = [
-                kw for kw in keywords if kw.rating_by_predict_ctr > 0
-            ]
-            keywords_with_rating.sort(
-                key=lambda x: x.rating_by_predict_ctr, reverse=True
+        if sort_mode_ in ["by_adv", "only_out_index"]:
+
+            kws_.sort(
+                key=lambda x: x.rating_by_orders, reverse=True
             )
-            keywords_without_rating = [
-                kw for kw in keywords if kw.rating_by_predict_ctr == 0
-            ]
-            keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
-            keywords = keywords_with_rating + keywords_without_rating
-            return keywords
 
-        elif sort_mode == "white_list":
+            return kws_
 
-            def sort_func(keyword: CalculatedKeyword) -> float | None:
-                return keyword.baes_ctr
+        elif sort_mode_ == "white_list":
 
-            return sorted(keywords, key=sort_func, reverse=True)  # type: ignore[arg-type]
+            def sort_func(kw_: CalculatedKeyword) -> float:
+                return kw_.rating_by_orders
 
-        elif sort_mode == "sort_by_ctr_desc":
-            return sorted(keywords, key=lambda x: x.ctr or 0, reverse=True)  # type: ignore[arg-type]
+            return sorted(kws_, key=sort_func, reverse=True)
+
+        elif sort_mode_ == "sort_by_ctr_desc":
+            return sorted(kws_, key=lambda x: x.ctr or 0, reverse=True)  # type: ignore[arg-type]
         else:
-            raise ValueError(f"Unknown sort_mode: {sort_mode}")
+            raise ValueError(f"Unknown sort_mode: {sort_mode_}")
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
     keywords = sorting_keywords(keywords, sort_mode)
 
-    if (
-        adv_setting.hide_small_query_keywords is not None
-        and adv_setting.hide_small_query_keywords
-    ):
-        keywords = [
-            keyword
-            for keyword in keywords
-            if isinstance(keyword.query, int)
-            and keyword.query >= adv_setting.hide_small_query_keywords
-        ]
-
-    bottoms = []
+    bottoms: list[list[InlineKeyboardButton]] = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
         views = keyword.views
         ctr = keyword.ctr
-        if keyword.reason == "max_position":
-            message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status += "ЦП"
-        elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-            message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status += "МП"
-        elif keyword.hard_status == BLACK_LIST:
-            message_status = "НРФ"
-        elif keyword.reason == "max_cpc":
-            message_status = "МС"
-        elif keyword.hard_status == TURN_OFF:
-            message_status = "О"
-        elif keyword.hard_status == WHITE_LIST:
-            message_status = "БС"
-        elif keyword.hard_status == AUTO_MODE:
-            message_status = "А"
-        else:
-            raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
-
         turn_on = "✅" if keyword.status == KeywordStatus.GOOD else "❌"
-        cluster_name = keyword.cluster_name
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
             text += "🟢"
-        total_views_history = f"({keyword.total_views})" if keyword.total_views else ""
-        text += f"""{clicks}/{views}{total_views_history}/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
-        total_orders = f"({keyword.total_orders})" if keyword.total_orders else ""
+        text += f"""{clicks}/{views}/{round(ctr * 100, 2)}%"""
+        add_to_cart = keyword.add_to_cart
+        orders = keyword.orders
+        total_orders = keyword.total_orders
+        total_orders = f"({add_to_cart}-{orders}-{total_orders})"
+
         text += total_orders
         text += "|"
-        if keyword.position and keyword.position != -1:
-            text += f"{keyword.position}"
+        if keyword.position:
+            text += f"{int(keyword.position + 0.5)}"
         elif keyword.position == 0:
-            text += ">>>"
-        elif keyword.position == -1:
-            text += ">i"
+            text += ">"
         else:
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
-        text += f"{turn_on}({message_status}) {keyword.text}"
+        cpm = int(keyword.cpm + 0.5) # плата за показы
+        text += f"({cpm})"
+        text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
 
-        text += f"({keyword.query})"
+        text += f"({round(keyword.rating_by_orders * 1000, 2)})"
 
-        text += f"({round(keyword.predict_ctr * 100 if keyword.predict_ctr is not None else 0, 2)}%)"
-
-        text += f"""{"(" + str(keyword.added_clicks) + ")" if keyword.added_clicks is not None else ""}"""
-        text += f"""{"❗" if not cluster_name else ""}"""
         inline_keyboard = [
             InlineKeyboardButton(
                 text=text,
@@ -854,7 +844,6 @@ def get_keywords_setting_keyboard(
 
 
 def get_keyword_setting_keyboard(
-    chat_id: int,
     keyword: KeywordSetting,
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
@@ -864,29 +853,12 @@ def get_keyword_setting_keyboard(
     keyword_setting_original_id = keyword.id
     assert keyword_setting_original_id
     assert adv_setting_original_id
-    buttons = []
+    buttons: list[list[InlineKeyboardButton]] = []
     reason: str | None
     if hasattr(keyword, "reason"):
         reason = keyword.reason  # type: ignore[attr-defined]
     else:
         reason = None
-
-    if (
-        calculated_keyword.hard_status == 1
-        and calculated_keyword.status == KeywordStatus.BAD
-        and calculated_keyword.reason != "max_position"
-    ):
-        button = [
-            InlineKeyboardButton(
-                text="Тестировать дальше",
-                callback_data=callbacks.ChangeKeywordHardStatus(
-                    new_hard_status=-1,
-                    keyword_setting_original_id=keyword_setting_original_id,
-                ).pack(),
-            )
-        ]
-
-        buttons.append(button)
 
     if keyword.hard_status in [BLACK_LIST, WHITE_LIST, TURN_OFF]:
         button = [
@@ -959,19 +931,8 @@ def get_keyword_setting_keyboard(
         ]
         buttons.append(button)
 
-    button = [
-        InlineKeyboardButton(
-            text="Проверить позицию",
-            callback_data=callbacks.CheckPosition(
-                keyword_setting_original_id=keyword_setting_original_id,
-                adv_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-    ]
 
-    buttons.append(button)
-
-    button = [
+    button: list[InlineKeyboardButton] = [
         InlineKeyboardButton(
             text="Изменить ставку",
             callback_data=callbacks.ChangeCPM(
@@ -1100,33 +1061,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_setting_min_ctr_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
-    )
-    if adv.new_auto_min_ctr_mode is not None and adv.new_auto_min_ctr_mode:
-        button = InlineKeyboardButton(
-            text="Выключить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_off_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Включить управление CTR по белому списку",
-            callback_data=callbacks.ChangeAutoMinCTR(
-                action="turn_on_auto_min_ctr", adv_setting_original_id=adv.id
-            ).pack(),
-        )
-
-    _ = builder.row(button)
-
-    return builder.as_markup()
-
-
 def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
     adv_original_id = adv.id
     builder = InlineKeyboardBuilder()
@@ -1239,20 +1173,6 @@ def get_payment_keyboard_for_shops(
     return builder.as_markup()
 
 
-def get_advs_list(advs: list[AdvSetting]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for adv in advs:
-        name = (
-            "(" + str(adv.worst_promo_position) + ")"
-            if adv.worst_promo_position is not None
-            else ""
-        )
-        name += adv.name
-        button = InlineKeyboardButton(
-            text=name, callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
-        _ = builder.row(button)
-    return builder.as_markup()
 
 
 def get_admin_keyboard() -> InlineKeyboardMarkup:

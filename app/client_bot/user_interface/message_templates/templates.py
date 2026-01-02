@@ -44,7 +44,7 @@ def manage_file_id(func: Callable[..., Any]) -> Callable[..., Any]:
         message: T = await func(self, *args, **kwargs)
 
         # Обработка результата выполнения основной функции для сохранения image_id
-        image_id = message.photo[-1].file_id  # type: ignore[index]
+        image_id = message.photo[-1].file_id # type: ignore[index]
         if isinstance(image, io.BytesIO):
             bot: aiogram.Bot = self.bot
             bot_id = bot.id
@@ -65,23 +65,20 @@ class TextWithKeyboard(Base):
     def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
-    async def __call__(self) -> tuple[ActualLastMessage, str]:
+    async def __call__(self, *args, **kwargs) -> None:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
         if parse_mode == "Markdown":
             text = text.replace("_", r"\_")
-        last_message = await self.bot.send_message(
+        _ = await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
             reply_markup=self.keyboard,
-            parse_mode=self.parse_mode,
+            parse_mode=parse_mode,
             disable_web_page_preview=True,
         )
-        return (
-            last_message,
-            self.get_content_type(),
-        )
+        return None
 
 
 class TextWithImage(Base):
@@ -114,7 +111,7 @@ class Text(Base):
     def text(self) -> str:
         pass
 
-    async def __call__(self) -> Any:
+    async def __call__(self, *args, **kwargs) -> Any:
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
@@ -141,14 +138,14 @@ class TextWithKeyboardPagination(Base):
     def on_page(self) -> int:
         pass
 
-    async def __call__(self) -> tuple[ActualLastMessage, str]:
-        last_message = await self.bot.send_message(
+    async def __call__(self) -> None:
+        _ = await self.bot.send_message(
             chat_id=self.chat_id,
             text=self.text,
             reply_markup=self.keyboard,
             parse_mode=getattr(self, "parse_mode", None),
         )
-        return last_message, self.get_content_type()
+        return None
 
 
 class TextWithKeyboardAndImage(Base):
@@ -172,8 +169,9 @@ class TextWithKeyboardAndImage(Base):
 
     @manage_file_id
     async def __call__(self) -> Message:
+        # TODO: Поймали ошибку в рантайме
         logger.debug("Вызов метода send_photo")
-        last_message = await self.bot.send_photo(
+        message = await self.bot.send_photo(
             chat_id=self.chat_id,
             photo=self.image,
             caption=self.text,
@@ -181,4 +179,4 @@ class TextWithKeyboardAndImage(Base):
             parse_mode=getattr(self, "parse_mode", None),
         )
         logger.debug("Отправка сообщения завершена")
-        return last_message
+        return message

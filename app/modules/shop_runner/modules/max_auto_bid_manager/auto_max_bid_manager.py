@@ -1,9 +1,7 @@
 from typing import TYPE_CHECKING
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if TYPE_CHECKING:
     from .max_cpm_redis_status_manager import MaxCpmRedisStatusManager
@@ -40,7 +38,8 @@ class AutoMaxBidManager:
                 result_max_cpm = user_max_cpm
             else:
                 result_max_cpm = min(int(max_cpm), user_max_cpm)
-        await self._max_cpm_status_manager.set(adv, result_max_cpm)
+        if result_max_cpm is not None:
+            await self._max_cpm_status_manager.set(adv, result_max_cpm)
         return result_max_cpm
 
     async def _get_max_cpm(
@@ -74,33 +73,40 @@ class AutoMaxBidManager:
         max_cpm = max_pay_for_view * 1000
         return max_cpm
 
+
+    @staticmethod
     async def _get_clicks_to_orders_ratio_for_keywords(
-        self, adv: AdvSetting, period_days: int
+       adv: AdvSetting, period_days: int
     ) -> float | None:
         from . import clickhouse_manager
 
         # TODO: тут логика завязана на 1 артикул в РК
         # Смотрим только по одной РК, чтобы точно узнать конверсию из показов ключей в заказы
         # TODO: Ошибка в проде: смотрели Автокампанию для определения конверсии в ключах
-        adv_ids = [
-            adv.search_adv_id,
-        ]
-        clicks_to_order_ratio: float = (
+        adv_ids: list[int] = []
+        if search_adv_id := adv.search_adv_id:
+            adv_ids.append(search_adv_id)
+        if not adv_ids:
+            return None
+        clicks_to_order_ratio: float | None= (
             await clickhouse_manager.get_clicks_to_orders_ration_on_phrases(
                 adv_ids, period_days
             )
         )
         return clicks_to_order_ratio
 
+    @staticmethod
     async def _get_target_pay_for_order(
-        self, adv: AdvSetting, keywords: list[CalculatedKeyword]
+      adv: AdvSetting, keywords: list[CalculatedKeyword]
     ) -> float | None:
         from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
             AdvSettingAutoUpdater as PlanFactGetter,
         )
 
         plan_fact_getter = PlanFactGetter(adv, 2)
-        plan_data: PlanData = plan_fact_getter.get_plan_data(adv)
+        plan_data: PlanData | None = plan_fact_getter.get_plan_data(adv)
+        if not plan_data:
+            return None
         if not plan_data.full_settings:
             return None
         fact_data: FactData = await plan_fact_getter.get_fact_data(keywords)

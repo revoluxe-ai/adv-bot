@@ -2,13 +2,14 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_all_coroutines_launched():
+async def test_wb_shop_all_coroutines_launched(fake_redis):
     """Test that WBShop.run() launches all expected coroutines.
 
     This test helps catch when coroutines are accidentally left commented out
@@ -20,7 +21,8 @@ async def test_wb_shop_all_coroutines_launched():
     redis_manager_mock.DEFAULT_TTL = 60
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Mock the CoroutinesManager and all its methods
     expected_coroutines = {
@@ -65,14 +67,15 @@ async def test_wb_shop_all_coroutines_launched():
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_commented_coroutines_detection():
+async def test_wb_shop_commented_coroutines_detection(fake_redis):
     """Test that detects if important coroutines are commented out."""
     wb_api_mock = Mock(spec=WBApi)
     wb_api_mock.shop_id = "test_shop_id"
     redis_manager_mock = Mock(spec=RedisShopManager)
     redis_manager_mock.DEFAULT_TTL = 60
 
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Core coroutines that should ALWAYS be running
     core_coroutines = {

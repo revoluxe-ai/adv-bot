@@ -1,15 +1,11 @@
 import logging
-from typing import Optional
 from collections.abc import Awaitable
 
 import grpc
 from dependency_injector.wiring import Provide, inject
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.grpcs.predict_ctr_service.predict_ctr_client.predict_ctr_client import (
     PredictCTRClient,
 )

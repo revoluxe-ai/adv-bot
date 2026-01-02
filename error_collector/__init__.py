@@ -1,0 +1,6 @@
+"""Error collector package."""
+
+
+
+
+

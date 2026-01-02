@@ -11,14 +11,13 @@ from redis.asyncio.client import Pipeline
 
 from app.core.wb_api.mixins.adv import MinCPMData
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.utils.text_cleaner import clear
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.settings import settings
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from typing import cast
 
 logger = logging.getLogger(__name__)
@@ -162,90 +161,90 @@ async def set_keyword_statistics(
     json_data = []
 
     for keyword in keywords:
-        data = keyword.to_json()
+        data = keyword.model_dump_json()
         json_data.append(data)
     json_data = json.dumps(json_data)
     await redis_master_client.set(key, json_data, ex=cache_timeout)
 
 
-async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:
-    base_key = "adv_positions"
-    for position in positions:
-        position.timestamp = datetime.datetime.now()
-        key = f"{base_key}:{position.keyword_text}:{position.nmid}"
-        position_dict = position.to_dict()
-        await redis_master_client.set(key, json.dumps(position_dict))
+# async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:
+#     base_key = "adv_positions"
+#     for position in positions:
+#         position.timestamp = datetime.datetime.now()
+#         key = f"{base_key}:{position.keyword_text}:{position.nmid}"
+#         position_dict = position.to_dict()
+#         await redis_master_client.set(key, json.dumps(position_dict))
+#
+#
+# async def get_keyword_position(keyword: str, nmid: int) -> WBItemPosition | None:
+#     base_key = f"adv_positions:{keyword}:{nmid}"
+#     json_data = await redis_replica_client.get(base_key)
+#     if not json_data:
+#         cluster, _ = await get_cluster_and_preset(keyword)
+#         if not cluster:
+#             return None
+#         base_key = f"adv_positions:{cluster}:{nmid}"
+#         json_data = await redis_replica_client.get(base_key)
+#         if not json_data:
+#             return None
+#         else:
+#             position = WBItemPosition.from_dict(json.loads(json_data))
+#             return position
+#     position = WBItemPosition.from_dict(json.loads(json_data))
+#     return position
+
+#
+# async def get_keywords_positions(
+#     adv_setting: AdvSetting, texts: list[str]
+# ) -> list[WBItemPosition]:
+#     keys = ["adv_positions:" + text + ":" + str(adv_setting.nmids[0]) for text in texts]
+#     results = await redis_replica_client.mget(keys)
+#     positions = []
+#     missing_texts = []
+#
+#     for text, json_data in zip(texts, results, strict=False):  # type: ignore
+#         if json_data:
+#             position = WBItemPosition.from_dict(json.loads(json_data))
+#             position.keyword_text = text
+#             positions.append(position)
+#         else:
+#             missing_texts.append(text)
+#
+#     if missing_texts:
+#         cluster_keys = []
+#         cluster_map = {}
+#
+#         for text in missing_texts:
+#             data = await get_cluster_and_preset(text)
+#             if data is None:
+#                 continue
+#             cluster, _ = data
+#             if cluster:
+#                 key = "adv_positions:" + cluster + ":" + str(adv_setting.nmids[0])
+#                 cluster_keys.append(key)
+#                 cluster_map[key] = text
+#
+#         if cluster_keys:
+#             cluster_results = await redis_replica_client.mget(cluster_keys)
+#
+#             for key, json_data in zip(cluster_keys, cluster_results, strict=False):  # type: ignore
+#                 if json_data:
+#                     position = WBItemPosition.from_dict(json.loads(json_data))
+#                     position.keyword_text = cluster_map[key]
+#                     positions.append(position)
+#
+#     return positions
 
 
-async def get_keyword_position(keyword: str, nmid: int) -> WBItemPosition | None:
-    base_key = f"adv_positions:{keyword}:{nmid}"
-    json_data = await redis_replica_client.get(base_key)
-    if not json_data:
-        cluster, _ = await get_cluster_and_preset(keyword)
-        if not cluster:
-            return None
-        base_key = f"adv_positions:{cluster}:{nmid}"
-        json_data = await redis_replica_client.get(base_key)
-        if not json_data:
-            return None
-        else:
-            position = WBItemPosition.from_dict(json.loads(json_data))
-            return position
-    position = WBItemPosition.from_dict(json.loads(json_data))
-    return position
-
-
-async def get_keywords_positions(
-    adv_setting: AdvSetting, texts: list[str]
-) -> list[WBItemPosition]:
-    keys = ["adv_positions:" + text + ":" + str(adv_setting.nmids[0]) for text in texts]
-    results = await redis_replica_client.mget(keys)
-    positions = []
-    missing_texts = []
-
-    for text, json_data in zip(texts, results, strict=False):  # type: ignore
-        if json_data:
-            position = WBItemPosition.from_dict(json.loads(json_data))
-            position.keyword_text = text
-            positions.append(position)
-        else:
-            missing_texts.append(text)
-
-    if missing_texts:
-        cluster_keys = []
-        cluster_map = {}
-
-        for text in missing_texts:
-            data = await get_cluster_and_preset(text)
-            if data is None:
-                continue
-            cluster, _ = data
-            if cluster:
-                key = "adv_positions:" + cluster + ":" + str(adv_setting.nmids[0])
-                cluster_keys.append(key)
-                cluster_map[key] = text
-
-        if cluster_keys:
-            cluster_results = await redis_replica_client.mget(cluster_keys)
-
-            for key, json_data in zip(cluster_keys, cluster_results, strict=False):  # type: ignore
-                if json_data:
-                    position = WBItemPosition.from_dict(json.loads(json_data))
-                    position.keyword_text = cluster_map[key]
-                    positions.append(position)
-
-    return positions
-
-
-async def set_position_to_out_index(position: WBItemPosition) -> None:
-    position_out_index = WBItemPosition()
-    position_out_index.position = 0
-    position_out_index.keyword_text = (
-        position.keyword_text if hasattr(position, "keyword_text") else None
-    )
-    position_out_index.adv_id = position.adv_id
-    position_out_index.nmid = position.nmid
-    await add_positions_to_redis([position_out_index])
+# async def set_position_to_out_index(position: WBItemPosition) -> None:
+#     position_out_index = WBItemPosition()
+#     position_out_index.position = 0
+#     position_out_index.keyword_text = (
+#         position.keyword_text if hasattr(position, "keyword_text") else None
+#     )
+#     position_out_index.adv_id = position.adv_id
+#     position_out_index.nmid = position.nmid
+#     await add_positions_to_redis([position_out_index])
 
 
 async def set_predict_ctr_with_pipeline(
@@ -291,29 +290,29 @@ async def get_predict_ctr(adv_id: int, keyword: str) -> float | None:
     return predict_ctr
 
 
-async def set_predict_ctrs(
-    adv_id: int,
-    keywords: list[CalculatedKeyword],
-) -> list[CalculatedKeyword]:
-    """
-    Получить предсказанные CTR для списка пар (adv_id, keyword).
-
-    :param adv_id: Идентификатор рекламной кампании.
-    :param keywords: Список объектов CalculatedKeyword.
-    :return: Список объектов CalculatedKeyword с обновленными предсказанными CTR.
-    """
-    # Формируем список ключей для запроса к Redis
-    keys = [
-        f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword.text)}"
-        for keyword in keywords
-    ]
-
-    # Получаем данные из Redis за один запрос
-    predict_ctr_bytes_list = await redis_replica_client.mget(keys)
-
-    for i, keyword in enumerate(keywords):
-        keyword.predict_ctr = predict_ctr_bytes_list[i]
-    return keywords
+# async def set_predict_ctrs(
+#     adv_id: int,
+#     keywords: list[CalculatedKeyword],
+# ) -> list[CalculatedKeyword]:
+#     """
+#     Получить предсказанные CTR для списка пар (adv_id, keyword).
+#
+#     :param adv_id: Идентификатор рекламной кампании.
+#     :param keywords: Список объектов CalculatedKeyword.
+#     :return: Список объектов CalculatedKeyword с обновленными предсказанными CTR.
+#     """
+#     # Формируем список ключей для запроса к Redis
+#     keys = [
+#         f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword.text)}"
+#         for keyword in keywords
+#     ]
+#
+#     # Получаем данные из Redis за один запрос
+#     predict_ctr_bytes_list = await redis_replica_client.mget(keys)
+#
+#     for i, keyword in enumerate(keywords):
+#         keyword.predict_ctr = predict_ctr_bytes_list[i]
+#     return keywords
 
 
 async def set_block_position_status(
@@ -568,19 +567,19 @@ async def get_clusters_and_presets(
 
     return clusters_and_presets
 
-
-async def get_keywords_positions_by_nmid(
-    nmid: int, texts: list[str]
-) -> list[WBItemPosition]:
-    keys = [f"adv_positions:{text}:{nmid}" for text in texts]
-    results = await redis_replica_client.mget(keys)
-    positions = []
-    for text, json_data in zip(texts, results, strict=False):  # type: ignore
-        if json_data:
-            position = WBItemPosition.from_dict(json.loads(json_data))
-            position.keyword_text = text
-            positions.append(position)
-    return positions
+#
+# async def get_keywords_positions_by_nmid(
+#     nmid: int, texts: list[str]
+# ) -> list[WBItemPosition]:
+#     keys = [f"adv_positions:{text}:{nmid}" for text in texts]
+#     results = await redis_replica_client.mget(keys)
+#     positions = []
+#     for text, json_data in zip(texts, results, strict=False):  # type: ignore
+#         if json_data:
+#             position = WBItemPosition.from_dict(json.loads(json_data))
+#             position.keyword_text = text
+#             positions.append(position)
+#     return positions
 
 
 async def set_full_stat_adv(adv_stats: typing.Iterable[FullAdvStat]) -> None:

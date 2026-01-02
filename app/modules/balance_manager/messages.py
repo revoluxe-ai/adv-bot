@@ -10,10 +10,10 @@ class WaitingForAmount(Text):
     def __init__(
         self,
         bot: Bot,
-        chat_id,
+        chat_id: int,
         master_sum: float,
-        current_balance: float = None,
-        current_bonus: float = None,
+        current_balance: float,
+        current_bonus: float,
     ):
         super().__init__(bot, chat_id)
         self.master_sum = master_sum
@@ -23,22 +23,19 @@ class WaitingForAmount(Text):
 
     @property
     def text(self):
-        text = self._pricer.text
-        # Добавляем информацию о текущем балансе, если она доступна
-        if self.current_balance is not None:
-            text = f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
+        text = f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
 
-            if self.current_bonus is not None and self.current_bonus > 0:
-                text += f"🎁 Текущие бонусы: {self.current_bonus:.0f} руб.\n"
+        if self.current_bonus > 0:
+            text += f"🎁 Текущие бонусы: {self.current_bonus:.0f} руб.\n"
 
-            text += "\n" + self._pricer.text
+        text += "\n" + self._pricer.text
 
         text += "\nУкажите сумму пополнения:"
         return text
 
 
 class BalanceUpdated(Text):
-    def __init__(self, bot: Bot, chat_id, added_balance: float, bonus: float):
+    def __init__(self, bot: Bot, chat_id: int, added_balance: float, bonus: float):
         super().__init__(bot, chat_id)
         self.__balance = added_balance
         self.__bonus = bonus

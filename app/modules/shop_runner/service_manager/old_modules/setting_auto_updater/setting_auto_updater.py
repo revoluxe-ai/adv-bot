@@ -5,15 +5,14 @@ from collections.abc import Awaitable
 from sqlalchemy import update
 
 from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .plan_fact_change_redis_caches import ChangePlanFact
@@ -101,16 +100,19 @@ class AdvSettingAutoUpdater:
     @staticmethod
     def get_plan_data(adv: AdvSetting) -> PlanData | None:
         plan_orders = adv.plan_for_sales_for_day
-        max_pay_for_order = adv.max_price_for_order
+        max_pay_for_order: float | None = adv.max_price_for_order
         target_pay_for_order = adv.target_price_for_order
-        if not any([plan_orders, target_pay_for_order, max_pay_for_order]):
+        if any([not plan_orders, not target_pay_for_order, not max_pay_for_order]):
             return None
-
-        plan = PlanData(
-            orders=plan_orders,
-            target_pay_for_order=target_pay_for_order,  # noqa
-            max_pay_for_order=max_pay_for_order,  # noqa
-        )
+        try:
+            plan = PlanData(
+                orders=plan_orders,
+                target_pay_for_order=target_pay_for_order, # noqa
+                max_pay_for_order=max_pay_for_order, # noqa
+            )
+        except Exception as exc:
+            logger.exception('Ошибка получения плана')
+            raise exc
 
         return plan
 
@@ -120,7 +122,7 @@ class AdvSettingAutoUpdater:
             return None
         assert keywords
         keywords.sort(
-            key=lambda kw: kw.predict_ctr, reverse=True
+            key=lambda kw: kw.rating_by_orders, reverse=True
         )  # ignore: type: ignore # predict_ctr не может быть
         # None здесь. Надо переделать CalculatedKeyword, чтобы у него не было полей с None, как минимум для predict_ctr
         first_kw = keywords[0]

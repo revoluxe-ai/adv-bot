@@ -4,12 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_calls_all_coroutines() -> None:
+async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     """
     Тест проверяет, что метод run класса WBShop запускает необходимые корутины
     """
@@ -21,7 +22,8 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     # Создаем экземпляр WBShop
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -32,10 +34,12 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.update_predict_ctr = AsyncMock()
-    coroutines_manager_mock.update_keywords_stamp = AsyncMock()
-    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
-
+    coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
+    coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
+    coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
+    coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
+    coroutines_manager_mock.update_cluster_bids = AsyncMock()
+    coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -52,7 +56,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             # Вызываем тестируемый метод
             await wb_shop.run()
 
-            # Проверяем, что все ожидаемые корутины были вызваныaad
+            # Проверяем, что все ожидаемые корутины были вызваны
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cpm_bid.assert_called_once()
@@ -60,12 +64,15 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.update_predict_ctr.assert_called_once()
-            coroutines_manager_mock.update_keywords_stamp.assert_called_once()
-            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
+            coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
+            coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
+            coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
+            coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
+            coroutines_manager_mock.update_cluster_bids.assert_called_once()
+            coroutines_manager_mock.update_plan_fact_stats.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
+async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> None:
     """
     Тест проверяет, что метод run класса WBShop передает правильное количество
     корутин в asyncio.gather
@@ -78,7 +85,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     # Создаем экземпляр WBShop
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
+    redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -89,9 +97,12 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.update_predict_ctr  = AsyncMock()
-    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
     coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
+    coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
+    coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
+    coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
+    coroutines_manager_mock.update_cluster_bids = AsyncMock()
+    coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -112,10 +123,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # Проверяем, что gather был вызван с 10 аргументами (9 корутин + _alive_worker_run)
+            # 14 корутин: 1 (_alive_worker_run) + 13 из CoroutinesManager
             assert (
-                len(call_args) == 12
-            ), f"asyncio.gather должен быть вызван с 10 аргументами, получено {len(call_args)}"
+                len(call_args) == 14
+            ), f"asyncio.gather должен быть вызван с 14 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
@@ -125,6 +136,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.update_predict_ctr.assert_called_once()
-            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
             coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
+            coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
+            coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
+            coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
+            coroutines_manager_mock.update_cluster_bids.assert_called_once()
+            coroutines_manager_mock.update_plan_fact_stats.assert_called_once()

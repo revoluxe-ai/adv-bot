@@ -6,7 +6,8 @@ from aiohttp import ClientSession
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
-from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+from app.core.di.wb_manager_hub import WBManagerHubFactory
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
@@ -24,6 +25,7 @@ async def run_shop_task(
     shop_id: str,
     client_session: ClientSession,
     redis_manager: RedisShopManager,
+    redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
     wb_manager_hub_factory: WBManagerHubFactory = Provide[
         "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
     ],
@@ -32,7 +34,7 @@ async def run_shop_task(
     try:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
         wb_api = WBApi(access, client_session)
-        wb_shop = WBShop(wb_api, redis_manager)
+        wb_shop = WBShop(wb_api, redis_manager, redis_client_wrapper)
         await wb_shop.run()
     except StopShopUpdateException:
         return None

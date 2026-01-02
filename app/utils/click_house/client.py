@@ -147,9 +147,13 @@ class get_clickhouse_client:  # noqa
             database=database,
             pool_mgr=pool_mgr,
             port=settings.CLICKHOUSE_PORT,
+            # settings={
+            #     "query_plan_optimize_lazy_materialization": 0,
+            #     # остальные твои настройки...
+            # },
         )
         assert self.client is not None
-        return self.client
+        return self.client # noqa
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         global connection_count
@@ -221,5 +225,5 @@ def track_connections(func: F) -> F:
 # Пример использования декоратора
 @track_connections
 async def query_data(client: AsyncClient, query: str) -> Any:
-    result = await client.query(query)
+    result = await client.query(query) # pyright: ignore
     return result

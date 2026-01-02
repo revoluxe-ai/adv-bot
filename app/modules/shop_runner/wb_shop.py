@@ -4,6 +4,7 @@ from typing import (
     TypeVar,
 )
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
 from .shop_run_worker.redis_manager import RedisShopManager
 
@@ -14,14 +15,20 @@ T = TypeVar("T")
 
 
 class WBShop:
-    def __init__(self, wb_api: WBApi, redis_manager: RedisShopManager):
+    def __init__(
+        self,
+        wb_api: WBApi,
+        redis_manager: RedisShopManager,
+        redis_client_wrapper: RedisClient,
+    ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
+        self._redis_client_wrapper = redis_client_wrapper
 
     async def run(self) -> None:
         wb_api = self._wb_api
-        coroutines_manager = CoroutinesManager(wb_api)
-
+        coroutines_manager = CoroutinesManager(wb_api, self._redis_client_wrapper)
+        # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
         #  автоэкспонентой, и именить тарификацию за автоматизацию, т.к. теперь управляющих сущности три
 
@@ -34,10 +41,13 @@ class WBShop:
             coroutines_manager.update_full_adv_stat(),
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
-            coroutines_manager.update_predict_ctr(),
-            coroutines_manager.update_keywords_stamp(),
-            coroutines_manager.update_keywords_positions_history(),
+            # # # # TODO: Отключил обновление Джема, т.к. выкидывает ошибку и мешает работе тем юзерам, у которых джема нет.
             coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr(),
+            coroutines_manager.update_minus_phrases_in_advs(),
+            coroutines_manager.update_clusters_adv_stats_today(),
+            coroutines_manager.update_clusters_adv_stats_history(),
+            coroutines_manager.update_cluster_bids(),
+            coroutines_manager.update_plan_fact_stats()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск

@@ -489,19 +489,19 @@ The system utilizes parallel processing for improved throughput:
 ```python
 async def update_full_adv_stat(self) -> None:
     wb_api = self._wb_api
-    auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
-    
+    auto_advs: list[AdvSetting] = await self._wb_shop_data_manager._get_active_advs()
+
     all_adv_ids = set()
     for adv in auto_advs:
         all_adv_ids.add(adv.adv_id)
         if auction_adv_id := adv.search_adv_id:
             all_adv_ids.add(auction_adv_id)
-    
+
     # Parallel data retrieval
     full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
         wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
     )
-    
+
     if full_stats:
         # Parallel data insertion
         await self._update_full_stat_in_click_house(full_stats)

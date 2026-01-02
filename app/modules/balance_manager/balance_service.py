@@ -213,7 +213,7 @@ async def process_payment_with_bonus(
         user_id: ID пользователя
         cabinet_id: ID кабинета WB
         amount: Сумма пополнения
-        bonus_percent: Процент бонуса (от 0 до 100)
+        bonus_percent: Процент бонуса (может быть больше 100, например 200 для двойного бонуса)
         description: Описание операции
 
     Returns:
@@ -222,11 +222,16 @@ async def process_payment_with_bonus(
     Raises:
         UserNotFoundError: Если пользователь не найден
         CabinetNotFoundError: Если кабинет не найден
-        InvalidAmountError: Если сумма меньше или равна нулю
+        InvalidAmountError: Если сумма меньше или равна нулю, или процент бонуса отрицательный
     """
     if amount <= 0:
         raise InvalidAmountError("Сумма пополнения должна быть положительной")
 
+    if bonus_percent < 0:
+        raise InvalidAmountError("Процент бонуса не может быть отрицательным")
+
+    # TODO(money): суммы/баланс должны быть Decimal (денежные расчеты),
+    # float здесь временно; допускаем погрешность в тестах только как временную меру.
     bonus_amount = amount * (bonus_percent / 100) if bonus_percent > 0 else 0
 
     # Создаем запись о пополнении баланса

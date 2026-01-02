@@ -29,6 +29,9 @@ os.environ.setdefault("BOT_TOKEN", "test_token_123")
 os.environ.setdefault("WEBHOOK_SECRET", "test_secret")
 os.environ.setdefault("YOOKASSA_TOKEN", "test_yookassa")
 os.environ.setdefault("MIN_SUM", "0")
+os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
+os.environ.setdefault("PG_POOL_SIZE", "5")
+os.environ.setdefault("PG_MAX_OVERFLOW", "10")
 
 TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
@@ -44,9 +47,9 @@ from fakeredis import FakeRedis
 import aiofiles
 from dependency_injector import containers
 import fakeredis
-from tests.factories import adv_factory
-from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
-from app.core.di.app_container import AppContainer
+import typing
+if typing.TYPE_CHECKING:
+    from app.core.di.app_container import AppContainer
 
 import sys
 from pathlib import Path
@@ -68,11 +71,12 @@ from datetime import datetime, timedelta
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text, create_engine
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.utils.db.base import BaseTable as Base
+
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
 TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
@@ -134,39 +138,86 @@ atexit.register(_emergency_cleanup)
 
 @pytest.fixture(scope="session")
 def docker_compose_cmd() -> list[str]:
-    """Определяет команду для запуска Docker Compose и скипает, если недоступна."""
+    """Определяет команду для запуска Docker Compose и падает ошибкой, если недоступна."""
     cmd = _detect_compose_cmd()
     if not cmd:
-        pytest.skip("Docker Compose не найден в системе — скипаем интеграционные тесты БД")
+        raise RuntimeError(
+            "Docker Compose не найден в системе. Установите Docker Desktop/Engine "
+            "и убедитесь, что доступны команды `docker compose` или `docker-compose`, "
+            "затем перезапустите pytest."
+        )
     _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
     return cmd
 
 
-@pytest.fixture(scope="session", autouse=True)
+_TEST_DB_READY = False
+
+
+@pytest.fixture(scope="session")
 def setup_test_database(docker_compose_cmd):
     """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
-    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", timeout=180)
+    # Используем --force-recreate чтобы гарантировать выполнение init скриптов
+    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", "--force-recreate", timeout=180)
     if rc != 0:
         raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
     # --- Ожидание запуска контейнера ---
     container_id: str = ""
-    max_retries = 30
+    # На Windows/Docker Desktop первый старт (pull + initdb) может занимать заметно больше минуты.
+    # Делаем запас, плюс выводим текущий статус для диагностики.
+    max_retries = 120
     for i in range(max_retries):
         rc, cid_out, _ = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10)
         container_id = cid_out.strip()
         if container_id:
             _DOCKER_CLEANUP_STATE["container_id"] = container_id  # Сохраняем для emergency cleanup
-            rc, health, _ = _sync_run(
-                "docker", "inspect", "--format", "{{.State.Health.Status}}", container_id, timeout=10
+            rc, status_out, _ = _sync_run(
+                "docker",
+                "inspect",
+                "--format",
+                "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
+                container_id,
+                timeout=10,
             )
-            if rc == 0 and health.strip() == "healthy":
+            status = status_out.strip() if rc == 0 else "unknown"
+
+            if status.endswith(" healthy"):
                 print("[OK] Test database is healthy.")
                 break
-        print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries}")
+
+            # Fallback: если healthcheck по какой-то причине не работает/не успевает,
+            # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
+            try:
+                loop_probe = asyncio.new_event_loop()
+
+                async def _probe() -> bool:
+                    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+                    try:
+                        async with engine.connect() as conn:
+                            await conn.execute(text("SELECT 1;"))
+                        return True
+                    finally:
+                        await engine.dispose()
+
+                if loop_probe.run_until_complete(_probe()):
+                    print("[OK] Test database is reachable (probe SELECT 1).")
+                    break
+            except Exception:
+                pass
+            finally:
+                try:
+                    loop_probe.close()
+                    # После закрытия временного цикла событий создаём новый дефолтный event loop
+                    asyncio.set_event_loop(asyncio.new_event_loop())
+                except Exception:
+                    pass
+
+            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: {status})")
+        else:
+            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: no container yet)")
         time.sleep(2)
     else:
         # Если так и не дождались health=healthy — покажем статус и логи для диагностики
@@ -175,87 +226,99 @@ def setup_test_database(docker_compose_cmd):
             _sync_run("docker", "logs", container_id, timeout=10)
         raise RuntimeError("Test database did not become healthy in time.")
 
-    from app.utils.db.base import BaseTable as Base
-    from sqlalchemy import create_engine
+    print("[DB] Resetting PostgreSQL schema for tests...")
 
-    print("[MIGRATION] Creating PostgreSQL extensions...")
+    # --- Ensure pg_hba.conf allows host connections (Windows/Docker Desktop often shows as 172.* gateway) ---
+    # Иногда init-скрипты в /docker-entrypoint-initdb.d не применяются (например, если volume не пересоздался),
+    # и тогда asyncpg получает: "no pg_hba.conf entry ... no encryption".
+    # Патчим pg_hba.conf прямо в контейнере и делаем reload конфигурации.
+    if container_id:
+        hba_patch_cmd = (
+            'set -e; '
+            'HBA="$PGDATA/pg_hba.conf"; '
+            'MARKER="# added by pytest conftest (allow host connections for tests)"; '
+            'if ! grep -q "$MARKER" "$HBA"; then '
+            '  printf "\\n%s\\n" "$MARKER" >> "$HBA"; '
+            '  printf "host    all             all             0.0.0.0/0               trust\\n" >> "$HBA"; '
+            '  printf "host    all             all             ::/0                    trust\\n" >> "$HBA"; '
+            '  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select pg_reload_conf();" >/dev/null; '
+            'fi'
+        )
+        _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
 
-    # Добавим небольшую задержку перед созданием расширений PostgreSQL
+    # Добавим небольшую задержку перед манипуляциями со схемой
     time.sleep(5)
 
-    # Создаём синхронный движок для создания расширений и таблиц
-    sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
-
-    # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
-    with sync_engine.connect() as conn:
-        try:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-            conn.commit()
-        except Exception as e:
-            # Игнорируем ошибку если расширение уже существует (race condition в PostgreSQL)
-            if "already exists" in str(e):
-                print(f"[INFO] Extension pg_trgm already exists, skipping...")
-                conn.rollback()
-            else:
-                raise
-
-    print("[MIGRATION] Creating tables from models metadata...")
-    Base.metadata.create_all(sync_engine)
-    
-    # Очищаем тестовые таблицы от данных предыдущих запусков
-    with sync_engine.connect() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
-        conn.commit()
-    print("[OK] Test tables truncated.")
-    
-    sync_engine.dispose()
-    print("[OK] Tables created successfully from models metadata.")
-
-    # Проставляем миграции Alembic как применённые
-    from alembic.config import Config
-    from alembic import command
-
-    print("[MIGRATION] Stamping Alembic migrations for test database...")
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("script_location", "alembic_")
-    alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
-    command.stamp(alembic_cfg, "head")
-    print("[OK] Alembic migrations stamped successfully.")
-
-    # --- Базовые данные (async) ---
-    # Создаём минимальный event loop только для этой задачи
+    # --- Подготовка схемы и таблиц через asyncpg (без psycopg2) ---
+    # Важно: после выполнения НЕ оставлять закрытый event loop установленным как current loop,
+    # иначе pytest-asyncio/asyncpg могут начать использовать "закрытый" loop.
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        async def insert_initial_data():
-            engine = create_async_engine(TEST_DB_URL)
-            async with engine.begin() as conn:
-                initial_wb_cabinet_data = {
-                    "id": 1,
-                    "shop_id": "test_shop_id",
-                    "active": True,
-                    "expiration_time": datetime.now() + timedelta(days=7),
-                    "balance": 0.0,
-                    "bonus": 0.0,
-                    "demo": True,
-                    "expiration_alarm_days_pass": None,
-                    "white_list_update_active": False,
-                }
-                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                    index_elements=["id"],
-                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-                )
-                await conn.execute(on_conflict_stmt)
-                await conn.commit()
-            await engine.dispose()
+        async def init_schema_and_seed():
+            engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+            try:
+                async with engine.begin() as conn:
+                    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
+                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+                    # Расширения
+                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                    # Таблицы
+                    await conn.run_sync(Base.metadata.create_all)
 
-        loop.run_until_complete(insert_initial_data())
+                    # Базовые данные
+                    initial_wb_cabinet_data = {
+                        "id": 1,
+                        "shop_id": "test_shop_id",
+                        "active": True,
+                        "expiration_time": datetime.now() + timedelta(days=7),
+                        "balance": 0.0,
+                        "bonus": 0.0,
+                        "demo": True,
+                        "expiration_alarm_days_pass": None,
+                        "white_list_update_active": False,
+                    }
+                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                    )
+                    await conn.execute(on_conflict_stmt)
+                    # При явной вставке id sequence может остаться на 1 -> следующий INSERT даст id=1.
+                    # Проставляем sequence в max(id), чтобы новые кабинеты получали id=2,3,...
+                    await conn.execute(
+                        text(
+                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                        )
+                    )
+            finally:
+                await engine.dispose()
+
+        # Docker Desktop иногда даёт "connection was closed..." сразу после health=healthy.
+        # Делаем несколько попыток инициализации схемы, чтобы интеграционные тесты были стабильными.
+        max_init_retries = 5
+        for attempt in range(1, max_init_retries + 1):
+            try:
+                loop.run_until_complete(init_schema_and_seed())
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= max_init_retries:
+                    raise
+                print(
+                    f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
+                    f"Retry {attempt}/{max_init_retries}..."
+                )
+                time.sleep(2)
     finally:
         loop.close()
+        # После закрытия временного цикла событий являем новый дефолтный event loop для тестов
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
     print("[OK] Test database setup complete.")
 
+    global _TEST_DB_READY
+    _TEST_DB_READY = True
     yield
 
     # --- TEARDOWN ---
@@ -284,17 +347,21 @@ def setup_test_database(docker_compose_cmd):
     if container_id:
         _sync_run("docker", "rm", "-f", container_id, timeout=10)
         _DOCKER_CLEANUP_STATE["container_id"] = None
+    # Если нормальный teardown прошёл — emergency cleanup больше не нужен
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
 
     print("[OK] Cleanup complete.")
 
 
 
 @pytest.fixture(scope="function", name="async_engine")
-async def _async_engine():
+async def _async_engine(setup_test_database):
     """Создаёт async движок для каждого теста."""
     engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
-    yield engine
-    await engine.dispose()
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture(name="async_session")
@@ -316,7 +383,7 @@ async def _async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture(name="access_mock_simple")
 def _access_mock():
     mock = MagicMock()
-    mock.wb_cabinet = MagicMock(spec=WBCabinet)
+    mock.wb_cabinet = MagicMock(spec="WBCabinet")
     mock.wb_cabinet.id = 1
     mock.wb_cabinet.shop_id = "test_shop_id"
     return mock
@@ -353,12 +420,17 @@ except Exception:
     stub_mod.try_except_decorator = try_except_decorator
     sys.modules[mod_name] = stub_mod
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBToken
 
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
+    KeywordSettingDTO,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
+    KeywordStat,
+)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken, WBCabinet
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -402,6 +474,7 @@ def adv_setting_mock():
     adv_setting_mock = MagicMock(spec=AdvSetting)
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.nmids = [222811118]
+    adv_setting_mock.search_adv_id = None
     adv_setting_mock.active_status = "started"
     return adv_setting_mock
 
@@ -426,53 +499,32 @@ from pytest import fixture
 
 
 @fixture
-def keywords_mocks() -> list[MagicMock]:
+def keywords_mocks() -> list[CalculatedKeyword]:
+    """Создаёт список тестовых CalculatedKeyword с разными статусами.
+    
+    Включает:
+    - 5 ключевых слов в whitelist (hard_status=2), 1 из них best
+    - 2 ключевых слова в blacklist (hard_status=0)
+    - 2 ключевых слова в тестировании (hard_status=1)
     """
-    Фикстура для генерации моков CalculatedKeyword с заданными параметрами
-    """
-    keyword_params = [
-        {
-            "best_keyword_status": True,
-            "baes_ctr": 0.5,
-            "hard_status": 2,
-            "spend": 100,
-            "relevant": True,
-            "keyword_setting_original_id": 1,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.2,
-            "hard_status": 2,
-            "spend": 10,
-            "relevant": False,
-            "keyword_setting_original_id": 2,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.1,
-            "hard_status": 2,
-            "spend": 40,
-            "relevant": True,
-            "keyword_setting_original_id": 3,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.4,
-            "hard_status": 1,
-            "spend": 0,
-            "relevant": False,
-            "keyword_setting_original_id": 4,
-        },
-    ]
-
-    mocks = []
-    for params in keyword_params:
-        mock = MagicMock(spec=CalculatedKeyword)
-        for key, value in params.items():
-            setattr(mock, key, value)
-        mocks.append(mock)
-
-    return mocks
+    from tests.factories.keyword_pipeline import (
+        GoodKeywordFactory,
+        BadKeywordFactory,
+        TestingKeywordFactory,
+        BestKeywordFactory,
+    )
+    
+    keywords = []
+    # 1 лучшее ключевое слово (whitelist, best_keyword_status=True)
+    keywords.append(BestKeywordFactory())
+    # 4 хороших ключевых слова (whitelist, best_keyword_status=False)
+    keywords.extend(GoodKeywordFactory.create_batch(4, state__best_keyword_status=False))
+    # 2 плохих ключевых слова (blacklist)
+    keywords.extend(BadKeywordFactory.create_batch(2))
+    # 2 в тестировании
+    keywords.extend(TestingKeywordFactory.create_batch(2))
+    
+    return keywords
 
 
 @pytest.fixture(name='front_too_many_requests_str', scope='function')
@@ -490,8 +542,8 @@ async def front_too_many_requests_str() -> AsyncGenerator[str, None]:
 
 
 @pytest.fixture(name="di_container", scope="function")
-async def di_container() -> AsyncGenerator[AppContainer, None]:
-
+async def di_container() -> AsyncGenerator["AppContainer", None]:
+    from app.core.di.app_container import  AppContainer
     AppContainer.wiring_config = containers.WiringConfiguration()
     container = AppContainer()
 
@@ -512,10 +564,11 @@ async def fake_redis():
     redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield redis
     await redis.flushall()  # очищаем после теста
-    await redis.close()
+    await redis.aclose()
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from tests.factories.complex_adv import create_complex_adv_seed
 
 
 
@@ -531,158 +584,16 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
 
     await postgres_session.begin()
-    adv_setting = AdvSettingFactory.build(
-        auto_update_white_list=True,
-        auto_update_target_place=True,
-        auto_update_exponent=True,
-        auto_add_only_relevant_phrase=False,
-        bidder_for_auto=True,
-        bidder_active=True,
-    )
-    adv_setting.cpm = 100
-    adv_setting.max_cpm = 250
-    adv_setting.max_place = 120
-    adv_setting.exponent_predict_ctr = 8.0
+    seed = await create_complex_adv_seed(postgres_session)
 
-    search_adv_setting = AdvSettingFactory.build()
-    search_adv_setting.cpm = 90
-    adv_setting._search_adv = search_adv_setting.adv_id
-    postgres_session.add(adv_setting)
-    await postgres_session.flush()
-    await postgres_session.refresh(adv_setting)
-    # 2️⃣ KeywordSettings
-    adv_factory.fake.unique.clear()
-    keyword_settings = []
-    for idx in range(50):
-        ks = KeywordSettingFactory.build(adv_setting_id=adv_setting.id)
-        if idx < 10:
-            ks.hard_status = 2
-            ks.relevant = True
-        elif idx < 20:
-            ks.hard_status = 1
-            ks.relevant = True
-        else:
-            ks.hard_status = 0
-            ks.relevant = False
-        keyword_settings.append(ks)
-    postgres_session.add_all(keyword_settings)
-    await postgres_session.flush()
-    for ks in keyword_settings:
-        await postgres_session.refresh(ks)
-
-    # 3️⃣ CalculatedKeywords
-    def _build_keyword(
-        ks: KeywordSetting,
-        *,
-        status: str,
-        hard_status: int,
-        predict_ctr: float,
-        predict_ctr_exponent: float,
-        views: int,
-        clicks: int,
-        spend: float,
-        relevant: bool,
-        best: bool = False,
-    ) -> CalculatedKeyword:
-        return CalculatedKeyword(
-            keyword_setting_original_id=ks.id,
-            text=ks.text,
-            clicks=clicks,
-            views=views,
-            spend=spend,
-            baes_ctr=round(predict_ctr * 0.8, 3),
-            predict_ctr=predict_ctr,
-            predict_ctr_exponent=predict_ctr_exponent,
-            status=status,
-            hard_status=hard_status,
-            relevant=relevant,
-            best_keyword_status=best,
-        )
-
-    calculated_keywords: list[CalculatedKeyword] = []
-    for idx, ks in enumerate(keyword_settings):
-        if idx == 0:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=2,
-                    predict_ctr=1.5,
-                    predict_ctr_exponent=6.0,
-                    views=1500,
-                    clicks=200,
-                    spend=320.0,
-                    relevant=True,
-                    best=True,
-                )
-            )
-        elif idx < 10:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=2,
-                    predict_ctr=1.2,
-                    predict_ctr_exponent=5.0,
-                    views=1200,
-                    clicks=150,
-                    spend=210.0,
-                    relevant=True,
-                )
-            )
-        elif idx < 15:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.BAD,
-                    hard_status=1,
-                    predict_ctr=0.35,
-                    predict_ctr_exponent=4.0,
-                    views=800,
-                    clicks=40,
-                    spend=45.0,
-                    relevant=True,
-                )
-            )
-        elif idx < 20:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=1,
-                    predict_ctr=1.1,
-                    predict_ctr_exponent=4.5,
-                    views=1000,
-                    clicks=120,
-                    spend=160.0,
-                    relevant=True,
-                )
-            )
-        else:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.BAD,
-                    hard_status=0,
-                    predict_ctr=0.25,
-                    predict_ctr_exponent=3.0,
-                    views=600,
-                    clicks=30,
-                    spend=30.0,
-                    relevant=False,
-                )
-            )
-
-    # 4️⃣ Асинхронный источник данных для ComplexAdv
     async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
-        return calculated_keywords
+        return seed.calculated_keywords
 
-    # 5️⃣ Реальный ComplexAdv
     complex_adv = ComplexAdv(
-        shop_id='559785095jljiuilhkh',
-        adv_setting=adv_setting,
+        shop_id="559785095jljiuilhkh",
         get_keywords_func=get_keywords_func,
-        search_adv=search_adv_setting,
+        adv_setting=seed.adv_setting,
+        search_adv=seed.search_adv,
     )
 
     yield complex_adv
@@ -721,25 +632,38 @@ async def sm_generator(postgres_session):
     return _FakeSessionMaker()
 
 
-SYNC_TEST_DB_URL = TEST_DB_URL.replace("postgresql+asyncpg", "postgresql")
-SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
-
-
 @pytest.fixture(autouse=True)
-def clean_db():
-    """Синхронно очищает ключевые таблицы до и после каждого теста."""
-    with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+async def clean_db():
+    """Очищает ключевые таблицы до и после каждого теста (не трогая event loop).
 
+    Для unit-тестов без поднятой Docker-БД — no-op.
+    """
+    if not _TEST_DB_READY:
+        yield
+        return
+
+    truncate_sql = text(
+        # Чистим данные, которые часто создаются тестами.
+        # Включаем wbcabinet, чтобы тесты могли стабильно создавать кабинет с id=1
+        # (иначе возможны UniqueViolation на pkey при сидировании).
+        'TRUNCATE "user", wbcabinet, wbusercabinet, wbbalancepayment, wbbonuspayment, '
+        "payment, keywordsetting, advsetting RESTART IDENTITY CASCADE"
+    )
+
+    async def _truncate() -> None:
+        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        async with engine.begin() as conn:
+            await conn.execute(truncate_sql)
+        await engine.dispose()
+
+    await _truncate()
     yield
-
-    with SYNC_TEST_ENGINE.begin() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+    await _truncate()
 
 
 @pytest.fixture(scope='function')
-def main_di_container() -> AppContainer:
-
+def main_di_container() -> "AppContainer":
+    from app.core.di.app_container import AppContainer
     container = AppContainer()
     return container
 
@@ -747,7 +671,7 @@ def main_di_container() -> AppContainer:
 
 
 @pytest.fixture(scope='function')
-def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> AppContainer:
+def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> "AppContainer":
     main_di_container.wiring_config.modules = ['app.core.redis_cache',  # Отключаем автоматическое встраивание зависимостей
                                        "old_modules.setting_auto_updater_v2.adv_control_system."
                                        "executors.target_place_executor.utils",
@@ -812,6 +736,206 @@ async def clickhouse_client(setup_test_database):
         ORDER BY (adv_id, text, date)
     """)
 
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.clusters_adv_stats (
+            adv_id UInt32,
+            nmid UInt64,
+            wb_category LowCardinality(String),
+            norm_query LowCardinality(String),
+            views UInt32,
+            clicks UInt32,
+            ctr Float64,
+            cpm Float64,
+            add_to_cart UInt32,
+            orders UInt32,
+            cpc Float64,
+            avr_pos Float64,
+            date Date,
+            timestamp DateTime default now()
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (wb_category, nmid, norm_query, date, timestamp)
+        SETTINGS index_granularity = 8192
+    """)
+
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.wb_common_stat (
+            nmid UInt64,
+            date Date,
+            open_card UInt32,
+            add_to_cart UInt32,
+            orders UInt32,
+            orders_sum Float64,
+            buy_outs UInt32,
+            version Float64,
+            INDEX idx_wb_common_stat_date date TYPE minmax GRANULARITY 1
+        )
+        ENGINE = ReplacingMergeTree(version)
+        ORDER BY (nmid, date)
+        SETTINGS index_granularity = 8192
+    """)
+
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.plan_fact_stats (
+            adv_id Int32,
+            shop_id String,
+            date Date,
+            timestamp DateTime,
+            plan_orders Nullable(Int32),
+            plan_target_pay_for_order Nullable(Int32),
+            plan_max_pay_for_order Nullable(Int32),
+            fact_predict_orders Nullable(Float64),
+            fact_original_orders Nullable(Float64),
+            fact_pay_for_order Nullable(Float64),
+            fact_method Nullable(String),
+            version Float64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, timestamp)
+        SETTINGS index_granularity = 8192
+    """)
+
+    # Создаём таблицу advkeyword (источник для Materialized Views)
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.advkeyword (
+            adv_id UInt64,
+            date Date,
+            text String,
+            views UInt32,
+            clicks UInt32,
+            spend Float64,
+            version UInt64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, text, version)
+        SETTINGS index_granularity = 8192
+    """)
+
+    # Создаём Materialized View: advkeyword_daily_mv
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.advkeyword_daily_mv
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.advkeyword_daily_mv
+        (
+            `adv_id` UInt64,
+            `date` Date,
+            `text` String,
+            `clicks` AggregateFunction(argMax, UInt32, UInt64),
+            `views` AggregateFunction(argMax, UInt32, UInt64),
+            `spend` AggregateFunction(argMax, Float64, UInt64)
+        )
+        ENGINE = AggregatingMergeTree
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, text)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT 
+            adv_id,
+            date,
+            text,
+            argMaxState(clicks, version) AS clicks,
+            argMaxState(views, version) AS views,
+            argMaxState(spend, version) AS spend
+        FROM default_db.advkeyword
+        GROUP BY adv_id, date, text
+    """)
+
+    # Создаём Materialized View: cumulative_views
+    # ВАЖНО: SummingMergeTree автоматически суммирует числовые колонки, поэтому НЕ используем sum() в SELECT
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.cumulative_views
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.cumulative_views
+        (
+            `adv_id` UInt64,
+            `text` String,
+            `date` Date,
+            `total_views` UInt64,
+            `total_clicks` UInt64,
+            `total_spend` Float64
+        )
+        ENGINE = SummingMergeTree
+        ORDER BY (adv_id, text, date)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT 
+            adv_id,
+            text,
+            date,
+            views AS total_views,
+            clicks AS total_clicks,
+            spend AS total_spend
+        FROM default_db.advkeyword
+    """)
+
+    # Создаём Materialized View: mv_clusters_daily
+    # Агрегирует данные из clusters_adv_stats по дням с использованием AggregatingMergeTree
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.mv_clusters_daily
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily
+        (
+            `nmid` UInt64,
+            `text` LowCardinality(String),
+            `date` Date,
+            `views_state` AggregateFunction(argMax, UInt32, DateTime),
+            `clicks_state` AggregateFunction(argMax, UInt32, DateTime),
+            `add_to_cart_state` AggregateFunction(argMax, UInt32, DateTime),
+            `orders_state` AggregateFunction(argMax, UInt32, DateTime),
+            `cpm_state` AggregateFunction(argMax, Float64, DateTime),
+            `cpc_state` AggregateFunction(argMax, Float64, DateTime),
+            `ts_state` AggregateFunction(max, DateTime)
+        )
+        ENGINE = AggregatingMergeTree
+        ORDER BY (nmid, text, date)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT nmid,
+               norm_query AS text,
+               date,
+               argMaxState(views, timestamp) AS views_state,
+               argMaxState(clicks, timestamp) AS clicks_state,
+               argMaxState(add_to_cart, timestamp) AS add_to_cart_state,
+               argMaxState(orders, timestamp) AS orders_state,
+               argMaxState(cpm, timestamp) AS cpm_state,
+               argMaxState(cpc, timestamp) AS cpc_state,
+               maxState(timestamp) AS ts_state
+        FROM default_db.clusters_adv_stats
+        GROUP BY nmid, text, date
+    """)
+
+    # Создаём Materialized View: mv_clusters_last_state
+    # Хранит последнее состояние для каждого nmid + text
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.mv_clusters_last_state
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_last_state
+        (
+            `nmid` UInt64,
+            `text` LowCardinality(String),
+            `last_avg_pos_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_cpc_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_cpm_state` AggregateFunction(argMax, Float64, DateTime),
+            `last_ts_state` AggregateFunction(max, DateTime)
+        )
+        ENGINE = AggregatingMergeTree
+        ORDER BY (nmid, text)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT nmid,
+               norm_query AS text,
+               argMaxState(avr_pos, timestamp) AS last_avg_pos_state,
+               argMaxState(cpc, timestamp) AS last_cpc_state,
+               argMaxState(cpm, timestamp) AS last_cpm_state,
+               maxState(timestamp) AS last_ts_state
+        FROM default_db.clusters_adv_stats
+        GROUP BY nmid, norm_query
+    """)
+
     print("[OK] ClickHouse tables created/checked")
 
     yield client
@@ -823,5 +947,12 @@ async def clickhouse_client(setup_test_database):
 
 @pytest.fixture(scope='function')
 def app_container():
+    from app.core.di.app_container import AppContainer
     container = AppContainer()
     return container
+
+
+@pytest.fixture(scope='function')
+def bidder_keywords_300() -> list[CalculatedKeyword]:
+    from tests.factories.keyword_pipeline import CalculatedKeywordFactory
+    return CalculatedKeywordFactory.create_batch(300)

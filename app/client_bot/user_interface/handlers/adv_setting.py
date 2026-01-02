@@ -1,16 +1,15 @@
 import logging
-
 import aiogram
+from typing import Sequence
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import update
+from sqlalchemy import Result
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
-from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
@@ -19,6 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 
 from .. import states
 from ..views import callbacks, messages
@@ -52,7 +52,7 @@ async def reset_filter(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        adv_settings = list(result.scalars().all())
 
     page = 1
     message = callback.message
@@ -74,8 +74,10 @@ async def waiting_for_keywords_for_filter(
     message: types.Message, bot: Bot, state: FSMContext
 ):
     chat_id = message.chat.id
-    text = message.text
-    filter_advs = text.splitlines()
+    if not (text := message.text):
+        await message.answer('Не получен список ключей')
+        return None
+    filter_advs: list[str] = text.splitlines()
     filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
     await state.update_data(filter_advs=filter_advs)
     state_data = await state.get_data()
@@ -87,8 +89,8 @@ async def waiting_for_keywords_for_filter(
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
 
     page = 1
     check_data = await state.get_data()
@@ -96,17 +98,19 @@ async def waiting_for_keywords_for_filter(
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
     )()
-    return
+    return None
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
 async def choice_adv_paginator(
-    callback: types.CallbackQuery | types.Message,
+    callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-    chat_id = callback.message.chat.id
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id: int = callback.message.chat.id
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(
@@ -122,8 +126,8 @@ async def choice_adv_paginator(
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
     )
     async with sm() as session:
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
+        result = await session.execute(stmt)
+        adv_settings = list(result.scalars().all())
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
     )()
@@ -137,6 +141,9 @@ async def adv_handler(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id = callback.message.chat.id
     await state.set_state()
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     adv_original_id = callback_data.adv_original_id
@@ -160,7 +167,7 @@ async def adv_handler(
                 )
             )
             result = await session.execute(stmt)
-            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
+            wb_user_cabinet = result.scalar_one()  # Извлекаем первую строку
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
@@ -171,7 +178,7 @@ async def adv_handler(
 
     if not adv:
         await bot.send_message(
-            callback.message.chat.id, "Кампания не найдена, попробуйте еще раз"
+            chat_id, "Кампания не найдена, попробуйте еще раз"
         )
         stmt = (
             select(AdvSetting)
@@ -181,12 +188,12 @@ async def adv_handler(
             .order_by(AdvSetting.name)
         )
         async with sm() as session:
-            adv_settings = await session.execute(stmt)
-            adv_settings = adv_settings.scalars().all()
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = list(result.scalars().all())
 
         await messages.AdvCompanyChoicing(
             bot,
-            callback.message.chat.id,
+            chat_id,
             wb_user_cabinet_original_id,
             adv_settings,
             state,
@@ -199,7 +206,12 @@ async def adv_handler(
         )
         wb_user_cabinet = wb_user_cabinet.scalar()
 
-    chat_id = callback.message.chat.id
+    if not wb_user_cabinet:
+        await bot.send_message(
+            chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
+
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
@@ -211,6 +223,10 @@ async def turn_adv_on(
     callback_data: callbacks.TurnBot,
     bot: aiogram.Bot,
 ) -> None:
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id = callback.message.chat.id
+
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=False) as session:
@@ -221,18 +237,16 @@ async def turn_adv_on(
             .options(selectinload(WBUserCabinet.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()  # type: ignore[attr-defined]
-        assert wb_user_cabinet
+        result_for_wb_user_cabinet = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar_one()
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.payments))
             .where(AdvSetting.id == adv_original_id)
         )
-        result = await session.execute(stmt)
-        adv: AdvSetting = result.scalar()
-        assert adv
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet  # type: ignore[attr-defined]
+        result_for_adv_setting = await session.execute(stmt)
+        adv: AdvSetting = result_for_adv_setting .scalar_one()
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
             session, wb_cabinet.shop_id
         )
@@ -257,9 +271,8 @@ async def turn_adv_on(
         stmt = select(WBUserCabinet).where(
             WBUserCabinet.id == wb_user_cabinet_original_id
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()  # type: ignore[attr-defined]
-        chat_id = callback.message.chat.id
+        result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet = result.scalar_one()
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
@@ -271,6 +284,11 @@ async def turn_adv_off_all(
     callback_data: callbacks.TurnBot,
     bot: aiogram.Bot,
 ):
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+
+    chat_id = callback.message.chat.id
+
     await bot.send_message(callback.message.chat.id, "Отключаю бота от всех кампаний")
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
@@ -284,7 +302,6 @@ async def turn_adv_off_all(
         for adv_ in advs:
             adv_.bot_active = False
         await session.commit()
-    chat_id = callback.message.chat.id
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return
 
@@ -293,6 +310,11 @@ async def turn_adv_off_all(
 async def turn_adv_off(
     call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot
 ):
+    if call.message is None:
+        raise ValueError('Нет сообщения')
+
+    chat_id = call.message.chat.id
+
     # data = await state.get_data()
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -304,58 +326,115 @@ async def turn_adv_off(
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
 
+    if not wb_user_cabinet:
+        await bot.send_message(
+            chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
+
     async with sm(read_only=False) as session:
         result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         )
-        adv_setting: AdvSetting = result.scalars().first()
+        adv_setting: AdvSetting = result.scalar_one()
         adv_setting.bot_active = False
         await session.commit()
 
     await messages.AdvSettingMenu(
         bot,
-        call.message.chat.id,
+        chat_id,
         wb_user_cabinet,
         adv_setting,
     )()
 
-
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr")
-)
-async def turn_on_auto_min_ctr(
-    callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR
-):
-    adv_setting_original_id = callback_data.adv_setting_original_id
-    stmt = (
-        update(AdvSetting)
-        .where(AdvSetting.id == callback_data.adv_setting_original_id)
-        .values({AdvSetting.new_auto_min_ctr_mode: True})
-    )
-
-    async with sm(read_only=False) as session:
-        await session.execute(stmt)
-        await session.commit()
-    await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_setting_original_id)
-
-
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_off_auto_min_ctr")
-)
-async def turn_off_auto_min_ctr(
+@router.callback_query(callbacks.ApplyCampaignDefaults.filter())
+async def apply_campaign_defaults(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChangeAutoMinCTR,
-    bot: Bot,
-):
-    adv_setting_original_id = callback_data.adv_setting_original_id
+    callback_data: callbacks.ApplyCampaignDefaults,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id = callback.message.chat.id
 
-    stmt = (
-        update(AdvSetting)
-        .where(AdvSetting.id == adv_setting_original_id)
-        .values({AdvSetting.new_auto_min_ctr_mode: False})
-    )
+    adv_original_id = callback_data.adv_setting_original_id
+    async with sm(read_only=False) as session:
+        result = await session.execute(
+            select(AdvSetting)
+            .options(joinedload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv_original_id)
+        )
+        adv_setting: AdvSetting = result.scalar_one()
+
+        # Применяем дефолты через ORM
+        apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+        await session.commit()
+
+        await bot.send_message(
+            chat_id, "Дефолтные настройки применены успешно!"
+        )
+
+        # Обновить меню кампании
+        data = await state.get_data()
+        wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
+        async with sm() as session_read:
+            wb_user_cabinet = await session_read.execute(
+                select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            )
+            wb_user_cabinet = wb_user_cabinet.scalar()
+
+        if not wb_user_cabinet:
+            await bot.send_message(
+                chat_id, "Кабинет не найден, попробуйте еще раз"
+            )
+            return
+
+        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+    return
+
+
+@router.callback_query(callbacks.ApplyDefaultsForShop.filter())
+async def apply_defaults_for_shop(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ApplyDefaultsForShop,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    if callback.message is None:
+        raise ValueError('Нет сообщения')
+    chat_id: int = callback.message.chat.id
 
     async with sm(read_only=False) as session:
-        await session.execute(stmt)
+        # Получаем только активные кампании магазина через ORM
+        stmt = (
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .options(selectinload(AdvSetting.wb_cabinet))
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .where(AdvSetting.bot_active.is_(True))
+        )
+        result: Result[tuple[AdvSetting]] = await session.execute(stmt)
+        adv_settings: Sequence[AdvSetting] = result.scalars().all()
+
+        # Применяем дефолты через ORM для каждой активной кампании
+        updated_count = 0
+        for adv_setting in adv_settings:
+            apply_defaults_to_adv_setting(adv_setting,
+                                         adv_setting.wb_cabinet)
+            updated_count += 1
+
         await session.commit()
-    await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_setting_original_id)
+
+    await bot.send_message(
+        chat_id,
+        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина.",
+    )
+
+    # Вернуть пользователя в меню магазина
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
+
+    return

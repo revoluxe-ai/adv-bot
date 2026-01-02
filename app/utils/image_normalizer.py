@@ -28,7 +28,7 @@ def safe_image_to_bytes(image: PIL.Image.Image, format: str = "JPEG") -> bytes:
         if format.upper() == "JPEG" and image.mode in ("RGBA", "P"):
             image = image.convert("RGB")
 
-        buffer = io.BytesIO()
+        buffer: io.BytesIO = io.BytesIO()
         image.save(buffer, format=format)
         return buffer.getvalue()
 
