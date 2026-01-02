@@ -27,7 +27,9 @@
     "app/modules/common_slaves/wildberries/wb_db_manager.py",
     "app/client_bot/common_routers.py",
     "app/modules/shop_runner/service_manager/services/plan_fact_controller",
-    "app/modules/shop_runner/modules/max_auto_bid_manager/auto_max_bid_manager.py"
+    "app/modules/shop_runner/modules/max_auto_bid_manager/auto_max_bid_manager.py",
+    "updater.py"
+
   ],
 
   "exclude": [
