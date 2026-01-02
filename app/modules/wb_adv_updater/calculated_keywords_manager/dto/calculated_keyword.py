@@ -32,7 +32,9 @@ class CalculatedKeyword(BaseModel):
 
 
     @property
-    def cpc(self) -> float:
+    def cpc(self) -> float | None:
+        if  not self.clicks:
+            return None
         return self.spend / self.clicks
 
     @property
