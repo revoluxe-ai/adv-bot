@@ -317,7 +317,7 @@ class BalanceReminderService:
             )
 
             items_map[reminder.user_id].append(item)
-            chat_map.setdefault(reminder.user_id, int(telegram_id))
+            _ = chat_map.setdefault(reminder.user_id, int(telegram_id))
 
         return {
             user_id: (chat_map[user_id], items)
