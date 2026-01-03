@@ -580,8 +580,8 @@ class KeywordSettingMessage(TextWithKeyboard):
     async def _get_calculated_keyword(
         adv_id: int, text: str
     ) -> CalculatedKeyword | None:
-        redis_manager = RedisCalculatedKeywordsCacheManager()
-        keyword = await redis_manager.get_calculated_keyword(adv_id, text)
+        redis_manager_ = RedisCalculatedKeywordsCacheManager()
+        keyword = await redis_manager_.get_calculated_keyword(adv_id, text)
         return keyword
 
     @staticmethod
