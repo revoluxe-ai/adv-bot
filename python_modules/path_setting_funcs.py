@@ -49,7 +49,7 @@ def get_setting_path() -> str:
     # # Путь к файлу данных относительно текущего скрипта
     # current_path = os.path.dirname(current_script_path)
     # data_file_path = os.path.join(current_path, 'setting.yaml')
-    root_path = find_project_root()
+    root_path = find_project_root(Path(__file__).resolve().parent)
     return os.path.join(root_path, "setting.yaml")
 
 
