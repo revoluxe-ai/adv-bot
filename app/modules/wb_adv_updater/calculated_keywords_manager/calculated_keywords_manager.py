@@ -57,17 +57,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return calculated_keyword_list
 
     async def _get_all_stats(self, complex_adv: ComplexAdv, min_days: int, min_views: int):
-        get_stat_tasks = [self.__get_keywords_stat_from_clickhouse(nmid, min_days, min_views)
-                          for nmid in complex_adv.nmids]
-
-        results: list[list[KeywordStat]] = await asyncio.gather(*get_stat_tasks)
-        stats: list[KeywordStat] = []
-        for result in results:
-            stats.extend(result)
-        return stats
+        nmids = complex_adv.nmids
+        return await self.__get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
 
     async def __get_keywords_stat_from_clickhouse(self,
-                                                  nmid: int,
+                                                  nmids: list[int],
                                                   min_days: int,
                                                   min_views: int,
                                                   cart_to_order_window:int=14
@@ -79,7 +73,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             response = await client.query(
                 query,
                 parameters={
-                    "nmid": nmid,
+                    "nmids": nmids,
                     "min_views": min_views,
                     "min_days": min_days,
                     "conv_days": cart_to_order_window,
@@ -237,9 +231,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         redis_cache_manager = RedisCalculatedKeywordsCacheManager()
         await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
 
-
-    async def _get_bidder_keyword_statuses(self,
-                                           complex_adv: ComplexAdv,
+    @staticmethod
+    async def _get_bidder_keyword_statuses(complex_adv: ComplexAdv,
                                            texts: list[str]) -> dict[str, BidderKeywordStatus]:
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 
@@ -253,7 +246,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             from app.core.redis_manager_v2.redis_client import RedisClient
             from app.configs import AppConfig
             from redis.asyncio import Redis
-            
+
             # Создаем Redis клиент напрямую (костыль)
             config = AppConfig.create()
             redis_config = config.infrastructure.redis
@@ -266,7 +259,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             redis_client_wrapper = RedisClient(redis_client=raw_redis_client)
             httpx_client_handler = HttpxClientHandler()
-            
+
             # Создаем контейнер и получаем hub
             wb_manager_hub_container = WBManagerHubContainer(
                 _shop_id=complex_adv.shop_id,
