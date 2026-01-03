@@ -827,7 +827,7 @@ class MaxCPCSetting(TextWithKeyboard):
             if str(kw.status) == KeywordStatus.GOOD
             or kw.reason == KeywordStatusReason.MAX_CPC
         ]
-        keywords_without_cpc_is_none: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]    
+        keywords_without_cpc_is_none: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
         keywords.sort(key=lambda x: x.cpc if x.cpc else 0, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
