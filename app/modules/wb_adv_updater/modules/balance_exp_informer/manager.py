@@ -5,7 +5,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from datetime import datetime, timezone, time, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app.modules.wb_adv_updater.modules.balance_exp_informer.service import (
@@ -35,10 +35,11 @@ def seconds_until_next_send_hour_utc(now: datetime, send_hour_utc: int) -> int:
     """
     assert now.tzinfo is not None
 
+    target_timezone = now.tzinfo
     target_today = datetime.combine(
         now.date(),
         time(send_hour_utc, 0),
-        tzinfo=timezone.utc,
+        tzinfo=target_timezone,
     )
     target = target_today if now < target_today else target_today + timedelta(days=1)
     return max(0, math.ceil((target - now).total_seconds()))
@@ -79,7 +80,7 @@ async def balance_expiration_informer_tick(
         await asyncio.sleep(cfg.fail_backoff_seconds)
         return
 
-    now_after = datetime.now(timezone.utc)
+    now_after = datetime.now(ZoneInfo("Europe/Moscow"))
     sleep_sec = seconds_until_next_send_hour_utc(now_after, cfg.send_hour_utc)
     await asyncio.sleep(sleep_sec + _jitter(cfg.sleep_jitter_seconds))
 
