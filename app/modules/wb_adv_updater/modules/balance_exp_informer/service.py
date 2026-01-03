@@ -141,6 +141,8 @@ class BalanceReminderService:
                             await send_chunk(bot, chat_id, text, keyboard)
                         except Exception as e:
                             logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
+                            await self._mark_failed(session, reminder_ids)
+                            send_errors_total += 1
                             continue
                         await self._mark_sent(session, reminder_ids)
                         messages_sent_total += 1
