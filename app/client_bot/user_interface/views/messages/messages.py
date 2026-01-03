@@ -857,7 +857,7 @@ class MaxCPCSetting(TextWithKeyboard):
             text += f"""{keyword.text} - {round(cpc, 2)} р. ❌\n"""
 
         text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
-        print("============")
+
         for keyword in self._down_kw_list:
             cpc = keyword.cpc
             if cpc is None:

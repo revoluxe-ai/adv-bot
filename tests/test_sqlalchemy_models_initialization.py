@@ -32,7 +32,7 @@ class TestSQLAlchemyModelsInitialization:
             from app.utils.db import models as db_models
             from app.modules.token_monitoring import models as token_models
             from app.core.wb_api import models as wb_api_models
-            from app.modules.wb_adv_updater import models as updater_models
+            from app.modules.wb_adv_updater.modules.balance_exp_informer import models as updater_models
             from app.payments.db import models as payment_models
             from app.admin_bot.sender.utils.db import models as admin_models
 
