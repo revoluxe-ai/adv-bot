@@ -333,7 +333,7 @@ class BalanceReminderService:
             .where(BalanceReminder.id.in_(reminder_ids))
             .values(status="sent", sent_at=now, last_attempt_at=now)
         )
-        await session.execute(stmt)
+        _ = await session.execute(stmt)
 
     @staticmethod
     async def _mark_failed(session: AsyncSession, reminder_ids: Iterable[int]) -> None:
@@ -347,7 +347,7 @@ class BalanceReminderService:
                 last_attempt_at=now,
             )
         )
-        await session.execute(stmt)
+        _ = await session.execute(stmt)
 
     @staticmethod
     async def _mark_failed_permanent(session: AsyncSession, reminder_ids: Iterable[int]) -> None:
@@ -361,4 +361,4 @@ class BalanceReminderService:
                 last_attempt_at=now,
             )
         )
-        await session.execute(stmt)
+        _ = await session.execute(stmt)
