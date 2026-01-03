@@ -96,7 +96,7 @@ async def iter_user_cabinets_batches(
                 )
             )
 
-        last_link_id = int(rows[-1].link_id)
+        last_link_id: int = int(rows[-1].link_id)
         yield batch
 
 
