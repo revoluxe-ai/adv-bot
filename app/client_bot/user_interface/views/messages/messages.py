@@ -366,7 +366,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
-        self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv)
+        self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
         return await super().__call__()
 
     @property
