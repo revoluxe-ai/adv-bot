@@ -32,6 +32,9 @@ from app.modules.wb_adv_updater.modules.balance_exp_informer.sender import send_
 from app.modules.wb_adv_updater.modules.balance_exp_informer.time import billing_today
 from app.utils.db.models import User
 
+
+logger = logging.getLogger(__file__)
+
 MAX_CHUNKS_PER_USER = 12
 BATCH_SIZE = 10
 
@@ -134,7 +137,11 @@ class BalanceReminderService:
                     text, keyboard = build_message(reminder_chunk)
                     reminder_ids = [it.reminder_id for it in reminder_chunk]
                     try:
-                        await send_chunk(bot, chat_id, text, keyboard)
+                        try:
+                            await send_chunk(bot, chat_id, text, keyboard)
+                        except Exception as e:
+                            logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
+                            continue
                         await self._mark_sent(session, reminder_ids)
                         messages_sent_total += 1
                     except Exception as exc:

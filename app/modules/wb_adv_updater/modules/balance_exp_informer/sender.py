@@ -14,7 +14,7 @@ async def send_chunk(
     keyboard: InlineKeyboardMarkup,
 ) -> None:
     try:
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id=user_telegram_id,
             text=text,
             reply_markup=keyboard,
@@ -22,4 +22,5 @@ async def send_chunk(
         )
     except Exception:
         logger.exception("Ошибка при отправке сообщения об истекающем балансе")
+        raise
     return None
