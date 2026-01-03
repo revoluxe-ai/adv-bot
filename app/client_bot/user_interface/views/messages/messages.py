@@ -828,7 +828,7 @@ class MaxCPCSetting(TextWithKeyboard):
             or kw.reason == KeywordStatusReason.MAX_CPC
         ]
         keywords_without_cpc_is_none: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
-        keywords.sort(key=lambda x: x.cpc if x.cpc else 0, reverse=True)
+        keywords_without_cpc_is_none.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
             down_kw_list = keywords_without_cpc_is_none
@@ -950,7 +950,7 @@ class WaitingForWhitePhrases(TextWithKeyboard):
     @property
     def text(self):
         return """
-Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).  
+Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).
 Например:
 
 платье женское
