@@ -821,21 +821,22 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv: AdvSetting = adv
 
         keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
-        keywords: list[CalculatedKeyword]   = [
+        keywords   = [
             kw
             for kw in keywords
             if str(kw.status) == KeywordStatus.GOOD
             or kw.reason == KeywordStatusReason.MAX_CPC
         ]
+        keywords_without_cpc_is_none: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]    
         keywords.sort(key=lambda x: x.cpc if x.cpc else 0, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
-            down_kw_list = keywords
+            down_kw_list = keywords_without_cpc_is_none
         else:
             top_kw_list: list[CalculatedKeyword] = []
             down_kw_list: list[CalculatedKeyword] = []
-            for keyword in keywords:
-                cpc = keyword.cpc
+            for keyword in keywords_without_cpc_is_none:
+                cpc: float | None = keyword.cpc
                 if cpc is None:
                     continue
                 if cpc > self._adv.max_cpc:
