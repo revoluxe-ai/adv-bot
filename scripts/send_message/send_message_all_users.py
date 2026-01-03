@@ -94,10 +94,12 @@ async def send_message_to_users():
            send_tasks.append(send_message(user, bot, send_count, not_send_count))
 
     await asyncio.gather(*send_tasks)
-    try:
-        _ = [await bot.session.close() for bot in bots]
-    except Exception as e:
-        logger.warning(f"Bot session close failed: {e}")
+
+    results = await asyncio.gather(*[bot.session.close() for bot in bots], return_exceptions=True)
+
+    for result in results:
+        if isinstance(result, BaseException):
+            logger.error(result)
 
     try:
         await redis_manager.close()
