@@ -13,7 +13,7 @@ daily_last AS (
         argMaxMerge(cpm_state)          AS cpm,
         maxMerge(ts_state)              AS last_ts_day
     FROM default_db.mv_clusters_daily
-    WHERE nmid = {nmid: UInt64}
+    WHERE nmid IN {nmids:Array(UInt64)}
     GROUP BY text, date
 ),
 
@@ -39,7 +39,7 @@ last_state AS (
         argMaxMerge(last_cpm_state)     AS last_cpm,
         maxMerge(last_ts_state)         AS last_ts
     FROM default_db.mv_clusters_last_state
-    WHERE nmid = {nmid: UInt64}
+    WHERE nmid IN {nmids:Array(UInt64)}
     GROUP BY text
 ),
 
@@ -54,7 +54,7 @@ data_pos AS (
         date,
         timestamp
     FROM default_db.clusters_adv_stats
-    WHERE nmid = {nmid: UInt64}
+    WHERE nmid IN {nmids:Array(UInt64)}
 ),
 
 day_for_real_position AS (
