@@ -163,7 +163,7 @@ class ComplexAdv:
 
     @property
     def main_nmid(self) -> int:
-        return self._adv_setting.nmids[0]
+        return self.nmids[0]
 
     @property
     def is_target_position_control_enabled(self) -> bool:
