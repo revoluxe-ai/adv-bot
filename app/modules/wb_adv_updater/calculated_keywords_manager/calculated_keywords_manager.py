@@ -67,7 +67,35 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                                   min_views: int,
                                                   cart_to_order_window:int=14
                                                   ) -> list[KeywordStat]:
+        """Fetch keyword statistics from ClickHouse and parse them into models.
 
+        This is a higher-level wrapper around
+        ``__get_keywords_stat_from_clickhouse``. It forwards the query
+        parameters to the cached low-level ClickHouse call and converts the
+        raw dictionaries returned from ClickHouse into ``KeywordStat`` model
+        instances.
+
+        Args:
+            nmids: List of Wildberries product IDs (nmids) to fetch statistics
+                for. A list is used so that statistics for multiple products
+                can be retrieved in a single ClickHouse query.
+            min_days: Minimum number of days of statistics that must be
+                available for a keyword to be included in the result.
+            min_views: Minimum number of views required for a keyword to be
+                included in the result set.
+            cart_to_order_window: Number of days to use as the conversion
+                window when aggregating cart-to-order statistics.
+
+        Returns:
+            A list of ``KeywordStat`` objects with aggregated statistics for
+            the requested nmids that satisfy the specified filters.
+
+        Note:
+            This method itself is not cached. Caching is applied at the level
+            of ``__get_keywords_stat_from_clickhouse``, which is decorated
+            with ``@noself(cache)`` and caches the raw ClickHouse query
+            results for a short period.
+        """
         result: list[dict[str, int | float | str]] = await self.__get_keywords_stat_from_clickhouse(
             nmids, min_days, min_views, cart_to_order_window
         )
