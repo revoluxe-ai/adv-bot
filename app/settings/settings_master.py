@@ -278,6 +278,13 @@ class Settings:
         return value
 
     @property
+    def BILLING_TZ(self) -> str:
+        value = os.environ.get("BILLING_TZ")
+        if value is None:
+            return "Europe/Moscow"
+        return value
+
+    @property
     def YOOKASSA_TOKEN(self) -> str:
         value = os.environ.get("YOOKASSA_TOKEN")
         if value is None:

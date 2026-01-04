@@ -203,7 +203,7 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
     expected_add_to_cart = sum(record.add_to_cart for record in records)
     expected_orders = sum(record.orders for record in records)
     expected_spend = sum(
-        (record.cpm * record.views) / 1000 + (record.cpc * record.clicks)
+        (record.cpm * record.views) / 1000
         for record in records
     )
 

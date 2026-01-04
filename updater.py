@@ -5,13 +5,11 @@ from functools import partial
 from multiprocessing import Process
 
 import dotenv
-import psutil
-from typing import NoReturn, Never, Any
+import psutil # pyright: ignore
+from typing import Any
 from collections.abc import Callable, Coroutine
 
 # Use direct imports to avoid any re-export typing issues
-from app.core.di.di_manager import DIManager
-from app.core.di.app_container import AppContainer
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     run_update_all_keywords_on_wb,
@@ -23,8 +21,11 @@ dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
+
+
 # Явная аннотация типов для списка корутин
-run_own_process_list: list[Callable[..., Never]] = [
+run_own_process_list: list[AsyncEntry] = [
     #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
     run_update_all_keywords_on_wb,
     run_main_coroutines,
@@ -49,7 +50,7 @@ def process_controller(process_pids: list[int], process_names: list[str]) -> Non
 # (а не DI-провайдер)
 
 
-def run_coroutines(coroutine_func: Callable[..., Coroutine[Any, Any, Never]]) -> None:
+def run_coroutines(coroutine_func:  AsyncEntry) -> None:
     asyncio.run(coroutine_func())
 
 

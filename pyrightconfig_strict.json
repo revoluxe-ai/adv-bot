@@ -27,8 +27,9 @@
     "app/modules/common_slaves/wildberries/wb_db_manager.py",
     "app/client_bot/common_routers.py",
     "app/modules/shop_runner/service_manager/services/plan_fact_controller",
-    "app/modules/shop_runner/modules/max_auto_bid_manager/auto_max_bid_manager.py"
-    "updater.py"
+    "app/modules/shop_runner/modules/max_auto_bid_manager/auto_max_bid_manager.py",
+    "updater.py",
+    "app/modules/wb_adv_updater/modules/balance_exp_informer"
 
   ],
 
@@ -42,6 +43,7 @@
     "app/utils/db/session_maker.py",
     "app/modules/wb_adv_updater/word_to_vec_object.py",
     "app/modules/wb_adv_updater/wb_manager.py",
-    "app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py"
+    "app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py",
+    "app/utils/graphic_positions_creator/graphic_positions_creator.py"
   ]
 }

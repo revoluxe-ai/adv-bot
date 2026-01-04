@@ -366,7 +366,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
-        self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv)
+        self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
         return await super().__call__()
 
     @property
@@ -580,8 +580,8 @@ class KeywordSettingMessage(TextWithKeyboard):
     async def _get_calculated_keyword(
         adv_id: int, text: str
     ) -> CalculatedKeyword | None:
-        redis_manager = RedisCalculatedKeywordsCacheManager()
-        keyword = await redis_manager.get_calculated_keyword(adv_id, text)
+        redis_manager_ = RedisCalculatedKeywordsCacheManager()
+        keyword = await redis_manager_.get_calculated_keyword(adv_id, text)
         return keyword
 
     @staticmethod
@@ -821,13 +821,18 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv: AdvSetting = adv
 
         keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
-        keywords: list[CalculatedKeyword]   = [
+        keywords   = [
             kw
             for kw in keywords
             if str(kw.status) == KeywordStatus.GOOD
             or kw.reason == KeywordStatusReason.MAX_CPC
         ]
-        keywords.sort(key=lambda x: x.cpc, reverse=True)
+        keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
+
+        def safe_sort(kw: CalculatedKeyword) -> float:
+            return kw.cpc if kw.cpc is not None else float('-inf')
+
+        keywords.sort(key=safe_sort, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
             down_kw_list = keywords
@@ -835,7 +840,10 @@ class MaxCPCSetting(TextWithKeyboard):
             top_kw_list: list[CalculatedKeyword] = []
             down_kw_list: list[CalculatedKeyword] = []
             for keyword in keywords:
-                if keyword.cpc > self._adv.max_cpc:
+                cpc: float | None = keyword.cpc
+                if cpc is None:
+                    continue
+                if cpc > self._adv.max_cpc:
                     top_kw_list.append(keyword)
                 else:
                     down_kw_list.append(keyword)
@@ -847,12 +855,18 @@ class MaxCPCSetting(TextWithKeyboard):
     def text(self):
         text = f"""Максимальная цена клика {"для кампании " + self._adv.name + " равна " + str(round(self._adv.max_cpc, 2)) + " р." if self._adv.max_cpc else "не задана"}\n"""
         for keyword in self._top_kw_list:
-            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ❌\n"""
+            cpc = keyword.cpc
+            if cpc is None:
+                continue
+            text += f"""{keyword.text} - {round(cpc, 2)} р. ❌\n"""
 
         text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
-        print("============")
+
         for keyword in self._down_kw_list:
-            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ✅\n"""
+            cpc = keyword.cpc
+            if cpc is None:
+                continue
+            text += f"""{keyword.text} - {round(cpc, 2)} р. ✅\n"""
 
         text += "Введите новую максимальную цену клика для кампании:"
         return text
@@ -940,7 +954,7 @@ class WaitingForWhitePhrases(TextWithKeyboard):
     @property
     def text(self):
         return """
-Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).  
+Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).
 Например:
 
 платье женское
