@@ -5,7 +5,7 @@ from functools import partial
 from multiprocessing import Process
 
 import dotenv
-import psutil
+import psutil # pyright: ignore
 from typing import Any
 from collections.abc import Callable, Coroutine
 

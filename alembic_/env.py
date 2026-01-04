@@ -12,6 +12,7 @@ from app.modules.common_slaves.wildberries.models import *
 from app.modules.token_monitoring.models import *
 from app.payments.db.models import *
 from app.utils.db.models import *
+from app.modules.wb_adv_updater.modules.balance_exp_informer.models import *
 from app.utils.db.base import BaseTable as Base
 from app.utils.db.session_maker import get_alchemy_row_for_migration
 

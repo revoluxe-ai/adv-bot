@@ -17,6 +17,8 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
 from ..user_message_sender import message_for_not_pay_user_sender
+from .modules.balance_exp_informer import balance_expiration_informer_update
+
 
 set_config()
 
@@ -103,9 +105,10 @@ async def process_payment_for_advs() -> None:
 async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
-        # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
-        # TODO: Не понятно эта функция вообще работает или нет
+        # # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
+        # # TODO: Не понятно эта функция вообще работает или нет
         process_token_expiration_check(),
+        balance_expiration_informer_update(),
     )
 
 
