@@ -46,7 +46,7 @@ async def test_balance_expiration_informer_tick_calls_service_update_in_send_win
     """Тест: внутри окна отправки вызывается service.update()."""
     mock_service = AsyncMock()
     
-    # 15:10 UTC — внутри окна [15, 18)
+    # 15:10 (выходной случай), окно по Москве [15, 18)
     send_hour = 15
     window_end_hour = 18
     current_time = datetime(2026, 1, 3, 15, 10, tzinfo=timezone.utc)
@@ -64,8 +64,8 @@ async def test_balance_expiration_informer_tick_calls_service_update_in_send_win
         ) as mock_sleep:
         
             cfg_in_window = type('CFG', (), {
-                'send_hour_utc': send_hour,
-                'window_end_hour_utc': window_end_hour,
+                'send_hour_msk': send_hour,
+                'window_end_hour_msk': window_end_hour,
                 'fail_backoff_seconds': 60,
                 'sleep_jitter_seconds': 10,
             })()
@@ -83,7 +83,7 @@ async def test_balance_expiration_informer_tick_sleeps_outside_send_window():
     """Тест: вне окна отправки функция спит до окна."""
     mock_service = AsyncMock()
     
-    # 12:00 UTC — вне окна [15, 18)
+    # 12:00 (Москва) — вне окна [15, 18)
     send_hour = 15
     window_end_hour = 18
     current_time = datetime(2026, 1, 3, 12, 0, tzinfo=timezone.utc)
@@ -101,8 +101,8 @@ async def test_balance_expiration_informer_tick_sleeps_outside_send_window():
         ) as mock_sleep:
         
             cfg_not_in_window = type('CFG', (), {
-                'send_hour_utc': send_hour,
-                'window_end_hour_utc': window_end_hour,
+                'send_hour_msk': send_hour,
+                'window_end_hour_msk': window_end_hour,
                 'fail_backoff_seconds': 60,
                 'sleep_jitter_seconds': 10,
             })()
@@ -121,7 +121,7 @@ async def test_balance_expiration_informer_tick_handles_service_exception():
     mock_service = AsyncMock()
     mock_service.update.side_effect = ValueError("Test error")
     
-    # 15:10 UTC — внутри окна
+    # 15:10 (Москва) — внутри окна
     send_hour = 15
     window_end_hour = 18
     current_time = datetime(2026, 1, 3, 15, 10, tzinfo=timezone.utc)
@@ -141,8 +141,8 @@ async def test_balance_expiration_informer_tick_handles_service_exception():
         ) as mock_logger:
         
             cfg_in_window = type('CFG', (), {
-                'send_hour_utc': send_hour,
-                'window_end_hour_utc': window_end_hour,
+                'send_hour_msk': send_hour,
+                'window_end_hour_msk': window_end_hour,
                 'fail_backoff_seconds': 60,
                 'sleep_jitter_seconds': 10,
             })()

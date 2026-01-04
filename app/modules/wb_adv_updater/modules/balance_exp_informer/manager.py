@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BalanceInformerConfig:
-    send_hour_utc: int = 14
-    window_end_hour_utc: int = 18
+    send_hour_msk: int = 14
+    window_end_hour_msk: int = 18
     fail_backoff_seconds: int = 60
     sleep_jitter_seconds: int = 10
 
@@ -27,29 +27,28 @@ class BalanceInformerConfig:
 CFG = BalanceInformerConfig()
 
 
-def seconds_until_next_send_hour_utc(now: datetime, send_hour_utc: int) -> int:
+def seconds_until_next_send_hour_msk(now: datetime, send_hour_msk: int) -> int:
     """
-    Секунды до ближайшего {send_hour_utc}:00 UTC.
-    Если сейчас раньше — до сегодня.
-    Если сейчас >= — до завтра.
+    Секунды до ближайшего {send_hour_msk}:00 по Москве.
+    Если сейчас раньше — до сегодня, иначе — до завтра.
     """
     assert now.tzinfo is not None
 
     target_timezone = now.tzinfo
     target_today = datetime.combine(
         now.date(),
-        time(send_hour_utc, 0),
+        time(send_hour_msk, 0),
         tzinfo=target_timezone,
     )
     target = target_today if now < target_today else target_today + timedelta(days=1)
     return max(0, math.ceil((target - now).total_seconds()))
 
 
-def in_send_window_utc(now: datetime, send_hour_utc: int, window_end_hour_utc: int) -> bool:
+def in_send_window_msk(now: datetime, send_hour_msk: int, window_end_hour_msk: int) -> bool:
     """
-    Окно: [send_hour_utc, window_end_hour_utc)
+    Окно: [send_hour_msk, window_end_hour_msk) по московскому часу.
     """
-    return send_hour_utc <= now.hour < window_end_hour_utc
+    return send_hour_msk <= now.hour < window_end_hour_msk
 
 
 def _jitter(seconds: int) -> int:
@@ -68,8 +67,8 @@ async def balance_expiration_informer_tick(
     """
     now = datetime.now(ZoneInfo("Europe/Moscow"))
 
-    if not in_send_window_utc(now, cfg.send_hour_utc, cfg.window_end_hour_utc):
-        sleep_sec = seconds_until_next_send_hour_utc(now, cfg.send_hour_utc)
+    if not in_send_window_msk(now, cfg.send_hour_msk, cfg.window_end_hour_msk):
+        sleep_sec = seconds_until_next_send_hour_msk(now, cfg.send_hour_msk)
         await asyncio.sleep(sleep_sec + _jitter(cfg.sleep_jitter_seconds))
         return
 
@@ -81,7 +80,7 @@ async def balance_expiration_informer_tick(
         return
 
     now_after = datetime.now(ZoneInfo("Europe/Moscow"))
-    sleep_sec = seconds_until_next_send_hour_utc(now_after, cfg.send_hour_utc)
+    sleep_sec = seconds_until_next_send_hour_msk(now_after, cfg.send_hour_msk)
     await asyncio.sleep(sleep_sec + _jitter(cfg.sleep_jitter_seconds))
 
 
