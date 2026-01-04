@@ -137,22 +137,23 @@ class BalanceReminderService:
                     text, keyboard = build_message(reminder_chunk)
                     reminder_ids = [it.reminder_id for it in reminder_chunk]
                     try:
-                        try:
-                            await send_chunk(bot, chat_id, text, keyboard)
-                        except Exception as e:
-                            logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
-                            await self._mark_failed(session, reminder_ids)
-                            send_errors_total += 1
-                            continue
+                        await send_chunk(bot, chat_id, text, keyboard)
+                    except Exception as e:
+                        logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
+                        await self._mark_failed(session, reminder_ids)
+                        send_errors_total += 1
+                        continue
+
+                    try:
                         await self._mark_sent(session, reminder_ids)
-                        messages_sent_total += 1
                     except Exception as exc:
                         send_errors_total += 1
-                        await self._mark_failed(session, reminder_ids)
                         self._logger.error(
-                            "Failed to send balance reminder chunk", exc_info=exc
+                            "Failed to mark balance reminders as sent", exc_info=exc
                         )
                         break
+
+                    messages_sent_total += 1
 
             await session.commit()
 
