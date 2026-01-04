@@ -151,6 +151,13 @@ class BalanceReminderService:
                         self._logger.error(
                             "Failed to mark balance reminders as sent", exc_info=exc
                         )
+                        try:
+                            await self._mark_failed_permanent(session, reminder_ids)
+                        except Exception as inner_exc:
+                            self._logger.exception(
+                                "Failed to record reminders as permanently failed after send succeeded",
+                                exc_info=inner_exc,
+                            )
                         break
 
                     messages_sent_total += 1
