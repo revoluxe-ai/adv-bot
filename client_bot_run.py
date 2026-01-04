@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, Response
 from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
 from app.settings import settings
+from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
 
 # Import token monitoring system
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 # TODO: Переделать кнопки в боте на более понятные, чтобы было видно какой режим сейчас включен, на какой переключиться при нажатии
 
 setup_logging()
+setup_redis_cache()
 
 bot = get_bot()
 

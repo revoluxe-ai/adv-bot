@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
+from app.utils.redis_cache import setup_redis_cache
 from tests.factories.clickhouse_factory import (
     CLUSTERS_ADV_STATS_COLUMNS,
     ClustersAdvStatsFactory,
@@ -133,7 +134,7 @@ async def test_adv_settings_auto_update(
 @pytest.mark.asyncio
 async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
     await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
-
+    setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
     # TODO: Перевести проект на работу с датой в utc
@@ -189,7 +190,7 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
         return_value=mock_context,
     ):
         manager = CalculatedKeywordsManager()
-        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(  # noqa
+        stats = await manager._get_keywords_stat_from_clickhouse(  # noqa
             nmids=[nmid],
             min_days=2,
             min_views=0,
