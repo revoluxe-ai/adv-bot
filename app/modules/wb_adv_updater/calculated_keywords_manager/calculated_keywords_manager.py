@@ -20,7 +20,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from operator import  attrgetter
 
 from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
-from cashews import cache, noself
+from cashews import cache, noself #pyright: ignore
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
