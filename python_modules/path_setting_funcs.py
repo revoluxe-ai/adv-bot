@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import aiofiles
 import yaml
@@ -24,22 +25,22 @@ async def get_document_by_key_name_async(file_path: str, key_name: str) -> Any:
     raise Exception(f"Ключ {key_name} не найден в файле {file_path}")
 
 
-def find_project_root(marker_filename: str = "project_root.marker") -> str:
+def find_project_root(
+    start: Path,
+    marker_filename: str = "project_root.marker",
+) -> Path:
     """
-    Ищет корневую директорию проекта, содержащую файл-метку.
-    Возвращает путь к корневой директории проекта.
+    Ищет корневую директорию проекта, содержащую файл-маркер.
     """
-    current_path = os.path.abspath(os.path.dirname(__file__))
-    while True:
-        marker_path = os.path.join(current_path, marker_filename)
-        if os.path.isfile(marker_path):
-            return current_path
-        new_path = os.path.abspath(os.path.join(current_path, ".."))
-        if new_path == current_path:
-            raise FileNotFoundError(
-                f"Marker file '{marker_filename}' not found in any parent directory"
-            )
-        current_path = new_path
+    current_path = start.resolve()
+
+    for parent in (current_path, *current_path.parents):
+        if (parent / marker_filename).is_file():
+            return parent
+
+    raise FileNotFoundError(
+        f"Marker file '{marker_filename}' not found starting from {start}"
+    )
 
 
 def get_setting_path() -> str:
@@ -48,7 +49,7 @@ def get_setting_path() -> str:
     # # Путь к файлу данных относительно текущего скрипта
     # current_path = os.path.dirname(current_script_path)
     # data_file_path = os.path.join(current_path, 'setting.yaml')
-    root_path = find_project_root()
+    root_path = find_project_root(Path(__file__).resolve().parent)
     return os.path.join(root_path, "setting.yaml")
 
 
