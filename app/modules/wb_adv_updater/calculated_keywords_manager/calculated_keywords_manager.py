@@ -27,7 +27,7 @@ class _ClickHouseNamedResultsResponse(Protocol):
     def named_results(self) -> Generator[dict[str, int | float | str], None, None]:
         ...
 
-
+anti_ch_crash_semaphore = asyncio.Semaphore(1)
 
 # TODO: Нужно сделать автоматизацию по проверке обновлений API и внесением правок через ИИ
 
@@ -114,17 +114,17 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                                   ) -> list[dict[str, int | float | str]]:
         query = self._get_query('get_clusters_stats')
 
-
-        async with get_clickhouse_client() as client:
-            response = await client.query(
-                query,
-                parameters={
-                    "nmids": nmids,
-                    "min_views": min_views,
-                    "min_days": min_days,
-                    "conv_days": cart_to_order_window,
-                },
-            )
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                response = await client.query(
+                    query,
+                    parameters={
+                        "nmids": nmids,
+                        "min_views": min_views,
+                        "min_days": min_days,
+                        "conv_days": cart_to_order_window,
+                    },
+                )
 
         typed_response = cast(_ClickHouseNamedResultsResponse, response)
         result: Generator[dict[str, int | float | str], None, None] = typed_response.named_results()
