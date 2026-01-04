@@ -20,6 +20,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from operator import  attrgetter
 
 from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+from cashews import cache, noself
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
@@ -58,14 +59,31 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
     async def _get_all_stats(self, complex_adv: ComplexAdv, min_days: int, min_views: int):
         nmids = complex_adv.nmids
-        return await self.__get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
+        return await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
 
-    async def __get_keywords_stat_from_clickhouse(self,
+    async def _get_keywords_stat_from_clickhouse(self,
                                                   nmids: list[int],
                                                   min_days: int,
                                                   min_views: int,
                                                   cart_to_order_window:int=14
                                                   ) -> list[KeywordStat]:
+
+        result: list[dict[str, int | float | str]] = await self.__get_keywords_stat_from_clickhouse(
+            nmids, min_days, min_views, cart_to_order_window
+        )
+        stats: list[KeywordStat] = []
+        for obj in result:
+            stat = KeywordStat.model_validate(obj)
+            stats.append(stat)
+        return stats
+
+    @noself(cache)(ttl="15m", lock=True)
+    async def __get_keywords_stat_from_clickhouse(self,
+                                                  nmids: list[int],
+                                                  min_days: int,
+                                                  min_views: int,
+                                                  cart_to_order_window:int=14
+                                                  ) -> list[dict[str, int | float | str]]:
         query = self._get_query('get_clusters_stats')
 
 
@@ -82,11 +100,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         typed_response = cast(_ClickHouseNamedResultsResponse, response)
         result: Generator[dict[str, int | float | str], None, None] = typed_response.named_results()
-        stats: list[KeywordStat] = []
-        for obj in result:
-            stat = KeywordStat.model_validate(obj)
-            stats.append(stat)
-        return stats
+        return list(result)
+
+
 
     @staticmethod
     def __create_pre_calculated_keywords(keyword_hard_statuses: list[KeywordHardStatus],
