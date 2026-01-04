@@ -157,7 +157,9 @@ class ComplexAdv:
 
     @property
     def nmids(self) -> list[int]:
-        return list(self._adv_setting.nmids)
+        nmids = list(self._adv_setting.nmids)
+        nmids.sort()
+        return nmids
 
     @property
     def main_nmid(self) -> int:
