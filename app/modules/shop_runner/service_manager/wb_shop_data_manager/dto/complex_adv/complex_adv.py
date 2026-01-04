@@ -157,11 +157,13 @@ class ComplexAdv:
 
     @property
     def nmids(self) -> list[int]:
-        return list(self._adv_setting.nmids)
+        nmids = list(self._adv_setting.nmids)
+        nmids.sort()
+        return nmids
 
     @property
     def main_nmid(self) -> int:
-        return self._adv_setting.nmids[0]
+        return self.nmids[0]
 
     @property
     def is_target_position_control_enabled(self) -> bool:

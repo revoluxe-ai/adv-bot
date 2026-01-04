@@ -20,6 +20,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from operator import  attrgetter
 
 from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+from cashews import cache, noself #pyright: ignore
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
@@ -57,21 +58,60 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return calculated_keyword_list
 
     async def _get_all_stats(self, complex_adv: ComplexAdv, min_days: int, min_views: int):
-        get_stat_tasks = [self.__get_keywords_stat_from_clickhouse(nmid, min_days, min_views)
-                          for nmid in complex_adv.nmids]
+        nmids = complex_adv.nmids
+        return await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
 
-        results: list[list[KeywordStat]] = await asyncio.gather(*get_stat_tasks)
-        stats: list[KeywordStat] = []
-        for result in results:
-            stats.extend(result)
-        return stats
-
-    async def __get_keywords_stat_from_clickhouse(self,
-                                                  nmid: int,
+    async def _get_keywords_stat_from_clickhouse(self,
+                                                  nmids: list[int],
                                                   min_days: int,
                                                   min_views: int,
                                                   cart_to_order_window:int=14
                                                   ) -> list[KeywordStat]:
+        """Fetch keyword statistics from ClickHouse and parse them into models.
+
+        This is a higher-level wrapper around
+        ``__get_keywords_stat_from_clickhouse``. It forwards the query
+        parameters to the cached low-level ClickHouse call and converts the
+        raw dictionaries returned from ClickHouse into ``KeywordStat`` model
+        instances.
+
+        Args:
+            nmids: List of Wildberries product IDs (nmids) to fetch statistics
+                for. A list is used so that statistics for multiple products
+                can be retrieved in a single ClickHouse query.
+            min_days: Minimum number of days of statistics that must be
+                available for a keyword to be included in the result.
+            min_views: Minimum number of views required for a keyword to be
+                included in the result set.
+            cart_to_order_window: Number of days to use as the conversion
+                window when aggregating cart-to-order statistics.
+
+        Returns:
+            A list of ``KeywordStat`` objects with aggregated statistics for
+            the requested nmids that satisfy the specified filters.
+
+        Note:
+            This method itself is not cached. Caching is applied at the level
+            of ``__get_keywords_stat_from_clickhouse``, which is decorated
+            with ``@noself(cache)`` and caches the raw ClickHouse query
+            results for a short period.
+        """
+        result: list[dict[str, int | float | str]] = await self.__get_keywords_stat_from_clickhouse(
+            nmids, min_days, min_views, cart_to_order_window
+        )
+        stats: list[KeywordStat] = []
+        for obj in result:
+            stat = KeywordStat.model_validate(obj)
+            stats.append(stat)
+        return stats
+
+    @noself(cache)(ttl="15m", lock=True)
+    async def __get_keywords_stat_from_clickhouse(self,
+                                                  nmids: list[int],
+                                                  min_days: int,
+                                                  min_views: int,
+                                                  cart_to_order_window:int=14
+                                                  ) -> list[dict[str, int | float | str]]:
         query = self._get_query('get_clusters_stats')
 
 
@@ -79,7 +119,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             response = await client.query(
                 query,
                 parameters={
-                    "nmid": nmid,
+                    "nmids": nmids,
                     "min_views": min_views,
                     "min_days": min_days,
                     "conv_days": cart_to_order_window,
@@ -88,11 +128,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         typed_response = cast(_ClickHouseNamedResultsResponse, response)
         result: Generator[dict[str, int | float | str], None, None] = typed_response.named_results()
-        stats: list[KeywordStat] = []
-        for obj in result:
-            stat = KeywordStat.model_validate(obj)
-            stats.append(stat)
-        return stats
+        return list(result)
+
+
 
     @staticmethod
     def __create_pre_calculated_keywords(keyword_hard_statuses: list[KeywordHardStatus],
@@ -237,9 +275,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         redis_cache_manager = RedisCalculatedKeywordsCacheManager()
         await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
 
-
-    async def _get_bidder_keyword_statuses(self,
-                                           complex_adv: ComplexAdv,
+    @staticmethod
+    async def _get_bidder_keyword_statuses(complex_adv: ComplexAdv,
                                            texts: list[str]) -> dict[str, BidderKeywordStatus]:
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 
@@ -253,7 +290,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             from app.core.redis_manager_v2.redis_client import RedisClient
             from app.configs import AppConfig
             from redis.asyncio import Redis
-            
+
             # Создаем Redis клиент напрямую (костыль)
             config = AppConfig.create()
             redis_config = config.infrastructure.redis
@@ -266,7 +303,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             redis_client_wrapper = RedisClient(redis_client=raw_redis_client)
             httpx_client_handler = HttpxClientHandler()
-            
+
             # Создаем контейнер и получаем hub
             wb_manager_hub_container = WBManagerHubContainer(
                 _shop_id=complex_adv.shop_id,

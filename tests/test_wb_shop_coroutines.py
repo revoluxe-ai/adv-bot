@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
+from app.utils.redis_cache import setup_redis_cache
 from tests.factories.clickhouse_factory import (
     CLUSTERS_ADV_STATS_COLUMNS,
     ClustersAdvStatsFactory,
@@ -74,12 +75,12 @@ async def test_adv_settings_auto_update(
     fact_data = FactData(
         predict_orders=1, pay_for_order=100, original_orders=1, fact_method=fact_method
     )
-    
+
     # Мок для ChangePlanFact
     mock_change_plan_fact = MagicMock()
     mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     mock_change_plan_fact.set_new_plan_fact = AsyncMock(return_value=None)
-    
+
     with (
         patch(
             "app.utils.db.session_maker.get_async_session_maker",
@@ -133,7 +134,7 @@ async def test_adv_settings_auto_update(
 @pytest.mark.asyncio
 async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
     await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
-
+    setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
     # TODO: Перевести проект на работу с датой в utc
@@ -189,8 +190,8 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
         return_value=mock_context,
     ):
         manager = CalculatedKeywordsManager()
-        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(  # noqa
-            nmid=nmid,
+        stats = await manager._get_keywords_stat_from_clickhouse(  # noqa
+            nmids=[nmid],
             min_days=2,
             min_views=0,
         )

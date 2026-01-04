@@ -13,10 +13,12 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.modules.shop_runner import run_process_func
 from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
+from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
 setup_logging()
+setup_redis_cache()
 
 system = platform.system()
 if system == "Linux":
