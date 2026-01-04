@@ -251,6 +251,7 @@ class BalanceReminderService:
             .on_conflict_do_nothing(
                 index_elements=[
                     BalanceReminder.wb_cabinet_id,
+                    BalanceReminder.user_id,
                     BalanceReminder.day,
                     BalanceReminder.level,
                 ]
