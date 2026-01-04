@@ -53,6 +53,12 @@ class BalanceReminder(BaseTable):
     user: Mapped["User"] = relationship("User")
 
     __table_args__ = (
-        UniqueConstraint("wb_cabinet_id", "day", "level", name="uq_balance_reminders"),
+        UniqueConstraint(
+            "wb_cabinet_id",
+            "user_id",
+            "day",
+            "level",
+            name="uq_balance_reminders",
+        ),
         Index("idx_balance_reminders_send", "status", "day", "user_id"),
     )
