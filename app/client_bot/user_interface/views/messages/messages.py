@@ -830,7 +830,7 @@ class MaxCPCSetting(TextWithKeyboard):
         keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
 
         def safe_sort(kw: CalculatedKeyword) -> float:
-            return kw.cpc if kw.cpc else float('-inf')
+            return kw.cpc if kw.cpc is not None else float('-inf')
 
         keywords.sort(key=safe_sort, reverse=True)
         if not self._adv.max_cpc:
