@@ -303,6 +303,29 @@ class BillingEventManager:
             session=session,
         )
 
+    async def emit_add_balance_context_lost(
+        self,
+        *,
+        user_telegram_id: int,
+        wb_cabinet_id: int | None = None,
+        reason: str,
+        correlation_id: str | None = None,
+        payload: dict[str, Any] | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        details = {"reason": reason}
+        if payload:
+            details.update(payload)
+        await self.emit(
+            event_type=EventType.ADD_BALANCE_CONTEXT_LOST,
+            source=self._SOURCE_CLIENT_BOT,
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_id,
+            correlation_id=correlation_id,
+            payload=details,
+            session=session,
+        )
+
     async def emit_error_event(
         self,
         *,

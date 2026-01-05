@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.modules.wb_adv_updater.modules.balance_exp_informer.excs import SenderTickError
 from app.modules.wb_adv_updater.modules.balance_exp_informer.manager import (
     balance_expiration_informer_update,
     balance_expiration_informer_tick,
@@ -32,11 +33,13 @@ async def test_balance_expiration_informer_update_creates_service_and_loops():
         # Прерываем цикл на 2-й итерации
         mock_tick.side_effect = [None, asyncio.CancelledError]
 
-        with pytest.raises(asyncio.CancelledError):
-            await balance_expiration_informer_update()
+        mock_event_manager = AsyncMock()
 
-        # Проверяем, что сервис создан с правильной session_factory
-        mock_service_class.assert_called_once_with(mock_session_factory)
+        with pytest.raises(asyncio.CancelledError):
+            await balance_expiration_informer_update(mock_event_manager)
+
+        # Проверяем, что сервис создан с правильной session_factory и event_manager
+        mock_service_class.assert_called_once_with(mock_session_factory, mock_event_manager)
         
         # Проверяем, что tick вызывался 2 раза
         assert mock_tick.call_count == 2
@@ -147,8 +150,9 @@ async def test_balance_expiration_informer_tick_handles_service_exception():
                 'sleep_jitter_seconds': 10,
             })()
 
-            # Функция должна завершиться без исключения
-            await balance_expiration_informer_tick(mock_service, cfg_in_window)
+            # Функция должна выбросить SenderTickError во время сбоя
+            with pytest.raises(SenderTickError):
+                await balance_expiration_informer_tick(mock_service, cfg_in_window)
 
             # Проверяем, что исключение залогировано
             mock_logger.exception.assert_called_once()

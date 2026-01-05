@@ -647,7 +647,7 @@ async def clean_db():
         # Включаем wbcabinet, чтобы тесты могли стабильно создавать кабинет с id=1
         # (иначе возможны UniqueViolation на pkey при сидировании).
         'TRUNCATE "user", wbcabinet, wbusercabinet, wbbalancepayment, wbbonuspayment, '
-        "payment, keywordsetting, advsetting RESTART IDENTITY CASCADE"
+        "payment, keywordsetting, advsetting, balancereminder, billing_event RESTART IDENTITY CASCADE"
     )
 
     async def _truncate() -> None:

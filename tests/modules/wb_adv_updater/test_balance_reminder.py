@@ -16,6 +16,7 @@ def _make_reminder(level: int, days_left: float, name: str) -> ReminderItem:
     return ReminderItem(
         reminder_id=0,
         wb_cabinet_id=1,
+        shop_id=str(name),
         shop_name=name,
         level=level,
         balance=0.0,

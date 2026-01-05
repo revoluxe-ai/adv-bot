@@ -77,6 +77,7 @@ async def balance_expiration_informer_tick(
         await service.update()
     except Exception as exc:
         logger.exception("Balance reminder service failed", exc_info=exc)
+        await asyncio.sleep(cfg.fail_backoff_seconds + _jitter(cfg.sleep_jitter_seconds))
         raise SenderTickError from exc
 
     now_after = datetime.now(ZoneInfo("Europe/Moscow"))

@@ -1,0 +1,5 @@
+
+
+
+class LostAddBalanceContextError(Exception):
+    pass

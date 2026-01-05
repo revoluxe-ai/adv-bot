@@ -15,5 +15,6 @@ class EventType(StrEnum):
     BALANCE_TOPUP_APPLIED = "balance_topup_applied"
     BALANCE_REMINDER_SENT = "balance_reminder_sent"
     BALANCE_REMINDER_FAILED = "balance_reminder_failed"
+    ADD_BALANCE_CONTEXT_LOST = "add_balance_context_lost"
     ERROR = "billing_error"
 

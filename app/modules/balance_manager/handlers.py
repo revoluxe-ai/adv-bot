@@ -3,9 +3,9 @@ import datetime
 from datetime import date
 import json
 import logging
-from typing import TypedDict
 from uuid import uuid4
 
+# pyright: reportUnusedCallResult=false
 import aiogram
 from aiogram import Router, types
 from aiogram.filters import StateFilter
@@ -27,7 +27,7 @@ from app.payments.db.models import Payment
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-
+from .excs import LostAddBalanceContextError
 from . import messages
 from ..billing.event_manager.event_manager import BillingEventManager
 
@@ -39,16 +39,32 @@ sm = get_async_session_maker
 
 router = Router()
 BALANCE_TOPUP_CORRELATION_KEY = "balance_topup_correlation_id"
+LOST_CONTEXT_MESSAGE = (
+    "Потерян контекст оплаты. Нажмите на /start, зайдите в магазин и выполните оплату снова. Извините за неудобства!"
+)
 
 async def _get_balance_event_context(
     state: FSMContext,
-) -> tuple[str | None, int | None]:
+) -> tuple[str, int]:
     data = await state.get_data()
     correlation_id = data.get(BALANCE_TOPUP_CORRELATION_KEY)
     cabinet_id = data.get("wb_cabinet_original_id_for_add_balance")
-    if cabinet_id is not None and not isinstance(cabinet_id, int):
-        raise RuntimeError("wb_cabinet_original_id_for_add_balance должен быть целым числом")
+    if cabinet_id is None or correlation_id is None:
+        raise LostAddBalanceContextError()
     return correlation_id, cabinet_id
+
+
+async def _handle_lost_context(
+    bot: aiogram.Bot,
+    chat_id: int,
+    billing_event_manager: BillingEventManager,
+    where: str,
+) -> None:
+    await billing_event_manager.emit_add_balance_context_lost(
+        user_telegram_id=chat_id,
+        reason=where,
+    )
+    await bot.send_message(chat_id, LOST_CONTEXT_MESSAGE)
 
 
 
@@ -117,9 +133,18 @@ async def confirm_add_balance(
     bot: aiogram.Bot,
     billing_event_manager: BillingEventManager,
 ) -> None:
-    correlation_id, _ = await _get_balance_event_context(state)
-    assert callback.message is not None
+    if callback.message is None:
+        return
     chat_id = callback.message.chat.id
+    try:
+        correlation_id, _ = await _get_balance_event_context(state)
+    except LostAddBalanceContextError:
+        await _handle_lost_context(
+            bot, chat_id, billing_event_manager, where="confirm_add_balance"
+        )
+        return
+    assert callback.message is not None
+
     await billing_event_manager.emit_offerta_confirm_click(
         user_telegram_id=chat_id,
         wb_cabinet_id=callback_data.wb_cabinet_original_id,
@@ -170,17 +195,17 @@ async def waiting_for_amount(
     assert message.text is not None
     amount: str = message.text
     min_sum = const.min_sum
-    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
+    try:
+        correlation_id, wb_cabinet_original_id = await _get_balance_event_context(
+            state
+        )
+    except LostAddBalanceContextError:
+        await _handle_lost_context(
+            bot, message.chat.id, billing_event_manager, where="waiting_for_amount"
+        )
+        return
     user_telegram_id = message.chat.id
 
-    if wb_cabinet_original_id is None:
-        await billing_event_manager.emit_error_event(
-            where="waiting_for_amount",
-            error="missing_wb_cabinet",
-            user_telegram_id=user_telegram_id,
-            correlation_id=correlation_id,
-        )
-        raise RuntimeError("Контекст пополнения баланса потерян во время ввода суммы")
     if not amount.isdigit():
         await billing_event_manager.emit_amount_input(
             user_telegram_id=user_telegram_id,
@@ -268,7 +293,18 @@ async def pre_checkout_query_handler(
     state: FSMContext,
     billing_event_manager: BillingEventManager,
 ) -> None:
-    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
+    try:
+        correlation_id, wb_cabinet_original_id = await _get_balance_event_context(
+            state
+        )
+    except LostAddBalanceContextError:
+        await _handle_lost_context(
+            bot,
+            pre_checkout_query.from_user.id if pre_checkout_query.from_user else 0,
+            billing_event_manager,
+            where="pre_checkout_query",
+        )
+        return
     from_user_id = pre_checkout_query.from_user.id
 
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
@@ -289,13 +325,15 @@ async def successful_payment_handler(
     successful_payment = message.successful_payment
     assert successful_payment is not None
     cost = successful_payment.total_amount / 100
-    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
-    await billing_event_manager.emit_error_event(
-        where="successful_payment",
-        error="missing_wb_cabinet",
-        user_telegram_id=message.chat.id,
-        correlation_id=correlation_id,
-    )
+    try:
+        correlation_id, wb_cabinet_original_id = await _get_balance_event_context(
+            state
+        )
+    except LostAddBalanceContextError:
+        await _handle_lost_context(
+            bot, message.chat.id, billing_event_manager, where="successful_payment"
+        )
+        return
 
     async with sm() as session:
         stmt = select(User.id).where(User.user_telegram_id == message.chat.id)
