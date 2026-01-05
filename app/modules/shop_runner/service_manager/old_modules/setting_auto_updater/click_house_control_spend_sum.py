@@ -1,3 +1,7 @@
+from typing import cast
+
+from clickhouse_connect.driver.query import QueryResult
+
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -26,7 +30,6 @@ ORDER BY date
 async def get_sum_spend_for_complex_adv(adv_ids: list[int]) -> float:
     async with anti_ch_crash_semaphore:
         async with get_clickhouse_client() as client:
-            result = await client.query(query, parameters={"adv_ids": adv_ids})
-
-        sum_spend: float = result.first_item["spend"]
-        return sum_spend
+            result: QueryResult = await client.query(query, parameters={"adv_ids": adv_ids})
+            sum_spend = cast(float, result.first_item["spend"])
+            return sum_spend
