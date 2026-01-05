@@ -8,6 +8,7 @@ from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_s
 from app.modules.shop_runner.service_manager.services.common_sale_stat_updater.clickhouse_common_stat_manager import (
     ClickHouseCommonStatManager,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
 
 @pytest.mark.integration
@@ -42,15 +43,15 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
 
     # Act
     await manager.insert(rows)
-
-    # Assert
-    result = await clickhouse_client.query(
-        """
-        SELECT nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs
-        FROM default_db.wb_common_stat
-        WHERE nmid IN (123, 456) AND date = '2025-12-21'
-        ORDER BY nmid
-        """
+    async with anti_ch_crash_semaphore:
+        # Assert
+        result = await clickhouse_client.query(
+            """
+            SELECT nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs
+            FROM default_db.wb_common_stat
+            WHERE nmid IN (123, 456) AND date = '2025-12-21'
+            ORDER BY nmid
+            """
     )
 
     assert result is not None

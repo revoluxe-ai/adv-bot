@@ -2,6 +2,9 @@ import logging
 from datetime import date
 from typing import Sequence
 from typing import TYPE_CHECKING
+
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
+
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 
@@ -20,49 +23,50 @@ async def get_existing_adv_nmid_dates(
 ) -> set[tuple[int, int, date]]:
     """
     Возвращает множество (adv_id, nmid, date) для которых уже есть данные в ClickHouse.
-    
+
     Args:
         adv_nmid_pairs: Список пар (adv_id, nmid) для проверки
         start_date: Начальная дата диапазона
         end_date: Конечная дата диапазона
-        
+
     Returns:
         Множество кортежей (adv_id, nmid, date) с существующими данными
     """
     if not adv_nmid_pairs:
         return set()
-    
+
     # ClickHouse не поддерживает параметризацию для IN с кортежами,
     # поэтому формируем запрос с подстановкой
     pairs_str = ", ".join(
         "(%d, %d)" % (adv_id, nmid) for adv_id, nmid in adv_nmid_pairs
     )
-    
+
     query = """
         SELECT DISTINCT adv_id, nmid, date
         FROM default_db.clusters_adv_stats
         WHERE (adv_id, nmid) IN (%s)
           AND date BETWEEN toDate('%s') AND toDate('%s')
     """ % (pairs_str, start_date.isoformat(), end_date.isoformat())
-    
+
     try:
-        async with get_clickhouse_client() as client:
-            result = await client.query(query)
-            rows = result.result_rows
-            
-            existing: set[tuple[int, int, date]] = set()
-            for row in rows:
-                adv_id = int(row[0])
-                nmid = int(row[1])
-                row_date = row[2]
-                if isinstance(row_date, date):
-                    existing.add((adv_id, nmid, row_date))
-                else:
-                    # Если вернулась строка, парсим
-                    from datetime import datetime
-                    parsed_date = datetime.strptime(str(row_date), "%Y-%m-%d").date()
-                    existing.add((adv_id, nmid, parsed_date))
-            
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result = await client.query(query)
+                rows = result.result_rows
+
+                existing: set[tuple[int, int, date]] = set()
+                for row in rows:
+                    adv_id = int(row[0])
+                    nmid = int(row[1])
+                    row_date = row[2]
+                    if isinstance(row_date, date):
+                        existing.add((adv_id, nmid, row_date))
+                    else:
+                        # Если вернулась строка, парсим
+                        from datetime import datetime
+                        parsed_date = datetime.strptime(str(row_date), "%Y-%m-%d").date()
+                        existing.add((adv_id, nmid, parsed_date))
+
             return existing
     except Exception:
         logger.error("Ошибка получения существующих дат из ClickHouse", exc_info=True)
@@ -77,7 +81,7 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
         'adv_id', 'nmid', 'wb_category', 'norm_query', 'views', 'clicks', 'ctr',
         'cpm', 'add_to_cart', 'orders', 'cpc', 'avr_pos', 'date'
     ]
-    
+
     # clickhouse_connect ожидает список списков/кортежей при использовании column_names
     data = [
         [
@@ -97,7 +101,7 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
         ]
         for row in stats
     ]
-    
+
     async with get_clickhouse_client() as client:
         await client.insert('default_db.clusters_adv_stats', data, column_names=column_names)
 
