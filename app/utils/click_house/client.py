@@ -217,8 +217,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def track_connections(func: F) -> F:
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        async with get_clickhouse_client() as client:
-            return await func(client, *args, **kwargs)
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                return await func(client, *args, **kwargs)
 
     return cast(F, wrapper)
 
@@ -226,6 +227,5 @@ def track_connections(func: F) -> F:
 # Пример использования декоратора
 @track_connections
 async def query_data(client: AsyncClient, query: str) -> Any:
-    async with anti_ch_crash_semaphore:
-        result = await client.query(query) # pyright: ignore
+    result = await client.query(query)  # pyright: ignore
     return result
