@@ -9,6 +9,7 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     SmallFullAdvStat,
     SmallFullAdvStatPerDay,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -79,16 +80,16 @@ async def get_daily_stats_by_last_days(
     async with get_clickhouse_client() as client:
         # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
         query = """
-        SELECT 
+        SELECT
             date,
-            SUM(latest_views) AS views, 
-            SUM(latest_clicks) AS clicks, 
-            SUM(latest_spend) AS spend, 
-            SUM(latest_added_to_cart) AS added_to_cart, 
-            SUM(latest_orders) AS orders, 
+            SUM(latest_views) AS views,
+            SUM(latest_clicks) AS clicks,
+            SUM(latest_spend) AS spend,
+            SUM(latest_added_to_cart) AS added_to_cart,
+            SUM(latest_orders) AS orders,
             SUM(latest_sum_price_orders) AS sum_price_orders
         FROM (
-            SELECT 
+            SELECT
                 adv_id,
                 date,
                 argMax(views, version) AS latest_views,
@@ -105,39 +106,39 @@ async def get_daily_stats_by_last_days(
         GROUP BY date
         ORDER BY date
         """
-
-        try:
-            res = await client.query(
-                query,
-                parameters={
-                    "start_date": start_date_str,
-                    "end_date": end_date_str,
-                    "adv_ids": adv_ids,
-                },
-            )
-            rows = res.result_rows
-            if not rows:
-                return []
-
-            stats_per_day = [
-                SmallFullAdvStatPerDay(
-                    date=row[0],
-                    views=row[1],
-                    clicks=row[2],
-                    spend=row[3],
-                    added_to_cart=row[4],
-                    orders=row[5],
-                    sum_price=row[6],
+        async with anti_ch_crash_semaphore:
+            try:
+                res = await client.query(
+                    query,
+                    parameters={
+                        "start_date": start_date_str,
+                        "end_date": end_date_str,
+                        "adv_ids": adv_ids,
+                    },
                 )
-                for row in rows
-            ]
-            return stats_per_day
+                rows = res.result_rows
+                if not rows:
+                    return []
 
-        except Exception:
-            logger.error(
-                "Ошибка получения дневной статистики из ClickHouse", exc_info=True
-            )
-            raise
+                stats_per_day = [
+                    SmallFullAdvStatPerDay(
+                        date=row[0],
+                        views=row[1],
+                        clicks=row[2],
+                        spend=row[3],
+                        added_to_cart=row[4],
+                        orders=row[5],
+                        sum_price=row[6],
+                    )
+                    for row in rows
+                ]
+                return stats_per_day
+
+            except Exception:
+                logger.error(
+                    "Ошибка получения дневной статистики из ClickHouse", exc_info=True
+                )
+                raise
 
 
 async def get_stats_by_last_days(
@@ -148,15 +149,15 @@ async def get_stats_by_last_days(
     async with get_clickhouse_client() as client:
         # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
         query = """
-        SELECT 
-            SUM(latest_views) AS views, 
-            SUM(latest_clicks) AS clicks, 
-            SUM(latest_spend) AS spend, 
-            SUM(latest_added_to_cart) AS added_to_cart, 
-            SUM(latest_orders) AS orders, 
+        SELECT
+            SUM(latest_views) AS views,
+            SUM(latest_clicks) AS clicks,
+            SUM(latest_spend) AS spend,
+            SUM(latest_added_to_cart) AS added_to_cart,
+            SUM(latest_orders) AS orders,
             SUM(latest_sum_price_orders) AS sum_price_orders
         FROM (
-            SELECT 
+            SELECT
                 adv_id,
                 date,
                 argMax(views, version) AS latest_views,
@@ -166,22 +167,23 @@ async def get_stats_by_last_days(
                 argMax(orders, version) AS latest_orders,
                 argMax(sum_price_orders, version) AS latest_sum_price_orders
             FROM default_db.full_adv_wb_stat
-            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s) 
+            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
             GROUP BY adv_id, date
         )
         """
         try:
             # Выполняем запрос
-            res = await client.query(
-                query,
-                parameters={
-                    "start_date": start_date_str,
-                    "end_date": end_date_str,
-                    "adv_ids": adv_ids,
-                },
-            )
-            result = res.first_item
+            async with anti_ch_crash_semaphore:
+                res = await client.query(
+                    query,
+                    parameters={
+                        "start_date": start_date_str,
+                        "end_date": end_date_str,
+                        "adv_ids": adv_ids,
+                    },
+                )
+                result = res.first_item
 
             # Обрабатываем результат, создавая общий объект FullAdvStat
             if result:
@@ -231,34 +233,34 @@ def _get_insert_query() -> str:
 async def insert(stats: Iterable[FullAdvStat]) -> None:
     if not stats:
         return
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            # Получаем запрос для вставки
+            query = _get_insert_query()
+            version = str(time.time())
+            # Подготовим параметры для вставки
+            values = []
+            for stat in stats:
+                adv_id = stat.advertId  # ID рекламного объявления
+                for day in stat.days:
+                    # Вставляем данные каждого дня как параметры
+                    values.append(
+                        [
+                            adv_id,
+                            day.date.strftime("%Y-%m-%d"),
+                            day.views,
+                            day.clicks,
+                            day.sum,
+                            day.atbs,
+                            day.orders,
+                            day.sum_price,
+                            version,  # Здесь можно использовать значение для версии
+                        ]
+                    )
 
-    async with get_clickhouse_client() as client:
-        # Получаем запрос для вставки
-        query = _get_insert_query()
-        version = str(time.time())
-        # Подготовим параметры для вставки
-        values = []
-        for stat in stats:
-            adv_id = stat.advertId  # ID рекламного объявления
-            for day in stat.days:
-                # Вставляем данные каждого дня как параметры
-                values.append(
-                    [
-                        adv_id,
-                        day.date.strftime("%Y-%m-%d"),
-                        day.views,
-                        day.clicks,
-                        day.sum,
-                        day.atbs,
-                        day.orders,
-                        day.sum_price,
-                        version,  # Здесь можно использовать значение для версии
-                    ]
-                )
-
-        for row in values:
-            query_result = await client.query(query, parameters=row)
-            logger.debug(query_result)
+            for row in values:
+                query_result = await client.query(query, parameters=row)
+                logger.debug(query_result)
 
 
 async def get_keywords_spend(
@@ -291,15 +293,16 @@ async def get_keywords_spend(
     """
 
     try:
-        async with get_clickhouse_client() as client:
-            res = await client.query(query)
-            result = res.first_item
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                result = res.first_item
 
-            return (
-                float(result["total_spend"])
-                if result and result["total_spend"]
-                else 0.0
-            )
+                return (
+                    float(result["total_spend"])
+                    if result and result["total_spend"]
+                    else 0.0
+                )
 
     except Exception:
         logger.error(
@@ -352,23 +355,24 @@ async def get_keywords_views_by_days(
     """
 
     try:
-        async with get_clickhouse_client() as client:
-            res = await client.query(query)
-            rows = res.result_rows
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                rows = res.result_rows
 
-            # Инициализируем словарь с нулями для всех дат в диапазоне
-            result: dict[dt.date, int] = {}
-            current_date = dt.date.fromisoformat(start_date_str)
-            while current_date <= dt.date.fromisoformat(end_date_str):
-                result[current_date] = 0
-                current_date += dt.timedelta(days=1)
+                # Инициализируем словарь с нулями для всех дат в диапазоне
+                result: dict[dt.date, int] = {}
+                current_date = dt.date.fromisoformat(start_date_str)
+                while current_date <= dt.date.fromisoformat(end_date_str):
+                    result[current_date] = 0
+                    current_date += dt.timedelta(days=1)
 
-            for row in rows:
-                if row and len(row) >= 2:
-                    date_val = row[0]
-                    views = int(row[1]) if row[1] is not None else 0
-                    result[date_val] = views
-            return result
+                for row in rows:
+                    if row and len(row) >= 2:
+                        date_val = row[0]
+                        views = int(row[1]) if row[1] is not None else 0
+                        result[date_val] = views
+                return result
 
     except Exception:
         logger.error(
@@ -410,18 +414,19 @@ async def get_keywords_clicks_and_views(
     """
 
     try:
-        async with get_clickhouse_client() as client:
-            res = await client.query(query)
-            result = res.first_item
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                result = res.first_item
 
-            if (
-                result
-                and result["total_clicks"] is not None
-                and result["total_views"] is not None
-            ):
-                return int(result["total_clicks"]), int(result["total_views"])
-            else:
-                return 0, 0
+                if (
+                    result
+                    and result["total_clicks"] is not None
+                    and result["total_views"] is not None
+                ):
+                    return int(result["total_clicks"]), int(result["total_views"])
+                else:
+                    return 0, 0
 
     except Exception:
         logger.error(

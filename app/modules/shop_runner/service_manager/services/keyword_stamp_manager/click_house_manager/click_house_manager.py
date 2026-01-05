@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.clic
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.keyword_stamp import (
     KeywordStamp,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -126,29 +127,30 @@ class ClickHouseKeywordJamStatManager:
         nmid = adv_setting.nmids[0]
         adv_id = adv_setting.adv_id
         adv_type = adv_setting.type
-        async with get_clickhouse_client() as client:
-            result: QueryResult = await client.query(query, parameters={"nmid": nmid,
-                                                                        "days": 7})
-            rows: Sequence[tuple[str, float,  int, int, datetime]] = cast(
-                Sequence[tuple[str, float, int, int, datetime]], result.result_rows
-            )
-            positions: list[KeywordJamStat] = []
-            for row in rows:
-                text = row[0]
-                # TODO: Сюда из рантайма дошла ошибка
-                p = int(row[1] + 0.5)
-                total_views = row[2]
-                total_orders = row[3]
-                timestamp = row[4]
-                position = KeywordJamStat(
-                    nmid=nmid,
-                    keyword_text=text,
-                    position=p,
-                    timestamp=timestamp,
-                    adv_id=adv_id,
-                    adv_type=adv_type,
-                    total_views=total_views,
-                    total_orders=total_orders,
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters={"nmid": nmid,
+                                                                            "days": 7})
+                rows: Sequence[tuple[str, float,  int, int, datetime]] = cast(
+                    Sequence[tuple[str, float, int, int, datetime]], result.result_rows
                 )
-                positions.append(position)
+                positions: list[KeywordJamStat] = []
+                for row in rows:
+                    text = row[0]
+                    # TODO: Сюда из рантайма дошла ошибка
+                    p = int(row[1] + 0.5)
+                    total_views = row[2]
+                    total_orders = row[3]
+                    timestamp = row[4]
+                    position = KeywordJamStat(
+                        nmid=nmid,
+                        keyword_text=text,
+                        position=p,
+                        timestamp=timestamp,
+                        adv_id=adv_id,
+                        adv_type=adv_type,
+                        total_views=total_views,
+                        total_orders=total_orders,
+                    )
+                    positions.append(position)
         return positions

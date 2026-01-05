@@ -3,6 +3,7 @@ import time
 from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_sales_funnel_products_history.dto import (
     CommonSaleStatRow,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -34,9 +35,9 @@ class ClickHouseCommonStatManager:
         query += ",".join(
             ["(%s, %s, %s, %s, %s, %s, %s, %s)" % (*value, version) for value in values]
         )
-
-        async with get_clickhouse_client() as client:
-            await client.query(query)
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                await client.query(query)
         return None
 
 

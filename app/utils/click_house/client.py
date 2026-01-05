@@ -11,6 +11,7 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 from urllib3 import PoolManager
 
 from app.settings import settings
+from ..ch_semaphore import anti_ch_crash_semaphore
 
 system_name = platform.system()
 from .clickhouse_protocol import ClickHouseClientProtocol
@@ -225,5 +226,6 @@ def track_connections(func: F) -> F:
 # Пример использования декоратора
 @track_connections
 async def query_data(client: AsyncClient, query: str) -> Any:
-    result = await client.query(query) # pyright: ignore
+    async with anti_ch_crash_semaphore:
+        result = await client.query(query) # pyright: ignore
     return result

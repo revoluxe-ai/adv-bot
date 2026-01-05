@@ -1,5 +1,7 @@
 import dotenv
 
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
+
 dotenv.load_dotenv()
 import asyncio
 import logging
@@ -21,11 +23,11 @@ async def truncate_logs():
         "system.trace_log",
         "system.error_log",
     ]
-
-    async with get_clickhouse_client() as client:
-        for table in tables:
-            print(f"Truncating {table}...")
-            await client.query(f"TRUNCATE TABLE {table}")
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            for table in tables:
+                print(f"Truncating {table}...")
+                await client.query(f"TRUNCATE TABLE {table}")
 
         print("Truncate completed!")
 
