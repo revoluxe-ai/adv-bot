@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.settings import settings
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
 from .dto.states import KeywordStatus, KeywordStatusReason
 from .keyword_stat import KeywordStat
@@ -27,7 +28,7 @@ class _ClickHouseNamedResultsResponse(Protocol):
     def named_results(self) -> Generator[dict[str, int | float | str], None, None]:
         ...
 
-anti_ch_crash_semaphore = asyncio.Semaphore(1)
+
 
 # TODO: Нужно сделать автоматизацию по проверке обновлений API и внесением правок через ИИ
 

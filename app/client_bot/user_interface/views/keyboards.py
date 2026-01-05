@@ -931,17 +931,6 @@ def get_keyword_setting_keyboard(
         ]
         buttons.append(button)
 
-
-    button: list[InlineKeyboardButton] = [
-        InlineKeyboardButton(
-            text="Изменить ставку",
-            callback_data=callbacks.ChangeCPM(
-                adv_setting_original_id=adv_setting_original_id
-            ).pack(),
-        )
-    ]
-
-    buttons.append(button)
     buttons.append(
         [
             InlineKeyboardButton(

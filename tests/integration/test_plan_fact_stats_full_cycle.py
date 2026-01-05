@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
 
 @pytest.mark.integration
@@ -25,11 +26,11 @@ async def test_full_cycle_plan_fact_stats(
 ):
     """Тест полного цикла: получение кампаний → получение плана/факта → запись в ClickHouse"""
     await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
-    
+
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = CoroutinesManager(wb_api, redis_client_wrapper)
-    
+
     # Настраиваем план и факт для кампании
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     fact = FactData(
@@ -38,7 +39,7 @@ async def test_full_cycle_plan_fact_stats(
         pay_for_order=520.0,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    
+
     with (
         patch(
             "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
@@ -56,25 +57,25 @@ async def test_full_cycle_plan_fact_stats(
     ):
         # Используем __wrapped__ для обхода декоратора
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    
-    # Проверяем, что данные записались в ClickHouse
-    result = await clickhouse_client.query(
-        f"""
-        SELECT 
-            adv_id, shop_id, date, timestamp,
-            plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
-            fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
-            version
-        FROM default_db.plan_fact_stats
-        WHERE adv_id = {complex_adv.adv_id}
-        ORDER BY timestamp DESC
-        LIMIT 1
-        """
-    )
-    
+    async with anti_ch_crash_semaphore:
+        # Проверяем, что данные записались в ClickHouse
+        result = await clickhouse_client.query(
+            f"""
+            SELECT
+                adv_id, shop_id, date, timestamp,
+                plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
+                fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
+                version
+            FROM default_db.plan_fact_stats
+            WHERE adv_id = {complex_adv.adv_id}
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """
+        )
+
     assert result is not None
     assert len(result.result_rows) == 1
-    
+
     row = result.result_rows[0]
     assert row[0] == complex_adv.adv_id  # adv_id
     assert row[1] == complex_adv.shop_id  # shop_id (используется shop_id из ComplexAdv, а не из manager)
@@ -97,11 +98,11 @@ async def test_full_cycle_with_real_complex_adv(
 ):
     """Тест с реальными ComplexAdv из фикстуры"""
     await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
-    
+
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = CoroutinesManager(wb_api, redis_client_wrapper)
-    
+
     # Используем реальные данные из complex_adv
     plan = PlanData(orders=200, target_pay_for_order=600, max_pay_for_order=1200)
     fact = FactData(
@@ -110,7 +111,7 @@ async def test_full_cycle_with_real_complex_adv(
         pay_for_order=610.0,
         fact_method=FactMethods.BY_CARTS,
     )
-    
+
     with (
         patch(
             "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
@@ -127,17 +128,17 @@ async def test_full_cycle_with_real_complex_adv(
         ),
     ):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    
-    # Проверяем, что данные записались с правильным adv_id из complex_adv
-    result = await clickhouse_client.query(
-        f"""
-        SELECT adv_id, shop_id, plan_orders, fact_predict_orders, fact_method
-        FROM default_db.plan_fact_stats
-        WHERE adv_id = {complex_adv.adv_id}
-        LIMIT 1
-        """
-    )
-    
+    async with anti_ch_crash_semaphore:
+        # Проверяем, что данные записались с правильным adv_id из complex_adv
+        result = await clickhouse_client.query(
+            f"""
+            SELECT adv_id, shop_id, plan_orders, fact_predict_orders, fact_method
+            FROM default_db.plan_fact_stats
+            WHERE adv_id = {complex_adv.adv_id}
+            LIMIT 1
+            """
+        )
+
     assert len(result.result_rows) == 1
     row = result.result_rows[0]
     assert row[0] == complex_adv.adv_id
@@ -154,28 +155,28 @@ async def test_full_cycle_error_handling_for_some_advs(
 ):
     """Тест обработки ошибок получения данных для отдельных кампаний"""
     await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
-    
+
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = CoroutinesManager(wb_api, redis_client_wrapper)
-    
+
     # Создаем второй ComplexAdv
     adv2 = MagicMock()
     adv2.adv_id = 99999
     adv2.shop_id = "test_shop_2"
     adv2.adv_setting = MagicMock()
     adv2.get_keywords = AsyncMock(return_value=[])
-    
+
     plan1 = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     plan2 = PlanData(orders=50, target_pay_for_order=300, max_pay_for_order=800)
-    
+
     fact1 = FactData(
         predict_orders=95.5,
         original_orders=90.0,
         pay_for_order=520.0,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    
+
     with (
         patch(
             "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
@@ -193,25 +194,25 @@ async def test_full_cycle_error_handling_for_some_advs(
     ):
         # Должно обработать ошибку для второй кампании и продолжить
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    
-    # Проверяем, что записались данные для обеих кампаний
-    result = await clickhouse_client.query(
-        f"""
-        SELECT adv_id, plan_orders, fact_predict_orders
-        FROM default_db.plan_fact_stats
-        WHERE adv_id IN ({complex_adv.adv_id}, 99999)
-        ORDER BY adv_id
-        """
-    )
-    
+    async with anti_ch_crash_semaphore:
+        # Проверяем, что записались данные для обеих кампаний
+        result = await clickhouse_client.query(
+            f"""
+            SELECT adv_id, plan_orders, fact_predict_orders
+            FROM default_db.plan_fact_stats
+            WHERE adv_id IN ({complex_adv.adv_id}, 99999)
+            ORDER BY adv_id
+            """
+        )
+
     assert len(result.result_rows) == 2
-    
+
     # Первая кампания с полными данными
     row1 = result.result_rows[0]
     assert row1[0] == complex_adv.adv_id
     assert row1[1] == 100  # plan_orders
     assert row1[2] == 95.5  # fact_predict_orders
-    
+
     # Вторая кампания без факта из-за ошибки
     row2 = result.result_rows[1]
     assert row2[0] == 99999
@@ -226,30 +227,30 @@ async def test_full_cycle_multiple_advs_simultaneously(
 ):
     """Тест записи данных для нескольких кампаний одновременно"""
     await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
-    
+
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = CoroutinesManager(wb_api, redis_client_wrapper)
-    
+
     # Создаем дополнительные кампании
     adv2 = MagicMock()
     adv2.adv_id = 11111
     adv2.shop_id = "test_shop_2"
     adv2.adv_setting = MagicMock()
     adv2.get_keywords = AsyncMock(return_value=[])
-    
+
     adv3 = MagicMock()
     adv3.adv_id = 22222
     adv3.shop_id = "test_shop_3"
     adv3.adv_setting = MagicMock()
     adv3.get_keywords = AsyncMock(return_value=[])
-    
+
     plans = [
         PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000),
         PlanData(orders=150, target_pay_for_order=550, max_pay_for_order=1100),
         PlanData(orders=200, target_pay_for_order=600, max_pay_for_order=1200),
     ]
-    
+
     facts = [
         FactData(
             predict_orders=95.5,
@@ -270,7 +271,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
             fact_method=FactMethods.DIRECT_SALES,
         ),
     ]
-    
+
     with (
         patch(
             "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
@@ -287,30 +288,30 @@ async def test_full_cycle_multiple_advs_simultaneously(
         ),
     ):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    
-    # Проверяем, что все три кампании записались
-    result = await clickhouse_client.query(
-        f"""
-        SELECT adv_id, plan_orders, fact_predict_orders, fact_method
-        FROM default_db.plan_fact_stats
-        WHERE adv_id IN ({complex_adv.adv_id}, 11111, 22222)
-        ORDER BY adv_id
-        """
-    )
-    
+    async with anti_ch_crash_semaphore:
+        # Проверяем, что все три кампании записались
+        result = await clickhouse_client.query(
+            f"""
+            SELECT adv_id, plan_orders, fact_predict_orders, fact_method
+            FROM default_db.plan_fact_stats
+            WHERE adv_id IN ({complex_adv.adv_id}, 11111, 22222)
+            ORDER BY adv_id
+            """
+        )
+
     assert len(result.result_rows) == 3
-    
+
     # Проверяем данные для каждой кампании
     assert result.result_rows[0][0] == complex_adv.adv_id
     assert result.result_rows[0][1] == 100
     assert result.result_rows[0][2] == 95.5
     assert result.result_rows[0][3] == "DIRECT_SALES"
-    
+
     assert result.result_rows[1][0] == 11111
     assert result.result_rows[1][1] == 150
     assert result.result_rows[1][2] == 145.3
     assert result.result_rows[1][3] == "BY_CARTS"
-    
+
     assert result.result_rows[2][0] == 22222
     assert result.result_rows[2][1] == 200
     assert result.result_rows[2][2] == 190.0
@@ -324,11 +325,11 @@ async def test_full_cycle_data_correctness_in_clickhouse(
 ):
     """Тест корректности данных в ClickHouse после записи"""
     await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
-    
+
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = CoroutinesManager(wb_api, redis_client_wrapper)
-    
+
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     fact = FactData(
         predict_orders=95.5,
@@ -336,7 +337,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
         pay_for_order=520.0,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    
+
     with (
         patch(
             "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
@@ -353,45 +354,45 @@ async def test_full_cycle_data_correctness_in_clickhouse(
         ),
     ):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    
-    # Проверяем все поля на корректность
-    result = await clickhouse_client.query(
-        f"""
-        SELECT 
-            adv_id, shop_id, date, timestamp,
-            plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
-            fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
-            version
-        FROM default_db.plan_fact_stats
-        WHERE adv_id = {complex_adv.adv_id}
-        LIMIT 1
-        """
-    )
-    
+    async with anti_ch_crash_semaphore:
+        # Проверяем все поля на корректность
+        result = await clickhouse_client.query(
+            f"""
+            SELECT
+                adv_id, shop_id, date, timestamp,
+                plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
+                fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
+                version
+            FROM default_db.plan_fact_stats
+            WHERE adv_id = {complex_adv.adv_id}
+            LIMIT 1
+            """
+        )
+
     assert len(result.result_rows) == 1
     row = result.result_rows[0]
-    
+
     # Проверяем обязательные поля
     assert row[0] == complex_adv.adv_id
     assert row[1] == complex_adv.shop_id
     assert isinstance(row[2], date)
     assert isinstance(row[3], datetime)
-    
+
     # Проверяем план
     assert row[4] == 100
     assert row[5] == 500
     assert row[6] == 1000
-    
+
     # Проверяем факт
     assert row[7] == 95.5
     assert row[8] == 90.0
     assert row[9] == 520.0
     assert row[10] == "DIRECT_SALES"
-    
+
     # Проверяем версию
     assert isinstance(row[11], float)
     assert row[11] > 0
-    
+
     # Проверяем, что timestamp близок к текущему времени
     # ClickHouse возвращает datetime с timezone, нормализуем для сравнения
     timestamp_from_db = row[3].replace(tzinfo=None) if row[3].tzinfo else row[3]

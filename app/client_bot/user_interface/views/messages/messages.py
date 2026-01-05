@@ -1082,7 +1082,7 @@ class CPMSetting(TextWithKeyboard):
         _ = builder.row(bottom)
 
         bottom = InlineKeyboardButton(
-            text="Изменить ставку (Максимальную ставку)",
+            text="Изменить Максимальную ставку",
             callback_data=callbacks.CPMSettingMenu(
                 action="set_manual_cpm", adv_original_id=self.adv_setting.id
             ).pack(),

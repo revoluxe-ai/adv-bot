@@ -156,9 +156,9 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     FROM data
     GROUP BY adv_id, text, date
     """
-
-    async with get_clickhouse_client() as client:
-        await client.query(query, external_data=ext_data) # noqa
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            await client.query(query, external_data=ext_data) # noqa
 
     logger.debug(f"Inserted/updated {len(keyword_stats)} rows into advkeyword_new")
 

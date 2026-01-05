@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 from .types.common_card_stat import CommonCardStat
 
@@ -43,14 +44,14 @@ async def get_stats_for_last_period(nmid: int, days: int) -> CommonCardStat | No
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date": end_date.strftime("%Y-%m-%d"),
     }
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            # Получаем результат запроса с параметрами
+            result = await client.query(query, parameters=params)
 
-    async with get_clickhouse_client() as client:
-        # Получаем результат запроса с параметрами
-        result = await client.query(query, parameters=params)
-
-        if not result:
-            return None
-        result_row = result.first_row
+            if not result:
+                return None
+            result_row = result.first_row
 
     # Преобразуем результат в объект CommonCardStat
     return CommonCardStat(
@@ -103,9 +104,9 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date": end_date.strftime("%Y-%m-%d"),
     }
-
-    async with get_clickhouse_client() as client:
-        result = await client.query(query, parameters=params)
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(query, parameters=params)
 
     stats: list[CommonCardStat] = []
     for row in result.result_rows:
@@ -174,7 +175,7 @@ class WBCommonStatManager:
         query += ",".join(
             [f"({', '.join(map(str, value))}, {version})" for value in values]
         )
-
-        async with get_clickhouse_client() as client:
-            await client.query(query)
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                await client.query(query)
         return None
