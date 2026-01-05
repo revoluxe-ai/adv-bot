@@ -376,14 +376,21 @@ async def successful_payment_handler(
             )
             return
 
-    await billing_event_manager.emit_successful_payment_received(
-        user_id=user_id,
-        user_telegram_id=message.chat.id,
-        wb_cabinet_id=wb_cabinet_original_id,
-        amount=float(cost),
-        currency="RUB",
-        correlation_id=correlation_id,
-    )
+    try:
+        await billing_event_manager.emit_successful_payment_received(
+            user_id=user_id,
+            user_telegram_id=message.chat.id,
+            wb_cabinet_id=wb_cabinet_original_id,
+            amount=float(cost),
+            currency="RUB",
+            correlation_id=correlation_id,
+        )
+    except Exception as exc:  # pragma: no cover - logging/error handling path
+        logger.exception(
+            "Failed to emit successful_payment_received event; "
+            "continuing with balance update",
+            exc_info=exc,
+        )
 
     # Определяем процент бонуса: начисляем только до конца 2025 года
     bonus_percent = 0.0
