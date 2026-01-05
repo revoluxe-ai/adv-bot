@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.settings import settings
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
 from .dto.states import KeywordStatus, KeywordStatusReason
 from .keyword_stat import KeywordStat
@@ -114,17 +115,17 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                                   ) -> list[dict[str, int | float | str]]:
         query = self._get_query('get_clusters_stats')
 
-
-        async with get_clickhouse_client() as client:
-            response = await client.query(
-                query,
-                parameters={
-                    "nmids": nmids,
-                    "min_views": min_views,
-                    "min_days": min_days,
-                    "conv_days": cart_to_order_window,
-                },
-            )
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                response = await client.query(
+                    query,
+                    parameters={
+                        "nmids": nmids,
+                        "min_views": min_views,
+                        "min_days": min_days,
+                        "conv_days": cart_to_order_window,
+                    },
+                )
 
         typed_response = cast(_ClickHouseNamedResultsResponse, response)
         result: Generator[dict[str, int | float | str], None, None] = typed_response.named_results()

@@ -1,3 +1,4 @@
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -6,14 +7,14 @@ async def get_clicks_to_orders_ration_on_phrases(
 ) -> float | None:
     """Получает соотношение кликов к заказам по фразам из ClickHouse"""
     query = """
-            SELECT 
+            SELECT
                IF(
-                    SUM(toFloat64(orders)) = 0, 
-                     SUM(toFloat64(clicks)), 
+                    SUM(toFloat64(orders)) = 0,
+                     SUM(toFloat64(clicks)),
                        SUM(toFloat64(clicks)) / SUM(toFloat64(orders))
                 ) AS ratio
             FROM (
-                SELECT 
+                SELECT
                     adv_id,
                     date,
                     argMax(clicks, version) AS clicks,
@@ -24,9 +25,9 @@ async def get_clicks_to_orders_ration_on_phrases(
                 GROUP BY adv_id, date
                 )
     """
-
-    async with get_clickhouse_client() as client:
-        result = await client.query(query, {"adv_ids": adv_ids, "days": days})
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(query, {"adv_ids": adv_ids, "days": days})
     ratio = float(list(result.named_results())[0]["ratio"])
     if ratio == 0:
         return None
