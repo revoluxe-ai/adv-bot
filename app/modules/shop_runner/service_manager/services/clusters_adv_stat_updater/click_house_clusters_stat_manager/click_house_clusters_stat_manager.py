@@ -102,8 +102,9 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
         for row in stats
     ]
 
-    async with get_clickhouse_client() as client:
-        await client.insert('default_db.clusters_adv_stats', data, column_names=column_names)
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            await client.insert('default_db.clusters_adv_stats', data, column_names=column_names)
 
 
 async def update_clusters_adv_stats(stats: Sequence["NormqueryStatsDTO"]) -> None:
