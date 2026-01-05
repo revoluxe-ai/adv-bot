@@ -1,1 +1,1 @@
-﻿"""Get users scripts package."""
+"""Get users scripts package."""

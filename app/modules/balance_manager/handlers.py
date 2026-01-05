@@ -3,6 +3,8 @@ import datetime
 from datetime import date
 import json
 import logging
+from typing import TypedDict
+from uuid import uuid4
 
 import aiogram
 from aiogram import Router, types
@@ -27,6 +29,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 from . import messages
+from ..billing.event_manager.event_manager import BillingEventManager
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,18 @@ TEST_SUBSCRIBE_COST = 99
 sm = get_async_session_maker
 
 router = Router()
+BALANCE_TOPUP_CORRELATION_KEY = "balance_topup_correlation_id"
+
+async def _get_balance_event_context(
+    state: FSMContext,
+) -> tuple[str | None, int | None]:
+    data = await state.get_data()
+    correlation_id = data.get(BALANCE_TOPUP_CORRELATION_KEY)
+    cabinet_id = data.get("wb_cabinet_original_id_for_add_balance")
+    if cabinet_id is not None and not isinstance(cabinet_id, int):
+        raise RuntimeError("wb_cabinet_original_id_for_add_balance должен быть целым числом")
+    return correlation_id, cabinet_id
+
 
 
 @router.callback_query(callbacks.AddBalance.filter())
@@ -43,10 +58,21 @@ async def add_balance(
     bot: aiogram.Bot,
     callback_data: callbacks.AddBalance,
     state: FSMContext,
+    billing_event_manager: BillingEventManager,
 ) -> None:
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
+    correlation_id = str(uuid4())
     await state.update_data(
-        wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id
+        wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id,
+        balance_topup_correlation_id=correlation_id,
+    )
+
+    assert callback.message is not None
+    chat_id = callback.message.chat.id
+    await billing_event_manager.emit_add_balance_click(
+        user_telegram_id=chat_id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        correlation_id=correlation_id,
     )
 
     keyboard = types.InlineKeyboardMarkup(
@@ -74,6 +100,11 @@ async def add_balance(
     await bot.send_message(
         chat_id, text, reply_markup=keyboard, parse_mode="MarkdownV2"
     )
+    await billing_event_manager.emit_offerta_shown(
+        user_telegram_id=chat_id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        correlation_id=correlation_id,
+    )
 
     return
 
@@ -84,7 +115,16 @@ async def confirm_add_balance(
     callback_data: callbacks.ConfirmAddBalance,
     state: FSMContext,
     bot: aiogram.Bot,
+    billing_event_manager: BillingEventManager,
 ) -> None:
+    correlation_id, _ = await _get_balance_event_context(state)
+    assert callback.message is not None
+    chat_id = callback.message.chat.id
+    await billing_event_manager.emit_offerta_confirm_click(
+        user_telegram_id=chat_id,
+        wb_cabinet_id=callback_data.wb_cabinet_original_id,
+        correlation_id=correlation_id,
+    )
     wb_cabinet_original_id: int = callback_data.wb_cabinet_original_id
     await state.set_state(states.AddBalance.awaiting_amount)
     result = await get_cabinet_balance(wb_cabinet_original_id)
@@ -113,24 +153,67 @@ async def confirm_add_balance(
         current_balance=cabinet_balance,
         current_bonus=cabinet_bonus,
     )()
+    await billing_event_manager.emit_amount_prompt_shown(
+        user_telegram_id=callback.message.chat.id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        correlation_id=correlation_id,
+    )
 
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
+    message: types.Message,
+    state: FSMContext,
+    bot: aiogram.Bot,
+    billing_event_manager: BillingEventManager,
 ) -> None:
     assert message.text is not None
     amount: str = message.text
     min_sum = const.min_sum
+    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
+    user_telegram_id = message.chat.id
+
+    if wb_cabinet_original_id is None:
+        await billing_event_manager.emit_error_event(
+            where="waiting_for_amount",
+            error="missing_wb_cabinet",
+            user_telegram_id=user_telegram_id,
+            correlation_id=correlation_id,
+        )
+        raise RuntimeError("Контекст пополнения баланса потерян во время ввода суммы")
     if not amount.isdigit():
+        await billing_event_manager.emit_amount_input(
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_original_id,
+            amount_text=amount,
+            is_valid=False,
+            parsed_amount=None,
+            correlation_id=correlation_id,
+        )
         await message.answer(f"Введите сумму (число) от {min_sum} рублей")
         return
+
     amount_int: int = int(amount)
     if amount_int < const.MIN_SUM:
+        await billing_event_manager.emit_amount_input(
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_original_id,
+            amount_text=amount,
+            is_valid=False,
+            parsed_amount=float(amount_int),
+            correlation_id=correlation_id,
+        )
         await message.answer(f"Введите сумму (число) от {min_sum}")
         return
-    state_data = await state.get_data()
-    wb_cabinet_original_id = state_data["wb_cabinet_original_id_for_add_balance"]
+
+    await billing_event_manager.emit_amount_input(
+        user_telegram_id=user_telegram_id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        amount_text=amount,
+        is_valid=True,
+        parsed_amount=float(amount_int),
+        correlation_id=correlation_id,
+    )
 
     payload = json.dumps(
         {
@@ -155,7 +238,6 @@ async def waiting_for_amount(
         }
     )
 
-    user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
     prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))] # pyright: ignore # noqa
     await bot.send_invoice(
@@ -168,26 +250,53 @@ async def waiting_for_amount(
         currency="RUB",
         prices=prices,
     )
+    await billing_event_manager.emit_invoice_sent(
+        user_telegram_id=user_telegram_id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        amount=float(amount_int),
+        currency="RUB",
+        payload={"invoice_payload": payload},
+        correlation_id=correlation_id,
+    )
     await state.set_state()
 
 
 @router.pre_checkout_query()
 async def pre_checkout_query_handler(
-    pre_checkout_query: types.PreCheckoutQuery, bot: aiogram.Bot
+    pre_checkout_query: types.PreCheckoutQuery,
+    bot: aiogram.Bot,
+    state: FSMContext,
+    billing_event_manager: BillingEventManager,
 ) -> None:
+    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
+    from_user_id = pre_checkout_query.from_user.id
+
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+    await billing_event_manager.emit_pre_checkout_ok(
+        user_telegram_id=from_user_id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        correlation_id=correlation_id,
+    )
 
 
 @router.message(aiogram.F.successful_payment)
 async def successful_payment_handler(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
+    message: types.Message,
+    state: FSMContext,
+    bot: aiogram.Bot,
+    billing_event_manager: BillingEventManager,
 ) -> None:
     successful_payment = message.successful_payment
     assert successful_payment is not None
     cost = successful_payment.total_amount / 100
-    state_data = await state.get_data()
-    wb_cabinet_original_id = state_data["wb_cabinet_original_id_for_add_balance"]
-    # Получаем ID пользователя из базы
+    correlation_id, wb_cabinet_original_id = await _get_balance_event_context(state)
+    await billing_event_manager.emit_error_event(
+        where="successful_payment",
+        error="missing_wb_cabinet",
+        user_telegram_id=message.chat.id,
+        correlation_id=correlation_id,
+    )
+
     async with sm() as session:
         stmt = select(User.id).where(User.user_telegram_id == message.chat.id)
         user_result = await session.execute(stmt)
@@ -195,10 +304,25 @@ async def successful_payment_handler(
 
         if not user_id:
             logger.error("Пользователь с telegram_id %s не найден", message.chat.id)
+            await billing_event_manager.emit_error_event(
+                where="successful_payment",
+                error="user_not_found",
+                user_telegram_id=message.chat.id,
+                correlation_id=correlation_id,
+            )
             await message.answer(
                 "Произошла ошибка при обработке платежа. Обратитесь в поддержку."
             )
             return
+
+    await billing_event_manager.emit_successful_payment_received(
+        user_id=user_id,
+        user_telegram_id=message.chat.id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        amount=float(cost),
+        currency="RUB",
+        correlation_id=correlation_id,
+    )
 
     # Определяем процент бонуса: начисляем только до конца 2025 года
     bonus_percent = 0.0
@@ -218,6 +342,15 @@ async def successful_payment_handler(
         amount=float(cost),
         bonus_percent=bonus_percent,
         description="Пополнение баланса через Telegram",
+    )
+
+    await billing_event_manager.emit_balance_topup_applied(
+        user_id=user_id,
+        user_telegram_id=message.chat.id,
+        wb_cabinet_id=wb_cabinet_original_id,
+        amount=amount,
+        bonus_amount=bonus_amount,
+        correlation_id=correlation_id,
     )
 
     await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()

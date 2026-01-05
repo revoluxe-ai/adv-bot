@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.wb_adv_updater.modules.balance_exp_informer.service import (
     BalanceReminderService,
 )
@@ -83,8 +84,9 @@ async def balance_expiration_informer_tick(
     await asyncio.sleep(sleep_sec + _jitter(cfg.sleep_jitter_seconds))
 
 
-async def balance_expiration_informer_update() -> None:
-    service = BalanceReminderService(session_factory)
+async def balance_expiration_informer_update(event_manager: BillingEventManager) -> None:
+    service = BalanceReminderService(session_factory,
+                                     event_manager)
     while True:
         try:
             await balance_expiration_informer_tick(service)

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class ReminderItem:
     reminder_id: int
     wb_cabinet_id: int
+    shop_id: str
     shop_name: str
     level: int
     balance: float
