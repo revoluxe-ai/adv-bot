@@ -77,9 +77,10 @@ async def get_daily_stats_by_last_days(
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
 
-    async with get_clickhouse_client() as client:
-        # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
-        query = """
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
+            query = """
         SELECT
             date,
             SUM(latest_views) AS views,
@@ -106,7 +107,6 @@ async def get_daily_stats_by_last_days(
         GROUP BY date
         ORDER BY date
         """
-        async with anti_ch_crash_semaphore:
             try:
                 res = await client.query(
                     query,
@@ -146,35 +146,35 @@ async def get_stats_by_last_days(
 ) -> SmallFullAdvStat:
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
-    async with get_clickhouse_client() as client:
-        # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
-        query = """
-        SELECT
-            SUM(latest_views) AS views,
-            SUM(latest_clicks) AS clicks,
-            SUM(latest_spend) AS spend,
-            SUM(latest_added_to_cart) AS added_to_cart,
-            SUM(latest_orders) AS orders,
-            SUM(latest_sum_price_orders) AS sum_price_orders
-        FROM (
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
+            query = """
             SELECT
-                adv_id,
-                date,
-                argMax(views, version) AS latest_views,
-                argMax(clicks, version) AS latest_clicks,
-                argMax(spend, version) AS latest_spend,
-                argMax(added_to_cart, version) AS latest_added_to_cart,
-                argMax(orders, version) AS latest_orders,
-                argMax(sum_price_orders, version) AS latest_sum_price_orders
-            FROM default_db.full_adv_wb_stat
-            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
-            AND adv_id IN %(adv_ids)s
-            GROUP BY adv_id, date
-        )
-        """
-        try:
-            # Выполняем запрос
-            async with anti_ch_crash_semaphore:
+                SUM(latest_views) AS views,
+                SUM(latest_clicks) AS clicks,
+                SUM(latest_spend) AS spend,
+                SUM(latest_added_to_cart) AS added_to_cart,
+                SUM(latest_orders) AS orders,
+                SUM(latest_sum_price_orders) AS sum_price_orders
+            FROM (
+                SELECT
+                    adv_id,
+                    date,
+                    argMax(views, version) AS latest_views,
+                    argMax(clicks, version) AS latest_clicks,
+                    argMax(spend, version) AS latest_spend,
+                    argMax(added_to_cart, version) AS latest_added_to_cart,
+                    argMax(orders, version) AS latest_orders,
+                    argMax(sum_price_orders, version) AS latest_sum_price_orders
+                FROM default_db.full_adv_wb_stat
+                WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
+                AND adv_id IN %(adv_ids)s
+                GROUP BY adv_id, date
+            )
+            """
+            try:
+                # Выполняем запрос
                 res = await client.query(
                     query,
                     parameters={
@@ -185,33 +185,38 @@ async def get_stats_by_last_days(
                 )
                 result = res.first_item
 
-            # Обрабатываем результат, создавая общий объект FullAdvStat
-            if result:
-                row = result
-                views = row["views"]
-                clicks = row["clicks"]
-                spend = row["spend"]
-                added_to_cart = row["added_to_cart"]
-                orders = row["orders"]
-                sum_price_orders = row["sum_price_orders"]
+                # Обрабатываем результат, создавая общий объект FullAdvStat
+                if result:
+                    row = result
+                    views = row["views"]
+                    clicks = row["clicks"]
+                    spend = row["spend"]
+                    added_to_cart = row["added_to_cart"]
+                    orders = row["orders"]
+                    sum_price_orders = row["sum_price_orders"]
 
-                # Собираем общую статистику в объект FullAdvStat
-                return SmallFullAdvStat(
-                    views=views,
-                    clicks=clicks,
-                    spend=spend,
-                    added_to_cart=added_to_cart,
-                    orders=orders,
-                    sum_price=sum_price_orders,
-                )
-            else:
-                # Если нет данных
-                return SmallFullAdvStat(
-                    views=0, clicks=0, spend=0, added_to_cart=0, orders=0, sum_price=0
-                )
-        except Exception:
-            logger.error("Ошибка получения статистики из ClickHouse", exc_info=True)
-            raise
+                    # Собираем общую статистику в объект FullAdvStat
+                    return SmallFullAdvStat(
+                        views=views,
+                        clicks=clicks,
+                        spend=spend,
+                        added_to_cart=added_to_cart,
+                        orders=orders,
+                        sum_price=sum_price_orders,
+                    )
+                else:
+                    # Если нет данных
+                    return SmallFullAdvStat(
+                        views=0,
+                        clicks=0,
+                        spend=0,
+                        added_to_cart=0,
+                        orders=0,
+                        sum_price=0,
+                    )
+            except Exception:
+                logger.error("Ошибка получения статистики из ClickHouse", exc_info=True)
+                raise
 
 
 def _get_insert_query() -> str:
