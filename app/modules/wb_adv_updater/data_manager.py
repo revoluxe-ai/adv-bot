@@ -87,8 +87,7 @@ async def get_keyword_statistic_clickhouse(
             GROUP BY adv_id, text, date
         ) AS merged
     """
-    async with anti_ch_crash_semaphore:
-        result = await client.query(query, parameters={"text": text})
+    result = await client.query(query, parameters={"text": text})
 
     if not result.result_rows:
         return 0, 0, 0.0
