@@ -38,7 +38,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from ...utils.ch_semaphore import anti_ch_crash_semaphore
+
 
 logger = logging.getLogger(__name__)
 
@@ -953,6 +953,8 @@ async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     SELECT DISTINCT text FROM default_db.advkeyword_new
     WHERE date >= today() - %(last_days)s
     """
+    from ...utils.ch_semaphore import anti_ch_crash_semaphore
+
     async with anti_ch_crash_semaphore:
         async with get_clickhouse_client() as client:
             result = await client.query(ch_query, parameters={"last_days": last_days})
