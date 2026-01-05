@@ -28,7 +28,9 @@ async def test_balance_reminder_service_update_creates_sent_reminder_and_event(
     user = User(user_telegram_id=123456789, username="test_reminder_user")
     wb_cabinet = WBCabinet(
         shop_id="test-shop-balance",
-        expiration_time=datetime.now(timezone.utc) + timedelta(days=7),
+        expiration_time=(datetime.now(timezone.utc) + timedelta(days=7)).replace(
+            tzinfo=None
+        ),
         balance=0.0,
         bonus=0.0,
         active=True,
