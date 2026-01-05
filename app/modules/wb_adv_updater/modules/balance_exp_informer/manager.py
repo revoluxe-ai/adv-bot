@@ -14,7 +14,7 @@ from app.modules.wb_adv_updater.modules.balance_exp_informer.service import (
 from app.utils.db.session_maker import get_async_session_maker as session_factory
 
 logger = logging.getLogger(__name__)
-
+from .excs import SenderTickError
 
 @dataclass(frozen=True)
 class BalanceInformerConfig:
@@ -76,8 +76,7 @@ async def balance_expiration_informer_tick(
         await service.update()
     except Exception as exc:
         logger.exception("Balance reminder service failed", exc_info=exc)
-        await asyncio.sleep(cfg.fail_backoff_seconds)
-        return
+        raise SenderTickError from exc
 
     now_after = datetime.now(ZoneInfo("Europe/Moscow"))
     sleep_sec = seconds_until_next_send_hour_msk(now_after, cfg.send_hour_msk)
@@ -86,6 +85,14 @@ async def balance_expiration_informer_tick(
 
 async def balance_expiration_informer_update() -> None:
     service = BalanceReminderService(session_factory)
-
     while True:
-        await balance_expiration_informer_tick(service)
+        try:
+            await balance_expiration_informer_tick(service)
+        except SenderTickError:
+            logger.exception("Balance reminder service failed")
+        except Exception as exc:
+            logger.exception("Balance reminder service failed", exc_info=exc)
+        finally:
+            await asyncio.sleep(60)
+
+

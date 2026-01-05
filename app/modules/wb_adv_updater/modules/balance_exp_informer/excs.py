@@ -1,0 +1,6 @@
+
+
+
+
+class SenderTickError(Exception):
+    pass
