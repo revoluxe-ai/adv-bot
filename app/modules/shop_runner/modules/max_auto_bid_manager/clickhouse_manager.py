@@ -27,7 +27,7 @@ async def get_clicks_to_orders_ration_on_phrases(
     """
     async with anti_ch_crash_semaphore:
         async with get_clickhouse_client() as client:
-        result = await client.query(query, {"adv_ids": adv_ids, "days": days})
+            result = await client.query(query, {"adv_ids": adv_ids, "days": days})
     ratio = float(list(result.named_results())[0]["ratio"])
     if ratio == 0:
         return None
