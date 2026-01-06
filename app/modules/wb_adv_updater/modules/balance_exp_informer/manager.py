@@ -76,7 +76,6 @@ async def balance_expiration_informer_tick(
     try:
         await service.update()
     except Exception as exc:
-        logger.exception("Balance reminder service failed", exc_info=exc)
         raise SenderTickError from exc
 
     now_after = datetime.now(ZoneInfo("Europe/Moscow"))
