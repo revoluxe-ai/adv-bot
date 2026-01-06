@@ -146,7 +146,10 @@ async def confirm_add_balance(
             notify_user=False,
         )
         correlation_id = str(uuid4())
-        await state.update_data(balance_topup_correlation_id=correlation_id)
+        await state.update_data(
+            balance_topup_correlation_id=correlation_id,
+            wb_cabinet_original_id_for_add_balance=callback_data.wb_cabinet_original_id,
+        )
     assert callback.message is not None
 
     await billing_event_manager.emit_offerta_confirm_click(
