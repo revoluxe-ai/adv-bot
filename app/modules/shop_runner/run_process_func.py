@@ -48,14 +48,10 @@ async def run_shop_task(
 async def _update_tasks(
     active_tasks: dict[str, Task[None]], client_session: ClientSession
 ) -> None:
-    # TODO: Никогда не загрузяться компании, если в магазине нет активной рекламы
     stmt = (
         select(WBCabinet.shop_id)
         .distinct()
         .join(WBCabinet.adv_settings)
-        .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active.is_(True)),
-        )
     )
 
     shop_filter_list: list[str] = settings.SHOP_FILTER_LIST
