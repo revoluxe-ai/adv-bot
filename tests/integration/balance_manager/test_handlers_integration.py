@@ -84,7 +84,10 @@ async def test_successful_payment_handler_integration_bonus_before_2026(
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message, mock_state, mock_bot, billing_event_manager=mock_event_manager
+            )
 
             # Проверяем, что платежи созданы в БД
             balance_payments_stmt = select(WBBalancePayment).where(
@@ -157,7 +160,10 @@ async def test_successful_payment_handler_integration_no_bonus_after_2025(
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message, mock_state, mock_bot, billing_event_manager=mock_event_manager
+            )
 
             # Проверяем, что платеж создан, но бонуса нет
             balance_payments_stmt = select(WBBalancePayment).where(
@@ -210,7 +216,10 @@ async def test_successful_payment_handler_user_not_found_integration(
 
         mock_bot = MagicMock()
 
-        await successful_payment_handler(mock_message, mock_state, mock_bot)
+        mock_event_manager = AsyncMock()
+        await successful_payment_handler(
+            mock_message, mock_state, mock_bot, billing_event_manager=mock_event_manager
+        )
 
         # Проверяем, что было отправлено сообщение об ошибке
         mock_message.answer.assert_called_once()

@@ -52,6 +52,7 @@ async def test_send_balance_reminder_integration(days_left: float):
         reminder = ReminderItem(
             reminder_id=1,
             wb_cabinet_id=1,
+            shop_id="integration-shop",
             shop_name="integration-shop",
             level=int(level),
             balance=0.0,

@@ -83,7 +83,13 @@ async def test_bonus_awarded_before_end_of_2025():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             # Проверяем, что process_payment_with_bonus был вызван с bonus_percent=200
             mock_process_payment.assert_called_once()
@@ -164,7 +170,13 @@ async def test_bonus_not_awarded_after_end_of_2025():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             # Проверяем, что process_payment_with_bonus был вызван с bonus_percent=0
             mock_process_payment.assert_called_once()
@@ -240,7 +252,13 @@ async def test_bonus_awarded_on_last_day_of_2025():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             call_args = mock_process_payment.call_args
             assert call_args.kwargs["bonus_percent"] == 200.0, (

@@ -16,8 +16,9 @@ from app.modules.token_monitoring.services.token_expiration_service import (
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
+from ..billing.event_manager.event_manager import BillingEventManager
 from ..user_message_sender import message_for_not_pay_user_sender
-from .modules.balance_exp_informer import balance_expiration_informer_update
+from .modules.balance_exp_informer.manager import balance_expiration_informer_update
 
 
 set_config()
@@ -102,27 +103,26 @@ async def process_payment_for_advs() -> None:
             )
             await asyncio.sleep(sleep_seconds)
 
-async def main_loop() -> None:
+async def main_loop(event_manager: BillingEventManager) -> None:
     await asyncio.gather(
         process_payment_for_advs(),
         # # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
         # # TODO: Не понятно эта функция вообще работает или нет
         process_token_expiration_check(),
-        balance_expiration_informer_update(),
+        balance_expiration_informer_update(event_manager),
     )
 
 
 async def run_main_coroutines() -> None:
     from app.core.di.app_container import AppContainer
-
+    event_manager = BillingEventManager()
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-        await __run_main_coroutines()
+        await __run_main_coroutines(event_manager)
 
-
-async def __run_main_coroutines() -> None:
+async def __run_main_coroutines(event_manager: BillingEventManager) -> None:
     while True:
         try:
-            await main_loop()
+            await main_loop(event_manager)
         except Exception as e:
             logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
             del e

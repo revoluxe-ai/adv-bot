@@ -29,7 +29,8 @@
     "app/modules/shop_runner/service_manager/services/plan_fact_controller",
     "app/modules/shop_runner/modules/max_auto_bid_manager/auto_max_bid_manager.py",
     "updater.py",
-    "app/modules/wb_adv_updater/modules/balance_exp_informer"
+    "app/modules/wb_adv_updater/modules/balance_exp_informer",
+    "app/modules/billing/event_manager"
 
   ],
 

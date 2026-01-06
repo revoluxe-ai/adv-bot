@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.bot import get_bot
 from app.modules.balance_manager.balance_service import get_cabinet_balance
+from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.pricer.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -101,10 +102,12 @@ async def iter_user_cabinets_batches(
 
 
 class BalanceReminderService:
-    def __init__(self, session_factory: Any):
+    def __init__(self, session_factory: Any,
+                 event_manager: BillingEventManager):
         self._session_factory = session_factory
         self._logger = logging.getLogger(__name__)
         self._pricer = Pricer()
+        self._event_manager = event_manager
 
     async def update(self) -> None:
         today: date = billing_today()
@@ -140,9 +143,32 @@ class BalanceReminderService:
                         await send_chunk(bot, chat_id, text, keyboard)
                     except Exception as e:
                         logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
+                        await self._event_manager.emit_balance_reminder_failed(
+                            user_id=_user_id,
+                            user_telegram_id=chat_id,
+                            shop_id=reminder_chunk[0].shop_id if reminder_chunk else "",
+                            reminder_ids=reminder_ids,
+                            error=str(e),
+                            session=session,
+                        )
                         await self._mark_failed(session, reminder_ids)
                         send_errors_total += 1
                         continue
+
+                    for reminder_item in reminder_chunk:
+                        try:
+                            await self._event_manager.emit_balance_reminder_sent(
+                                user_id=_user_id,
+                                user_telegram_id=chat_id,
+                                shop_id=reminder_item.shop_id,
+                                reminder_item=reminder_item,
+                                session=session,
+                            )
+                        except Exception as exc:
+                            self._logger.exception(
+                                "Не удалось зарегистрировать событие отправки уведомления о балансе",
+                                exc_info=exc,
+                            )
 
                     try:
                         await self._mark_sent(session, reminder_ids)
@@ -281,9 +307,11 @@ class BalanceReminderService:
             select(
                 BalanceReminder,
                 User.user_telegram_id,
+                WBCabinet.shop_id,
             )
             .select_from(BalanceReminder)
             .join(User, User.id == BalanceReminder.user_id)
+            .join(WBCabinet, WBCabinet.id == BalanceReminder.wb_cabinet_id)
             .where(
                 BalanceReminder.status.in_(("pending", "failed")),
                 BalanceReminder.attempts < 3,
@@ -301,7 +329,7 @@ class BalanceReminderService:
         items_map: dict[int, list[ReminderItem]] = defaultdict(list)
         chat_map: dict[int, int] = {}
 
-        for reminder, telegram_id in rows:
+        for reminder, telegram_id, shop_id in rows:
             # telegram_id может быть None на старых данных/в редких случаях.
             # Мы такие записи пропускаем, т.к. отправить всё равно некуда.
             if telegram_id is None:
@@ -312,10 +340,10 @@ class BalanceReminderService:
             shop_name = (payload.get("shop_name") or "").strip()
             if not shop_name:
                 shop_name = f"Кабинет {reminder.wb_cabinet_id}"
-
             item = ReminderItem(
                 reminder_id=reminder.id,
                 wb_cabinet_id=reminder.wb_cabinet_id,
+                shop_id=str(shop_id) if shop_id is not None else f"cabinet_{reminder.wb_cabinet_id}",
                 shop_name=shop_name,
                 level=reminder.level,
                 balance=BalanceReminderService._to_float(payload.get("balance")),

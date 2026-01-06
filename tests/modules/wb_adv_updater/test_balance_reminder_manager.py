@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.modules.wb_adv_updater.modules.balance_exp_informer.excs import SenderTickError
 from app.modules.wb_adv_updater.modules.balance_exp_informer.manager import (
     balance_expiration_informer_update,
     balance_expiration_informer_tick,
@@ -32,11 +33,13 @@ async def test_balance_expiration_informer_update_creates_service_and_loops():
         # Прерываем цикл на 2-й итерации
         mock_tick.side_effect = [None, asyncio.CancelledError]
 
-        with pytest.raises(asyncio.CancelledError):
-            await balance_expiration_informer_update()
+        mock_event_manager = AsyncMock()
 
-        # Проверяем, что сервис создан с правильной session_factory
-        mock_service_class.assert_called_once_with(mock_session_factory)
+        with pytest.raises(asyncio.CancelledError):
+            await balance_expiration_informer_update(mock_event_manager)
+
+        # Проверяем, что сервис создан с правильной session_factory и event_manager
+        mock_service_class.assert_called_once_with(mock_session_factory, mock_event_manager)
         
         # Проверяем, что tick вызывался 2 раза
         assert mock_tick.call_count == 2
@@ -132,29 +135,16 @@ async def test_balance_expiration_informer_tick_handles_service_exception():
         mock_datetime_module.now.return_value = current_time
         mock_datetime_module.combine = datetime.combine
         mock_datetime_module.timezone = timezone
-        
-        with patch(
-            "app.modules.wb_adv_updater.modules.balance_exp_informer.manager.asyncio.sleep",
-            new_callable=AsyncMock,
-        ) as mock_sleep, patch(
-            "app.modules.wb_adv_updater.modules.balance_exp_informer.manager.logger"
-        ) as mock_logger:
-        
-            cfg_in_window = type('CFG', (), {
-                'send_hour_msk': send_hour,
-                'window_end_hour_msk': window_end_hour,
-                'fail_backoff_seconds': 60,
-                'sleep_jitter_seconds': 10,
-            })()
 
-            # Функция должна завершиться без исключения
+        cfg_in_window = type("CFG", (), {
+            "send_hour_msk": send_hour,
+            "window_end_hour_msk": window_end_hour,
+            "fail_backoff_seconds": 60,
+            "sleep_jitter_seconds": 10,
+        })()
+
+        with pytest.raises(SenderTickError):
             await balance_expiration_informer_tick(mock_service, cfg_in_window)
-
-            # Проверяем, что исключение залогировано
-            mock_logger.exception.assert_called_once()
-            
-            # Проверяем, что произошел backoff sleep
-            mock_sleep.assert_awaited()
 
 
 async def test_balance_expiration_informer_tick_uses_service_in_window():
