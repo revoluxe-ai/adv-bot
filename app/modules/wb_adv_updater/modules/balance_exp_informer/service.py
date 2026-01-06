@@ -141,14 +141,6 @@ class BalanceReminderService:
                     reminder_ids = [it.reminder_id for it in reminder_chunk]
                     try:
                         await send_chunk(bot, chat_id, text, keyboard)
-                        for reminder_item in reminder_chunk:
-                            await self._event_manager.emit_balance_reminder_sent(
-                                user_id=_user_id,
-                                user_telegram_id=chat_id,
-                                shop_id=reminder_item.shop_id,
-                                reminder_item=reminder_item,
-                                session=session,
-                            )
                     except Exception as e:
                         logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
                         await self._event_manager.emit_balance_reminder_failed(
@@ -162,6 +154,21 @@ class BalanceReminderService:
                         await self._mark_failed(session, reminder_ids)
                         send_errors_total += 1
                         continue
+
+                    for reminder_item in reminder_chunk:
+                        try:
+                            await self._event_manager.emit_balance_reminder_sent(
+                                user_id=_user_id,
+                                user_telegram_id=chat_id,
+                                shop_id=reminder_item.shop_id,
+                                reminder_item=reminder_item,
+                                session=session,
+                            )
+                        except Exception as exc:
+                            self._logger.exception(
+                                "Не удалось зарегистрировать событие отправки уведомления о балансе",
+                                exc_info=exc,
+                            )
 
                     try:
                         await self._mark_sent(session, reminder_ids)
