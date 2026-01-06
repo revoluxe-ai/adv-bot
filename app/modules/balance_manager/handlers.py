@@ -146,6 +146,7 @@ async def confirm_add_balance(
             notify_user=False,
         )
         correlation_id = str(uuid4())
+        await state.update_data(balance_topup_correlation_id=correlation_id)
     assert callback.message is not None
 
     await billing_event_manager.emit_offerta_confirm_click(
@@ -306,6 +307,7 @@ async def pre_checkout_query_handler(
             notify_user=False,
         )
         correlation_id = str(uuid4())
+        await state.update_data(balance_topup_correlation_id=correlation_id)
     from_user_id = pre_checkout_query.from_user.id
 
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
