@@ -415,14 +415,20 @@ async def successful_payment_handler(
         description="Пополнение баланса через Telegram",
     )
 
-    await billing_event_manager.emit_balance_topup_applied(
-        user_id=user_id,
-        user_telegram_id=message.chat.id,
-        wb_cabinet_id=wb_cabinet_original_id,
-        amount=amount,
-        bonus_amount=bonus_amount,
-        correlation_id=correlation_id,
-    )
+    try:
+        await billing_event_manager.emit_balance_topup_applied(
+            user_id=user_id,
+            user_telegram_id=message.chat.id,
+            wb_cabinet_id=wb_cabinet_original_id,
+            amount=amount,
+            bonus_amount=bonus_amount,
+            correlation_id=correlation_id,
+        )
+    except Exception as exc:  # pragma: no cover - logging/error handling path
+        logger.exception(
+            "Failed to emit balance_topup_applied event; continuing",
+            exc_info=exc,
+        )
 
     await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()
 
