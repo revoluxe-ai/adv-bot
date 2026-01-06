@@ -36,17 +36,17 @@ class WBShop:
             self._alive_worker_run(),
             coroutines_manager.update_advs_data_from_wb_to_pg(),
             coroutines_manager.update_cards_data_from_wb_to_pg(),
-            coroutines_manager.update_cpm_bid(),
+            coroutines_manager.update_cpm_bid(), # фильтруем только активные РК
             coroutines_manager.update_common_sale_stat(),
             coroutines_manager.update_full_adv_stat(),
-            coroutines_manager.adv_settings_auto_update(),
-            coroutines_manager.update_top_key_in_advs(),
+            coroutines_manager.adv_settings_auto_update(), # фильтруем только активные РК
+            coroutines_manager.update_top_key_in_advs(), # фильтруем только активные РК
             # # # # TODO: Отключил обновление Джема, т.к. выкидывает ошибку и мешает работе тем юзерам, у которых джема нет.
-            coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr(),
-            coroutines_manager.update_minus_phrases_in_advs(),
+            coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr(), # фильтруем только активные РК
+            coroutines_manager.update_minus_phrases_in_advs(),   # фильтруем только активные РК
             coroutines_manager.update_clusters_adv_stats_today(),
             coroutines_manager.update_clusters_adv_stats_history(),
-            coroutines_manager.update_cluster_bids(),
+            coroutines_manager.update_cluster_bids(), # фильтруем только активные РК
             coroutines_manager.update_plan_fact_stats()
         )
 

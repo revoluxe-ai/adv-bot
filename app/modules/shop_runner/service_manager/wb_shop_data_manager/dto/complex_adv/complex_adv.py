@@ -43,6 +43,11 @@ class ComplexAdv:
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
 
     @property
+    def bot_active(self) -> bool:
+        return self._adv_setting.bot_active
+
+
+    @property
     def auto_max_bid_cpm_active(self) -> bool:
         if self._adv_setting.auto_max_cpm_mode is None:
             return False

@@ -53,9 +53,6 @@ async def _update_tasks(
         select(WBCabinet.shop_id)
         .distinct()
         .join(WBCabinet.adv_settings)
-        .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active.is_(True)),
-        )
     )
 
     shop_filter_list: list[str] = settings.SHOP_FILTER_LIST

@@ -64,6 +64,7 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
+        advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.bidder_active]
         if not advs:
             return None
@@ -174,6 +175,7 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
+        advs = [adv for adv in advs if adv.bot_active]
         update_tasks: list[asyncio.Task[None] | Awaitable[None]] = []
         last_days_for_analyze = 2
         control_system_v2 = AdvControlSystem(max_last_period=2)
@@ -209,6 +211,7 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = (
             await self._wb_shop_data_manager.get_complex_advs()
         )
+        advs = [adv for adv in advs if adv.bot_active]
         tasks: list[asyncio.Task[None]] = []
         for adv in advs:
             if not adv.auto_update_white_list:
@@ -242,6 +245,7 @@ class CoroutinesManager:
             if adv.rec_system_promotion_mode_active
             and adv.auto_update_setting_version == 2
             and adv.is_white_list_control_enabled
+            and adv.bot_active
         ]
 
         tasks: list[Awaitable[None]] = []
@@ -345,7 +349,7 @@ class CoroutinesManager:
         minus_phrase_manager = container.minus_phrase_manager()
 
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         update_tasks: list[Awaitable[None]] = []
         for adv in complex_advs:
             task = minus_phrase_manager.update_minus_phrases(adv)
@@ -370,7 +374,7 @@ class CoroutinesManager:
         """Обновление статистики кластеров за сегодня."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
         from app.core.di.wb_manager_hub import WBManagerHubFactory
-        
+
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
@@ -383,7 +387,7 @@ class CoroutinesManager:
         """Обновление статистики кластеров за прошлые дни."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
         from app.core.di.wb_manager_hub import WBManagerHubFactory
-        
+
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
@@ -402,6 +406,7 @@ class CoroutinesManager:
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs = [adv for adv in advs if adv.bot_active]
         advs = [
             adv
             for adv in advs
