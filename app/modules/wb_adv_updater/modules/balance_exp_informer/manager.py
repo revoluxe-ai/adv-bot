@@ -88,14 +88,15 @@ async def balance_expiration_informer_tick(
 async def balance_expiration_informer_update(event_manager: BillingEventManager) -> None:
     service = BalanceReminderService(session_factory,
                                      event_manager)
+    SLEEP_ON_ERROR = 60
     while True:
         try:
             await balance_expiration_informer_tick(service)
         except SenderTickError:
             logger.exception("Balance reminder service failed")
+            await asyncio.sleep(SLEEP_ON_ERROR)
         except Exception as exc:
             logger.exception("Balance reminder service failed", exc_info=exc)
-        finally:
-            await asyncio.sleep(60)
+            await asyncio.sleep(SLEEP_ON_ERROR)
 
 
