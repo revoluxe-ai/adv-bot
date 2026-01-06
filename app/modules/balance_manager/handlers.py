@@ -205,6 +205,7 @@ async def waiting_for_amount(
         await _handle_lost_context(
             bot, user_telegram_id, billing_event_manager, where="waiting_for_amount"
         )
+        await state.set_state()
         return
     user_telegram_id = message.chat.id
 
