@@ -503,6 +503,26 @@ files = [
 ]
 
 [[package]]
+name = "cashews"
+version = "7.4.4"
+description = "cache tools with async power"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "cashews-7.4.4-py3-none-any.whl", hash = "sha256:d5b8fc3cb590ed388823388b972947fd5659e2a94109af107cb508a3240f5ef0"},
+    {file = "cashews-7.4.4.tar.gz", hash = "sha256:dca761c60192bfe354abd6e9eb98d6f62c817e675df3fbe7d1bdfaa4303d1320"},
+]
+
+[package.extras]
+dill = ["dill"]
+diskcache = ["diskcache (>=5.0.0)"]
+lint = ["mypy (>=1.5.0)", "types-redis"]
+redis = ["redis (>=4.3.1,!=5.0.1)"]
+speedup = ["bitarray (<4.0.0)", "hiredis", "xxhash (<4.0.0)"]
+tests = ["hypothesis (==6.139.2)", "pytest (==8.4.2)", "pytest-asyncio (==1.1.0)", "pytest-cov (==6.2.1)", "pytest-randomly (==3.16.0)", "pytest-rerunfailures (==16.0.1)"]
+
+[[package]]
 name = "celery"
 version = "5.4.0"
 description = "Distributed Task Queue."
@@ -6100,4 +6120,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "2dde26f8591bf886adf5da54729eb9fb01bd32f0d0732ec98628b7ab792776a3"
+content-hash = "813639581240952d9dda842354ac8d834cb41e0a59e9d6579c3743cf14924ee6"

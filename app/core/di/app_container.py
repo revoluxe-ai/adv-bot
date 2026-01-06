@@ -10,7 +10,6 @@ from . import databases
 from .module_resources import ModuleResources
 from app.configs.app_config import AppConfig  # Добавляем импорт AppConfig здесь
 
-
 def create_redis_client(redis_config: AppConfig) -> Redis:  # pyright: ignore
     redis: Redis = databases.create_redis_client(redis_config)  # pyright: ignore
     return redis  # pyright: ignore

@@ -15,6 +15,7 @@ def test_title_only_expired() -> None:
             ReminderItem(
                 reminder_id=1,
                 wb_cabinet_id=10,
+                shop_id="integration-shop",
                 shop_name="integration-shop",
                 level=int(BalanceLevel.EXPIRED),
                 balance=0.0,
@@ -35,6 +36,7 @@ def test_title_mixed_expired_and_low() -> None:
             ReminderItem(
                 reminder_id=1,
                 wb_cabinet_id=10,
+                shop_id="shop-a",
                 shop_name="shop-a",
                 level=int(BalanceLevel.EXPIRED),
                 balance=0.0,
@@ -44,6 +46,7 @@ def test_title_mixed_expired_and_low() -> None:
             ReminderItem(
                 reminder_id=2,
                 wb_cabinet_id=11,
+                shop_id="shop-b",
                 shop_name="shop-b",
                 level=int(BalanceLevel.D1),
                 balance=50.0,
@@ -65,6 +68,7 @@ def test_d1_message_is_less_than_day() -> None:
             ReminderItem(
                 reminder_id=1,
                 wb_cabinet_id=10,
+                shop_id="shop",
                 shop_name="shop",
                 level=int(BalanceLevel.D1),
                 balance=10.0,
@@ -85,6 +89,7 @@ def test_sort_items_expired_first_then_d1_then_d3() -> None:
         ReminderItem(
             reminder_id=1,
             wb_cabinet_id=10,
+            shop_id="b",
             shop_name="b",
             level=int(BalanceLevel.D3),
             balance=0.0,
@@ -94,6 +99,7 @@ def test_sort_items_expired_first_then_d1_then_d3() -> None:
         ReminderItem(
             reminder_id=2,
             wb_cabinet_id=11,
+            shop_id="a",
             shop_name="a",
             level=int(BalanceLevel.D1),
             balance=0.0,
@@ -103,6 +109,7 @@ def test_sort_items_expired_first_then_d1_then_d3() -> None:
         ReminderItem(
             reminder_id=3,
             wb_cabinet_id=12,
+            shop_id="c",
             shop_name="c",
             level=int(BalanceLevel.EXPIRED),
             balance=0.0,
@@ -126,6 +133,7 @@ def test_title_only_d3() -> None:
             ReminderItem(
                 reminder_id=1,
                 wb_cabinet_id=10,
+                shop_id="shop-d3",
                 shop_name="shop-d3",
                 level=int(BalanceLevel.D3),
                 balance=300.0,

@@ -325,7 +325,7 @@ _sm = get_async_session_maker
 
 
 
-async def  get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
+async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
 
     from .calculated_keywords_manager import CalculatedKeywordsManager
     keyword_manager = CalculatedKeywordsManager()

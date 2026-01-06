@@ -9,6 +9,7 @@ from app.core.mp.wb.dto import KeywordPosition
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager import (
     ClickHouseKeywordJamStatManager,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from tests.factories import KeywordStatFromJamFactory
 
 
@@ -48,13 +49,13 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
         get_clickhouse_client_mock.return_value = cm
 
         await ClickHouseKeywordJamStatManager.update_positions(test_positions)
-
-    count_result = await clickhouse_client.query(f"SELECT COUNT(*) FROM {table_name}")
+    async with anti_ch_crash_semaphore:
+        count_result = await clickhouse_client.query(f"SELECT COUNT(*) FROM {table_name}")
     assert count_result.result_rows[0][0] == num_positions
-
-    select_result = await clickhouse_client.query(
-        f"SELECT nmid, text, avr_position, total_views, orders, date FROM {table_name} ORDER BY nmid"
-    )
+    async with anti_ch_crash_semaphore:
+        select_result = await clickhouse_client.query(
+            f"SELECT nmid, text, avr_position, total_views, orders, date FROM {table_name} ORDER BY nmid"
+        )
     actual_rows = select_result.result_rows
     sorted_test_positions = sorted(test_positions, key=lambda p: p.nmid)
 

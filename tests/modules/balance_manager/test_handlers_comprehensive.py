@@ -42,7 +42,10 @@ async def test_successful_payment_user_not_found():
         mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        await successful_payment_handler(mock_message, mock_state, mock_bot)
+        mock_event_manager = AsyncMock()
+        await successful_payment_handler(
+            mock_message, mock_state, mock_bot, billing_event_manager=mock_event_manager
+        )
 
         # Проверяем, что было отправлено сообщение об ошибке
         mock_message.answer.assert_called_once()
@@ -120,7 +123,13 @@ async def test_successful_payment_different_amounts():
                 mock_shop_menu_instance = AsyncMock()
                 mock_shop_menu.return_value = mock_shop_menu_instance
 
-                await successful_payment_handler(mock_message, mock_state, mock_bot)
+                mock_event_manager = AsyncMock()
+                await successful_payment_handler(
+                    mock_message,
+                    mock_state,
+                    mock_bot,
+                    billing_event_manager=mock_event_manager,
+                )
 
                 # Проверяем, что process_payment_with_bonus был вызван с правильной суммой
                 call_args = mock_process_payment.call_args
@@ -193,7 +202,13 @@ async def test_successful_payment_calls_balance_updated():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             # Проверяем, что BalanceUpdated был вызван с правильными параметрами
             mock_messages.BalanceUpdated.assert_called_once_with(
@@ -267,7 +282,13 @@ async def test_successful_payment_calls_shop_menu():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             # Проверяем, что ShopMenu был вызван с правильными параметрами
             mock_shop_menu.assert_called_once_with(
@@ -346,7 +367,13 @@ async def test_bonus_date_boundary_cases():
                 mock_shop_menu_instance = AsyncMock()
                 mock_shop_menu.return_value = mock_shop_menu_instance
 
-                await successful_payment_handler(mock_message, mock_state, mock_bot)
+                mock_event_manager = AsyncMock()
+                await successful_payment_handler(
+                    mock_message,
+                    mock_state,
+                    mock_bot,
+                    billing_event_manager=mock_event_manager,
+                )
 
                 call_args = mock_process_payment.call_args
                 expected_bonus_percent = 200.0 if should_have_bonus else 0.0
@@ -418,7 +445,13 @@ async def test_successful_payment_description():
             mock_shop_menu_instance = AsyncMock()
             mock_shop_menu.return_value = mock_shop_menu_instance
 
-            await successful_payment_handler(mock_message, mock_state, mock_bot)
+            mock_event_manager = AsyncMock()
+            await successful_payment_handler(
+                mock_message,
+                mock_state,
+                mock_bot,
+                billing_event_manager=mock_event_manager,
+            )
 
             # Проверяем, что description был передан правильно
             call_args = mock_process_payment.call_args

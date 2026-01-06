@@ -43,6 +43,11 @@ class ComplexAdv:
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
 
     @property
+    def bot_active(self) -> bool:
+        return self._adv_setting.bot_active
+
+
+    @property
     def auto_max_bid_cpm_active(self) -> bool:
         if self._adv_setting.auto_max_cpm_mode is None:
             return False
@@ -157,11 +162,13 @@ class ComplexAdv:
 
     @property
     def nmids(self) -> list[int]:
-        return list(self._adv_setting.nmids)
+        nmids = list(self._adv_setting.nmids)
+        nmids.sort()
+        return nmids
 
     @property
     def main_nmid(self) -> int:
-        return self._adv_setting.nmids[0]
+        return self.nmids[0]
 
     @property
     def is_target_position_control_enabled(self) -> bool:

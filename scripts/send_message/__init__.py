@@ -1,1 +1,1 @@
-﻿"""Send message scripts package."""
+"""Send message scripts package."""
