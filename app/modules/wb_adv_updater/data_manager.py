@@ -31,6 +31,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.utils import redis_manager
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User
@@ -87,7 +88,8 @@ async def get_keyword_statistic_clickhouse(
             GROUP BY adv_id, text, date
         ) AS merged
     """
-    result = await client.query(query, parameters={"text": text})
+    async with anti_ch_crash_semaphore:
+        result = await client.query(query, parameters={"text": text})
 
     if not result.result_rows:
         return 0, 0, 0.0
@@ -953,8 +955,6 @@ async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     SELECT DISTINCT text FROM default_db.advkeyword_new
     WHERE date >= today() - %(last_days)s
     """
-    from ...utils.ch_semaphore import anti_ch_crash_semaphore
-
     async with anti_ch_crash_semaphore:
         async with get_clickhouse_client() as client:
             result = await client.query(ch_query, parameters={"last_days": last_days})

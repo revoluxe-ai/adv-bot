@@ -2,6 +2,8 @@
 
 import dotenv
 
+from app.utils.db.models import User
+
 dotenv.load_dotenv()
 from datetime import datetime, timedelta
 
@@ -11,10 +13,10 @@ from sqlalchemy.orm import joinedload
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    User,
     WBCabinet,
     WBUserCabinet,
 )
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -34,7 +36,8 @@ async def get_total_spend(adv_ids: list[int]) -> float:
             AND adv_id IN {adv_ids}
         """
         try:
-            result = await ch_client.query(query)
+            async with anti_ch_crash_semaphore:
+                result = await ch_client.query(query)
         except Exception as e:
             print(e)
             del e
