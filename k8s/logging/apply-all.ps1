@@ -80,3 +80,4 @@ Write-Host "kubectl logs -n $namespace -l app=error-collector --tail=50" -Foregr
 
 
 
+
