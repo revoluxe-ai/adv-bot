@@ -76,6 +76,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
 from app.utils.db.base import BaseTable as Base
+from app.modules.wb_adv_updater.modules.balance_exp_informer import models as balance_exp_informer_models
+from app.modules.billing.event_manager import models as billing_event_models
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
@@ -905,6 +907,41 @@ async def clickhouse_client(setup_test_database):
                maxState(timestamp) AS ts_state
         FROM default_db.clusters_adv_stats
         GROUP BY nmid, text, date
+    """)
+
+    # Создаём Materialized View: mv_clusters_daily_agg
+    await client.command("""
+        DROP VIEW IF EXISTS default_db.mv_clusters_daily_agg
+    """)
+    await client.command("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily_agg
+        (
+            `nmid` UInt64,
+            `norm_query` LowCardinality(String),
+            `date` Date,
+            `views_state` AggregateFunction(argMax, UInt32, DateTime),
+            `clicks_state` AggregateFunction(argMax, UInt32, DateTime),
+            `carts_state` AggregateFunction(argMax, UInt32, DateTime),
+            `orders_state` AggregateFunction(argMax, UInt32, DateTime),
+            `cpm_state` AggregateFunction(argMax, Float64, DateTime),
+            `ts_state` AggregateFunction(max, DateTime)
+        )
+        ENGINE = AggregatingMergeTree()
+        ORDER BY (nmid, norm_query, date)
+        SETTINGS index_granularity = 8192
+        AS
+        SELECT
+            nmid,
+            norm_query,
+            date,
+            argMaxState(views, timestamp) AS views_state,
+            argMaxState(clicks, timestamp) AS clicks_state,
+            argMaxState(add_to_cart, timestamp) AS carts_state,
+            argMaxState(orders, timestamp) AS orders_state,
+            argMaxState(cpm, timestamp) AS cpm_state,
+            maxState(timestamp) AS ts_state
+        FROM default_db.clusters_adv_stats
+        GROUP BY nmid, norm_query, date
     """)
 
     # Создаём Materialized View: mv_clusters_last_state
