@@ -2,6 +2,8 @@
 
 import dotenv
 
+from app.utils.db.models import User
+
 dotenv.load_dotenv()
 from datetime import datetime, timedelta
 
@@ -11,7 +13,6 @@ from sqlalchemy.orm import joinedload
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    User,
     WBCabinet,
     WBUserCabinet,
 )
