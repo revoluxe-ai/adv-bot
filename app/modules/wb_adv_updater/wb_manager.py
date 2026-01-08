@@ -30,6 +30,7 @@ from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from ..wb_update_state_manager import KeywordStatUpdateState
 from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
+from ...utils.ch_semaphore import anti_ch_crash_semaphore
 
 logger = logging.getLogger(__name__)
 
