@@ -1,12 +1,12 @@
 WITH
 /* ================================================================
-   0) DAILY_LAST из MV: сначала "последний снимок" на (adv_id,nmid,text,date),
-      потом СУММИРУЕМ по text+date (если nmids несколько)
+   0) DAILY_LAST — БЕЗ FINAL, через argMaxMerge
    ================================================================ */
 daily_last AS (
     SELECT
         text,
         date,
+
         sum(views0)       AS views,
         sum(clicks0)      AS clicks,
         sum(add_to_cart0) AS add_to_cart,
@@ -23,19 +23,24 @@ daily_last AS (
             norm_query AS text,
             date,
 
-            /* ВАЖНО: здесь НЕ агрегаты, а финализация state */
-            finalizeAggregation(views_state)  AS views0,
-            finalizeAggregation(clicks_state) AS clicks0,
-            finalizeAggregation(carts_state)  AS add_to_cart0,
-            finalizeAggregation(orders_state) AS orders0,
-            finalizeAggregation(cpm_state)    AS cpm0
+            argMaxMerge(views_state)  AS views0,
+            argMaxMerge(clicks_state) AS clicks0,
+            argMaxMerge(carts_state)  AS add_to_cart0,
+            argMaxMerge(orders_state) AS orders0,
+            argMaxMerge(cpm_state)    AS cpm0
 
-        FROM default_db.mv_clusters_daily_agg FINAL
+        FROM default_db.mv_clusters_daily_agg
         WHERE nmid IN {nmids:Array(UInt64)}
+        GROUP BY
+            norm_query,
+            date,
+            nmid
     )
     GROUP BY
-        text, date
+        text,
+        date
 ),
+
 /* ================================================================
    2) ALL TIME
    ================================================================ */
@@ -47,8 +52,9 @@ all_time_agg AS (
     FROM daily_last
     GROUP BY text
 ),
+
 /* ================================================================
-   3) LAST STATE — оставляем как было (берётся из last_state MV)
+   3) LAST STATE — как было (берётся из last_state MV)
    ================================================================ */
 last_state AS (
     SELECT
@@ -60,8 +66,9 @@ last_state AS (
     WHERE nmid IN {nmids:Array(UInt64)}
     GROUP BY text
 ),
+
 /* ================================================================
-   6) 7-DAY AGG — теперь spend_sum = sum(spend), без пересчёта через cpm*views
+   6) 7-DAY AGG — spend_sum = sum(spend)
    ================================================================ */
 agg_stats AS (
     SELECT
@@ -75,12 +82,9 @@ agg_stats AS (
     WHERE date >= today() - 7
     GROUP BY text
 ),
+
 /* ================================================================
-   4) REAL POSITION — ВАЖНО: ТОЛЬКО MergeTree!
-   Оптимизация без изменения логики:
-   - считаем только для text, которые реально есть в agg_stats
-   - выбираем самый свежий день, где есть >=2 версий и views менялись
-   - берём 2 последних timestamp в этот день через groupArray(2)(... ORDER BY ts DESC)
+   4) REAL POSITION — оставляем как было (raw MergeTree)
    ================================================================ */
 day_for_real_position AS (
     SELECT
@@ -91,7 +95,7 @@ day_for_real_position AS (
         max(views)  AS views_max
     FROM default_db.clusters_adv_stats
     WHERE nmid IN {nmids:Array(UInt64)}
-      AND norm_query IN (SELECT text FROM agg_stats)   -- безопасно: финал всё равно только по agg_stats
+      AND norm_query IN (SELECT text FROM agg_stats)
     GROUP BY text, date
     HAVING versions_count >= 2
        AND views_min != views_max
@@ -142,6 +146,7 @@ final_pos_real AS (
     FROM versions_for_real_pos
     WHERE length(pos_arr) >= 2 AND length(views_arr) >= 2
 ),
+
 /* ================================================================
    5) CART → ORDER base (14d)
    ================================================================ */
@@ -157,6 +162,7 @@ cart_conv_base AS (
     FROM daily_last
     WHERE date >= today() - 14
 ),
+
 /* ================================================================
    7) PRIORS
    ================================================================ */
@@ -184,32 +190,42 @@ priors AS (
     FROM campaign_7d AS c7
     CROSS JOIN campaign_14d AS c14
 ),
+
 /* ================================================================
-   8) CTR WINDOW (как было)
+   8) CTR — НОВОЕ: ПОСЛЕДНИЕ 500 ПОКАЗОВ из L2 ticks
+   ------------------------------------------------
+   Берём тики показов/кликов по времени назад.
+   running_views = накопленные показы от "сейчас" в прошлое.
+   Режем строго по running_views <= 500.
    ================================================================ */
-ctr_window AS (
+ctr_ticks AS (
     SELECT
-        text,
-        date,
-        views,
-        clicks,
-        sum(views) OVER (
-            PARTITION BY text
-            ORDER BY date DESC
+        norm_query AS text,
+        ts,
+        d_views,
+        d_clicks,
+        sum(d_views) OVER (
+            PARTITION BY norm_query
+            ORDER BY ts DESC
             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
         ) AS running_views
-    FROM daily_last
-    WHERE date >= today() - 7
+    FROM default_db.adv_events_ticks
+    WHERE nmid IN {nmids:Array(UInt64)}
+      AND d_views > 0
 ),
 ctr_cut AS (
     SELECT
         text,
-        sum(views)  AS ctr_views,
-        sum(clicks) AS ctr_clicks
-    FROM ctr_window
-    WHERE (running_views - views) < 500
+        sum(d_views)  AS ctr_views,
+        sum(d_clicks) AS ctr_clicks
+    FROM ctr_ticks
+    WHERE running_views <= 500
     GROUP BY text
 ),
+
+/* ================================================================
+   7d/14d разрезы по daily_last — как было
+   ================================================================ */
 cart_7d AS (
     SELECT
         text,
@@ -228,8 +244,9 @@ order_14d AS (
     WHERE date >= today() - 14
     GROUP BY text
 ),
+
 /* ================================================================
-   9) BAES
+   9) BAES — без изменений, только ctr_cut теперь из ticks
    ================================================================ */
 baes AS (
     SELECT
@@ -258,6 +275,7 @@ baes AS (
     LEFT JOIN order_14d  AS o14 ON o14.text = t.text
     CROSS JOIN priors    AS p
 )
+
 /* ================================================================
    10) FINAL
    ================================================================ */
