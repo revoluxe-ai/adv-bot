@@ -134,6 +134,7 @@ async def test_adv_settings_auto_update(
 @pytest.mark.asyncio
 async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
     await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
+    await clickhouse_client.command("TRUNCATE TABLE default_db.adv_events_ticks")
     setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
