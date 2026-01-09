@@ -16,7 +16,6 @@ from .redis_cache.last_keyword_stamp_timestamp_cache import (
     LastKeywordStampTimestampCache,
 )
 
-from ...common_slaves.wildberries.models.bidder_mode import BidderMode
 from ...wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
@@ -175,8 +174,6 @@ async def run_bidder_process_for_adv(
                 nmid,
                 new_cpm,
             )
-        # TODO: Вынести в общий код проверку режима биддера
-        if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
-            await redis_last_total_views.set(best_keyword)
-            await last_keyword_stamp_timestamp_cache.set(best_keyword)
+        await redis_last_total_views.set(best_keyword)
+        await last_keyword_stamp_timestamp_cache.set(best_keyword)
     return None

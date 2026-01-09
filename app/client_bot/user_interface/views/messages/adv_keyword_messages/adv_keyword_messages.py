@@ -33,13 +33,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater im
     AdvSettingAutoUpdater,
 )
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
-from dependency_injector.wiring import inject, Provide
+from dependency_injector.wiring import inject
 
 
-from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import (
-    AutoMaxBidManager,
-)
-from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 
 # TODO: Починить сохранение файла перед отправкой в ТГ
 
@@ -78,9 +74,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self,
         state: FSMContext,
         sort_mode: str = "by_adv",
-        auto_max_bid_manager: "AutoMaxBidManager" = Provide[
-            AutoMaxCpmContainer.auto_max_cpm_bid_manager
-        ],
     ) -> tuple[LastMessage, str]:
         self.sort_mode = sort_mode
         self._state = state
@@ -180,7 +173,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
-        self._auto_max_cpm_value: int | None = None
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
             MinCtrManager,
         )

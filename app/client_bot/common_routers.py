@@ -42,7 +42,6 @@ from .user_interface.handlers import (
     add_white_phrases,
     adv_setting,
     change_cpm,
-    auto_max_cpm_toggle,
     change_max_cpc,
     clusters,
     cpm_builder,
@@ -66,7 +65,6 @@ from .user_interface.handlers import (
 from .user_interface.handlers.bidder_coroutine_type_toggle import (
     router as bidder_coroutine_type_toggle_router,
 )
-from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
 
 common_router = Router()
 
@@ -90,7 +88,6 @@ common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
-common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
@@ -119,7 +116,6 @@ common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
-common_router.include_routers(bidder_mode_toggle.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
 common_router.callback_query.middleware(
