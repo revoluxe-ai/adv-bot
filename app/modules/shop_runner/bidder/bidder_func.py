@@ -16,13 +16,11 @@ from .redis_cache.last_keyword_stamp_timestamp_cache import (
     LastKeywordStampTimestampCache,
 )
 
-from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 from ...common_slaves.wildberries.models.bidder_mode import BidderMode
 from ...wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if typing.TYPE_CHECKING:
-    from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
     from app.modules.shop_runner.bidder.redis_cache.redis_last_total_views import (
         RedisLastTotalViews,
     )
@@ -108,9 +106,6 @@ async def run_bidder_process_for_adv(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
-    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
-        AutoMaxCpmContainer.auto_max_cpm_bid_manager
-    ],
     redis_last_total_views: "RedisLastTotalViews" = Provide[
         "module_resources.bidder_container.redis_last_total_views"
     ],
@@ -140,36 +135,24 @@ async def run_bidder_process_for_adv(
     best_keyword = data_manager.get_best_keyword(white_list)
     if not best_keyword:
         return None
-
     # TODO: Надо тут перепроверить логику выбора режима, включая что по умолчанию в модели и т.д.
 
-    if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
-        last_views = await redis_last_total_views.get(best_keyword)
-        if last_views and last_views > 0 and last_views == best_keyword.total_views:
-            return None
+    last_views = await redis_last_total_views.get(best_keyword)
+    if last_views and last_views > 0 and last_views == best_keyword.total_views:
+        return None
 
-        last_time_stamp = await last_keyword_stamp_timestamp_cache.get(best_keyword)
-        if last_time_stamp and last_time_stamp == best_keyword.timestamp:
-            return None
-        new_cpm = await __get_new_cpm_by_position(
-            adv_setting,
-            wb_api,
-            best_keyword,
-            cpm_now,
-        )
-        if not new_cpm:
-            return None
-    elif adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
-        if not adv_setting.auto_max_cpm_mode:
-            return None
-        max_cpm = await auto_max_bid_manager.get_max_cpm(
-            adv_setting, keywords, user_max_cpm
-        )
-        if not max_cpm:
-            return None
-        new_cpm = max_cpm
-    else:
-        raise RuntimeError("Неверный режим биддера")
+    last_time_stamp = await last_keyword_stamp_timestamp_cache.get(best_keyword)
+    if last_time_stamp and last_time_stamp == best_keyword.timestamp:
+        return None
+    new_cpm = await __get_new_cpm_by_position(
+        adv_setting,
+        wb_api,
+        best_keyword,
+        cpm_now,
+    )
+    if not new_cpm:
+        return None
+
 
     if not adv_setting.nmids:
         raise RuntimeError("Пустой список nmids - это недопустимое состояние")

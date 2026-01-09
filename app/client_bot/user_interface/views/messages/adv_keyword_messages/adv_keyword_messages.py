@@ -180,21 +180,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
-
-        # Получаем данные по Автомаксимальной ставке из Redis (через DI)
-        self._auto_max_cpm_mode: bool = bool(
-            getattr(self._adv_setting, "auto_max_cpm_mode", False)
-        )
         self._auto_max_cpm_value: int | None = None
-        if self._auto_max_cpm_mode:
-            user_max_cpm = self._adv_setting.max_cpm
-            self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm(
-                self._adv_setting, self._keywords, user_max_cpm
-            )
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
             MinCtrManager,
         )
-
         min_ctr_manager = MinCtrManager(self._adv_setting)
 
         self._mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
@@ -300,16 +289,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             else "Не задана"
         )
         text += f"Максимальная ставка: {max_cpm_str}\n"
-
-        if not self._auto_max_cpm_mode:
-            text += "Авто-Максимальная ставка: не активна\n"
-        else:
-            value_str = (
-                str(self._auto_max_cpm_value)
-                if self._auto_max_cpm_value is not None
-                else "нет данных"
-            )
-            text += f"Авто-Максимальная ставка: {value_str}\n"
         return text
 
     @property
