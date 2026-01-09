@@ -64,13 +64,13 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
     fake_redis: FakeRedis, monkeypatch
 ) -> None:
     """Проверяет что bidder сохраняет значения в Redis через RedisClient."""
-    
+
     # Создаём DIManager для правильной инициализации контейнера
     di_manager = await DIManager.create(AppContainer)
     async with di_manager as app_container:
         # Создаём RedisClient обёртку над fake_redis
         fake_redis_client = RedisClient(redis_client=fake_redis)
-        
+
         # Override базовых зависимостей
         app_container.settings.override(providers.Object(Mock()))
         app_container.redis_client.override(providers.Object(fake_redis))
