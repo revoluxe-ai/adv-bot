@@ -45,4 +45,3 @@ class CampaignDefaultsV1:
     target_ctr_mode: bool = False
     new_auto_min_ctr_mode: bool = False
     reset_place: bool = True
-    auto_max_cpm_mode: bool = False

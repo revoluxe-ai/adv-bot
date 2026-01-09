@@ -761,6 +761,19 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.adv_events_ticks (
+            norm_query LowCardinality(String),
+            ts DateTime,
+            d_views UInt32,
+            d_clicks UInt32,
+            nmid UInt64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (norm_query, nmid, ts)
+        SETTINGS index_granularity = 8192
+    """)
+
+    await client.command("""
         CREATE TABLE IF NOT EXISTS default_db.wb_common_stat (
             nmid UInt64,
             date Date,

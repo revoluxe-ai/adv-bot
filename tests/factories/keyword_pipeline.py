@@ -263,7 +263,6 @@ class CalculatedKeywordFactory(factory.Factory):
     keyword_setting = factory.SubFactory(KeywordSettingDTOFactory)
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     state = factory.SubFactory(KeywordStateFactory)
-    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(50, 500))
     target_pay_for_order = factory.LazyFunction(lambda: fake.random_int(100, 1000))
 
     @factory.lazy_attribute
@@ -324,7 +323,6 @@ class GoodKeywordFactory(CalculatedKeywordFactory):
         views=factory.LazyFunction(lambda: fake.random_int(500, 5000)),
         clicks=factory.LazyFunction(lambda: fake.random_int(50, 500)),
     )
-    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(100, 300))
 
 
 class BadKeywordFactory(CalculatedKeywordFactory):
@@ -345,7 +343,6 @@ class BadKeywordFactory(CalculatedKeywordFactory):
         views=factory.LazyFunction(lambda: fake.random_int(100, 500)),
         clicks=factory.LazyFunction(lambda: fake.random_int(1, 20)),
     )
-    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(50, 150))
 
 
 class TestingKeywordFactory(CalculatedKeywordFactory):
@@ -360,7 +357,6 @@ class TestingKeywordFactory(CalculatedKeywordFactory):
         status=KeywordStatus.VIEWS_IS_NOT_ENOUGH,
         reason=KeywordStatusReason.MORE_THEN_HARD_MIN_CTR,
     )
-    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(75, 200))
 
 
 class BestKeywordFactory(GoodKeywordFactory):
@@ -378,7 +374,6 @@ class BestKeywordFactory(GoodKeywordFactory):
         clicks=factory.LazyFunction(lambda: fake.random_int(200, 1000)),
         final_rating=factory.LazyFunction(lambda: round(fake.pyfloat(min_value=80.0, max_value=100.0), 2)),
     )
-    auto_max_bid = factory.LazyFunction(lambda: fake.random_int(200, 400))
 
 
 # ============================================================================
@@ -421,7 +416,6 @@ def make_calculated_keyword(**kwargs) -> CalculatedKeyword:
         'status': 'state__status',
         'best_keyword_status': 'state__best_keyword_status',
         'reason': 'state__reason',
-        # auto_max_bid остается на верхнем уровне
     }
     
     for flat_key, nested_key in flat_to_nested.items():

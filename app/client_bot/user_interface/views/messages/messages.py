@@ -42,7 +42,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
-from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
@@ -1045,41 +1044,6 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
-        # Auto Max CPM toggle
-        if self.adv_setting.auto_max_cpm_mode:
-            bottom = InlineKeyboardButton(
-                text="Выключить АвтоМаксимальную ставку",
-                callback_data=callbacks.CPMSettingMenu(
-                    action="turn_off_auto_max_cpm_mode",
-                    adv_original_id=self.adv_setting.id,
-                ).pack(),
-            )
-        else:
-            bottom = InlineKeyboardButton(
-                text="Включить АвтоМаксимальную ставку",
-                callback_data=callbacks.CPMSettingMenu(
-                    action="turn_on_auto_max_cpm_mode",
-                    adv_original_id=self.adv_setting.id,
-                ).pack(),
-            )
-        _ = builder.row(bottom)  # Bidder Mode toggle
-        bidder_mode: BidderMode = (
-            self.adv_setting.bidder_mode or BidderMode.BY_POSITIONS
-        )
-        if bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
-            button_text = "⚠️Вкл. работу  по позициям (новый режим)"
-            callback_action = "turn_on_bidder_positions"
-        else:
-            button_text = "✅Вкл. работу по АвтоМакс. ставке (устаревший режим) "
-            callback_action = "turn_on_bidder_auto_max"
-
-        bottom = InlineKeyboardButton(
-            text=button_text,
-            callback_data=callbacks.CPMSettingMenu(
-                action=callback_action, adv_original_id=self.adv_setting.id
-            ).pack(),
-        )
-        _ = builder.row(bottom)
 
         bottom = InlineKeyboardButton(
             text="Изменить Максимальную ставку",

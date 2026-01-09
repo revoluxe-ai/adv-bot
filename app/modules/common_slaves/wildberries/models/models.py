@@ -435,10 +435,6 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm: Mapped[int | None] = mapped_column(Integer, nullable=True) # Максимальная ставка
-    auto_max_cpm_mode: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True, default=False, server_default=text("false")
-    )
-    # TODO: Убрать Optional
     max_place: Mapped[int | None ] = mapped_column(Integer,
                                                   nullable=True,
                                                 default=1,
@@ -555,7 +551,6 @@ class AdvSetting(BaseTable):
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
-    # TODO: The default value for bidder_mode was changed from BY_POSITIONS to BY_AUTO_MAX_CPM, but the database migration only sets server_default without updating existing NULL records. Since the field is nullable and existing records may have NULL values, the logic in bidder_func.py line 82 treats NULL as equivalent to BY_AUTO_MAX_CPM. However, if users have auto_max_cpm_mode=False (which is the default), the bidder will silently return None instead of processing bids, breaking functionality for existing campaigns without explicit migration of their settings.
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
@@ -624,17 +619,6 @@ class AdvSetting(BaseTable):
         if match:
             return int(match.group(1))
         return None
-
-    @property
-    def auto_max_bid(self) -> bool:
-        # TODO: DEPRICATED - удалить!!!!
-        pattern = re.compile(
-            r"<MAX_PAY>(\d+)!?</MAX_PAY>"
-        )  # Используем тот же паттерн, чтобы найти!
-        match = re.search(pattern, self.name)
-        if match and "!" in match.group(0):  # Проверяем, есть ли "!" в найденной строке
-            return True
-        return False
 
     @property
     def worst_promo_position(self) -> bool | None:

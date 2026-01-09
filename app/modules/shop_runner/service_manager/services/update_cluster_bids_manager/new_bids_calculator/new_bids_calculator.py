@@ -12,9 +12,6 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     step: int = calculation_input.step
     max_bid = calculation_input.max_bid
     min_bid: int | None = calculation_input.min_bid
-    auto_max_bid = calculation_input.auto_max_bid
-    if auto_max_bid and auto_max_bid < max_bid:
-        max_bid = int(auto_max_bid + 0.5)
     new_bid: int
     if current_position > target_position or current_position == 0:
         new_bid = current_bid + step

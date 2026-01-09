@@ -15,7 +15,6 @@ from app.core.di import DIManager
 from app.core.di.app_container import AppContainer
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
-from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.shop_runner.bidder import bidder_func
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 import logging
@@ -65,13 +64,13 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
     fake_redis: FakeRedis, monkeypatch
 ) -> None:
     """Проверяет что bidder сохраняет значения в Redis через RedisClient."""
-    
+
     # Создаём DIManager для правильной инициализации контейнера
     di_manager = await DIManager.create(AppContainer)
     async with di_manager as app_container:
         # Создаём RedisClient обёртку над fake_redis
         fake_redis_client = RedisClient(redis_client=fake_redis)
-        
+
         # Override базовых зависимостей
         app_container.settings.override(providers.Object(Mock()))
         app_container.redis_client.override(providers.Object(fake_redis))
@@ -118,8 +117,6 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
                 bidder_for_auto=True,
                 search_adv_id=None,
                 max_cpm=150,
-                bidder_mode=BidderMode.BY_POSITIONS,
-                auto_max_cpm_mode=False,
                 nmids=[555],
                 bidder_step=5,
                 max_place=10,
