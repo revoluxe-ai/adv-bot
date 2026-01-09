@@ -17,7 +17,6 @@ from app.client_bot.user_interface.views.callbacks import (
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
-from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.utils.db.models import User
@@ -178,8 +177,6 @@ async def test_apply_campaign_defaults_single_active_campaign(
     adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting.reset_place = not initial_defaults.reset_place
-    adv_setting.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
-    
     # Для полей типа Enum выбираем другое валидное значение, если оно есть
     if initial_defaults.automatic_version == 2:
         adv_setting.automatic_version = 1
@@ -191,12 +188,6 @@ async def test_apply_campaign_defaults_single_active_campaign(
         adv_setting.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
     else:
         adv_setting.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-    
-    # bidder_mode
-    if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
-        adv_setting.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
-    else:
-        adv_setting.bidder_mode = BidderMode.BY_POSITIONS
     
     # orders_source_for_auto_mode
     if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
@@ -271,7 +262,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+        "new_auto_min_ctr_mode", "reset_place"
     ]
 
     for key in default_fields:
@@ -337,7 +328,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+        "new_auto_min_ctr_mode", "reset_place"
     ]
 
     for key in default_fields:
@@ -364,8 +355,6 @@ async def test_turn_adv_on_applies_defaults(
     adv_setting_inactive.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting_inactive.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting_inactive.reset_place = not initial_defaults.reset_place
-    adv_setting_inactive.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
-    
     # Для полей типа Enum выбираем другое валидное значение, если оно есть
     if initial_defaults.automatic_version == 2:
         adv_setting_inactive.automatic_version = 1
@@ -377,12 +366,6 @@ async def test_turn_adv_on_applies_defaults(
         adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
     else:
         adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-    
-    # bidder_mode
-    if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
-        adv_setting_inactive.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
-    else:
-        adv_setting_inactive.bidder_mode = BidderMode.BY_POSITIONS
     
     # orders_source_for_auto_mode
     if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
@@ -472,7 +455,6 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
         adv.reset_place = not initial_defaults.reset_place
-        adv.auto_max_cpm_mode = not initial_defaults.auto_max_cpm_mode
         
         # Для полей типа Enum выбираем другое валидное значение, если оно есть
         if initial_defaults.automatic_version == 2:
@@ -485,12 +467,6 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
             adv.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
         else:
             adv.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-        
-        # bidder_mode
-        if initial_defaults.bidder_mode == BidderMode.BY_POSITIONS:
-            adv.bidder_mode = BidderMode.BY_AUTO_MAX_CPM
-        else:
-            adv.bidder_mode = BidderMode.BY_POSITIONS
         
         # orders_source_for_auto_mode
         if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
@@ -548,7 +524,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place", "auto_max_cpm_mode"
+        "new_auto_min_ctr_mode", "reset_place"
     ]
 
     for key in default_fields:

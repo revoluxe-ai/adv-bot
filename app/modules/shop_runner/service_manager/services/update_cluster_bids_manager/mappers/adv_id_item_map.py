@@ -10,5 +10,4 @@ class AdvIdItemCalculateData:
     target_position: int
     max_cpm: int
     step: int
-    auto_max_bid_cpm:  float | None
     current_cpm: int | None

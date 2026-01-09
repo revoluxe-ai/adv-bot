@@ -788,40 +788,6 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
     return adv_ids
 
 
-# async def get_keywords_statistic(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-#     keywords = await get_keywords_statistic_clickhouse(adv_setting, last_views=3000)
-#     return keywords
-
-#
-# async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
-#     setting_max_bid = adv_setting.max_cpm
-#     max_pay_for_order = adv_setting.max_pay_for_order
-#     if not max_pay_for_order:
-#         return setting_max_bid
-#     if adv_setting.auto_max_bid:
-#         keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
-#         full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(
-#             adv_setting.adv_id
-#         )
-#         if not full_keyword_stat:
-#             return setting_max_bid
-#         views = float(full_keyword_stat.views + 1)
-#         orders = float(full_keyword_stat.orders + 1)
-#         best_keyword: CalculatedKeyword | None = get_best_keyword(keywords)
-#         if not best_keyword:
-#             return setting_max_bid
-#         convert_views_to_order = views / orders
-#         ctr: float | None = best_keyword.predict_ctr
-#         if ctr is None:
-#             raise ValueError("predict_ctr cannot be None for max_adv_bid calculation")
-#         assert ctr is not None  # Утверждение, что ctr теперь не None
-#         max_bid_for_1000_views = (
-#             (max_pay_for_order / convert_views_to_order) * ctr * 1000
-#         )
-#         if setting_max_bid < max_bid_for_1000_views:
-#             setting_max_bid = max_bid_for_1000_views
-#     return setting_max_bid
-
 
 async def is_adv_in_favorites(
     adv_setting_original_id: int, user_original_id: int

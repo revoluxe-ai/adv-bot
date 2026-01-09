@@ -48,13 +48,6 @@ class ComplexAdv:
 
 
     @property
-    def auto_max_bid_cpm_active(self) -> bool:
-        if self._adv_setting.auto_max_cpm_mode is None:
-            return False
-        return self._adv_setting.auto_max_cpm_mode
-
-
-    @property
     def auction_adv_id(self) -> int | None:
         if self._search_adv is None:
             return None

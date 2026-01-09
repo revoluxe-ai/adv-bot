@@ -17,7 +17,7 @@ def test_apply_defaults_to_adv_setting():
     adv_setting = AdvSetting(
         bidder_active=False,
         bidder_for_auto=True,
-        bidder_mode=BidderMode.BY_AUTO_MAX_CPM,
+        bidder_mode=BidderMode.BY_POSITIONS,
         automatic_version=1,
         bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
         orders_source_for_auto_mode=OrdersSourceForAutoMode.ADV_SUM,
@@ -27,7 +27,6 @@ def test_apply_defaults_to_adv_setting():
         target_ctr_mode=True,
         new_auto_min_ctr_mode=True,
         reset_place=True,
-        auto_max_cpm_mode=True,
         max_place=None
     )
     wb_cabinet = WBCabinet(id=1, default_max_cpm=5000) # Mock WBCabinet
@@ -51,7 +50,6 @@ def test_apply_defaults_to_adv_setting():
     assert adv_setting.target_ctr_mode == defaults_v1.target_ctr_mode
     assert adv_setting.new_auto_min_ctr_mode == defaults_v1.new_auto_min_ctr_mode
     assert adv_setting.reset_place == defaults_v1.reset_place
-    assert adv_setting.auto_max_cpm_mode == defaults_v1.auto_max_cpm_mode
     assert adv_setting.max_cpm == wb_cabinet.default_max_cpm # Check max_cpm update
 
     # Проверяем логику max_place (если был None, стал 1)

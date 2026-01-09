@@ -34,8 +34,6 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     adv_setting.target_ctr_mode = defaults_v1.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = defaults_v1.new_auto_min_ctr_mode
     adv_setting.reset_place = defaults_v1.reset_place
-    adv_setting.auto_max_cpm_mode = defaults_v1.auto_max_cpm_mode
-    
     if adv_setting.max_place is None:
         adv_setting.max_place = 1
     
