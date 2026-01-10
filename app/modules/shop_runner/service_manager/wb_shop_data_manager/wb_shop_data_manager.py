@@ -81,6 +81,8 @@ class WBShopDataManager:
                 search_adv=search_adv_idv.get(adv.search_adv_id),
             )
             complex_advs.append(complex_adv)
+        # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
+        complex_advs = [adv for adv in complex_advs if adv.nmids]
         return complex_advs
 
 
