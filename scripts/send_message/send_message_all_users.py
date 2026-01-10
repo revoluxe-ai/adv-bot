@@ -8,13 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.admin_bot.sender import redis_manager
-from scripts.send_message import single_messages
 from app.modules.common_slaves.wildberries.models.models import (
     WBUserCabinet,
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
-
+from scripts.send_message.utils.get_user_with_token_without_balance import \
+    iter_users_with_zero_or_negative_balance_without_active_advs
+from scripts.send_message.utils.messages import message_1
 
 logger = logging.getLogger(__name__)
 
@@ -63,44 +64,56 @@ async def async_chain(*async_generators):
         async for item in gen:
             yield item
 
-async def send_message(user: User, bot: Bot, send_count: int, not_send_count: int) -> None:
+redis_semaphore = asyncio.Semaphore(1)
+
+
+async def send_message(user: User, bot: Bot) -> bool:
     user_id = user.user_telegram_id
-    message = single_messages.Single_message
-    hash_ = sha256((str(message)).encode()).hexdigest()
+    message = message_1.Single_message
+    hash_ = sha256(str(message).encode()).hexdigest()
+
+    # фильтр Влада
+    if user_id == 1121102685:
+        return False
+
+    # проверка в Redis
     if await redis_manager.check_message_send(hash_, user_id, bot.id):
-        return None
-    if user_id == 1121102685:  # фильтруем Влада
-        return None
+        return False
+
     try:
         await message(bot, user_id)()
         await redis_manager.set_message_send(hash_, user_id, bot.id)
-        send_count += 1
+        return True
     except Exception as e:
         logger.error(e)
-        not_send_count += 1
-    print("Отправлено сообщений: ", send_count)
-    print("Не отправлено сообщений: ", not_send_count)
+        return False
 
 async def send_message_to_users():
     send_count = 0
     not_send_count = 0
-    users = get_users()
-    # users = get_test_user()
-    # chain = async_chain(admin_users, users)
-    send_tasks = []
+
+    users = iter_users_with_zero_or_negative_balance_without_active_advs()
     bots = get_bots()
+
     async for user in users:
-       for bot in bots:
-           send_tasks.append(send_message(user, bot, send_count, not_send_count))
+        for bot in bots:
+            ok = await send_message(user, bot)
+            if ok:
+                send_count += 1
+            else:
+                not_send_count += 1
 
-    await asyncio.gather(*send_tasks)
+            print("Отправлено сообщений:", send_count)
+            print("Не отправлено сообщений:", not_send_count)
 
-    results = await asyncio.gather(*[bot.session.close() for bot in bots], return_exceptions=True)
+    # закрываем ботов
+    for bot in bots:
+        try:
+            await bot.session.close()
+        except Exception as e:
+            logger.error(e)
 
-    for result in results:
-        if isinstance(result, BaseException):
-            logger.error(result)
-
+    # закрываем Redis (пул + сокеты)
     try:
         await redis_manager.close()
     except Exception as e:
