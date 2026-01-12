@@ -227,7 +227,7 @@ class BalanceReminderService:
                 balance, bonus = await get_cabinet_balance(wb_cabinet_id)
                 total_balance = balance + bonus
                 days_left = total_balance / avg_daily_spend
-
+                days_left = max(0, int(days_left))
                 level = pick_level(days_left)
                 if level is None:
                     continue
