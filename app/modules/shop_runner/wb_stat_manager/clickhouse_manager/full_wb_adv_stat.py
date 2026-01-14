@@ -272,29 +272,34 @@ async def get_keywords_spend(
     adv_ids: list[int],
     start_date: datetime,
     end_date: datetime,
-    table_name: str = "advkeyword_new",
 ) -> float:
     """
     Возвращает общие затраты по ключевым словам за период [start_date, end_date]
-    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+    по агрегатам из `mv_clusters_daily_agg`.
     """
+
+    if not adv_ids:
+        return 0.0
 
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
     adv_ids_str = ", ".join(map(str, adv_ids))
 
     query = f"""
-        SELECT
-            COALESCE(SUM(total_spend), 0) AS total_spend
-        FROM (
+        WITH aggregated AS (
             SELECT
-                argMaxMerge(spend_state) AS total_spend
-            FROM default_db.{table_name}
+                argMaxMerge(views_state) AS views,
+                argMaxMerge(clicks_state) AS clicks,
+                argMaxMerge(cpm_state) AS cpm
+            FROM default_db.mv_clusters_daily_agg
             WHERE
                 adv_id IN ({adv_ids_str})
                 AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
-            GROUP BY adv_id, text, date
-        ) AS merged
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            COALESCE(SUM(cpm * views) / 1000.0, 0.0) AS total_spend
+        FROM aggregated
     """
 
     try:
@@ -302,13 +307,7 @@ async def get_keywords_spend(
             async with get_clickhouse_client() as client:
                 res = await client.query(query)
                 result = res.first_item
-
-                return (
-                    float(result["total_spend"])
-                    if result and result["total_spend"]
-                    else 0.0
-                )
-
+                return float(result["total_spend"]) if result else 0.0
     except Exception:
         logger.error(
             "Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True
@@ -326,16 +325,18 @@ async def get_keywords_views_by_days(
     adv_ids: list[int],
     start_date: datetime,
     end_date: datetime,
-    table_name: str = "advkeyword_new",
 ) -> dict[date, int]:
     """
     Возвращает показы по ключевым словам по дням за период [start_date, end_date]
-    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+    из аггрегированных `mv_clusters_daily_agg`.
 
     Returns:
         dict[date, int]: {дата: суммарные показы по ключевым словам за этот день}
     """
     import datetime as dt
+
+    if not adv_ids:
+        return {}
 
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
@@ -344,17 +345,11 @@ async def get_keywords_views_by_days(
     query = f"""
         SELECT
             date,
-            COALESCE(SUM(total_views), 0) AS total_views
-        FROM (
-            SELECT
-                date,
-                argMaxMerge(views_state) AS total_views
-            FROM default_db.{table_name}
-            WHERE
-                adv_id IN ({adv_ids_str})
-                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
-            GROUP BY adv_id, text, date
-        ) AS merged
+            SUM(argMaxMerge(views_state)) AS total_views
+        FROM default_db.mv_clusters_daily_agg
+        WHERE
+            adv_id IN ({adv_ids_str})
+            AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
         GROUP BY date
         ORDER BY date
     """
@@ -365,15 +360,15 @@ async def get_keywords_views_by_days(
                 res = await client.query(query)
                 rows = res.result_rows
 
-                # Инициализируем словарь с нулями для всех дат в диапазоне
                 result: dict[dt.date, int] = {}
                 current_date = dt.date.fromisoformat(start_date_str)
-                while current_date <= dt.date.fromisoformat(end_date_str):
+                end_date_obj = dt.date.fromisoformat(end_date_str)
+                while current_date <= end_date_obj:
                     result[current_date] = 0
                     current_date += dt.timedelta(days=1)
 
                 for row in rows:
-                    if row and len(row) >= 2:
+                    if row and len(row) >= 2 and row[0] is not None:
                         date_val = row[0]
                         views = int(row[1]) if row[1] is not None else 0
                         result[date_val] = views
@@ -391,31 +386,34 @@ async def get_keywords_clicks_and_views(
     adv_ids: list[int],
     start_date: datetime,
     end_date: datetime,
-    table_name: str = "advkeyword_new",
 ) -> tuple[int, int]:
     """
     Возвращает общие клики и показы по ключевым словам за период [start_date, end_date]
-    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+    по агрегатам `mv_clusters_daily_agg`.
     """
+
+    if not adv_ids:
+        return 0, 0
 
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
     adv_ids_str = ", ".join(map(str, adv_ids))
 
     query = f"""
-        SELECT
-            COALESCE(SUM(total_clicks), 0) AS total_clicks,
-            COALESCE(SUM(total_views), 0) AS total_views
-        FROM (
+        WITH aggregated AS (
             SELECT
-                argMaxMerge(clicks_state) AS total_clicks,
-                argMaxMerge(views_state) AS total_views
-            FROM default_db.{table_name}
+                argMaxMerge(views_state) AS views,
+                argMaxMerge(clicks_state) AS clicks
+            FROM default_db.mv_clusters_daily_agg
             WHERE
                 adv_id IN ({adv_ids_str})
                 AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
-            GROUP BY adv_id, text, date
-        ) AS merged
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            COALESCE(SUM(clicks), 0) AS total_clicks,
+            COALESCE(SUM(views), 0) AS total_views
+        FROM aggregated
     """
 
     try:
@@ -423,16 +421,9 @@ async def get_keywords_clicks_and_views(
             async with get_clickhouse_client() as client:
                 res = await client.query(query)
                 result = res.first_item
-
-                if (
-                    result
-                    and result["total_clicks"] is not None
-                    and result["total_views"] is not None
-                ):
+                if result:
                     return int(result["total_clicks"]), int(result["total_views"])
-                else:
-                    return 0, 0
-
+                return 0, 0
     except Exception:
         logger.error(
             "Ошибка получения суммы кликов и показов по ключам из ClickHouse",

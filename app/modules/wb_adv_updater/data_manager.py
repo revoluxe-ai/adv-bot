@@ -53,40 +53,41 @@ async def get_keyword_statistic_clickhouse(
     pass_days: int | None = 7,
 ) -> tuple[int, int, float]:
     """
-    Возвращает суммарную статистику по ключевому слову text из агрегирующей таблицы advkeyword_new:
+    Возвращает суммарную статистику по ключевому слову text из агрегатов `mv_clusters_daily_agg`:
     - total_clicks
     - total_views
     - total_spend
-
-    Таблица хранит агрегаты вида argMaxState(...), которые нужно раскрывать через argMaxMerge().
     """
 
+    if not adv_ids:
+        return 0, 0, 0.0
+
     today = datetime.now().date()
-    start_date_clause = ""
+    date_filter = ""
     if pass_days:
         start_date = today - timedelta(days=pass_days)
-        start_date_clause = f"AND date >= '{start_date}'"
+        date_filter = f"AND date >= '{start_date}'"
 
     adv_ids_str = ", ".join(map(str, adv_ids))
-    # TODO: Прикрутить к Pycharm ClickHouse плагин и проверить запрос
-    query = f"""
 
-        SELECT
-            COALESCE(SUM(total_clicks), 0) AS total_clicks,
-            COALESCE(SUM(total_views), 0)  AS total_views,
-            COALESCE(SUM(total_spend), 0)  AS total_spend
-        FROM (
+    query = f"""
+        WITH keyword_stats AS (
             SELECT
-                argMaxMerge(clicks_state) AS total_clicks,
-                argMaxMerge(views_state)  AS total_views,
-                argMaxMerge(spend_state)  AS total_spend
-            FROM default_db.advkeyword_new
+                argMaxMerge(views_state) AS views,
+                argMaxMerge(clicks_state) AS clicks,
+                argMaxMerge(cpm_state) AS cpm
+            FROM default_db.mv_clusters_daily_agg
             WHERE
                 adv_id IN ({adv_ids_str})
-                AND text = %(text)s
-                {start_date_clause}
-            GROUP BY adv_id, text, date
-        ) AS merged
+                AND norm_query = %(text)s
+                {date_filter}
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            COALESCE(SUM(clicks), 0) AS total_clicks,
+            COALESCE(SUM(views), 0) AS total_views,
+            COALESCE(SUM(cpm * views) / 1000.0, 0.0) AS total_spend
+        FROM keyword_stats
     """
     async with anti_ch_crash_semaphore:
         result = await client.query(query, parameters={"text": text})
@@ -96,131 +97,10 @@ async def get_keyword_statistic_clickhouse(
 
     total_clicks, total_views, total_spend = result.result_rows[0]
 
-    # исправляем кейс, когда кликов больше показов (из-за округлений или некорректных данных)
     if total_clicks > total_views:
         total_views = total_clicks
 
     return int(total_clicks), int(total_views), float(total_spend)
-
-
-# async def get_keywords_statistic_clickhouse(
-#     adv_setting: AdvSetting,
-#     pass_time: timedelta | None = timedelta(days=7),
-#     last_views: int | None = None,
-# ) -> list[CalculatedKeyword]:
-#     async with get_clickhouse_client() as ch_client:
-#         advs: set[int] = set()
-#         auto_adv_id = int(adv_setting.adv_id)
-#         advs.add(auto_adv_id)
-#         if search_adv_id := adv_setting.search_adv_id:
-#             advs.add(search_adv_id)
-#         query = _build_clickhouse_query(advs, pass_time, last_views)
-#         result = await ch_client.query(query)
-#         rows = result.result_rows
-#         keywords = []
-#         for row in rows:
-#             text = row[0]
-#             clicks = row[1]
-#             views = row[2]
-#             spend = row[3]
-#             if clicks > views:
-#                 views = clicks
-#             keyword = CalculatedKeyword(
-#                 text=text, clicks=clicks, views=views, spend=spend
-#             )
-#             keywords.append(keyword)
-#
-#     return keywords
-
-
-# async def _get_keyword_settings(
-#     adv_setting_id: int, hard_statuses: list[int] | None
-# ) -> list[KeywordSetting]:
-#     async with _sm() as session:
-#         stmt = select(KeywordSetting).where(
-#             KeywordSetting.adv_setting_id == adv_setting_id
-#         )
-#         if hard_statuses:
-#             stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
-#         result = await session.execute(stmt)
-#         return list(result.scalars().all())
-
-#
-# def _build_clickhouse_query(
-#     adv_ids: set[int],
-#     pass_time: timedelta | None = None,
-#     last_views: int | None = None,
-# ) -> str:
-#     """
-#     Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
-#     (fields: adv_id, text, date, clicks_state, views_state, spend_state)
-#     Возвращает: text, total_clicks, total_views, total_spend, date
-#     """
-#
-#     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
-#
-#     # --- Внутренний подзапрос: извлекаем агрегаты для каждой кампании ---
-#     inner = [
-#         "SELECT",
-#         "    adv_id,",
-#         "    text,",
-#         "    argMaxMerge(clicks_state) AS total_clicks,",
-#         "    argMaxMerge(views_state)  AS total_views,",
-#         "    argMaxMerge(spend_state)  AS total_spend,",
-#         "    date",
-#         "FROM default_db.advkeyword_new",
-#         f"WHERE adv_id IN ({adv_ids_str})",
-#     ]
-#
-#     if pass_time:
-#         start_time = datetime.now() - pass_time
-#         inner.append(f"  AND date >= '{start_time.strftime('%Y-%m-%d')}'")
-#
-#     inner.append("GROUP BY adv_id, text, date")
-#     inner_query = "\n".join(inner)
-#
-#     # --- Внешний уровень: суммируем по text/date ---
-#     outer = [
-#         "SELECT",
-#         "    text,",
-#         "    SUM(total_clicks) AS total_clicks,",
-#         "    SUM(total_views)  AS total_views,",
-#         "    SUM(total_spend)  AS total_spend,",
-#         "    date",
-#         "FROM (",
-#         inner_query,
-#         ") AS merged",
-#         "GROUP BY text, date",
-#     ]
-#     query = "\n".join(outer)
-#
-#     # --- Если есть last_views — оборачиваем в CTE ---
-#     if last_views:
-#         query = f"""
-# WITH base AS (
-# {query}
-# ),
-# cumulative AS (
-#     SELECT
-#         text,
-#         total_clicks,
-#         total_views,
-#         total_spend,
-#         date,
-#         SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
-#     FROM base
-# )
-# SELECT
-#     text,
-#     SUM(total_clicks) AS total_clicks,
-#     SUM(total_views)  AS total_views,
-#     SUM(total_spend)  AS total_spend
-# FROM cumulative
-# WHERE cumulative_total_views <= {last_views}
-# GROUP BY text
-# """.strip()
-#
-#     return query
 
 
 async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
@@ -918,7 +798,7 @@ async def get_last_full_stat_update(adv_id: int) -> datetime | None:
 
 async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     ch_query = """
-    SELECT DISTINCT text FROM default_db.advkeyword_new
+    SELECT DISTINCT norm_query FROM default_db.mv_clusters_daily_agg
     WHERE date >= today() - %(last_days)s
     """
     async with anti_ch_crash_semaphore:
