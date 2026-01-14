@@ -2,7 +2,7 @@ import csv
 import logging
 from io import StringIO
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, Result
 
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 
@@ -45,8 +45,8 @@ async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedK
     if search_adv_id:
         stmt = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
         async with _sm(read_only=True) as session:
-            result = await session.execute(stmt)
-            search_adv = result.scalar_one()
+            result: Result = await session.execute(stmt)
+            search_adv = result.scalar_one_or_none()
     complex_adv = ComplexAdv(
         shop_id=shop_id,
         adv_setting=adv_setting,

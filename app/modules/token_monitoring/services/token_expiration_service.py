@@ -23,6 +23,18 @@ from app.utils.db.session_maker import get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
+def _utcnow() -> datetime.datetime:
+    """Return current UTC time with timezone info."""
+    return datetime.datetime.now(datetime.UTC)
+
+
+def _ensure_aware_utc(value: datetime.datetime) -> datetime.datetime:
+    """Normalize datetime to UTC with tzinfo."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=datetime.UTC)
+    return value.astimezone(datetime.UTC)
+
+
 class TokenExpirationService:
     """Service for monitoring token expiration dates and sending proactive notifications."""
 
@@ -113,12 +125,22 @@ class TokenExpirationService:
             return
 
         # Calculate days until expiry
-        now = datetime.datetime.now()
-        if token.expires <= now:
+        now = _utcnow()
+        try:
+            token_expires = _ensure_aware_utc(token.expires)
+        except Exception as exc:
+            logger.warning(
+                "Skipping token %s in expiration check due to expiry access error: %s",
+                token.id,
+                exc,
+            )
+            return
+
+        if token_expires <= now:
             logger.debug(f"Token {token.id} already expired, skipping")
             return
 
-        days_until_expiry = (token.expires - now).days
+        days_until_expiry = (token_expires - now).days
 
         # Check if this is a warning stage
         if days_until_expiry not in self.WARNING_STAGES:
@@ -169,20 +191,35 @@ class TokenExpirationService:
         self, session: AsyncSession
     ) -> list[WBToken]:
         """Get all active tokens that have expiration dates."""
-        now = datetime.datetime.now()
+        now = _utcnow()
         max_check_ahead = datetime.timedelta(days=max(self.WARNING_STAGES))
         cutoff_date = now + max_check_ahead
 
         stmt = (
             select(WBToken)
             .where(WBToken.active == True)  # noqa: E712 (SQLAlchemy requires == True)
-            .where(WBToken.expires > now)  # Not yet expired
-            .where(WBToken.expires <= cutoff_date)  # Within warning window
             .where(WBToken.shop_id.is_not(None))  # Has shop_id
         )
 
         result = await session.execute(stmt)
-        return result.scalars().all()
+        tokens = result.scalars().all()
+
+        expiring_tokens: list[WBToken] = []
+        for token in tokens:
+            try:
+                expires = _ensure_aware_utc(token.expires)
+            except Exception as exc:
+                logger.warning(
+                    "Skipping token %s due to expiry access error: %s",
+                    token.id,
+                    exc,
+                )
+                continue
+
+            if now < expires <= cutoff_date:
+                expiring_tokens.append(token)
+
+        return expiring_tokens
 
     async def _notification_already_sent(
         self, session: AsyncSession, shop_id: str, notification_type: str
@@ -210,19 +247,34 @@ class TokenExpirationService:
             Dictionary with expiring tokens summary
         """
         async with self.session_maker() as session:
-            now = datetime.datetime.now()
+            now = _utcnow()
             cutoff_date = now + datetime.timedelta(days=days_ahead)
 
             stmt = (
                 select(WBToken)
                 .where(WBToken.active == True)  # noqa: E712
-                .where(WBToken.expires > now)
-                .where(WBToken.expires <= cutoff_date)
                 .where(WBToken.shop_id.is_not(None))
             )
 
             result = await session.execute(stmt)
-            expiring_tokens = result.scalars().all()
+            all_tokens = result.scalars().all()
+
+            expiring_tokens: list[WBToken] = []
+            for token in all_tokens:
+                try:
+                    token_expires = _ensure_aware_utc(token.expires)
+                except Exception as exc:
+                    logger.warning(
+                        "Skipping token %s while building expiring summary: %s",
+                        token.id,
+                        exc,
+                    )
+                    continue
+
+                if not (now < token_expires <= cutoff_date):
+                    continue
+
+                expiring_tokens.append(token)
 
             # Group by shop and days until expiry
             summary = {
@@ -232,7 +284,8 @@ class TokenExpirationService:
             }
 
             for token in expiring_tokens:
-                days_until_expiry = (token.expires - now).days
+                token_expires = _ensure_aware_utc(token.expires)
+                days_until_expiry = (token_expires - now).days
                 shop_id = token.shop_id
 
                 # Add to shop summary

@@ -184,6 +184,68 @@ class TestTokenMonitoringIntegration:
             assert "Test Shop" in args[1]
 
     @pytest.mark.asyncio
+    async def test_check_token_expiration_skips_invalid_expires(
+        self, mock_session_maker
+    ):
+        session_maker, session = mock_session_maker
+
+        notification_manager = MagicMock()
+        notification_manager.notify_token_issue = AsyncMock(return_value=None)
+
+        expiration_service = TokenExpirationService(
+            notification_manager=notification_manager, session_maker=session_maker
+        )
+        expiration_service._notification_already_sent = AsyncMock(
+            return_value=False
+        )
+
+        fixed_now = datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC)
+
+        class _SimpleToken:
+            def __init__(
+                self, token_id: int, shop_id: str, expires: datetime.datetime
+            ) -> None:
+                self.id = token_id
+                self.shop_id = shop_id
+                self._expires = expires
+
+            @property
+            def expires(self) -> datetime.datetime:
+                return self._expires
+
+        class _InvalidToken(_SimpleToken):
+            @property
+            def expires(self) -> datetime.datetime:
+                raise ValueError("invalid JWT")
+
+        # InvalidToken simulates corrupted expiry metadata to ensure the service skips it gracefully.
+        valid_token = _SimpleToken(
+            token_id=301,
+            shop_id="shop-integration",
+            expires=fixed_now + datetime.timedelta(days=3),
+        )
+        invalid_token = _InvalidToken(
+            token_id=302,
+            shop_id="shop-integration",
+            expires=fixed_now,
+        )
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [valid_token, invalid_token]
+        session.execute = AsyncMock(return_value=result)
+
+        with patch(
+            "app.modules.token_monitoring.services.token_expiration_service._utcnow",
+            return_value=fixed_now,
+        ):
+            stats = await expiration_service.check_token_expiration()
+
+        assert stats["total_tokens_checked"] == 1
+        assert stats["expiring_tokens_found"] == 1
+        assert stats["warnings_by_stage"][3] == 1
+        notification_manager.notify_token_issue.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_token_info_service_integration(self, mock_session_maker):
         """Test TokenInfoService integration with real data flow."""
         session_maker, session = mock_session_maker
