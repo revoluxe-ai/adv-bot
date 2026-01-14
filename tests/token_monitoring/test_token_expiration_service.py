@@ -1,8 +1,30 @@
 """Tests for TokenExpirationService."""
 
 import datetime
+import logging
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+class _DummyToken:
+    """Simple token-like object for tests that only need expires/shop_id."""
+
+    def __init__(self, token_id: int, shop_id: str, expires: datetime.datetime):
+        self.id = token_id
+        self.shop_id = shop_id
+        self._expires = expires
+
+    @property
+    def expires(self) -> datetime.datetime:
+        return self._expires
+
+
+class _InvalidExpiresToken(_DummyToken):
+    """Token whose expires property raises an exception."""
+
+    @property
+    def expires(self) -> datetime.datetime:
+        raise ValueError("invalid JWT data")
 
 from app.modules.token_monitoring.services.token_expiration_service import (
     TokenExpirationService,
@@ -422,6 +444,142 @@ class TestTokenExpirationService:
         assert stats["errors"] == 1
         assert stats["expiring_tokens_found"] == 1
         assert stats["notifications_sent"] == 0
+
+    @pytest.mark.asyncio
+    async def test_get_active_tokens_with_expiry_filters_invalid(
+        self,
+        token_expiration_service,
+        mock_session_maker,
+        caplog,
+    ):
+        """Ensure invalid or out-of-window tokens get skipped while valid ones stay."""
+        _, session = mock_session_maker
+        fixed_now = datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC)
+
+        valid_token = _DummyToken(
+            token_id=101,
+            shop_id="shop-valid",
+            expires=fixed_now + datetime.timedelta(days=3),
+        )
+        expired_token = _DummyToken(
+            token_id=102,
+            shop_id="shop-expired",
+            expires=fixed_now - datetime.timedelta(days=1),
+        )
+        future_token = _DummyToken(
+            token_id=103,
+            shop_id="shop-future",
+            expires=fixed_now + datetime.timedelta(days=30),
+        )
+        invalid_token = _InvalidExpiresToken(
+            token_id=104,
+            shop_id="shop-bad",
+            expires=fixed_now,
+        )
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [
+            valid_token,
+            expired_token,
+            future_token,
+            invalid_token,
+        ]
+        session.execute = AsyncMock(return_value=result)
+
+        caplog.set_level(logging.WARNING)
+
+        with patch(
+            "app.modules.token_monitoring.services.token_expiration_service._utcnow",
+            return_value=fixed_now,
+        ):
+            filtered = await token_expiration_service._get_active_tokens_with_expiry(
+                session
+            )
+
+        assert filtered == [valid_token]
+        assert f"Skipping token {invalid_token.id}" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_get_expiring_tokens_summary_skips_invalid_expires(
+        self, token_expiration_service, mock_session_maker
+    ):
+        """Summary should count only tokens with accessible expires within window."""
+        _, session = mock_session_maker
+        fixed_now = datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC)
+
+        expiring_token = _DummyToken(
+            token_id=201,
+            shop_id="shop-summary",
+            expires=fixed_now + datetime.timedelta(days=3),
+        )
+        invalid_token = _InvalidExpiresToken(
+            token_id=202,
+            shop_id="shop-summary",
+            expires=fixed_now,
+        )
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [
+            expiring_token,
+            invalid_token,
+        ]
+        session.execute = AsyncMock(return_value=result)
+
+        with patch(
+            "app.modules.token_monitoring.services.token_expiration_service._utcnow",
+            return_value=fixed_now,
+        ):
+            summary = await token_expiration_service.get_expiring_tokens_summary(
+                days_ahead=14
+            )
+
+        assert summary["total_expiring"] == 1
+        assert len(summary["by_shop"]) == 1
+        assert summary["by_days"]["3"] == [
+            {"shop_id": "shop-summary", "token_id": expiring_token.id}
+        ]
+        assert summary["by_days"]["1"] == []
+
+    @pytest.mark.asyncio
+    async def test_check_single_token_expiration_skips_invalid_expires(
+        self, token_expiration_service, mock_session_maker, caplog
+    ):
+        """Ensure tokens with broken expires are skipped during per-token checks."""
+        _, session = mock_session_maker
+
+        token_expiration_service._notification_already_sent = AsyncMock(
+            return_value=False
+        )
+
+        invalid_token = _InvalidExpiresToken(
+            token_id=999,
+            shop_id="broken-shop",
+            expires=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
+        )
+
+        stats = {
+            "total_tokens_checked": 0,
+            "expiring_tokens_found": 0,
+            "notifications_sent": 0,
+            "notifications_skipped": 0,
+            "errors": 0,
+            "warnings_by_stage": {14: 0, 3: 0, 1: 0},
+        }
+
+        caplog.set_level(logging.WARNING)
+
+        fixed_now = datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC)
+        with patch(
+            "app.modules.token_monitoring.services.token_expiration_service._utcnow",
+            return_value=fixed_now,
+        ):
+            await token_expiration_service._check_single_token_expiration(
+                session, invalid_token, stats
+            )
+
+        assert stats["expiring_tokens_found"] == 0
+        assert "Skipping token 999" in caplog.text
+        token_expiration_service.notification_manager.notify_token_issue.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_convenience_functions(self):
