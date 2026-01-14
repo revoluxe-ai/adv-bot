@@ -125,12 +125,22 @@ class TokenExpirationService:
             return
 
         # Calculate days until expiry
-        now = datetime.datetime.now()
-        if token.expires <= now:
+        now = _utcnow()
+        try:
+            token_expires = _ensure_aware_utc(token.expires)
+        except Exception as exc:
+            logger.warning(
+                "Skipping token %s in expiration check due to expiry access error: %s",
+                token.id,
+                exc,
+            )
+            return
+
+        if token_expires <= now:
             logger.debug(f"Token {token.id} already expired, skipping")
             return
 
-        days_until_expiry = (token.expires - now).days
+        days_until_expiry = (token_expires - now).days
 
         # Check if this is a warning stage
         if days_until_expiry not in self.WARNING_STAGES:
