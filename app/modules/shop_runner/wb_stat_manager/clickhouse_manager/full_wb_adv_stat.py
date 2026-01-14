@@ -343,13 +343,20 @@ async def get_keywords_views_by_days(
     adv_ids_str = ", ".join(map(str, adv_ids))
 
     query = f"""
+        WITH aggregated AS (
+            SELECT
+                date,
+                argMaxMerge(views_state) AS views
+            FROM default_db.mv_clusters_daily_agg
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, nmid, norm_query, date
+        )
         SELECT
             date,
-            SUM(argMaxMerge(views_state)) AS total_views
-        FROM default_db.mv_clusters_daily_agg
-        WHERE
-            adv_id IN ({adv_ids_str})
-            AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            COALESCE(SUM(views), 0) AS total_views
+        FROM aggregated
         GROUP BY date
         ORDER BY date
     """
