@@ -381,6 +381,7 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
 
         await updater.update_today_stats(complex_advs)
+        return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
     async def update_clusters_adv_stats_history(self) -> None:

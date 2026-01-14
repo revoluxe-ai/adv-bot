@@ -23,57 +23,99 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
 
     # Очищаем таблицы перед тестом
     await clickhouse_client.command(f"TRUNCATE TABLE default_db.full_adv_wb_stat")
-    await clickhouse_client.command(f"TRUNCATE TABLE default_db.advkeyword_new")
+    await clickhouse_client.command(f"TRUNCATE TABLE default_db.clusters_adv_stats")
+    await clickhouse_client.command(f"TRUNCATE TABLE default_db.mv_clusters_daily_agg")
 
 
-    # Тестовые данные для advkeyword_new
+    # Тестовые данные для mv_clusters_daily_agg через clusters_adv_stats
     # День 1: 2025-11-26
-    await clickhouse_client.command(f"""
-        INSERT INTO default_db.advkeyword_new (adv_id, text, date, clicks_state, views_state, spend_state, version)
-        SELECT
-            {adv_id},
-            'ключ1',
-            '2025-11-26'::Date,
-            argMaxState(CAST(1000 AS Int32), 50.0),
-            argMaxState(CAST(5000 AS Int32), 50.0),
-            argMaxState(CAST(50.0 AS Float64), 50.0),
-            50.0
-        
-        UNION ALL
-        
-        SELECT
-            {adv_id},
-            'ключ2',
-            '2025-11-26'::Date,
-            argMaxState(CAST(2000 AS Int32), 100.0),
-            argMaxState(CAST(10000 AS Int32), 100.0),
-            argMaxState(CAST(100.0 AS Float64), 100.0),
-            100.0
-    """)
+    cluster_rows = [
+        (
+            adv_id,
+            1111,
+            "category",
+            "ключ1",
+            5000,
+            1000,
+            0.2,
+            10.0,
+            0,
+            0,
+            0.0,
+            0.0,
+            dt.date(2025, 11, 26),
+            dt.datetime(2025, 11, 26, 12, 0, 0),
+        ),
+        (
+            adv_id,
+            1111,
+            "category",
+            "ключ2",
+            10000,
+            2000,
+            0.2,
+            10.0,
+            0,
+            0,
+            0.0,
+            0.0,
+            dt.date(2025, 11, 26),
+            dt.datetime(2025, 11, 26, 12, 30, 0),
+        ),
+        (
+            adv_id,
+            1111,
+            "category",
+            "ключ1",
+            7000,
+            1500,
+            0.214,
+            10.714285,
+            0,
+            0,
+            0.0,
+            0.0,
+            dt.date(2025, 11, 27),
+            dt.datetime(2025, 11, 27, 12, 0, 0),
+        ),
+        (
+            adv_id,
+            1111,
+            "category",
+            "ключ3",
+            3000,
+            500,
+            0.166,
+            10.0,
+            0,
+            0,
+            0.0,
+            0.0,
+            dt.date(2025, 11, 27),
+            dt.datetime(2025, 11, 27, 12, 30, 0),
+        ),
+    ]
 
-    # День 2: 2025-11-27
-    await clickhouse_client.command(f"""
-        INSERT INTO default_db.advkeyword_new (adv_id, text, date, clicks_state, views_state, spend_state, version)
-        SELECT
-            {adv_id},
-            'ключ1',
-            '2025-11-27'::Date,
-            argMaxState(CAST(1500 AS Int32), 75.0),
-            argMaxState(CAST(7000 AS Int32), 75.0),
-            argMaxState(CAST(75.0 AS Float64), 75.0),
-            75.0
-        
-        UNION ALL
-        
-        SELECT
-            {adv_id},
-            'ключ3',
-            '2025-11-27'::Date,
-            argMaxState(CAST(500 AS Int32), 30.0),
-            argMaxState(CAST(3000 AS Int32), 30.0),
-            argMaxState(CAST(30.0 AS Float64), 30.0),
-            30.0
-    """)
+    await clickhouse_client.insert(
+        "default_db.clusters_adv_stats",
+        cluster_rows,
+        column_names=[
+            "adv_id",
+            "nmid",
+            "wb_category",
+            "norm_query",
+            "views",
+            "clicks",
+            "ctr",
+            "cpm",
+            "add_to_cart",
+            "orders",
+            "cpc",
+            "avr_pos",
+            "date",
+            "timestamp",
+        ],
+    )
 
     # Тестовые данные для full_adv_wb_stat
     # День 1: 2025-11-26
@@ -227,7 +269,8 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
     assert generated_text == expected_text
 
     # Тестирование с пустыми данными
-    await clickhouse_client.command(f"TRUNCATE TABLE default_db.advkeyword_new")
+    await clickhouse_client.command(f"TRUNCATE TABLE default_db.clusters_adv_stats")
+    await clickhouse_client.command(f"TRUNCATE TABLE default_db.mv_clusters_daily_agg")
     with patch(
         "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
         return_value=mock_context,

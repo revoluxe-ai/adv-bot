@@ -929,6 +929,7 @@ async def clickhouse_client(setup_test_database):
     await client.command("""
         CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily_agg
         (
+            `adv_id` UInt32,
             `nmid` UInt64,
             `norm_query` LowCardinality(String),
             `date` Date,
@@ -940,10 +941,11 @@ async def clickhouse_client(setup_test_database):
             `ts_state` AggregateFunction(max, DateTime)
         )
         ENGINE = AggregatingMergeTree()
-        ORDER BY (nmid, norm_query, date)
+        ORDER BY (adv_id, nmid, norm_query, date)
         SETTINGS index_granularity = 8192
         AS
         SELECT
+            adv_id,
             nmid,
             norm_query,
             date,
@@ -954,7 +956,7 @@ async def clickhouse_client(setup_test_database):
             argMaxState(cpm, timestamp) AS cpm_state,
             maxState(timestamp) AS ts_state
         FROM default_db.clusters_adv_stats
-        GROUP BY nmid, norm_query, date
+        GROUP BY adv_id, nmid, norm_query, date
     """)
 
     # Создаём Materialized View: mv_clusters_last_state
