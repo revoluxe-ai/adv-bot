@@ -564,10 +564,10 @@ class Settings:
 
     @property
     def TG_TOKENS_FOR_SENDING(self) -> list[str]:
-        value: str = os.getenv("TG_TOKENS_FOR_SENDING")
-        if not value:
+        value: str | None = os.getenv("TG_TOKENS_FOR_SENDING")
+        if value is None:
             raise ValueError('not set TG_TOKENS_FOR_SENDING')
-        return [token.strip() for token in value.split(',')]
+        return [token.strip() for token in value.split(',') if token.strip() != '']
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()
