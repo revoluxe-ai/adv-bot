@@ -7,8 +7,6 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramForbiddenError
 
-from app.settings import settings
-
 # === CONFIG ===
 LEGACY_BOT_TOKEN = os.getenv("LEGACY_BOT_TOKEN")
 MAIN_BOT_USERNAME = "wb_sky_bot"  # без @
