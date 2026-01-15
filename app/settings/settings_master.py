@@ -562,6 +562,12 @@ class Settings:
         else:
             return int(value)
 
+    @property
+    def LEGACY_BOT_TOKEN(self) -> str:
+        value = os.getenv("LEGACY_BOT_TOKEN")
+        if not value:
+            return ""
+        return value
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()
