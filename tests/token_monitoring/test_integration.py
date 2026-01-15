@@ -5,6 +5,7 @@ import datetime
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.client_bot.notification_sender import NotificationSender
 from app.modules.token_monitoring import (
     initialize_token_monitoring,
     shutdown_token_monitoring,
@@ -19,11 +20,14 @@ from app.utils.db.models import User
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
+MockSessionMaker = tuple[MagicMock, AsyncMock]
+
+
 class TestTokenMonitoringIntegration:
     """Integration tests for the complete token monitoring system."""
 
     @pytest.fixture
-    def mock_session_maker(self):
+    def mock_session_maker(self) -> MockSessionMaker:
         """Mock session maker for database operations."""
         session = AsyncMock(return_value=None)
         session.execute = AsyncMock(return_value=None)
@@ -35,11 +39,11 @@ class TestTokenMonitoringIntegration:
         return session_maker, session
 
     @pytest.fixture
-    def mock_bot(self):
-        """Mock Telegram bot."""
-        bot = AsyncMock(return_value=None)
-        bot.send_message = AsyncMock(return_value=None)
-        return bot
+    def mock_notification_sender(self) -> NotificationSender:
+        """Mock NotificationSender."""
+        sender = MagicMock(spec=NotificationSender)
+        sender.send_message = AsyncMock(return_value=True)
+        return sender
 
     @pytest.mark.asyncio
     async def test_complete_system_initialization(self):
@@ -75,14 +79,16 @@ class TestTokenMonitoringIntegration:
 
     @pytest.mark.asyncio
     async def test_token_deactivation_end_to_end_workflow(
-        self, mock_session_maker, mock_bot
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
     ):
         """Test complete token deactivation detection and notification workflow."""
         session_maker, session = mock_session_maker
 
         # Create integrated components
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
 
         # Mock user data
@@ -108,8 +114,8 @@ class TestTokenMonitoringIntegration:
         )
 
         # Verify notification was sent
-        mock_bot.send_message.assert_called_once()
-        args, kwargs = mock_bot.send_message.call_args
+        mock_notification_sender.send_message.assert_called_once()
+        args, _ = mock_notification_sender.send_message.call_args
 
         assert args[0] == 123456789  # user_telegram_id
         assert "деактивирован" in args[1].lower()
@@ -121,14 +127,16 @@ class TestTokenMonitoringIntegration:
 
     @pytest.mark.asyncio
     async def test_token_expiration_monitoring_workflow(
-        self, mock_session_maker, mock_bot
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
     ):
         """Test complete token expiration monitoring workflow."""
         session_maker, session = mock_session_maker
 
         # Create integrated components
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
         expiration_service = TokenExpirationService(
             notification_manager=notification_manager, session_maker=session_maker
@@ -176,8 +184,8 @@ class TestTokenMonitoringIntegration:
             assert stats["warnings_by_stage"][14] == 1
 
             # Verify notification was sent
-            mock_bot.send_message.assert_called_once()
-            args, kwargs = mock_bot.send_message.call_args
+            mock_notification_sender.send_message.assert_called_once()
+            args, _ = mock_notification_sender.send_message.call_args
 
             assert args[0] == 123456789
             assert "2 недели" in args[1]
@@ -185,7 +193,7 @@ class TestTokenMonitoringIntegration:
 
     @pytest.mark.asyncio
     async def test_check_token_expiration_skips_invalid_expires(
-        self, mock_session_maker
+        self, mock_session_maker: MockSessionMaker
     ):
         session_maker, session = mock_session_maker
 
@@ -246,7 +254,9 @@ class TestTokenMonitoringIntegration:
         notification_manager.notify_token_issue.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_token_info_service_integration(self, mock_session_maker):
+    async def test_token_info_service_integration(
+        self, mock_session_maker: MockSessionMaker
+    ):
         """Test TokenInfoService integration with real data flow."""
         session_maker, session = mock_session_maker
 
@@ -307,13 +317,17 @@ class TestTokenMonitoringIntegration:
         assert status_report.has_all_required_permissions
 
     @pytest.mark.asyncio
-    async def test_scheduler_integration(self, mock_session_maker, mock_bot):
+    async def test_scheduler_integration(
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
+    ):
         """Test scheduler integration with expiration service."""
         session_maker, session = mock_session_maker
 
         # Create integrated components
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
         expiration_service = TokenExpirationService(
             notification_manager=notification_manager, session_maker=session_maker
@@ -366,20 +380,24 @@ class TestTokenMonitoringIntegration:
             assert mock_http_module.try_except_decorator == mock_original_decorator
 
     @pytest.mark.asyncio
-    async def test_error_handling_in_integration(self, mock_session_maker, mock_bot):
+    async def test_error_handling_in_integration(
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
+    ):
         """Test error handling across integrated components."""
         session_maker, session = mock_session_maker
 
         # Create components
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
 
         # Mock bot to raise exception
         from aiogram.exceptions import TelegramForbiddenError
 
-        mock_bot.send_message.side_effect = TelegramForbiddenError(
-            message="User blocked bot", method="test_method"
+        mock_notification_sender.send_message.side_effect = TelegramForbiddenError(
+            message="User blocked bot"
         )
 
         # Mock user data
@@ -399,12 +417,14 @@ class TestTokenMonitoringIntegration:
         )
 
         # Bot was called but notification was not recorded due to error
-        mock_bot.send_message.assert_called_once()
+        mock_notification_sender.send_message.assert_called_once()
         session.add.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_duplicate_notification_prevention(
-        self, mock_session_maker, mock_bot
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
     ):
         """Test prevention of duplicate notifications."""
         from sqlalchemy.exc import IntegrityError
@@ -412,7 +432,7 @@ class TestTokenMonitoringIntegration:
         session_maker, session = mock_session_maker
 
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
 
         # Mock user data
@@ -435,19 +455,21 @@ class TestTokenMonitoringIntegration:
         )
 
         # Message was sent but database rolled back
-        mock_bot.send_message.assert_called_once()
+        mock_notification_sender.send_message.assert_called_once()
         session.rollback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_multiple_warning_stages_integration(
-        self, mock_session_maker, mock_bot
+        self,
+        mock_session_maker: MockSessionMaker,
+        mock_notification_sender: NotificationSender,
     ):
         """Test multiple warning stages in a single expiration check."""
         session_maker, session = mock_session_maker
 
         # Create components
         notification_manager = NotificationManager(
-            bot=mock_bot, session_maker=session_maker
+            notification_sender=mock_notification_sender, session_maker=session_maker
         )
         expiration_service = TokenExpirationService(
             notification_manager=notification_manager, session_maker=session_maker
@@ -501,4 +523,4 @@ class TestTokenMonitoringIntegration:
             assert stats["warnings_by_stage"][1] == 1
 
             # Verify all notifications were sent
-            assert mock_bot.send_message.call_count == 3
+            assert mock_notification_sender.send_message.call_count == 3

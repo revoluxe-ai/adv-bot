@@ -23,11 +23,11 @@ class TestNotificationManager:
     """Test cases for NotificationManager."""
 
     @pytest.fixture
-    def mock_bot(self):
-        """Mock Telegram bot."""
-        bot = AsyncMock(return_value=None)
-        bot.send_message = AsyncMock(return_value=None)
-        return bot
+    def mock_notification_sender(self):
+        """Mock NotificationSender."""
+        sender = MagicMock()
+        sender.send_message = AsyncMock(return_value=True)
+        return sender
 
     @pytest.fixture
     def mock_session_maker(self):
@@ -51,14 +51,23 @@ class TestNotificationManager:
         return cabinet
 
     @pytest.fixture
-    def notification_manager(self, mock_bot, mock_session_maker):
+    def notification_manager(
+        self, mock_notification_sender, mock_session_maker
+    ):
         """Create NotificationManager with mocked dependencies."""
         session_maker, _ = mock_session_maker
-        return NotificationManager(bot=mock_bot, session_maker=session_maker)
+        return NotificationManager(
+            notification_sender=mock_notification_sender,
+            session_maker=session_maker,
+        )
 
     @pytest.mark.asyncio
     async def test_notify_token_deactivation(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test sending token deactivation notification."""
         session_maker, session = mock_session_maker
@@ -73,9 +82,9 @@ class TestNotificationManager:
             notification_type=NotificationType.TOKEN_DEACTIVATED.value,
         )
 
-        # Verify bot.send_message was called
-        notification_manager.bot.send_message.assert_called_once()
-        args, kwargs = notification_manager.bot.send_message.call_args
+        # Verify notification sender was called
+        mock_notification_sender.send_message.assert_called_once()
+        args, kwargs = mock_notification_sender.send_message.call_args
         assert args[0] == 123456789  # user_telegram_id
         assert "деактивирован" in args[1].lower()  # message contains deactivation text
 
@@ -85,7 +94,11 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_notify_token_expiring_14_days(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test sending 14-day expiration notification."""
         session_maker, session = mock_session_maker
@@ -103,8 +116,8 @@ class TestNotificationManager:
         )
 
         # Verify message content
-        notification_manager.bot.send_message.assert_called_once()
-        args, kwargs = notification_manager.bot.send_message.call_args
+        mock_notification_sender.send_message.assert_called_once()
+        args, kwargs = mock_notification_sender.send_message.call_args
         message = args[1]
         assert "2 недели" in message
         assert "Test Shop" in message
@@ -112,7 +125,11 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_notify_token_expiring_3_days(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test sending 3-day expiration notification."""
         session_maker, session = mock_session_maker
@@ -129,7 +146,7 @@ class TestNotificationManager:
             expiry_date=expiry_date,
         )
 
-        args, kwargs = notification_manager.bot.send_message.call_args
+        args, kwargs = mock_notification_sender.send_message.call_args
         message = args[1]
         assert "Внимание!" in message
         assert "3 дня" in message
@@ -137,7 +154,11 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_notify_token_expiring_1_day(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test sending 1-day expiration notification."""
         session_maker, session = mock_session_maker
@@ -154,7 +175,7 @@ class TestNotificationManager:
             expiry_date=expiry_date,
         )
 
-        args, kwargs = notification_manager.bot.send_message.call_args
+        args, kwargs = mock_notification_sender.send_message.call_args
         message = args[1]
         assert "СРОЧНО!" in message
         assert "завтра" in message
@@ -162,13 +183,17 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_telegram_forbidden_error_handling(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test handling when user blocks the bot."""
         session_maker, session = mock_session_maker
 
         # Mock TelegramForbiddenError - create a simple Exception instead
-        notification_manager.bot.send_message.side_effect = Exception(
+        mock_notification_sender.send_message.side_effect = Exception(
             "Forbidden: bot was blocked by the user"
         )
         notification_manager._get_shop_users = AsyncMock(
@@ -182,13 +207,17 @@ class TestNotificationManager:
         )
 
         # Bot message was attempted but failed
-        notification_manager.bot.send_message.assert_called_once()
+        mock_notification_sender.send_message.assert_called_once()
         # Session should not have added notification due to failed send
         session.add.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_duplicate_notification_handling(
-        self, notification_manager, mock_session_maker, sample_user_cabinet
+        self,
+        notification_manager,
+        mock_session_maker,
+        sample_user_cabinet,
+        mock_notification_sender,
     ):
         """Test handling duplicate notifications via database constraint."""
         session_maker, session = mock_session_maker
@@ -207,12 +236,15 @@ class TestNotificationManager:
         )
 
         # Message was sent but database rollback occurred
-        notification_manager.bot.send_message.assert_called_once()
+        mock_notification_sender.send_message.assert_called_once()
         session.rollback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_multiple_users_notification(
-        self, notification_manager, mock_session_maker
+        self,
+        notification_manager,
+        mock_session_maker,
+        mock_notification_sender,
     ):
         """Test sending notifications to multiple users."""
         session_maker, session = mock_session_maker
@@ -236,7 +268,7 @@ class TestNotificationManager:
         )
 
         # Verify message sent to all users
-        assert notification_manager.bot.send_message.call_count == 3
+        assert mock_notification_sender.send_message.call_count == 3
 
         # Verify all notifications recorded
         assert session.add.call_count == 3
@@ -362,7 +394,10 @@ class TestNotificationManager:
 
     @pytest.mark.asyncio
     async def test_no_users_found_for_shop(
-        self, notification_manager, mock_session_maker
+        self,
+        notification_manager,
+        mock_session_maker,
+        mock_notification_sender,
     ):
         """Test notification when no users found for shop."""
         session_maker, session = mock_session_maker
@@ -375,5 +410,5 @@ class TestNotificationManager:
         )
 
         # No messages should be sent
-        notification_manager.bot.send_message.assert_not_called()
+        mock_notification_sender.send_message.assert_not_called()
         session.add.assert_not_called()

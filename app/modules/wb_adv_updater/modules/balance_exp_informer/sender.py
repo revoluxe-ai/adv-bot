@@ -1,26 +1,28 @@
 from __future__ import annotations
 
-from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
 import logging
 
+from app.client_bot.notification_sender import NotificationSender
 
 logger = logging.getLogger(__name__)
 
+
 async def send_chunk(
-    bot: Bot,
+    sender: NotificationSender,
     user_telegram_id: int,
     text: str,
     keyboard: InlineKeyboardMarkup,
 ) -> None:
-    try:
-        _ = await bot.send_message(
-            chat_id=user_telegram_id,
-            text=text,
-            reply_markup=keyboard,
-            disable_web_page_preview=True,
+    success = await sender.send_message(
+        user_telegram_id,
+        text,
+        reply_markup=keyboard,
+        disable_web_page_preview=True,
+    )
+    if not success:
+        logger.error(
+            "Notification sender failed to deliver balance reminder to user %s",
+            user_telegram_id,
         )
-    except Exception:
-        logger.exception("Ошибка при отправке сообщения об истекающем балансе")
-        raise
-    return None
+        raise RuntimeError("Notification sender could not deliver balance reminder")

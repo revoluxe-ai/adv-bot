@@ -59,8 +59,8 @@ async def test_balance_reminder_service_update_creates_sent_reminder_and_event(
         "app.modules.wb_adv_updater.modules.balance_exp_informer.service.get_cabinet_balance",
         new_callable=AsyncMock,
     ) as mock_get_balance, patch(
-        "app.modules.wb_adv_updater.modules.balance_exp_informer.service.get_bot",
-    ) as mock_get_bot, patch(
+        "app.modules.wb_adv_updater.modules.balance_exp_informer.service.get_notification_sender",
+    ) as mock_get_sender, patch(
         "app.modules.wb_adv_updater.modules.balance_exp_informer.service.send_chunk",
         new_callable=AsyncMock,
     ) as mock_send_chunk, patch(
@@ -69,7 +69,7 @@ async def test_balance_reminder_service_update_creates_sent_reminder_and_event(
     ):
         mock_get_price.return_value = 100.0
         mock_get_balance.return_value = (0.0, 0.0)
-        mock_get_bot.return_value = MagicMock()
+        mock_get_sender.return_value = MagicMock()
 
         service = BalanceReminderService(
             session_factory=session_factory,
