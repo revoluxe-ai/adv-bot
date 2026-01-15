@@ -201,6 +201,50 @@ class TestPricerTariffs:
         assert details.total_per_month == 2 * tariffs[2]
 
     @pytest.mark.asyncio
+    async def test_mode_auto_when_auto_settings_configured_but_no_active_search(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        advs = [
+            DummyAdv(
+                search_adv_id=10,
+                automatic_version=1,
+                auto_update_white_list=True,
+                auto_update_target_place=False,
+            ),
+        ]
+
+        async def _fake_fetch_bot_active_advs(
+            session: Any, shop_id: str
+        ) -> Sequence[DummyAdv]:
+            return advs
+
+        async def _fake_fetch_active_search_adv_ids(
+            session: Any, search_adv_ids: Sequence[int]
+        ) -> set[int]:
+            return set()
+
+        monkeypatch.setattr(
+            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
+        )
+        if hasattr(Pricer, "fetch_active_search_adv_ids"):
+            monkeypatch.setattr(
+                Pricer,
+                "fetch_active_search_adv_ids",
+                staticmethod(_fake_fetch_active_search_adv_ids),
+            )
+        else:
+            monkeypatch.setattr(
+                Pricer,
+                "_fetch_active_search_adv_ids",
+                staticmethod(_fake_fetch_active_search_adv_ids),
+            )
+
+        details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
+        assert details.mode == TariffMode.AUTO
+        assert details.count == 0
+        assert details.total_per_month == 0.0
+
+    @pytest.mark.asyncio
     async def test_exponent_does_not_switch_to_auto_mode(
         self, monkeypatch: pytest.MonkeyPatch
     ):

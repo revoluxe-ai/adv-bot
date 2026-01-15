@@ -109,6 +109,32 @@ async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
     assert details.total_per_month == float(tariffs[2])
 
 
+async def test_auto_mode_applies_without_active_search_campaigns(
+    async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
+):
+    wb_cabinet_id = 1
+    shop_id = "test_shop_id"
+
+    auto = _make_auto_adv(
+        adv_id=90402,
+        wb_cabinet_id=wb_cabinet_id,
+        search_adv_id=None,
+        automatic_version=2,
+        wl=True,
+        tp=False,
+    )
+
+    async_session.add(auto)
+    await async_session.flush()
+
+    details = await Pricer().get_tariff_details(async_session, shop_id)
+
+    assert details.count == 0
+    assert details.mode == TariffMode.AUTO
+    assert details.total_per_month == 0.0
+
+
 async def test_count_is_zero_when_search_campaign_not_started(
     async_session: AsyncSession,
     wb_cabinet: WBCabinet,

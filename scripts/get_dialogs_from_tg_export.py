@@ -45,7 +45,7 @@ def main():
 
         # Удаляем папку, если она пустая
         try:
-            dirpath.rmdir()
+            dirpath.rmdir() # type: ignore
             print(f"Удалена папка: {dirpath}")
         except OSError:
             # не пустая — значит там что-то осталось (например, скрытые файлы)
