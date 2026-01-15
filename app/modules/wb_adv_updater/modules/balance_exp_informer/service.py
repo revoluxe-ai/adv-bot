@@ -9,7 +9,10 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.client_bot.bot import get_bot
+from app.client_bot.notification_sender import (
+    NotificationSender,
+    get_notification_sender,
+)
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.pricer.pricer import Pricer
@@ -102,12 +105,17 @@ async def iter_user_cabinets_batches(
 
 
 class BalanceReminderService:
-    def __init__(self, session_factory: Any,
-                 event_manager: BillingEventManager):
+    def __init__(
+        self,
+        session_factory: Any,
+        event_manager: BillingEventManager,
+        notification_sender: NotificationSender | None = None,
+    ):
         self._session_factory = session_factory
         self._logger = logging.getLogger(__name__)
         self._pricer = Pricer()
         self._event_manager = event_manager
+        self._notification_sender = notification_sender or get_notification_sender()
 
     async def update(self) -> None:
         today: date = billing_today()
@@ -132,7 +140,6 @@ class BalanceReminderService:
             due = await self._select_due_reminders(session, today)
             due_to_send_total = sum(len(items) for _, items in due.values())
 
-            bot = get_bot()
             for _user_id, (chat_id, items) in due.items():
                 items_sorted = sort_items(items)
                 chunks = chunk(items_sorted)[:MAX_CHUNKS_PER_USER]
@@ -140,7 +147,9 @@ class BalanceReminderService:
                     text, keyboard = build_message(reminder_chunk)
                     reminder_ids = [it.reminder_id for it in reminder_chunk]
                     try:
-                        await send_chunk(bot, chat_id, text, keyboard)
+                        await send_chunk(
+                            self._notification_sender, chat_id, text, keyboard
+                        )
                     except Exception as e:
                         logger.error("Ошибка отправки уведомления об исходе баланса: %s", e)
                         await self._event_manager.emit_balance_reminder_failed(

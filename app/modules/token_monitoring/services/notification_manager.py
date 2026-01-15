@@ -2,14 +2,17 @@
 
 import datetime
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_bot.notification_sender import (
+    NotificationSender,
+    get_notification_sender,
+)
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.modules.token_monitoring.models import (
     NotificationType,
@@ -45,25 +48,28 @@ class NotificationManager:
         ),
     }
 
-    def __init__(self, bot: Bot | None = None, session_maker=None) -> None:
+    def __init__(
+        self,
+        bot: Bot | None = None,
+        notification_sender: NotificationSender | None = None,
+        session_maker: Callable[..., AsyncSession] | None = None,
+    ) -> None:
         """
         Initialize the notification manager.
 
         Args:
-            bot: Optional Bot instance. If None, will be imported lazily.
+            bot: Optional Bot instance. If provided, its token is used to build a sender.
+            notification_sender: Optional notification sender.
             session_maker: Optional session maker. If None, uses default.
         """
-        self._bot = bot
         self.session_maker = session_maker or get_async_session_maker
-
-    @property
-    def bot(self) -> Bot:
-        """Lazy-load bot to avoid circular imports."""
-        if self._bot is None:
-            from app.client_bot.bot import get_bot
-
-            self._bot = get_bot()
-        return self._bot
+        if notification_sender is not None:
+            self._notification_sender = notification_sender
+        elif bot is not None:
+            token = bot.token
+            self._notification_sender = NotificationSender([token])
+        else:
+            self._notification_sender = get_notification_sender()
 
     async def notify_token_issue(
         self,
@@ -87,7 +93,7 @@ class NotificationManager:
                 shop_users = await self._get_shop_users(session, shop_id)
 
                 if not shop_users:
-                    logger.warning(f"No users found for shop {shop_id}")
+                    logger.warning("No users found for shop %s", shop_id)
                     return
 
                 # Get shop name from first user cabinet
@@ -115,14 +121,18 @@ class NotificationManager:
                 await session.commit()
 
                 logger.info(
-                    f"Sent {notifications_sent} notifications for shop {shop_id}, "
-                    f"type: {notification_type}"
+                    "Sent %s notifications for shop %s, type: %s",
+                    notifications_sent,
+                    shop_id,
+                    notification_type,
                 )
 
         except Exception as e:
             logger.error(
-                f"Failed to send notifications for shop {shop_id}, "
-                f"type {notification_type}: {e}",
+                "Failed to send notifications for shop %s, type %s: %s",
+                shop_id,
+                notification_type,
+                e,
                 exc_info=True,
             )
 
@@ -150,49 +160,54 @@ class NotificationManager:
             True if notification was sent successfully, False otherwise
         """
         user_telegram_id = user_cabinet.user.user_telegram_id
-
         try:
-            # Check if notification already exists (handled by unique constraint)
-            # Send Telegram message
-            await self.bot.send_message(user_telegram_id, message)
+            sent = await self._notification_sender.send_message(
+                user_telegram_id,
+                message,
+                disable_web_page_preview=True,
+            )
+            if not sent:
+                logger.warning(
+                    "Notification sender failed for user %s, shop %s",
+                    user_telegram_id,
+                    shop_id,
+                )
+                return False
 
-            # Record notification in database
             notification = TokenNotificationTracker(
                 shop_id=shop_id,
                 user_telegram_id=user_telegram_id,
                 notification_type=notification_type,
                 token_expiry_date=expiry_date,
-                sent_at=datetime.datetime.utcnow(),
+                sent_at=datetime.datetime.now(datetime.UTC),
             )
 
             session.add(notification)
             await session.flush()  # Flush to check for constraint violations
 
             logger.debug(
-                f"Notification sent to user {user_telegram_id} for shop {shop_id}"
+                "Notification sent to user %s for shop %s",
+                user_telegram_id,
+                shop_id,
             )
             return True
 
-        except TelegramForbiddenError:
-            # User blocked the bot - skip silently
-            logger.debug(
-                f"User {user_telegram_id} has blocked the bot, skipping notification"
-            )
-            return False
-
         except IntegrityError:
-            # Duplicate notification - skip (handled by database constraint)
             logger.debug(
-                f"Duplicate notification prevented for user {user_telegram_id}, "
-                f"shop {shop_id}, type {notification_type}"
+                "Duplicate notification prevented for user %s, shop %s, type %s",
+                user_telegram_id,
+                shop_id,
+                notification_type,
             )
             await session.rollback()
             return False
 
         except Exception as e:
             logger.error(
-                f"Failed to send notification to user {user_telegram_id} "
-                f"for shop {shop_id}: {e}",
+                "Failed to send notification to user %s for shop %s: %s",
+                user_telegram_id,
+                shop_id,
+                e,
                 exc_info=True,
             )
             return False
@@ -208,7 +223,7 @@ class NotificationManager:
             .where(WBCabinet.shop_id == shop_id)
         )
         result = await session.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     def _format_message(
         self,
@@ -230,7 +245,7 @@ class NotificationManager:
         template = self.MESSAGE_TEMPLATES.get(notification_type)
         if not template:
             logger.warning(
-                f"No template found for notification type: {notification_type}"
+                "No template found for notification type: %s", notification_type
             )
             return f"Проблема с токеном для магазина {shop_name}"
 
@@ -243,7 +258,9 @@ class NotificationManager:
         try:
             message = template.format(shop_name=shop_name, expiry_date=expiry_date_str)
         except KeyError as e:
-            logger.warning(f"Template formatting error for {notification_type}: {e}")
+            logger.warning(
+                "Template formatting error for %s: %s", notification_type, e
+            )
             message = f"Проблема с токеном для магазина {shop_name}"
 
         return message
@@ -282,8 +299,10 @@ class NotificationManager:
             await session.commit()
 
             logger.debug(
-                f"Marked {resolved_count} notifications as resolved for shop {shop_id}, "
-                f"type: {notification_type}"
+                "Marked %s notifications as resolved for shop %s, type: %s",
+                resolved_count,
+                shop_id,
+                notification_type,
             )
 
             return resolved_count
