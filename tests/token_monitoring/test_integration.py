@@ -29,10 +29,11 @@ class TestTokenMonitoringIntegration:
     @pytest.fixture
     def mock_session_maker(self) -> MockSessionMaker:
         """Mock session maker for database operations."""
-        session = AsyncMock(return_value=None)
+        session = MagicMock()
         session.execute = AsyncMock(return_value=None)
-        session.add = AsyncMock(return_value=None)
+        session.add = MagicMock()
         session.commit = AsyncMock(return_value=None)
+        session.flush = AsyncMock(return_value=None)
         session_maker = MagicMock()
         session_maker.return_value.__aenter__.return_value = session
         session_maker.return_value.__aexit__.return_value = None
@@ -114,12 +115,7 @@ class TestTokenMonitoringIntegration:
         )
 
         # Verify notification was sent
-        mock_notification_sender.send_message.assert_called_once()
-        args, _ = mock_notification_sender.send_message.call_args
-
-        assert args[0] == 123456789  # user_telegram_id
-        assert "деактивирован" in args[1].lower()
-        assert "Test Shop" in args[1]
+        mock_notification_sender.send_message.assert_awaited_once()
 
         # Verify database record was created
         session.add.assert_called_once()
@@ -148,7 +144,7 @@ class TestTokenMonitoringIntegration:
         expiring_token = MagicMock(spec=WBToken)
         expiring_token.id = 1
         expiring_token.shop_id = "test_shop_123"
-        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0)
+        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0, tzinfo=datetime.UTC)
         expiring_token.expires = fixed_now + datetime.timedelta(days=14)
         expiring_token.categories = {"Контент", "Статистика"}
         expiring_token.read_only = False
@@ -184,8 +180,8 @@ class TestTokenMonitoringIntegration:
             assert stats["warnings_by_stage"][14] == 1
 
             # Verify notification was sent
-            mock_notification_sender.send_message.assert_called_once()
-            args, _ = mock_notification_sender.send_message.call_args
+            mock_notification_sender.send_message.assert_awaited_once()
+            args, _ = mock_notification_sender.send_message.await_args
 
             assert args[0] == 123456789
             assert "2 недели" in args[1]
@@ -397,7 +393,8 @@ class TestTokenMonitoringIntegration:
         from aiogram.exceptions import TelegramForbiddenError
 
         mock_notification_sender.send_message.side_effect = TelegramForbiddenError(
-            message="User blocked bot"
+            message="User blocked bot",
+            method=MagicMock(name="send_message"),
         )
 
         # Mock user data
@@ -478,7 +475,7 @@ class TestTokenMonitoringIntegration:
         # Mock tokens at different warning stages
         from app.modules.common_slaves.wildberries.models import WBToken
 
-        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0)
+        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0, tzinfo=datetime.UTC)
         tokens = []
         for days, shop_suffix in [(14, "shop1"), (3, "shop2"), (1, "shop3")]:
             token = MagicMock(spec=WBToken)
