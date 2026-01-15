@@ -101,13 +101,15 @@ class Pricer:
     async def calculate_tariff_context(
         session: AsyncSession, shop_id: str
     ) -> TariffContext:
-        active_auto_advs = await Pricer.fetch_tariff_auto_advs(session, shop_id)
-        if not active_auto_advs:
+        auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
+        if not auto_advs:
             return TariffContext(count=0, has_auto=False)
 
-        has_auto = any(
-            Pricer.is_part_auto_setting_active(adv) for adv in active_auto_advs
+        has_auto = any(Pricer.is_part_auto_setting_active(adv) for adv in auto_advs)
+        active_auto_advs = await Pricer.fetch_tariff_auto_advs(
+            session, shop_id, auto_advs=auto_advs
         )
+
         return TariffContext(count=len(active_auto_advs), has_auto=has_auto)
 
     @staticmethod
@@ -147,7 +149,10 @@ class Pricer:
 
     @staticmethod
     async def fetch_tariff_auto_advs(
-        session: AsyncSession, shop_id: str
+        session: AsyncSession,
+        shop_id: str,
+        *,
+        auto_advs: Sequence[AdvSetting] | None = None,
     ) -> Sequence[AdvSetting]:
         """Возвращает auto-кампании, которые участвуют в тарификации.
 
@@ -155,7 +160,8 @@ class Pricer:
         - AdvSetting.bot_active == True
         - search-кампания (search_adv_id) имеет active_status == 'started'
         """
-        auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
+        if auto_advs is None:
+            auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
         if not auto_advs:
             return []
 
