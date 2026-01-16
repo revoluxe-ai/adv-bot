@@ -635,7 +635,7 @@ async def process_add_new_token(
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
 async def select_shop(
     callback_query: types.CallbackQuery,
-    callback_data: callbacks.Shop,
+    callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
@@ -644,6 +644,7 @@ async def select_shop(
     if reset_filter:
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    page = callback_data.page
     await state.update_data(
         last_wb_user_cabinet_original_id=wb_user_cabinet_original_id
     )
@@ -665,7 +666,12 @@ async def select_shop(
         adv_settings = []
 
     await messages.AdvCompanyChoicing(
-        bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
+        bot,
+        chat_id,
+        wb_user_cabinet_original_id,
+        adv_settings,
+        state,
+        page=page,
     )()
     return
 

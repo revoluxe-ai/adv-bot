@@ -414,6 +414,7 @@ class CoroutinesManager:
             if adv.bidder_active
                and adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
         ]
+        advs = [adv for adv in advs if adv.search_adv_active_status]
         if not advs:
             return None
         await update_clusters_bid_manager.update_cluster_bids(advs)
