@@ -1,7 +1,7 @@
 ﻿from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Type
 
 from sqlalchemy import select
@@ -23,7 +23,7 @@ async def get_users_with_low_balance_and_near_last_payment(
 ) -> AsyncGenerator[User, None]:
     """Yield users with low balance that received top-ups recently."""
 
-    threshold = datetime.now(datetime.UTC) - timedelta(days=payments_days_ago)
+    threshold = datetime.now(UTC) - timedelta(days=payments_days_ago)
     async with sm() as payment_session:
         async for user in get_users_with_low_balance(max_balance=max_balance):
             cabinet_ids = [cab.wb_cabinet_id for cab in user.wb_user_cabinets]
