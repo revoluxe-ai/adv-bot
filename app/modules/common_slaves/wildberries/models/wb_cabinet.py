@@ -66,6 +66,7 @@ class WBCabinet(BaseTable):
         Index("idx_balance", "balance"),
         Index("idx_bonus", "bonus"),
         Index("idx_wb_cabinet_id", "id"),
+        Index('idx_shop_id_active', 'shop_id','active'),
     )
 
     @hybrid_property

@@ -1,6 +1,6 @@
-import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.dto.plan_fact_stat_dto import PlanFactStatDTO
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller import (
@@ -12,6 +12,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.click
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,15 @@ class PlanFactManager:
 
         version = time.time()
 
-        # Создаем задачи для обработки каждой кампании
-        tasks = [
-            self._controller.process_adv(adv, version) for adv in advs
+        handlers: list[Callable[[], Awaitable[PlanFactStatDTO | None]]] = [
+            lambda adv=adv: self._controller.process_adv(adv, version) for adv in advs
         ]
 
-        # Запускаем все задачи параллельно
-        results: list[PlanFactStatDTO | None | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(
+            handlers,
+            max_workers=max(1, min(len(handlers), 16)),
+            return_exceptions=True,
+        )
 
         # Собираем успешные результаты
         plan_fact_stats: list[PlanFactStatDTO] = []

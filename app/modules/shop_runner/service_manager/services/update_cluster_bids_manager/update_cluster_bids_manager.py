@@ -1,7 +1,6 @@
-import asyncio
-from collections.abc import Awaitable
+import logging
+from collections.abc import Awaitable, Callable, Iterator
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
-from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
@@ -18,17 +17,21 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     new_bids_calculator.update_bids_command import UpdateBidsCommand, NewBid
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
-import logging
-from typing import Iterator, Coroutine, Any
+from typing import Any
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import RedisClusterBidsTimestampManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
 
 # TODO: Внедрить в ректрай WB Api декораторы всплески
 
 
 logger = logging.getLogger(__name__)
 
+
+def _max_workers_for(handler_count: int, cap: int) -> int:
+    return max(1, min(handler_count, cap))
+
 """
-TODO: WB Стал передавать информацию о Depricated методах прям в методах, 
+TODO: WB Стал передавать информацию о Depricated методах прям в методах,
 
 2025-12-10 22:32:56 - DEBUG - app.core.wb_api.http_request:156 - Запрос к https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail/history выполнен. Статус: 429, ответ: {
  "title": "too many requests",
@@ -90,18 +93,16 @@ class UpdateClusterBidsManager:
         advs: list[ComplexAdv],
         map_datas: set[AdvIdItemCalculateData],
     ) -> BidderUpdateData:
-        cluster_bids_task = asyncio.create_task(
-            self._get_cluster_bids_for_maps(map_datas, advs)
-        )
-        min_bids_task = asyncio.create_task(self._wb_manager.get_min_bids(advs))
-        fact_datas_task = asyncio.create_task(self._get_fact_datas(advs))
-        current_bids: list[NormqueryBidDTO]
-        min_bids: AdvMinNmidsBids
-        fact_data: dict[int, FactData]
-        current_bids, min_bids, fact_data = await asyncio.gather(
-            cluster_bids_task,
-            min_bids_task,
-            fact_datas_task,
+        handlers: list[Callable[[], Awaitable[Any]]] = [
+            lambda: self._get_cluster_bids_for_maps(map_datas, advs),
+            lambda: self._wb_manager.get_min_bids(advs),
+            lambda: self._get_fact_datas(advs),
+        ]
+
+        current_bids, min_bids, fact_data = await run_tasks(
+            handlers,
+            max_workers=3,
+            return_exceptions=False,
         )
         plan_data = self._get_plan_data(advs)
 
@@ -241,13 +242,13 @@ class UpdateClusterBidsManager:
 
 
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
-        calculate_data_tasks: list[Awaitable[set[AdvIdItemCalculateData]]] = []
-        for adv in advs:
-            get_data_task = self.__get_calculate_data(adv)
-            calculate_data_tasks.append(get_data_task)
-
-        results: list[ set[AdvIdItemCalculateData] | BaseException] \
-            = await asyncio.gather(*calculate_data_tasks, return_exceptions=True)
+        handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = [
+            lambda adv=adv: self.__get_calculate_data(adv) for adv in advs
+        ]
+        results = await run_tasks(
+            handlers,
+            max_workers=_max_workers_for(len(handlers), cap=16),
+        )
         datas: set[AdvIdItemCalculateData] = set()
         for result in results:
             if isinstance(result, BaseException):
@@ -257,11 +258,15 @@ class UpdateClusterBidsManager:
         return datas
 
     async def _apply_command(self, update_bids_command: UpdateBidsCommand):
-        tasks = await asyncio.gather(
-            self._redis_keyword_bidder_status_manager.update_statuses(
+        handlers: list[Callable[[], Awaitable[Any]]] = [
+            lambda: self._redis_keyword_bidder_status_manager.update_statuses(
                 update_bids_command
             ),
-            self._wb_manager.set_new_cluster_bids(update_bids_command),
+            lambda: self._wb_manager.set_new_cluster_bids(update_bids_command),
+        ]
+        tasks = await run_tasks(
+            handlers,
+            max_workers=2,
             return_exceptions=True,
         )
         wb_error: BaseException | None = None
@@ -289,11 +294,14 @@ class UpdateClusterBidsManager:
         return UpdateBidsCommand(new_bids)
 
     async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
-        tasks: list[Coroutine[Any, Any, FactData]] = []
-        for adv in advs:
-            task = self.__get_fact_data(adv)
-            tasks.append(task)
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        handlers: list[Callable[[], Awaitable[FactData]]] = [
+            lambda adv=adv: self.__get_fact_data(adv) for adv in advs
+        ]
+        results = await run_tasks(
+            handlers,
+            max_workers=_max_workers_for(len(handlers), cap=16),
+            return_exceptions=True,
+        )
         facts: list[FactData | None] = []
         for result in results:
             if isinstance(result, BaseException):

@@ -62,12 +62,16 @@ async def get_access_for_wb_cabinet(
 
         valited_tokens = []
         for token in wb_tokens:
+            token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
             if not token.check_valid():
                 logger.debug(f"Не валидный токен {token.api_key}")
                 continue
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
+            if wb_cabinet.active is not False:
+                wb_cabinet.active = False
+                await session.commit()
             raise ApiForbiddenError(
                 f"Нет валидных токенов для кабинета с shop_id {shop_id}"
             )
@@ -81,6 +85,7 @@ async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
     stmt = select(WBToken)
     async with sm() as session:
         async for wb_token in await session.stream_scalars(stmt):
+            wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
                 continue

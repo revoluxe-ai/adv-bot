@@ -5,6 +5,9 @@ from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
 
+from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
+from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,10 +38,13 @@ def single_run() -> (
                 self._single_run_call_counter[key] += 1
                 try:
                     await events[key].wait()
-                    try:
-                        return results[key]
-                    except KeyError:
-                        raise
+                    value = results.get(key)
+                    if value is None:
+                        raise KeyError(key)
+                    value_type, payload = value
+                    if value_type == "exc":
+                        raise payload
+                    return payload
 
                 finally:
                     self._single_run_call_counter[key] -= 1
@@ -55,12 +61,16 @@ def single_run() -> (
 
             try:
                 result = await func(self, *args, **kwargs)
-                results[key] = result
+                results[key] = ("ok", result)
                 return result
-            except Exception:
+            except NotFoundActiveAdvCompany as exc:
+                results[key] = ("exc", exc)
+                raise
+            except Exception as exc:
                 logger.error(
                     f"Ошибка обернутой функции: {func.__name__}", exc_info=True
                 )
+                results[key] = ("exc", exc)
                 raise
             finally:
                 event.set()

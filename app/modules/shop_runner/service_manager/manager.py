@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import  Awaitable, Coroutine, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
@@ -34,6 +34,10 @@ from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.shop_runner.tasks_manager.tasks_manager import (
+    TasksManager,
+    run_tasks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,12 @@ T = TypeVar("T")
 
 
 class CoroutinesManager:
-    def __init__(self, wb_api: WBApi, redis_client_wrapper: RedisClient):
+    def __init__(
+        self,
+        wb_api: WBApi,
+        redis_client_wrapper: RedisClient,
+        tasks_manager: TasksManager | None = None,
+    ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
@@ -58,6 +67,11 @@ class CoroutinesManager:
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client=redis_client_wrapper
         )
+        self._tasks_manager = tasks_manager
+
+    @staticmethod
+    def _max_workers_for(handler_count: int, cap: int) -> int:
+        return max(1, min(handler_count, cap))
 
     @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
@@ -76,12 +90,17 @@ class CoroutinesManager:
         if not advs:
             return None
         logger.debug("Обновляю ставки для магазина %s", self.shop_id)
-        results = await asyncio.gather(
-            *[
-                self.__run_bidder_process_for_adv(adv, self._wb_api)
-                for adv in advs
-            ],
-            return_exceptions=True,
+        handlers = [
+            lambda complex_adv=adv: self.__run_bidder_process_for_adv(
+                complex_adv, self._wb_api
+            )
+            for adv in advs
+        ]
+        max_workers = self._max_workers_for(len(handlers), cap=16)
+        results = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -93,6 +112,7 @@ class CoroutinesManager:
                     adv_setting.adv_id,
                     self.shop_id,
                 )
+
 
         logger.debug("Все ставки обновлены для магазина %s", self.shop_id)
         return None
@@ -176,21 +196,23 @@ class CoroutinesManager:
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
-        update_tasks: list[asyncio.Task[None] | Awaitable[None]] = []
         last_days_for_analyze = 2
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
+        handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
             if adv.auto_update_setting_version == 1:
                 adv_setting = adv.adv_setting
                 adv_updater = AdvSettingAutoUpdater(adv_setting, last_days_for_analyze)
                 keywords_coro = adv.get_keywords()
-                adv_update = adv_updater.update(keywords_coro)
-                adv_update_task = asyncio.create_task(adv_update)
-                update_tasks.append(adv_update_task)
+                handlers.append(
+                    lambda keywords_coro=keywords_coro,
+                           adv_updater=adv_updater: adv_updater.update(keywords_coro)
+                )
             elif adv.auto_update_setting_version == 2:
-                adv_update_task = control_system_v2.process_adv(adv)
-                update_tasks.append(adv_update_task)
+                handlers.append(
+                    lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
+                )
             else:
                 logger.error(
                     "[adv_id=%s] Неизвестная версия автообновления настроек: %s",
@@ -198,7 +220,16 @@ class CoroutinesManager:
                     adv.auto_update_setting_version,
                 )
 
-        await asyncio.gather(*update_tasks)
+        if not handlers:
+            return None
+
+        max_workers = self._max_workers_for(len(handlers), cap=16)
+        _ = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+            return_exceptions=False,
+            tasks_manager=self._tasks_manager,
+        )
         return None
 
     @while_coroutine_decorator(60, 1)
@@ -248,13 +279,21 @@ class CoroutinesManager:
             and adv.bot_active
         ]
 
-        tasks: list[Awaitable[None]] = []
+        handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
-            task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
-            tasks.append(task)
+            handlers.append(
+                lambda complex_adv=adv: delete_keywords_from_wl_by_mean_auto_ctr(
+                    complex_adv=complex_adv
+                )
+            )
 
-        results: Sequence[None | BaseException] = await asyncio.gather(
-            *tasks, return_exceptions=True
+        if not handlers:
+            return None
+
+        results: Sequence[None | BaseException] = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -286,13 +325,18 @@ class CoroutinesManager:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
-        update_tasks: list[Awaitable[None]] = []
+        handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
-            task = keyword_stamp_manager.update_keywords_position_stamp(adv)
-            update_tasks.append(task)
+            handlers.append(
+                lambda complex_adv=adv: keyword_stamp_manager.update_keywords_position_stamp(
+                    complex_adv
+                )
+            )
 
-        results: list[BaseException | None] = await asyncio.gather(
-            *update_tasks, return_exceptions=True
+        results: list[BaseException | None] = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
 
         for result in results:
@@ -322,13 +366,18 @@ class CoroutinesManager:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
-        update_tasks: list[Awaitable[None]] = []
+        handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
-            task = keyword_stamp_manager.update_keyword_history(adv)
-            update_tasks.append(task)
+            handlers.append(
+                lambda complex_adv=adv: keyword_stamp_manager.update_keyword_history(
+                    complex_adv
+                )
+            )
 
-        results: list[BaseException | None] = await asyncio.gather(
-            *update_tasks, return_exceptions=True
+        results: list[BaseException | None] = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
 
         for result in results:
@@ -350,12 +399,21 @@ class CoroutinesManager:
 
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        update_tasks: list[Awaitable[None]] = []
-        for adv in complex_advs:
-            task = minus_phrase_manager.update_minus_phrases(adv)
-            update_tasks.append(task)
+        handlers: list[Callable[[], Awaitable[Any]]] = [
+            lambda complex_adv=adv: minus_phrase_manager.update_minus_phrases(
+                complex_adv
+            )
+            for adv in complex_advs
+        ]
 
-        results: list[BaseException | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+        if not handlers:
+            return None
+
+        results: list[BaseException | None] = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
+        )
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):

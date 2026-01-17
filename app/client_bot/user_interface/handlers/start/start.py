@@ -278,6 +278,8 @@ async def process_cabinet_api(
 
         if wb_cabinet:
             await messages.CabinetExistsForUser(bot, chat_id)()
+            if wb_cabinet.active is not True:
+                wb_cabinet.active = True
             stmt_for_select_user_id = select(WBUserCabinet).where(
                 WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
                 WBUserCabinet.user_id == user_id,
@@ -307,6 +309,7 @@ async def process_cabinet_api(
             # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
             wb_cabinet: WBCabinet = WBCabinet()
             wb_cabinet.shop_id = shop_id
+            wb_cabinet.active = True
             wb_cabinet.balance = 0
             wb_cabinet.bonus = 0
             wb_cabinet.default_max_cpm = settings.DEFAULT_MAX_CPM
@@ -583,6 +586,14 @@ async def process_add_new_token(
             shop_id,
             user_id,
         )
+
+    async with sm() as session:
+        stmt_activate = select(WBCabinet).where(WBCabinet.shop_id == shop_id)
+        result_activate = await session.execute(stmt_activate)
+        wb_cabinet = result_activate.scalar()
+        if wb_cabinet and wb_cabinet.active is not True:
+            wb_cabinet.active = True
+            await session.commit()
 
     # Резолв всех уведомлений для этого магазина
     try:

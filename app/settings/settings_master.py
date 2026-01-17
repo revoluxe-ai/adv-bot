@@ -569,5 +569,13 @@ class Settings:
             raise ValueError('not set TG_TOKENS_FOR_SENDING')
         return [token.strip() for token in value.split(',') if token.strip() != '']
 
+
+    @property
+    def MAX_TASKS(self) -> int:
+        value = os.getenv("MAX_TASKS")
+        if not value:
+            return 1
+        return int(value)
+
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()
