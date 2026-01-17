@@ -9,7 +9,6 @@ work_folder/
 memory-bank/
 docs/
 stubs/
-scripts/
 **/node_modules/
 *.sqlite
 *.tar.gz*
