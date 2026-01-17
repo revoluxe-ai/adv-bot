@@ -1,16 +1,15 @@
 import asyncio
 import logging
-from typing import (
-    TypeVar,
-)
+from typing import TypeVar
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
+from .service_manager.exc import StopShopUpdateException
 from .shop_run_worker.redis_manager import RedisShopManager
+from .service_manager import CoroutinesManager
+from .tasks_manager.tasks_manager import TasksManager
 
 logger = logging.getLogger(__name__)
-from .service_manager import CoroutinesManager
-
 T = TypeVar("T")
 
 
@@ -20,35 +19,51 @@ class WBShop:
         wb_api: WBApi,
         redis_manager: RedisShopManager,
         redis_client_wrapper: RedisClient,
+        tasks_manager: TasksManager | None = None,
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
         self._redis_client_wrapper = redis_client_wrapper
+        self._tasks_manager = tasks_manager
 
     async def run(self) -> None:
         wb_api = self._wb_api
-        coroutines_manager = CoroutinesManager(wb_api, self._redis_client_wrapper)
+        coroutines_manager = CoroutinesManager(
+            wb_api, self._redis_client_wrapper, tasks_manager=self._tasks_manager
+        )
         # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
         #  автоэкспонентой, и именить тарификацию за автоматизацию, т.к. теперь управляющих сущности три
-
-        await asyncio.gather(
-            self._alive_worker_run(),
-            coroutines_manager.update_advs_data_from_wb_to_pg(),
-            coroutines_manager.update_cards_data_from_wb_to_pg(),
-            coroutines_manager.update_cpm_bid(), # фильтруем только активные РК
-            coroutines_manager.update_common_sale_stat(),
-            coroutines_manager.update_full_adv_stat(),
-            coroutines_manager.adv_settings_auto_update(), # фильтруем только активные РК
-            coroutines_manager.update_top_key_in_advs(), # фильтруем только активные РК
-            # # # # TODO: Отключил обновление Джема, т.к. выкидывает ошибку и мешает работе тем юзерам, у которых джема нет.
-            coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr(), # фильтруем только активные РК
-            coroutines_manager.update_minus_phrases_in_advs(),   # фильтруем только активные РК
-            coroutines_manager.update_clusters_adv_stats_today(),
-            coroutines_manager.update_clusters_adv_stats_history(),
-            coroutines_manager.update_cluster_bids(), # фильтруем только активные РК
-            coroutines_manager.update_plan_fact_stats()
-        )
+        try:
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(self._alive_worker_run())
+                tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg())
+                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg())
+                tg.create_task(coroutines_manager.update_cpm_bid())
+                tg.create_task(coroutines_manager.update_common_sale_stat())
+                tg.create_task(coroutines_manager.update_full_adv_stat())
+                tg.create_task(coroutines_manager.adv_settings_auto_update())
+                tg.create_task(
+                    coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
+                )
+                tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
+                tg.create_task(coroutines_manager.update_clusters_adv_stats_today())
+                tg.create_task(
+                    coroutines_manager.update_clusters_adv_stats_history()
+                )
+                tg.create_task(coroutines_manager.update_cluster_bids())
+                tg.create_task(coroutines_manager.update_plan_fact_stats())
+        except* StopShopUpdateException as stop_exc:
+            # Проглатываем StopShopUpdateException
+            # (все StopShopUpdateException из группы соберутся сюда)
+            for single in stop_exc.exceptions:
+                logger.info(f"Shop update stopped: {single!r}")
+            # ничего не поднимаем дальше
+        except* Exception:
+            # Остальные ошибки — поднимаем наружу
+            # (если хочется — можно логировать детали)
+            logger.error("Критические ошибки в TaskGroup (не StopShopUpdateException).")
+            raise
 
         # TODO: Перенести PV кликхаус на более маленький диск
 

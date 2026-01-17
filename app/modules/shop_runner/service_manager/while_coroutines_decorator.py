@@ -39,8 +39,14 @@ def while_coroutine_decorator(
                 except InterfaceError:
                     logger.exception(f"Корутина: {func.__name__}")
                     await asyncio.sleep(pause_on_error)
-                except (NotFoundActiveAdvCompany, ApiForbiddenError) as exc:
+                except ApiForbiddenError:
+                    raise
+                except NotFoundActiveAdvCompany as exc:
+                    logger.info("Нет активных кампаний: %s", exc)
                     raise StopShopUpdateException from exc
+                except StopShopUpdateException as exc:
+                    logger.info("Коробка остановлена: %s", exc)
+                    break
                 except MaxAttemptsError as exc:
                     logger.error(
                         f"Максимальное количество попыток для {func.__name__} достигнуто: {exc}",
