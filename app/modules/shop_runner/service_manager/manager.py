@@ -201,23 +201,8 @@ class CoroutinesManager:
         # TODO: Внедрить в бот плату за оборот
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
-            if adv.auto_update_setting_version == 1:
-                adv_setting = adv.adv_setting
-                adv_updater = AdvSettingAutoUpdater(adv_setting, last_days_for_analyze)
-                keywords_coro = adv.get_keywords()
-                handlers.append(
-                    lambda keywords_coro=keywords_coro,
-                           adv_updater=adv_updater: adv_updater.update(keywords_coro)
-                )
-            elif adv.auto_update_setting_version == 2:
-                handlers.append(
-                    lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
-                )
-            else:
-                logger.error(
-                    "[adv_id=%s] Неизвестная версия автообновления настроек: %s",
-                    adv.adv_setting.adv_id,
-                    adv.auto_update_setting_version,
+            handlers.append(
+                lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
                 )
 
         if not handlers:
