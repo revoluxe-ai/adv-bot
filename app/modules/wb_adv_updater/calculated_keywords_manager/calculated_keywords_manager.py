@@ -1,6 +1,8 @@
 from __future__ import annotations
 import asyncio
-from typing import Generator, Protocol, Sequence, cast
+from collections.abc import Awaitable, Callable
+from typing import Any, Generator, Protocol, Sequence, TypeVar, cast
+from typing_extensions import ParamSpec
 
 from sqlalchemy import select
 
@@ -21,7 +23,28 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from operator import  attrgetter
 
 from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
-from cashews import cache, noself #pyright: ignore
+from cashews import cache, noself  # pyright: ignore
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+class _AsyncDecoratorFactory(Protocol):
+    def __call__(
+        self, *, ttl: str, lock: bool
+    ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+        ...
+
+
+def _typed_noself_cache() -> _AsyncDecoratorFactory:
+    """Typed wrapper for ``cashews.noself(cache)``.
+
+    cashews doesn't ship strict typings for this decorator factory.
+    This helper preserves the signature of decorated async callables
+    for pyright/mypy.
+    """
+
+    return cast(Any, noself(cache))
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
@@ -106,7 +129,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             stats.append(stat)
         return stats
 
-    @noself(cache)(ttl="15m", lock=True)
+    @_typed_noself_cache()(ttl="15m", lock=True)
     async def __get_keywords_stat_from_clickhouse(self,
                                                   nmids: list[int],
                                                   min_days: int,
@@ -318,18 +341,3 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance() .get_statuses( # pyright: ignore # noqa
             complex_adv, texts)
         return statuses_map # pyright: ignore
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
