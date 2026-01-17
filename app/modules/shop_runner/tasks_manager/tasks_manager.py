@@ -79,7 +79,7 @@ class TasksManager:
                 if not entry.future.done():
                     entry.future.set_result(result)
             finally:
-                _ = self._queue.task_done()
+                self._queue.task_done()
 
 
 async def run_tasks(

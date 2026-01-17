@@ -5540,7 +5540,7 @@ version = "2025.2.0.20251108"
 description = "Typing stubs for pytz"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "dev"]
 files = [
     {file = "types_pytz-2025.2.0.20251108-py3-none-any.whl", hash = "sha256:0f1c9792cab4eb0e46c52f8845c8f77cf1e313cb3d68bf826aa867fe4717d91c"},
     {file = "types_pytz-2025.2.0.20251108.tar.gz", hash = "sha256:fca87917836ae843f07129567b74c1929f1870610681b4c92cb86a3df5817bdb"},
@@ -6120,4 +6120,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "813639581240952d9dda842354ac8d834cb41e0a59e9d6579c3743cf14924ee6"
+content-hash = "58e1d7278c5e4c5e7980c709e85d706863a21cf152995b5c29c033f846962bbe"

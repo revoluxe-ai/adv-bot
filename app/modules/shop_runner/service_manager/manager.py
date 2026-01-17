@@ -1,7 +1,6 @@
-import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
@@ -188,22 +187,19 @@ class CoroutinesManager:
         logger.debug("Обновление карточек завершено")
 
     @while_coroutine_decorator(5 * 60)
-    async def adv_settings_auto_update(self):
-        from .old_modules.setting_auto_updater import (
-            AdvSettingAutoUpdater,
-        )
+    async def adv_settings_auto_update(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
         last_days_for_analyze = 2
-        control_system_v2 = AdvControlSystem(max_last_period=2)
+        control_system_v2 = AdvControlSystem(max_last_period=last_days_for_analyze)
         # TODO: Внедрить в бот плату за оборот
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
             handlers.append(
                 lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
-                )
+            )
 
         if not handlers:
             return None
@@ -228,24 +224,47 @@ class CoroutinesManager:
             await self._wb_shop_data_manager.get_complex_advs()
         )
         advs = [adv for adv in advs if adv.bot_active]
-        tasks: list[asyncio.Task[None]] = []
-        for adv in advs:
-            if not adv.auto_update_white_list:
-                continue
+        advs_with_whitelist = [
+            adv for adv in advs if adv.auto_update_white_list
+        ]
+        if not advs_with_whitelist:
+            return None
+
+        handlers: list[Callable[[], Awaitable[Any]]] = []
+        for adv in advs_with_whitelist:
             adv_setting = adv.adv_setting
             updater = FirstKeyUpdater(adv_setting)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
-                adv
+            handlers.append(
+                lambda complex_adv=adv, upd=updater: upd.top_key_auto_update(
+                    complex_adv
+                )
             )
-            task = asyncio.create_task(update_coroutine)
-            tasks.append(task)
 
-        for task in tasks:
-            try:
-                await task
-            except FirstKeyUpdaterError as exc:
-                logger.error("Ошибка обновления верхнего ключа: %s", exc, exc_info=True)
-                raise exc
+        results = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
+        )
+
+        for adv, result in zip(advs_with_whitelist, results):
+            if isinstance(result, FirstKeyUpdaterError):
+                logger.error(
+                    "Ошибка обновления верхнего ключа для adv_id %s: %s",
+                    adv.adv_id,
+                    result,
+                    exc_info=True,
+                )
+                raise result
+            if isinstance(result, Exception):
+                logger.error(
+                    "Ошибка обновления верхнего ключа для adv_id %s: %s",
+                    adv.adv_id,
+                    result,
+                    exc_info=True,
+                )
+                raise result
+
+        return None
 
     @while_coroutine_decorator(15, 60)
     async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
