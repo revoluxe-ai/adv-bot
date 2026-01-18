@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from typing import Any
 from typing import List, TYPE_CHECKING
 import datetime
 
@@ -13,11 +15,26 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    GetAdvV1BalanceResponse200,
+)
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
         SetNormqueryBidsCommandItem,
     )
+
+
+@dataclass(slots=True)
+class CampaignBudgetInfo:
+    total: int | None
+    raw: dict[str, Any]
+
+
+@dataclass(slots=True)
+class BudgetTopUpResult:
+    total: int | None
+    raw: dict[str, Any]
 
 
 class PromotionManager:
@@ -85,3 +102,29 @@ class PromotionManager:
         from .methods.set_cluster_bids import set_cluster_bids as method
 
         await method(self._client.normquery_bids_adapter, bids)
+
+    async def get_campaign_budget(self, adv_id: int) -> CampaignBudgetInfo:
+        response = await self._client.finance_adapter.get_campaign_budget(adv_id)
+        raw: dict[str, Any] = response.to_dict() if response else {}
+        total = raw.get("total")
+        return CampaignBudgetInfo(total=total if isinstance(total, int) else None, raw=raw)
+
+    async def top_up_budget(
+        self,
+        adv_id: int,
+        amount: int,
+        balance_type: str,
+        return_total: bool = True,
+    ) -> BudgetTopUpResult:
+        response = await self._client.finance_adapter.top_up_budget(
+            adv_id=adv_id,
+            amount=amount,
+            balance_type=balance_type,
+            return_total=return_total,
+        )
+        raw: dict[str, Any] = response.to_dict() if response else {}
+        total = raw.get("total")
+        return BudgetTopUpResult(total=total if isinstance(total, int) else None, raw=raw)
+
+    async def get_campaign_balance(self) -> GetAdvV1BalanceResponse200 | None:
+        return await self._client.finance_adapter.get_campaign_balance()

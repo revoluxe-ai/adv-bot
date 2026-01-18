@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 if typing.TYPE_CHECKING:
-    from app.core.mp.wb.api.domain_managers.promotion import PromotionManager
+    from app.core.mp.wb.api.domain_managers.promotion import (
+        PromotionManager,
+        CampaignBudgetInfo,
+        BudgetTopUpResult,
+    )
+    from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+        GetAdvV1BalanceResponse200,
+    )
 
 
 
@@ -64,3 +71,23 @@ class WBModifier:
 
         await self._promotion_manager.set_cluster_bids(converted_bids)
         return None
+
+    async def get_campaign_budget(self, adv_id: int) -> "CampaignBudgetInfo":
+        return await self._promotion_manager.get_campaign_budget(adv_id)
+
+    async def top_up_budget(
+        self,
+        adv_id: int,
+        amount: int,
+        balance_type: str,
+        return_total: bool = True,
+    ) -> "BudgetTopUpResult":
+        return await self._promotion_manager.top_up_budget(
+            adv_id=adv_id,
+            amount=amount,
+            balance_type=balance_type,
+            return_total=return_total,
+        )
+
+    async def get_campaign_balance(self) -> typing.Union["GetAdvV1BalanceResponse200", None]:
+        return await self._promotion_manager.get_campaign_balance()
