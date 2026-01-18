@@ -14,12 +14,8 @@ from app.client_bot.user_interface import states
 from app.modules.common_slaves.wildberries.models import (
     WBToken,
     WBUserCabinet,
-    WBCabinet,
 )
-from app.utils.db.models import User
-from app.core.wb_api.exceptions import NotValidTokenError
-from app.modules.shop_menu import message as shop_menu_messages
-from app.client_bot.user_interface.views.messages import messages as view_messages
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 @pytest.fixture

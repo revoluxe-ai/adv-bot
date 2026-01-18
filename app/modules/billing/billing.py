@@ -15,12 +15,12 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBBalancePayment,
     WBBonusPayment,
-    WBCabinet,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .models import AdvPayment
 from .redis_lock import RedisLock
 from .redis_manager import RedisManager
+from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 logger = logging.getLogger(__name__)
 

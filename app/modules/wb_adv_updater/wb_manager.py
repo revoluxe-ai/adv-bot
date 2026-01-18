@@ -13,7 +13,6 @@ from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
-    WBCabinet,
 )
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 
@@ -24,6 +23,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from .wb_adv_api import WBAdvAPI
 from ..billing import AdvPayment
 from ..common_slaves.wildberries import super_cabinet_manager
+from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
 from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate

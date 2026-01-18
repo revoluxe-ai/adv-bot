@@ -2,6 +2,8 @@
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
 os.environ["POSTGRES_REPLICA_HOST"] = "localhost"

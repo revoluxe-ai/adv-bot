@@ -15,7 +15,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ApplyDefaultsForShop,
     TurnBot,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType

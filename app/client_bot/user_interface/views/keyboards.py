@@ -21,7 +21,6 @@ from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
-    WBCabinet,
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
@@ -30,6 +29,7 @@ from app.modules.common_slaves.wildberries.models.models import (
     BidderCoroutineType,
     PredictCTRMode,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )

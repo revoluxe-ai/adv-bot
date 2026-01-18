@@ -15,7 +15,7 @@ from app.modules.token_monitoring.models import (
     NotificationType,
     TokenNotificationTracker,
 )
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 
 

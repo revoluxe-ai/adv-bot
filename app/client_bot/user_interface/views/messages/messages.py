@@ -38,10 +38,10 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBBalancePayment,
-    WBCabinet,
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (

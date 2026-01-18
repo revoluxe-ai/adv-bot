@@ -23,9 +23,9 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
-    WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client

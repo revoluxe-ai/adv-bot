@@ -18,9 +18,9 @@ from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.pricer.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater.modules.balance_exp_informer.dto import ReminderItem
 from app.modules.wb_adv_updater.modules.balance_exp_informer.levels import (
     BalanceLevel,

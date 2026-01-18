@@ -28,10 +28,10 @@ from app.modules.common_slaves.wildberries import (
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBToken,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.shop_menu.message import ShopMenu
@@ -132,7 +132,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api(
     message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
-) -> None:
+) -> bool:
     """
     Юзер вводит токен, который проверяется на валидность.
     Если токен не валиден, то юзеру отправляется сообщение об этом.
@@ -387,7 +387,7 @@ async def add_app_token(
 @router.message(StateFilter(states.AddNewToken.token))
 async def process_add_new_token(
     message: Message, bot: aiogram.Bot, state: FSMContext
-) -> None:
+) -> bool:
     """
     Обработчик добавления нов��го токена для существующего магазина.
 

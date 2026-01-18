@@ -1,7 +1,8 @@
 from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 

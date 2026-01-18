@@ -20,8 +20,8 @@ from app.modules.balance_manager.exceptions import (
 from app.modules.common_slaves.wildberries.models import (
     WBBalancePayment,
     WBBonusPayment,
-    WBCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
 

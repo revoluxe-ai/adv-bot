@@ -7,10 +7,11 @@ from sqlalchemy import select
 
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
 from . import exceptions
 from .models import WBToken
+from .models.wb_cabinet import WBCabinet
 
 sm = get_async_session_maker
 

@@ -1,8 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.billing.pricer import Pricer
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 

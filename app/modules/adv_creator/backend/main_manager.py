@@ -14,6 +14,11 @@ from app.client_bot.modules.default_settings import apply_defaults_to_adv_settin
 from app.core.wb_api.mixins.excs import (
     CardNotFoundInWB,
 )
+
+from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
+
+
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (

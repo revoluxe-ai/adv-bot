@@ -11,7 +11,6 @@ from aiogram.types import InlineKeyboardButton
 
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
     WBUserCabinet,
     AdvSetting,
 )

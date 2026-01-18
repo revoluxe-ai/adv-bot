@@ -1,11 +1,11 @@
 from datetime import datetime
 
 from sqlalchemy.orm import selectinload
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.balance_manager.exceptions import (
     CabinetNotFoundError,
     InvalidAmountError,
-    PaymentNotFoundError,
     UserNotFoundError,
 )
 from app.modules.common_slaves.wildberries.models import (

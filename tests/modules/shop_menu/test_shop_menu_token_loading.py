@@ -14,12 +14,6 @@ from app.modules.token_monitoring.services.token_info_service import (
     TokenStatusReport,
     TokenInfo,
 )
-from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
-    WBUserCabinet,
-    AdvSetting,
-)
-from app.utils.db.models import User
 
 
 class TestShopMenuTokenLoading:

@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from aiogram import Bot
 from sqlalchemy import select
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +14,6 @@ from app.client_bot.notification_sender import (
     NotificationSender,
     get_notification_sender,
 )
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.modules.token_monitoring.models import (
     NotificationType,
     TokenNotificationTracker,

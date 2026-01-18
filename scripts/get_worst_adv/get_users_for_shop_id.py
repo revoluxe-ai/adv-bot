@@ -2,8 +2,8 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
-from app.modules.shop_runner.service_manager.wb_shop_data_manager import WBShopDataManager
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 

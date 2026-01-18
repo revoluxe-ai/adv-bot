@@ -210,7 +210,8 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
     # Добавим проверку, что _get_days_static_text формирует правильный текст
     # Для этого нам понадобится CommonStatDataManager и AdvSetting
     from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import CommonStatDataManager
-    from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+    from app.modules.common_slaves.wildberries.models import AdvSetting
+    from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
     from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
 
     # Создаем фиктивный WBCabinet

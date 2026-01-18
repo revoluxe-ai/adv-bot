@@ -7,6 +7,7 @@ from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .redis_manager import RedisShopManager
+from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:

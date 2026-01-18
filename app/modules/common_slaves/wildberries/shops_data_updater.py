@@ -8,7 +8,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from . import models, wb_db_manager
 from .data_classes.adv import Adv
-from .models import WBCabinet
+from .models.wb_cabinet import WBCabinet
 
 if typing.TYPE_CHECKING:
     from ...shop_runner.modules.wb_api import WBApi

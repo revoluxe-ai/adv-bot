@@ -8,7 +8,7 @@ from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
-from .models import WBCabinet
+from .models.wb_cabinet import WBCabinet
 
 if TYPE_CHECKING:
     from .models import WBToken

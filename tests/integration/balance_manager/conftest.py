@@ -6,8 +6,7 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 
-from app.modules.balance_manager.balance_service import sm
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 @pytest.fixture(autouse=True)

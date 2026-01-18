@@ -7,8 +7,8 @@ from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
-    WBCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 
