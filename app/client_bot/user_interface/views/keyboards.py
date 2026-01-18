@@ -76,6 +76,16 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(button)
 
+    activity_callback = callbacks.ManageCampaignActivity(
+        action="menu", adv_setting_original_id=adv_setting.id
+    ).pack()
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Управление активностью РК",
+            callback_data=activity_callback,
+        )
+    )
+
     # Кнопка для применения дефолтных настроек
     if adv_setting.bot_active:
         button = InlineKeyboardButton(
