@@ -27,7 +27,7 @@ class Adapter(BaseSectionAdapter):
     ) -> list[CommonSaleStatRow]:
         body = command_to_body(command)
         client = await self.auth_client_handler.get_proxy_client(self)
-        response = await with_raise_errors(asyncio_detailed, client, body)
+        response = await with_raise_errors(asyncio_detailed, client, body=body)
         response = cast(Response[list[ProductHistoryResponseItem]], response)
         parsed = response.parsed
         if parsed is None:
