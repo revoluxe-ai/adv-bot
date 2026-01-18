@@ -27,15 +27,15 @@ class ResponseProtocol(Protocol):
 async def with_raise_errors(
     method: Callable[..., Awaitable[Any]],
     client: AuthenticatedCastClient,
-    body: Any,
+    **kwargs: Any,
 ) -> Any:
     try:
-        result = await method(client=client, body=body)
+        result = await method(client=client, **kwargs)
     except httpx.TimeoutException as exc:
         raise HttpTimeOutError("Превышено время ожидания") from exc
 
     # здесь нам важно только то, что у result есть status_code
-    status = result.status_code  # type: ignore[attr-defined]
+    status = result.status_code
 
     if 200 <= status < 300:
         return result
