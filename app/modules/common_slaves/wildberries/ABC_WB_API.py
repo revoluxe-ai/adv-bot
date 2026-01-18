@@ -2,7 +2,7 @@ import logging
 import os
 from abc import ABC
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession
 
@@ -38,7 +38,7 @@ class Headers:
 # Существует два похожих базовых класса: ABC_WB_API и BaseAPI (app/core/wb_api/base.py)
 # Нужно провести рефакторинг для объединения или четкого разделения ответственности
 # Дата: 04.09.2025
-class ABC_WB_API(WbRequestApiMixin):
+class ABC_WB_API(WbRequestApiMixin): # noqa
     current_path = os.path.dirname(os.path.abspath(__file__))
     ORDERS_REPORTS_FOLDER = os.path.join(current_path, "WB_orders_reports")
     DISCOUNT_REPORTS_FOLDER = os.path.join(current_path, "WB_discount_reports")
