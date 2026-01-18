@@ -234,6 +234,18 @@ class ComplexAdv:
         return self._adv_setting.adv_id
 
     @property
+    def auto_budget_daily_limit(self) -> int:
+        return self._adv_setting.auto_budget_daily_limit
+
+    @property
+    def search_auto_budget_daily_limit(self) -> int:
+        return self._adv_setting.search_auto_budget_daily_limit
+
+    @property
+    def search_adv_id(self) -> int | None:
+        return self._adv_setting.search_adv_id
+
+    @property
     def auto_add_only_relevant_phrase(self):
         return self._adv_setting.auto_add_only_relevant_phrase
 
