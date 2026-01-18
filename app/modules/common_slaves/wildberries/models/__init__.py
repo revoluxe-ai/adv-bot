@@ -1,16 +1,15 @@
-from app.modules.billing import models as _billing_models  # noqa: F401
-
 __all__ = [
     "KeywordSetting",
     "AdvSetting",
-    "WBCabinet",
     "WBUserCabinet",
     "WBCard",
     "WBCategory",
     "WBToken",
     "WBBalancePayment",
     "WBBonusPayment",
+    "WBAutoBudgetTopUp",
     "AdvKeyword",
+    "WBCabinet",
 ]
 
 from .models import (
@@ -22,6 +21,8 @@ from .models import (
     WBToken,
     WBBalancePayment,
     WBBonusPayment,
+    WBAutoBudgetTopUp,
     AdvKeyword,
 )
+
 from .wb_cabinet import WBCabinet
