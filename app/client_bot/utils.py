@@ -113,7 +113,6 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
         # TODO: Привести выгрузку к текущему формату, по уму - полностью переделать, убрать не а
         # Определение позиции (единое поле)
-        first_position: str | float = ""
         position_value = keyword.position
         if position_value > 0:
             first_position = int(position_value + 0.5)
