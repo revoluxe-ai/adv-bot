@@ -46,7 +46,7 @@ class MinBidsAdapter(BaseSectionAdapter):
         response: Response[PostAdvV0BidsMinResponse200] = await with_raise_errors(
             asyncio_detailed,
             client,
-            body,
+            body=body,
         )
         parsed = response.parsed
         if parsed is None:
