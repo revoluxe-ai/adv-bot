@@ -25,7 +25,7 @@ class MinusPhrasesAdapter(BaseSectionAdapter):
         try:
             response = await with_raise_errors(post_adv_v0_normquery_set_minus.asyncio_detailed,
                                            client,
-                                           body)
+                                           body=body)
         except Exception as exc:
             logger.error('Ошибка обновления минус-фраз', exc_info=True)
             raise exc
