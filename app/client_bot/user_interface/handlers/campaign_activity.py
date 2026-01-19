@@ -110,13 +110,13 @@ async def turn_off_limit(
             raise ValueError("AdvSetting not found")
         setattr(adv_setting, _limit_attr_name(callback_data.campaign_type), 0)
         await session.commit()
-    await messages.CampaignActivityTargetMenu(
-        callback.bot,
-        callback.message.chat.id,
-        adv_setting,
-        callback_data.campaign_type,
-        0,
-    )()
+        await messages.CampaignActivityTargetMenu(
+            callback.bot,
+            callback.message.chat.id,
+            adv_setting,
+            callback_data.campaign_type,
+            0,
+        )()
 
 
 @router.message(StateFilter(states.CampaignActivity.waiting_for_new_limit))
@@ -151,12 +151,11 @@ async def set_new_limit(message: types.Message, state: FSMContext):
             return
         setattr(adv_setting, _limit_attr_name(campaign_type), limit)
         await session.commit()
-
-    await state.clear()
-    await messages.CampaignActivityTargetMenu(
-        message.bot,
-        message.chat.id,
-        adv_setting,
-        campaign_type,
-        limit,
-    )()
+        await state.clear()
+        await messages.CampaignActivityTargetMenu(
+            message.bot,
+            message.chat.id,
+            adv_setting,
+            campaign_type,
+            limit,
+        )()
