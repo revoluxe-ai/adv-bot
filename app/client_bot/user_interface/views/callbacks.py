@@ -266,6 +266,11 @@ class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):
     new_status: bool
 
 
+class AutoBudgetWatchdogToggle(CallbackData, prefix="auto_budget_watchdog_toggle"):
+    adv_setting_original_id: int
+    new_status: bool
+
+
 class ChangeAuctionBidderActiveStatus(
     CallbackData, prefix="change_auction_bidder_active_status"
 ):

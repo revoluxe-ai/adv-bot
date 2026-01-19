@@ -89,6 +89,20 @@ def get_adv_setting_keyboard(
         )
     )
 
+    watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
+    watchdog_button = InlineKeyboardButton(
+        text=(
+            "$ Выключить контроль запуска кампаний и пополнения бюджета"
+            if watchdog_enabled
+            else "Включить контроль запуска кампаний и пополнения бюджета"
+        ),
+        callback_data=callbacks.AutoBudgetWatchdogToggle(
+            adv_setting_original_id=adv_setting.id,
+            new_status=not watchdog_enabled,
+        ).pack(),
+    )
+    _ = builder.row(watchdog_button)
+
     # Кнопка для применения дефолтных настроек
     if adv_setting.bot_active:
         button = InlineKeyboardButton(
