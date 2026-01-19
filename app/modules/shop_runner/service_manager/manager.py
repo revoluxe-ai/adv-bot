@@ -473,7 +473,7 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=max_workers,
-            tasks_manager=self._tasks_manager,
+            tasks_manager=self._db_tasks_manager,
         )
 
         for (adv_setting, campaign_type, adv_id), result in zip(task_specs, results):
