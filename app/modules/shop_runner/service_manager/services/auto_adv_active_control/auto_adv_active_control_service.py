@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable, Awaitable
+from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 logger = logging.getLogger(__name__)
+
+MSK_TZ = timezone(timedelta(hours=3))
 
 
 class AutoAdvActiveControlService:
@@ -33,9 +37,21 @@ class AutoAdvActiveControlService:
 
         handlers: list[Callable[[], Awaitable[None]]] = []
 
+        now_msk = datetime.now(MSK_TZ)
+        start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
+        end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
+
         for adv in complex_advs:
-            self._schedule_auto_campaign_actions(adv, handlers)
-            self._schedule_search_campaign_actions(adv, handlers)
+            handlers.append(
+                lambda complex_adv=adv: self._auto_campaign_handler(
+                    complex_adv, start_of_day, end_of_day
+                )
+            )
+            handlers.append(
+                lambda complex_adv=adv: self._search_campaign_handler(
+                    complex_adv, start_of_day, end_of_day
+                )
+            )
 
         if not handlers:
             return None
@@ -58,49 +74,83 @@ class AutoAdvActiveControlService:
     def _max_workers_for(handler_count: int, cap: int) -> int:
         return max(1, min(handler_count, cap))
 
-    def _schedule_auto_campaign_actions(
+    @staticmethod
+    async def _get_spend_for_adv(
+        adv_id: int | None,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> float:
+        if adv_id is None:
+            return 0.0
+        return await full_wb_adv_stat.get_spend_by_last_days(
+            [adv_id],
+            start_date,
+            end_date,
+        )
+
+    async def _auto_campaign_handler(
         self,
         adv: ComplexAdv,
-        handlers: list[Callable[[], Awaitable[None]]],
+        start_of_day: datetime,
+        end_of_day: datetime,
     ) -> None:
-
-        auto_limit = adv.auto_budget_daily_limit or 0
-        auto_status: str = adv.auto_adv_active_status_str
         adv_id = adv.auto_adv_id
-        if auto_limit > 0 and auto_status == "pause":
+        spend_today = await self._get_spend_for_adv(adv_id, start_of_day, end_of_day)
+        auto_limit = adv.auto_budget_daily_limit or 0
+        auto_status = adv.auto_adv_active_status_str
+
+        if 0 < auto_limit <= spend_today:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign because spend %.2f >= limit %s adv_id=%s shop_id=%s",
+                    spend_today,
+                    auto_limit,
+                    adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return
+
+        if auto_limit > 0 and auto_status == WBAdvActiveStatus.PAUSE:
             logger.info(
                 "Auto budget watcher: starting auto campaign adv_id=%s shop_id=%s",
                 adv_id,
                 adv.shop_id,
             )
-            handlers.append(
-                lambda complex_adv=adv: self._wb_modifier.start_auto_campaign(
-                    complex_adv
-                )
-            )
-        elif auto_limit == 0 and auto_status == "started":
+            await self._wb_modifier.start_auto_campaign(adv)
+        elif auto_limit == 0 and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto budget watcher: pausing auto campaign adv_id=%s shop_id=%s",
                 adv_id,
                 adv.shop_id,
             )
-            handlers.append(
-                lambda complex_adv=adv: self._wb_modifier.pause_auto_campaign(
-                    complex_adv
-                )
-            )
+            await self._wb_modifier.pause_auto_campaign(adv)
 
-    def _schedule_search_campaign_actions(
+    async def _search_campaign_handler(
         self,
         adv: ComplexAdv,
-        handlers: list[Callable[[], Awaitable[None]]],
+        start_of_day: datetime,
+        end_of_day: datetime,
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
             return None
 
+        spend_today = await self._get_spend_for_adv(adv_id, start_of_day, end_of_day)
         search_limit = adv.search_auto_budget_daily_limit or 0
         search_status = adv.search_adv_active_status_str
+
+        if 0 < search_limit <= spend_today:
+            if search_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auction campaign because spend %.2f >= limit %s adv_id=%s shop_id=%s",
+                    spend_today,
+                    search_limit,
+                    adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auction_campaign(adv)
+            return
 
         if search_limit > 0 and search_status == WBAdvActiveStatus.PAUSE:
             logger.info(
@@ -108,19 +158,11 @@ class AutoAdvActiveControlService:
                 adv_id,
                 adv.shop_id,
             )
-            handlers.append(
-                lambda complex_adv=adv: self._wb_modifier.start_auction_campaign(
-                    complex_adv
-                )
-            )
+            await self._wb_modifier.start_auction_campaign(adv)
         elif search_limit == 0 and search_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto budget watcher: pausing auction campaign adv_id=%s shop_id=%s",
                 adv_id,
                 adv.shop_id,
             )
-            handlers.append(
-                lambda complex_adv=adv: self._wb_modifier.pause_auction_campaign(
-                    complex_adv
-                )
-            )
+            await self._wb_modifier.pause_auction_campaign(adv)
