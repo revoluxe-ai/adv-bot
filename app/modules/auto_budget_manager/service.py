@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from app.modules.common_slaves.wildberries.models.wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -567,4 +569,6 @@ class AutoBudgetService:
 
     @staticmethod
     async def _get_last_full_stat_update(adv_id: int) -> datetime.datetime | None:
-        return await data_manager.get_last_full_stat_update(adv_id)
+        dt = data_manager.get_last_full_stat_update(adv_id)
+        dt = dt.replace(tzinfo=ZoneInfo("Europe/Moscow"))
+        return dt
