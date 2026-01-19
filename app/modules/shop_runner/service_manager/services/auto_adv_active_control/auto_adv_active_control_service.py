@@ -5,6 +5,10 @@ from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+    PlanFactSummary,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -22,9 +26,11 @@ class AutoAdvActiveControlService:
         self,
         wb_modifier: WBModifier,
         tasks_manager: TasksManager,
+        plan_fact_reader: PlanFactReader,
     ) -> None:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
+        self._plan_fact_reader = plan_fact_reader
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
         complex_advs = [
@@ -87,6 +93,33 @@ class AutoAdvActiveControlService:
             start_date,
             end_date,
         )
+    @staticmethod
+    async def _get_average_order_cost(adv_id: int) -> float | None:
+        now = datetime.now(MSK_TZ)
+        start_date = (now - timedelta(days=6)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        stats = await full_wb_adv_stat.get_stats_by_last_days(
+            [adv_id], start_date, now
+        )
+        if stats.orders == 0:
+            return float("inf") if stats.spend > 0 else 0.0
+        return stats.spend / stats.orders
+
+    @staticmethod
+    def _resolve_target_cost(summary: PlanFactSummary | None) -> float | None:
+        if not summary:
+            return None
+        if (
+            summary.plan_orders is None
+            or summary.plan_target_pay_for_order is None
+            or summary.plan_max_pay_for_order is None
+        ):
+            return None
+        fact_orders = summary.fact_predict_orders or 0.0
+        if fact_orders >= summary.plan_orders:
+            return summary.plan_target_pay_for_order
+        return summary.plan_max_pay_for_order
 
     async def _auto_campaign_handler(
         self,
@@ -94,8 +127,9 @@ class AutoAdvActiveControlService:
         start_of_day: datetime,
         end_of_day: datetime,
     ) -> None:
-        adv_id = adv.auto_adv_id
-        spend_today = await self._get_spend_for_adv(adv_id, start_of_day, end_of_day)
+        auto_adv_id = adv.auto_adv_id
+        plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(auto_adv_id )
+        spend_today = await self._get_spend_for_adv(auto_adv_id , start_of_day, end_of_day)
         auto_limit = adv.auto_budget_daily_limit or 0
         auto_status = adv.auto_adv_active_status_str
 
@@ -105,7 +139,7 @@ class AutoAdvActiveControlService:
                     "Auto budget watcher: pausing auto campaign because spend %.2f >= limit %s adv_id=%s shop_id=%s",
                     spend_today,
                     auto_limit,
-                    adv_id,
+                    auto_adv_id ,
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auto_campaign(adv)
@@ -114,17 +148,44 @@ class AutoAdvActiveControlService:
         if auto_limit > 0 and auto_status == WBAdvActiveStatus.PAUSE:
             logger.info(
                 "Auto budget watcher: starting auto campaign adv_id=%s shop_id=%s",
-                adv_id,
+                auto_adv_id ,
                 adv.shop_id,
             )
             await self._wb_modifier.start_auto_campaign(adv)
         elif auto_limit == 0 and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto budget watcher: pausing auto campaign adv_id=%s shop_id=%s",
-                adv_id,
+                auto_adv_id,
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auto_campaign(adv)
+
+        target_cost = self._resolve_target_cost(plan_fact_summary)
+        if target_cost is None:
+            return
+
+        avg_cost = await self._get_average_order_cost(auto_adv_id)
+        if avg_cost is None:
+            return
+
+        if avg_cost > target_cost and auto_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Auto watchdog: pausing auto campaign due to high avg cost %.2f vs target %.2f adv_id=%s shop_id=%s",
+                avg_cost,
+                target_cost,
+                auto_adv_id ,
+                adv.shop_id,
+            )
+            await self._wb_modifier.pause_auto_campaign(adv)
+        elif avg_cost <= target_cost and auto_status == WBAdvActiveStatus.PAUSE:
+            logger.info(
+                "Auto watchdog: starting auto campaign since avg cost %.2f <= target %.2f adv_id=%s shop_id=%s",
+                avg_cost,
+                target_cost,
+                auto_adv_id ,
+                adv.shop_id,
+            )
+            await self._wb_modifier.start_auto_campaign(adv)
 
     async def _search_campaign_handler(
         self,
