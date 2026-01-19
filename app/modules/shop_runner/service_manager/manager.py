@@ -10,6 +10,7 @@ from typing import (
 
 
 
+from app.core.di.wb_manager_hub import WBManagerHubFactory
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -145,8 +146,6 @@ class CoroutinesManager:
             CommonSaleStatUpdater,
             CommonSaleStatUpdaterContainer,
         )
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
-
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
@@ -302,7 +301,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -343,7 +341,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
     async def update_keywords_positions_history(self) -> None:
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -385,7 +382,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
@@ -436,8 +432,6 @@ class CoroutinesManager:
         candidates = [adv for adv in candidates if adv.auto_budget_watchdog_enabled]
         if not candidates:
             return None
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
-
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         handlers: list[Callable[[], Awaitable[AutoBudgetEnsureResult | None]]] = []
         task_specs: list[tuple[AdvSetting, AdvType, int]] = []
@@ -497,7 +491,6 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -511,7 +504,6 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_history(self) -> None:
         """Обновление статистики кластеров за прошлые дни."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -523,7 +515,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 15, 60)
     async def update_cluster_bids(self) -> None:
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
@@ -606,8 +597,6 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
-
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         service = AutoAdvActiveControlService(
