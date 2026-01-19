@@ -213,7 +213,7 @@ class AutoBudgetService:
                 reason="Daily successful top-ups already reached limit",
             )
 
-        if attempt_sum * 2 >= limit:
+        if attempt_sum / 2 >= limit:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.LIMIT_REACHED,
                 campaign_type=campaign_type,
