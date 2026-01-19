@@ -25,9 +25,30 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+async def run_shop_task(
+    shop_id: str,
+    client_session: ClientSession,
+    redis_manager: RedisShopManager,
+    tasks_manager: TasksManager,
+    plan_fact_reader: PlanFactReader,
+) -> None:
+    try:
+        await _run_shop_task(
+            shop_id,
+            client_session,
+            redis_manager,
+            tasks_manager,
+            plan_fact_reader,
+        )
+    except Exception as e:
+        logger.exception(e,exc_info=True)
+        raise e
+
+    return None
+
 
 @inject
-async def run_shop_task(
+async def _run_shop_task(
     shop_id: str,
     client_session: ClientSession,
     redis_manager: RedisShopManager,
@@ -72,7 +93,6 @@ async def run_shop_task(
         raise exc
     finally:
         wb_manager_hub_factory.reset_shop(shop_id)
-
 
 async def _update_tasks(
     active_tasks: dict[str, Task[None]],
