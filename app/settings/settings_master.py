@@ -631,7 +631,7 @@ class Settings:
     def UPDATE_FULL_ADV_STAT_PERIOD(self) -> int:
         value = os.getenv("UPDATE_FULL_ADV_STAT_PERIOD")
         if not value:
-            return 5 * 60
+            return 60 * 60
         return int(value)
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
