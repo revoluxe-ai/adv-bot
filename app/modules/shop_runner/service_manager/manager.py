@@ -254,7 +254,7 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
+            tasks_manager=self._db_tasks_manager,
         )
 
         for adv, result in zip(advs_with_whitelist, results):
