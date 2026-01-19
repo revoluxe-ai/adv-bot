@@ -47,6 +47,10 @@ def test_apply_defaults_to_adv_setting():
     assert adv_setting.sales_predict_method == defaults_v1.sales_predict_method
     assert adv_setting.auto_update_white_list == defaults_v1.auto_update_white_list
     assert adv_setting.auto_update_target_place == defaults_v1.auto_update_target_place
+    assert (
+        adv_setting.auto_budget_watchdog_enabled
+        == defaults_v1.auto_budget_watchdog_enabled
+    )
     assert adv_setting.target_ctr_mode == defaults_v1.target_ctr_mode
     assert adv_setting.new_auto_min_ctr_mode == defaults_v1.new_auto_min_ctr_mode
     assert adv_setting.reset_place == defaults_v1.reset_place
