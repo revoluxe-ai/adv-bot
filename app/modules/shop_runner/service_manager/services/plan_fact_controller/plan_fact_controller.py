@@ -37,19 +37,10 @@ class PlanFactController:
             plan: Optional[PlanData] = PlanFactProvider.get_plan_data(
                 adv.adv_setting
             )
+            keywords = await adv.get_keywords()
+            provider = PlanFactProvider(adv.adv_setting)
+            fact = await provider.get_fact_data(keywords)
 
-            # Получаем факт данные (асинхронно)
-            fact: Optional[FactData] = None
-            try:
-                keywords = await adv.get_keywords()
-                provider = PlanFactProvider(adv.adv_setting)
-                fact = await provider.get_fact_data(keywords)
-            except Exception as exc:
-                logger.error(
-                    "Ошибка получения факта для adv_id=%s: %s",
-                    adv.adv_id,
-                    exc,
-                )
             # Создаем DTO
             dto = PlanFactStatDTO.create(
                 adv_id=adv.adv_id,
