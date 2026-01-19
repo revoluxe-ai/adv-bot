@@ -7,13 +7,13 @@ from aiohttp import ClientSession
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
 
-from app.core.di.wb_manager_hub import WBManagerHubFactory
+
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.modules.wb_api import WBApi
-from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
+
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
 
@@ -22,6 +22,11 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
+import typing
+
+if typing.TYPE_CHECKING:
+    from app.core.di.wb_manager_hub import WBManagerHubFactory
+
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +60,11 @@ async def _run_shop_task(
     tasks_manager: TasksManager,
     plan_fact_reader: PlanFactReader,
     redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
-    wb_manager_hub_factory: WBManagerHubFactory = Provide[
+    wb_manager_hub_factory: "WBManagerHubFactory" = Provide[
         "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
     ],
 ) -> None:
+    from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
     wb_manager_hub_factory.set_wb_manager_hub(shop_id)
 
     async def _deactivate_cabinet() -> None:
