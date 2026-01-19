@@ -488,10 +488,16 @@ class CampaignActivityMenu(TextWithKeyboard):
     def text(self) -> str:
         auto_limit = self._adv_setting.auto_budget_daily_limit or 0
         search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
+        watchdog_status = (
+            "включен"
+            if getattr(self._adv_setting, "auto_budget_watchdog_enabled", False)
+            else "выключен"
+        )
         return (
             f"Управление активностью РК «{self._adv_setting.name}»\n"
             f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
             f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+            f"• Контроль запуска кампаний и пополнения бюджета: {watchdog_status}\n"
             "Выберите, какую активность хотите скорректировать:"
         )
 
