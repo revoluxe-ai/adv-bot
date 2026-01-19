@@ -10,6 +10,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 import typing
 
+from app.shared.domains.wb.enums import AdvType
+
 if typing.TYPE_CHECKING:
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
@@ -56,6 +58,21 @@ class ComplexAdv:
             return None
         else:
             return  self._search_adv.adv_id
+
+    def get_adv_id_by_type(self, adv_type: AdvType) -> int:
+        if adv_type == AdvType.AUTO:
+            return self.auto_adv_id
+        if adv_type == AdvType.SEARCH:
+            auction_adv_id = self.auction_adv_id
+            if auction_adv_id is None:
+                raise ValueError(
+                    "Аукционная кампания не зарегистрирована для adv_id=%s"
+                    % self.auto_adv_id
+                )
+            return auction_adv_id
+        raise ValueError(
+            "Неизвестный тип кампании %s" % adv_type
+        )
 
     @property
     def bidder_mode(self) -> BidderMode:
