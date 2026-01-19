@@ -51,6 +51,9 @@ from app.modules.wb_update_state_manager import (
     AdvActiveKeywordUpdateStateManager,
     KeywordStatUpdateState,
 )
+from app.shared.domains.wb.enums import (
+    AdvType,
+)
 from app.utils import redis_manager
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker as sm
