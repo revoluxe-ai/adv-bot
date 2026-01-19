@@ -203,6 +203,31 @@ class AutoBudgetService:
 
         date_msk = now_msk.date()
         spend_today = await self._calculate_spend_today(config.adv_id, now_msk)
+        successful_topups, attempt_sum = await self._get_daily_topup_sums(
+            adv_setting_id=adv_setting.id,
+            campaign_type=campaign_type,
+            date_msk=date_msk,
+        )
+
+        if successful_topups >= limit:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=campaign_type,
+                adv_id=config.adv_id,
+                spend_today=spend_today,
+                available_limit=0,
+                reason="Daily successful top-ups already reached limit",
+            )
+
+        if attempt_sum * 2 >= limit:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=campaign_type,
+                adv_id=config.adv_id,
+                spend_today=spend_today,
+                available_limit=0,
+                reason="Daily top-up attempts doubled exceed limit",
+            )
 
         if spend_today >= limit:
             return AutoBudgetEnsureResult(
@@ -243,7 +268,6 @@ class AutoBudgetService:
             )
 
 
-        date_msk = now_msk.date()
         balance_response = await wb_manager_hub.wb_modifier.get_campaign_balance()
         if not balance_response:
             return AutoBudgetEnsureResult(
@@ -398,6 +422,32 @@ class AutoBudgetService:
             if spend:
                 total_spend += float(spend)
         return total_spend
+
+    @staticmethod
+    async def _get_daily_topup_sums(
+        adv_setting_id: int,
+        campaign_type: AdvType,
+        date_msk: datetime.date,
+    ) -> tuple[float, float]:
+        filters = (
+            WBAutoBudgetTopUp.adv_setting_id == adv_setting_id,
+            WBAutoBudgetTopUp.campaign_type == campaign_type,
+            WBAutoBudgetTopUp.date_msk == date_msk,
+        )
+        success_stmt = (
+            select(func.coalesce(func.sum(WBAutoBudgetTopUp.amount), 0))
+            .where(*filters, WBAutoBudgetTopUp.status == "success")
+        )
+        attempts_stmt = (
+            select(func.coalesce(func.sum(WBAutoBudgetTopUp.amount), 0))
+            .where(*filters)
+        )
+        async with sm(read_only=True) as session:
+            success_result = await session.execute(success_stmt)
+            attempts_result = await session.execute(attempts_stmt)
+        success_total = success_result.scalar() or 0
+        attempts_total = attempts_result.scalar() or 0
+        return float(success_total), float(attempts_total)
 
     @staticmethod
     async def _create_topup_entry(
