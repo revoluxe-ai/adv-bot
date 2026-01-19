@@ -564,7 +564,7 @@ class Settings:
     def AUTO_BUDGET_MIN_BALANCE(self) -> int:
         value = os.getenv("AUTO_BUDGET_MIN_BALANCE")
         if not value:
-            return 2000
+            return 500
         return int(value)
 
     @property
@@ -607,7 +607,7 @@ class Settings:
     def DEFAULT_MAX_CPM(self) -> int:
         value = os.getenv("DEFAULT_MAX_CPM")
         if not value:
-            return 3000
+            return 5000
         else:
             return int(value)
 
@@ -631,8 +631,16 @@ class Settings:
     def UPDATE_FULL_ADV_STAT_PERIOD(self) -> int:
         value = os.getenv("UPDATE_FULL_ADV_STAT_PERIOD")
         if not value:
-            return 6 * 60
+            return 5 * 60
         return int(value)
+
+    @property
+    def MAX_HTTP_TASKS(self) -> int:
+        value = os.getenv("MAX_HTTP_TASKS")
+        if not value:
+            return 30
+        return int(value)
+
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
