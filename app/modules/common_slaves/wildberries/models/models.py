@@ -498,6 +498,14 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=False, server_default="false"
     )
 
+    auto_budget_watchdog_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Включает контроль запуска кампаний и пополнения бюджета",
+    )
+
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
