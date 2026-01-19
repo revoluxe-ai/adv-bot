@@ -4,10 +4,10 @@ from collections.abc import Awaitable
 
 from sqlalchemy import update
 
-from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
-
+from app.modules.common_advs_stat import CommonAdvsStatData
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -24,40 +24,15 @@ logger = logging.getLogger(__name__)
 class AdvSettingAutoUpdater:
     def __init__(self, adv: AdvSetting, max_last_period: int = 2):
         self._adv = adv
-        auto_adv_id = self._adv.adv_id
-        self._all_adv_ids = [auto_adv_id]
-        auction_id = self._adv.auction_adv_id
-        if auction_id:
-            self._all_adv_ids.append(auction_id)
-
-        self._max_last_period = max_last_period
-
-    async def __get_stat_data(
-        self, keywords: list[CalculatedKeyword]
-    ) -> CommonAdvsStatData:
-        common_stat_manager = CommonAdvsStatDataManager()
-        stat: CommonAdvsStatData = await common_stat_manager.get_data(
-            self._adv, keywords, last_days=self._max_last_period
-        )
-        return stat
+        self._provider = PlanFactProvider(adv, max_last_period=max_last_period)
 
     async def get_fact_data_and_stat(
         self, keywords: list[CalculatedKeyword]
     ) -> tuple[FactData, CommonAdvsStatData]:
-        stat = await self.__get_stat_data(keywords)
-        fact = self._get_fact_data_from_stat(stat)
-        return fact, stat
-
-    def _get_fact_data_from_stat(
-        self, common_stat_data: CommonAdvsStatData
-    ) -> FactData:
-        fact_data = self.__get_fact_data_from_stats(common_stat_data)
-        return fact_data
+        return await self._provider.get_fact_data_and_stat(keywords)
 
     async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
-        stat = await self.__get_stat_data(keywords)
-        fact = self._get_fact_data_from_stat(stat)
-        return fact
+        return await self._provider.get_fact_data(keywords)
 
     async def update(
         self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
@@ -99,22 +74,7 @@ class AdvSettingAutoUpdater:
 
     @staticmethod
     def get_plan_data(adv: AdvSetting) -> PlanData | None:
-        plan_orders = adv.plan_for_sales_for_day
-        max_pay_for_order: float | None = adv.max_price_for_order
-        target_pay_for_order = adv.target_price_for_order
-        if any([not plan_orders, not target_pay_for_order, not max_pay_for_order]):
-            return None
-        try:
-            plan = PlanData(
-                orders=plan_orders,
-                target_pay_for_order=target_pay_for_order, # noqa
-                max_pay_for_order=max_pay_for_order, # noqa
-            )
-        except Exception as exc:
-            logger.exception('Ошибка получения плана')
-            raise exc
-
-        return plan
+        return PlanFactProvider.get_plan_data(adv)
 
     @staticmethod
     async def add_top_keyword_to_white_list(keywords: list[CalculatedKeyword]) -> None:

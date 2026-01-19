@@ -68,7 +68,7 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
             MagicMock(),
             tasks_manager=TasksManager(max_workers=1),
         )
-        await coroutines_manager.auto_budget_watchdog()
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
 
     auto_budget_service_instance.ensure_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_budget.call_args[0]

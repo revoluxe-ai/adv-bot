@@ -10,9 +10,7 @@ from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactM
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -55,11 +53,11 @@ async def test_full_cycle_plan_fact_stats(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),
@@ -127,11 +125,11 @@ async def test_full_cycle_with_real_complex_adv(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),
@@ -192,11 +190,11 @@ async def test_full_cycle_error_handling_for_some_advs(
             new=AsyncMock(return_value=[complex_adv, adv2]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             side_effect=[plan1, plan2],
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
         ),
@@ -287,11 +285,11 @@ async def test_full_cycle_multiple_advs_simultaneously(
             new=AsyncMock(return_value=[complex_adv, adv2, adv3]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             side_effect=plans,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             new=AsyncMock(side_effect=facts),
         ),
@@ -353,11 +351,11 @@ async def test_full_cycle_data_correctness_in_clickhouse(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),

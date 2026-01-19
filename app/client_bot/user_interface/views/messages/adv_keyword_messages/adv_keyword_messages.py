@@ -29,9 +29,7 @@ from app.client_bot.user_interface.views.messages.positions_graphic_messanges.po
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
 from dependency_injector.wiring import inject
 
@@ -132,9 +130,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
-        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting)
+        plan_fact_provider = PlanFactProvider(self._adv_setting)
 
-        fact_data, stat_data = await auto_update_manager.get_fact_data_and_stat(
+        fact_data, stat_data = await plan_fact_provider.get_fact_data_and_stat(
             self._keywords
         )
 

@@ -1,9 +1,7 @@
 import logging
 from typing import Optional
 
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -36,7 +34,7 @@ class PlanFactController:
         """
         try:
             # Получаем план данные (синхронно)
-            plan: Optional[PlanData] = AdvSettingAutoUpdater.get_plan_data(
+            plan: Optional[PlanData] = PlanFactProvider.get_plan_data(
                 adv.adv_setting
             )
 
@@ -44,8 +42,8 @@ class PlanFactController:
             fact: Optional[FactData] = None
             try:
                 keywords = await adv.get_keywords()
-                auto_updater = AdvSettingAutoUpdater(adv.adv_setting)
-                fact = await auto_updater.get_fact_data(keywords)
+                provider = PlanFactProvider(adv.adv_setting)
+                fact = await provider.get_fact_data(keywords)
             except Exception as exc:
                 logger.error(
                     "Ошибка получения факта для adv_id=%s: %s",
