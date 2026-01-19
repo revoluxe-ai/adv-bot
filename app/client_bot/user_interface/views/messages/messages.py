@@ -479,6 +479,71 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return last_full_stat_update
 
 
+class CampaignActivityMenu(TextWithKeyboard):
+    def __init__(self, bot: Bot, chat_id: int, adv_setting: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+
+    @property
+    def text(self) -> str:
+        auto_limit = self._adv_setting.auto_budget_daily_limit or 0
+        search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
+        return (
+            f"Управление активностью РК «{self._adv_setting.name}»\n"
+            f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
+            f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+            "Выберите, какую активность хотите скорректировать:"
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_campaign_activity_menu_keyboard(self._adv_setting)
+
+
+class CampaignActivityTargetMenu(TextWithKeyboard):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        adv_setting: AdvSetting,
+        campaign_type: AdvType,
+        current_limit: int,
+    ):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+        self._campaign_type = campaign_type
+        self._current_limit = current_limit
+
+    @property
+    def text(self) -> str:
+        limit_str = f"{self._current_limit} руб/сутки" if self._current_limit > 0 else "выключено"
+        return (
+            f"Настройка лимита для {_campaign_type_display(self._campaign_type)} "
+            f"РК «{self._adv_setting.name}»\n"
+            f"Текущий лимит: {limit_str}\n"
+            "Выберите действие:"
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_campaign_activity_target_keyboard(
+            self._adv_setting, self._campaign_type, self._current_limit
+        )
+
+
+class CampaignActivityChangeLimit(Text):
+    def __init__(self, bot: Bot, chat_id: int, campaign_type: AdvType):
+        super().__init__(bot, chat_id)
+        self._campaign_type = campaign_type
+
+    @property
+    def text(self) -> str:
+        return (
+            f"Введите новый лимит для {_campaign_type_display(self._campaign_type)} "
+            "в рублях (целое положительное число):"
+        )
+
+
 class CabinetNameExists(Text):
     @property
     def text(self) -> str:

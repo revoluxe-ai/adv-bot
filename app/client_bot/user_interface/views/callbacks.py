@@ -3,6 +3,9 @@ from aiogram.filters.callback_data import CallbackData
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.shared.domains.wb.enums import (
+    AdvType,
+)
 
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
@@ -99,6 +102,11 @@ class Start(CallbackData, prefix="start"):
 class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
+
+class ManageCampaignActivity(CallbackData, prefix="campaign_activity"):
+    action: str
+    adv_setting_original_id: int
+    campaign_type: AdvType | None = None
 
 
 class ChangeMinViewsForPredictCTR(
