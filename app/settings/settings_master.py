@@ -623,7 +623,7 @@ class Settings:
     def MAX_TASKS(self) -> int:
         value = os.getenv("MAX_TASKS")
         if not value:
-            return 1
+            return 7
         return int(value)
 
 
