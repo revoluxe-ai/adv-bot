@@ -162,6 +162,15 @@ class AutoBudgetService:
 
         async with sm(read_only=True) as session:
             adv_setting = await session.get(AdvSetting, adv_setting_id)
+        if adv_setting is None:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=campaign_type,
+                adv_id=None,
+                spend_today=0.0,
+                reason="AdvSetting is not found",
+            )
+
         config = self.get_campaign_config(adv_setting, campaign_type)
         if config is None:
             return AutoBudgetEnsureResult(
