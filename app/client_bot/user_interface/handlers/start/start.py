@@ -396,12 +396,12 @@ async def process_add_new_token(
     """
     text = message.text
     if not text:
-        return None
+        return False
 
     # Проверка на команду /start для рестарта
     if "/start" in text:
         await start_registration(message, bot, state)
-        return None
+        return False
 
     user_telegram_id: int = message.from_user.id
     assert user_telegram_id is not None
@@ -414,7 +414,7 @@ async def process_add_new_token(
             chat_id,
             "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
-        return None
+        return False
     # Получение данных из состояния
     data_state = await state.get_data()
     wb_user_cabinet_original_id = data_state.get("wb_user_cabinet_original_id")
@@ -424,7 +424,7 @@ async def process_add_new_token(
             chat_id, "Ошибка: магазин не найден. Начните процесс заново."
         )
         await state.clear()
-        return None
+        return False
 
     # Создание и валидация токена
     wb_token = wb_models.WBToken(api_key=text)
@@ -438,14 +438,14 @@ async def process_add_new_token(
         await state.set_state(
             states.AddNewToken.token
         )  # Возвращаем пользователя в состояние ввода токена
-        return None
+        return False
 
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
         await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
         # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
-        return None
+        return False
     except Exception as e:
         # Catch all unexpected exceptions from token parsing to avoid silent failures
         logger.warning(
@@ -463,7 +463,7 @@ async def process_add_new_token(
             "Sent error message to user %s after token parse exception, returning",
             user_telegram_id,
         )
-        return None
+        return False
     # Получение user_id из БД
     async with sm() as session:
         stmt_for_select_user_id: Select = select(User.id).where(
@@ -493,7 +493,7 @@ async def process_add_new_token(
         await bot.send_message(
             chat_id, "Ошибка: токен принадлежит другому магазину. Попробуйте еще раз:"
         )
-        return None
+        return False
 
     # Установка атрибутов токена
     wb_token.shop_id = shop_id
