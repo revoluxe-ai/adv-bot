@@ -19,17 +19,21 @@ class WBShop:
         wb_api: WBApi,
         redis_manager: RedisShopManager,
         redis_client_wrapper: RedisClient,
-        tasks_manager: TasksManager | None = None,
+        db_tasks_manager: TasksManager,
+        http_tasks_manager: TasksManager,
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
         self._redis_client_wrapper = redis_client_wrapper
-        self._tasks_manager = tasks_manager
+        self._db_tasks_manager = db_tasks_manager
+        self._http_tasks_manager = http_tasks_manager
 
     async def run(self) -> None:
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(
-            wb_api, self._redis_client_wrapper, tasks_manager=self._tasks_manager
+            wb_api, self._redis_client_wrapper,
+            db_tasks_manager=self._db_tasks_manager,
+            http_tasks_manager=self._http_tasks_manager,
         )
         # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
