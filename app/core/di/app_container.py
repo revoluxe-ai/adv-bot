@@ -22,7 +22,6 @@ class AppContainer(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
         packages=[
             "app.core.redis_manager_v2",
-            "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",
             "app.modules.common_slaves.wildberries.super_cabinet_manager",
             "app.modules.shop_runner.bidder.bidder_func",
             "app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager",
