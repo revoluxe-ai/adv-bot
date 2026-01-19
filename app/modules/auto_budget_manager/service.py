@@ -190,7 +190,7 @@ class AutoBudgetService:
 
         if (last_full_adv_stat_update
                 and now_msk < last_full_adv_stat_update
-                + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
+                + datetime.timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
                 campaign_type=campaign_type,
