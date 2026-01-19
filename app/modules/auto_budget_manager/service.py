@@ -569,6 +569,6 @@ class AutoBudgetService:
 
     @staticmethod
     async def _get_last_full_stat_update(adv_id: int) -> datetime.datetime | None:
-        dt = data_manager.get_last_full_stat_update(adv_id)
+        dt = await data_manager.get_last_full_stat_update(adv_id)
         dt = dt.replace(tzinfo=ZoneInfo("Europe/Moscow"))
         return dt
