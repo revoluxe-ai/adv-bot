@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
 )
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 
 class _FakeAdvSetting:
@@ -39,6 +40,10 @@ class _FakeComplexAdv:
         self._adv_setting = _FakeAdvSetting(active_status=auto_status, adv_id=auto_adv_id)
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
+        self.auto_adv_id = auto_adv_id
+        self.search_adv_id = search_adv_id
+        self.auto_adv_active_status_str = WBAdvActiveStatus(auto_status)
+        self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
 
     @property
     def adv_setting(self):
@@ -102,9 +107,16 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         tasks_manager=http_tasks_manager,
     )
 
+    async def mock_spend(*args, **kwargs):
+        adv_id = args[0]
+        return 0.0
+
     with patch(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
         new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_spend),
     ):
         await service.ensure_campaigns_active(
             [adv_to_start, adv_to_pause, ignored_adv]
@@ -115,3 +127,51 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv_to_pause)
     wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv_to_pause)
     assert run_tasks_call["tasks_manager"] is http_tasks_manager
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded():
+    overspend_adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=80,
+        search_status="started",
+        auto_adv_id=7,
+        search_adv_id=8,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        results = []
+        for handler in handlers:
+            results.append(await handler())
+        return results
+
+    http_tasks_manager = MagicMock()
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=http_tasks_manager,
+    )
+
+    async def mock_spend(*args, **kwargs):
+        adv_id = args[0]
+        return 150.0 if adv_id == 7 else 200.0
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_spend),
+    ):
+        await service.ensure_campaigns_active([overspend_adv])
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(overspend_adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(overspend_adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_not_called()
