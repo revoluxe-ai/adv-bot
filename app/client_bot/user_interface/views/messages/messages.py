@@ -70,6 +70,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _campaign_type_display(campaign_type: AdvType) -> str:
+    if campaign_type == AdvType.SEARCH:
+        return "Аукцион"
+    elif campaign_type == AdvType.AUTO:
+        return "Авто"
+    else:
+        raise ValueError('Неверных тип Кампании')
+
+
 # def reverse_date(date_str: str) -> str:
 #     parts = date_str.split("-")
 #     if len(parts) == 3:
