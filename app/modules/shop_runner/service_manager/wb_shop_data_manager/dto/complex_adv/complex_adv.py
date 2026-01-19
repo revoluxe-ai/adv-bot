@@ -49,7 +49,9 @@ class ComplexAdv:
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
 
     @property
-    def search_adv_active_status_str(self) -> WBAdvActiveStatus:
+    def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:
+        if self._search_adv is None:
+            return None
         return WBAdvActiveStatus(self._search_adv.active_status)
 
     @property
