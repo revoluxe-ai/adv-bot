@@ -404,16 +404,9 @@ class AutoBudgetService:
         end = datetime.datetime.combine(
             now_msk.date(), datetime.time.max, tzinfo=MSK_TZ
         )
-
-        try:
-            stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
-                list(adv_ids), start, end
-            )
-        except Exception as exc:  # pragma: no cover - ClickHouse errors
-            logger.error(
-                "Failed to fetch spend stats for adv_ids=%s: %s", adv_ids, exc
-            )
-            return 0.0
+        stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
+            list(adv_ids), start, end
+        )
 
         total_spend = 0.0
         for stat in stats or []:
