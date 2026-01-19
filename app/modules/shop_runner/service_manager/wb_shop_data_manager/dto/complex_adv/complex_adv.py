@@ -11,6 +11,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 import typing
 
 from app.shared.domains.wb.enums import AdvType
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 if typing.TYPE_CHECKING:
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -46,6 +47,14 @@ class ComplexAdv:
         self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+
+    @property
+    def search_adv_active_status_str(self) -> WBAdvActiveStatus:
+        return WBAdvActiveStatus(self._search_adv.active_status)
+
+    @property
+    def auto_adv_active_status_str(self) -> WBAdvActiveStatus:
+        return WBAdvActiveStatus(self._adv_setting.active_status)
 
     @property
     def bot_active(self) -> bool:
