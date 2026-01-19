@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table('wbautobudgettopup',
     sa.Column('adv_setting_id', sa.Integer(), nullable=False),
     sa.Column('adv_id', sa.BIGINT(), nullable=False, comment='adv_id кампании, к которой относится пополнение'),
-    sa.Column('campaign_type', sa.Enum('auto', 'search', name='auto_budget_campaign_type'), nullable=False, comment='Тип кампании (auto/search)'),
+    sa.Column('campaign_type', sa.Enum('auto', 'search', name='adv_type_enum'), nullable=False, comment='Тип кампании (auto/search)'),
     sa.Column('date_msk', sa.Date(), nullable=False),
     sa.Column('idempotency_key', sa.String(length=64), nullable=False),
     sa.Column('amount', sa.Integer(), nullable=False),
