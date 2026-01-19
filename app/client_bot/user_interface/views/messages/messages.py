@@ -44,12 +44,6 @@ from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
-    PredictCTRManagerContainer,
-)
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import (
-    PredictCTRRedisManager,
-)
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason, KeywordStatus

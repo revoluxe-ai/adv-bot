@@ -50,6 +50,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
+from app.shared.domains.wb.enums import (
+    AdvType,
+)
 
 sm = get_async_session_maker
 
@@ -424,6 +427,84 @@ def get_adv_setting_keyboard(
             text="Вернуться к списку кампаний",
             callback_data=callbacks.ChoiceAdvPaginator(
                 wb_user_cabinet_original_id=wb_user_cabinet_original_id, page=1
+            ).pack(),
+        )
+    )
+
+    return builder.as_markup()
+
+
+def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Настроить Аукцион",
+            callback_data=callbacks.ManageCampaignActivity(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+                campaign_type=AdvType.SEARCH,
+            ).pack(),
+        )
+    )
+
+    _ =builder.row(
+        InlineKeyboardButton(
+            text="Настроить Авто",
+            callback_data=callbacks.ManageCampaignActivity(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+                campaign_type=AdvType.AUTO,
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Вернуться к настройкам кампании",
+            callback_data=callbacks.Adv(adv_original_id=adv_setting.id).pack(),
+        )
+    )
+
+    return builder.as_markup()
+
+
+def get_campaign_activity_target_keyboard(
+    adv_setting: AdvSetting,
+    campaign_type: AdvType,
+    current_limit: int,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Изменить лимит",
+            callback_data=callbacks.ManageCampaignActivity(
+                action="change",
+                adv_setting_original_id=adv_setting.id,
+                campaign_type=campaign_type,
+            ).pack(),
+        )
+    )
+
+    if current_limit > 0:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Выключить",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="turn_off",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=campaign_type,
+                ).pack(),
+            )
+        )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Назад",
+            callback_data=callbacks.ManageCampaignActivity(
+                action="menu",
+                adv_setting_original_id=adv_setting.id,
             ).pack(),
         )
     )
@@ -855,7 +936,6 @@ def get_keywords_setting_keyboard(
 
 def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
-    calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
     page: int,
 ) -> InlineKeyboardMarkup:
