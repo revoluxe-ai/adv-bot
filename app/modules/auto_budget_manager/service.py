@@ -5,12 +5,14 @@ from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 import asyncio
 import datetime
+from datetime import timedelta
 import logging
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -36,7 +38,7 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MSK_TZ = datetime.timezone(datetime.timedelta(hours=3))
+MSK_TZ = datetime.timezone(timedelta(hours=3))
 
 
 class AutoBudgetEnsureStatus(StrEnum):
@@ -190,7 +192,7 @@ class AutoBudgetService:
 
         if (last_full_adv_stat_update
                 and now_msk < last_full_adv_stat_update
-                + datetime.timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
+                + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
                 campaign_type=campaign_type,
@@ -199,6 +201,7 @@ class AutoBudgetService:
                 reason="Last Update Full Adv Stats too old",
             )
 
+        date_msk = now_msk.date()
         spend_today = await self._calculate_spend_today(config.adv_id, now_msk)
 
         if spend_today >= limit:
