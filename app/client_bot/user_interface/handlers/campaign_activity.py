@@ -22,7 +22,10 @@ sm = get_async_session_maker
 def _limit_attr_name(campaign_type: AdvType) -> str:
     if campaign_type == AdvType.SEARCH:
         return "search_auto_budget_daily_limit"
-    return "auto_budget_daily_limit"
+    elif campaign_type == AdvType.AUTO:
+        return "auto_budget_daily_limit"
+    else:
+        raise ValueError("Invalid campaign type")
 
 
 def _get_limit_value(adv_setting: AdvSetting, campaign_type: AdvType) -> int:
