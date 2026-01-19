@@ -20,15 +20,21 @@ from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 from app.modules.common_slaves.wildberries import wb_db_manager
+from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (
     CardsNotFoundForShopError,
-    NotEnoughBalanceOnShopError,
     AdvExistsForNmidError,
 )
 from .wb_api import WBApi
-from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
+from ...common_slaves.wildberries.models import AdvSetting
 
+
+
+
+from app.shared.domains.wb.utils.balance_source import (
+    select_balance_source_from_response,
+)
 
 if TYPE_CHECKING:
     from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -263,44 +269,8 @@ class MainAdvManager:
                 return []
 
     @staticmethod
-    def _check_enough_balance(balances: Balances) -> bool:
-        balance = balances.balance
-        net = balances.net
-        bonus = balances.bonus
-        full_balance: list[int] = [balance, net, bonus]
-        logger.debug("Балансы: %s", full_balance)
-        if (
-            sum(full_balance) >= 2000
-            or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
-        ):
-            return True
-        return False
-
-    def _get_balance_type(self, balances: Balances) -> tuple[int, str]:
-        is_balance_enough: bool = self._check_enough_balance(balances)
-
-        if not is_balance_enough:
-            raise NotEnoughBalanceOnShopError()
-
-        balance_rows = [
-            (balances.balance, "balance"),
-            (balances.net, "net"),
-            (balances.bonus, "bonus"),
-        ]
-
-        min_balance_property_name = min(
-            list(filter(lambda row: row[0] > 1000, balance_rows))
-        )[1]
-
-        if min_balance_property_name == "balance":
-            balance_type = 0
-        elif min_balance_property_name == "net":
-            balance_type = 1
-        elif min_balance_property_name == "bonus":
-            balance_type = 3
-        else:
-            raise Exception("Неизвестный тип баланса")
-        return balance_type, min_balance_property_name
+    def _get_balance_type(balances: Balances) -> tuple[int, str]:
+        return select_balance_source_from_response(balances)
 
     async def _upcast_target_placement(self, adv_id, /, search, recommendations):
         await self.wb_api.upcast_target_placement(adv_id, search, recommendations)

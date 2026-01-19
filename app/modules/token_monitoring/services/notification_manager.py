@@ -10,6 +10,8 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+
 from app.client_bot.notification_sender import (
     NotificationSender,
     get_notification_sender,

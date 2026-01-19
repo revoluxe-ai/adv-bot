@@ -29,7 +29,8 @@
     "app/modules/shop_runner/service_manager/services/plan_fact_controller",
     "updater.py",
     "app/modules/wb_adv_updater/modules/balance_exp_informer",
-    "app/modules/billing/event_manager"
+    "app/modules/billing/event_manager",
+    "app/modules/auto_budget_manager"
 
   ],
 

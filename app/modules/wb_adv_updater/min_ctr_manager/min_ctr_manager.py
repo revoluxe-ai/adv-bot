@@ -1,16 +1,7 @@
 import logging
-from dependency_injector.wiring import inject, Provide
-import typing
+from dependency_injector.wiring import inject
 from datetime import datetime, timedelta
 
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
-    PredictCTRManagerContainer,
-)
-
-if typing.TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import (
-        PredictCTRRedisManager,
-    )
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
@@ -24,12 +15,8 @@ class MinCtrManager:
     def __init__(
         self,
         adv: AdvSetting,
-        redis_manager: "PredictCTRRedisManager" = Provide[
-            PredictCTRManagerContainer.redis_manager
-        ],
     ):
         self._adv = adv
-        self._redis_manager = redis_manager
 
     # async def get_min_ctr(self) -> float:
     #     adv = self._adv
@@ -158,8 +145,8 @@ class MinCtrManager:
 
         """
         TODO: The calculation of additional_clicks and additional_views can produce negative values when keyword statistics exceed total campaign statistics. This happens when keywords_clicks > total_clicks or keywords_views > total_views, leading to negative values that will cause incorrect CTR calculations. The code should handle this edge case by ensuring non-negative values or returning early when the data is inconsistent.
-        
-        
+
+
         """
 
         # Вычисляем дополнительные клики и показы

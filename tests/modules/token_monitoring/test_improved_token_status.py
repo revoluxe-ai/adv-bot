@@ -29,7 +29,7 @@ class TestImprovedTokenStatus:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() + datetime.timedelta(days=30),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
             categories={"Контент", "Статистика"},
             is_read_only=False,
             is_valid=True,
@@ -41,7 +41,7 @@ class TestImprovedTokenStatus:
             api_key="key2",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now()
+            expires=datetime.datetime.now(datetime.UTC)
             + datetime.timedelta(days=10),  # Earlier expiration
             categories={"Аналитика", "Продвижение"},
             is_read_only=False,
@@ -77,7 +77,7 @@ class TestImprovedTokenStatus:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() + datetime.timedelta(days=30),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
             categories={"Контент", "Статистика"},
             is_read_only=False,
             is_valid=True,
@@ -112,7 +112,7 @@ class TestImprovedTokenStatus:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() + datetime.timedelta(days=5),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5),
             categories={"Контент", "Аналитика"},
             is_read_only=False,
             is_valid=True,
@@ -125,7 +125,7 @@ class TestImprovedTokenStatus:
             api_key="key2",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now()
+            expires=datetime.datetime.now(datetime.UTC)
             + datetime.timedelta(days=1),  # Earlier but irrelevant
             categories={"Цены и скидки", "Маркетплейс"},
             is_read_only=False,
@@ -167,7 +167,7 @@ class TestImprovedTokenStatus:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now()
+            expires=datetime.datetime.now(datetime.UTC)
             + datetime.timedelta(hours=12),  # Less than 1 day
             categories=REQUIRED_RIGHTS,
             is_read_only=False,
@@ -200,7 +200,7 @@ class TestImprovedTokenStatus:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() + datetime.timedelta(days=30),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
             categories={"Цены и скидки"},
             is_read_only=False,
             is_valid=True,
@@ -234,7 +234,7 @@ class TestImprovedTokenStatus:
         pytest.skip(
             "Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
         )
-        same_date = datetime.datetime.now() + datetime.timedelta(days=7)
+        same_date = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7)
 
         token1 = TokenInfo(
             id=1,

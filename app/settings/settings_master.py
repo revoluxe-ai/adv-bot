@@ -553,6 +553,55 @@ class Settings:
             return 0.1
         return float(value)
 
+    @property
+    def AUTO_BUDGET_TOPUP_AMOUNT(self) -> int:
+        value = os.getenv("AUTO_BUDGET_TOPUP_AMOUNT")
+        if not value:
+            return 1000
+        return int(value)
+
+    @property
+    def AUTO_BUDGET_MIN_BALANCE(self) -> int:
+        value = os.getenv("AUTO_BUDGET_MIN_BALANCE")
+        if not value:
+            return 2000
+        return int(value)
+
+    @property
+    def AUTO_BUDGET_LOCK_TTL_SEC(self) -> int:
+        value = os.getenv("AUTO_BUDGET_LOCK_TTL_SEC")
+        if not value:
+            return 120
+        return int(value)
+
+    @property
+    def AUTO_BUDGET_MAX_SINGLE_TOPUP_RATIO(self) -> float:
+        value = os.getenv("AUTO_BUDGET_MAX_SINGLE_TOPUP_RATIO")
+        if not value:
+            return 0.3
+        return float(value)
+
+    @property
+    def AUTO_BUDGET_MIN_REMAINING_LIMIT(self) -> int:
+        value = os.getenv("AUTO_BUDGET_MIN_REMAINING_LIMIT")
+        if not value:
+            return 0
+        return int(value)
+
+    @property
+    def AUTO_BUDGET_VERIFICATION_ATTEMPTS(self) -> int:
+        value = os.getenv("AUTO_BUDGET_VERIFICATION_ATTEMPTS")
+        if not value:
+            return 2
+        return int(value)
+
+    @property
+    def AUTO_BUDGET_VERIFICATION_DELAY_SEC(self) -> float:
+        value = os.getenv("AUTO_BUDGET_VERIFICATION_DELAY_SEC")
+        if not value:
+            return 2.0
+        return float(value)
+
 
     @property
     def DEFAULT_MAX_CPM(self) -> int:
@@ -576,6 +625,15 @@ class Settings:
         if not value:
             return 1
         return int(value)
+
+
+    @property
+    def UPDATE_FULL_ADV_STAT_PERIOD(self) -> int:
+        value = os.getenv("UPDATE_FULL_ADV_STAT_PERIOD")
+        if not value:
+            return 6 * 60
+        return int(value)
+
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

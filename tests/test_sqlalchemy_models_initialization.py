@@ -166,6 +166,7 @@ class TestSQLAlchemyModelsInitialization:
             WBToken,
             AdvKeyword,
             KeywordSetting,
+            WBAutoBudgetTopUp,
         )
         from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
         from app.utils.db.models import User
@@ -181,6 +182,7 @@ class TestSQLAlchemyModelsInitialization:
             (KeywordSetting, "keywordsetting"),
             (WBCabinet, "wbcabinet"),
             (User, "user"),
+            (WBAutoBudgetTopUp, "wbautobudgettopup"),
         ]
 
         for model, expected_tablename in models_to_check:

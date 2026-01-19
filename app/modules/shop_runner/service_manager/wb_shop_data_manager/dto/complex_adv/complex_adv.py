@@ -6,9 +6,12 @@ from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
     KeywordGettingMode
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+import typing
+
+if typing.TYPE_CHECKING:
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 class _CPMs:
     def __init__(self, adv_setting: AdvSetting, search_adv: AdvSetting | None):
@@ -31,14 +34,14 @@ class ComplexAdv:
         search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
-        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]] | None = None,
+        get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
-        self._calculated_keywords: list[CalculatedKeyword] | None = None
+        self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
 
@@ -202,7 +205,7 @@ class ComplexAdv:
     def auto_update_setting_version(self) -> int:
         return self._adv_setting.automatic_version
 
-    async def get_keywords(self) -> list[CalculatedKeyword]:
+    async def get_keywords(self) -> list["CalculatedKeyword"]:
         if not self._calculated_keywords:
             if not self._get_keywords:
                 raise RuntimeError("_get_keywords not set")

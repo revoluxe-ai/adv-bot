@@ -168,7 +168,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     # Проверяем, что начальные значения отличаются от дефолтных
     initial_defaults = CampaignDefaultsV1()
-    
+
     # Явно устанавливаем отличающиеся значения для тестовой кампании
     # Для булевых полей инвертируем значение
     adv_setting.bidder_active = not initial_defaults.bidder_active
@@ -188,7 +188,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         adv_setting.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
     else:
         adv_setting.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-    
+
     # orders_source_for_auto_mode
     if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
         adv_setting.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
@@ -200,7 +200,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         adv_setting.sales_predict_method = FactMethods.DIRECT_SALES
     else:
         adv_setting.sales_predict_method = FactMethods.BY_CARTS
-    
+
 
     await async_session.commit() # Сохраняем измененные значения
     await async_session.refresh(adv_setting)
@@ -229,7 +229,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     mock_menu_instance = AsyncMock()
     mock_menu_instance.return_value = None
-    
+
     # Мокаем session maker чтобы хэндлер использовал тестовую сессию
     class MockSessionMaker:
         def __init__(self, session):
@@ -240,7 +240,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
             return self.session
         async def __aexit__(self, *args):
             pass
-    
+
     with (
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
         patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
@@ -256,7 +256,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
     updated_adv_setting = updated_adv_setting.scalar_one()
 
     expected_defaults = CampaignDefaultsV1()
-    
+
     # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
     default_fields = [
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
@@ -305,7 +305,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
 
     # Коммитим изменения перед вызовом хэндлера
     await async_session.commit()
-    
+
     mock_menu_instance = AsyncMock()
     with (
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
@@ -366,7 +366,7 @@ async def test_turn_adv_on_applies_defaults(
         adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
     else:
         adv_setting_inactive.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-    
+
     # orders_source_for_auto_mode
     if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
         adv_setting_inactive.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
@@ -378,7 +378,7 @@ async def test_turn_adv_on_applies_defaults(
         adv_setting_inactive.sales_predict_method = FactMethods.DIRECT_SALES
     else:
         adv_setting_inactive.sales_predict_method = FactMethods.BY_CARTS
-    
+
     await async_session.commit()
     await async_session.refresh(adv_setting_inactive)
 
@@ -455,7 +455,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
         adv.reset_place = not initial_defaults.reset_place
-        
+
         # Для полей типа Enum выбираем другое валидное значение, если оно есть
         if initial_defaults.automatic_version == 2:
             adv.automatic_version = 1
@@ -467,7 +467,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
             adv.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
         else:
             adv.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-        
+
         # orders_source_for_auto_mode
         if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
             adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
@@ -518,7 +518,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         select(AdvSetting).where(AdvSetting.id == adv_active_1.id)
     )
     updated_adv_active_1 = updated_adv_active_1.scalar_one()
-    
+
     expected_defaults = CampaignDefaultsV1()
     default_fields = [
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",

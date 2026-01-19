@@ -7,12 +7,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton
 
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
-    AdvSetting,
 )
 from app.utils.db.models import User
 from app.client_bot.user_interface.views.callbacks import AddNewToken

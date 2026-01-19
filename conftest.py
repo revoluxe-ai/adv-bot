@@ -78,8 +78,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
 from app.utils.db.base import BaseTable as Base
-from app.modules.wb_adv_updater.modules.balance_exp_informer import models as balance_exp_informer_models
-from app.modules.billing.event_manager import models as billing_event_models
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
@@ -267,6 +265,23 @@ def setup_test_database(docker_compose_cmd):
                     await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
                     # Расширения
                     await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                    # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
+                    from app.modules.common_slaves.wildberries.models.models import (
+                        AdvSetting,
+                        KeywordSetting,
+                        WBUserCabinet,
+                        WBCard,
+                        WBCategory,
+                        WBToken,
+                        WBBalancePayment,
+                        WBBonusPayment,
+                        WBAutoBudgetTopUp,
+                        AdvKeyword,
+                    )
+                    from app.modules.wb_adv_updater.modules.balance_exp_informer.models import BalanceReminder
+                    from app.modules.billing.event_manager.models import BillingEvent
+                    from app.utils.db.models import User
+
                     # Таблицы
                     await conn.run_sync(Base.metadata.create_all)
 
@@ -434,7 +449,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto 
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
     KeywordStat,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -505,7 +520,7 @@ from pytest import fixture
 @fixture
 def keywords_mocks() -> list[CalculatedKeyword]:
     """Создаёт список тестовых CalculatedKeyword с разными статусами.
-    
+
     Включает:
     - 5 ключевых слов в whitelist (hard_status=2), 1 из них best
     - 2 ключевых слова в blacklist (hard_status=0)
@@ -517,7 +532,7 @@ def keywords_mocks() -> list[CalculatedKeyword]:
         TestingKeywordFactory,
         BestKeywordFactory,
     )
-    
+
     keywords = []
     # 1 лучшее ключевое слово (whitelist, best_keyword_status=True)
     keywords.append(BestKeywordFactory())
@@ -527,7 +542,7 @@ def keywords_mocks() -> list[CalculatedKeyword]:
     keywords.extend(BadKeywordFactory.create_batch(2))
     # 2 в тестировании
     keywords.extend(TestingKeywordFactory.create_batch(2))
-    
+
     return keywords
 
 
@@ -847,7 +862,7 @@ async def clickhouse_client(setup_test_database):
         ORDER BY (adv_id, date, text)
         SETTINGS index_granularity = 8192
         AS
-        SELECT 
+        SELECT
             adv_id,
             date,
             text,
@@ -877,7 +892,7 @@ async def clickhouse_client(setup_test_database):
         ORDER BY (adv_id, text, date)
         SETTINGS index_granularity = 8192
         AS
-        SELECT 
+        SELECT
             adv_id,
             text,
             date,

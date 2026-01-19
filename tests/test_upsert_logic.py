@@ -2,7 +2,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from absl.testing.absltest import skip
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 

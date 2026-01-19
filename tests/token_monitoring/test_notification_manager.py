@@ -4,7 +4,6 @@ import datetime
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.exc import IntegrityError
-from aiogram.exceptions import TelegramForbiddenError
 
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from app.core.wb_api.data_classes.advs.other_classes import Balances
-from app.modules.adv_creator.backend.exc import NotEnoughBalanceOnShopError
+from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 
 
 @dataclass

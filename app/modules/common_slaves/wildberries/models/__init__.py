@@ -7,9 +7,9 @@ __all__ = [
     "WBToken",
     "WBBalancePayment",
     "WBBonusPayment",
-    "WBAutoBudgetTopUp",
     "AdvKeyword",
     "WBCabinet",
+    "WBAutoBudgetTopUp",
 ]
 
 from .models import (
@@ -21,8 +21,8 @@ from .models import (
     WBToken,
     WBBalancePayment,
     WBBonusPayment,
-    WBAutoBudgetTopUp,
     AdvKeyword,
 )
 
+from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from .wb_cabinet import WBCabinet

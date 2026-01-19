@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.token_monitoring.services.token_info_service import (
     TokenStatusReport,
-    TokenInfo,
 )
 
 

@@ -367,9 +367,8 @@ async def test_bonus_description_format_integration(
     assert bonus_payment is not None
     assert bonus_payment.description == f"Бонус {bonus_percent}% при пополнении баланса"
 
-    # Проверяем в БД через отдельную сессию (избегаем проблем с транзакциями)
-    from app.utils.db.session_maker import get_async_session_maker
-    async with get_async_session_maker() as check_session:
+    # Проверяем в БД через отдельную сессию
+    async with test_session_factory() as check_session:
         bonus_payments_stmt = select(WBBonusPayment).where(
             WBBonusPayment.wb_cabinet_id == cabinet.id
         )

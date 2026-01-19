@@ -267,7 +267,7 @@ class TestTokenMonitoringIntegration:
         valid_token.api_key = "valid_key"
         valid_token.user_id = 123
         valid_token.shop_id = "test_shop_123"
-        valid_token.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        valid_token.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
         valid_token.categories = {"Контент", "Статистика", "Аналитика", "Продвижение"}
         valid_token.read_only = False
         valid_token.check_valid.return_value = True
@@ -277,7 +277,7 @@ class TestTokenMonitoringIntegration:
         expired_token.api_key = "expired_key"
         expired_token.user_id = 123
         expired_token.shop_id = "test_shop_123"
-        expired_token.expires = datetime.datetime.now() - datetime.timedelta(days=1)
+        expired_token.expires = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
         expired_token.categories = {"Контент"}
         expired_token.read_only = False
         expired_token.check_valid.return_value = False

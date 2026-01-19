@@ -9,8 +9,8 @@ from app.core.di import DIManager
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
+from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.modules.adv_creator.backend.exc import (
-    NotEnoughBalanceOnShopError,
     AdvExistsForNmidError,
 )
 from app.core.di.app_container import AppContainer

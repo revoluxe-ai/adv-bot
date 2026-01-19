@@ -2,6 +2,7 @@ import logging
 import time
 from collections.abc import Iterable
 from datetime import datetime, date
+from pathlib import Path
 from typing import TypedDict
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -22,6 +23,11 @@ class KeywordStat(TypedDict):
 
 
 logger = logging.getLogger(__name__)
+
+
+def _load_sql_query(query_name: str) -> str:
+    sql_path = Path(__file__).parent / "sql" / f"{query_name}.sql"
+    return sql_path.read_text(encoding="utf-8")
 
 
 def concatenate_stats(
@@ -217,6 +223,35 @@ async def get_stats_by_last_days(
             except Exception:
                 logger.error("Ошибка получения статистики из ClickHouse", exc_info=True)
                 raise
+
+
+async def get_spend_by_last_days(
+    adv_ids: list[int], start_date: datetime, end_date: datetime
+) -> float:
+    if not adv_ids:
+        return 0.0
+
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    query = _load_sql_query("get_spend_by_last_days")
+
+    try:
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(
+                    query,
+                    parameters={
+                        "start_date": start_date_str,
+                        "end_date": end_date_str,
+                        "adv_ids": adv_ids,
+                    },
+                )
+                result = res.first_item
+                total_spend = result["total_spend"] if result else 0.0
+                return float(total_spend or 0.0)
+    except Exception:
+        logger.error("Ошибка получения затрат из ClickHouse", exc_info=True)
+        raise
 
 
 def _get_insert_query() -> str:
