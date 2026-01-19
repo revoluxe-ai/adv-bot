@@ -432,6 +432,7 @@ class CoroutinesManager:
                 or ((adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id)
             )
         ]
+        candidates = [adv for adv in candidates if adv.auto_budget_watchdog_enabled]
         if not candidates:
             return None
         from app.core.di.wb_manager_hub import WBManagerHubFactory
