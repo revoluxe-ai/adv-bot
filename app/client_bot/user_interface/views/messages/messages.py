@@ -673,9 +673,6 @@ class KeywordSettingMessage(TextWithKeyboard):
     @inject
     async def __call__(
         self,
-        redis_manager_predict_ctr: PredictCTRRedisManager = Provide[
-            PredictCTRManagerContainer.redis_manager
-        ],
     ) -> None:
         keyword_setting, adv_setting = await self._get_keyword_text_and_adv_id(self._keyword_original_id)
         self._keyword_setting = keyword_setting
@@ -749,7 +746,6 @@ class KeywordSettingMessage(TextWithKeyboard):
     def keyboard(self):
         return keyboards.get_keyword_setting_keyboard(
             self._keyword_setting,
-            self.calculated_keyword,
             self._adv_setting,
             self._page,
         )
