@@ -530,14 +530,14 @@ class AdvSetting(BaseTable):
         nullable=False,
         default=0,
         server_default="0",
-        comment="Автолимит пополнения бюджета (руб/сутки) для автоматической кампании, 0 = отключено",
+        comment="Автолимит РАСХОДА бюджета (руб/сутки) для автоматической кампании, 0 = отключено",
     )
     search_auto_budget_daily_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
         server_default="0",
-        comment="Автолимит пополнения бюджета (руб/сутки) для аукционной кампании, 0 = отключено",
+        comment="Автолимит РАСХОДА бюджета (руб/сутки) для аукционной кампании, 0 = отключено",
     )
 
     auto_adv_target_status: Mapped[bool | None] = mapped_column(
