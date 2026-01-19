@@ -498,12 +498,15 @@ class AutoBudgetService:
         budget_after: int | float | None = None,
         response_payload: dict[str, Any] | None = None,
     ) -> None:
-        topup.status = status
-        topup.reason = reason
-        topup.budget_after = (
+        stored_topup = await session.get(WBAutoBudgetTopUp, topup.id)
+        if stored_topup is None:
+            raise ValueError(f"WBAutoBudgetTopUp {topup.id} not found")
+        stored_topup.status = status
+        stored_topup.reason = reason
+        stored_topup.budget_after = (
             float(budget_after) if budget_after is not None else budget_after
         )
-        topup.response_payload = response_payload
+        stored_topup.response_payload = response_payload
         await session.commit()
 
     async def _verify_budget(
