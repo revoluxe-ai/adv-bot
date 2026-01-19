@@ -146,7 +146,7 @@ class AutoAdvActiveControlService:
             return
 
         auto_limit_action_taken = False
-        if auto_limit > 0 and auto_status == WBAdvActiveStatus.PAUSE:
+        if auto_limit > 0 and auto_status in [WBAdvActiveStatus.PAUSE, WBAdvActiveStatus.READY_FOR_START]:
             logger.info(
                 "Auto budget watcher: starting auto campaign adv_id=%s shop_id=%s",
                 auto_adv_id ,
