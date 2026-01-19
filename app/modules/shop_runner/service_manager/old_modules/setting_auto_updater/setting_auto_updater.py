@@ -25,6 +25,7 @@ class AdvSettingAutoUpdater:
     def __init__(self, adv: AdvSetting, max_last_period: int = 2):
         self._adv = adv
         self._provider = PlanFactProvider(adv, max_last_period=max_last_period)
+        self._max_last_period = max_last_period
 
     async def get_fact_data_and_stat(
         self, keywords: list[CalculatedKeyword]
