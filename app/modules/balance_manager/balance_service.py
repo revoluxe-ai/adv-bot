@@ -141,10 +141,10 @@ async def get_cabinet_balance(cabinet_id: int) -> tuple[float, float]:
                 selectinload(WBCabinet.bonus_payments),
             ],
         )
-        if not cabinet:
-            raise CabinetNotFoundError(f"Кабинет с ID {cabinet_id} не найден")
+    if not cabinet:
+        raise CabinetNotFoundError(f"Кабинет с ID {cabinet_id} не найден")
 
-        return cabinet.calculated_balance, cabinet.calculated_bonus
+    return cabinet.calculated_balance, cabinet.calculated_bonus
 
 async def process_payment_with_bonus(
     user_id: int,
