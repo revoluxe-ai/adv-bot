@@ -7,9 +7,6 @@ from app.modules.shop_runner.bidder.di import BidderContainer
 from app.core.mp.wb.di import WBManagerHubFactoryContainer
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.billing.di import BillingContainer
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
-    PredictCTRManagerContainer,
-)
 
 
 class ModuleResources(containers.DeclarativeContainer):
@@ -24,12 +21,6 @@ class ModuleResources(containers.DeclarativeContainer):
         redis_client_wrapper=redis_client_wrapper,
     )
 
-    predict_ctr_manager: providers.Container[PredictCTRManagerContainer] = (
-        providers.Container(
-            PredictCTRManagerContainer,
-            redis_client_wrapper=redis_client_wrapper,
-        )
-    )
 
     bidder_container = providers.Container(
         BidderContainer, _redis_client=redis_client_wrapper
