@@ -2,12 +2,14 @@ from collections.abc import Sequence
 from typing import cast
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
+
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
+
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )

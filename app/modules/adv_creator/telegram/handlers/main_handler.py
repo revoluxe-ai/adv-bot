@@ -10,7 +10,8 @@ from sqlalchemy import select
 from app.arq_workers.arq_redis_settings import arq_redis_settings
 from app.client_bot.user_interface.handlers.start import start_registration
 from app.modules.balance_manager import balance_service
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from ..into_callback import (

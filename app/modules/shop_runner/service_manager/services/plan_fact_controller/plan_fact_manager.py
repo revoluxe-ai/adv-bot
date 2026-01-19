@@ -37,7 +37,7 @@ class PlanFactManager:
         version = time.time()
 
         handlers: list[Callable[[], Awaitable[PlanFactStatDTO | None]]] = [
-            lambda adv=adv: self._controller.process_adv(adv, version) for adv in advs
+            lambda adv_=adv: self._controller.process_adv(adv_, version) for adv in advs
         ]
 
         results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(

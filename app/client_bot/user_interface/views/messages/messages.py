@@ -38,24 +38,21 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBBalancePayment,
-    WBCabinet,
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
-    PredictCTRManagerContainer,
-)
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import (
-    PredictCTRRedisManager,
-)
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason, KeywordStatus
 from app.modules.wb_update_state_manager import (
     AdvActiveKeywordUpdateStateManager,
     KeywordStatUpdateState,
+)
+from app.shared.domains.wb.enums import (
+    AdvType,
 )
 from app.utils import redis_manager
 from app.utils.db.models import RefLink, User
@@ -71,6 +68,15 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+
+def _campaign_type_display(campaign_type: AdvType) -> str:
+    if campaign_type == AdvType.SEARCH:
+        return "Аукцион"
+    elif campaign_type == AdvType.AUTO:
+        return "Авто"
+    else:
+        raise ValueError('Неверных тип Кампании')
 
 
 # def reverse_date(date_str: str) -> str:
@@ -473,6 +479,77 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return last_full_stat_update
 
 
+class CampaignActivityMenu(TextWithKeyboard):
+    def __init__(self, bot: Bot, chat_id: int, adv_setting: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+
+    @property
+    def text(self) -> str:
+        auto_limit = self._adv_setting.auto_budget_daily_limit or 0
+        search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
+        watchdog_status = (
+            "включен"
+            if getattr(self._adv_setting, "auto_budget_watchdog_enabled", False)
+            else "выключен"
+        )
+        return (
+            f"Управление активностью РК «{self._adv_setting.name}»\n"
+            f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
+            f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+            f"• Контроль запуска кампаний и пополнения бюджета: {watchdog_status}\n"
+            "Выберите, какую активность хотите скорректировать:"
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_campaign_activity_menu_keyboard(self._adv_setting)
+
+
+class CampaignActivityTargetMenu(TextWithKeyboard):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        adv_setting: AdvSetting,
+        campaign_type: AdvType,
+        current_limit: int,
+    ):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+        self._campaign_type = campaign_type
+        self._current_limit = current_limit
+
+    @property
+    def text(self) -> str:
+        limit_str = f"{self._current_limit} руб/сутки" if self._current_limit > 0 else "выключено"
+        return (
+            f"Настройка лимита для {_campaign_type_display(self._campaign_type)} "
+            f"РК «{self._adv_setting.name}»\n"
+            f"Текущий лимит: {limit_str}\n"
+            "Выберите действие:"
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_campaign_activity_target_keyboard(
+            self._adv_setting, self._campaign_type, self._current_limit
+        )
+
+
+class CampaignActivityChangeLimit(Text):
+    def __init__(self, bot: Bot, chat_id: int, campaign_type: AdvType):
+        super().__init__(bot, chat_id)
+        self._campaign_type = campaign_type
+
+    @property
+    def text(self) -> str:
+        return (
+            f"Введите новый лимит для {_campaign_type_display(self._campaign_type)} "
+            "в рублях (целое положительное число):"
+        )
+
+
 class CabinetNameExists(Text):
     @property
     def text(self) -> str:
@@ -602,9 +679,6 @@ class KeywordSettingMessage(TextWithKeyboard):
     @inject
     async def __call__(
         self,
-        redis_manager_predict_ctr: PredictCTRRedisManager = Provide[
-            PredictCTRManagerContainer.redis_manager
-        ],
     ) -> None:
         keyword_setting, adv_setting = await self._get_keyword_text_and_adv_id(self._keyword_original_id)
         self._keyword_setting = keyword_setting
@@ -678,7 +752,6 @@ class KeywordSettingMessage(TextWithKeyboard):
     def keyboard(self):
         return keyboards.get_keyword_setting_keyboard(
             self._keyword_setting,
-            self.calculated_keyword,
             self._adv_setting,
             self._page,
         )

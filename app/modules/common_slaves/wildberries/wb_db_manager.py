@@ -12,10 +12,10 @@ from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBCard,
     WBCategory,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
@@ -52,7 +52,7 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
         existing_stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
         existing_result = await session.execute(existing_stmt)
         existing_adv_settings = {adv.adv_id: adv for adv in existing_result.scalars().all()}
-        
+
         # Обрабатываем каждую кампанию
         for adv in advs_to_process:
             if adv.advertId in existing_adv_settings:
@@ -78,7 +78,7 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                 # Применяем дефолты через ORM
                 apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
                 session.add(adv_setting)
-        
+
         await session.commit()
 
 

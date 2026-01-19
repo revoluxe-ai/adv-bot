@@ -2,6 +2,8 @@ import time
 
 import dotenv
 
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
 dotenv.load_dotenv()
 from app.client_bot.bot import get_bot
 from app.utils import redis_manager
@@ -18,7 +20,7 @@ from app.modules.user_message_sender import messages
 setup_logging()
 import logging
 
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 

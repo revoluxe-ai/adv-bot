@@ -1,10 +1,14 @@
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.wb_shop import WBShop
 
 
@@ -22,7 +26,14 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
+    )
 
     # Mock the CoroutinesManager and all its methods
     expected_coroutines = {
@@ -75,7 +86,14 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
     redis_manager_mock.DEFAULT_TTL = 60
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
+    )
 
     # Core coroutines that should ALWAYS be running
     core_coroutines = {

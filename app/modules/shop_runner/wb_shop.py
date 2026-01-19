@@ -5,6 +5,8 @@ from typing import TypeVar
 from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
 from .service_manager.exc import StopShopUpdateException
+from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
+
 from .shop_run_worker.redis_manager import RedisShopManager
 from .service_manager import CoroutinesManager
 from .tasks_manager.tasks_manager import TasksManager
@@ -19,17 +21,22 @@ class WBShop:
         wb_api: WBApi,
         redis_manager: RedisShopManager,
         redis_client_wrapper: RedisClient,
-        tasks_manager: TasksManager | None = None,
+        tasks_manager: TasksManager,
+        plan_fact_reader: PlanFactReader,
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
         self._redis_client_wrapper = redis_client_wrapper
         self._tasks_manager = tasks_manager
+        self._plan_fact_reader = plan_fact_reader
 
     async def run(self) -> None:
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(
-            wb_api, self._redis_client_wrapper, tasks_manager=self._tasks_manager
+            wb_api,
+            self._redis_client_wrapper,
+            tasks_manager=self._tasks_manager,
+            plan_fact_reader=self._plan_fact_reader,
         )
         # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
@@ -53,6 +60,8 @@ class WBShop:
                 )
                 tg.create_task(coroutines_manager.update_cluster_bids())
                 tg.create_task(coroutines_manager.update_plan_fact_stats())
+                tg.create_task(coroutines_manager.auto_budget_watchdog())
+                tg.create_task(coroutines_manager.auto_adv_active_control())
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException

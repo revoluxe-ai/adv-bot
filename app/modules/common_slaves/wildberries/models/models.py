@@ -29,6 +29,7 @@ from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from .bidder_mode import BidderMode
 from .fact_methods_enum import FactMethods
+from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
@@ -497,6 +498,14 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=False, server_default="false"
     )
 
+    auto_budget_watchdog_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Включает контроль запуска кампаний и пополнения бюджета",
+    )
+
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
@@ -516,12 +525,29 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=0, server_default="0"
     )
 
+    auto_budget_daily_limit: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Автолимит РАСХОДА бюджета (руб/сутки) для автоматической кампании, 0 = отключено",
+    )
+    search_auto_budget_daily_limit: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Автолимит РАСХОДА бюджета (руб/сутки) для аукционной кампании, 0 = отключено",
+    )
+
     auto_adv_target_status: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=None
     )
     auction_adv_target_status: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=None
     )
+
+
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
@@ -631,6 +657,12 @@ class AdvSetting(BaseTable):
     @worst_promo_position.setter
     def worst_promo_position(self, value):
         self._worst_promo_position = value
+
+    auto_budget_topups: Mapped[list["WBAutoBudgetTopUp"]] = relationship(
+        "WBAutoBudgetTopUp",
+        back_populates="adv_setting",
+        cascade="all, delete-orphan",
+    )
 
 
 class KeywordSetting(BaseTable):

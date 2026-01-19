@@ -1,4 +1,3 @@
-__all__ = ["PredictCTRRedisMixin", "RateLimitMixin"]
+__all__ = ["RateLimitMixin"]
 
-from .predict_ctr import PredictCTRRedisMixin
 from .rate_limit import RateLimitMixin

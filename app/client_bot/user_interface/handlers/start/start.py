@@ -28,10 +28,10 @@ from app.modules.common_slaves.wildberries import (
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBToken,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.shop_menu.message import ShopMenu
@@ -152,10 +152,10 @@ async def process_cabinet_api(
     """
     text = message.text
     if not text:
-        return True
+        return  None
     if "/start" in text:
         await start_registration(message, bot, state)
-        return True
+        return None
 
     user_telegram_id = message.from_user.id
     chat_id = message.chat.id
@@ -167,7 +167,7 @@ async def process_cabinet_api(
             chat_id,
             "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
-        return True
+        return None
 
     wb_token = wb_models.WBToken(
         api_key=text,
@@ -181,7 +181,7 @@ async def process_cabinet_api(
         await state.set_state(
             states.CabinetRegistration.api
         )  # Возвращаем пользователя в состояние ввода токена
-        return True
+        return None
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
@@ -191,7 +191,7 @@ async def process_cabinet_api(
         logger.info(
             "Sent invalid token message to user %s, keeping state", user_telegram_id
         )
-        return True
+        return None
     except Exception as e:
         # Catch all unexpected exceptions from token parsing to avoid silent failures
         logger.warning(
@@ -209,7 +209,7 @@ async def process_cabinet_api(
             "Sent error message to user %s after token parse exception, returning",
             user_telegram_id,
         )
-        return True
+        return None
     async with sm() as session:
         # TODO: Тут попала ошибка в код с проверкой существования токена.
         # Получаем ID пользователя
@@ -220,7 +220,7 @@ async def process_cabinet_api(
         user_id = result.scalar()
         if user_id is None:
             await bot.send_message(chat_id, "Ошибка: пользователь не найден.")
-            return True
+            return None
 
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
@@ -259,13 +259,13 @@ async def process_cabinet_api(
                 # Token already saved for the same user — nothing to change.
                 await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
-                return True
+                return None
             else:
                 # Token belongs to another user — users must have unique tokens.
                 await bot.send_message(
                     chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
-                return True
+                return None
         session.add(wb_token)
         await session.flush()
         await session.commit()
@@ -302,9 +302,9 @@ async def process_cabinet_api(
             adv_settings = list(adv_settings)
             await session.commit()
             await messages.AdvCompanyChoicing(
-                bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
+                bot, chat_id, int(wb_user_cabinet_original_id), adv_settings, state # noqa
             )()
-            return True
+            return None
         else:
             # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
             wb_cabinet: WBCabinet = WBCabinet()
@@ -342,7 +342,7 @@ async def process_cabinet_api(
             wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
 
         await ShopChoice(bot, chat_id, wb_user_cabinets)()
-        return True
+        return None
 
 
 @router.callback_query(callbacks.AddNewToken.filter())
@@ -529,13 +529,13 @@ async def process_add_new_token(
                 # Token already saved for the same user — nothing to change.
                 await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
-                return True
+                return None
             else:
                 # Token belongs to another user — users must have unique tokens.
                 await bot.send_message(
                     chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
-                return True
+                return None
 
         # Сохранение токена. Пытаемся атомарно вставить — при гонке может быть
         # IntegrityError (уникальность токена на уровне БД). В этом случае
@@ -569,17 +569,17 @@ async def process_add_new_token(
                 if normalized_existing_user_id == user_id:
                     await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                     await state.clear()
-                    return True
+                    return None
                 else:
                     await bot.send_message(
                         chat_id, "Ошибка: этот токен используется другим пользователем."
                     )
-                    return True
+                    return None
             # Если по какой-то причине existing_token не найден — сообщаем об общей ошибке
             await bot.send_message(
                 chat_id, "Ошибка при добавлении токена. Попробуйте снова."
             )
-            return True
+            return None
 
         logger.info(
             "Новый токен успешно добавлен для shop_id=%s, user_id=%s",
@@ -640,7 +640,7 @@ async def process_add_new_token(
 
     # Переход в меню магазина
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
-    return True
+    return None
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())

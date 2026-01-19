@@ -76,6 +76,7 @@ app/modules/predict_ctr_service/model/model/model.json
 .dmypy.json
 .coverage
 !k8s/*
+!k8s/prod-adv-bot/*.yaml
 model/model.json
 .mypy_cache/
 .wb_profile/

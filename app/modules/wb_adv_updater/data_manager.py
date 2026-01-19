@@ -24,7 +24,6 @@ from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
     AdvSetting,
     KeywordSetting,
-    WBCabinet,
     WBCard,
     WBCategory,
     WBUserCabinet,
@@ -38,6 +37,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 

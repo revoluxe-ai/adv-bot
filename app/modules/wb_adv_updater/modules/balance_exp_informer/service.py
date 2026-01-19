@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
 from typing import Any, AsyncIterator, Iterable
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select, update, Result
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,9 +18,9 @@ from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.pricer.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater.modules.balance_exp_informer.dto import ReminderItem
 from app.modules.wb_adv_updater.modules.balance_exp_informer.levels import (
     BalanceLevel,
@@ -332,7 +332,7 @@ class BalanceReminderService:
             )
         )
 
-        result = await session.execute(stmt)
+        result: Result[tuple[BalanceReminder, int, str]] = await session.execute(stmt)
         rows = result.all()
 
         items_map: dict[int, list[ReminderItem]] = defaultdict(list)

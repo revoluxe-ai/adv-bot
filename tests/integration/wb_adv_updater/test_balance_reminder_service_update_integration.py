@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.modules.billing.event_manager.dto.event_type import EventType
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.event_manager.models import BillingEvent
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting,WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater.modules.balance_exp_informer.models import BalanceReminder
 from app.modules.wb_adv_updater.modules.balance_exp_informer.service import BalanceReminderService
 from app.utils.db.models import User

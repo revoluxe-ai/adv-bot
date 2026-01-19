@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.pricer.pricer import Pricer, TariffMode
 from app.modules.billing.pricer.tariffs import tariffs, tariffs_for_auto_setting
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from tests.factories.adv_factory import WBCabinetFactory
 
 

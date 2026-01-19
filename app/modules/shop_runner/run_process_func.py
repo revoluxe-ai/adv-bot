@@ -11,10 +11,12 @@ from app.core.di.wb_manager_hub import WBManagerHubFactory
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
+
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
@@ -23,13 +25,35 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
-
-@inject
 async def run_shop_task(
     shop_id: str,
     client_session: ClientSession,
     redis_manager: RedisShopManager,
-    tasks_manager: TasksManager | None = None,
+    tasks_manager: TasksManager,
+    plan_fact_reader: PlanFactReader,
+) -> None:
+    try:
+        await _run_shop_task(
+            shop_id,
+            client_session,
+            redis_manager,
+            tasks_manager,
+            plan_fact_reader,
+        )
+    except Exception as e:
+        logger.exception(e,exc_info=True)
+        raise e
+
+    return None
+
+
+@inject
+async def _run_shop_task(
+    shop_id: str,
+    client_session: ClientSession,
+    redis_manager: RedisShopManager,
+    tasks_manager: TasksManager,
+    plan_fact_reader: PlanFactReader,
     redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
     wb_manager_hub_factory: WBManagerHubFactory = Provide[
         "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
@@ -54,6 +78,7 @@ async def run_shop_task(
             redis_manager,
             redis_client_wrapper,
             tasks_manager=tasks_manager,
+            plan_fact_reader=plan_fact_reader,
         )
         await wb_shop.run()
     except StopShopUpdateException:
@@ -69,12 +94,12 @@ async def run_shop_task(
     finally:
         wb_manager_hub_factory.reset_shop(shop_id)
 
-
 async def _update_tasks(
     active_tasks: dict[str, Task[None]],
     client_session: ClientSession,
     redis_manager: RedisShopManager,
-    tasks_manager: TasksManager | None,
+    tasks_manager: TasksManager,
+    plan_fact_reader: PlanFactReader,
 ) -> None:
     stmt = (
         select(WBCabinet.shop_id)
@@ -101,6 +126,7 @@ async def _update_tasks(
                     client_session,
                     redis_manager,
                     tasks_manager=tasks_manager,
+                    plan_fact_reader=plan_fact_reader,
                 )
             )
             active_tasks[shop_id] = task
@@ -110,7 +136,8 @@ async def _update_tasks(
             if task.done():
                 if exc := task.exception():
                     logger.exception(
-                        f"Не обработанная ошибка выполнения задачи магазина: {exc}"
+                        f"Не обработанная ошибка выполнения задачи магазина: %s",
+                        exc
                     )
                     raise exc
                 del active_tasks[shop_id]
@@ -129,12 +156,17 @@ async def _update_tasks(
 
 
 async def run() -> None:
+    tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
+    stop_event = asyncio.Event()
+    queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
+    plan_fact_reader = PlanFactReader()
     async with ClientSession() as session:
-        tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
-        stop_event = asyncio.Event()
-        queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
         shop_loop_task = asyncio.create_task(
-            _run_shops_loop(tasks_manager, session)
+            _run_shops_loop(
+                tasks_manager=tasks_manager,
+                client_session=session,
+                plan_fact_reader=plan_fact_reader,
+            )
         )
         try:
             await shop_loop_task
@@ -142,16 +174,22 @@ async def run() -> None:
             stop_event.set()
             await queue_task
 
-
 async def _run_shops_loop(
     tasks_manager: TasksManager,
     client_session: ClientSession,
+    plan_fact_reader: PlanFactReader,
 ) -> None:
     redis_manager = RedisShopManager()
     active_tasks: dict[str, Task[None]] = {}
     while True:
         try:
-            await _update_tasks(active_tasks, client_session, redis_manager, tasks_manager)
+            await _update_tasks(
+                active_tasks,
+                client_session,
+                redis_manager,
+                tasks_manager=tasks_manager,
+                plan_fact_reader=plan_fact_reader,
+            )
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)

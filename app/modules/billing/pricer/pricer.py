@@ -7,9 +7,10 @@ from enum import StrEnum, auto
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from .tariffs import tariffs, tariffs_for_auto_setting
 from .tariffs_text import text
+from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 class TariffMode(StrEnum):

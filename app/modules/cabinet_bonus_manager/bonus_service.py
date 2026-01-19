@@ -3,10 +3,13 @@
 Позволяет администраторам пополнять, убирать и обнулять бонусы кабинетов по shop_id.
 """
 
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
 from sqlalchemy import Result, select
 from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.models import WBBonusPayment, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBBonusPayment
+
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 

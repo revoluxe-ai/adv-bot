@@ -7,14 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.token_monitoring.services.token_info_service import (
     TokenStatusReport,
-    TokenInfo,
 )
-from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
-    WBUserCabinet,
-    AdvSetting,
-)
-from app.utils.db.models import User
 
 
 class TestShopMenuTokenIntegration:
@@ -80,7 +73,7 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
-        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
 
         return TokenStatusReport(
             shop_id="test_shop_123",
@@ -102,7 +95,7 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
-        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
 
         return TokenStatusReport(
             shop_id="test_shop_123",
@@ -128,7 +121,7 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
-        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=3)
+        token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=3)
 
         expiring_token = ExpiringToken(
             token_info=token_info, days_until_expiry=3, shop_name="Test Shop"
@@ -148,9 +141,6 @@ class TestShopMenuTokenIntegration:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-    )
     async def test_shop_menu_text_with_complete_tokens(
         self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_complete
     ):
@@ -264,9 +254,6 @@ class TestShopMenuTokenIntegration:
                         )
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-    )
     async def test_shop_menu_text_with_expiring_tokens(
         self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_expiring
     ):

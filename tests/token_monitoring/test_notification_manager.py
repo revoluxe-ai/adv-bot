@@ -4,7 +4,6 @@ import datetime
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.exc import IntegrityError
-from aiogram.exceptions import TelegramForbiddenError
 
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
@@ -15,7 +14,7 @@ from app.modules.token_monitoring.models import (
     NotificationType,
     TokenNotificationTracker,
 )
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 
 

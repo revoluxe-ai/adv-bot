@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.balance_manager.handlers import successful_payment_handler
-from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
 

@@ -1,5 +1,7 @@
-from typing import List, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any
 import datetime
+from typing import List, TYPE_CHECKING
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
     NormqueryStatsDTO,
@@ -7,17 +9,37 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
     NormqueryBidDTO,
 )
+from app.core.mp.wb.api.domain_managers.promotion.methods.campaign_control import (
+    pause_adv as pause_adv_method,
+    start_adv as start_adv_method,
+    stop_adv as stop_adv_method,
+)
 from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases import (
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    GetAdvV1BalanceResponse200,
+)
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
         SetNormqueryBidsCommandItem,
     )
+
+
+@dataclass(slots=True)
+class CampaignBudgetInfo:
+    total: int | None
+    raw: dict[str, Any]
+
+
+@dataclass(slots=True)
+class BudgetTopUpResult:
+    total: int | None
+    raw: dict[str, Any]
 
 
 class PromotionManager:
@@ -48,10 +70,12 @@ class PromotionManager:
     ) -> List[NormqueryStatsDTO] | None:
         from .methods.get_normquery_stats import method
 
-        result = await method.get_normquery_stats(self._client.normquery_stats_adapter,
-                                                  complex_advs,
-                                                  date_from,
-                                                  date_to)
+        result = await method.get_normquery_stats(
+            self._client.normquery_stats_adapter,
+            complex_advs,
+            date_from,
+            date_to,
+        )
         return result
 
     async def get_normquery_bids(
@@ -85,3 +109,50 @@ class PromotionManager:
         from .methods.set_cluster_bids import set_cluster_bids as method
 
         await method(self._client.normquery_bids_adapter, bids)
+
+    async def get_campaign_budget(self, adv_id: int) -> CampaignBudgetInfo:
+        response = await self._client.finance_adapter.get_campaign_budget(adv_id)
+        raw: dict[str, Any] = response.to_dict() if response else {}
+        total = raw.get("total")
+        return CampaignBudgetInfo(total=total if isinstance(total, int) else None, raw=raw)
+
+    async def top_up_budget(
+        self,
+        adv_id: int,
+        amount: int,
+        balance_type: str,
+        return_total: bool = True,
+    ) -> BudgetTopUpResult:
+        response = await self._client.finance_adapter.top_up_budget(
+            adv_id=adv_id,
+            amount=amount,
+            balance_type=balance_type,
+            return_total=return_total,
+        )
+        raw: dict[str, Any] = response.to_dict() if response else {}
+        total = raw.get("total")
+        return BudgetTopUpResult(total=total if isinstance(total, int) else None, raw=raw)
+
+    async def get_campaign_balance(self) -> GetAdvV1BalanceResponse200 | None:
+        return await self._client.finance_adapter.get_campaign_balance()
+
+    async def start_campaign(self, advert_id: int) -> None:
+        """Запустить рекламную кампанию WB."""
+        await start_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )
+
+    async def pause_campaign(self, advert_id: int) -> None:
+        """Приостановить рекламную кампанию."""
+        await pause_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )
+
+    async def stop_campaign(self, advert_id: int) -> None:
+        """Остановить рекламную кампанию окончательно."""
+        await stop_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )

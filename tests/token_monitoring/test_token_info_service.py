@@ -33,7 +33,7 @@ class TestTokenInfoService:
         token.api_key = "test_api_key"
         token.user_id = 123
         token.shop_id = "test_shop_123"
-        token.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        token.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
         token.categories = {"Контент", "Статистика", "Аналитика", "Продвижение"}
         token.read_only = False
         token.check_valid.return_value = True
@@ -47,7 +47,7 @@ class TestTokenInfoService:
         token.api_key = "expired_api_key"
         token.user_id = 123
         token.shop_id = "test_shop_123"
-        token.expires = datetime.datetime.now() - datetime.timedelta(days=1)
+        token.expires = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
         token.categories = {"Контент", "Статистика"}
         token.read_only = False
         token.check_valid.return_value = False
@@ -119,7 +119,7 @@ class TestTokenInfoService:
         incomplete_token.api_key = "incomplete_api_key"
         incomplete_token.user_id = 123
         incomplete_token.shop_id = "test_shop_123"
-        incomplete_token.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        incomplete_token.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
         incomplete_token.categories = {
             "Контент",
             "Статистика",
@@ -170,7 +170,7 @@ class TestTokenInfoService:
         # Token with limited permissions
         limited_token = MagicMock(spec=WBToken)
         limited_token.id = 1
-        limited_token.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        limited_token.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
         limited_token.categories = {"Контент"}
         limited_token.read_only = False
         limited_token.check_valid.return_value = True
@@ -222,7 +222,7 @@ class TestTokenInfoService:
             api_key="expiring_key",
             user_id=123,
             shop_id="test_shop_123",
-            expires=datetime.datetime.now() + datetime.timedelta(days=5),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5),
             categories={"Контент"},
             is_read_only=False,
             is_valid=True,
@@ -255,7 +255,7 @@ class TestTokenInfoService:
             api_key="key1",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() + datetime.timedelta(days=30),
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
             categories={"Контент"},
             is_read_only=False,
             is_valid=True,
@@ -267,7 +267,7 @@ class TestTokenInfoService:
             api_key="key2",
             user_id=123,
             shop_id="shop1",
-            expires=datetime.datetime.now() - datetime.timedelta(days=1),
+            expires=datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1),
             categories={"Статистика"},
             is_read_only=False,
             is_valid=False,

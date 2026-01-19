@@ -210,7 +210,8 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
     # Добавим проверку, что _get_days_static_text формирует правильный текст
     # Для этого нам понадобится CommonStatDataManager и AdvSetting
     from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import CommonStatDataManager
-    from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+    from app.modules.common_slaves.wildberries.models import AdvSetting
+    from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
     from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
 
     # Создаем фиктивный WBCabinet
@@ -279,3 +280,49 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             [adv_id], start_date, end_date
         )
     assert empty_result_views == {dt.date(2025, 11, 26): 0, dt.date(2025, 11, 27): 0, dt.date(2025, 11, 28): 0}
+
+
+@pytest.mark.integration
+async def test_get_spend_by_last_days_with_argmax(
+    clickhouse_client: get_async_client,
+):
+    adv_id = 321
+    other_adv_id = 999
+    start_date = dt.datetime(2025, 11, 26)
+    end_date = dt.datetime(2025, 11, 27)
+
+    await clickhouse_client.command("TRUNCATE TABLE default_db.full_adv_wb_stat")
+
+    await clickhouse_client.insert(
+        "default_db.full_adv_wb_stat",
+        [
+            (adv_id, dt.date(2025, 11, 26), 1, 1, 50.0, 0, 0, 0.0, 1.0),
+            (adv_id, dt.date(2025, 11, 26), 1, 1, 75.0, 0, 0, 0.0, 2.0),
+            (adv_id, dt.date(2025, 11, 27), 1, 1, 40.0, 0, 0, 0.0, 1.0),
+            (adv_id, dt.date(2025, 11, 27), 1, 1, 55.0, 0, 0, 0.0, 3.0),
+            (other_adv_id, dt.date(2025, 11, 26), 1, 1, 999.0, 0, 0, 0.0, 5.0),
+        ],
+        column_names=[
+            "adv_id",
+            "date",
+            "views",
+            "clicks",
+            "spend",
+            "added_to_cart",
+            "orders",
+            "sum_price_orders",
+            "version",
+        ],
+    )
+
+    mock_context = _create_mock_clickhouse_context(clickhouse_client)
+
+    with patch(
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        value = await full_wb_adv_stat.get_spend_by_last_days(
+            [adv_id], start_date, end_date
+        )
+
+    assert value == pytest.approx(75.0 + 55.0)

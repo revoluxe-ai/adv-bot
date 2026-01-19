@@ -21,7 +21,7 @@ class Adapter(BaseSectionAdapter):
     ) -> list[KeywordPosition]:
         body = command_to_body(command)
         client = await self.auth_client_handler.get_proxy_client(self)
-        raw_response = await with_raise_errors(asyncio_detailed, client, body)
+        raw_response = await with_raise_errors(asyncio_detailed, client, body=body)
         raw_response = cast(Response[Any], raw_response)
         dto: list[KeywordPosition] = raw_response_to_dto(command.nmid, raw_response)
         return dto

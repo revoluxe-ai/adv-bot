@@ -8,10 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
     WBToken,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
 # Required rights for the bot to function properly
@@ -311,15 +311,18 @@ class TokenInfoService:
                 session, shop_id, shop_name, days_ahead
             )
 
+    @staticmethod
     async def _get_shop_tokens(
-        self, session: AsyncSession, shop_id: str
+        session: AsyncSession, shop_id: str
     ) -> list[WBToken]:
         """Get all tokens for a shop."""
         stmt = select(WBToken).where(WBToken.shop_id == shop_id)
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_shop_name(self, session: AsyncSession, shop_id: str) -> str:
+
+    @staticmethod
+    async def _get_shop_name(session: AsyncSession, shop_id: str) -> str:
         """Get shop name from WBUserCabinet."""
         stmt = (
             select(WBUserCabinet.name)
@@ -331,8 +334,12 @@ class TokenInfoService:
         shop_name = result.scalar()
         return shop_name or f"Магазин {shop_id}"
 
+    @staticmethod
     async def _get_expiring_tokens(
-        self, session: AsyncSession, shop_id: str, shop_name: str, days_ahead: int = 14
+        session: AsyncSession,
+        shop_id: str,
+        shop_name: str,
+        days_ahead: int = 14,
     ) -> list[ExpiringToken]:
         """Get tokens expiring within specified days."""
         cutoff_date = utcnow() + datetime.timedelta(days=days_ahead)
@@ -352,7 +359,7 @@ class TokenInfoService:
                 token_expires = _to_aware_utc(token.expires)
 
                 # Filter tokens that expire within the timeframe but haven't expired yet
-                if token_expires <= cutoff_date and token_expires > now:
+                if cutoff_date >= token_expires > now:
                     token_info = TokenInfo.from_wb_token(token)
                     if token_info.is_valid and not token_info.is_read_only:
                         days_until_expiry = (token_expires - now).days

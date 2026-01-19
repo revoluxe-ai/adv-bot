@@ -1,19 +1,19 @@
 from datetime import datetime
 
 from sqlalchemy.orm import selectinload
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.balance_manager.exceptions import (
     CabinetNotFoundError,
     InvalidAmountError,
-    PaymentNotFoundError,
     UserNotFoundError,
 )
 from app.modules.common_slaves.wildberries.models import (
     WBBalancePayment,
     WBBonusPayment,
-    WBCabinet,
 )
-from app.utils.db.models import Payment, User
+
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 # Алиас для получения сессии
@@ -141,63 +141,10 @@ async def get_cabinet_balance(cabinet_id: int) -> tuple[float, float]:
                 selectinload(WBCabinet.bonus_payments),
             ],
         )
-        if not cabinet:
-            raise CabinetNotFoundError(f"Кабинет с ID {cabinet_id} не найден")
+    if not cabinet:
+        raise CabinetNotFoundError(f"Кабинет с ID {cabinet_id} не найден")
 
-        return cabinet.calculated_balance, cabinet.calculated_bonus
-
-
-async def confirm_payment(
-    user_id: int, payment_id: int, add_to_system_payments: bool = True
-) -> tuple[WBBalancePayment, WBCabinet]:
-    """
-    Подтверждает платеж и регистрирует его в системе платежей
-
-    Args:
-        user_id: ID пользователя
-        payment_id: ID платежа WBBalancePayment
-        add_to_system_payments: Добавлять ли запись в таблицу Payment
-
-    Returns:
-        Tuple[WBBalancePayment, WBCabinet]: Подтвержденный платеж и кабинет
-
-    Raises:
-        UserNotFoundError: Если пользователь не найден
-        PaymentNotFoundError: Если платеж не найден
-    """
-    async with sm() as session:
-        # Проверяем существование пользователя
-        user = await session.get(User, user_id)
-        if not user:
-            raise UserNotFoundError(f"Пользователь с ID {user_id} не найден")
-
-        # Получаем платеж
-        payment = await session.get(WBBalancePayment, payment_id)
-        if not payment:
-            raise PaymentNotFoundError(f"Платеж с ID {payment_id} не найден")
-
-        # Получаем кабинет
-        cabinet = await session.get(WBCabinet, payment.wb_cabinet_id)
-        if not cabinet:
-            raise CabinetNotFoundError(
-                f"Кабинет с ID {payment.wb_cabinet_id} не найден"
-            )
-
-        # Если указано, создаем запись в общей таблице платежей
-        if add_to_system_payments:
-            system_payment = Payment(
-                user=user,
-                amount=payment.amount,
-                target="balance",
-            )
-            session.add(system_payment)
-
-        await session.commit()
-        await session.refresh(payment)
-        await session.refresh(cabinet)
-
-        return payment, cabinet
-
+    return cabinet.calculated_balance, cabinet.calculated_bonus
 
 async def process_payment_with_bonus(
     user_id: int,

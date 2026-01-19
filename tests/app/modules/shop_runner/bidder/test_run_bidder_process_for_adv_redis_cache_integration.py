@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 from tests.factories.keyword_pipeline import make_calculated_keyword, HardStatus
 
-sys.modules.setdefault("matplotlib", MagicMock())
+if "matplotlib" not in sys.modules:
+    try:
+        import matplotlib  # noqa: F401
+    except ModuleNotFoundError:
+        sys.modules["matplotlib"] = MagicMock()
 
 import pytest
 from dependency_injector import providers

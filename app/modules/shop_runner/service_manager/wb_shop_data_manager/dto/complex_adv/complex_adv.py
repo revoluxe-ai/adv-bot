@@ -6,9 +6,15 @@ from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
     KeywordGettingMode
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+import typing
+
+from app.shared.domains.wb.enums import AdvType
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
+
+if typing.TYPE_CHECKING:
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 class _CPMs:
     def __init__(self, adv_setting: AdvSetting, search_adv: AdvSetting | None):
@@ -31,16 +37,26 @@ class ComplexAdv:
         search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
-        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]] | None = None,
+        get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
-        self._calculated_keywords: list[CalculatedKeyword] | None = None
+        self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+
+    @property
+    def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:
+        if self._search_adv is None:
+            return None
+        return WBAdvActiveStatus(self._search_adv.active_status)
+
+    @property
+    def auto_adv_active_status_str(self) -> WBAdvActiveStatus:
+        return WBAdvActiveStatus(self._adv_setting.active_status)
 
     @property
     def bot_active(self) -> bool:
@@ -53,6 +69,21 @@ class ComplexAdv:
             return None
         else:
             return  self._search_adv.adv_id
+
+    def get_adv_id_by_type(self, adv_type: AdvType) -> int:
+        if adv_type == AdvType.AUTO:
+            return self.auto_adv_id
+        if adv_type == AdvType.SEARCH:
+            auction_adv_id = self.auction_adv_id
+            if auction_adv_id is None:
+                raise ValueError(
+                    "Аукционная кампания не зарегистрирована для adv_id=%s"
+                    % self.auto_adv_id
+                )
+            return auction_adv_id
+        raise ValueError(
+            "Неизвестный тип кампании %s" % adv_type
+        )
 
     @property
     def bidder_mode(self) -> BidderMode:
@@ -202,7 +233,7 @@ class ComplexAdv:
     def auto_update_setting_version(self) -> int:
         return self._adv_setting.automatic_version
 
-    async def get_keywords(self) -> list[CalculatedKeyword]:
+    async def get_keywords(self) -> list["CalculatedKeyword"]:
         if not self._calculated_keywords:
             if not self._get_keywords:
                 raise RuntimeError("_get_keywords not set")
@@ -232,6 +263,22 @@ class ComplexAdv:
     @property
     def adv_id(self) -> int:
         return self._adv_setting.adv_id
+
+    @property
+    def auto_budget_daily_limit(self) -> int:
+        return self._adv_setting.auto_budget_daily_limit
+
+    @property
+    def search_auto_budget_daily_limit(self) -> int:
+        return self._adv_setting.search_auto_budget_daily_limit
+
+    @property
+    def auto_budget_watchdog_enabled(self) -> bool:
+        return bool(self._adv_setting.auto_budget_watchdog_enabled)
+
+    @property
+    def search_adv_id(self) -> int | None:
+        return self._adv_setting.search_adv_id
 
     @property
     def auto_add_only_relevant_phrase(self):

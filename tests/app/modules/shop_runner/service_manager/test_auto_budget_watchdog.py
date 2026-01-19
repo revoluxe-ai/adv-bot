@@ -1,0 +1,75 @@
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from app.modules.shop_runner.service_manager.manager import CoroutinesManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+
+
+@pytest.mark.asyncio
+async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
+    wb_api = MagicMock()
+    wb_api.wb_cabinet = MagicMock()
+    wb_api.access = MagicMock()
+    wb_api.shop_id = "test-shop"
+    wb_api.session = MagicMock()
+
+    enabled_adv_setting = MagicMock()
+    enabled_adv_setting.id = 1
+    enabled_adv_setting.auto_budget_watchdog_enabled = True
+
+    disabled_adv_setting = MagicMock()
+    disabled_adv_setting.id = 2
+    disabled_adv_setting.auto_budget_watchdog_enabled = False
+
+    enabled_adv = MagicMock()
+    enabled_adv.auto_budget_daily_limit = 100
+    enabled_adv.adv_id = 101
+    enabled_adv.search_auto_budget_daily_limit = 0
+    enabled_adv.search_adv_id = None
+    enabled_adv.auto_budget_watchdog_enabled = True
+    enabled_adv.adv_setting = enabled_adv_setting
+
+    disabled_adv = MagicMock()
+    disabled_adv.auto_budget_daily_limit = 100
+    disabled_adv.adv_id = 202
+    disabled_adv.search_auto_budget_daily_limit = 0
+    disabled_adv.search_adv_id = None
+    disabled_adv.auto_budget_watchdog_enabled = False
+    disabled_adv.adv_setting = disabled_adv_setting
+
+    wb_shop_data_manager_instance = MagicMock()
+    wb_shop_data_manager_instance.get_complex_advs = AsyncMock(
+        return_value=[enabled_adv, disabled_adv]
+    )
+
+    auto_budget_service_instance = MagicMock()
+    auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
+
+    async def mock_run_tasks(handlers, *args, **kwargs):
+        return [await handler() for handler in handlers]
+
+    wb_manager_hub = MagicMock()
+
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.WBShopDataManager",
+        return_value=wb_shop_data_manager_instance,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.AutoBudgetService",
+        return_value=auto_budget_service_instance,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.WBManagerHubFactory.get_wb_manager_from_context",
+        return_value=wb_manager_hub,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.run_tasks",
+        new=mock_run_tasks,
+    ):
+        coroutines_manager = CoroutinesManager(
+            wb_api,
+            MagicMock(),
+            tasks_manager=TasksManager(max_workers=1),
+        )
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
+
+    auto_budget_service_instance.ensure_budget.assert_called_once()
+    called_args = auto_budget_service_instance.ensure_budget.call_args[0]
+    assert called_args[0] == enabled_adv_setting.id

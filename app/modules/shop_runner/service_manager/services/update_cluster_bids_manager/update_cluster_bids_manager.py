@@ -10,7 +10,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     ClusterBidKey,
 )
 from .wb_manager import WBManager
-from ...old_modules.setting_auto_updater import AdvSettingAutoUpdater
+from app.modules.plan_fact.provider import PlanFactProvider
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
@@ -319,16 +319,15 @@ class UpdateClusterBidsManager:
     @staticmethod
     async def __get_fact_data(adv: ComplexAdv) -> FactData:
         keywords = await adv.get_keywords()
-        auto_updater = AdvSettingAutoUpdater(adv.adv_setting)
-        fact_data = await auto_updater.get_fact_data(keywords)
-        return fact_data
+        provider = PlanFactProvider(adv.adv_setting)
+        return await provider.get_fact_data(keywords)
 
 
     @staticmethod
     def _get_plan_data(advs: list[ComplexAdv]) -> dict[int, PlanData]:
         plan_datas_map: dict[int, PlanData] = {}
         for adv in advs:
-            plan = AdvSettingAutoUpdater.get_plan_data(adv.adv_setting)
+            plan = PlanFactProvider.get_plan_data(adv.adv_setting)
             if plan is not None:
                 plan_datas_map[adv.adv_id] = plan
 

@@ -12,14 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.token_monitoring.services.token_info_service import (
     TokenStatusReport,
-    TokenInfo,
 )
-from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
-    WBUserCabinet,
-    AdvSetting,
-)
-from app.utils.db.models import User
 
 
 class TestShopMenuTokenLoading:

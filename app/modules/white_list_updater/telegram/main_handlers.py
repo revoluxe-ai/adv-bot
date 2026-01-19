@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy import select, update
 
 from app.client_bot.user_interface.views import callbacks
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()

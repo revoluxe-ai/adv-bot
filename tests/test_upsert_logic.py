@@ -2,13 +2,13 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from absl.testing.absltest import skip
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.wb_api.data_classes.advs.other_classes import Balances
 from app.modules.adv_creator.backend.main_manager import MainAdvManager
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 
 # access_mock и async_session теперь предоставляются через conftest.py

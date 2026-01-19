@@ -7,9 +7,18 @@ import pytest
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+
+
+def _create_manager(wb_api, redis_client_wrapper):
+    return CoroutinesManager(
+        wb_api,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+    )
 
 
 @pytest.mark.unit
@@ -20,7 +29,7 @@ async def test_update_plan_fact_stats_success_with_full_data(
     """Тест успешного выполнения с полными данными (план и факт)"""
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
     
     # Создаем моки для ComplexAdv
     adv1 = MagicMock(spec=ComplexAdv)
@@ -65,7 +74,7 @@ async def test_update_plan_fact_stats_empty_advs_list(access_mock, fake_redis):
     """Тест обработки пустого списка кампаний"""
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
     
     mock_plan_fact_manager = MagicMock()
     mock_plan_fact_manager.process_and_save = AsyncMock()
@@ -92,7 +101,7 @@ async def test_update_plan_fact_stats_calls_process_and_save(access_mock, fake_r
     """Тест вызова process_and_save с правильными аргументами"""
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
     
     adv = MagicMock(spec=ComplexAdv)
     adv.adv_id = 12345
@@ -129,7 +138,7 @@ async def test_update_plan_fact_stats_multiple_advs(access_mock, fake_redis):
     """Тест обработки нескольких кампаний"""
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
     
     advs = []
     for i in range(5):
@@ -170,7 +179,7 @@ async def test_update_plan_fact_stats_uses_wrapped(access_mock, fake_redis):
     """Тест использования __wrapped__ для обхода декоратора"""
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
     
     adv = MagicMock(spec=ComplexAdv)
     adv.adv_id = 99999

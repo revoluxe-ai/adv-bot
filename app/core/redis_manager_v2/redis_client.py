@@ -135,11 +135,12 @@ class RedisClient:
         value: str | str,
         ex: int | None = None,
         px: int | None = None,
+        nx: bool | None = None,
     ) -> bool:
         return cast(
             bool,
             await ensure_awaitable(
-                self._replica_write_client.set(key, value, ex=ex, px=px)
+                self._replica_write_client.set(key, value, ex=ex, px=px, nx=nx)
             ),
         )
 

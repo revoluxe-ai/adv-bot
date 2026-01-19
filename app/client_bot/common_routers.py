@@ -57,10 +57,12 @@ from .user_interface.handlers import (
     sales_predict_method_toggle,
     auto_update_exponent_toggle,
     auto_add_only_relevant_phrase_toggle,
+    auto_budget_watchdog_toggle,
     reset_place_setting,
     shop_settings,
     strategy_setting,
     rec_system_mode_toggle,
+    campaign_activity,
 )
 from .user_interface.handlers.bidder_coroutine_type_toggle import (
     router as bidder_coroutine_type_toggle_router,
@@ -88,6 +90,7 @@ common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
+common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
@@ -106,6 +109,7 @@ common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
+common_router.include_routers(campaign_activity.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)

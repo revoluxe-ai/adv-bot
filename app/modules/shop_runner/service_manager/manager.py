@@ -9,12 +9,21 @@ from typing import (
 
 
 
+from app.core.di.wb_manager_hub import WBManagerHubFactory
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.modules.auto_budget_manager import (
+    AutoBudgetEnsureResult,
+    AutoBudgetEnsureStatus,
+    AutoBudgetService,
+)
+from app.shared.domains.wb.enums import (
+    AdvType,
+)
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -26,8 +35,8 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 
 from app.settings import settings
 
-
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
+from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
@@ -37,6 +46,8 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
     run_tasks,
 )
+from ...wb_adv_updater import data_manager
+from .services.auto_adv_active_control import AutoAdvActiveControlService
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +59,8 @@ class CoroutinesManager:
         self,
         wb_api: WBApi,
         redis_client_wrapper: RedisClient,
-        tasks_manager: TasksManager | None = None,
+        tasks_manager: TasksManager,
+        plan_fact_reader: PlanFactReader,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -66,7 +78,9 @@ class CoroutinesManager:
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client=redis_client_wrapper
         )
+        self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
+        self._plan_fact_reader = plan_fact_reader
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -131,8 +145,6 @@ class CoroutinesManager:
             CommonSaleStatUpdater,
             CommonSaleStatUpdaterContainer,
         )
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
-
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
@@ -146,10 +158,13 @@ class CoroutinesManager:
     @staticmethod
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:
         await full_wb_adv_stat.insert(stats)
+        date_time = datetime.now()
+        for stat in stats:
+            await data_manager.set_last_full_stat_update(stat.advertId, date_time)
+
 
     @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
-        from app.modules.wb_adv_updater import data_manager
         wb_api = self._wb_api
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         all_adv_ids: set[int] = set()
@@ -162,9 +177,6 @@ class CoroutinesManager:
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
-            date_time = datetime.now()
-            for stat in full_stats:
-                await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
     @staticmethod
@@ -192,8 +204,7 @@ class CoroutinesManager:
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
-        last_days_for_analyze = 2
-        control_system_v2 = AdvControlSystem(max_last_period=last_days_for_analyze)
+        control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
@@ -209,7 +220,6 @@ class CoroutinesManager:
             handlers,
             max_workers=max_workers,
             return_exceptions=False,
-            tasks_manager=self._tasks_manager,
         )
         return None
 
@@ -243,7 +253,6 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
         )
 
         for adv, result in zip(advs_with_whitelist, results):
@@ -297,7 +306,6 @@ class CoroutinesManager:
         results: Sequence[None | BaseException] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -312,7 +320,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -340,7 +347,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
         )
 
         for result in results:
@@ -353,7 +359,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
     async def update_keywords_positions_history(self) -> None:
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -381,7 +386,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
         )
 
         for result in results:
@@ -395,7 +399,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
@@ -416,7 +419,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -430,12 +432,80 @@ class CoroutinesManager:
                 )
         return None
 
+    @while_coroutine_decorator(settings.UPDATE_FULL_ADV_STAT_PERIOD, 60)
+    async def auto_budget_watchdog(self) -> None:
+        advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+        candidates: list[ComplexAdv] = [
+            adv
+            for adv in advs
+            if (
+                ((adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id)
+                or ((adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id)
+            )
+        ]
+        candidates = [adv for adv in candidates if adv.auto_budget_watchdog_enabled]
+        if not candidates:
+            return None
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        handlers: list[Callable[[], Awaitable[AutoBudgetEnsureResult | None]]] = []
+        task_specs: list[tuple[AdvSetting, AdvType, int]] = []
+
+        for adv in candidates:
+            campaign_checks: list[tuple[AdvType, int]] = []
+            if (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
+                campaign_checks.append((AdvType.AUTO, adv.adv_id))
+            if (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
+                campaign_checks.append(
+                    (AdvType.SEARCH, adv.search_adv_id)
+                )
+            adv_setting = adv.adv_setting
+            adv_setting_id = adv_setting.id
+            for campaign_type, adv_id in campaign_checks:
+                handlers.append(
+                    lambda adv_setting_id_=adv_setting_id,
+                           campaign_type_=campaign_type,
+                           wb_manager_hub_=wb_manager_hub:
+                    (
+                        self._auto_budget_service.ensure_budget(
+                            adv_setting_id_,
+                            campaign_type_,
+                            wb_manager_hub_,
+                        )
+                    )
+                )
+                task_specs.append((adv_setting, campaign_type, adv_id))
+
+        if not handlers:
+            return None
+
+        max_workers = self._max_workers_for(len(handlers), cap=16)
+        results = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+        )
+
+        for (adv_setting, campaign_type, adv_id), result in zip(task_specs, results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Auto budget ensure failed for shop_id=%s, adv_id=%s, campaign=%s: %s",
+                    self.shop_id,
+                    adv_id,
+                    campaign_type,
+                    result,
+                    exc_info=True,
+                )
+                continue
+            self._log_auto_budget_result(
+                adv_setting, result, campaign_type, adv_id
+            )
+        return None
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -449,7 +519,6 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_history(self) -> None:
         """Обновление статистики кластеров за прошлые дни."""
         from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -461,7 +530,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 15, 60)
     async def update_cluster_bids(self) -> None:
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
-        from app.core.di.wb_manager_hub import WBManagerHubFactory
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
@@ -494,8 +562,65 @@ class CoroutinesManager:
         manager = PlanFactManager()
         await manager.process_and_save(advs)
         return None
+    def _log_auto_budget_result(
+        self,
+        adv: AdvSetting,
+        result: AutoBudgetEnsureResult | None,
+        campaign_type: AdvType,
+        adv_id: int | None,
+    ) -> None:
+        if result:
+            message = (
+                "[auto-budget] shop_id=%s adv_setting_id=%s adv_id=%s campaign=%s "
+                "status=%s spend_today=%.2f planned=%s reason=%s"
+            )
+            params = (
+                self.shop_id,
+                adv.id,
+                result.adv_id or adv_id,
+                result.campaign_type,
+                result.status.value,
+                result.spend_today,
+                result.planned_amount,
+                result.reason,
+            )
+            if result.status in {
+                AutoBudgetEnsureStatus.TOPPED_UP,
+                AutoBudgetEnsureStatus.TOPUP_UNVERIFIED,
+            }:
+                logger.info(message, *params)
+            elif result.status in {
+                AutoBudgetEnsureStatus.LOCK_BUSY,
+                AutoBudgetEnsureStatus.LIMIT_DISABLED,
+                AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
+                AutoBudgetEnsureStatus.LIMIT_REACHED,
+            }:
+                logger.debug(message, *params)
+            else:
+                logger.warning(message, *params)
+        else:
+            logger.error(
+                "[auto-budget] shop_id=%s adv_setting_id=%s adv_id=%s campaign=%s: ensure_budget returned None (unexpected error)",
+                self.shop_id,
+                adv.id,
+                adv_id,
+                    campaign_type,
+            )
 
+    @while_coroutine_decorator(5 * 60, 60)
+    async def auto_adv_active_control(self) -> None:
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
 
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        service = AutoAdvActiveControlService(
+            wb_modifier=wb_manager_hub.wb_modifier,
+            tasks_manager=self._tasks_manager,
+            plan_fact_reader=self._plan_fact_reader,
+        )
+        await service.ensure_campaigns_active(advs)
+        return None
 
 # TODO: Переделать граф зависимостей
 

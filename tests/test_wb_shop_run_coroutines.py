@@ -6,6 +6,10 @@ import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.wb_shop import WBShop
 
 
@@ -23,7 +27,14 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
+    )
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -40,6 +51,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
     coroutines_manager_mock.update_cluster_bids = AsyncMock()
     coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
+    coroutines_manager_mock.auto_budget_watchdog = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -66,6 +78,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
             coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
             coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
+            coroutines_manager_mock.auto_budget_watchdog.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
             coroutines_manager_mock.update_cluster_bids.assert_called_once()
@@ -86,7 +99,14 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
+    )
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -103,6 +123,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
     coroutines_manager_mock.update_cluster_bids = AsyncMock()
     coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
+    coroutines_manager_mock.auto_budget_watchdog = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -123,10 +144,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # 14 корутин: 1 (_alive_worker_run) + 13 из CoroutinesManager
+            # 15 корутин: 1 (_alive_worker_run) + 14 из CoroutinesManager
             assert (
-                len(call_args) == 14
-            ), f"asyncio.gather должен быть вызван с 14 аргументами, получено {len(call_args)}"
+                len(call_args) == 15
+            ), f"asyncio.gather должен быть вызван с 15 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
@@ -138,6 +159,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
             coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
             coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
+            coroutines_manager_mock.auto_budget_watchdog.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
             coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
             coroutines_manager_mock.update_cluster_bids.assert_called_once()

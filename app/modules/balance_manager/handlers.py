@@ -21,7 +21,7 @@ from app.modules.balance_manager.balance_service import (
     get_cabinet_balance,
     process_payment_with_bonus,
 )
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.payments.db.models import Payment
 from app.settings import settings
@@ -29,6 +29,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from . import messages
 from ..billing.event_manager.event_manager import BillingEventManager
+from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,8 @@ from sqlalchemy import delete, select, update
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -66,7 +67,7 @@ async def change_shop_default_max_cpm(
     async with sm(read_only=True) as session:
         result = await session.execute(stmt)
         wb_cabinet = result.scalar_one()
-    
+
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.ShopDefaultMaxCPM.waiting_for_new_default_max_cpm)
     await messages.ChangeShopDefaultMaxCPMMessage(bot, chat_id, wb_cabinet.default_max_cpm)()

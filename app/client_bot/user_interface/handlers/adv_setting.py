@@ -12,9 +12,9 @@ from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker

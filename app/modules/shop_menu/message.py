@@ -26,10 +26,10 @@ from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBToken,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.token_monitoring.services.token_info_service import (
     TokenInfoService,
     TokenStatusReport,

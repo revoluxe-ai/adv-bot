@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
@@ -48,6 +49,7 @@ async def test_adv_settings_auto_update(
     fact_method,
     get_async_session_mock,
     fake_redis,
+    di_containner_for_adv_auto_updater_v2,
 ):
     adv_setting_mock.auto_update_white_list = True
     adv_setting_mock.auto_update_target_place = True
@@ -56,6 +58,15 @@ async def test_adv_settings_auto_update(
     adv_setting_mock.auto_updater_version = 1
     adv_setting_mock.sales_predict_method = fact_method
     adv_setting_mock.rec_system_mode = False
+    adv_setting_mock.max_place = 10
+    adv_setting_mock.max_cpm = 200
+    adv_setting_mock.cpm = 100
+    adv_setting_mock.id = 1
+    adv_setting_mock.bidder_for_auto = True
+    adv_setting_mock.bidder_active = True
+    adv_setting_mock.bot_active = True
+    _ = di_containner_for_adv_auto_updater_v2
+
     wb_api = WBApi(access_mock, client_session_mock)
 
     async def _get_keywords(_: ComplexAdv):
@@ -119,9 +130,17 @@ async def test_adv_settings_auto_update(
             "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
             return_value=mock_change_plan_fact,
         ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
+            new=get_async_session_mock,
+        ),
     ):
         redis_client_wrapper = RedisClient(redis_client=fake_redis)
-        manager = CoroutinesManager(wb_api, redis_client_wrapper)
+        manager = CoroutinesManager(
+            wb_api,
+            redis_client_wrapper,
+            tasks_manager=TasksManager(max_workers=1),
+        )
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]
         manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}

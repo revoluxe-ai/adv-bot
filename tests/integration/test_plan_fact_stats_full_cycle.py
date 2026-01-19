@@ -9,14 +9,21 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
+
+
+def _create_manager(wb_api, redis_client_wrapper):
+    return CoroutinesManager(
+        wb_api,
+        redis_client_wrapper,
+        tasks_manager=TasksManager(max_workers=1),
+    )
 
 
 @pytest.mark.integration
@@ -29,7 +36,7 @@ async def test_full_cycle_plan_fact_stats(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Настраиваем план и факт для кампании
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
@@ -46,11 +53,11 @@ async def test_full_cycle_plan_fact_stats(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),
@@ -101,7 +108,7 @@ async def test_full_cycle_with_real_complex_adv(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Используем реальные данные из complex_adv
     plan = PlanData(orders=200, target_pay_for_order=600, max_pay_for_order=1200)
@@ -118,11 +125,11 @@ async def test_full_cycle_with_real_complex_adv(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),
@@ -158,7 +165,7 @@ async def test_full_cycle_error_handling_for_some_advs(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Создаем второй ComplexAdv
     adv2 = MagicMock()
@@ -183,11 +190,11 @@ async def test_full_cycle_error_handling_for_some_advs(
             new=AsyncMock(return_value=[complex_adv, adv2]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             side_effect=[plan1, plan2],
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
         ),
@@ -230,7 +237,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Создаем дополнительные кампании
     adv2 = MagicMock()
@@ -278,11 +285,11 @@ async def test_full_cycle_multiple_advs_simultaneously(
             new=AsyncMock(return_value=[complex_adv, adv2, adv3]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             side_effect=plans,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             new=AsyncMock(side_effect=facts),
         ),
@@ -328,7 +335,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     fact = FactData(
@@ -344,11 +351,11 @@ async def test_full_cycle_data_correctness_in_clickhouse(
             new=AsyncMock(return_value=[complex_adv]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             return_value=plan,
         ),
         patch.object(
-            AdvSettingAutoUpdater,
+            PlanFactProvider,
             "get_fact_data",
             return_value=fact,
         ),

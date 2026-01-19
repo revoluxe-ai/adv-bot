@@ -1,8 +1,8 @@
 import factory
 from factory.alchemy import SQLAlchemyModelFactory
 from faker import Faker
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet
-
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 fake = Faker("ru_RU")
 

@@ -9,9 +9,6 @@ class ComplexAdvsExistsError(Exception):
         super().__init__(message)
 
 
-class NotEnoughBalanceOnShopError(Exception):
-    adv_id: int | None = None
-
 
 class StartComplexAdvError(Exception):
     auto_adv_id: int

@@ -15,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 # Создаем базу тестов
 Base = declarative_base()

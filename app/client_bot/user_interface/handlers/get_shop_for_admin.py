@@ -11,9 +11,9 @@ from app.client_bot import const
 from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm

@@ -75,3 +75,7 @@ class ShopDefaultMaxCPM(StatesGroup):
 
 class ShopMenuState(StatesGroup):
     shop_menu = State()
+
+
+class CampaignActivity(StatesGroup):
+    waiting_for_new_limit = State()
