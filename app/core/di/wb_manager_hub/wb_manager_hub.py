@@ -1,12 +1,11 @@
 import typing
 
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager import UpdateClusterBidsManager
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import \
-    RedisKeywordBidderStatusManager
-
 if typing.TYPE_CHECKING:
     from app.core.mp.wb.api.managers import WBDataManager, WBModifier
     from app.core.redis_manager_v2.redis_client import RedisClient
+    from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager import UpdateClusterBidsManager
+    from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import \
+        RedisKeywordBidderStatusManager
 
 
 class WBManagerHub:

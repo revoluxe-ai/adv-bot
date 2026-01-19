@@ -4,8 +4,11 @@ from typing import TypeVar
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
-from .service_manager.exc import StopShopUpdateException
-from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
+
+import typing
+
+if typing.TYPE_CHECKING:
+    from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
 
 from .shop_run_worker.redis_manager import RedisShopManager
 from .service_manager import CoroutinesManager
@@ -22,7 +25,7 @@ class WBShop:
         redis_manager: RedisShopManager,
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
-        plan_fact_reader: PlanFactReader,
+        plan_fact_reader: "PlanFactReader",
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
@@ -31,6 +34,7 @@ class WBShop:
         self._plan_fact_reader = plan_fact_reader
 
     async def run(self) -> None:
+        from .service_manager.exc import StopShopUpdateException
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(
             wb_api,
