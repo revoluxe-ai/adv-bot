@@ -26,11 +26,11 @@ class AutoAdvActiveControlService:
         self,
         wb_modifier: WBModifier,
         tasks_manager: TasksManager,
-        plan_fact_reader: PlanFactReader,
+        plan_fact_reader: PlanFactReader | None = None,
     ) -> None:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
-        self._plan_fact_reader = plan_fact_reader
+        self._plan_fact_reader = plan_fact_reader or PlanFactReader() # просят тесты, потом все это исправить, техдолг
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
         complex_advs = [
