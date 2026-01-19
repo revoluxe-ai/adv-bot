@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Any
-from typing import List, TYPE_CHECKING
 import datetime
 from typing import List, TYPE_CHECKING
 
