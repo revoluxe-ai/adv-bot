@@ -134,9 +134,6 @@ async def _update_tasks(
 
 async def run() -> None:
     async with ClientSession() as session:
-        tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
-        stop_event = asyncio.Event()
-        queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
         db_tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
         db_stop_event = asyncio.Event()
         db_queue_task = asyncio.create_task(db_tasks_manager.run_queue(db_stop_event))
