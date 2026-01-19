@@ -145,6 +145,7 @@ class AutoAdvActiveControlService:
                 await self._wb_modifier.pause_auto_campaign(adv)
             return
 
+        auto_limit_action_taken = False
         if auto_limit > 0 and auto_status == WBAdvActiveStatus.PAUSE:
             logger.info(
                 "Auto budget watcher: starting auto campaign adv_id=%s shop_id=%s",
@@ -152,6 +153,8 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.start_auto_campaign(adv)
+            auto_status = WBAdvActiveStatus.STARTED
+            auto_limit_action_taken = True
         elif auto_limit == 0 and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto budget watcher: pausing auto campaign adv_id=%s shop_id=%s",
@@ -159,6 +162,11 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auto_campaign(adv)
+            auto_status = WBAdvActiveStatus.PAUSE
+            auto_limit_action_taken = True
+
+        if auto_limit_action_taken:
+            return
 
         target_cost = self._resolve_target_cost(plan_fact_summary)
         if target_cost is None:
