@@ -193,7 +193,7 @@ class AutoBudgetService:
         now_msk = self._now_msk()
 
         if (last_full_adv_stat_update
-                and now_msk < last_full_adv_stat_update
+                and now_msk > last_full_adv_stat_update
                 + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
