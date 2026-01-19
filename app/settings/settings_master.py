@@ -564,7 +564,7 @@ class Settings:
     def AUTO_BUDGET_MIN_BALANCE(self) -> int:
         value = os.getenv("AUTO_BUDGET_MIN_BALANCE")
         if not value:
-            return 1000
+            return 500
         return int(value)
 
     @property
