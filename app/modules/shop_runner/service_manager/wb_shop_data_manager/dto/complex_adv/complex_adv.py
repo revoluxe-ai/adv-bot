@@ -262,6 +262,10 @@ class ComplexAdv:
         return self._adv_setting.search_auto_budget_daily_limit
 
     @property
+    def auto_budget_watchdog_enabled(self) -> bool:
+        return bool(self._adv_setting.auto_budget_watchdog_enabled)
+
+    @property
     def search_adv_id(self) -> int | None:
         return self._adv_setting.search_adv_id
 
