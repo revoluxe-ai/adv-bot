@@ -1,3 +1,4 @@
+from .campaigns_management.adapter import CampaignsManagementAdapter
 from .minus_phrases.adapter import MinusPhrasesAdapter
 from .normquery_stats.adapter import NormqueryStatsAdapter
 from .normquery_bids.adapter import NormqueryBidsAdapter
@@ -15,11 +16,13 @@ class PromotionClient:
         normquery_bids_adapter: NormqueryBidsAdapter,
         min_bids_adapter: MinBidsAdapter,
         finance_adapter: FinanceAdapter,
+        campaigns_management_adapter: CampaignsManagementAdapter,
     ) -> None:
         self.__minus_phrases_adapter = minus_phrases_adapter
         self.__normquery_stats_adapter = normquery_stats_adapter
         self.__normquery_bids_adapter = normquery_bids_adapter
         self.__min_bids_adapter = min_bids_adapter
+        self.__campaigns_management_adapter = campaigns_management_adapter
         self.__finance_adapter = finance_adapter
 
     @property
@@ -41,3 +44,7 @@ class PromotionClient:
     @property
     def finance_adapter(self) -> FinanceAdapter:
         return self.__finance_adapter
+
+    @property
+    def campaigns_management_adapter(self) -> CampaignsManagementAdapter:
+        return self.__campaigns_management_adapter

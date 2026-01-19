@@ -140,6 +140,7 @@ class AutoBudgetService:
             result = await self._ensure_budget_locked(
                 adv_setting_id, campaign_type, wb_manager_hub
             )
+
             return result
         except Exception: # noqa
             logger.exception("Failed to ensure budget lock")

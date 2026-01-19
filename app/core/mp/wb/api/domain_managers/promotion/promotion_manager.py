@@ -2,12 +2,18 @@ from dataclasses import dataclass
 from typing import Any
 from typing import List, TYPE_CHECKING
 import datetime
+from typing import List, TYPE_CHECKING
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
     NormqueryStatsDTO,
 )
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
     NormqueryBidDTO,
+)
+from app.core.mp.wb.api.domain_managers.promotion.methods.campaign_control import (
+    pause_adv as pause_adv_method,
+    start_adv as start_adv_method,
+    stop_adv as stop_adv_method,
 )
 from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases import (
     request,
@@ -65,10 +71,12 @@ class PromotionManager:
     ) -> List[NormqueryStatsDTO] | None:
         from .methods.get_normquery_stats import method
 
-        result = await method.get_normquery_stats(self._client.normquery_stats_adapter,
-                                                  complex_advs,
-                                                  date_from,
-                                                  date_to)
+        result = await method.get_normquery_stats(
+            self._client.normquery_stats_adapter,
+            complex_advs,
+            date_from,
+            date_to,
+        )
         return result
 
     async def get_normquery_bids(
@@ -128,3 +136,24 @@ class PromotionManager:
 
     async def get_campaign_balance(self) -> GetAdvV1BalanceResponse200 | None:
         return await self._client.finance_adapter.get_campaign_balance()
+
+    async def start_campaign(self, advert_id: int) -> None:
+        """Запустить рекламную кампанию WB."""
+        await start_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )
+
+    async def pause_campaign(self, advert_id: int) -> None:
+        """Приостановить рекламную кампанию."""
+        await pause_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )
+
+    async def stop_campaign(self, advert_id: int) -> None:
+        """Остановить рекламную кампанию окончательно."""
+        await stop_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+        )
