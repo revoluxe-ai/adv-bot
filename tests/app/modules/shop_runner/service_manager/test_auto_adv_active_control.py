@@ -101,10 +101,10 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
             results.append(await handler())
         return results
 
-    http_tasks_manager = MagicMock()
+    tasks_manager = MagicMock()
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
-        tasks_manager=http_tasks_manager,
+        tasks_manager=tasks_manager,
     )
 
     async def mock_spend(*args, **kwargs):
@@ -126,7 +126,7 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
     wb_modifier.start_auction_campaign.assert_awaited_once_with(adv_to_start)
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv_to_pause)
     wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv_to_pause)
-    assert run_tasks_call["tasks_manager"] is http_tasks_manager
+    assert run_tasks_call["tasks_manager"] is tasks_manager
 
 
 @pytest.mark.asyncio
@@ -152,10 +152,10 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
             results.append(await handler())
         return results
 
-    http_tasks_manager = MagicMock()
+    tasks_manager = MagicMock()
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
-        tasks_manager=http_tasks_manager,
+        tasks_manager=tasks_manager,
     )
 
     async def mock_spend(*args, **kwargs):

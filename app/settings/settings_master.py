@@ -634,14 +634,5 @@ class Settings:
             return 5 * 60
         return int(value)
 
-    @property
-    def MAX_HTTP_TASKS(self) -> int:
-        value = os.getenv("MAX_HTTP_TASKS")
-        if not value:
-            return 30
-        return int(value)
-
-
-
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

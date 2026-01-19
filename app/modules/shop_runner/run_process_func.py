@@ -29,8 +29,7 @@ async def run_shop_task(
     shop_id: str,
     client_session: ClientSession,
     redis_manager: RedisShopManager,
-    db_tasks_manager: TasksManager,
-    http_tasks_manager: TasksManager,
+    tasks_manager: TasksManager,
     redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
     wb_manager_hub_factory: WBManagerHubFactory = Provide[
         "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
@@ -54,8 +53,7 @@ async def run_shop_task(
             wb_api,
             redis_manager,
             redis_client_wrapper,
-            db_tasks_manager=db_tasks_manager,
-            http_tasks_manager=http_tasks_manager,
+            tasks_manager=tasks_manager,
         )
         await wb_shop.run()
     except StopShopUpdateException:
@@ -76,8 +74,7 @@ async def _update_tasks(
     active_tasks: dict[str, Task[None]],
     client_session: ClientSession,
     redis_manager: RedisShopManager,
-    db_tasks_manager: TasksManager,
-    http_tasks_manager: TasksManager,
+    tasks_manager: TasksManager,
 ) -> None:
     stmt = (
         select(WBCabinet.shop_id)
@@ -103,8 +100,7 @@ async def _update_tasks(
                     shop_id,
                     client_session,
                     redis_manager,
-                    db_tasks_manager=db_tasks_manager,
-                    http_tasks_manager=http_tasks_manager,
+                    tasks_manager=tasks_manager,
                 )
             )
             active_tasks[shop_id] = task
@@ -134,39 +130,35 @@ async def _update_tasks(
 
 async def run() -> None:
     async with ClientSession() as session:
-        db_tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
-        db_stop_event = asyncio.Event()
-        db_queue_task = asyncio.create_task(db_tasks_manager.run_queue(db_stop_event))
-        http_task_manager = TasksManager(max_workers=settings.MAX_HTTP_TASKS)
-        http_stop_event = asyncio.Event()
-        http_queue_task = asyncio.create_task(http_task_manager.run_queue(http_stop_event))
+        tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
+        stop_event = asyncio.Event()
+        queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
         shop_loop_task = asyncio.create_task(
-            _run_shops_loop(db_tasks_manager=db_tasks_manager,
-                            http_task_manager=http_task_manager,
-                            client_session=session)
+            _run_shops_loop(
+                tasks_manager=tasks_manager,
+                client_session=session,
+            )
         )
         try:
             await shop_loop_task
         finally:
-            db_stop_event.set()
-            await db_queue_task
-            http_stop_event.set()
-            await http_queue_task
+            stop_event.set()
+            await queue_task
 
 async def _run_shops_loop(
-    db_tasks_manager: TasksManager,
-    http_task_manager: TasksManager,
+    tasks_manager: TasksManager,
     client_session: ClientSession,
 ) -> None:
     redis_manager = RedisShopManager()
     active_tasks: dict[str, Task[None]] = {}
     while True:
         try:
-            await _update_tasks(active_tasks,
-                                client_session,
-                                redis_manager,
-                                db_tasks_manager=db_tasks_manager,
-                                http_tasks_manager=http_task_manager)
+            await _update_tasks(
+                active_tasks,
+                client_session,
+                redis_manager,
+                tasks_manager=tasks_manager,
+            )
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)

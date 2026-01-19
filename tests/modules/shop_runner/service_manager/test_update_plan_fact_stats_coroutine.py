@@ -17,8 +17,7 @@ def _create_manager(wb_api, redis_client_wrapper):
     return CoroutinesManager(
         wb_api,
         redis_client_wrapper,
-        db_tasks_manager=TasksManager(max_workers=1),
-        http_tasks_manager=TasksManager(max_workers=1),
+        tasks_manager=TasksManager(max_workers=1),
     )
 
 

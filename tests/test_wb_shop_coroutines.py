@@ -136,13 +136,10 @@ async def test_adv_settings_auto_update(
         ),
     ):
         redis_client_wrapper = RedisClient(redis_client=fake_redis)
-        db_tasks_manager = TasksManager(max_workers=1)
-        http_tasks_manager = TasksManager(max_workers=1)
         manager = CoroutinesManager(
             wb_api,
             redis_client_wrapper,
-            db_tasks_manager=db_tasks_manager,
-            http_tasks_manager=http_tasks_manager,
+            tasks_manager=TasksManager(max_workers=1),
         )
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]

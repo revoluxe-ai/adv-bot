@@ -23,14 +23,11 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    db_tasks_manager = TasksManager(max_workers=1)
-    http_tasks_manager = TasksManager(max_workers=1)
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
-        db_tasks_manager=db_tasks_manager,
-        http_tasks_manager=http_tasks_manager,
+        tasks_manager=TasksManager(max_workers=1),
     )
 
     # Mock the CoroutinesManager and all its methods
@@ -84,14 +81,11 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
     redis_manager_mock.DEFAULT_TTL = 60
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    db_tasks_manager = TasksManager(max_workers=1)
-    http_tasks_manager = TasksManager(max_workers=1)
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
-        db_tasks_manager=db_tasks_manager,
-        http_tasks_manager=http_tasks_manager,
+        tasks_manager=TasksManager(max_workers=1),
     )
 
     # Core coroutines that should ALWAYS be running

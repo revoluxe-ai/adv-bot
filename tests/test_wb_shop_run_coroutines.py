@@ -24,14 +24,11 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    db_tasks_manager = TasksManager(max_workers=1)
-    http_tasks_manager = TasksManager(max_workers=1)
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
-        db_tasks_manager=db_tasks_manager,
-        http_tasks_manager=http_tasks_manager,
+        tasks_manager=TasksManager(max_workers=1),
     )
 
     # Создаем мок для CoroutinesManager
@@ -97,14 +94,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    db_tasks_manager = TasksManager(max_workers=1)
-    http_tasks_manager = TasksManager(max_workers=1)
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
-        db_tasks_manager=db_tasks_manager,
-        http_tasks_manager=http_tasks_manager,
+        tasks_manager=TasksManager(max_workers=1),
     )
 
     # Создаем мок для CoroutinesManager

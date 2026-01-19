@@ -66,8 +66,7 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
         coroutines_manager = CoroutinesManager(
             wb_api,
             MagicMock(),
-            db_tasks_manager=TasksManager(max_workers=1),
-            http_tasks_manager=TasksManager(max_workers=1),
+            tasks_manager=TasksManager(max_workers=1),
         )
         await coroutines_manager.auto_budget_watchdog()
 

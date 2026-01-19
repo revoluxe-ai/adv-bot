@@ -59,8 +59,7 @@ class CoroutinesManager:
         self,
         wb_api: WBApi,
         redis_client_wrapper: RedisClient,
-        db_tasks_manager: TasksManager,
-        http_tasks_manager: TasksManager,
+        tasks_manager: TasksManager,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -79,8 +78,7 @@ class CoroutinesManager:
             redis_client=redis_client_wrapper
         )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
-        self._db_tasks_manager = db_tasks_manager
-        self._http_tasks_manager = http_tasks_manager
+        self._tasks_manager = tasks_manager
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -113,7 +111,7 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=max_workers,
-            tasks_manager=self._db_tasks_manager,
+            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -220,7 +218,6 @@ class CoroutinesManager:
             handlers,
             max_workers=max_workers,
             return_exceptions=False,
-            tasks_manager=self._db_tasks_manager,
         )
         return None
 
@@ -254,7 +251,6 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._db_tasks_manager,
         )
 
         for adv, result in zip(advs_with_whitelist, results):
@@ -308,7 +304,6 @@ class CoroutinesManager:
         results: Sequence[None | BaseException] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._db_tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -350,7 +345,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._db_tasks_manager,
         )
 
         for result in results:
@@ -390,7 +384,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._db_tasks_manager,
         )
 
         for result in results:
@@ -424,7 +417,6 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._db_tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -490,7 +482,6 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers,
             max_workers=max_workers,
-            tasks_manager=self._db_tasks_manager,
         )
 
         for (adv_setting, campaign_type, adv_id), result in zip(task_specs, results):
@@ -623,7 +614,7 @@ class CoroutinesManager:
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         service = AutoAdvActiveControlService(
             wb_modifier=wb_manager_hub.wb_modifier,
-            tasks_manager=self._http_tasks_manager,
+            tasks_manager=self._tasks_manager,
         )
         await service.ensure_campaigns_active(advs)
         return None
