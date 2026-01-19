@@ -238,9 +238,18 @@ def test_balance_source_from_response_raises_when_insufficient() -> None:
         select_balance_source_from_response(response)
 
 
+class _FakeExecutionResult:
+    def __init__(self, value: float = 0.0) -> None:
+        self._value = value
+
+    def scalar(self) -> float:
+        return self._value
+
+
 class _FakeAdvSettingSession:
-    def __init__(self, adv_setting):
+    def __init__(self, adv_setting, execute_values: list[float] | None = None):
         self._adv_setting = adv_setting
+        self._execute_values = execute_values or []
 
     async def __aenter__(self):
         return self
@@ -251,10 +260,14 @@ class _FakeAdvSettingSession:
     async def get(self, model, id):
         return self._adv_setting
 
+    async def execute(self, _stmt):
+        value = self._execute_values.pop(0) if self._execute_values else 0.0
+        return _FakeExecutionResult(value)
 
-def _patch_adv_setting(monkeypatch, adv_setting):
+
+def _patch_adv_setting(monkeypatch, adv_setting, execute_values: list[float] | None = None):
     def _fake_sm(**kwargs):
-        return _FakeAdvSettingSession(adv_setting)
+        return _FakeAdvSettingSession(adv_setting, execute_values=execute_values)
 
     monkeypatch.setattr("app.modules.auto_budget_manager.service.sm", _fake_sm)
 
