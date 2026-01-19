@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -6,6 +6,9 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.wb_shop import WBShop
 
 
@@ -28,6 +31,8 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
     )
 
     # Mock the CoroutinesManager and all its methods
@@ -86,6 +91,8 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
     )
 
     # Core coroutines that should ALWAYS be running

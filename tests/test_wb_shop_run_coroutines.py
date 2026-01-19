@@ -7,6 +7,9 @@ import pytest
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.wb_shop import WBShop
 
 
@@ -29,6 +32,8 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
     )
 
     # Создаем мок для CoroutinesManager
@@ -99,6 +104,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
+        plan_fact_manager=MagicMock(),
+        plan_fact_reader=PlanFactReader(),
     )
 
     # Создаем мок для CoroutinesManager

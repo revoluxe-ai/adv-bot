@@ -35,8 +35,8 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 
 from app.settings import settings
 
-
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
+from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
@@ -60,6 +60,7 @@ class CoroutinesManager:
         wb_api: WBApi,
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
+        plan_fact_reader: PlanFactReader,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -79,6 +80,7 @@ class CoroutinesManager:
         )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
+        self._plan_fact_reader = plan_fact_reader
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -615,6 +617,7 @@ class CoroutinesManager:
         service = AutoAdvActiveControlService(
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
+            plan_fact_reader=self._plan_fact_reader,
         )
         await service.ensure_campaigns_active(advs)
         return None
