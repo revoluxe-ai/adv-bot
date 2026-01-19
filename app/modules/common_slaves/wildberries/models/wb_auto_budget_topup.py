@@ -77,13 +77,13 @@ class WBAutoBudgetTopUp(BaseTable):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.datetime.now(datetime.timezone.utc),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.datetime.now(tz=datetime.timezone.utc),
-        onupdate=datetime.datetime.now(tz=datetime.timezone.utc),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc),
+        onupdate=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
 
     __table_args__ = (
