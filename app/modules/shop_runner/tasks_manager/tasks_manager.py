@@ -100,7 +100,7 @@ async def run_tasks(
             async with semaphore:
                 return await handler()
 
-        wrapped_handlers = [lambda handler=handler: _bounded(handler) for handler in handlers]
+        wrapped_handlers = [lambda handler_=handler: _bounded(handler_) for handler in handlers]
     futures: deque[asyncio.Future[Any]] = deque()
     for handler in wrapped_handlers:
         future = await manager.add_task(handler)
