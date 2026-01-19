@@ -6,6 +6,7 @@ import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
 
 
@@ -23,7 +24,15 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    db_tasks_manager = TasksManager(max_workers=1)
+    http_tasks_manager = TasksManager(max_workers=1)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        db_tasks_manager=db_tasks_manager,
+        http_tasks_manager=http_tasks_manager,
+    )
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
@@ -88,7 +97,15 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock, redis_client_wrapper)
+    db_tasks_manager = TasksManager(max_workers=1)
+    http_tasks_manager = TasksManager(max_workers=1)
+    wb_shop = WBShop(
+        wb_api_mock,
+        redis_manager_mock,
+        redis_client_wrapper,
+        db_tasks_manager=db_tasks_manager,
+        http_tasks_manager=http_tasks_manager,
+    )
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()

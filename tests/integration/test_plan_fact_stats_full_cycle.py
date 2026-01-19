@@ -9,6 +9,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -17,6 +18,15 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
+
+
+def _create_manager(wb_api, redis_client_wrapper):
+    return CoroutinesManager(
+        wb_api,
+        redis_client_wrapper,
+        db_tasks_manager=TasksManager(max_workers=1),
+        http_tasks_manager=TasksManager(max_workers=1),
+    )
 
 
 @pytest.mark.integration
@@ -29,7 +39,7 @@ async def test_full_cycle_plan_fact_stats(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Настраиваем план и факт для кампании
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
@@ -101,7 +111,7 @@ async def test_full_cycle_with_real_complex_adv(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Используем реальные данные из complex_adv
     plan = PlanData(orders=200, target_pay_for_order=600, max_pay_for_order=1200)
@@ -158,7 +168,7 @@ async def test_full_cycle_error_handling_for_some_advs(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Создаем второй ComplexAdv
     adv2 = MagicMock()
@@ -230,7 +240,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     # Создаем дополнительные кампании
     adv2 = MagicMock()
@@ -328,7 +338,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
-    manager = CoroutinesManager(wb_api, redis_client_wrapper)
+    manager = _create_manager(wb_api, redis_client_wrapper)
 
     plan = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     fact = FactData(

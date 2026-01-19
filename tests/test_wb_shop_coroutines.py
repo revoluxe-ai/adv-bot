@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
@@ -135,7 +136,14 @@ async def test_adv_settings_auto_update(
         ),
     ):
         redis_client_wrapper = RedisClient(redis_client=fake_redis)
-        manager = CoroutinesManager(wb_api, redis_client_wrapper)
+        db_tasks_manager = TasksManager(max_workers=1)
+        http_tasks_manager = TasksManager(max_workers=1)
+        manager = CoroutinesManager(
+            wb_api,
+            redis_client_wrapper,
+            db_tasks_manager=db_tasks_manager,
+            http_tasks_manager=http_tasks_manager,
+        )
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]
         manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}
