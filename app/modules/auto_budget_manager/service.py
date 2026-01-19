@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from zoneinfo import ZoneInfo
 
 from app.modules.common_slaves.wildberries.models.wb_auto_budget_topup import WBAutoBudgetTopUp
@@ -258,7 +259,12 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
             )
 
-        planned_amount = self._compute_planned_amount(limit, spend_today)
+        remaining_successful_limit = max(limit - successful_topups, 0)
+        planned_amount = self._compute_planned_amount(
+            limit=limit,
+            spend_today=spend_today,
+            remaining_topup_amount=remaining_successful_limit,
+        )
         if planned_amount <= 0:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.LIMIT_REACHED,
@@ -518,14 +524,22 @@ class AutoBudgetService:
                 return total
         return None
 
-    def _compute_planned_amount(self, limit: int, spend_today: float) -> int:
+    def _compute_planned_amount(
+        self,
+        limit: int,
+        spend_today: float,
+        remaining_topup_amount: float,
+    ) -> int:
         available = max(limit - spend_today, 0)
         if self._min_remaining_limit > 0 and available < self._min_remaining_limit:
             return 0
-        planned = int(min(self._topup_amount, available))
-        if self._max_single_ratio > 0:
-            planned = min(planned, int(limit * self._max_single_ratio))
-        return max(planned, 0)
+        if available <= 0 or remaining_topup_amount <= 0:
+            return 0
+        topup_increment = max(int(self._topup_amount), 1)
+        deficit = max(available, topup_increment)
+        multiplier = math.ceil(deficit / topup_increment)
+        planned = multiplier * topup_increment
+        return planned
 
     @staticmethod
     def _normalize_balance_type(value: str | None) -> str:
