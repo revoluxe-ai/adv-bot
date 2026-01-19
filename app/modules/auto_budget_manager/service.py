@@ -105,26 +105,6 @@ class AutoBudgetService:
             0.0, float(settings.AUTO_BUDGET_VERIFICATION_DELAY_SEC)
         )
 
-    @staticmethod
-    async def set_daily_limit(
-        adv_setting_id: int,
-        limit: int,
-        balance_type: str | None,
-        campaign_type: AdvType,
-    ) -> None:
-        async with sm(read_only=False) as session:
-            adv_setting = await session.get(AdvSetting, adv_setting_id)
-            if adv_setting is None:
-                raise ValueError(f"AdvSetting {adv_setting_id} not found")
-            normalized_balance = balance_type.strip() if balance_type else None
-            if campaign_type == AdvType.AUTO:
-                adv_setting.auto_budget_daily_limit = max(limit, 0)
-                adv_setting.auto_budget_balance_type = normalized_balance
-            else:
-                adv_setting.search_auto_budget_daily_limit = max(limit, 0)
-                adv_setting.search_auto_budget_balance_type = normalized_balance
-            await session.commit()
-
     async def ensure_budget(
         self,
         adv_setting_id: int,
