@@ -224,7 +224,7 @@ class AutoAdvActiveControlService:
                 await self._wb_modifier.pause_auction_campaign(adv)
             return
 
-        if search_limit > 0 and search_status == WBAdvActiveStatus.PAUSE:
+        if search_limit > 0 and search_status in [WBAdvActiveStatus.PAUSE, WBAdvActiveStatus.READY_FOR_START]:
             logger.info(
                 "Auto budget watcher: starting auction campaign adv_id=%s shop_id=%s",
                 adv_id,
