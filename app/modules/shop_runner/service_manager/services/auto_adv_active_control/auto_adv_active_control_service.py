@@ -132,6 +132,15 @@ class AutoAdvActiveControlService:
         spend_today = await self._get_spend_for_adv(auto_adv_id , start_of_day, end_of_day)
         auto_limit = adv.auto_budget_daily_limit or 0
         auto_status = adv.auto_adv_active_status_str
+        
+        if auto_limit == 0 and auto_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Auto budget watcher: pausing auto campaign adv_id=%s shop_id=%s",
+                auto_adv_id,
+                adv.shop_id,
+            )
+            await self._wb_modifier.pause_auto_campaign(adv)
+            return None
 
         if 0 < auto_limit <= spend_today:
             if auto_status == WBAdvActiveStatus.STARTED:
@@ -139,58 +148,50 @@ class AutoAdvActiveControlService:
                     "Auto budget watcher: pausing auto campaign because spend %.2f >= limit %s adv_id=%s shop_id=%s",
                     spend_today,
                     auto_limit,
-                    auto_adv_id ,
+                    auto_adv_id,
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auto_campaign(adv)
             return
 
-        auto_limit_action_taken = False
+        target_cost = self._resolve_target_cost(plan_fact_summary)
+        if target_cost is None:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign due to no target cost adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return
+      
+        avg_cost = await self._get_average_order_cost(auto_adv_id)
+        if avg_cost is None:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign due to no avg cost adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return
+
+        if avg_cost > target_cost:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign due to high avg cost %.2f vs target %.2f adv_id=%s shop_id=%s",
+                    avg_cost,
+                    target_cost,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return
+
         if auto_limit > 0 and auto_status in [WBAdvActiveStatus.PAUSE, WBAdvActiveStatus.READY_FOR_START]:
             logger.info(
                 "Auto budget watcher: starting auto campaign adv_id=%s shop_id=%s",
-                auto_adv_id ,
-                adv.shop_id,
-            )
-            await self._wb_modifier.start_auto_campaign(adv)
-            auto_status = WBAdvActiveStatus.STARTED
-            auto_limit_action_taken = True
-        elif auto_limit == 0 and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto budget watcher: pausing auto campaign adv_id=%s shop_id=%s",
                 auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            auto_status = WBAdvActiveStatus.PAUSE
-            auto_limit_action_taken = True
-
-        if auto_limit_action_taken:
-            return
-
-        target_cost = self._resolve_target_cost(plan_fact_summary)
-        if target_cost is None:
-            return
-
-        avg_cost = await self._get_average_order_cost(auto_adv_id)
-        if avg_cost is None:
-            return
-
-        if avg_cost > target_cost and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign due to high avg cost %.2f vs target %.2f adv_id=%s shop_id=%s",
-                avg_cost,
-                target_cost,
-                auto_adv_id ,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-        elif avg_cost <= target_cost and auto_status == WBAdvActiveStatus.PAUSE:
-            logger.info(
-                "Auto watchdog: starting auto campaign since avg cost %.2f <= target %.2f adv_id=%s shop_id=%s",
-                avg_cost,
-                target_cost,
-                auto_adv_id ,
                 adv.shop_id,
             )
             await self._wb_modifier.start_auto_campaign(adv)
