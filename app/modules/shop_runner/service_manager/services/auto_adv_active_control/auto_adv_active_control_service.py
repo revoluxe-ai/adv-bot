@@ -103,8 +103,10 @@ class AutoAdvActiveControlService:
             [adv_id], start_date, now
         )
         if stats.orders == 0:
-            return float("inf") if stats.spend > 0 else 0.0
-        return stats.spend / stats.orders
+            orders = 1
+        else:
+            orders = stats.orders
+        return stats.spend / orders
 
     @staticmethod
     def _resolve_target_cost(summary: PlanFactSummary | None) -> float | None:
