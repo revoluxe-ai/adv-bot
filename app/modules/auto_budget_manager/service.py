@@ -235,8 +235,10 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
             )
 
-        planned_amount = self._compute_planned_amount(
-        )
+        # Следующее пополнение всегда происходит фиксированным шагом из настроек.
+        # Предыдущая проверка гарантийно запрещает топап, если суммарно уже пополнили больше лимита,
+        # поэтому здесь достаточно брать настроечную величину.
+        planned_amount = self._compute_planned_amount()
         if planned_amount <= 0:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.LIMIT_REACHED,
@@ -495,6 +497,9 @@ class AutoBudgetService:
     def _compute_planned_amount(
         self,
     ) -> int:
+        # Возвращаем количество, строго соответствующее конфигу AUTO_BUDGET_TOPUP_AMOUNT.
+        # Лимиты уже проверены выше (_ensure_budget_locked) по сумме успешных топапов,
+        # а эта функция просто озвучивает, сколько добавить в очередной раз.
         return self._topup_amount
 
     @staticmethod

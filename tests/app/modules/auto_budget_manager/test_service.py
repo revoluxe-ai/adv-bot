@@ -121,6 +121,7 @@ def test_compute_planned_amount_always_matches_configured_topup(monkeypatch) -> 
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
 
+    # Проверяем, что функция всегда возвращает ровно тот шаг, что задан в настройках.
     planned = service._compute_planned_amount()
 
     assert planned == 1200
@@ -133,6 +134,7 @@ def test_compute_planned_amount_uses_default_topup_amount(monkeypatch) -> None:
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
 
+    # Без дополнительной конфигурации шаг остаётся прежним (1000).
     planned = service._compute_planned_amount()
 
     assert planned == 1000
