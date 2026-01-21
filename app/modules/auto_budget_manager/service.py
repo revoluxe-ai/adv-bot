@@ -95,9 +95,6 @@ class AutoBudgetService:
         self._max_single_ratio = max(
             0.0, float(settings.AUTO_BUDGET_MAX_SINGLE_TOPUP_RATIO)
         )
-        self._min_remaining_limit = max(
-            0, int(settings.AUTO_BUDGET_MIN_REMAINING_LIMIT)
-        )
         self._verification_attempts = max(
             0, int(settings.AUTO_BUDGET_VERIFICATION_ATTEMPTS)
         )
