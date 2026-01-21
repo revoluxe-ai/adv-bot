@@ -46,7 +46,6 @@ class WhiteListUpdateManager:
             kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
         ]
         white_keywords.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
-        white_keywords = white_keywords[1:]
         if not white_keywords:
             return False, True
         down_key: CalculatedKeyword = white_keywords[-1]
