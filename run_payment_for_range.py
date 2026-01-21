@@ -65,13 +65,10 @@ async def run_billing_for_range(
     end_date: date,
     dry_run: bool,
 ) -> None:
-    async with await DIManager.create(AppContainer) as app_container:
+    async with await DIManager.create(AppContainer) as app_container: # type: ignore
         billing_container = BillingContainer(
             redis_client_wrapper=app_container.redis_client_wrapper,
         )
-        redis_manager = billing_container.redis_manager()
-        pricer = Pricer()
-
         for target_date in iterate_dates(start_date, end_date):
             current_dt = datetime.combine(target_date, time.min)
             logger.info("Processing billing for %s", target_date.isoformat())
