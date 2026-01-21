@@ -582,13 +582,6 @@ class Settings:
         return float(value)
 
     @property
-    def AUTO_BUDGET_MIN_REMAINING_LIMIT(self) -> int:
-        value = os.getenv("AUTO_BUDGET_MIN_REMAINING_LIMIT")
-        if not value:
-            return 0
-        return int(value)
-
-    @property
     def AUTO_BUDGET_VERIFICATION_ATTEMPTS(self) -> int:
         value = os.getenv("AUTO_BUDGET_VERIFICATION_ATTEMPTS")
         if not value:
