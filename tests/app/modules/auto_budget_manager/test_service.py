@@ -53,7 +53,6 @@ def _build_settings(**overrides):
         "AUTO_BUDGET_TOPUP_AMOUNT": 1000,
         "AUTO_BUDGET_MIN_BALANCE": 0,
         "AUTO_BUDGET_MAX_SINGLE_TOPUP_RATIO": 0.5,
-        "AUTO_BUDGET_MIN_REMAINING_LIMIT": 0,
         "AUTO_BUDGET_VERIFICATION_ATTEMPTS": 0,
         "AUTO_BUDGET_VERIFICATION_DELAY_SEC": 0.0,
         "UPDATE_FULL_ADV_STAT_PERIOD": 360,
@@ -113,74 +112,32 @@ async def test_ensure_budget_releases_lock(monkeypatch) -> None:
     inner.assert_awaited_once()
 
 
-def test_compute_planned_amount_rounds_up_to_topup_increment(monkeypatch) -> None:
+def test_compute_planned_amount_always_matches_configured_topup(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
         _build_settings(
-            AUTO_BUDGET_TOPUP_AMOUNT=1000,
+            AUTO_BUDGET_TOPUP_AMOUNT=1200,
         ),
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
 
-    planned = service._compute_planned_amount(
-        limit=1500,
-        spend_today=0,
-        remaining_topup_amount=4000,
-    )
+    # Проверяем, что функция всегда возвращает ровно тот шаг, что задан в настройках.
+    planned = service._compute_planned_amount()
 
-    assert planned == 2000
+    assert planned == 1200
 
 
-def test_compute_planned_amount_respects_min_remaining_limit(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "app.modules.auto_budget_manager.service.settings",
-        _build_settings(
-            AUTO_BUDGET_MIN_REMAINING_LIMIT=500,
-        ),
-    )
-    service = AutoBudgetService(redis_client=_FakeRedis())
-
-    planned = service._compute_planned_amount(
-        limit=2000,
-        spend_today=1600,
-        remaining_topup_amount=4000,
-    )
-
-    assert planned == 0
-
-
-def test_compute_planned_amount_requires_remaining_topup_amount(monkeypatch) -> None:
+def test_compute_planned_amount_uses_default_topup_amount(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
         _build_settings(),
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
 
-    planned = service._compute_planned_amount(
-        limit=2000,
-        spend_today=0,
-        remaining_topup_amount=0,
-    )
+    # Без дополнительной конфигурации шаг остаётся прежним (1000).
+    planned = service._compute_planned_amount()
 
-    assert planned == 0
-
-
-def test_compute_planned_amount_respects_increment_even_if_less_than_limit(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "app.modules.auto_budget_manager.service.settings",
-        _build_settings(
-            AUTO_BUDGET_TOPUP_AMOUNT=600,
-        ),
-    )
-    service = AutoBudgetService(redis_client=_FakeRedis())
-
-    planned = service._compute_planned_amount(
-        limit=1100,
-        spend_today=0,
-        remaining_topup_amount=3000,
-    )
-
-    assert planned == 1200
+    assert planned == 1000
 
 
 def test_get_campaign_config_selects_search_when_active() -> None:
