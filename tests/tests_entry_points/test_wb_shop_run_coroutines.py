@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -50,18 +51,30 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
         "adv_settings_auto_update": AsyncMock(),
         "update_top_key_in_advs": AsyncMock(),
         "update_predict_ctr": AsyncMock(),
+        "auto_adv_active_control": AsyncMock(),
     }
 
     wb_shop._alive_worker_run = AsyncMock()
 
-    async def mock_gather(*coroutines, **kwargs):
-        return [None] * len(coroutines)
+    class _FakeTaskGroup:
+        def __init__(self):
+            self.created: list[Any] = []
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def create_task(self, coro: Any):
+            self.created.append(coro)
+            return MagicMock()
 
     with (
         patch(
             "app.modules.shop_runner.wb_shop.CoroutinesManager"
         ) as mock_coroutines_manager,
-        patch("asyncio.gather", side_effect=mock_gather),
+        patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         # Set up all the expected methods on the mock
         mock_manager_instance = mock_coroutines_manager.return_value
@@ -114,6 +127,7 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
         "adv_settings_auto_update": AsyncMock(),
         "update_top_key_in_advs": AsyncMock(),
         "update_predict_ctr": AsyncMock(),
+    "auto_adv_active_control": AsyncMock(),
     }
 
     # Optional coroutines that might be commented during development
@@ -124,14 +138,11 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
 
     wb_shop._alive_worker_run = AsyncMock()
 
-    async def mock_gather(*coroutines, **kwargs):
-        return [None] * len(coroutines)
-
     with (
         patch(
             "app.modules.shop_runner.wb_shop.CoroutinesManager"
         ) as mock_coroutines_manager,
-        patch("asyncio.gather", side_effect=mock_gather),
+        patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         # Set up all methods on the mock
         mock_manager_instance = mock_coroutines_manager.return_value
