@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from aiogram import Bot
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -220,6 +221,7 @@ class NotificationManager:
         """Get all user cabinets for a shop."""
         stmt = (
             select(WBUserCabinet)
+            .options(selectinload(WBUserCabinet.user))
             .join(WBCabinet)
             .join(User)
             .where(WBCabinet.shop_id == shop_id)
