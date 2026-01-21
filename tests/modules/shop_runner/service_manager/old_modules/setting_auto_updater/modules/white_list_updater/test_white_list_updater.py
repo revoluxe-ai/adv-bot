@@ -221,6 +221,40 @@ async def test_white_list_manager_delete_phrase_no_candidates(
         redis_cache_mock_pass_time.last_auto_delete_white_list.set.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_white_list_manager_keeps_best_keyword_only(
+    adv_setting_mock,
+    common_mocks,
+    redis_cache_mock_pass_time,
+):
+    """Ensure the best white keyword alone is never deleted."""
+    session_mock, get_session_maker_mock = common_mocks
+    best_keyword = MagicMock(spec=CalculatedKeyword)
+    best_keyword.hard_status = 2
+    best_keyword.best_keyword_status = True
+    best_keyword.rating_by_orders = 100.0
+    best_keyword.keyword_setting_original_id = 123
+
+    with (
+        patch(f"{MODULE_PATH}.sm", new=get_session_maker_mock),
+        patch(
+            f"{MODULE_PATH}.AdvSettingRedisCache",
+            return_value=redis_cache_mock_pass_time,
+        ),
+    ):
+        manager = WhiteListUpdateManager(adv_setting_mock)
+        deleted, no_candidates = await manager.delete_last_white_phrase(
+            [best_keyword]
+        )
+
+        assert deleted is False
+        assert no_candidates is True
+
+        session_mock.execute.assert_not_called()
+        session_mock.commit.assert_not_called()
+        redis_cache_mock_pass_time.last_auto_delete_white_list.set.assert_not_called()
+
+
 
 
 
