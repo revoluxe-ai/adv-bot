@@ -109,9 +109,9 @@ async def add_balance(
 
     text = (
         "Оплачивая сервис вы соглашаетесь с  [публичной офертой]"
-        "(https://docs.google.com/document/d/12oK7Z9f8vrRik9_kjjtN1B3t4QFex6RxBCbyQwzBJ4o/)"
+        "(https://docs.google.com/document/d/1SK9ixZO1LD3yc_-rzkE5K_uOG5qWNCO-4RwGd1fq24A/)"
         " и [пользовательским соглашением]"
-        "(https://docs.google.com/document/d/1fxmcwfZUwoHqDUQenHq31eHjcg641vef1ZYx3Mxqg40/)"
+        "(https://docs.google.com/document/d/1fyxx_X25WSZ7cridzbCTFTBXqzqltpla1ew4XOAPo7g/)"
     )
 
     await bot.send_message(
