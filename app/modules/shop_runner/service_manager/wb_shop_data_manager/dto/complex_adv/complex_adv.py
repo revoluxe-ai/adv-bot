@@ -47,6 +47,10 @@ class ComplexAdv:
         self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+    @property
+    def bidder_for_auto(self) -> bool:
+        return self._adv_setting.bidder_for_auto
+
 
     @property
     def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:

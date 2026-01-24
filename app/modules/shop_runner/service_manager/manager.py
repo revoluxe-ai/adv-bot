@@ -48,6 +48,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
 )
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
+from .services.auto_reset_bid_service import AutoResetBidService
 
 logger = logging.getLogger(__name__)
 
@@ -607,7 +608,7 @@ class CoroutinesManager:
                     campaign_type,
             )
 
-    @while_coroutine_decorator(5 * 60, 60)
+    @while_coroutine_decorator(1 * 30, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -620,6 +621,20 @@ class CoroutinesManager:
             plan_fact_reader=self._plan_fact_reader,
         )
         await service.ensure_campaigns_active(advs)
+        return None
+
+    @while_coroutine_decorator(60 * 60 * 4, 60)
+    async def auto_reset_bid_for_auto_adv(self) -> None:
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        service = AutoResetBidService(
+            wb_manager_hub=wb_manager_hub,
+            tasks_manager=self._tasks_manager,
+        )
+        await service.ensure_auto_bids_minimum(advs)
         return None
 
 # TODO: Переделать граф зависимостей

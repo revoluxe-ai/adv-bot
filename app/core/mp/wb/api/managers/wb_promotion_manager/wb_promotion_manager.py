@@ -79,6 +79,26 @@ class WBModifier:
         await self._promotion_manager.set_cluster_bids(converted_bids)
         return None
 
+    async def update_auto_adv_cpm(
+        self, adv_id: int, nm_bid_pairs: dict[int, int]
+    ) -> None:
+        """Понижает CPM автоматической кампании до предельных значений."""
+        from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+            PatchAdvV0BidsBody,
+            V0AdvertMultibid,
+            V0AdvertMultiBidItem,
+        )
+
+        nm_bid_items = [
+            V0AdvertMultiBidItem(nm=nmid, bid=bid) for nmid, bid in nm_bid_pairs.items()
+        ]
+
+        body = PatchAdvV0BidsBody(
+            bids=[V0AdvertMultibid(advert_id=adv_id, nm_bids=nm_bid_items)]
+        )
+
+        await self._promotion_manager.patch_adv_bids(body)
+
     async def get_campaign_budget(self, adv_id: int) -> "CampaignBudgetInfo":
         return await self._promotion_manager.get_campaign_budget(adv_id)
 
