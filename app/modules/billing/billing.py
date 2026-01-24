@@ -374,6 +374,7 @@ async def _process_payment_for_advs(
     current_date_time: datetime,
     pricer: Pricer,
     redis_manager: RedisManager,
+    skip_by_redis: bool = True,
 ) -> None:
     """Внутренний цикл обработки всех кабинетов (без глобального лока).
 
@@ -396,6 +397,7 @@ async def _process_payment_for_advs(
             current_dt=current_dt,
             pricer=pricer,
             redis_manager=redis_manager,
+            skip_by_redis=skip_by_redis
         )
         tasks_list.append(task)
     results = await asyncio.gather(*tasks_list, return_exceptions=True)
