@@ -69,25 +69,23 @@ async def run_billing_for_range(
         billing_container = BillingContainer(
             redis_client_wrapper=app_container.redis_client_wrapper,
         )
+        pricer = Pricer()
+        redis_manager = billing_container.redis_manager()
         for target_date in iterate_dates(start_date, end_date):
             current_dt = datetime.combine(target_date, time.min)
             logger.info("Processing billing for %s", target_date.isoformat())
             if dry_run:
-                logger.info("Dry run enabled; skipping actual billing for %s", target_date.isoformat())
+                logger.info(
+                    "Dry run enabled; skipping actual billing for %s",
+                    target_date.isoformat(),
+                )
                 continue
-
-                try:
-                    await _process_payment_for_advs(
-                        current_date_time=current_dt,
-                        pricer=pricer,
-                        redis_manager=redis_manager,
-                    )
-                except IntegrityError as exc:
-                    logger.info(
-                        "Integrity error during billing for %s: %s (likely already processed)",
-                        target_date.isoformat(),
-                        exc.orig,
-                    )
+            await _process_payment_for_advs(
+                current_date_time=current_dt,
+                pricer=pricer,
+                redis_manager=redis_manager,
+                skip_by_redis=False
+            )
 
 
 
