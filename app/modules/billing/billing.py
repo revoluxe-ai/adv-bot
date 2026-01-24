@@ -228,7 +228,7 @@ async def __process_single_cabinet(
                     amount=-amt,
                     description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {day}",
                     operation_type="auto_subtract",
-                    transaction_date_time=datetime.now(),
+                    transaction_date_time=current_dt,
                     wb_cabinet=wb_cabinet,
                 )
             )
@@ -239,7 +239,7 @@ async def __process_single_cabinet(
                     amount=-amt,
                     description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {day}",
                     operation_type="auto_subtract",
-                    transaction_date_time=datetime.now(),
+                    transaction_date_time=current_dt,
                     wb_cabinet=wb_cabinet,
                 )
             )
