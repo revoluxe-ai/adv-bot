@@ -74,6 +74,19 @@ class NotificationManager:
         else:
             self._notification_sender = get_notification_sender()
 
+    @staticmethod
+    def _to_naive_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
+        """
+        Convert a datetime to a timezone-naive UTC value.
+
+        This ensures compliance with TIMESTAMP WITHOUT TIME ZONE columns.
+        """
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt
+        return dt.astimezone(datetime.UTC).replace(tzinfo=None)
+
     async def notify_token_issue(
         self,
         shop_id: str,
@@ -181,8 +194,8 @@ class NotificationManager:
                 shop_id=shop_id,
                 user_telegram_id=user_telegram_id,
                 notification_type=notification_type,
-                token_expiry_date=expiry_date,
-                sent_at=datetime.datetime.now(datetime.UTC),
+                token_expiry_date=self._to_naive_utc(expiry_date),
+                sent_at=self._to_naive_utc(datetime.datetime.now(datetime.UTC)),
             )
 
             session.add(notification)
