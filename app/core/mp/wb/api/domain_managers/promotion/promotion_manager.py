@@ -22,6 +22,7 @@ from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
+    PatchAdvV0BidsBody,
 )
 
 if TYPE_CHECKING:
@@ -109,6 +110,9 @@ class PromotionManager:
         from .methods.set_cluster_bids import set_cluster_bids as method
 
         await method(self._client.normquery_bids_adapter, bids)
+
+    async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
+        await self._client.campaigns_management_adapter.patch_adv_bids(body)
 
     async def get_campaign_budget(self, adv_id: int) -> CampaignBudgetInfo:
         response = await self._client.finance_adapter.get_campaign_budget(adv_id)

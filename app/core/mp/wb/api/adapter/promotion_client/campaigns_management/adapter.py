@@ -8,6 +8,10 @@ from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.
     get_adv_v0_pause,
     get_adv_v0_start,
     get_adv_v0_stop,
+    patch_adv_v0_bids,
+)
+from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    PatchAdvV0BidsBody,
 )
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 
@@ -29,3 +33,12 @@ class CampaignsManagementAdapter(BaseSectionAdapter):
     async def stop_adv(self, adv_id: int) -> None:
         client = await self.auth_client_handler.get_proxy_client(self)
         await with_raise_errors(get_adv_v0_stop.asyncio_detailed, client, id=adv_id)
+
+    @retry_decorator(period=1, limit=2)
+    async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
+        client = await self.auth_client_handler.get_proxy_client(self)
+        await with_raise_errors(
+            patch_adv_v0_bids.asyncio_detailed,
+            client,
+            body=body,
+        )
