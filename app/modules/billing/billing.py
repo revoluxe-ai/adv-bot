@@ -80,6 +80,7 @@ async def _process_single_cabinet(
     current_dt: datetime,
     pricer: Pricer,
     redis_manager: RedisManager,
+    skip_by_redis: bool = True
 ) -> dict[str, int | bool | str | float | None]:
     async with sm() as session:
         return await __process_single_cabinet(
@@ -88,6 +89,7 @@ async def _process_single_cabinet(
             current_dt=current_dt,
             pricer=pricer,
             redis_manager=redis_manager,
+            skip_by_redis=skip_by_redis
         )
 
 
@@ -97,6 +99,7 @@ async def __process_single_cabinet(
     current_dt: datetime,
     pricer: Pricer,
     redis_manager: RedisManager,
+    skip_by_redis: bool = True,
 ) -> dict[str, int | bool | str | float | None]:
     """Обработать один кабинет в отдельной короткой транзакции.
 
@@ -123,9 +126,10 @@ async def __process_single_cabinet(
     }
 
     # # Быстрая проверка идемпотентности по Redis
-    if await redis_manager.get_billing_process_for_day(cabinet_id, current_dt):
-        result["reason"] = "redis_flag_skip"
-        return result
+    if skip_by_redis:
+        if await redis_manager.get_billing_process_for_day(cabinet_id, current_dt):
+            result["reason"] = "redis_flag_skip"
+            return result
 
     try:
         wb_cabinet = await _load_cabinet_with_relations(session, cabinet_id)
