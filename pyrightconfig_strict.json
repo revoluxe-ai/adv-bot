@@ -33,6 +33,8 @@
     "app/modules/wb_adv_updater/modules/balance_exp_informer",
     "app/modules/billing/event_manager",
     "app/modules/auto_budget_manager",
+    "app/client_bot/user_interface/handlers/keyword_settings.py",
+    "app/modules/wb_adv_updater/phrases_processor.py",
     "app/modules/shop_runner/service_manager/services/update_commot_bid_in_search_advs_manager"
 
   ],
