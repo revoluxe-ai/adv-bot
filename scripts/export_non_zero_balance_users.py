@@ -11,14 +11,15 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Export users with non-zero Wildberries balances for sales reporting."
     )
-    parser.add_argument(
+    default_path = Path("scripts/send_message/non_zero_balance_users.csv")
+    _ = parser.add_argument(
         "--dest",
         "-o",
         type=Path,
-        default=Path("send_message/scripts/send_message/non_zero_balance_users.csv"),
+        default=default_path,
         help="CSV file to write (defaults to scripts/send_message/non_zero_balance_users.csv).",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -29,7 +30,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    asyncio.run(
+    _ = asyncio.run(
         export_non_zero_balance_users_to_csv(
             args.dest,
             limit=args.limit,
