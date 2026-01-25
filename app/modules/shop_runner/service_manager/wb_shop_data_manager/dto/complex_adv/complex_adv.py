@@ -53,6 +53,10 @@ class ComplexAdv:
 
 
     @property
+    def  search_cpm(self) -> int | None:
+        return self._search_adv.cpm
+
+    @property
     def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:
         if self._search_adv is None:
             return None

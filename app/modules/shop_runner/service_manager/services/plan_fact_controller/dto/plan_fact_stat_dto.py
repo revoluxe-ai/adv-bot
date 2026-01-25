@@ -25,7 +25,7 @@ class PlanFactStatDTO(BaseModel):
     fact_pay_for_order: Optional[float] = None
     fact_method: Optional[str] = None
     # Версия для дедупликации
-    version: float
+    version: float | None = None
 
     @classmethod
     def create(
@@ -34,7 +34,7 @@ class PlanFactStatDTO(BaseModel):
         shop_id: str,
         plan: Optional[PlanData],
         fact: Optional[FactData],
-        version: float,
+        version: float | None = None,
     ) -> "PlanFactStatDTO":
         """Создает DTO из PlanData и FactData"""
         now = datetime.now()

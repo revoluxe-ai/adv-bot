@@ -24,6 +24,11 @@ class PlanFactManager:
         self._controller = PlanFactController()
         self._clickhouse_manager = ClickHousePlanFactManager()
 
+
+    async def get_plan_fact_dto(self, adv: ComplexAdv):
+        return await self._controller.process_adv(adv)
+
+
     async def process_and_save(self, advs: list[ComplexAdv]) -> None:
         """
         Обрабатывает все кампании и записывает данные в ClickHouse.

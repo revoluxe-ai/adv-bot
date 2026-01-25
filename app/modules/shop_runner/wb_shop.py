@@ -7,6 +7,7 @@ from .modules.wb_api import WBApi
 
 import typing
 
+
 if typing.TYPE_CHECKING:
     from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
 
@@ -67,6 +68,7 @@ class WBShop:
                 tg.create_task(coroutines_manager.auto_budget_watchdog())
                 tg.create_task(coroutines_manager.auto_adv_active_control())
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
+                tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
                 tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
