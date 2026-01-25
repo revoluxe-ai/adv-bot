@@ -5,7 +5,7 @@ from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import (
     ErrorObject400,
     ErrorObject403,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.types import Response
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import Response
 
 
 class AsyncioDetailedProtocol(Protocol):

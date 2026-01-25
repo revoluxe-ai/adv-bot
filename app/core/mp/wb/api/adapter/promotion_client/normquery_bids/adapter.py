@@ -14,13 +14,13 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.raw_response_to_
     raw_response_to_dto,
 )
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.search_clusters.post_adv_v0_normquery_bids import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.search_clusters.post_adv_v0_normquery_bids import (
     asyncio_detailed as post_adv_v0_normquery_bids_async,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.search_clusters.post_adv_v0_normquery_get_bids import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.search_clusters.post_adv_v0_normquery_get_bids import (
     asyncio_detailed as post_adv_v0_normquery_get_bids_async,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     V0GetNormQueryBidsRequest,
     V0SetNormQueryBidsRequest,
     V0SetNormQueryBidsRequestItem,

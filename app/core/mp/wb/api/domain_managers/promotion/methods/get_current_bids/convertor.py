@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     V0GetNormQueryBidsRequest,
     V0GetNormQueryBidsRequestItem,
 )

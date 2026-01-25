@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
         CampaignBudgetInfo,
         BudgetTopUpResult,
     )
-    from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
         GetAdvV1BalanceResponse200,
     )
     from app.core.mp.wb.api.domain_managers.promotion import PromotionManager
@@ -83,7 +83,7 @@ class WBModifier:
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
         """Понижает CPM автоматической кампании до предельных значений."""
-        from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+        from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
             PatchAdvV0BidsBody,
             V0AdvertMultibid,
             V0AdvertMultiBidItem,

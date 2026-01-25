@@ -15,7 +15,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from . import convertor
 
 if TYPE_CHECKING:
-    from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
         V0GetNormQueryBidsRequest,
     )
 

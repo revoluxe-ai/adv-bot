@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.types import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     UNSET,
 )
 from app.core.redis_manager_v2.redis_client import RedisClient

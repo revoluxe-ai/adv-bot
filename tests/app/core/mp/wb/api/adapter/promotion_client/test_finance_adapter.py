@@ -7,7 +7,7 @@ from app.core.mp.wb.api.adapter.promotion_client.finance.adapter import (
     FinanceAdapter,
     BalanceTypeNotSupportedError,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BudgetResponse200,
     ResponseWithReturn,
 )

@@ -4,13 +4,13 @@ from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
 )
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.campaigns_creation.post_adv_v0_bids_min import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.campaigns_creation.post_adv_v0_bids_min import (
     asyncio_detailed,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     PostAdvV0BidsMinResponse200,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.types import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     Response,
 )
 from app.core.mp.wb.api.retry_decorator import retry_decorator

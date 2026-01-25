@@ -1,7 +1,7 @@
 from typing import cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO, NormqueryStat
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import V0GetNormQueryStatsItem, \
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import V0GetNormQueryStatsItem, \
     V0GetNormQueryStatsItemStat
 
 

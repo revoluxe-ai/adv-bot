@@ -20,7 +20,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
     PatchAdvV0BidsBody,
 )
