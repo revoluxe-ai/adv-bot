@@ -133,6 +133,8 @@ async def _create_complex_advs(
         )
 
         builder = InlineKeyboardBuilder()
+        if access.wb_cabinet is None:
+            raise ValueError('У доступа не установлен магазин')
         wb_original_cabinet_id = access.wb_cabinet.id
         assert isinstance(wb_original_cabinet_id, int)
         builder.row(
