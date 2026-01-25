@@ -14,7 +14,9 @@ import typing
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO
 from typing import TYPE_CHECKING
 
+from app.core.mp.wb.dto.adv_info import AdvInfoDTO, AdvInfoNmSetting
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.shared.domains.wb.dto.current_common_bids_for_adv import CurrentCommonBidsForAdv
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
@@ -94,3 +96,37 @@ class WBDataManager:
         """Получить минимальные ставки CPM (auto + search) для списка РК."""
 
         return await self._promotion_manager.get_min_bids_for_complex_adv(advs)
+
+
+    async def get_advs_info(
+        self, advs: list[ComplexAdv], *, get_auto: bool = True
+    ) -> dict[int, "AdvInfoDTO"]:
+        return await self._promotion_manager.get_campaigns_info(advs, get_auto=get_auto)
+
+
+    async def get_current_common_bids_for_search_adv(self, advs: list[ComplexAdv]) -> dict[int, CurrentCommonBidsForAdv]:
+        adv_infos: dict[int, AdvInfoDTO] = await self.get_advs_info(advs, get_auto=False)
+        result = {}
+        for adv in advs:
+            adv_info = adv_infos[adv.adv_id]
+            nmids_settings: list[AdvInfoNmSetting] = adv_info.search_adv.nmids_settings
+
+            nmid_to_current_bid = {}
+            for nmid_setting in nmids_settings:
+                nmid = nmid_setting.nmid
+                current_bid = nmid_setting.search_bid_kopecks
+                nmid_to_current_bid[nmid] = current_bid
+
+            current_adv_bid = CurrentCommonBidsForAdv(
+                adv_id_of_wb_adv=adv_info.search_adv.adv_id,
+                nmids_to_bids=nmid_to_current_bid,
+            )
+            result[adv.adv_id] = current_adv_bid
+        return result
+
+
+
+
+
+
+

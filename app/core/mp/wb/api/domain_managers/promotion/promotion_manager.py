@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
         SetNormqueryBidsCommandItem,
     )
+    from app.core.mp.wb.dto.adv_info import AdvInfoDTO
 
 
 @dataclass(slots=True)
@@ -102,6 +103,17 @@ class PromotionManager:
             complex_advs,
         )
         return result
+
+    async def get_campaigns_info(
+        self, complex_advs: list[ComplexAdv], *, get_auto: bool = True
+    ) -> dict[int, "AdvInfoDTO"] | None:
+        from .methods.get_campaigns_info import get_campaigns_info as method
+
+        return await method(
+            self._client.campaigns_info_v2_adapter,
+            complex_advs,
+            get_auto=get_auto,
+        )
 
     async def set_cluster_bids(
         self,
