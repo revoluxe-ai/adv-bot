@@ -9,7 +9,7 @@ from typing import (
 
 
 
-from app.core.di.wb_manager_hub import WBManagerHubFactory
+from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -36,6 +36,7 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 from app.settings import settings
 
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
+from .services.plan_fact_controller import PlanFactManager
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -62,10 +63,15 @@ class CoroutinesManager:
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
         plan_fact_reader: PlanFactReader,
+        wb_manager_hub: WBManagerHub,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
-        self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
+        self._wb_shop_data_manager = WBShopDataManager(
+            wb_cabinet,
+            tasks_manager=tasks_manager,
+            wb_api_data_manager=wb_manager_hub.wb_data_manager
+        )
 
         self._wb_api = wb_api
         self._access = wb_api.access
@@ -554,8 +560,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_plan_fact_stats(self) -> None:
         """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
-        from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
-
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
@@ -636,6 +640,23 @@ class CoroutinesManager:
         )
         await service.ensure_auto_bids_minimum(advs)
         return None
+
+
+    @while_coroutine_decorator(1 * 60, 15)
+    async def update_common_bid_in_search_adv(self):
+        from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        manager = UpdateCommotBidInSearchAdvsManager(
+            wb_manager_hub=wb_manager_hub,
+            tasks_manager=self._tasks_manager,
+        )
+        advs = await self._wb_shop_data_manager.get_wb_advs_dto()
+        advs = [adv for adv in advs if adv.bot_active and adv.bidder_active]
+        if not advs:
+            return None
+        await manager.update_common_bid_in_search_advs(advs)
+
+
 
 # TODO: Переделать граф зависимостей
 

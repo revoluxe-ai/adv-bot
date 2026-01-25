@@ -7,6 +7,7 @@ from .modules.wb_api import WBApi
 
 import typing
 
+
 if typing.TYPE_CHECKING:
     from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
 
@@ -47,27 +48,28 @@ class WBShop:
         #  автоэкспонентой, и именить тарификацию за автоматизацию, т.к. теперь управляющих сущности три
         try:
             async with asyncio.TaskGroup() as tg:
-                tg.create_task(self._alive_worker_run())
+                # tg.create_task(self._alive_worker_run())
                 tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg())
-                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg())
-                tg.create_task(coroutines_manager.update_cpm_bid())
-                tg.create_task(coroutines_manager.update_common_sale_stat())
-                tg.create_task(coroutines_manager.update_full_adv_stat())
-                tg.create_task(coroutines_manager.adv_settings_auto_update())
-                tg.create_task(
-                    coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
-                )
-                tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
-                tg.create_task(coroutines_manager.update_clusters_adv_stats_today())
-                tg.create_task(
-                    coroutines_manager.update_clusters_adv_stats_history()
-                )
-                tg.create_task(coroutines_manager.update_cluster_bids())
-                tg.create_task(coroutines_manager.update_plan_fact_stats())
-                tg.create_task(coroutines_manager.auto_budget_watchdog())
-                tg.create_task(coroutines_manager.auto_adv_active_control())
-                tg.create_task(coroutines_manager.update_top_key_in_advs())
-                tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
+                # tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg())
+                # tg.create_task(coroutines_manager.update_cpm_bid())
+                # tg.create_task(coroutines_manager.update_common_sale_stat())
+                # tg.create_task(coroutines_manager.update_full_adv_stat())
+                # tg.create_task(coroutines_manager.adv_settings_auto_update())
+                # tg.create_task(
+                #     coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
+                # )
+                # tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
+                # tg.create_task(coroutines_manager.update_clusters_adv_stats_today())
+                # tg.create_task(
+                #     coroutines_manager.update_clusters_adv_stats_history()
+                # )
+                # tg.create_task(coroutines_manager.update_cluster_bids())
+                # tg.create_task(coroutines_manager.update_plan_fact_stats())
+                # tg.create_task(coroutines_manager.auto_budget_watchdog())
+                # tg.create_task(coroutines_manager.auto_adv_active_control())
+                # tg.create_task(coroutines_manager.update_top_key_in_advs())
+                # tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
+                # tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
             # (все StopShopUpdateException из группы соберутся сюда)
