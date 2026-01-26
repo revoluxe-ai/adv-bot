@@ -8,7 +8,6 @@ description = ""
 authors = ["Andrey <vkitaebiz@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "app" }]  # если у тебя основная папка называется app
-package-mode = false
 
 [tool.black]
 exclude = '''
