@@ -1,7 +1,6 @@
 [tool.poetry.scripts]
 pyright-strict = "pyright:cli --project pyrightconfig_strict.json"
 
-
 [tool.poetry]
 name = "adv-bot"
 version = "0.1.0"
@@ -9,7 +8,7 @@ description = ""
 authors = ["Andrey <vkitaebiz@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "app" }]  # если у тебя основная папка называется app
-
+package-mode = false
 
 [tool.black]
 exclude = '''
