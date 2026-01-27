@@ -583,6 +583,10 @@ class AdvSetting(BaseTable):
         server_default=BidderMode.BY_AUTO_MAX_CPM.name,
     )
 
+    updater_common_bid_in_search_adv_active_status: Mapped[bool] = \
+         mapped_column(Boolean, nullable=True, default=False, server_default=text("false"))
+
+
     __table_args__ = (
         # Составной индекс для основного запроса
         Index(

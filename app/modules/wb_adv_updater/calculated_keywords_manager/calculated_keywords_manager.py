@@ -21,9 +21,14 @@ from ...common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import  get_async_session_maker as sm
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from operator import  attrgetter
-
-from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from cashews import cache, noself  # pyright: ignore
+
+
+import typing
+
+if typing.TYPE_CHECKING:
+    from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -58,7 +63,7 @@ class _ClickHouseNamedResultsResponse(Protocol):
 
 class CalculatedKeywordsManager(BaseClickHouseManager):
     async def get_calculated_keywords(self,
-                                      complex_adv: ComplexAdv,
+                                      complex_adv: 'ComplexAdv',
                                       min_days: int=7,
                                       min_views: int=500) \
             -> list[CalculatedKeyword]:
@@ -81,7 +86,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         return calculated_keyword_list
 
-    async def _get_all_stats(self, complex_adv: ComplexAdv, min_days: int, min_views: int):
+    async def _get_all_stats(self, complex_adv: 'ComplexAdv', min_days: int, min_views: int):
         nmids = complex_adv.nmids
         return await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
 
@@ -159,7 +164,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
     @staticmethod
     def __create_pre_calculated_keywords(keyword_hard_statuses: list[KeywordHardStatus],
                                                stats: list[KeywordStat],
-                                               complex_adv: ComplexAdv) \
+                                               complex_adv: 'ComplexAdv') \
             -> list[PreCalculatedKeyword]:
         from .convertor import  keyword_setting_to_keyword_setting_dto
         text_to_stat = {stat.text: stat for stat in stats}
@@ -178,7 +183,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 keywords.append(calculated_keyword)
         return keywords
 
-    async def _get_all_keyword_setting(self, complex_adv: ComplexAdv) -> list[KeywordHardStatus]:
+    async def _get_all_keyword_setting(self, complex_adv: 'ComplexAdv') -> list[KeywordHardStatus]:
         adv_setting_original_id = complex_adv.original_adv_setting_id
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
         async with sm(read_only=True) as session:
@@ -196,7 +201,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return keyword_hard_statuses
 
     @staticmethod
-    async def __get_calculated_keywords(complex_adv: ComplexAdv,
+    async def __get_calculated_keywords(complex_adv: 'ComplexAdv',
                                         pre_keywords: list[PreCalculatedKeyword]) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
@@ -294,13 +299,13 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
 
     @staticmethod
-    async def _set_calculated_keywords_in_redis_cache(complex_adv: ComplexAdv,
+    async def _set_calculated_keywords_in_redis_cache(complex_adv: 'ComplexAdv',
                                                       calculated_keyword_list: list[CalculatedKeyword]) -> None:
         redis_cache_manager = RedisCalculatedKeywordsCacheManager()
         await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
 
     @staticmethod
-    async def _get_bidder_keyword_statuses(complex_adv: ComplexAdv,
+    async def _get_bidder_keyword_statuses(complex_adv: 'ComplexAdv',
                                            texts: list[str]) -> dict[str, BidderKeywordStatus]:
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 
@@ -338,6 +343,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         redis_manager_instance = wb_manager_hub.redis_keyword_bidder_status_manager
 
-        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance() .get_statuses( # pyright: ignore # noqa
-            complex_adv, texts)
-        return statuses_map # pyright: ignore
+        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance.get_statuses(  # pyright: ignore
+            complex_adv, texts
+        )
+        return statuses_map

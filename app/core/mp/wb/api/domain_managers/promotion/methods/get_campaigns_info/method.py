@@ -19,32 +19,25 @@ async def get_campaigns_info(
     complex_advs: Sequence[ComplexAdv],
     *,
     get_auto: bool = True,
-) -> dict[int, AdvInfoDTO] | None:
-    if not complex_advs:
-        return None
+) -> dict[int, AdvInfoDTO]:
 
     all_ids: set[int] = set()
     for complex_adv in complex_advs:
         if get_auto:
             all_ids.add(complex_adv.auto_adv_id)
-        if search_adv := complex_adv.search_adv:
-            all_ids.add(search_adv.adv_id)
-    if not all_ids:
-        return None
+        if search_adv_id := complex_adv.search_adv_id:
+            all_ids.add(int(search_adv_id))
 
     campaigns = await campaigns_info_adapter.get_campaigns_info(list(all_ids))
-    adv_info_map = {campaign.id: convert_to_simple(campaign) for campaign in campaigns}
+    adv_info_map: dict[int, AdvInfoSimple] = {campaign.id: convert_to_simple(campaign) for campaign in campaigns}
 
     result: dict[int, AdvInfoDTO] = {}
     for complex_adv in complex_advs:
         if complex_adv.search_adv is None:
             raise ValueError("Search campaign is required to build AdvInfoDTO")
-        search_info : AdvInfoSimple | None = adv_info_map.get(complex_adv.search_adv.adv_id)
-        if search_info is None:
-            raise ValueError(
-                f"Missing advert info for search campaign {complex_adv.search_adv.adv_id}"
-            )
-
+        if not (search_adv_id := complex_adv.search_adv_id):
+            raise ValueError("Search campaign is required to build AdvInfoDTO")
+        search_info : AdvInfoSimple = adv_info_map[search_adv_id]
         dto: AdvInfoDTO = AdvInfoDTO(
             adv_id=complex_adv.adv_id,
             auto_adv=adv_info_map.get(complex_adv.auto_adv_id)

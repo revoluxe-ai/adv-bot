@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import cast
 from sqlalchemy import select
 
@@ -10,6 +11,9 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
 )
 from app.core.mp.wb.api.managers import WBDataManager
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
+    WBManager,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
@@ -48,14 +52,15 @@ class WBShopDataManager:
     def __init__(
         self,
         wb_cabinet: WBCabinet,
-        tasks_manager: TasksManager | None = None,
-        wb_api_data_manager: WBDataManager
-
+        tasks_manager: TasksManager,
+        wb_api_data_manager : WBDataManager,
+        wb_manager: WBManager,
     ):
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
         self._tasks_manager: TasksManager | None = tasks_manager
         self._wb_api_data_manager = wb_api_data_manager
+        self._wb_manager = wb_manager
 
     @single_run()
     async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
@@ -98,20 +103,25 @@ class WBShopDataManager:
         return adv_dict
 
     @single_run()
-    async def get_wb_advs_dto(self) -> list[WBAdvDTO]:
-        complex_advs = await self.get_complex_advs()
+    async def get_wb_advs_dto(self, complex_advs: list[ComplexAdv] ) -> list[WBAdvDTO]:
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         if not complex_advs:
             return []
+        min_bids, search_adv_bids = await asyncio.gather(
+            self._get_min_bids(complex_advs, cache_possible=False),
+            self._get_search_adv_common_bids(complex_advs),
+        )
+        if min_bids is None:
+            raise RuntimeError("Missing min_bids for advs")
 
-        min_bids: AdvMinNmidsBids = await self._get_min_bids(complex_advs)
-        search_adv_bids = await self._get_search_adv_normquery_bids(complex_advs)
-
-        handlers = [
-            lambda complex_adv=adv, search_adv_bids=search_adv_bids: (
-                self._collect_adv_data_parts(complex_adv, search_adv_bids)
-            )
-            for adv in complex_advs
-        ]
+        handlers: list[Callable[[], Awaitable[WBAdvDataParts]]] = []
+        for complex_adv in complex_advs:
+            search_adv_id = complex_adv.search_adv_id
+            if search_adv_id not in search_adv_bids:
+                raise RuntimeError(f"Missing search bids for adv_id={search_adv_id}")
+            current_search_bids = search_adv_bids[search_adv_id]
+            handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
+            handlers.append(handler)
 
         max_workers = max(1, min(len(handlers), 16))
         results = await run_tasks(
@@ -138,7 +148,9 @@ class WBShopDataManager:
             for parts in successful_parts
         ]
 
-    async def _collect_plan_data(self, complex_adv: ComplexAdv) -> PlanData:
+
+    @staticmethod
+    async def _collect_plan_data(complex_adv: ComplexAdv) -> PlanData:
         plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
         if plan is None:
             raise RuntimeError(
@@ -146,11 +158,13 @@ class WBShopDataManager:
             )
         return plan
 
-    async def _collect_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
+
+    @staticmethod
+    async def _collect_keywords(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
         return await complex_adv.get_keywords()
 
+    @staticmethod
     async def _collect_fact_data(
-        self,
         complex_adv: ComplexAdv,
         keywords: list[CalculatedKeyword],
     ) -> FactData:
@@ -169,17 +183,12 @@ class WBShopDataManager:
         keywords = await keywords_task
         fact = await self._collect_fact_data(complex_adv, keywords)
 
-        search_adv_id = complex_adv.search_adv_id
-        current_common_bids = {}
-        if search_adv_id:
-            current_common_bids = search_adv_bids.get(search_adv_id, {})
-
         return WBAdvDataParts(
             complex_adv=complex_adv,
             plan=plan,
             fact=fact,
             keywords=keywords,
-            current_common_bids_in_search_adv=current_common_bids,
+            current_common_bids_in_search_adv=search_adv_bids
         )
 
     @single_run()
@@ -209,10 +218,12 @@ class WBShopDataManager:
             complex_advs.append(complex_adv)
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
+        complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
         return complex_advs
 
+    @staticmethod
     def _build_wb_adv_dto_from_parts(
-        self, parts: WBAdvDataParts, min_bids: AdvMinNmidsBids
+        parts: WBAdvDataParts, min_bids: AdvMinNmidsBids
     ) -> WBAdvDTO:
         return WBAdvDTO(
             complex_adv=parts.complex_adv,
@@ -223,22 +234,22 @@ class WBShopDataManager:
             min_bids=min_bids,
         )
 
-    async def _get_search_adv_normquery_bids(
+    async def _get_search_adv_common_bids(
         self, complex_advs: list[ComplexAdv]
     ) -> dict[int, dict[int, int]]:
-        normquery_bids = await self._wb_api_data_manager.get_current_bids_for_advs(
+        bids = await self._wb_api_data_manager.get_current_bids_for_advs(
             complex_advs
         )
-        return self._aggregate_normquery_bids(normquery_bids)
+        return self._aggregate_bids(bids)
 
     @staticmethod
-    def _aggregate_normquery_bids(
-        normquery_bids: list[NormqueryBidDTO] | None,
+    def _aggregate_bids(
+        bids: list[NormqueryBidDTO] | None,
     ) -> dict[int, dict[int, int]]:
         aggregated: dict[int, dict[int, int]] = {}
-        if not normquery_bids:
+        if not bids:
             return aggregated
-        for bid in normquery_bids:
+        for bid in bids:
             adv_bids = aggregated.setdefault(bid.advert_id, {})
             current_bid = adv_bids.get(bid.nm_id)
             adv_bids[bid.nm_id] = bid.bid if current_bid is None else max(
@@ -246,7 +257,11 @@ class WBShopDataManager:
             )
         return aggregated
 
-    async def _get_min_bids(self, complex_advs: list[ComplexAdv]) -> AdvMinNmidsBids:
+    async def _get_min_bids(
+        self, complex_advs: list[ComplexAdv], cache_possible
+    ) -> AdvMinNmidsBids | None:
+        if self._wb_manager is not None:
+            return await self._wb_manager.get_min_bids(complex_advs, cache_possible)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

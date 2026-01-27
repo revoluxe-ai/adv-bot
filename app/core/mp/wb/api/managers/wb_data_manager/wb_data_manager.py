@@ -99,19 +99,24 @@ class WBDataManager:
 
 
     async def get_advs_info(
-        self, advs: list[ComplexAdv], *, get_auto: bool = True
+        self, advs: list["ComplexAdv"], *, get_auto: bool = True
     ) -> dict[int, "AdvInfoDTO"]:
         return await self._promotion_manager.get_campaigns_info(advs, get_auto=get_auto)
 
 
-    async def get_current_common_bids_for_search_adv(self, advs: list[ComplexAdv]) -> dict[int, CurrentCommonBidsForAdv]:
+    async def get_current_common_bids_for_search_adv(self,
+                                                     advs: list["ComplexAdv"])  \
+                                                        -> dict[int, CurrentCommonBidsForAdv | None]:
         adv_infos: dict[int, AdvInfoDTO] = await self.get_advs_info(advs, get_auto=False)
-        result = {}
+        result: dict[int, CurrentCommonBidsForAdv | None] = {}
         for adv in advs:
-            adv_info = adv_infos[adv.adv_id]
+            complex_adv_id = adv.adv_id
+            adv_info = adv_infos.get(complex_adv_id)
+            if adv_info is None:
+                continue
             nmids_settings: list[AdvInfoNmSetting] = adv_info.search_adv.nmids_settings
 
-            nmid_to_current_bid = {}
+            nmid_to_current_bid: dict[int, int] = {}
             for nmid_setting in nmids_settings:
                 nmid = nmid_setting.nmid
                 current_bid = nmid_setting.search_bid_kopecks

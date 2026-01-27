@@ -12,6 +12,7 @@ def dto_to_command(complex_advs: list[ComplexAdv]) -> GetMinBidsCommand:
     items: list[GetMinBidsCommandItem] = []
 
     for adv in complex_advs:
+
         nmids = adv.nmids
         if not nmids:
             continue
@@ -24,14 +25,14 @@ def dto_to_command(complex_advs: list[ComplexAdv]) -> GetMinBidsCommand:
             )
         )
 
-        if search_adv := adv.search_adv:
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is not None:
             items.append(
                 GetMinBidsCommandItem(
-                    adv_id=search_adv.adv_id,
+                    adv_id=search_adv_id,
                     nmids=nmids,
                     placement_type=AdvPlacementType.SEARCH_ADV,
                 )
             )
 
     return GetMinBidsCommand(items=items)
-

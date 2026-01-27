@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     PlacementType,
-    PostAdvV0BidsMinBodyPlacementTypesItem,
+    PostApiAdvertV1BidsMinBodyPlacementTypesItem,
 )
 
 
@@ -15,12 +15,12 @@ class AdvPlacementType(str, Enum):
     SEARCH_ADV = "search_adv"
     RECOMMENDATION = 'recommendation'
 
-    def to_wb_placement_type(self) -> PostAdvV0BidsMinBodyPlacementTypesItem:
+    def to_wb_placement_type(self) -> PostApiAdvertV1BidsMinBodyPlacementTypesItem:
         match self:
             case AdvPlacementType.AUTO_ADV:
-                return PostAdvV0BidsMinBodyPlacementTypesItem.COMBINED
+                return PostApiAdvertV1BidsMinBodyPlacementTypesItem.COMBINED
             case AdvPlacementType.SEARCH_ADV:
-                return PostAdvV0BidsMinBodyPlacementTypesItem.SEARCH
+                return PostApiAdvertV1BidsMinBodyPlacementTypesItem.SEARCH
             case _:
                 raise ValueError(f"Unsupported placement type {self}")
 

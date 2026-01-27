@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import TypeVar
 
+from app.core.di.wb_manager_hub import WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
 
@@ -27,12 +28,14 @@ class WBShop:
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
         plan_fact_reader: "PlanFactReader",
+        wb_manager_hub: "WBManagerHub"
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
         self._redis_client_wrapper = redis_client_wrapper
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader
+        self._wb_manager_hub = wb_manager_hub
 
     async def run(self) -> None:
         from .service_manager.exc import StopShopUpdateException
@@ -42,6 +45,7 @@ class WBShop:
             self._redis_client_wrapper,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            wb_manager_hub=self._wb_manager_hub
         )
         # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
@@ -51,7 +55,6 @@ class WBShop:
                 tg.create_task(self._alive_worker_run())
                 tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg())
                 tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg())
-                tg.create_task(coroutines_manager.update_cpm_bid())
                 tg.create_task(coroutines_manager.update_common_sale_stat())
                 tg.create_task(coroutines_manager.update_full_adv_stat())
                 tg.create_task(coroutines_manager.adv_settings_auto_update())

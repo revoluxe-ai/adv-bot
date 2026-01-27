@@ -21,6 +21,7 @@ from app.modules.auto_budget_manager import (
     AutoBudgetEnsureStatus,
     AutoBudgetService,
 )
+from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.shared.domains.wb.enums import (
     AdvType,
 )
@@ -36,7 +37,6 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 from app.settings import settings
 
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
-from .services.plan_fact_controller import PlanFactManager
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -70,7 +70,8 @@ class CoroutinesManager:
         self._wb_shop_data_manager = WBShopDataManager(
             wb_cabinet,
             tasks_manager=tasks_manager,
-            wb_api_data_manager=wb_manager_hub.wb_data_manager
+            wb_api_data_manager=wb_manager_hub.wb_data_manager,
+            wb_manager=wb_manager_hub.wb_manager,
         )
 
         self._wb_api = wb_api
@@ -560,6 +561,8 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_plan_fact_stats(self) -> None:
         """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
+        from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
+
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
@@ -642,19 +645,37 @@ class CoroutinesManager:
         return None
 
 
-    @while_coroutine_decorator(1 * 60, 15)
-    async def update_common_bid_in_search_adv(self):
+    @while_coroutine_decorator(60 * 15, 15)
+    async def update_common_bid_in_search_adv(self) -> None:
+        # TODO: Ускорить работу, как вариант - переделать на генераторы
         from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         manager = UpdateCommotBidInSearchAdvsManager(
-            wb_manager_hub=wb_manager_hub,
+            wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
         )
-        advs = await self._wb_shop_data_manager.get_wb_advs_dto()
-        advs = [adv for adv in advs if adv.bot_active and adv.bidder_active]
+        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active and
+                adv.bidder_active and
+                adv.updater_common_bid_in_search_adv_active_status and
+                adv.search_adv_active_status is True]
+        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+
         if not advs:
             return None
-        await manager.update_common_bid_in_search_advs(advs)
+
+        handlers: list[Callable[..., Any]] = []
+        for adv in advs:
+            handler = lambda adv_=adv: manager.update_common_bid_in_search_adv(adv_)
+            handlers.append(handler)
+
+        await run_tasks(
+            handlers=handlers,
+            max_workers=16,
+            tasks_manager=self._tasks_manager,
+        )
+        return None
+
 
 
 

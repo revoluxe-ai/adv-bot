@@ -49,19 +49,28 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
             ClusterBidsManagerContainer, shop_id=_shop_id, redis_client=_redis_wrapper
         )
     )
+    _cluster_bids_updater_container_typed = cast(
+        ClusterBidsManagerContainer,
+        _cluster_bids_updater_container,
+    )
     _update_cluster_bids_manager: Provider[UpdateClusterBidsManager] = cast(
         Provider[UpdateClusterBidsManager],
-        _cluster_bids_updater_container.provided.update_cluster_bids_manager,
+        _cluster_bids_updater_container_typed.update_cluster_bids_manager,
+    )
+    _wb_manager = cast(
+        Provider["WBManager"],
+        _cluster_bids_updater_container_typed.wb_manager,
     )
     _redis_keyword_bidder_status_manager: Provider[RedisKeywordBidderStatusManager] = cast(
         Provider[RedisKeywordBidderStatusManager],
-        _cluster_bids_updater_container.provided.redis_keyword_bidder_status_manager,
+        _cluster_bids_updater_container_typed.redis_keyword_bidder_status_manager,
     )
 
     wb_manager_hub = providers.Singleton(
         WBManagerHub,
         wb_data_manager=_wb_data_manager,
         wb_promotion_manager=_wb_promotion_manager,
+        wb_manager=_wb_manager,
         cluster_bids_update_manager=_update_cluster_bids_manager,
         redis_client_wrapper=_redis_wrapper,
         redis_keyword_bidder_status_manager=_redis_keyword_bidder_status_manager

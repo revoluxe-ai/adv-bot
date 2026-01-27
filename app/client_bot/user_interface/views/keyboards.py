@@ -16,6 +16,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeAutoUpdateExponentStatus,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeRecSystemModeStatus,
+    ChangeCommonBidInSearchAdvStatus,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.models import (
@@ -78,6 +79,21 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    common_bid_active = bool(
+        adv_setting.updater_common_bid_in_search_adv_active_status
+    )
+    common_bid_text = (
+        "Выключить управление общей ставкой в Аукционе"
+        if common_bid_active
+        else "Включить управление общей ставкой в Аукционе"
+    )
+    common_bid_callback = ChangeCommonBidInSearchAdvStatus(
+        adv_id=adv_setting.adv_id, new_status=not common_bid_active
+    ).pack()
+    _ = builder.row(
+        InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
+    )
 
     activity_callback = callbacks.ManageCampaignActivity(
         action="menu", adv_setting_original_id=adv_setting.id

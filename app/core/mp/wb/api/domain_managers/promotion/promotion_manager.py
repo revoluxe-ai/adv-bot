@@ -20,6 +20,9 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
+    SetCommonBidsCommand,
+)
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
     PatchAdvV0BidsBody,
@@ -106,9 +109,8 @@ class PromotionManager:
 
     async def get_campaigns_info(
         self, complex_advs: list[ComplexAdv], *, get_auto: bool = True
-    ) -> dict[int, "AdvInfoDTO"] | None:
+    ) -> dict[int, "AdvInfoDTO"]:
         from .methods.get_campaigns_info import get_campaigns_info as method
-
         return await method(
             self._client.campaigns_info_v2_adapter,
             complex_advs,
@@ -125,6 +127,9 @@ class PromotionManager:
 
     async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
         await self._client.campaigns_management_adapter.patch_adv_bids(body)
+
+    async def set_common_bids(self, command: SetCommonBidsCommand) -> None:
+        await self._client.common_bids_adapter.patch_common_bids(command)
 
     async def get_campaign_budget(self, adv_id: int) -> CampaignBudgetInfo:
         response = await self._client.finance_adapter.get_campaign_budget(adv_id)

@@ -58,6 +58,7 @@ from .user_interface.handlers import (
     auto_update_exponent_toggle,
     auto_add_only_relevant_phrase_toggle,
     auto_budget_watchdog_toggle,
+    common_bid_toggle,
     reset_place_setting,
     shop_settings,
     strategy_setting,
@@ -91,6 +92,7 @@ common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
+common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)

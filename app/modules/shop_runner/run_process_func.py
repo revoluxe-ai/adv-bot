@@ -78,12 +78,14 @@ async def _run_shop_task(
     try:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
         wb_api = WBApi(access, client_session)
+        wb_manager_hub = wb_manager_hub_factory.get_wb_manager_hub(shop_id)
         wb_shop = WBShop(
             wb_api,
             redis_manager,
             redis_client_wrapper,
             tasks_manager=tasks_manager,
             plan_fact_reader=plan_fact_reader,
+            wb_manager_hub=wb_manager_hub,
         )
         await wb_shop.run()
     except StopShopUpdateException:

@@ -11,6 +11,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.shared.domains.wb.enums import AdvType
+from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
+    SetCommonBidsCommand,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -175,3 +178,8 @@ class WBModifier:
     ) -> None:
         adv_id = complex_adv.get_adv_id_by_type(adv_type)
         await action(adv_id)
+
+    async def update_search_adv_common_cpm(
+        self, command: SetCommonBidsCommand
+    ) -> None:
+        await self._promotion_manager.set_common_bids(command)
