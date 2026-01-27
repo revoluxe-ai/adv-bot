@@ -31,7 +31,6 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
-        plan_fact_manager=MagicMock(),
         plan_fact_reader=PlanFactReader(),
     )
 
@@ -91,7 +90,6 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
-        plan_fact_manager=MagicMock(),
         plan_fact_reader=PlanFactReader(),
     )
 
