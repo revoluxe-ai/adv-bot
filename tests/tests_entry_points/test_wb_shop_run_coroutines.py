@@ -26,13 +26,17 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_data_manager = MagicMock()
+    wb_manager_hub.wb_manager = MagicMock()
+
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
-        plan_fact_manager=MagicMock(),
         plan_fact_reader=PlanFactReader(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     # Mock the CoroutinesManager and all its methods
@@ -86,13 +90,17 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
     redis_manager_mock.DEFAULT_TTL = 60
 
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_data_manager = MagicMock()
+    wb_manager_hub.wb_manager = MagicMock()
+
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
-        plan_fact_manager=MagicMock(),
         plan_fact_reader=PlanFactReader(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     # Core coroutines that should ALWAYS be running

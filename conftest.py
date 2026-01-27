@@ -45,6 +45,7 @@ dotenv.load_dotenv(override=False)
 # Now it's safe to import modules that use settings
 import asyncio
 from clickhouse_connect import get_async_client
+from clickhouse_connect.driver.exceptions import DatabaseError
 from fakeredis import FakeRedis
 import aiofiles
 from dependency_injector import containers
@@ -581,9 +582,15 @@ async def postgres_session(async_engine):
 async def fake_redis():
     """Создает фейковый Redis для тестов (асинхронная версия)."""
     redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
-    yield redis
-    await redis.flushall()  # очищаем после теста
-    await redis.aclose()
+    try:
+        yield redis
+    finally:
+        try:
+            await redis.flushall()  # очищаем после теста
+            await redis.aclose()
+        except RuntimeError as exc:
+            if "Event loop is closed" not in str(exc):
+                raise
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
@@ -717,6 +724,20 @@ async def clickhouse_client(setup_test_database):
             password=password,
             database="default_db",
         )
+
+    max_attempts = 10
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await client.command("SELECT 1")
+            print("[OK] ClickHouse HTTP endpoint is ready.")
+            break
+        except DatabaseError as exc:
+            if attempt == max_attempts:
+                raise
+            print(
+                f"[WAIT] ClickHouse not ready (attempt {attempt}/{max_attempts}): {exc}"
+            )
+            await asyncio.sleep(1)
 
 
     print("[OK] ClickHouse async client created")

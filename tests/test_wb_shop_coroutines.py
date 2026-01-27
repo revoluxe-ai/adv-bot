@@ -11,6 +11,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
     FactData,
 )
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -136,10 +139,19 @@ async def test_adv_settings_auto_update(
         ),
     ):
         redis_client_wrapper = RedisClient(redis_client=fake_redis)
+        plan_fact_reader = MagicMock(spec=PlanFactReader)
+        plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+        wb_manager_hub = MagicMock()
+        wb_manager_hub.wb_data_manager = MagicMock()
+        wb_manager_hub.wb_manager = MagicMock()
+
         manager = CoroutinesManager(
             wb_api,
             redis_client_wrapper,
             tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=plan_fact_reader,
+            wb_manager_hub=wb_manager_hub,
         )
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]

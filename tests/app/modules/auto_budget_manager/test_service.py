@@ -119,6 +119,12 @@ def test_compute_planned_amount_always_matches_configured_topup(monkeypatch) -> 
             AUTO_BUDGET_TOPUP_AMOUNT=1200,
         ),
     )
+    wb_modifier = MagicMock()
+    wb_modifier.get_campaign_budget = AsyncMock(return_value=MagicMock(total=0))
+    wb_modifier.get_campaign_balance = AsyncMock(return_value=MagicMock())
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_modifier = wb_modifier
+
     service = AutoBudgetService(redis_client=_FakeRedis())
 
     # Проверяем, что функция всегда возвращает ровно тот шаг, что задан в настройках.
@@ -241,6 +247,16 @@ def _build_adv_setting() -> SimpleNamespace:
     )
 
 
+def _build_wb_manager_hub():
+    wb_modifier = MagicMock()
+    wb_modifier.get_campaign_budget = AsyncMock(return_value=MagicMock(total=0))
+    balance_response = SimpleNamespace(balance=2500, net=2500, bonus=2500)
+    wb_modifier.get_campaign_balance = AsyncMock(return_value=balance_response)
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_modifier = wb_modifier
+    return wb_manager_hub
+
+
 @pytest.mark.asyncio
 async def test_ensure_budget_limits_by_successful_topups(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -258,10 +274,11 @@ async def test_ensure_budget_limits_by_successful_topups(monkeypatch) -> None:
     )
 
     service = AutoBudgetService(redis_client=_FakeRedis())
+    wb_manager_hub = _build_wb_manager_hub()
     result = await service._ensure_budget_locked(
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.LIMIT_REACHED
@@ -282,14 +299,21 @@ async def test_ensure_budget_limits_by_doubled_all_attempts(monkeypatch) -> None
     )
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums",
-        AsyncMock(return_value=(400.0, 600.0)),
+        AsyncMock(return_value=(0.0, 2000.0)),
+    )
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_get_last_full_stat_update",
+        AsyncMock(return_value=now),
     )
 
     service = AutoBudgetService(redis_client=_FakeRedis())
+    wb_manager_hub = _build_wb_manager_hub()
     result = await service._ensure_budget_locked(
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.LIMIT_REACHED
@@ -310,7 +334,7 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
     now = datetime.datetime(
         2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
     )
-    last_update = now - datetime.timedelta(seconds=period // 2)
+    last_update = now - datetime.timedelta(seconds=period * 2)
 
     monkeypatch.setattr(
         AutoBudgetService,
