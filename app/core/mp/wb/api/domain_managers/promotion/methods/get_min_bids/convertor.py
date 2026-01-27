@@ -26,13 +26,14 @@ def dto_to_command(complex_advs: list[ComplexAdv]) -> GetMinBidsCommand:
         )
 
         search_adv_id = adv.search_adv_id
-        if search_adv_id is not None:
-            items.append(
-                GetMinBidsCommandItem(
-                    adv_id=search_adv_id,
-                    nmids=nmids,
-                    placement_type=AdvPlacementType.SEARCH_ADV,
-                )
+        if search_adv_id is None:
+            raise ValueError("Нет Поисковой кампании")
+        items.append(
+            GetMinBidsCommandItem(
+                adv_id=search_adv_id,
+                nmids=nmids,
+                placement_type=AdvPlacementType.SEARCH_ADV,
             )
+        )
 
     return GetMinBidsCommand(items=items)
