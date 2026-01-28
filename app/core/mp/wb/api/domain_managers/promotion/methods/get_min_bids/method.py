@@ -32,10 +32,11 @@ async def get_min_bids(
     search: dict[int, int] = {}
 
     for bid in results:
+        rounded_cpm = (bid.min_cpm + 99) // 100
         if bid.placement_type == AdvPlacementType.AUTO_ADV:
-            auto[bid.nmid] = int(bid.min_cpm/100)
+            auto[bid.nmid] = rounded_cpm
         elif bid.placement_type == AdvPlacementType.SEARCH_ADV:
-            search[bid.nmid] = int(bid.min_cpm/100)
+            search[bid.nmid] = rounded_cpm
 
     return AdvMinNmidsBids(auto=auto, search=search)
 
