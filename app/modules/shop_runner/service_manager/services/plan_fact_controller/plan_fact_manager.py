@@ -40,11 +40,15 @@ class PlanFactManager:
             lambda adv_=adv: self._controller.process_adv(adv_, version) for adv in advs
         ]
 
-        results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(
-            handlers,
-            max_workers=max(1, min(len(handlers), 16)),
-            return_exceptions=True,
-        )
+        try:
+            results: list[PlanFactStatDTO | None] = await run_tasks(
+                handlers,
+                max_workers=max(1, min(len(handlers), 16)),
+                return_exceptions=False,
+            )
+        except Exception as exc:
+            logger.error("PlanFactManager failed to process advs: %s", exc)
+            raise
 
         # Собираем успешные результаты
         plan_fact_stats: list[PlanFactStatDTO] = []
