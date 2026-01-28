@@ -27,8 +27,7 @@ def texts():
 def _get_redis_manager_stub(return_value):
     redis_manager = MagicMock()
     redis_manager.get_statuses = AsyncMock(return_value=return_value)
-    redis_manager_factory = MagicMock(return_value=redis_manager)
-    return redis_manager_factory
+    return redis_manager
 
 
 @pytest.mark.asyncio
@@ -38,9 +37,9 @@ async def test_get_bidder_keyword_statuses_context_available(complex_adv, texts)
         "alpha": BidderKeywordStatus.GOOD,
         "beta": BidderKeywordStatus.BAD,
     }
-    redis_manager_factory = _get_redis_manager_stub(expected_statuses)
+    redis_manager = _get_redis_manager_stub(expected_statuses)
     hub_mock = MagicMock()
-    hub_mock.redis_keyword_bidder_status_manager = redis_manager_factory
+    hub_mock.redis_keyword_bidder_status_manager = redis_manager
 
     with patch(
         "app.core.di.wb_manager_hub.WBManagerHubFactory.get_wb_manager_from_context",
@@ -49,17 +48,16 @@ async def test_get_bidder_keyword_statuses_context_available(complex_adv, texts)
         result = await manager._get_bidder_keyword_statuses(complex_adv, texts)
 
     assert result == expected_statuses
-    redis_manager_factory.assert_called_once_with()
-    redis_manager_factory.return_value.get_statuses.assert_awaited_once_with(complex_adv, texts)
+    redis_manager.get_statuses.assert_awaited_once_with(complex_adv, texts)
 
 
 @pytest.mark.asyncio
 async def test_get_bidder_keyword_statuses_fallback_creates_container(complex_adv, texts):
     manager = CalculatedKeywordsManager()
     expected_statuses = {"alpha": BidderKeywordStatus.GOOD}
-    redis_manager_factory = _get_redis_manager_stub(expected_statuses)
+    redis_manager = _get_redis_manager_stub(expected_statuses)
     hub_mock = MagicMock()
-    hub_mock.redis_keyword_bidder_status_manager = redis_manager_factory
+    hub_mock.redis_keyword_bidder_status_manager = redis_manager
 
     redis_config = types.SimpleNamespace(
         host="localhost",
@@ -97,8 +95,7 @@ async def test_get_bidder_keyword_statuses_fallback_creates_container(complex_ad
         result = await manager._get_bidder_keyword_statuses(complex_adv, texts)
 
     assert result == expected_statuses
-    redis_manager_factory.assert_called_once_with()
-    redis_manager_factory.return_value.get_statuses.assert_awaited_once_with(complex_adv, texts)
+    redis_manager.get_statuses.assert_awaited_once_with(complex_adv, texts)
 
     app_config_create_mock.assert_called_once_with()
     redis_cls_mock.assert_called_once_with(

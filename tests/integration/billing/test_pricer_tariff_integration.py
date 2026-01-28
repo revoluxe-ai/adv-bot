@@ -136,7 +136,7 @@ async def test_auto_mode_applies_without_active_search_campaigns(
     assert details.total_per_month == 0.0
 
 
-async def test_count_is_zero_when_search_campaign_not_started(
+async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
     async_session: AsyncSession,
     wb_cabinet: WBCabinet,
 ):
@@ -163,8 +163,8 @@ async def test_count_is_zero_when_search_campaign_not_started(
     await async_session.flush()
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
-    assert details.count == 0
-    assert details.total_per_month == 0.0
+    assert details.count == 1
+    assert details.total_per_month > 0.0
 
 
 async def test_auto_tariff_thresholds_apply_to_total_count(

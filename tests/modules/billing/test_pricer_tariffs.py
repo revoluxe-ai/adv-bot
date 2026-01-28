@@ -80,7 +80,7 @@ class TestPricerTariffs:
         assert details.total_per_month == 0.0
 
     @pytest.mark.asyncio
-    async def test_context_counts_only_advs_with_started_search(
+    async def test_context_counts_all_advs_with_search_adv_id(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
@@ -95,30 +95,11 @@ class TestPricerTariffs:
         ) -> Sequence[DummyAdv]:
             return advs
 
-        async def _fake_fetch_active_search_adv_ids(
-            session: Any, search_adv_ids: Sequence[int]
-        ) -> set[int]:
-            # started только для 10 и 12
-            return {10, 12}
-
         monkeypatch.setattr(
             Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
         )
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
-        assert details.count == 2
+        assert details.count == 4
 
     @pytest.mark.asyncio
     async def test_mode_switches_to_auto_if_any_part_auto_enabled(
@@ -201,7 +182,7 @@ class TestPricerTariffs:
         assert details.total_per_month == 2 * tariffs[2]
 
     @pytest.mark.asyncio
-    async def test_mode_auto_when_auto_settings_configured_but_no_active_search(
+    async def test_mode_auto_when_auto_settings_configured_but_search_not_started(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
@@ -218,31 +199,13 @@ class TestPricerTariffs:
         ) -> Sequence[DummyAdv]:
             return advs
 
-        async def _fake_fetch_active_search_adv_ids(
-            session: Any, search_adv_ids: Sequence[int]
-        ) -> set[int]:
-            return set()
-
         monkeypatch.setattr(
             Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
         )
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.AUTO
-        assert details.count == 0
-        assert details.total_per_month == 0.0
+        assert details.count == 1
+        assert details.total_per_month == details.price_per_adv
 
     @pytest.mark.asyncio
     async def test_exponent_does_not_switch_to_auto_mode(
