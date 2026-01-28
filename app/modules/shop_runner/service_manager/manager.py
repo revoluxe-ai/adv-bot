@@ -9,7 +9,7 @@ from typing import (
 
 
 
-from app.core.di.wb_manager_hub import WBManagerHubFactory
+from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -21,6 +21,7 @@ from app.modules.auto_budget_manager import (
     AutoBudgetEnsureStatus,
     AutoBudgetService,
 )
+from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.shared.domains.wb.enums import (
     AdvType,
 )
@@ -62,10 +63,18 @@ class CoroutinesManager:
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
         plan_fact_reader: PlanFactReader | None = None,
+        wb_manager_hub: WBManagerHub | None = None,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
-        self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
+        if wb_manager_hub is None:
+            wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        self._wb_shop_data_manager = WBShopDataManager(
+            wb_cabinet,
+            tasks_manager=tasks_manager,
+            wb_api_data_manager=wb_manager_hub.wb_data_manager,
+            wb_manager=wb_manager_hub.wb_manager,
+        )
 
         self._wb_api = wb_api
         self._access = wb_api.access
@@ -636,6 +645,47 @@ class CoroutinesManager:
         )
         await service.ensure_auto_bids_minimum(advs)
         return None
+
+
+    @while_coroutine_decorator(60 * 15, 15)
+    async def update_common_bid_in_search_adv(self) -> None:
+        # TODO: Ускорить работу, как вариант - переделать на генераторы
+        from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        manager = UpdateCommotBidInSearchAdvsManager(
+            wb_modifier=wb_manager_hub.wb_modifier,
+            tasks_manager=self._tasks_manager,
+        )
+        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active and
+                adv.bidder_active and
+                adv.updater_common_bid_in_search_adv_active_status and
+                adv.search_adv_active_status is True]
+        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+
+        if not advs:
+            return None
+
+        handlers: list[Callable[..., Any]] = []
+        for adv in advs:
+            handler = lambda adv_=adv: manager.update_common_bid_in_search_adv(adv_)
+            handlers.append(handler)
+
+        results = await run_tasks(
+            handlers=handlers,
+            max_workers=16,
+            tasks_manager=self._tasks_manager,
+        )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "Auto adv active control handler failed: %s", result
+                )
+        return None
+
+
+
 
 # TODO: Переделать граф зависимостей
 

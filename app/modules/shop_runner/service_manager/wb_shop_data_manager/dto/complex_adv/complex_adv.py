@@ -47,10 +47,28 @@ class ComplexAdv:
         self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+
+    def __repr__(self):
+        return str(self._adv_setting.id)
+
+
+    @property
+    def updater_common_bid_in_search_adv_active_status(self)-> bool:
+        return self._adv_setting.updater_common_bid_in_search_adv_active_status
+
+
+    @property
+    def adv_setting_original_id(self) -> int:
+        return self._adv_setting.id
+
     @property
     def bidder_for_auto(self) -> bool:
         return self._adv_setting.bidder_for_auto
 
+
+    @property
+    def  search_cpm(self) -> int | None:
+        return self._search_adv.cpm
 
     @property
     def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:

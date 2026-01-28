@@ -7,12 +7,12 @@ from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
 )
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.finance import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.finance import (
     get_adv_v1_balance,
     get_adv_v1_budget,
     post_adv_v1_budget_deposit,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
     GetAdvV1BudgetResponse200,
     PostAdvV1BudgetDepositBody,

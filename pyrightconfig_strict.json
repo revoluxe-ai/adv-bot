@@ -19,6 +19,8 @@
     "app/utils/graphic_positions_creator/graphic_positions_creator.py",
     "app/client_bot/user_interface/views/messages/messages.py",
     "app/client_bot/user_interface/handlers/keyword_settings.py",
+    "app/modules/wb_adv_updater/phrases_processor.py",
+    "app/client_bot/user_interface/handlers/keyword_settings.py",
     "app/modules/shop_runner/service_manager/services/update_cluster_bids_manager",
     "app/modules/wb_adv_updater/calculated_keywords_manager",
     "app/modules/shop_runner/service_manager/manager.py",
@@ -30,7 +32,11 @@
     "updater.py",
     "app/modules/wb_adv_updater/modules/balance_exp_informer",
     "app/modules/billing/event_manager",
-    "app/modules/auto_budget_manager"
+    "app/modules/auto_budget_manager",
+    "app/client_bot/user_interface/handlers/keyword_settings.py",
+    "app/modules/wb_adv_updater/phrases_processor.py",
+    "app/modules/shop_runner/service_manager/services/update_commot_bid_in_search_advs_manager",
+    "app/modules/shop_runner/wb_shop.py"
 
   ],
 

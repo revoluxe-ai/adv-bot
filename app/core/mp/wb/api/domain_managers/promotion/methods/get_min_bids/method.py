@@ -27,15 +27,16 @@ async def get_min_bids(
     if not command.items:
         return None
 
-    results = await min_bids_adapter.post_adv_v0_bids_min(command)
+    results = await min_bids_adapter.post_api_advert_v1_bids_min(command)
     auto: dict[int, int] = {}
     search: dict[int, int] = {}
 
     for bid in results:
+        rounded_cpm = (bid.min_cpm + 99) // 100
         if bid.placement_type == AdvPlacementType.AUTO_ADV:
-            auto[bid.nmid] = bid.min_cpm
+            auto[bid.nmid] = rounded_cpm
         elif bid.placement_type == AdvPlacementType.SEARCH_ADV:
-            search[bid.nmid] = bid.min_cpm
+            search[bid.nmid] = rounded_cpm
 
     return AdvMinNmidsBids(auto=auto, search=search)
 

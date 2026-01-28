@@ -30,7 +30,7 @@ class WBManager(WBBaseManager):
         await self.wb_manager_hub.wb_modifier.set_cluster_bids_for_adv(update_bids_command)
 
 
-    async def get_min_bids(self, advs: list[ComplexAdv]) -> AdvMinNmidsBids:
+    async def get_min_bids(self, advs: list[ComplexAdv], cache_possible: bool) -> AdvMinNmidsBids:
         """Получить минимальные ставки CPM (auto/search) для переданных рекламных кампаний."""
 
         all_nmids: set[int] = set()
@@ -41,20 +41,19 @@ class WBManager(WBBaseManager):
 
         redis_client = self.wb_manager_hub.redis_client_wrapper
         cache_manager = MinBidsCacheManager(redis_client)
+        if cache_possible:
+            cached_data = await cache_manager.get_min_bids_for_nmids(nmids_list)
+            if len(cached_data) == len(all_nmids):
+                logger.info("Min bids cache HIT for %s/%s nmids", len(cached_data), len(all_nmids))
+                auto_dict = {nmid: cpms[0] for nmid, cpms in cached_data.items()}
+                search_dict = {nmid: cpms[1] for nmid, cpms in cached_data.items()}
+                return AdvMinNmidsBids(auto=auto_dict, search=search_dict)
 
-        cached_data = await cache_manager.get_min_bids_for_nmids(nmids_list)
-
-        if len(cached_data) == len(all_nmids):
-            logger.info("Min bids cache HIT for %s/%s nmids", len(cached_data), len(all_nmids))
-            auto_dict = {nmid: cpms[0] for nmid, cpms in cached_data.items()}
-            search_dict = {nmid: cpms[1] for nmid, cpms in cached_data.items()}
-            return AdvMinNmidsBids(auto=auto_dict, search=search_dict)
-
-        logger.info(
-            "Min bids cache MISS (%s/%s cached), fetching from API",
-            len(cached_data),
-            len(all_nmids),
-        )
+            logger.info(
+                "Min bids cache MISS (%s/%s cached), fetching from API",
+                len(cached_data),
+                len(all_nmids),
+            )
 
         min_bids = await self.wb_manager_hub.wb_data_manager.get_min_bids(advs)
         if min_bids is None:

@@ -17,3 +17,6 @@ async def get_non_zero_users(get_users: AsyncGenerator[User, None],
             sum_balance = balance + bonus
             if sum_balance != 0 and sum_balance < max_balance:
                 yield user
+
+
+

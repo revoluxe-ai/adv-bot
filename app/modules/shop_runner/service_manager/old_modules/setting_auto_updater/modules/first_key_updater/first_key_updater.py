@@ -1,12 +1,19 @@
 from collections.abc import Awaitable
+import typing
+
+
 
 from sqlalchemy import update
 
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
+
+if typing.TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+
 
 from .exc import FirstKeyUpdaterError
 
@@ -17,7 +24,7 @@ class FirstKeyUpdater:
 
     async def top_key_auto_update(
         self,
-        complex_adv: ComplexAdv,
+        complex_adv: "ComplexAdv",
     ) -> None:
         keywords = await complex_adv.get_keywords()
 

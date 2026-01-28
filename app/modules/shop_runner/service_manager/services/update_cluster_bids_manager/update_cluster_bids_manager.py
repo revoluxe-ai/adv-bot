@@ -1,6 +1,9 @@
 import logging
 from collections.abc import Awaitable, Callable, Iterator
+from typing import Any, cast
+
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
+from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
@@ -8,6 +11,9 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_manager import (
     RedisClusterBidsManager,
     ClusterBidKey,
+)
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
+    RedisClusterBidsTimestampManager,
 )
 from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
@@ -17,8 +23,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     new_bids_calculator.update_bids_command import UpdateBidsCommand, NewBid
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
-from typing import Any
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import RedisClusterBidsTimestampManager
+
 from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
 
 # TODO: Внедрить в ректрай WB Api декораторы всплески
@@ -59,7 +64,9 @@ class UpdateClusterBidsManager:
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
         self._redis_cluster_bids_manager = redis_cluster_bids_manager
-        self._redis_cluster_bids_timestamp_manager = redis_cluster_bids_timestamp_manager
+        self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
+            redis_cluster_bids_timestamp_manager
+        )
 
 
     async def _get_local_data(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
@@ -93,17 +100,29 @@ class UpdateClusterBidsManager:
         advs: list[ComplexAdv],
         map_datas: set[AdvIdItemCalculateData],
     ) -> BidderUpdateData:
+        async def _get_cluster_bids() -> list[NormqueryBidDTO]:
+            return await self._get_cluster_bids_for_maps(map_datas, advs)
+
+        async def _get_min_bids() -> AdvMinNmidsBids:
+            return await self._wb_manager.get_min_bids(advs, cache_possible=True)
+
+        async def _get_fact_data() -> dict[int, FactData]:
+            return await self._get_fact_datas(advs)
+
         handlers: list[Callable[[], Awaitable[Any]]] = [
-            lambda: self._get_cluster_bids_for_maps(map_datas, advs),
-            lambda: self._wb_manager.get_min_bids(advs),
-            lambda: self._get_fact_datas(advs),
+            _get_cluster_bids,
+            _get_min_bids,
+            _get_fact_data,
         ]
 
-        current_bids, min_bids, fact_data = await run_tasks(
+        results = await run_tasks(
             handlers,
             max_workers=3,
             return_exceptions=False,
         )
+        current_bids = cast(list[NormqueryBidDTO], results[0])
+        min_bids = cast(AdvMinNmidsBids, results[1])
+        fact_data = cast(dict[int, FactData], results[2])
         plan_data = self._get_plan_data(advs)
 
         return BidderUpdateData(
@@ -332,8 +351,4 @@ class UpdateClusterBidsManager:
                 plan_datas_map[adv.adv_id] = plan
 
         return plan_datas_map
-
-
-
-
 

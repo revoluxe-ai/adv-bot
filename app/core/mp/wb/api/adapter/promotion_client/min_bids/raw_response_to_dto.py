@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
-    PostAdvV0BidsMinResponse200,
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    PostApiAdvertV1BidsMinResponse200,
 )
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
@@ -9,7 +9,7 @@ from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from .dto import MinBidForNmid
 
 
-def convert(response: PostAdvV0BidsMinResponse200) -> list[MinBidForNmid]:
+def convert(response: PostApiAdvertV1BidsMinResponse200) -> list[MinBidForNmid]:
     min_bids: list[MinBidForNmid] = []
     for bid_item in response.bids:
         for placement_bid in bid_item.bids:

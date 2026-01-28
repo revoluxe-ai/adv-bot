@@ -219,6 +219,9 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
     ), patch(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        new=AsyncMock(return_value=0.0),
     ):
         await service.ensure_campaigns_active([overspend_adv])
 
@@ -287,7 +290,7 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 @pytest.mark.asyncio
 async def test_auto_adv_avg_cost_starts_when_below_target():
     adv = _FakeComplexAdv(
-        auto_limit=0,
+        auto_limit=100,
         auto_status="pause",
         search_limit=0,
         search_status="pause",

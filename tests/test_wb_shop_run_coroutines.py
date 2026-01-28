@@ -25,6 +25,10 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     redis_manager_mock.DEFAULT_TTL = 60
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_data_manager = MagicMock()
+    wb_manager_hub.wb_manager = MagicMock()
+
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     wb_shop = WBShop(
@@ -33,55 +37,19 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
         plan_fact_reader=PlanFactReader(),
+        wb_manager_hub=wb_manager_hub,
     )
 
-    # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cpm_bid = AsyncMock()
-    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
-    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
-    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
-    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
-    coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
-    coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
-    coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
-    coroutines_manager_mock.update_cluster_bids = AsyncMock()
-    coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
-    coroutines_manager_mock.auto_budget_watchdog = AsyncMock()
+    coroutines_manager_mock.update_common_bid_in_search_adv = AsyncMock()
 
-    # Подменяем создание CoroutinesManager
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
     ):
-        # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
-        async def mock_gather(*args: Any, **kwargs: Any) -> list[Any]:
-            # Создаем задачи для каждой корутины, но не запускаем их
-            return [arg for arg in args]
+        await wb_shop.run()
 
-        # Применяем наш мок-метод
-        with patch("asyncio.gather", side_effect=mock_gather):
-            # Вызываем тестируемый метод
-            await wb_shop.run()
-
-            # Проверяем, что все ожидаемые корутины были вызваны
-            coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cpm_bid.assert_called_once()
-            coroutines_manager_mock.update_common_sale_stat.assert_called_once()
-            coroutines_manager_mock.update_full_adv_stat.assert_called_once()
-            coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
-            coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
-            coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
-            coroutines_manager_mock.auto_budget_watchdog.assert_called_once()
-            coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
-            coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
-            coroutines_manager_mock.update_cluster_bids.assert_called_once()
-            coroutines_manager_mock.update_plan_fact_stats.assert_called_once()
+    coroutines_manager_mock.update_common_bid_in_search_adv.assert_awaited_once()
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> None:
@@ -98,67 +66,52 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
 
     # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_data_manager = MagicMock()
+    wb_manager_hub.wb_manager = MagicMock()
+
     wb_shop = WBShop(
         wb_api_mock,
         redis_manager_mock,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
         plan_fact_reader=PlanFactReader(),
+        wb_manager_hub=wb_manager_hub,
     )
 
-    # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cpm_bid = AsyncMock()
-    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
-    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
-    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
-    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-    coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
-    coroutines_manager_mock.update_minus_phrases_in_advs = AsyncMock()
-    coroutines_manager_mock.update_clusters_adv_stats_today = AsyncMock()
-    coroutines_manager_mock.update_clusters_adv_stats_history = AsyncMock()
-    coroutines_manager_mock.update_cluster_bids = AsyncMock()
-    coroutines_manager_mock.update_plan_fact_stats = AsyncMock()
-    coroutines_manager_mock.auto_budget_watchdog = AsyncMock()
+    coroutines_manager_mock.update_common_bid_in_search_adv = AsyncMock()
 
-    # Подменяем создание CoroutinesManager
+    original_task_group = asyncio.TaskGroup
+    recorded_groups: list["RecordingTaskGroup"] = []
+
+    class RecordingTaskGroup:
+        def __init__(self):
+            self.created: list[object] = []
+            self._inner = original_task_group()
+
+        async def __aenter__(self):
+            await self._inner.__aenter__()
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return await self._inner.__aexit__(exc_type, exc, tb)
+
+        def create_task(self, coro):
+            self.created.append(coro)
+            return self._inner.create_task(coro)
+
+    def recording_task_group_factory(*args, **kwargs):
+        group = RecordingTaskGroup()
+        recorded_groups.append(group)
+        return group
+
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
-    ):
-        # Мокируем asyncio.gather для проверки количества аргументов
-        with patch("asyncio.gather") as mock_gather:
-            # Настраиваем mock_gather, чтобы он возвращал корутину
-            mock_gather.return_value = asyncio.create_task(asyncio.sleep(0))
+    ), patch("asyncio.TaskGroup", new=recording_task_group_factory):
+        await wb_shop.run()
 
-            # Вызываем тестируемый метод
-            await wb_shop.run()
-
-            # Проверяем, что gather был вызван ровно один раз
-            mock_gather.assert_called_once()
-
-            # Получаем все аргументы, с которыми был вызван gather
-            call_args = mock_gather.call_args[0]
-
-            # 15 корутин: 1 (_alive_worker_run) + 14 из CoroutinesManager
-            assert (
-                len(call_args) == 15
-            ), f"asyncio.gather должен быть вызван с 15 аргументами, получено {len(call_args)}"
-
-            # Проверяем, что все методы были вызваны по одному разу
-            coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cpm_bid.assert_called_once()
-            coroutines_manager_mock.update_common_sale_stat.assert_called_once()
-            coroutines_manager_mock.update_full_adv_stat.assert_called_once()
-            coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
-            coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-            coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
-            coroutines_manager_mock.update_minus_phrases_in_advs.assert_called_once()
-            coroutines_manager_mock.auto_budget_watchdog.assert_called_once()
-            coroutines_manager_mock.update_clusters_adv_stats_today.assert_called_once()
-            coroutines_manager_mock.update_clusters_adv_stats_history.assert_called_once()
-            coroutines_manager_mock.update_cluster_bids.assert_called_once()
-            coroutines_manager_mock.update_plan_fact_stats.assert_called_once()
+    assert recorded_groups, "TaskGroup was not created"
+    assert len(recorded_groups[0].created) == 1
+    coroutines_manager_mock.update_common_bid_in_search_adv.assert_awaited_once()

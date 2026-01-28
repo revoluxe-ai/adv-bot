@@ -6,7 +6,7 @@ from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import Promo
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
     dto_to_command,
 )
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     V0GetNormQueryStatsItem,
     V0GetNormQueryStatsItemStat,
 )

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, cast
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
-from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import \
     convertor
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
@@ -8,6 +8,7 @@ from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keywor
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import \
         UpdateBidsCommand
+    from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager.redis_command import RedisCommand
 
 
@@ -48,7 +49,7 @@ class RedisKeywordBidderStatusManager(BaseRedisManager):
 
 
     async def get_statuses(self,
-                           adv: ComplexAdv,
+                           adv: "ComplexAdv",
                            texts: list[str]) -> dict[str, BidderKeywordStatus]:
         normalized_texts =  texts
         redis_commands: list[RedisCommand] = convertor.dto_to_redis_commands(adv, normalized_texts)

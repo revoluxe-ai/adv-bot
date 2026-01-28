@@ -279,6 +279,13 @@ class ChangeAuctionBidderActiveStatus(
     new_status: bool
 
 
+class ChangeCommonBidInSearchAdvStatus(
+    CallbackData, prefix="change_common_bid_in_search_adv_status"
+):
+    adv_id: int
+    new_status: bool
+
+
 class ApplyCampaignDefaults(CallbackData, prefix="apply_adv_defaults"):
     adv_setting_original_id: int
 

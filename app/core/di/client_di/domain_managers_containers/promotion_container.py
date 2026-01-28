@@ -2,12 +2,14 @@ from dependency_injector import containers, providers
 
 from app.core.mp.wb.api.adapter.promotion_client import (
     CampaignsManagementAdapter,
+    CampaignsInfoV2Adapter,
     MinusPhrasesAdapter,
     NormqueryStatsAdapter,
     NormqueryBidsAdapter,
     MinBidsAdapter,
     PromotionClient,
     FinanceAdapter,
+    CommonBidsAdapter,
 )
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 from app.core.mp.wb.api.domain_managers import PromotionManager
@@ -61,6 +63,20 @@ class PromotionContainer(containers.DeclarativeContainer):
         request_limit_manager=_request_limit_manager,
     )
 
+    _campaigns_info_v2_adapter = providers.Singleton(
+        CampaignsInfoV2Adapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
+    _common_bids_adapter = providers.Singleton(
+        CommonBidsAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
     _promotion_client = providers.Singleton(
         PromotionClient,
         minus_phrases_adapter=_minus_phrases_adapter,
@@ -69,6 +85,8 @@ class PromotionContainer(containers.DeclarativeContainer):
         min_bids_adapter=_min_bids_adapter,
         finance_adapter=_finance_adapter,
         campaigns_management_adapter=_campaigns_management_adapter,
+        campaigns_info_v2_adapter=_campaigns_info_v2_adapter,
+        common_bids_adapter=_common_bids_adapter,
     )
 
     promotion_domain_manager = providers.Singleton(

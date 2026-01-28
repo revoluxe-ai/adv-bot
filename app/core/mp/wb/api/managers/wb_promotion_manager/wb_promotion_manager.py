@@ -11,6 +11,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.shared.domains.wb.enums import AdvType
+from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
+    SetCommonBidsCommand,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,7 @@ if typing.TYPE_CHECKING:
         CampaignBudgetInfo,
         BudgetTopUpResult,
     )
-    from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+    from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
         GetAdvV1BalanceResponse200,
     )
     from app.core.mp.wb.api.domain_managers.promotion import PromotionManager
@@ -83,7 +86,7 @@ class WBModifier:
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
         """Понижает CPM автоматической кампании до предельных значений."""
-        from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
+        from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
             PatchAdvV0BidsBody,
             V0AdvertMultibid,
             V0AdvertMultiBidItem,
@@ -175,3 +178,8 @@ class WBModifier:
     ) -> None:
         adv_id = complex_adv.get_adv_id_by_type(adv_type)
         await action(adv_id)
+
+    async def update_search_adv_common_cpm(
+        self, command: SetCommonBidsCommand
+    ) -> None:
+        await self._promotion_manager.set_common_bids(command)

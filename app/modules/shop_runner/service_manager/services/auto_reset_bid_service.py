@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class AutoResetBidService:
     def __init__(self, wb_manager_hub: WBManagerHub, tasks_manager: TasksManager) -> None:
-        self._wb_data_manager = wb_manager_hub.wb_data_manager
+        self._wb_manager = wb_manager_hub.wb_manager
         self._wb_modifier = wb_manager_hub.wb_modifier
         self._tasks_manager = tasks_manager
 
@@ -25,7 +25,7 @@ class AutoResetBidService:
                       ]
 
         try:
-            min_bids = await self._wb_data_manager.get_min_bids(candidates)
+            min_bids = await self._wb_manager.get_min_bids(candidates, cache_possible=True)
         except Exception as error:  # noqa: BLE001
             logger.error(
                 "Не удалось получить минимальные ставки для сброса CPM: %s", error, exc_info=True

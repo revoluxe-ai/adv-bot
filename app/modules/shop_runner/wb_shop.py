@@ -2,10 +2,12 @@ import asyncio
 import logging
 from typing import TypeVar
 
+from app.core.di.wb_manager_hub import WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
 from .modules.wb_api import WBApi
 
 import typing
+
 
 if typing.TYPE_CHECKING:
     from .service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
@@ -26,12 +28,14 @@ class WBShop:
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
         plan_fact_reader: "PlanFactReader",
+        wb_manager_hub: "WBManagerHub"
     ):
         self._wb_api = wb_api
         self._redis_manager = redis_manager
         self._redis_client_wrapper = redis_client_wrapper
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader
+        self._wb_manager_hub = wb_manager_hub
 
     async def run(self) -> None:
         from .service_manager.exc import StopShopUpdateException
@@ -41,6 +45,7 @@ class WBShop:
             self._redis_client_wrapper,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            wb_manager_hub=self._wb_manager_hub
         )
         # TODO: Записи статистики идут в базу не одним батчем, это про общую или рекламную, исправить
         # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
@@ -66,7 +71,7 @@ class WBShop:
                 tg.create_task(coroutines_manager.auto_budget_watchdog())
                 tg.create_task(coroutines_manager.auto_adv_active_control())
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
-                tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
+                tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
             # (все StopShopUpdateException из группы соберутся сюда)

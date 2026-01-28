@@ -17,6 +17,27 @@ logger = logging.getLogger(__name__)
 class PlanFactController:
     """Контроллер для обработки план-факта данных одной кампании"""
 
+
+    @staticmethod
+    async def get_plan_fact_dto(adv: ComplexAdv) -> PlanFactStatDTO:
+        # Получаем план данные (синхронно)
+        plan: Optional[PlanData] = PlanFactProvider.get_plan_data(
+            adv.adv_setting
+        )
+        keywords = await adv.get_keywords()
+        provider = PlanFactProvider(adv.adv_setting)
+        fact = await provider.get_fact_data(keywords)
+
+        # Создаем DTO
+        dto = PlanFactStatDTO.create(
+            adv_id=adv.adv_id,
+            shop_id=adv.shop_id,
+            plan=plan,
+            fact=fact,
+        )
+        return dto
+
+
     @staticmethod
     async def process_adv(
         adv: ComplexAdv, version: float
@@ -49,7 +70,7 @@ class PlanFactController:
         )
         return dto
 
-    
+
 
 
 

@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 
@@ -24,11 +24,12 @@ F_Spec = ParamSpec("F_Spec")
 def while_coroutine_decorator(
     pause_on_success: int, pause_on_error: int = 5
 ) -> Callable[
-    [Callable[F_Spec, Awaitable[T_Result]]], Callable[F_Spec, Awaitable[T_Result]]
+    [Callable[F_Spec, Awaitable[T_Result]]],
+    Callable[F_Spec, Coroutine[Any, Any, T_Result]],
 ]:
     def decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
-    ) -> Callable[F_Spec, Awaitable[T_Result]]:
+    ) -> Callable[F_Spec, Coroutine[Any, Any, T_Result]]:
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
             while True:

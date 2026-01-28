@@ -1,9 +1,12 @@
-from typing import cast
+from typing import Protocol, cast
 
 from dependency_injector import containers, providers
 from dependency_injector.providers import Provider
 
 from app.core.di.client_di.wb_data_container import WBDataContainer
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
+    WBManager,
+)
 from ..wb_manager_hub.wb_manager_hub import WBManagerHub
 from ...mp.wb.api.auth_client_handler import AuthClientHandler
 from ...mp.wb.api.httpx_client_handler import HttpxClientHandler
@@ -16,6 +19,12 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     RedisKeywordBidderStatusManager,
 )
 from ...redis_manager_v2.redis_client import RedisClient
+
+
+class _ClusterBidsManagerContainerProviders(Protocol):
+    update_cluster_bids_manager: Provider[UpdateClusterBidsManager]
+    wb_manager: Provider[WBManager]
+    redis_keyword_bidder_status_manager: Provider[RedisKeywordBidderStatusManager]
 
 
 class WBManagerHubContainer(containers.DeclarativeContainer):
@@ -49,19 +58,23 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
             ClusterBidsManagerContainer, shop_id=_shop_id, redis_client=_redis_wrapper
         )
     )
-    _update_cluster_bids_manager: Provider[UpdateClusterBidsManager] = cast(
-        Provider[UpdateClusterBidsManager],
-        _cluster_bids_updater_container.provided.update_cluster_bids_manager,
+    _cluster_bids_updater_provided = cast(
+        _ClusterBidsManagerContainerProviders,
+        _cluster_bids_updater_container.provided,
     )
-    _redis_keyword_bidder_status_manager: Provider[RedisKeywordBidderStatusManager] = cast(
-        Provider[RedisKeywordBidderStatusManager],
-        _cluster_bids_updater_container.provided.redis_keyword_bidder_status_manager,
+    _update_cluster_bids_manager: Provider[UpdateClusterBidsManager] = (
+        _cluster_bids_updater_provided.update_cluster_bids_manager
+    )
+    _wb_manager: Provider[WBManager] = _cluster_bids_updater_provided.wb_manager
+    _redis_keyword_bidder_status_manager: Provider[RedisKeywordBidderStatusManager] = (
+        _cluster_bids_updater_provided.redis_keyword_bidder_status_manager
     )
 
     wb_manager_hub = providers.Singleton(
         WBManagerHub,
         wb_data_manager=_wb_data_manager,
         wb_promotion_manager=_wb_promotion_manager,
+        wb_manager=_wb_manager,
         cluster_bids_update_manager=_update_cluster_bids_manager,
         redis_client_wrapper=_redis_wrapper,
         redis_keyword_bidder_status_manager=_redis_keyword_bidder_status_manager

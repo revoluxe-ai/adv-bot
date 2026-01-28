@@ -2,6 +2,9 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.modules.shop_runner.service_manager.manager import CoroutinesManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 
 
@@ -63,10 +66,19 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
         "app.modules.shop_runner.service_manager.manager.run_tasks",
         new=mock_run_tasks,
     ):
+        plan_fact_reader = MagicMock(spec=PlanFactReader)
+        plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+        fake_wb_manager_hub = MagicMock()
+        fake_wb_manager_hub.wb_data_manager = MagicMock()
+        fake_wb_manager_hub.wb_manager = MagicMock()
+
         coroutines_manager = CoroutinesManager(
             wb_api,
             MagicMock(),
             tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=plan_fact_reader,
+            wb_manager_hub=fake_wb_manager_hub,
         )
         await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
 

@@ -7,22 +7,37 @@ import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
-from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
-from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
+)
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
 
 def _create_manager(wb_api, redis_client_wrapper):
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+    wb_manager_hub = MagicMock()
+    wb_manager_hub.wb_data_manager = MagicMock()
+    wb_manager_hub.wb_manager = MagicMock()
+
     return CoroutinesManager(
         wb_api,
         redis_client_wrapper,
         tasks_manager=TasksManager(max_workers=1),
+        plan_fact_reader=plan_fact_reader,
+        wb_manager_hub=wb_manager_hub,
     )
 
 

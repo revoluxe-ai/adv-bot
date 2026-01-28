@@ -1,6 +1,6 @@
 import logging
 
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.api.campaign_parameters \
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.campaign_parameters \
     import post_adv_v0_normquery_set_minus
 from ..base_section_adapter import BaseSectionAdapter
 from app.core.mp.wb.api.retry_decorator import retry_decorator
