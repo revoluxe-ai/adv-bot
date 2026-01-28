@@ -29,6 +29,12 @@ from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpd
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
+    RedisCommonBidTimestampManager,
+)
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
+    RedisCommonBidValueManager,
+)
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
@@ -87,6 +93,12 @@ class CoroutinesManager:
         self._session = wb_api.session
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client=redis_client_wrapper
+        )
+        self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
+            redis_client_wrapper
+        )
+        self._redis_common_bid_value_manager = RedisCommonBidValueManager(
+            redis_client_wrapper
         )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
@@ -655,6 +667,7 @@ class CoroutinesManager:
         manager = UpdateCommotBidInSearchAdvsManager(
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
+            redis_common_bid_value_manager=self._redis_common_bid_value_manager,
         )
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active and
@@ -677,11 +690,15 @@ class CoroutinesManager:
             tasks_manager=self._tasks_manager,
         )
 
-        for result in results:
+        for result, adv in zip(results, advs):
             if isinstance(result, Exception):
                 logger.error(
                     "Auto adv active control handler failed: %s", result
                 )
+            else:
+                await self._redis_common_bid_timestamp_manager.set(adv.adv_id)
+
+
         return None
 
 

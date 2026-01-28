@@ -152,7 +152,7 @@ class Pricer:
 
         Правило на текущий момент:
         - AdvSetting.bot_active == True
-        - search-кампания (search_adv_id) имеет active_status == 'started'
+        - Имеет search_adv_id (связь с поисковой кампанией)
         """
         if auto_advs is None:
             auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
