@@ -62,8 +62,8 @@ class CoroutinesManager:
         wb_api: WBApi,
         redis_client_wrapper: RedisClient,
         tasks_manager: TasksManager,
-        plan_fact_reader: PlanFactReader,
-        wb_manager_hub: WBManagerHub,
+        plan_fact_reader: PlanFactReader | None = None,
+        wb_manager_hub: WBManagerHub | None = None,
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -88,7 +88,7 @@ class CoroutinesManager:
         )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
-        self._plan_fact_reader = plan_fact_reader
+        self._plan_fact_reader = plan_fact_reader or PlanFactReader()
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:

@@ -142,13 +142,6 @@ class Pricer:
         return set(result.scalars().all())
 
     @staticmethod
-    async def _fetch_active_search_adv_ids(
-        session: AsyncSession, search_adv_ids: Sequence[int]
-    ) -> set[int]:
-        """Backwards-compatible alias (старое имя метода)."""
-        return await Pricer.fetch_active_search_adv_ids(session, search_adv_ids)
-
-    @staticmethod
     async def fetch_tariff_auto_advs(
         session: AsyncSession,
         shop_id: str,
@@ -169,14 +162,7 @@ class Pricer:
         search_adv_ids = [adv.search_adv_id for adv in auto_advs if adv.search_adv_id]
         if not search_adv_ids:
             return []
-
-        active_search_adv_ids = await Pricer.fetch_active_search_adv_ids(
-            session, search_adv_ids
-        )
-        if not active_search_adv_ids:
-            return []
-
-        return [adv for adv in auto_advs if adv.search_adv_id in active_search_adv_ids]
+        return auto_advs
 
     @staticmethod
     def is_part_auto_setting_active(adv: AdvSetting) -> bool:
