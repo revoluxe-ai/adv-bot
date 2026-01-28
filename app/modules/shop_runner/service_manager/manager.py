@@ -67,6 +67,8 @@ class CoroutinesManager:
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
+        if wb_manager_hub is None:
+            wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         self._wb_shop_data_manager = WBShopDataManager(
             wb_cabinet,
             tasks_manager=tasks_manager,
@@ -669,11 +671,17 @@ class CoroutinesManager:
             handler = lambda adv_=adv: manager.update_common_bid_in_search_adv(adv_)
             handlers.append(handler)
 
-        await run_tasks(
+        results = await run_tasks(
             handlers=handlers,
             max_workers=16,
             tasks_manager=self._tasks_manager,
         )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "Auto adv active control handler failed: %s", result
+                )
         return None
 
 

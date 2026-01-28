@@ -7,6 +7,7 @@ from typing_extensions import ParamSpec
 from sqlalchemy import select
 
 
+from dependency_injector import providers
 from app.settings import settings
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
@@ -15,6 +16,9 @@ from .dto.states import KeywordStatus, KeywordStatusReason
 from .keyword_stat import KeywordStat
 from app.core.clickhouse_manager import BaseClickHouseManager
 from app.core.clikhouse_client_manager import  get_clickhouse_client
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
+    RedisKeywordBidderStatusManager,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from ...calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
 from ...common_slaves.wildberries.models import KeywordSetting
@@ -305,8 +309,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
 
     @staticmethod
-    async def _get_bidder_keyword_statuses(complex_adv: 'ComplexAdv',
-                                           texts: list[str]) -> dict[str, BidderKeywordStatus]:
+    async def _get_bidder_keyword_statuses(
+        complex_adv: 'ComplexAdv',
+        texts: list[str],
+    ) -> dict[str, BidderKeywordStatus]:
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 
         # КОСТЫЛЬ: Пробуем получить из контекста, если не получается - создаем на лету
@@ -341,9 +347,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             wb_manager_hub = wb_manager_hub_container.wb_manager_hub()
 
-        redis_manager_instance = wb_manager_hub.redis_keyword_bidder_status_manager
+        redis_manager_instance: RedisKeywordBidderStatusManager = (
+            wb_manager_hub.redis_keyword_bidder_status_manager
+        )
+        if isinstance(redis_manager_instance, providers.Provider):
+            redis_manager_instance = cast(
+                RedisKeywordBidderStatusManager, redis_manager_instance() # noqa
+            )
 
-        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance.get_statuses(  # pyright: ignore
+        statuses_map: dict[str, BidderKeywordStatus] = await redis_manager_instance.get_statuses(
             complex_adv, texts
         )
         return statuses_map
