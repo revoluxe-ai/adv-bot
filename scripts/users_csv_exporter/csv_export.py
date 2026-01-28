@@ -8,7 +8,7 @@ from scripts.get_users.filters.get_non_zero_users import get_non_zero_users
 
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 
-DEFAULT_EXPORT_PATH = Path("scripts/users_csv_exporter/users.csv")
+DEFAULT_EXPORT_PATH = Path("scripts/users_csv_exporter/non-zero-users.csv")
 
 
 BATCH_SIZE = 30
