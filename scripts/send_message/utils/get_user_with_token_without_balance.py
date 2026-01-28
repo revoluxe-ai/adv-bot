@@ -32,8 +32,7 @@ async def iter_users_with_zero_or_negative_balance_without_active_advs(
             if active_adv_exists:
                 continue
 
-            balance, bonus = await get_cabinet_balance(cabinet.id,
-                                                       load_payments=False)
+            balance, bonus = await get_cabinet_balance(cabinet.id)
             total = balance + bonus
             if total <= 0:
                 yield user

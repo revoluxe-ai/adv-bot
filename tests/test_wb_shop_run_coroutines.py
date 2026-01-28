@@ -13,12 +13,57 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 from app.modules.shop_runner.wb_shop import WBShop
 
 
+async def _completed_coro() -> None:
+    return None
+
+
+def _build_coroutines_manager_mock() -> MagicMock:
+    methods = [
+        "update_advs_data_from_wb_to_pg",
+        "update_cards_data_from_wb_to_pg",
+        "update_common_sale_stat",
+        "update_full_adv_stat",
+        "adv_settings_auto_update",
+        "delete_keywords_from_wl_by_mean_auto_ctr",
+        "update_minus_phrases_in_advs",
+        "update_clusters_adv_stats_today",
+        "update_clusters_adv_stats_history",
+        "update_cluster_bids",
+        "update_plan_fact_stats",
+        "auto_budget_watchdog",
+        "auto_adv_active_control",
+        "update_top_key_in_advs",
+        "update_common_bid_in_search_adv",
+    ]
+
+    manager = MagicMock()
+    for method in methods:
+        setattr(manager, method, AsyncMock(side_effect=_completed_coro))
+    return manager
+
+
+class RecordingTaskGroup:
+    def __init__(self):
+        self.created: list[object] = []
+        self._tasks: list[asyncio.Task[Any]] = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self._tasks:
+            await asyncio.gather(*self._tasks)
+        return False
+
+    def create_task(self, coro):
+        self.created.append(coro)
+        task = asyncio.create_task(coro)
+        self._tasks.append(task)
+        return task
+
+
 @pytest.mark.asyncio
 async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
-    """
-    Тест проверяет, что метод run класса WBShop запускает необходимые корутины
-    """
-    # Создаем моки
     wb_api_mock = MagicMock()
     wb_api_mock.shop_id = "test_shop_id"
     redis_manager_mock = MagicMock(spec=RedisShopManager)
@@ -29,7 +74,6 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     wb_manager_hub.wb_data_manager = MagicMock()
     wb_manager_hub.wb_manager = MagicMock()
 
-    # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     wb_shop = WBShop(
         wb_api_mock,
@@ -40,31 +84,42 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         wb_manager_hub=wb_manager_hub,
     )
 
-    coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.update_common_bid_in_search_adv = AsyncMock()
+    coroutines_manager_mock = _build_coroutines_manager_mock()
 
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
-    ):
+    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=RecordingTaskGroup):
         await wb_shop.run()
 
-    coroutines_manager_mock.update_common_bid_in_search_adv.assert_awaited_once()
+    for method in (
+        "update_advs_data_from_wb_to_pg",
+        "update_cards_data_from_wb_to_pg",
+        "update_common_sale_stat",
+        "update_full_adv_stat",
+        "adv_settings_auto_update",
+        "delete_keywords_from_wl_by_mean_auto_ctr",
+        "update_minus_phrases_in_advs",
+        "update_clusters_adv_stats_today",
+        "update_clusters_adv_stats_history",
+        "update_cluster_bids",
+        "update_plan_fact_stats",
+        "auto_budget_watchdog",
+        "auto_adv_active_control",
+        "update_top_key_in_advs",
+        "update_common_bid_in_search_adv",
+    ):
+        getattr(coroutines_manager_mock, method).assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> None:
-    """
-    Тест проверяет, что метод run класса WBShop передает правильное количество
-    корутин в asyncio.gather
-    """
-    # Создаем моки
     wb_api_mock = MagicMock()
     wb_api_mock.shop_id = "test_shop_id"
     redis_manager_mock = MagicMock(spec=RedisShopManager)
     redis_manager_mock.DEFAULT_TTL = 60
     redis_manager_mock.renew_shop_ttl = AsyncMock()
 
-    # Создаем экземпляр WBShop
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     wb_manager_hub = MagicMock()
     wb_manager_hub.wb_data_manager = MagicMock()
@@ -79,39 +134,32 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         wb_manager_hub=wb_manager_hub,
     )
 
-    coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.update_common_bid_in_search_adv = AsyncMock()
+    coroutines_manager_mock = _build_coroutines_manager_mock()
 
-    original_task_group = asyncio.TaskGroup
-    recorded_groups: list["RecordingTaskGroup"] = []
-
-    class RecordingTaskGroup:
-        def __init__(self):
-            self.created: list[object] = []
-            self._inner = original_task_group()
-
-        async def __aenter__(self):
-            await self._inner.__aenter__()
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return await self._inner.__aexit__(exc_type, exc, tb)
-
-        def create_task(self, coro):
-            self.created.append(coro)
-            return self._inner.create_task(coro)
-
-    def recording_task_group_factory(*args, **kwargs):
-        group = RecordingTaskGroup()
-        recorded_groups.append(group)
-        return group
+    recorded_group = RecordingTaskGroup()
 
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
-    ), patch("asyncio.TaskGroup", new=recording_task_group_factory):
+    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    assert recorded_groups, "TaskGroup was not created"
-    assert len(recorded_groups[0].created) == 1
-    coroutines_manager_mock.update_common_bid_in_search_adv.assert_awaited_once()
+    assert len(recorded_group.created) == 16
+    for method in (
+        "update_advs_data_from_wb_to_pg",
+        "update_cards_data_from_wb_to_pg",
+        "update_common_sale_stat",
+        "update_full_adv_stat",
+        "adv_settings_auto_update",
+        "delete_keywords_from_wl_by_mean_auto_ctr",
+        "update_minus_phrases_in_advs",
+        "update_clusters_adv_stats_today",
+        "update_clusters_adv_stats_history",
+        "update_cluster_bids",
+        "update_plan_fact_stats",
+        "auto_budget_watchdog",
+        "auto_adv_active_control",
+        "update_top_key_in_advs",
+        "update_common_bid_in_search_adv",
+    ):
+        getattr(coroutines_manager_mock, method).assert_awaited_once()

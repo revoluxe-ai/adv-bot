@@ -3,22 +3,13 @@ import typing
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
-
+from app.utils.db.session_maker import get_async_session_maker as sm
 from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
-from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-
-if typing.TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-        FactData,
-    )
-
-from app.utils.db.session_maker import get_async_session_maker as sm
-
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -26,12 +17,21 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
+    RedisCommonBidValueManager,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
-from dependency_injector.wiring import inject
+
+if typing.TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+        FactData,
+    )
 
 
 
@@ -66,12 +66,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._filter: bool = False
         self._on_page = 24
         self.image_mode = image_mode
+        self._last_saved_bids: dict[int, int] = {}
 
     @inject
     async def __call__(
         self,
         state: FSMContext,
         sort_mode: str = "by_adv",
+        redis_client: RedisClient = Provide["redis_client_wrapper"],
     ) -> tuple[LastMessage, str]:
         self.sort_mode = sort_mode
         self._state = state
@@ -79,6 +81,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._status_auction = await self._get_status_auction(
             self._adv_setting.search_adv_id
         )
+        redis_manager = RedisCommonBidValueManager(redis_client)
+        adv_id = self._adv_setting.adv_id
+        nmids = self._adv_setting.nmids or []
+        self._last_saved_bids = {}
+        if adv_id is not None and nmids:
+            self._last_saved_bids = await redis_manager.get_bids(adv_id, nmids)
 
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
@@ -279,6 +287,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             else "Не задана"
         )
         text += f"Максимальная ставка: {max_cpm_str}\n"
+        text += self._format_last_saved_bids()
         return text
 
     @property
@@ -319,6 +328,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,
         )
+
+    def _format_last_saved_bids(self) -> str:
+        header = "Последняя ставка (по артикулам):"
+        if not self._last_saved_bids:
+            return f"{header} Нет данных\n"
+        lines = [header]
+        for nmid in sorted(self._last_saved_bids):
+            lines.append(f"{nmid}: {self._last_saved_bids[nmid]}")
+        return "\n".join(lines) + "\n"
 
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:

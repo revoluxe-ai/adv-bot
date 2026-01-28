@@ -20,7 +20,8 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from scripts.send_message.utils.get_users_with_low_balance_and_near_last_payment import \
     get_users_with_low_balance_and_near_last_payment
-from scripts.send_message.utils.messages import message_2
+from scripts.send_message.utils.messages import message_3
+from scripts.users_communicate_module.main_user_generator import get_users_iterator
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ redis_semaphore = asyncio.Semaphore(1)
 
 async def send_message(user: User, bot: Bot) -> bool:
     user_id = user.user_telegram_id
-    message = message_2.Message
+    message = message_3.Message
     hash_ = sha256(str(message).encode()).hexdigest()
 
     # фильтр Влада
@@ -93,17 +94,13 @@ async def send_message(user: User, bot: Bot) -> bool:
         return True
     except Exception as e:
         logger.error(e)
-        return False
+        raise e
 
 async def send_message_to_users():
     send_count = 0
     not_send_count = 0
 
-    users = get_users_with_low_balance_and_near_last_payment(
-        max_balance=200,
-        max_days_since_last_payment=120,
-        min_days_since_last_payment=5,
-    )
+    users = await get_users_iterator(batch_size=20)
     bots = get_bots()
 
     # users = get_test_user()
@@ -112,15 +109,23 @@ async def send_message_to_users():
 
     try:
         async for user in users:
+            send_flag = False
             for bot in bots:
-                ok = await send_message(user, bot)
-                if ok:
-                    send_count += 1
-                else:
-                    not_send_count += 1
+                try:
+                    await send_message(user, bot)
+                    send_flag = True
+                except Exception as e:
+                    logger.error(e)
+
+            if send_flag:
+                send_count += 1
+            else:
+                not_send_count += 1
 
                 print("Отправлено сообщений:", send_count)
                 print("Не отправлено сообщений:", not_send_count)
+        print(f'Всего отправлено: {send_count}')
+        print(f'Общая база рассылки: {not_send_count + send_count}')
     finally:
         # закрываем ботов
         for bot in bots:

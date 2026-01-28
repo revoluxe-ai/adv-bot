@@ -4,6 +4,9 @@ from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
 )
 from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager import WBModifier
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
+    RedisCommonBidValueManager,
+)
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.shared.domains.wb.enums import AdvType
 
@@ -13,10 +16,12 @@ class UpdateCommotBidInSearchAdvsManager:
         self,
         wb_modifier: WBModifier,
         tasks_manager: TasksManager,
+        redis_common_bid_value_manager: RedisCommonBidValueManager,
     ) -> None:
         # keep modifier/data manager handles for bid updates, and task runner for future steps
         self._wb_modifier: WBModifier = wb_modifier
         self._tasks_manager = tasks_manager
+        self._redis_common_bid_value_manager = redis_common_bid_value_manager
 
     async def update_common_bid_in_search_adv(self, adv: WBAdvDTO) -> None:
         nmids: list[int] = adv.nmids
@@ -32,6 +37,13 @@ class UpdateCommotBidInSearchAdvsManager:
 
         command = SetCommonBidsCommand(items=command_items)
         await self._wb_modifier.update_search_adv_common_cpm(command)
+        bid_values: dict[int, int] = {
+            item.target_nmid: int(item.new_bid)
+            for item in command_items
+            if item.new_bid is not None
+        }
+        if adv.adv_id and bid_values:
+            await self._redis_common_bid_value_manager.set_bids(adv.adv_id, bid_values)
         return None
 
 

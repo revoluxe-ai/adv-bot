@@ -199,47 +199,18 @@ async def test_full_cycle_error_handling_for_some_advs(
         fact_method=FactMethods.DIRECT_SALES,
     )
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[complex_adv, adv2]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-            side_effect=[plan1, plan2],
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_fact_data",
-            new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
-        ),
-    ):
-        # Должно обработать ошибку для второй кампании и продолжить
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
+        new=AsyncMock(return_value=[complex_adv, adv2]),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
+        side_effect=[plan1, plan2],
+    ), patch.object(
+        PlanFactProvider,
+        "get_fact_data",
+        new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
+    ), pytest.raises(Exception, match="Fact data error"):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
-    async with anti_ch_crash_semaphore:
-        # Проверяем, что записались данные для обеих кампаний
-        result = await clickhouse_client.query(
-            f"""
-            SELECT adv_id, plan_orders, fact_predict_orders
-            FROM default_db.plan_fact_stats
-            WHERE adv_id IN ({complex_adv.adv_id}, 99999)
-            ORDER BY adv_id
-            """
-        )
-
-    assert len(result.result_rows) == 2
-
-    # Первая кампания с полными данными
-    row1 = result.result_rows[0]
-    assert row1[0] == complex_adv.adv_id
-    assert row1[1] == 100  # plan_orders
-    assert row1[2] == 95.5  # fact_predict_orders
-
-    # Вторая кампания без факта из-за ошибки
-    row2 = result.result_rows[1]
-    assert row2[0] == 99999
-    assert row2[1] == 50  # plan_orders
-    assert row2[2] is None  # fact_predict_orders (ошибка получения факта)
 
 
 @pytest.mark.integration

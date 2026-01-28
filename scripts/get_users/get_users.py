@@ -50,7 +50,8 @@ async def get_users(batch_size) -> AsyncGenerator[User, None]:
             *_USER_LOADING_OPTIONS,
         )
         .where(User.id != 43, User.user_telegram_id != 1121102685,
-               User.user_telegram_id != 707068503)
+               User.user_telegram_id != 707068503,
+               User.user_telegram_id != 261235974)
         .order_by(User.id)
         .execution_options(stream_results=True)
     )
@@ -70,31 +71,6 @@ async def get_users(batch_size) -> AsyncGenerator[User, None]:
             await stream.close()
             print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Cursor closed for get_users")
 
-
-async def _user_has_target_balance(user: User, max_balance: int) -> bool:
-    """
-    Fetch all cabinet balances in parallel to avoid serial waits.
-    """
-    cabinets = [
-        wb_user_cabinet.wb_cabinet
-        for wb_user_cabinet in user.wb_user_cabinets
-        if wb_user_cabinet.wb_cabinet is not None
-    ]
-    if not cabinets:
-        return False
-
-    results = await asyncio.gather(
-        *(get_cabinet_balance(cabinet.id) for cabinet in cabinets)
-    )
-
-    total_balance = 0
-    for balance, bonus in results:
-        cabinet_total = balance + bonus
-        if cabinet_total >= max_balance:
-            return False
-        total_balance += cabinet_total
-
-    return total_balance != 0
 
 
 async def filter_users_for_table(
@@ -125,9 +101,7 @@ async def filter_users_for_table(
             user_queue.task_done()
             if user is None:
                 break
-
-            if await _user_has_target_balance(user, max_balance):
-                await result_queue.put(user)
+            await result_queue.put(user)
 
     async def _finalize() -> None:
         await producer_task

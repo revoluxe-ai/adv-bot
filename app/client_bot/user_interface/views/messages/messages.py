@@ -60,6 +60,12 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
     RedisClusterBidsTimestampManager,
 )
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
+    RedisCommonBidTimestampManager,
+)
+from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
+    RedisCommonBidValueManager,
+)
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
@@ -275,6 +281,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client
         )
+        self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
+            redis_client
+        )
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -366,6 +375,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         self.adv_stat: FullAdvStat | None = adv_stat
 
+        adv_id = self.adv.adv_id
+        last_common_bid_update = (
+            await self._redis_common_bid_timestamp_manager.get(adv_id)
+        )
+        if last_common_bid_update:
+            self.last_common_bid_update_str = last_common_bid_update.strftime(
+                "%H:%M:%S %d.%m.%Y"
+            )
+        else:
+            self.last_common_bid_update_str = "Нет данных"
+
         from .last_auto_update_informer import LastAutoUpdateSettingInformer
 
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
@@ -411,6 +431,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"Посл. обнов. минус-слов в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"Посл. обнов. минус-слов в аук.: {self.keywords_status_last_update_search_adv}\n"
             f"Посл. обнов. ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
+            f"Посл. обнов. общей ставки аукциона: {self.last_common_bid_update_str}\n"
             f"Посл. автом. добав. ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
             f"Посл. автом. удал. ключа из БС:"
@@ -1057,6 +1078,17 @@ class WhitePhrasesAdded(TextWithKeyboard):
 
 
 class CPMSetting(TextWithKeyboard):
+    @inject
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        redis_client: RedisClient = Provide["redis_client_wrapper"],
+    ) -> None:
+        super().__init__(bot, chat_id)
+        self._redis_common_bid_value_manager = RedisCommonBidValueManager(redis_client)
+        self._last_saved_bids: dict[int, int] = {}
+
     async def __call__(self, adv_setting_id: int) -> None:
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
@@ -1065,16 +1097,44 @@ class CPMSetting(TextWithKeyboard):
         if adv_setting is None:
             raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
         self.adv_setting = adv_setting
+        adv_id = adv_setting.adv_id
+        nmids = adv_setting.nmids or []
+        self._last_saved_bids = {}
+        self._last_saved_bids = await self._redis_common_bid_value_manager.get_bids(
+            adv_id, nmids
+        )
         await super().__call__()
 
     @property
-    def text(self):
-        text = f"""
-Режим управления ставкой: {"Ручной" if not self.adv_setting.bidder_active else "Автоматический"}\n\n"""
+    def text(self) -> str:
+        mode = "Ручной" if not self.adv_setting.bidder_active else "Автоматический"
+        text = f"Режим управления ставкой: {mode}\n\n"
         if self.adv_setting.bidder_active:
-            text += f"""{"Целевое место место: " + str(self.adv_setting.max_place)}\n
-Максимальная ставка: {str(self.adv_setting.max_cpm)}\n"""
+            max_place = (
+                str(self.adv_setting.max_place)
+                if self.adv_setting.max_place is not None
+                else "Не задано"
+            )
+            max_cpm = (
+                str(self.adv_setting.max_cpm)
+                if self.adv_setting.max_cpm is not None
+                else "Не задана"
+            )
+            text += (
+                f"Целевое место место: {max_place}\n"
+                f"Максимальная ставка: {max_cpm}\n"
+            )
+            text += self._format_last_saved_bids()
         return text
+
+    def _format_last_saved_bids(self) -> str:
+        header = "Последняя ставка (по артикулам):"
+        if not self._last_saved_bids:
+            return f"{header} Нет данных\n"
+        lines = [header]
+        for nmid in sorted(self._last_saved_bids):
+            lines.append(f"{nmid}: {self._last_saved_bids[nmid]}")
+        return "\n".join(lines) + "\n"
 
     @property
     def keyboard(self):
