@@ -17,9 +17,10 @@ def dto_to_command(complex_advs: list[ComplexAdv]) -> GetMinBidsCommand:
         if not nmids:
             continue
 
+        auto_adv_id = adv.auto_adv_id
         items.append(
             GetMinBidsCommandItem(
-                adv_id=adv.auto_adv_id,
+                adv_id=auto_adv_id,
                 nmids=nmids,
                 placement_type=AdvPlacementType.AUTO_ADV,
             )
