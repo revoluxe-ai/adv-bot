@@ -5,15 +5,18 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import load_only, selectinload
 
-from app.modules.balance_manager.balance_service import get_cabinet_balance
+from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-
 from app.utils.db.models import User
-
+from scripts.users_csv_exporter.dto import UserDTO
 
 _RESULT_SENTINEL = object()
+
+
+pricer = Pricer()
+
 
 _USER_LOADING_OPTIONS = (
     selectinload(User.wb_user_cabinets)
@@ -34,42 +37,68 @@ _USER_LOADING_OPTIONS = (
     .load_only(AdvSetting.id, AdvSetting.bot_active),
 )
 
-async def get_users(batch_size) -> AsyncGenerator[User, None]:
-    """
-    Stream users through a single server-side cursor to avoid repeated plans.
+_NEGATIVE_DEFAULT_USER_TELEGRAM_IDS = [
+    1121102685,
+    707068503,
+    261235974,
+    373435337,
+]
 
-    ``stream_results=True`` keeps the cursor open for the duration of the
-    generator, and ``yield_per`` batches the rows so the database can control
-    flow without replaying ``LIMIT`` + ``OFFSET``.
-    """
 
+async def _fetch_user_batch(
+    batch_size: int,
+    last_id: int | None,
+    telegram_ids_filter: list[int] | None,
+) -> list[User]:
     stmt = (
         select(User)
         .options(
             load_only(User.id, User.user_telegram_id, User.username),
             *_USER_LOADING_OPTIONS,
         )
-        .where(User.id != 43, User.user_telegram_id != 1121102685,
-               User.user_telegram_id != 707068503,
-               User.user_telegram_id != 261235974)
-        .order_by(User.id)
-        .execution_options(stream_results=True)
+        .where(User.user_telegram_id.not_in(_NEGATIVE_DEFAULT_USER_TELEGRAM_IDS))
     )
+    if telegram_ids_filter:
+        stmt = stmt.where(User.user_telegram_id.in_(telegram_ids_filter))
+    if last_id is not None:
+        stmt = stmt.where(User.id > last_id)
 
-    print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Opening cursor for get_users")
+    stmt = stmt.order_by(User.id).limit(batch_size)
+
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Opening session for get_users batch after id={last_id}"
+    )
     async with sm(read_only=True) as session:
-        stream = await session.stream(stmt)
-        print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Cursor opened; fetching with batch_size={batch_size}")
-        try:
-            user_count = 0
-            cursor_iter = stream.scalars().yield_per(batch_size)
-            async for user in cursor_iter:
-                user_count += 1
-                print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [{user_count}] Cursor row: user id={user.id}, username={user.username}")
-                yield user
-        finally:
-            await stream.close()
-            print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Cursor closed for get_users")
+        result = await session.scalars(stmt)
+        users = result.all()
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Session closed; fetched {len(users)} rows"
+    )
+    return users
+
+
+async def get_users(batch_size,  telegram_ids_filter = None) -> AsyncGenerator[UserDTO, None]:
+    """
+    Pull users in batches via short-lived sessions so no cursor stays open too long.
+    """
+
+    user_count = 0
+    last_id: int | None = None
+
+    while True:
+        batch = await _fetch_user_batch(batch_size, last_id, telegram_ids_filter)
+        if not batch:
+            break
+
+        for user in batch:
+            user_dto = await UserDTO.from_user(user, pricer, sm)
+            user_count += 1
+            last_id = user.id
+
+            print(
+                f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [{user_count}] Cursor row: user id={user.id}, username={user.username}"
+            )
+            yield user_dto
 
 
 

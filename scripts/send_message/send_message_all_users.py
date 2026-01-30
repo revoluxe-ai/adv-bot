@@ -6,7 +6,7 @@ import os
 from hashlib import sha256
 
 from collections.abc import AsyncGenerator, AsyncIterable
-from typing import Any
+from typing import Any, AsyncIterator
 
 from aiogram import Bot
 from sqlalchemy import select
@@ -18,10 +18,12 @@ from app.modules.common_slaves.wildberries.models.models import (
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
+from scripts.get_users.filters.filters import get_users_by_telegram_id, get_test_users
 from scripts.send_message.utils.get_users_with_low_balance_and_near_last_payment import \
     get_users_with_low_balance_and_near_last_payment
-from scripts.send_message.utils.messages import message_3
-from scripts.users_communicate_module.main_user_generator import get_users_iterator
+from scripts.send_message.utils.messages import message_5
+from scripts.users_communicate_module.main_user_generator import get_users_iterator, get_test_users_iterator
+from scripts.users_csv_exporter.dto import UserDTO
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +50,6 @@ def get_test_bots() -> list[Bot]:
 
 
 
-async def get_test_user():
-    async with sm() as session:
-        stmt = (
-            select(User)
-            .options(
-                selectinload(User.wb_user_cabinets).selectinload(
-                    WBUserCabinet.wb_cabinet
-                )
-            )
-            .where(User.user_telegram_id.in_(test_users_ids))
-        )
-        user = await session.execute(stmt)
-        user = user.scalars().all()
-    for user in user:
-        yield user
-
-
 async def async_chain(
     *async_generators: AsyncIterable[Any],
 ) -> AsyncGenerator[Any, None]:
@@ -75,37 +60,40 @@ async def async_chain(
 redis_semaphore = asyncio.Semaphore(1)
 
 
-async def send_message(user: User, bot: Bot) -> bool:
-    user_id = user.user_telegram_id
-    message = message_3.Message
+async def send_message(user: UserDTO, bot: Bot) -> bool:
+    user_id = user.telegram_id
+    message = message_5.Message
     hash_ = sha256(str(message).encode()).hexdigest()
 
     # фильтр Влада
     if user_id == 1121102685:
         return False
-
-    # проверка в Redis
-    if await redis_manager.check_message_send(hash_, user_id, bot.id):
-        return False
+    #
+    # # проверка в Redis
+    # if await redis_manager.check_message_send(hash_, user_id, bot.id):
+    #     return False
 
     try:
-        await message(bot, user_id)()
+        await message(bot, user)()
         await redis_manager.set_message_send(hash_, user_id, bot.id)
         return True
     except Exception as e:
         logger.error(e)
         raise e
 
+
+
+
+
 async def send_message_to_users():
     send_count = 0
     not_send_count = 0
 
-    users = await get_users_iterator(batch_size=20)
+    users: AsyncIterator[UserDTO] = await get_users_iterator()
     bots = get_bots()
 
-    # users = get_test_user()
     # bots =  get_test_bots()
-
+    # users = get_test_users_iterator()
 
     try:
         async for user in users:
