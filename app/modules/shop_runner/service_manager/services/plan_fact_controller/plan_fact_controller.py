@@ -10,6 +10,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.dto.p
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.fact_data_cache import FactDataCache, get_fact_data_for_adv
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +20,20 @@ class PlanFactController:
 
 
     @staticmethod
-    async def get_plan_fact_dto(adv: ComplexAdv) -> PlanFactStatDTO:
+    async def get_plan_fact_dto(
+        adv: ComplexAdv,
+        fact_data_cache: FactDataCache | None = None,
+    ) -> PlanFactStatDTO:
         # Получаем план данные (синхронно)
         plan: Optional[PlanData] = PlanFactProvider.get_plan_data(
             adv.adv_setting
         )
         keywords = await adv.get_keywords()
-        provider = PlanFactProvider(adv.adv_setting)
-        fact = await provider.get_fact_data(keywords)
+        fact = await get_fact_data_for_adv(
+            adv,
+            keywords=keywords,
+            cache=fact_data_cache,
+        )
 
         # Создаем DTO
         dto = PlanFactStatDTO.create(
@@ -40,7 +47,9 @@ class PlanFactController:
 
     @staticmethod
     async def process_adv(
-        adv: ComplexAdv, version: float
+        adv: ComplexAdv,
+        version: float,
+        fact_data_cache: FactDataCache | None = None,
     ) -> PlanFactStatDTO | None:
         """
         Обрабатывает одну кампанию: получает план, факт и создает DTO.
@@ -57,8 +66,11 @@ class PlanFactController:
             adv.adv_setting
         )
         keywords = await adv.get_keywords()
-        provider = PlanFactProvider(adv.adv_setting)
-        fact = await provider.get_fact_data(keywords)
+        fact = await get_fact_data_for_adv(
+            adv,
+            keywords=keywords,
+            cache=fact_data_cache,
+        )
 
         # Создаем DTO
         dto = PlanFactStatDTO.create(
@@ -69,9 +81,6 @@ class PlanFactController:
             version=version,
         )
         return dto
-
-
-
 
 
 

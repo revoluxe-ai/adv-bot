@@ -2,6 +2,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 
+from app.modules.fact_data_cache import FactDataCache
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.dto.plan_fact_stat_dto import PlanFactStatDTO
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller import (
     PlanFactController,
@@ -20,9 +21,10 @@ logger = logging.getLogger(__name__)
 class PlanFactManager:
     """Менеджер для обработки план-факта данных всех кампаний и записи в ClickHouse"""
 
-    def __init__(self):
+    def __init__(self, fact_data_cache: FactDataCache | None = None) -> None:
         self._controller = PlanFactController()
         self._clickhouse_manager = ClickHousePlanFactManager()
+        self._fact_data_cache = fact_data_cache
 
     async def process_and_save(self, advs: list[ComplexAdv]) -> None:
         """
@@ -37,7 +39,12 @@ class PlanFactManager:
         version = time.time()
 
         handlers: list[Callable[[], Awaitable[PlanFactStatDTO | None]]] = [
-            lambda adv_=adv: self._controller.process_adv(adv_, version) for adv in advs
+            lambda adv_=adv: self._controller.process_adv(
+                adv_,
+                version,
+                fact_data_cache=self._fact_data_cache,
+            )
+            for adv in advs
         ]
 
         try:
@@ -66,4 +73,3 @@ class PlanFactManager:
         if plan_fact_stats:
             await self._clickhouse_manager.insert_plan_fact_stats(plan_fact_stats)
         return None
-

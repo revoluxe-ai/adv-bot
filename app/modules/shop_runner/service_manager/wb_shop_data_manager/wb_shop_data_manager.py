@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
+from app.modules.fact_data_cache import FactDataCache, get_fact_data_for_adv
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -61,6 +62,12 @@ class WBShopDataManager:
         self._tasks_manager: TasksManager | None = tasks_manager
         self._wb_api_data_manager = wb_api_data_manager
         self._wb_manager = wb_manager
+        self._fact_data_cache: FactDataCache | None = None
+
+    def get_fact_data_cache(self) -> FactDataCache:
+        if self._fact_data_cache is None:
+            self._fact_data_cache = FactDataCache()
+        return self._fact_data_cache
 
     @single_run()
     async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
@@ -103,10 +110,15 @@ class WBShopDataManager:
         return adv_dict
 
     @single_run()
-    async def get_wb_advs_dto(self, complex_advs: list[ComplexAdv] ) -> list[WBAdvDTO]:
+    async def get_wb_advs_dto(
+        self,
+        complex_advs: list[ComplexAdv],
+        fact_data_cache: FactDataCache | None = None,
+    ) -> list[WBAdvDTO]:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         if not complex_advs:
             return []
+        fact_data_cache = fact_data_cache or self.get_fact_data_cache()
         min_bids, search_adv_bids = await asyncio.gather(
             self._get_min_bids(complex_advs, cache_possible=False),
             self._get_search_adv_common_bids(complex_advs),
@@ -120,7 +132,12 @@ class WBShopDataManager:
             if search_adv_id not in search_adv_bids:
                 raise RuntimeError(f"Missing search bids for adv_id={search_adv_id}")
             current_search_bids = search_adv_bids[search_adv_id]
-            handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
+            handler = partial(
+                self._collect_adv_data_parts,
+                complex_adv,
+                current_search_bids,
+                fact_data_cache,
+            )
             handlers.append(handler)
 
         max_workers = max(1, min(len(handlers), 16))
@@ -167,21 +184,30 @@ class WBShopDataManager:
     async def _collect_fact_data(
         complex_adv: ComplexAdv,
         keywords: list[CalculatedKeyword],
+        fact_data_cache: FactDataCache | None = None,
     ) -> FactData:
-        manager = PlanFactProvider(complex_adv.adv_setting)
-        return await manager.get_fact_data(keywords)
+        return await get_fact_data_for_adv(
+            complex_adv,
+            keywords=keywords,
+            cache=fact_data_cache,
+        )
 
     async def _collect_adv_data_parts(
         self,
         complex_adv: ComplexAdv,
         search_adv_bids: dict[int, dict[int, int]],
+        fact_data_cache: FactDataCache,
     ) -> WBAdvDataParts:
         plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
         keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
 
         plan = await plan_task
         keywords = await keywords_task
-        fact = await self._collect_fact_data(complex_adv, keywords)
+        fact = await self._collect_fact_data(
+            complex_adv,
+            keywords,
+            fact_data_cache=fact_data_cache,
+        )
 
         return WBAdvDataParts(
             complex_adv=complex_adv,

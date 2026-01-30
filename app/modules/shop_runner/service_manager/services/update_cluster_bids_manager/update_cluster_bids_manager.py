@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 )
 from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.fact_data_cache import FactDataCache, get_fact_data_for_adv
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
@@ -60,6 +61,7 @@ class UpdateClusterBidsManager:
         redis_keyword_bidder_status_manager: RedisKeywordBidderStatusManager,
         redis_cluster_bids_manager: RedisClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
+        fact_data_cache: FactDataCache | None = None,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
@@ -67,6 +69,7 @@ class UpdateClusterBidsManager:
         self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
             redis_cluster_bids_timestamp_manager
         )
+        self._fact_data_cache = fact_data_cache
 
 
     async def _get_local_data(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
@@ -312,7 +315,7 @@ class UpdateClusterBidsManager:
                 new_bids.append(new_bid)
         return UpdateBidsCommand(new_bids)
 
-    async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
+    async def _get_fact_datas(self, advs: list[ComplexAdv]) -> dict[int, FactData]:
         handlers: list[Callable[[], Awaitable[FactData]]] = [
             lambda adv=adv: self.__get_fact_data(adv) for adv in advs
         ]
@@ -335,11 +338,13 @@ class UpdateClusterBidsManager:
                 adv_to_fact_map[adv.adv_id] = fact
         return adv_to_fact_map
 
-    @staticmethod
-    async def __get_fact_data(adv: ComplexAdv) -> FactData:
+    async def __get_fact_data(self, adv: ComplexAdv) -> FactData:
         keywords = await adv.get_keywords()
-        provider = PlanFactProvider(adv.adv_setting)
-        return await provider.get_fact_data(keywords)
+        return await get_fact_data_for_adv(
+            adv,
+            keywords=keywords,
+            cache=self._fact_data_cache,
+        )
 
 
     @staticmethod
@@ -351,4 +356,3 @@ class UpdateClusterBidsManager:
                 plan_datas_map[adv.adv_id] = plan
 
         return plan_datas_map
-

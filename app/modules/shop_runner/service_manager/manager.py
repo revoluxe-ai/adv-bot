@@ -553,11 +553,15 @@ class CoroutinesManager:
     async def update_cluster_bids(self) -> None:
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        # Кеш факта живет до 15 минут и нужен для переиспользования в рамках цикла.
+        fact_data_cache = self._wb_shop_data_manager.get_fact_data_cache()
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
         )
-        update_clusters_bid_manager = container.update_cluster_bids_manager()
+        update_clusters_bid_manager = container.update_cluster_bids_manager(
+            fact_data_cache=fact_data_cache
+        )
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.bot_active]
         advs = [
@@ -581,7 +585,9 @@ class CoroutinesManager:
         if not advs:
             return None
 
-        manager = PlanFactManager()
+        # Кешируем факт, чтобы один и тот же adv_id не дергать несколько раз за цикл.
+        fact_data_cache = self._wb_shop_data_manager.get_fact_data_cache()
+        manager = PlanFactManager(fact_data_cache=fact_data_cache)
         await manager.process_and_save(advs)
         return None
     def _log_auto_budget_result(
@@ -674,7 +680,12 @@ class CoroutinesManager:
                 adv.bidder_active and
                 adv.updater_common_bid_in_search_adv_active_status and
                 adv.search_adv_active_status is True]
-        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+        # Получаем кеш факта из shop_data_manager, чтобы все сборки использовали один источник.
+        fact_data_cache = self._wb_shop_data_manager.get_fact_data_cache()
+        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
+            complex_advs,
+            fact_data_cache=fact_data_cache,
+        )
 
         if not advs:
             return None
