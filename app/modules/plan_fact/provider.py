@@ -45,10 +45,10 @@ class PlanFactProvider:
 
         return FactData(
             predict_orders=round(
-                common_stat_data.mean_orders_for_last_days, self._max_last_period
+                common_stat_data.mean_orders_for_last_days, 2
             ),
             pay_for_order=round(
-                common_stat_data.mean_price_for_order, self._max_last_period
+                common_stat_data.mean_price_for_order, 2
             ),
             original_orders=common_stat_data.all_orders_for_last_days,
             fact_method=common_stat_data.sales_predict_method,
@@ -64,8 +64,8 @@ class PlanFactProvider:
         try:
             return PlanData(
                 orders=plan_orders,
-                target_pay_for_order=target_pay_for_order, 
-                max_pay_for_order=max_pay_for_order,  
+                target_pay_for_order=target_pay_for_order,
+                max_pay_for_order=max_pay_for_order,
             )
         except Exception as exc:
             logger.exception("Ошибка получения плана")
