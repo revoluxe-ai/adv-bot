@@ -4,6 +4,7 @@ from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.models import User
+from scripts.users_csv_exporter.dto import UserDTO
 
 
 def get_total_balance(wb_cabinet):
@@ -42,10 +43,11 @@ async def get_user_with_near_payment(get_users: AsyncGenerator[User, None], max_
                 break
 
 
-
-
-
-
+async def get_users_by_telegram_id(get_users: AsyncGenerator[UserDTO, None],
+                                    telegram_ids: list[int] | None) -> AsyncGenerator[UserDTO, None]:
+     async for user in get_users:
+         if user.telegram_id in telegram_ids:
+             yield user
 
 
 
@@ -69,3 +71,9 @@ async def get_non_zero_users(get_users: AsyncGenerator[User, None],
         if not break_flag:
             if total_balance != 0:
                 yield user
+
+
+async def get_test_users(get_users: AsyncGenerator[UserDTO, None]) -> AsyncGenerator[UserDTO, None]:
+    async for user in get_users:
+        if user.telegram_id in [373435337]:
+            yield user

@@ -5,9 +5,8 @@ from pathlib import Path
 
 from app.modules.billing.pricer.pricer import Pricer
 from scripts.users_communicate_module.main_user_generator import get_users_iterator
-from scripts.users_csv_exporter.dto import UserCabinetExportDTO
 
-DEFAULT_EXPORT_PATH = Path("scripts/users_csv_exporter/with_near-payment-users.csv")
+DEFAULT_EXPORT_PATH = Path("scripts/users_csv_exporter/all_users.csv")
 
 
 BATCH_SIZE = 30
@@ -32,6 +31,7 @@ async def export_users_to_csv(
         "balance",
         "bonus",
         "balance_plus_bonus",
+        "last_30_days_topups",
         "active_campaigns",
         "has_active_campaign",
         "tariff_mode",
@@ -42,22 +42,21 @@ async def export_users_to_csv(
         "balance_days_left",
     ]
     written = 0
-
-    pricer = Pricer()
-    users_async_iterator = await get_users_iterator(batch_size=batch_size)
+    users_async_iterator = await get_users_iterator()
     with output.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
         async for user in users_async_iterator:
-            for user_cabinet in user.wb_user_cabinets:
-                dto = await UserCabinetExportDTO.from_models(
-                    user=user, wb_user_cabinet=user_cabinet, pricer=pricer
-                )
-                writer.writerow(asdict(dto))
+            user_base = {
+                "user_id": user.user_id,
+                "telegram_id": user.telegram_id,
+                "login": user.login,
+            }
+            for user_cabinet in user.cabinets:
+                writer.writerow({**user_base, **asdict(user_cabinet)})
                 written += 1
                 if limit is not None and written >= limit:
                     return output
-
     return output
 
 
