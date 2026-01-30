@@ -69,8 +69,6 @@ class WhiteListRemoveExecutor(BaseExecutor):
         white_keywords.sort(
             key=sort_func, reverse=True
         )  # тут было по баесу, заменил на predict_ctr
-        white_keywords = white_keywords[1:]  # Убираем лучший ключ из кандидатов
-
         if not white_keywords:
             logger.debug(
                 "[adv_id=%s] WhiteListRemove: только один ключ в БС, не удаляем",
