@@ -51,27 +51,6 @@ class AdvSettingAutoUpdater:
             await plan_fact_change.set_new_plan_fact(plan, fact)
         return None
 
-    def __get_fact_data_from_stats(
-        self,
-        common_stat_data: CommonAdvsStatData,
-    ) -> FactData:
-        assert common_stat_data.mean_orders_for_last_days is not None
-        assert common_stat_data.mean_price_for_order is not None
-        assert common_stat_data.all_orders_for_last_days is not None
-        mean_orders = round(
-            common_stat_data.mean_orders_for_last_days, self._max_last_period
-        )
-        mean_pay_for_order = round(
-            common_stat_data.mean_price_for_order, self._max_last_period
-        )
-        fact_data = FactData(
-            predict_orders=mean_orders,
-            pay_for_order=mean_pay_for_order,
-            original_orders=common_stat_data.all_orders_for_last_days,
-            fact_method=common_stat_data.sales_predict_method,
-        )
-
-        return fact_data
 
     @staticmethod
     def get_plan_data(adv: AdvSetting) -> PlanData | None:
