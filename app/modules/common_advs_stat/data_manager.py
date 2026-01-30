@@ -153,7 +153,7 @@ class CommonAdvsStatDataManager:
             min_rating_by_orders=min_rating_by_orders,
             hard_min_ctr=adv_setting.hard_min_ctr,
             auto_cpm=adv_setting.cpm,
-            auction_cpm=auction_cpm,
+            auction_cpm=auction_cpm, # TODO: вот это похоже на depricated, надо выпилить
             total_spend=full_spend_for_all_advs,
             addition_spend_in_adv=addition_spend_in_adv,
             all_orders_for_last_days=base_common_orders,
