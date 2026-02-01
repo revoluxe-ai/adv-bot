@@ -123,5 +123,4 @@ async def __run_main_coroutines(event_manager: BillingEventManager) -> None:
             await main_loop(event_manager)
         except Exception as e:
             logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
-            del e
             await asyncio.sleep(0)
