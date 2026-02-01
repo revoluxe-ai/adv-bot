@@ -1,3 +1,4 @@
+import functools
 import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
@@ -43,6 +44,9 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 from app.settings import settings
 
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
+from .services.increment_fact_data_manager.increment_fact_data_manager import (
+    IncrementFactDataManager,
+)
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -103,6 +107,9 @@ class CoroutinesManager:
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()
+        self._increment_fact_data_manager = IncrementFactDataManager(
+            redis_client_wrapper,
+        )
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -700,6 +707,47 @@ class CoroutinesManager:
 
 
         return None
+
+    @while_coroutine_decorator(60 * 5, 60)
+    async def increment_fact_data_stats(self) -> None:
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not complex_advs:
+            return None
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        if not complex_advs:
+            return None
+
+        handlers: list[Callable[[], Awaitable[None]]] = []
+        for adv in complex_advs:
+            handler = functools.partial(self._increment_fact_data_manager.update, adv)
+            handlers.append(handler)
+
+        max_workers = self._max_workers_for(len(handlers), 16)
+        results = await run_tasks(
+            handlers=handlers,
+            max_workers=max_workers,
+            tasks_manager=self._tasks_manager,
+            return_exceptions=True,
+        )
+
+        for adv, result in zip(complex_advs, results):
+            if isinstance(result, BaseException):
+                logger.exception(
+                    "increment_fact_data_stats failed for adv_id=%s shop_id=%s",
+                    adv.auto_adv_id,
+                    adv.shop_id,
+                    exc_info=result,
+                )
+
+        return None
+
+
+
+
+
+
+
+
 
 
 

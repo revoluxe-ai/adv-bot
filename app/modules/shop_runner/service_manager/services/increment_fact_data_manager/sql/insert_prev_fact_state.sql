@@ -1,0 +1,36 @@
+INSERT INTO default_db.fact_stat_states_prev (
+    bucket_start,
+    shop_id,
+    complex_adv_id,
+    views_adv_sum,
+    clicks_adv_sum,
+    carts_adv_sum,
+    orders_adv_sum,
+    spend_adv_sum_rub,
+    orders_sum_adv_rub,
+    open_card_sum,
+    carts_card_sum,
+    orders_card_sum,
+    orders_sum_card_rub,
+    buy_outs_sum,
+    src_ts,
+    version
+)
+VALUES (
+    %(bucket_start)s,
+    %(shop_id)s,
+    %(complex_adv_id)s,
+    %(views_adv_sum)s,
+    %(clicks_adv_sum)s,
+    %(carts_adv_sum)s,
+    %(orders_adv_sum)s,
+    %(spend_adv_sum_rub)s,
+    %(orders_sum_adv_rub)s,
+    %(open_card_sum)s,
+    %(carts_card_sum)s,
+    %(orders_card_sum)s,
+    %(orders_sum_card_rub)s,
+    %(buy_outs_sum)s,
+    %(src_ts)s,
+    %(version)s
+)

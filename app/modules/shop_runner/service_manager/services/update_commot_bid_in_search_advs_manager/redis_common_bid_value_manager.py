@@ -35,8 +35,10 @@ class RedisCommonBidValueManager(BaseRedisManager):
                 pipeline.get(key)
             raw_results: list[str | None] = await pipeline.execute() # pyright: ignore
         bids: dict[int, int] = {}
-        for nmid, raw in zip(nmids, raw_results):
-            if raw is None:
+        for raw in zip(nmids, raw_results):
+            nmid = raw[0]
+            raw_value = raw[1]
+            if raw_value is None:
                 continue
             if isinstance(raw, bytes):
                 raw_value = raw.decode()
