@@ -126,9 +126,6 @@ class CommonAdvsStatDataManager:
         predict_orders_for_days = await self._get_predict_orders_for_day(
             adv_setting, base_common_orders, base_common_carts,
         )
-        predict_orders_for_fraction_day = self._get_predict_order_for_fractation_day(
-            predict_orders_for_days, pass_days
-        )
 
         # Исправлено: используем реальные заказы вместо прогнозируемых с дробной частью дня
         # для корректного расчета средней себестоимости заказа

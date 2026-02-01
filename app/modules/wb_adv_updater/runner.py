@@ -54,37 +54,42 @@ async def sender_message_to_not_pay_users():
 async def process_token_expiration_check() -> None:
     """Запуск проверки истекающих токенов один раз в сутки в 9:00"""
     while True:
-        now = datetime.datetime.now()
-
-        # Вычисляем следующие 9:00
-        next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        if now.hour >= 9:
-            next_run += datetime.timedelta(days=1)
-
-        # Спим до 9:00
-        sleep_seconds = (next_run - now).total_seconds()
-        logger.info(
-            f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
-        )
-        await asyncio.sleep(sleep_seconds)
-
-        # Выполняем проверку токенов
         try:
-            stats = await run_token_expiration_check()
-            logger.info(f"Проверка токенов завершена: {stats}")
+            now = datetime.datetime.now()
+
+            # Вычисляем следующие 9:00
+            next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            if now.hour >= 9:
+                next_run += datetime.timedelta(days=1)
+
+            # Спим до 9:00
+            sleep_seconds = (next_run - now).total_seconds()
+            logger.info(
+                f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
+            )
+            await asyncio.sleep(sleep_seconds)
+
+            # Выполняем проверку токенов
+            try:
+                stats = await run_token_expiration_check()
+                logger.info(f"Проверка токенов завершена: {stats}")
+            except Exception as e:
+                logger.error(f"Ошибка проверки токенов: {e}", exc_info=True)
         except Exception as e:
-            logger.error(f"Ошибка проверки токенов: {e}", exc_info=True)
+            logger.exception('Ошибка процесса уведомлений о токенах')
+            await asyncio.sleep(60)
+
+
+
 
 
 async def process_payment_for_advs() -> None:
     from app.modules.billing import (
         process_payment_for_advs as billing_process_payment_for_advs,
     )
-
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
         while True:
-            now = datetime.datetime.now()
             try:
                 await billing_process_payment_for_advs(global_ttl=900)
                 logger.info("Обработка платежей завершена успешно")
@@ -92,16 +97,9 @@ async def process_payment_for_advs() -> None:
                 logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
                 await asyncio.sleep(60)
                 continue
-            # Вычисляем следующие 3:00
-            next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
-            if now.hour >= 3:
-                next_run += datetime.timedelta(days=1)
-            # Спим до 3:00
-            sleep_seconds = (next_run - now).total_seconds()
-            logger.info(
-                f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
-            )
-            await asyncio.sleep(sleep_seconds)
+            await asyncio.sleep(60 * 60)
+
+
 
 async def main_loop(event_manager: BillingEventManager) -> None:
     await asyncio.gather(
@@ -125,5 +123,4 @@ async def __run_main_coroutines(event_manager: BillingEventManager) -> None:
             await main_loop(event_manager)
         except Exception as e:
             logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
-            del e
             await asyncio.sleep(0)
