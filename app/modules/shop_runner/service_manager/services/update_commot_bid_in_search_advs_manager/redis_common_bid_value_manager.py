@@ -29,11 +29,11 @@ class RedisCommonBidValueManager(BaseRedisManager):
     async def get_bids(self, adv_id: int, nmids: Sequence[int]) -> dict[int, int]:
         if not nmids:
             return {}
-        async with self._client.read_pipeline() as pipeline:
+        async with self._client.read_pipeline() as pipeline: # pyright: ignore
             for nmid in nmids:
                 key = self._get_key(adv_id, nmid)
                 pipeline.get(key)
-            raw_results: list[str | None] = await pipeline.execute()
+            raw_results: list[str | None] = await pipeline.execute() # pyright: ignore
         bids: dict[int, int] = {}
         for nmid, raw in zip(nmids, raw_results):
             if raw is None:
