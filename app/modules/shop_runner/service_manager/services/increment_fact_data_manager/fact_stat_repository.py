@@ -37,7 +37,7 @@ class FactStatRepository:
                 )
         if not result.result_set:
             return None
-        row: dict[str, Any] | None = cast(dict[str, Any] | None, result.first_item)
+        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
         return CardCommonStat(
             open_card_sum=int(row["open_card_sum"]),
             carts_card_sum=int(row["carts_card_sum"]),
@@ -56,9 +56,7 @@ class FactStatRepository:
                 )
         if not result.result_set:
             return None
-        row: dict[str, Any] | None = cast(dict[str, Any] | None, result.first_item)
-        if not row:
-            return None
+        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
         return AdvCommonStat(
             views_adv_sum=int(row["views_adv_sum"]),
             clicks_adv_sum=int(row["clicks_adv_sum"]),
