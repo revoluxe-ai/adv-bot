@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Sequence, Any, cast
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
 
@@ -29,23 +29,28 @@ class RedisCommonBidValueManager(BaseRedisManager):
     async def get_bids(self, adv_id: int, nmids: Sequence[int]) -> dict[int, int]:
         if not nmids:
             return {}
-        async with self._client.read_pipeline() as pipeline: # pyright: ignore
+        async with self._client.read_pipeline() as pipeline:  # pyright: ignore
             for nmid in nmids:
                 key = self._get_key(adv_id, nmid)
-                pipeline.get(key)
-            raw_results: list[str | None] = await pipeline.execute() # pyright: ignore
+                _ = pipeline.get(key)
+            results = await pipeline.execute()  # pyright: ignore
+            raw_results: list[Any] = cast(list[Any], results)
+
         bids: dict[int, int] = {}
-        for raw in zip(nmids, raw_results):
-            nmid = raw[0]
-            raw_value = raw[1]
+        for nmid, raw_value in zip(nmids, raw_results):
             if raw_value is None:
                 continue
-            if isinstance(raw, bytes):
-                raw_value = raw.decode()
+            
+            val: str
+            if isinstance(raw_value, bytes):
+                val = raw_value.decode()
+            elif isinstance(raw_value, (str, int, float)):
+                val = str(raw_value)
             else:
-                raw_value = raw
+                continue
+
             try:
-                bids[nmid] = int(raw_value)
+                bids[nmid] = int(val)
             except (TypeError, ValueError):
                 continue
         return bids
