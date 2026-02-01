@@ -87,11 +87,9 @@ async def process_payment_for_advs() -> None:
     from app.modules.billing import (
         process_payment_for_advs as billing_process_payment_for_advs,
     )
-
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
         while True:
-            now = datetime.datetime.now()
             try:
                 await billing_process_payment_for_advs(global_ttl=900)
                 logger.info("Обработка платежей завершена успешно")
@@ -99,16 +97,9 @@ async def process_payment_for_advs() -> None:
                 logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
                 await asyncio.sleep(60)
                 continue
-            # Вычисляем следующие 3:00
-            next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
-            if now.hour >= 3:
-                next_run += datetime.timedelta(days=1)
-            # Спим до 3:00
-            sleep_seconds = (next_run - now).total_seconds()
-            logger.info(
-                f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
-            )
-            await asyncio.sleep(sleep_seconds)
+            await asyncio.sleep(60 * 60)
+
+
 
 async def main_loop(event_manager: BillingEventManager) -> None:
     await asyncio.gather(
