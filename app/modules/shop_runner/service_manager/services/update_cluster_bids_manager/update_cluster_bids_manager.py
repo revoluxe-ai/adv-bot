@@ -339,7 +339,8 @@ class UpdateClusterBidsManager:
     async def __get_fact_data(adv: ComplexAdv) -> FactData:
         keywords = await adv.get_keywords()
         provider = PlanFactProvider(adv.adv_setting)
-        return await provider.get_fact_data(keywords)
+        stat = await provider.get_stat_data(keywords)
+        return await provider.get_fact_data(stat)
 
 
     @staticmethod
