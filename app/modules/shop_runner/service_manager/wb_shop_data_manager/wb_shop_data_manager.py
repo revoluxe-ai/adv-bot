@@ -204,11 +204,9 @@ class WBShopDataManager:
         )
         complex_advs: list[ComplexAdv] = []
         for adv in adv_settings:
-            search_adv = (
-                search_adv_idv.get(adv.search_adv_id)
-                if adv.search_adv_id is not None
-                else None
-            )
+            search_adv = search_adv_idv.get(adv.search_adv_id)
+            if not search_adv:
+                continue
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
                 adv_setting=adv,

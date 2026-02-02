@@ -72,6 +72,7 @@ class WBShop:
                 tg.create_task(coroutines_manager.auto_adv_active_control())
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
                 tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
+                tg.create_task(coroutines_manager.increment_fact_data_stats())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
             # (все StopShopUpdateException из группы соберутся сюда)

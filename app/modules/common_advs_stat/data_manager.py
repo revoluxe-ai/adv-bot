@@ -95,7 +95,7 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auto_adv.orders
             + full_adv_stat_for_last_days_for_auction.orders
         )
-        # TODO: Настроить основные - резервные источники репозиториев образов
+
         # Проверяем источник заказов для автоуправления
         if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
             # Используем только заказы из рекламы (Авто + Аукцион)

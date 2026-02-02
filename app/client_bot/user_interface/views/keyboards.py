@@ -8,6 +8,7 @@ from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
+    IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
     PredictCTRModeToggle,
@@ -79,6 +80,21 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+    incremental_stats_text = (
+        "Включить инкрементальную статистику ПП"
+        if not adv_setting.use_incremental_stats
+        else "Выключить инкрементальную статистику ПП"
+    )
+    incremental_stats_callback = IncrementalStatsToggle(
+        adv_setting_original_id=adv_setting.id,
+        new_status=not bool(adv_setting.use_incremental_stats),
+    ).pack()
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=incremental_stats_text,
+            callback_data=incremental_stats_callback,
+        )
+    )
 
     common_bid_active = bool(
         adv_setting.updater_common_bid_in_search_adv_active_status

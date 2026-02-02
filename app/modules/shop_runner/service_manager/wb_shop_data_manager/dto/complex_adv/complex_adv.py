@@ -34,7 +34,7 @@ class ComplexAdv:
     def __init__(
         self,
         adv_setting: AdvSetting,
-        search_adv: AdvSetting | None = None,
+        search_adv: AdvSetting,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
         get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,

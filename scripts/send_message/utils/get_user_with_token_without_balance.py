@@ -16,10 +16,10 @@ async def iter_users_with_zero_or_negative_balance_without_active_advs(
     """
 
     async for user in get_users(batch_size=batch_size):
-        if not user.user_telegram_id:
+        if not user.user_telegram_id: # type: ignore
             continue
 
-        for link in user.wb_user_cabinets:
+        for link in user.wb_user_cabinets: # type: ignore
             cabinet = link.wb_cabinet
             if not cabinet:
                 continue
