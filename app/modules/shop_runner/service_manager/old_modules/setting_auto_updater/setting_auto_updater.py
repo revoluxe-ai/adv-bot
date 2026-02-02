@@ -37,7 +37,7 @@ class AdvSettingAutoUpdater:
     async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
         stat = await self._provider.get_stat_data(keywords)
         fact_data = await self._provider.get_fact_data(stat)
-        return await fact_data
+        return fact_data
 
     async def update(
         self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
