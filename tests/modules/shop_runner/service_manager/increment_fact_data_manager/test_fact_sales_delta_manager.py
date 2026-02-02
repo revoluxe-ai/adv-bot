@@ -54,18 +54,13 @@ async def test_fact_sales_delta_manager_by_carts_converts_carts_to_orders() -> N
 
     repo.fetch_closest_snapshot.return_value = snapshot
     repo.aggregate_deltas_between.return_value = {
-        "orders_adv_sum": 60,
-        "carts_card_sum": 20,
-        "orders_card_sum": 5,
-        "spend_adv_sum_rub": 500,
+        "orders": 60,
+        "carts": 20,
+        "spend": 500,
     }
-    repo.fetch_common_stat_aggregates.return_value = {
-        "add_to_cart_sum": 20,
-        "orders_sum_total": 5,
-    }
+    repo.get_carts_to_orders_ratio.return_value = 0.25
 
     fact_data = await manager.calculate_fact_data(
-        str(shop_uuid),
         12,
         FactMethods.BY_CARTS,
         [42],
@@ -89,14 +84,12 @@ async def test_fact_sales_delta_manager_direct_sales_scales_orders_per_day() -> 
 
     repo.fetch_closest_snapshot.return_value = snapshot
     repo.aggregate_deltas_between.return_value = {
-        "orders_adv_sum": 24,
-        "carts_card_sum": 0,
-        "orders_card_sum": 8,
-        "spend_adv_sum_rub": 200,
+        "orders": 24,
+        "carts": 0,
+        "spend": 200,
     }
 
     fact_data = await manager.calculate_fact_data(
-        str(shop_uuid),
         23,
         FactMethods.DIRECT_SALES,
         None,
@@ -115,6 +108,7 @@ async def test_plan_fact_provider_prefers_delta_manager() -> None:
         adv_id=10,
         shop_id=str(uuid4()),
         nmids=[42],
+        use_incremental_stats=True,
     )
     delta_manager = AsyncMock()
     expected_fact = FactData(
@@ -132,7 +126,6 @@ async def test_plan_fact_provider_prefers_delta_manager() -> None:
 
     assert result == expected_fact
     delta_manager.calculate_fact_data.assert_awaited_once_with(
-        fake_adv.shop_id,
         fake_adv.adv_id,
         fake_adv.sales_predict_method,
         fake_adv.nmids,
