@@ -7,13 +7,13 @@ from uuid import uuid4
 import pytest
 from zoneinfo import ZoneInfo
 
-from app.modules.shop_runner.service_manager.increment_fact_data_manager.dto.fact_stat_snapshot import (
+from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.dto.fact_stat_snapshot import (  # noqa: E501
     FactStatSnapshot,
 )
-from app.modules.shop_runner.service_manager.increment_fact_data_manager.last_state_manager import (
+from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.last_state_manager import (
     LastStateManager,
 )
-from app.modules.shop_runner.service_manager.increment_fact_data_manager.fact_stat_repository import (
+from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.fact_stat_repository import (
     FactStatRepository,
 )
 
