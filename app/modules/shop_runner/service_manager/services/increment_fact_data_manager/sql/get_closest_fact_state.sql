@@ -16,7 +16,7 @@ SELECT
     src_ts,
     version,
     abs(toUnixTimestamp(src_ts) - toUnixTimestamp(%(target_ts)s)) AS time_distance
-FROM default_db.fact_stat_states_prev
+FROM default_db.fact_stat_states
 WHERE complex_adv_id = %(complex_adv_id)s
 ORDER BY time_distance ASC
 LIMIT 1
