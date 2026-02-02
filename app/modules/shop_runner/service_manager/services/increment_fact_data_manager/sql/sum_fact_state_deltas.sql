@@ -1,6 +1,6 @@
 SELECT
-    if(sum(carts) = 0, 1, sum(carts))  AS carts,
-    if(sum(orders) = 0, 1, sum(orders))  AS orders,
+    if(sum(carts) <= 0, 1, sum(carts))  AS carts,
+    if(sum(orders) <= 0, 1, sum(orders))  AS orders,
     sum(spend)  AS spend
 FROM
 (
