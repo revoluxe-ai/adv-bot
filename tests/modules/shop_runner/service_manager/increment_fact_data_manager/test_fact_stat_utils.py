@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock
 import pytest
 from zoneinfo import ZoneInfo
 
-from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.bucket_calculator import (
+from app.modules.shop_runner.service_manager.increment_fact_data_manager.bucket_calculator import (
     BucketCalculator,
 )
-from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.redis_lock_manager import (
+from app.modules.shop_runner.service_manager.increment_fact_data_manager.redis_lock_manager import (
     RedisLockManager,
 )
-from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.version_calculator import (
+from app.modules.shop_runner.service_manager.increment_fact_data_manager.version_calculator import (
     VersionCalculator,
 )
 

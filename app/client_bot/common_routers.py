@@ -65,6 +65,9 @@ from .user_interface.handlers import (
     rec_system_mode_toggle,
     campaign_activity,
 )
+from .user_interface.handlers.incremental_stats_toggle import (
+    router as incremental_stats_toggle_router,
+)
 from .user_interface.handlers.bidder_coroutine_type_toggle import (
     router as bidder_coroutine_type_toggle_router,
 )
@@ -79,10 +82,10 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
-common_router.message.middleware.register(ReturnToStart())
+_ = common_router.message.middleware.register(ReturnToStart())
 
 common_router.include_routers(manual_update_phrase_position_router)
-common_router.include_router(auto_updater_target_place_setting_router)
+common_router.include_routers(auto_updater_target_place_setting_router)
 common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
@@ -93,6 +96,7 @@ common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(common_bid_toggle.router)
+common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
@@ -124,9 +128,9 @@ common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defi
 common_router.include_routers(shop_settings.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
-common_router.callback_query.middleware(
+_ = common_router.callback_query.middleware(
     middleware_for_adding_task.AddingMessageTaskMiddleWare()
 )
-common_router.message.middleware(
+_ = common_router.message.middleware(
     middleware_for_adding_task.AddingMessageTaskMiddleWare()
 )

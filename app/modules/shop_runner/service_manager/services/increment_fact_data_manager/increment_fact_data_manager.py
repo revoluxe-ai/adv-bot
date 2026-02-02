@@ -17,6 +17,7 @@ from .fact_stat_repository import FactStatRepository
 from .last_state_manager import LastStateManager
 from .redis_lock_manager import RedisLockManager
 from .version_calculator import VersionCalculator
+from ...old_modules.setting_auto_updater.data_classes import FactData
 
 logger = logging.getLogger(__name__)
 

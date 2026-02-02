@@ -30,7 +30,7 @@ class AdvSettingAutoUpdater:
     async def get_fact_data_and_stat(
         self, keywords: list[CalculatedKeyword]
     ) -> tuple[FactData, CommonAdvsStatData]:
-        return await self._provider.get_fact_data_and_stat(keywords)
+        return await self._provider.get_fact_data(keywords)
 
     async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
         return await self._provider.get_fact_data(keywords)
