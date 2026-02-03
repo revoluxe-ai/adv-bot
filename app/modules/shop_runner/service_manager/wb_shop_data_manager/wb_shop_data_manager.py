@@ -182,7 +182,8 @@ class WBShopDataManager:
         keywords: list[CalculatedKeyword],
     ) -> FactData:
         manager = PlanFactProvider(complex_adv.adv_setting)
-        return await manager.get_fact_data(keywords)
+        stat = await manager.get_stat_data(keywords)
+        return await manager.get_fact_data(stat)
 
     async def _collect_adv_data_parts(
         self,
