@@ -758,9 +758,10 @@ class CoroutinesManager:
 
         results = await run_tasks(handlers=handlers, max_workers=16, tasks_manager=self._tasks_manager)
 
-        for result, adv in zip(complex_advs, results):
+        for adv, result in zip(complex_advs, results):
             if isinstance(result, BaseException):
-                logger.exception("Ошибка срезания БС: %s", result)
+                logger.exception("Ошибка срезания БС adv_id: %s:  %s", adv.adv_id,
+                                 result)
 
         return None
 
