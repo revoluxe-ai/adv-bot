@@ -57,6 +57,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
     run_tasks,
 )
+from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
 from .services.auto_reset_bid_service import AutoResetBidService
@@ -742,15 +743,26 @@ class CoroutinesManager:
 
         return None
 
+    @while_coroutine_decorator(60, 60)
+    async def white_list_tail_trimmer(self):
+        from .services.white_list_trimmer import WhiteListTrimmer
+        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.white_list_mode == WhiteListMode.TAIL_TRIMMING]
+        if not complex_advs:
+            return None
+        trimmer = WhiteListTrimmer()
+        handlers: list[Callable[[], Awaitable[None]]] = []
+        for adv in complex_advs:
+            handler = functools.partial(trimmer.trim, adv)
+            handlers.append(handler)
 
+        results = await run_tasks(handlers=handlers, max_workers=16, tasks_manager=self._tasks_manager)
 
+        for result, adv in zip(complex_advs, results):
+            if isinstance(result, BaseException):
+                logger.exception("Ошибка срезания БС: %s", result)
 
-
-
-
-
-
-
+        return None
 
 
 # TODO: Переделать граф зависимостей

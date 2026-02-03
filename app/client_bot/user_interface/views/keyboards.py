@@ -39,6 +39,9 @@ from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
 )
+from app.modules.white_list_mode_settings.telegram.main_callback import (
+    WhiteListModeMenu,
+)
 from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
     BidderCoroutineTypeToggle,
 )
@@ -80,6 +83,12 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    white_list_button = InlineKeyboardButton(
+        text="Режимы Управления Белым Списком",
+        callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
+    )
+    _ = builder.row(white_list_button)
     incremental_stats_text = (
         "Включить инкрементальную статистику ПП"
         if not adv_setting.use_incremental_stats
