@@ -9,7 +9,7 @@ from .keyboards import WhiteListModeKeyboards
 
 
 class WhiteListModeMenuMessage(TextWithKeyboard):
-    def __init__(self, bot: Bot, chat_id: int, adv_id: int, state: FSMContext):
+    def __init__(self, bot: Bot, chat_id: int, adv_id: int):
         super().__init__(bot, chat_id)
         self._adv_id = adv_id
         self._adv: AdvSetting | None = None

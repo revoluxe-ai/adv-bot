@@ -42,4 +42,4 @@ async def toggle_white_list_mode(
         f"Выбран режим {new_mode.name.replace('_', ' ').title()}.",
     )
 
-    await WhiteListModeMenuMessage(bot, chat_id, adv_setting.adv_id, state)()
+    await WhiteListModeMenuMessage(bot, chat_id, adv_setting.adv_id)()

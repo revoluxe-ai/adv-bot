@@ -17,4 +17,4 @@ async def white_list_mode_menu_handler(
 ) -> None:
     chat_id = callback.from_user.id
     adv_id = callback_data.adv_id
-    await WhiteListModeMenuMessage(bot, chat_id, adv_id, state)()
+    await WhiteListModeMenuMessage(bot, chat_id, adv_id)()
