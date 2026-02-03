@@ -9,12 +9,12 @@ from zoneinfo import ZoneInfo
 from unittest.mock import AsyncMock
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.dto.fact_stat_snapshot import \
+    FactStatSnapshot
 from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.fact_sales_delta_manager import (
     FactSalesDeltaManager,
 )
-from app.modules.shop_runner.service_manager.increment_fact_data_manager.dto.fact_stat_snapshot import (
-    FactStatSnapshot,
-)
+
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
 )
