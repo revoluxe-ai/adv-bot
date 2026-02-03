@@ -118,7 +118,7 @@ class WBShopDataManager:
         for complex_adv in complex_advs:
             search_adv_id = complex_adv.search_adv_id
             if search_adv_id not in search_adv_bids:
-                raise RuntimeError(f"Missing search bids for adv_id={search_adv_id}")
+                logger.error('Нет Поисковой Кампании в Коплексе, пропускаю')
             current_search_bids = search_adv_bids[search_adv_id]
             handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
             handlers.append(handler)
