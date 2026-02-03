@@ -105,6 +105,16 @@ class WBShopDataManager:
     @single_run()
     async def get_wb_advs_dto(self, complex_advs: list[ComplexAdv] ) -> list[WBAdvDTO]:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs_with_search_adv: list[ComplexAdv] = []
+        for complex_adv in complex_advs:
+            search_adv_id = complex_adv.search_adv_id
+            if search_adv_id is None:
+                logger.error('Нет Поисковой Кампании в Коплексе, пропускаю')
+                continue
+            complex_advs_with_search_adv.append(complex_adv)
+
+        complex_advs = complex_advs_with_search_adv
+
         if not complex_advs:
             return []
         min_bids, search_adv_bids = await asyncio.gather(
@@ -115,12 +125,14 @@ class WBShopDataManager:
             raise RuntimeError("Missing min_bids for advs")
 
         handlers: list[Callable[[], Awaitable[WBAdvDataParts]]] = []
+
+        complex_advs_with_bids: list[ComplexAdv] = []
         for complex_adv in complex_advs:
             search_adv_id = complex_adv.search_adv_id
-            if search_adv_id not in search_adv_bids:
-                logger.error('Нет Поисковой Кампании в Коплексе, пропускаю')
-                continue
-            current_search_bids = search_adv_bids[search_adv_id]
+            current_search_bids = search_adv_bids.get(search_adv_id)
+            if current_search_bids is None:
+                logger.error('не получены текущие ставки для ComplexAdv.adv_id: " %s', complex_adv.adv_id)
+            complex_advs_with_bids.append(complex_adv)
             handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
             handlers.append(handler)
 
