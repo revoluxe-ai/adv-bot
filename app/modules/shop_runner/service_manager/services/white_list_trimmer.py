@@ -32,7 +32,7 @@ class WhiteListTrimmer:
     @staticmethod
     def _get_top_key_in_auto_position(keywords: list[CalculatedKeyword]) -> int | None:
          for n, kw in enumerate(keywords):
-             if kw.hard_status == HardStatus.IN_TEST:
+             if kw.hard_status == 1:
                  return n
          else:
              return None
