@@ -183,6 +183,25 @@ class FactStatRepository:
             return None
         return dict(zip(result.column_names, result.result_rows[0]))
 
+    async def has_zero_interval_record(
+        self,
+        shop_id: UUID,
+        complex_adv_id: int,
+        bucket_start: datetime,
+    ) -> bool:
+        query = self._load_sql("has_zero_interval_record.sql")
+        params = {
+            "shop_id": str(shop_id),
+            "complex_adv_id": complex_adv_id,
+            "bucket_start": bucket_start,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(
+                    query, parameters=params
+                )
+        return bool(result.result_rows)
+
     async def get_carts_to_orders_ratio(
         self,
         nmids: list[int],
