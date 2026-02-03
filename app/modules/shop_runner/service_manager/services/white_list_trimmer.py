@@ -4,7 +4,6 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
-from tests.factories import HardStatus
 import logging
 
 
@@ -20,7 +19,7 @@ class WhiteListTrimmer:
         keywords_below = keywords[top_key_in_auto_position:]
         candidates_to_auto_ids: list[int] = []
         for kw in keywords_below:
-            if kw.hard_status == HardStatus.WHITELIST:
+            if kw.hard_status == 2:
                 candidates_to_auto_ids.append(kw.keyword_setting_original_id)
         stmt = update(KeywordSetting)\
         .where(KeywordSetting.id.in_(candidates_to_auto_ids))\
