@@ -26,7 +26,7 @@ class WhiteListModeKeyboards:
             WhiteListMode.ABOVE_MIN_RATING,
         ]
 
-        current_mode = self._adv_setting.white_list_mode or WhiteListMode.TAIL_TRIMMING
+        current_mode = self._adv_setting.white_list_mode or WhiteListMode.ABOVE_MIN_RATING
 
         for label, mode in zip(labels, modes):
             prefix = "✅ " if mode == current_mode else ""
