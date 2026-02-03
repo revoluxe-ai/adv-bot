@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Tuple
 from uuid import UUID
 
@@ -55,3 +55,19 @@ class LastStateManager:
             key, snapshot.to_redis(), ex=self._TTL
         )
         await self._repository.upsert_prev_fact_state(snapshot)
+
+    @staticmethod
+    def _zero_interval_key(shop_id: str, complex_adv_id: int, day_date: date) -> str:
+        return f"zero:fact:{shop_id}:{complex_adv_id}:{day_date.isoformat()}"
+
+    async def is_zero_interval_recorded(
+        self, shop_id: str, complex_adv_id: int, day_date: date
+    ) -> bool:
+        key = self._zero_interval_key(shop_id, complex_adv_id, day_date)
+        return bool(await self._redis_client.get(key))
+
+    async def set_zero_interval_recorded(
+        self, shop_id: str, complex_adv_id: int, day_date: date
+    ) -> None:
+        key = self._zero_interval_key(shop_id, complex_adv_id, day_date)
+        _ = await self._redis_client.set(key, "1", ex=self._TTL)
