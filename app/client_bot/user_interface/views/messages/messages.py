@@ -76,13 +76,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _campaign_type_display(campaign_type: AdvType) -> str:
+def _campaign_type_display(campaign_type: AdvType | None) -> str:
+    if campaign_type is None:
+        return "Общий бюджет"
     if campaign_type == AdvType.SEARCH:
         return "Аукцион"
-    elif campaign_type == AdvType.AUTO:
+    if campaign_type == AdvType.AUTO:
         return "Авто"
-    else:
-        raise ValueError('Неверных тип Кампании')
+    raise ValueError("Неверный тип кампании")
 
 
 # def reverse_date(date_str: str) -> str:
@@ -507,17 +508,27 @@ class CampaignActivityMenu(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        auto_limit = self._adv_setting.auto_budget_daily_limit or 0
-        search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
         watchdog_status = (
             "включен"
             if getattr(self._adv_setting, "auto_budget_watchdog_enabled", False)
             else "выключен"
         )
+        use_common = getattr(self._adv_setting, "use_common_budget", False)
+        if use_common:
+            common_limit = self._adv_setting.common_budget_daily_limit or 0
+            limits_block = (
+                f"• Общий бюджет на обе РК: {common_limit} руб/сутки\n"
+            )
+        else:
+            auto_limit = self._adv_setting.auto_budget_daily_limit or 0
+            search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
+            limits_block = (
+                f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
+                f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+            )
         return (
             f"Управление активностью РК «{self._adv_setting.name}»\n"
-            f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
-            f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+            f"{limits_block}"
             f"• Контроль запуска кампаний и пополнения бюджета: {watchdog_status}\n"
             "Выберите, какую активность хотите скорректировать:"
         )
@@ -533,7 +544,7 @@ class CampaignActivityTargetMenu(TextWithKeyboard):
         bot: Bot,
         chat_id: int,
         adv_setting: AdvSetting,
-        campaign_type: AdvType,
+        campaign_type: AdvType | None,
         current_limit: int,
     ):
         super().__init__(bot, chat_id)
@@ -559,7 +570,7 @@ class CampaignActivityTargetMenu(TextWithKeyboard):
 
 
 class CampaignActivityChangeLimit(Text):
-    def __init__(self, bot: Bot, chat_id: int, campaign_type: AdvType):
+    def __init__(self, bot: Bot, chat_id: int, campaign_type: AdvType | None):
         super().__init__(bot, chat_id)
         self._campaign_type = campaign_type
 

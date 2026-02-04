@@ -10,6 +10,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+import app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager as _ckm_module
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
@@ -181,12 +182,10 @@ async def test_no_whitelist_uses_default_min_ctr(complex_adv_mock):
     )
     
     pre_keywords = [good_kw, bad_kw]
-    
-    with patch(
-        "app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager.settings"
-    ) as settings_mock:
-        settings_mock.DEFAULT_MIN_CTR = default_min_ctr
-        
+
+    settings_mock = MagicMock()
+    settings_mock.DEFAULT_MIN_CTR = default_min_ctr
+    with patch.object(_ckm_module, "settings", settings_mock):
         result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
             complex_adv_mock, pre_keywords
         )

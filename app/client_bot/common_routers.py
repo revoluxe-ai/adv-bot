@@ -67,6 +67,9 @@ from .user_interface.handlers import (
     campaign_activity,
     white_list_mode_toggle,
 )
+from .user_interface.handlers.common_budget_mode_toggle import (
+    router as common_budget_mode_toggle_router,
+)
 from .user_interface.handlers.incremental_stats_toggle import (
     router as incremental_stats_toggle_router,
 )
@@ -98,6 +101,7 @@ common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
+common_router.include_routers(common_budget_mode_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)

@@ -271,6 +271,11 @@ class AutoBudgetWatchdogToggle(CallbackData, prefix="auto_budget_watchdog_toggle
     new_status: bool
 
 
+class CommonBudgetModeToggle(CallbackData, prefix="common_budget_mode_toggle"):
+    adv_setting_original_id: int
+    new_status: bool
+
+
 class IncrementalStatsToggle(CallbackData, prefix="incremental_stats_toggle"):
     adv_setting_original_id: int
     new_status: bool

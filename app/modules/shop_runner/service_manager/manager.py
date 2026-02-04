@@ -467,7 +467,7 @@ class CoroutinesManager:
                 )
         return None
 
-    @while_coroutine_decorator(settings.UPDATE_FULL_ADV_STAT_PERIOD, 60)
+    @while_coroutine_decorator(60, 60)
     async def auto_budget_watchdog(self) -> None:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -475,42 +475,66 @@ class CoroutinesManager:
         candidates: list[ComplexAdv] = [
             adv
             for adv in advs
-            if (
-                ((adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id)
-                or ((adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id)
+            if adv.auto_budget_watchdog_enabled
+            and (
+                (
+                    adv.use_common_budget
+                    and (adv.common_budget_daily_limit or 0) > 0
+                    and (adv.adv_id or adv.search_adv_id)
+                )
+                or (
+                    not adv.use_common_budget
+                    and (
+                        ((adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id)
+                        or (
+                            (adv.search_auto_budget_daily_limit or 0) > 0
+                            and adv.search_adv_id
+                        )
+                    )
+                )
             )
         ]
-        candidates = [adv for adv in candidates if adv.auto_budget_watchdog_enabled]
         if not candidates:
             return None
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         handlers: list[Callable[[], Awaitable[AutoBudgetEnsureResult | None]]] = []
-        task_specs: list[tuple[AdvSetting, AdvType, int]] = []
+        task_specs: list[tuple[AdvSetting, AdvType, int | None]] = []
 
         for adv in candidates:
-            campaign_checks: list[tuple[AdvType, int]] = []
-            if (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
-                campaign_checks.append((AdvType.AUTO, adv.adv_id))
-            if (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
-                campaign_checks.append(
-                    (AdvType.SEARCH, adv.search_adv_id)
-                )
             adv_setting = adv.adv_setting
             adv_setting_id = adv_setting.id
-            for campaign_type, adv_id in campaign_checks:
+            if adv.use_common_budget:
                 handlers.append(
                     lambda adv_setting_id_=adv_setting_id,
-                           campaign_type_=campaign_type,
-                           wb_manager_hub_=wb_manager_hub:
-                    (
-                        self._auto_budget_service.ensure_budget(
+                           wb_manager_hub_=wb_manager_hub: (
+                        self._auto_budget_service.ensure_common_budget(
                             adv_setting_id_,
-                            campaign_type_,
                             wb_manager_hub_,
                         )
                     )
                 )
-                task_specs.append((adv_setting, campaign_type, adv_id))
+                task_specs.append((adv_setting, AdvType.AUTO, None))
+            else:
+                campaign_checks: list[tuple[AdvType, int]] = []
+                if (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
+                    campaign_checks.append((AdvType.AUTO, adv.adv_id))
+                if (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
+                    campaign_checks.append(
+                        (AdvType.SEARCH, adv.search_adv_id)
+                    )
+                for campaign_type, adv_id in campaign_checks:
+                    handlers.append(
+                        lambda adv_setting_id_=adv_setting_id,
+                               campaign_type_=campaign_type,
+                               wb_manager_hub_=wb_manager_hub: (
+                            self._auto_budget_service.ensure_budget(
+                                adv_setting_id_,
+                                campaign_type_,
+                                wb_manager_hub_,
+                            )
+                        )
+                    )
+                    task_specs.append((adv_setting, campaign_type, adv_id))
 
         if not handlers:
             return None
@@ -521,20 +545,26 @@ class CoroutinesManager:
             max_workers=max_workers,
         )
 
-        for (adv_setting, campaign_type, adv_id), result in zip(task_specs, results):
+        for (adv_setting, spec_campaign_type, spec_adv_id), result in zip(
+            task_specs, results
+        ):
             if isinstance(result, Exception):
                 logger.error(
                     "Auto budget ensure failed for shop_id=%s, adv_id=%s, campaign=%s: %s",
                     self.shop_id,
-                    adv_id,
-                    campaign_type,
+                    spec_adv_id,
+                    spec_campaign_type,
                     result,
                     exc_info=True,
                 )
                 continue
-            self._log_auto_budget_result(
-                adv_setting, result, campaign_type, adv_id
-            )
+            if result is not None:
+                self._log_auto_budget_result(
+                    adv_setting,
+                    result,
+                    result.campaign_type,
+                    result.adv_id,
+                )
         return None
 
     @while_coroutine_decorator(5 * 60, 60)

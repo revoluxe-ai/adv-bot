@@ -305,6 +305,14 @@ class ComplexAdv:
         return bool(self._adv_setting.auto_budget_watchdog_enabled)
 
     @property
+    def use_common_budget(self) -> bool:
+        return bool(self._adv_setting.use_common_budget)
+
+    @property
+    def common_budget_daily_limit(self) -> int | None:
+        return self._adv_setting.common_budget_daily_limit
+
+    @property
     def search_adv_id(self) -> int | None:
         return self._adv_setting.search_adv_id
 

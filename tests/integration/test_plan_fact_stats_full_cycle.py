@@ -6,7 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
+from app.modules.common_advs_stat.data_manager import CommonAdvsStatData
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
@@ -22,6 +24,31 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
+
+
+def _make_minimal_common_advs_stat_data(adv_setting: object) -> CommonAdvsStatData:
+    """Минимальный CommonAdvsStatData для тестов с моками (без обращения к CH/Postgres)."""
+    zero_stat = SmallFullAdvStat(
+        views=0, clicks=0, spend=0.0, added_to_cart=0, orders=0, sum_price=0.0
+    )
+    return CommonAdvsStatData(
+        adv_setting=adv_setting,
+        keywords=[],
+        min_rating_by_orders=None,
+        hard_min_ctr=None,
+        auto_cpm=0,
+        auction_cpm=None,
+        total_spend=0.0,
+        addition_spend_in_adv=0.0,
+        all_orders_for_last_days=0,
+        mean_orders_for_last_days=0.0,
+        mean_price_for_order=1.0,
+        spend_for_inner_advs=None,
+        full_adv_stat_for_last_days_for_auto_adv=zero_stat,
+        full_adv_stat_for_last_days_for_auction=zero_stat,
+        common_stat=None,
+        sales_predict_method=FactMethods.DIRECT_SALES,
+    )
 
 
 def _create_manager(wb_api, redis_client_wrapper):
@@ -207,6 +234,12 @@ async def test_full_cycle_error_handling_for_some_advs(
         side_effect=[plan1, plan2],
     ), patch.object(
         PlanFactProvider,
+        "get_stat_data",
+        new=AsyncMock(
+            return_value=_make_minimal_common_advs_stat_data(MagicMock()),
+        ),
+    ), patch.object(
+        PlanFactProvider,
         "get_fact_data",
         new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
     ), pytest.raises(Exception, match="Fact data error"):
@@ -273,6 +306,13 @@ async def test_full_cycle_multiple_advs_simultaneously(
         patch(
             "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
             side_effect=plans,
+        ),
+        patch.object(
+            PlanFactProvider,
+            "get_stat_data",
+            new=AsyncMock(
+                return_value=_make_minimal_common_advs_stat_data(MagicMock()),
+            ),
         ),
         patch.object(
             PlanFactProvider,
