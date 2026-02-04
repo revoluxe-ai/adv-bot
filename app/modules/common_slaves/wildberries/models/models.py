@@ -35,6 +35,7 @@ from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from .white_list_mode import WhiteListMode
 
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
@@ -586,6 +587,11 @@ class AdvSetting(BaseTable):
     updater_common_bid_in_search_adv_active_status: Mapped[bool] = \
          mapped_column(Boolean, nullable=True, default=False, server_default=text("false"))
 
+    # TODO: Как будет время - установить дефолт в БД для старых строк
+    white_list_mode: Mapped[WhiteListMode] = mapped_column(SAEnum(WhiteListMode),
+                                                           nullable=True,
+                                                           default=WhiteListMode.ABOVE_MIN_RATING,
+                                                           server_default=WhiteListMode.ABOVE_MIN_RATING.name,)
 
     __table_args__ = (
         # Составной индекс для основного запроса
