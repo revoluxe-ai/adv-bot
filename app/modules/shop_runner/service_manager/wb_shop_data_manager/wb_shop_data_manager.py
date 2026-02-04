@@ -203,7 +203,7 @@ class WBShopDataManager:
             plan=plan,
             fact=fact,
             keywords=keywords,
-            current_common_bids_in_search_adv=search_adv_bids
+            current_common_bids_in_search_adv=search_adv_bids # noqa
         )
 
     @single_run()
