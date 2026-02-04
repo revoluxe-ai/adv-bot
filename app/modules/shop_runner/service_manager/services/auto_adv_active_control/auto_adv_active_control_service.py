@@ -286,13 +286,6 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.start_auction_campaign(adv)
-            elif common_limit == 0 and search_status == WBAdvActiveStatus.STARTED:
-                logger.info(
-                    "Auto budget watcher: pausing auction campaign adv_id=%s shop_id=%s",
-                    adv_id,
-                    adv.shop_id,
-                )
-                await self._wb_modifier.pause_auction_campaign(adv)
             return None
 
         spend_today = await self._get_spend_for_adv(adv_id, start_of_day, end_of_day)
