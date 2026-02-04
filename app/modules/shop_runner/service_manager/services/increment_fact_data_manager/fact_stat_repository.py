@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional, cast
 from uuid import UUID
@@ -112,7 +112,10 @@ class FactStatRepository:
                 )
         if not result.result_rows:
             return None
-        row = dict(zip(result.column_names, result.result_rows[0]))
+        column_names: tuple[Any, ...] = result.column_names
+        row_values = result.result_rows[0]
+        row: dict[str, Any] = cast(dict[str, Any],
+         dict(zip(column_names, row_values)))
         return FactStatSnapshot.from_clickhouse(row)
 
     async def upsert_prev_fact_state(self, snapshot: FactStatSnapshot) -> None:
@@ -137,4 +140,83 @@ class FactStatRepository:
         }
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
-                await client.query(query, parameters=params)
+                _ =await client.query(query, parameters=params)
+
+    async def fetch_closest_snapshot(
+        self,
+        complex_adv_id: int,
+        target_ts: datetime,
+    ) -> FactStatSnapshot | None:
+        query = self._load_sql("get_closest_fact_state.sql")
+        params = {
+            "complex_adv_id": complex_adv_id,
+            "target_ts": target_ts,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(
+                    query, parameters=params
+                )
+        if not result.result_rows:
+            return None
+        row = dict(zip(result.column_names, result.result_rows[0]))
+        return FactStatSnapshot.from_clickhouse(row)
+
+    async def aggregate_deltas_between(
+        self,
+        complex_adv_id: int,
+        from_ts: datetime,
+        to_ts: datetime,
+    ) -> dict[str, Any] | None:
+        query = self._load_sql("sum_fact_state_deltas.sql")
+        params = {
+            "complex_adv_id": complex_adv_id,
+            "from_ts": from_ts,
+            "to_ts": to_ts,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(
+                    query, parameters=params
+                )
+        if not result.result_rows:
+            return None
+        return dict(zip(result.column_names, result.result_rows[0]))
+
+    async def has_zero_interval_record(
+        self,
+        shop_id: UUID,
+        complex_adv_id: int,
+        bucket_start: datetime,
+    ) -> bool:
+        query = self._load_sql("has_zero_interval_record.sql")
+        params = {
+            "shop_id": str(shop_id),
+            "complex_adv_id": complex_adv_id,
+            "bucket_start": bucket_start,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(
+                    query, parameters=params
+                )
+        return bool(result.result_rows)
+
+    async def get_carts_to_orders_ratio(
+        self,
+        nmids: list[int],
+        from_date: date,
+        to_date: date,
+    ) -> float:
+        query = self._load_sql("get_carts_to_orders_ratio.sql")
+        params = {
+            "nmids": nmids,
+            "from_date": from_date,
+            "to_date": to_date,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(
+                    query, parameters=params
+                )
+        return result.result_rows[0][0]

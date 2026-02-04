@@ -60,6 +60,13 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
 from .services.auto_reset_bid_service import AutoResetBidService
+from .services.clusters_adv_stat_updater.clusters_adv_stat_updater import (
+    ClustersAdvStatUpdater,
+)
+from .services.clusters_adv_stat_updater.di import ClustersAdvStatUpdaterContainer
+from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_from_wl_by_mean_auto_ctr_manager import (
+    delete_keywords_from_wl_by_mean_auto_ctr,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -307,8 +314,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(15, 60)
     async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
         # TODO: Добавить функцию-фильтр для ComplexAdvs getter
-        from .services import delete_keywords_from_wl_by_mean_auto_ctr
-
         complex_advs: Sequence[ComplexAdv] = (
             await self._wb_shop_data_manager.get_complex_advs()
         )
@@ -534,8 +539,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
-        from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
@@ -547,8 +550,6 @@ class CoroutinesManager:
     @while_coroutine_decorator(24 * 60 * 60, 60)
     async def update_clusters_adv_stats_history(self) -> None:
         """Обновление статистики кластеров за прошлые дни."""
-        from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
-
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()

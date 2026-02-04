@@ -26,7 +26,8 @@ class PlanFactController:
         )
         keywords = await adv.get_keywords()
         provider = PlanFactProvider(adv.adv_setting)
-        fact = await provider.get_fact_data(keywords)
+        stat = await provider.get_stat_data(keywords)
+        fact = await provider.get_fact_data(stat)
 
         # Создаем DTO
         dto = PlanFactStatDTO.create(
@@ -58,7 +59,8 @@ class PlanFactController:
         )
         keywords = await adv.get_keywords()
         provider = PlanFactProvider(adv.adv_setting)
-        fact = await provider.get_fact_data(keywords)
+        stat = await provider.get_stat_data(keywords)
+        fact = await provider.get_fact_data(stat)
 
         # Создаем DTO
         dto = PlanFactStatDTO.create(

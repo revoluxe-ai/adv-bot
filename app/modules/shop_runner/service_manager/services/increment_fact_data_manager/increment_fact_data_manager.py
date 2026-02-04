@@ -4,7 +4,8 @@ import logging
 import socket
 import time
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timezone
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -13,6 +14,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from .bucket_calculator import BucketCalculator
 from .clickhouse_fact_stat_writer import ClickHouseFactStatWriter
 from .dto import FactStatRow
+from .dto.fact_stat_snapshot import FactStatSnapshot
 from .fact_stat_repository import FactStatRepository
 from .last_state_manager import LastStateManager
 from .redis_lock_manager import RedisLockManager
@@ -39,6 +41,7 @@ class IncrementFactDataManager:
         self._stat_repository = stat_repository or FactStatRepository()
         self._lock_manager = lock_manager or RedisLockManager(redis_client)
         self._writer = writer or ClickHouseFactStatWriter()
+        self._tz = ZoneInfo("Europe/Moscow")
         self._last_state_manager = LastStateManager(redis_client, self._stat_repository)
         self._lock_ttl = min(max(lock_ttl, 60), 180)
         hostname = socket.gethostname()
@@ -123,6 +126,9 @@ class IncrementFactDataManager:
 
             if prev_snapshot.src_ts.date() != current_snapshot.src_ts.date():
                 await self._last_state_manager.persist(current_snapshot)
+                await self._ensure_zero_interval_recorded(
+                    shop_uuid, complex_adv_id, current_snapshot
+                )
                 logger.info(
                     "fact15m_reset_day shop_id=%s complex_adv_id=%s bucket=%s prev_source=%s reset_day=true",
                     shop_id,
@@ -194,6 +200,81 @@ class IncrementFactDataManager:
     ) -> str:
         bucket_epoch = int(bucket_start.timestamp())
         return f"lock:fact:{shop_id}:{complex_adv_id}:{bucket_epoch}"
+
+    def _to_moscow_time(self, src_ts: datetime) -> datetime:
+        if src_ts.tzinfo is None:
+            src_ts = src_ts.replace(tzinfo=timezone.utc)
+        return src_ts.astimezone(self._tz)
+
+    def _snapshot_date(self, snapshot: FactStatSnapshot) -> date:
+        return self._to_moscow_time(snapshot.src_ts).date()
+
+    def _start_of_day(self, src_ts: datetime) -> datetime:
+        localized = self._to_moscow_time(src_ts)
+        return localized.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    @staticmethod
+    def _build_zero_interval_row(
+        bucket_start: datetime, snapshot: FactStatSnapshot
+    ) -> FactStatRow:
+        return FactStatRow(
+            bucket_start=bucket_start,
+            shop_id=snapshot.shop_id,
+            complex_adv_id=snapshot.complex_adv_id,
+            views_adv_sum=snapshot.views_adv_sum,
+            clicks_adv_sum=snapshot.clicks_adv_sum,
+            carts_adv_sum=snapshot.carts_adv_sum,
+            orders_adv_sum=snapshot.orders_adv_sum,
+            spend_adv_sum_rub=snapshot.spend_adv_sum_rub,
+            orders_sum_adv_rub=snapshot.orders_sum_adv_rub,
+            open_card_sum=snapshot.open_card_sum,
+            carts_card_sum=snapshot.carts_card_sum,
+            orders_card_sum=snapshot.orders_card_sum,
+            orders_sum_card_rub=snapshot.orders_sum_card_rub,
+            buy_outs_sum=snapshot.buy_outs_sum,
+            src_ts=snapshot.src_ts,
+            version=snapshot.version,
+        )
+
+    async def _ensure_zero_interval_recorded(
+        self, shop_id: UUID, complex_adv_id: int, snapshot: FactStatSnapshot
+    ) -> None:
+        current_date = self._snapshot_date(snapshot)
+        shop_key = str(shop_id)
+        if await self._last_state_manager.is_zero_interval_recorded(
+            shop_key, complex_adv_id, current_date
+        ):
+            return
+        bucket_start = self._start_of_day(snapshot.src_ts)
+        if await self._stat_repository.has_zero_interval_record(
+            shop_id, complex_adv_id, bucket_start
+        ):
+            await self._last_state_manager.set_zero_interval_recorded(
+                shop_key, complex_adv_id, current_date
+            )
+            return
+        row = self._build_zero_interval_row(bucket_start, snapshot)
+        try:
+            await self._writer.insert(row)
+        except Exception:
+            logger.exception(
+                "fact15m_zero_interval_insert_error shop_id=%s complex_adv_id=%s bucket=%s version=%s",
+                shop_id,
+                complex_adv_id,
+                bucket_start,
+                snapshot.version,
+            )
+            return
+        await self._last_state_manager.set_zero_interval_recorded(
+            shop_key, complex_adv_id, current_date
+        )
+        logger.info(
+            "fact15m_zero_interval_insert_ok shop_id=%s complex_adv_id=%s bucket=%s version=%s",
+            shop_id,
+            complex_adv_id,
+            bucket_start,
+            snapshot.version,
+        )
 
 
 

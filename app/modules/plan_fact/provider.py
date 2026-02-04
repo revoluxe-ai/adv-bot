@@ -11,34 +11,47 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.fact_sales_delta_manager import (
+    FactSalesDeltaManager,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class PlanFactProvider:
-    def __init__(self, adv: AdvSetting, max_last_period: int = 2):
+    def __init__(
+        self,
+        adv: AdvSetting,
+        max_last_period: int = 2,
+        fact_sales_manager: FactSalesDeltaManager | None = None,
+    ):
         self._adv = adv
         self._max_last_period = max_last_period
+        self._fact_sales_manager = fact_sales_manager or FactSalesDeltaManager()
 
-    async def get_fact_data_and_stat(
-        self, keywords: list[CalculatedKeyword]
-    ) -> tuple[FactData, CommonAdvsStatData]:
-        stat = await self._get_stat_data(keywords)
-        return self._get_fact_data_from_stat(stat), stat
-
-    async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
-        stat = await self._get_stat_data(keywords)
+    async def get_fact_data(
+        self, stat: CommonAdvsStatData
+    ) ->FactData:
+        if self._adv.use_incremental_stats:
+            fact_data: FactData | None = await self._fact_sales_manager.calculate_fact_data(
+                self._adv.adv_id,
+                self._adv.sales_predict_method,
+                self._adv.nmids,
+            )
+            if fact_data:
+                return fact_data
         return self._get_fact_data_from_stat(stat)
 
-    async def _get_stat_data(
+
+    async def get_stat_data(
         self, keywords: list[CalculatedKeyword]
     ) -> CommonAdvsStatData:
         common_stat_manager = CommonAdvsStatDataManager()
         return await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
-
-    def _get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
+    @staticmethod
+    def _get_fact_data_from_stat(common_stat_data: CommonAdvsStatData) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None
         assert common_stat_data.mean_price_for_order is not None
         assert common_stat_data.all_orders_for_last_days is not None
@@ -64,8 +77,8 @@ class PlanFactProvider:
         try:
             return PlanData(
                 orders=plan_orders,
-                target_pay_for_order=target_pay_for_order,
-                max_pay_for_order=max_pay_for_order,
+                target_pay_for_order=target_pay_for_order, # noqa
+                max_pay_for_order=max_pay_for_order, # noqa
             )
         except Exception as exc:
             logger.exception("Ошибка получения плана")

@@ -118,7 +118,7 @@ class WBShopDataManager:
         for complex_adv in complex_advs:
             search_adv_id = complex_adv.search_adv_id
             if search_adv_id not in search_adv_bids:
-                raise RuntimeError(f"Missing search bids for adv_id={search_adv_id}")
+                logger.error('Нет Поисковой Кампании в Комплексе, пропускаю')
             current_search_bids = search_adv_bids[search_adv_id]
             handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
             handlers.append(handler)
@@ -169,7 +169,8 @@ class WBShopDataManager:
         keywords: list[CalculatedKeyword],
     ) -> FactData:
         manager = PlanFactProvider(complex_adv.adv_setting)
-        return await manager.get_fact_data(keywords)
+        stats = await manager.get_stat_data(keywords)
+        return await manager.get_fact_data(stats)
 
     async def _collect_adv_data_parts(
         self,
@@ -188,7 +189,7 @@ class WBShopDataManager:
             plan=plan,
             fact=fact,
             keywords=keywords,
-            current_common_bids_in_search_adv=search_adv_bids
+            current_common_bids_in_search_adv=search_adv_bids # noqa
         )
 
     @single_run()
@@ -204,11 +205,9 @@ class WBShopDataManager:
         )
         complex_advs: list[ComplexAdv] = []
         for adv in adv_settings:
-            search_adv = (
-                search_adv_idv.get(adv.search_adv_id)
-                if adv.search_adv_id is not None
-                else None
-            )
+            search_adv = search_adv_idv.get(adv.search_adv_id)
+            if not search_adv:
+                continue
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
                 adv_setting=adv,

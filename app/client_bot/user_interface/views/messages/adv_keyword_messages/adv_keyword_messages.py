@@ -139,9 +139,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._keywords = clear_keywords
 
         plan_fact_provider = PlanFactProvider(self._adv_setting)
-
-        fact_data, stat_data = await plan_fact_provider.get_fact_data_and_stat(
-            self._keywords
+        stat_data = await plan_fact_provider.get_stat_data(self._keywords)
+        fact_data = await plan_fact_provider.get_fact_data(
+            stat_data
         )
 
         self._fact_data: FactData = fact_data
