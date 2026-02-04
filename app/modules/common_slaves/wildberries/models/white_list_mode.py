@@ -1,7 +1,7 @@
-from enum import StrEnum, auto
+from enum import StrEnum
 
 
 class WhiteListMode(StrEnum):
-    ACTIVE_ONLY_WHITE_LIST = auto()
-    TAIL_TRIMMING = auto()
-    ABOVE_MIN_RATING = auto()
+    ACTIVE_ONLY_WHITE_LIST = "ACTIVE_ONLY_WHITE_LIST"
+    TAIL_TRIMMING = "TAIL_TRIMMING"
+    ABOVE_MIN_RATING = "ABOVE_MIN_RATING"
