@@ -21,6 +21,9 @@ class WhiteListTrimmer:
         for kw in keywords_below:
             if kw.hard_status == 2:
                 candidates_to_auto_ids.append(kw.keyword_setting_original_id)
+
+        if not candidates_to_auto_ids:
+            return None
         stmt = update(KeywordSetting)\
         .where(KeywordSetting.id.in_(candidates_to_auto_ids))\
         .values(hard_status=1)
