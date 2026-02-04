@@ -26,7 +26,8 @@ async def toggle_common_budget_mode(
                 select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             )
             adv_setting = result.scalar_one_or_none()
-            if adv_setting is not None and adv_setting.common_budget_daily_limit is None:
+            if adv_setting is not None and (adv_setting.common_budget_daily_limit is None or
+                    adv_setting.common_budget_daily_limit == 0):
                 common_limit = (adv_setting.auto_budget_daily_limit or 0) + (
                     adv_setting.search_auto_budget_daily_limit or 0
                 )
