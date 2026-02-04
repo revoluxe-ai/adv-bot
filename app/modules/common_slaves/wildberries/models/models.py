@@ -444,8 +444,8 @@ class AdvSetting(BaseTable):
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
-        server_default="false",
+        default=True,
+        server_default="true",
         comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
     )  # поле от недоделанного модуля инкрементальной статистики
     min_block_position = mapped_column(Integer, nullable=True, default=0)
