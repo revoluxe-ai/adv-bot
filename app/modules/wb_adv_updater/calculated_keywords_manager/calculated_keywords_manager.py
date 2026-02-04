@@ -216,7 +216,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
-                if pre_kw.bidder_status == BidderKeywordStatus.BAD:
+                if best_keyword_status:
                     state = KeywordState(
                         status=KeywordStatus.GOOD,
                         reason=KeywordStatusReason.BEST_KEYWORD,
