@@ -1,5 +1,7 @@
 [tool.poetry.scripts]
 pyright-strict = "pyright:cli --project pyrightconfig_strict.json"
+pyright = "pyright:cli --project pyrightconfig.json"
+
 
 [tool.poetry]
 name = "adv-bot"

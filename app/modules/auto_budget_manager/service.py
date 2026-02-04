@@ -538,6 +538,296 @@ class AutoBudgetService:
         return f"auto_budget_lock:{adv_setting_id}:{campaign_type}"
 
     @staticmethod
+    def _lock_key_common(adv_setting_id: int) -> str:
+        return f"auto_budget_lock:{adv_setting_id}:common"
+
+    @staticmethod
+    async def _get_daily_topup_sums_common(
+        adv_setting_id: int,
+        date_msk: datetime.date,
+    ) -> tuple[float, float]:
+        """Sum successful and all topups for adv_setting_id on date (any campaign_type)."""
+        filters = (
+            WBAutoBudgetTopUp.adv_setting_id == adv_setting_id,
+            WBAutoBudgetTopUp.date_msk == date_msk,
+        )
+        success_stmt = (
+            select(func.coalesce(func.sum(WBAutoBudgetTopUp.amount), 0))
+            .where(*filters, WBAutoBudgetTopUp.status == "success")
+        )
+        attempts_stmt = (
+            select(func.coalesce(func.sum(WBAutoBudgetTopUp.amount), 0))
+            .where(*filters)
+        )
+        async with sm(read_only=True) as session:
+            success_result = await session.execute(success_stmt)
+            attempts_result = await session.execute(attempts_stmt)
+        success_total = success_result.scalar() or 0
+        attempts_total = attempts_result.scalar() or 0
+        return float(success_total), float(attempts_total)
+
+    async def ensure_common_budget(
+        self,
+        adv_setting_id: int,
+        wb_manager_hub: "WBManagerHub",
+    ) -> AutoBudgetEnsureResult | None:
+        """Ensure combined budget for both campaigns (common budget mode)."""
+        lock_key = self._lock_key_common(adv_setting_id)
+        acquired = await self._acquire_lock(lock_key)
+        if not acquired:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LOCK_BUSY,
+                campaign_type=AdvType.AUTO,
+                adv_id=None,
+                spend_today=0.0,
+                reason="Auto-budget common lock is busy",
+            )
+        try:
+            return await self._ensure_common_budget_locked(
+                adv_setting_id, wb_manager_hub
+            )
+        except Exception:  # noqa
+            logger.exception("Failed to ensure common budget")
+            return None
+        finally:
+            await self._release_lock(lock_key)
+
+    async def _ensure_common_budget_locked(
+        self,
+        adv_setting_id: int,
+        wb_manager_hub: "WBManagerHub",
+    ) -> AutoBudgetEnsureResult:
+        async with sm(read_only=True) as session:
+            adv_setting = await session.get(AdvSetting, adv_setting_id)
+        if adv_setting is None:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=AdvType.AUTO,
+                adv_id=None,
+                spend_today=0.0,
+                reason="AdvSetting is not found",
+            )
+        if not getattr(adv_setting, "use_common_budget", False):
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=AdvType.AUTO,
+                adv_id=None,
+                spend_today=0.0,
+                reason="Common budget mode is disabled",
+            )
+        limit = adv_setting.common_budget_daily_limit or 0
+        adv_id_auto = adv_setting.adv_id
+        adv_id_search = adv_setting.search_adv_id
+        if adv_id_search is None:
+            logger.error('Нет adv_id search_adv')
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=AdvType.AUTO,
+                adv_id=None,
+                spend_today=0.0,
+                reason="Common budget mode is disabled",
+            )
+        if limit <= 0:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_DISABLED,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=0.0,
+                reason="Common budget limit is not configured",
+            )
+        now_msk = self._now_msk()
+        date_msk = now_msk.date()
+        spend_auto = await self._calculate_spend_today(adv_id_auto, now_msk)
+
+        spend_search = await self._calculate_spend_today(adv_id_search, now_msk)
+        spend_today = spend_auto + spend_search
+        last_update_auto = await self._get_last_full_stat_update(adv_id_auto)
+        last_update_search = await self._get_last_full_stat_update(adv_id_search)
+        last_full = last_update_auto
+        if last_update_search is not None and (
+            last_full is None or last_update_search > last_full
+        ):
+            last_full = last_update_search
+        if last_full is not None and now_msk > last_full + timedelta(
+            seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD
+        ):
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                reason="Last full adv stats too old",
+            )
+        successful_topups, attempt_sum = await self._get_daily_topup_sums_common(
+            adv_setting_id=adv_setting_id,
+            date_msk=date_msk,
+        )
+        if successful_topups >= limit:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                available_limit=0,
+                reason="Daily successful top-ups already reached limit",
+            )
+        if attempt_sum / 2 >= limit:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                available_limit=0,
+                reason="Daily top-up attempts doubled exceed limit",
+            )
+        if spend_today >= limit:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                available_limit=0,
+                reason="Daily spend limit exceeded",
+            )
+
+        info_auto = await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_auto)
+        budget_auto = info_auto.total
+        info_search = await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_search)
+        budget_search = info_search.total
+        combined_budget = (budget_auto or 0) + (budget_search or 0)
+        if (
+                0 < self._min_balance <= combined_budget
+        ):
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                budget_total_before=int(combined_budget),
+                available_limit=limit - spend_today,
+            )
+        planned_amount = self._compute_planned_amount()
+        if planned_amount <= 0:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                available_limit=max(limit - spend_today, 0),
+                reason="Computed planned amount is zero",
+            )
+
+        if (budget_auto or 0) <= (budget_search or 0):
+            target_adv_id = adv_id_auto
+            target_campaign_type = AdvType.AUTO
+        else:
+            target_adv_id = adv_id_search
+            target_campaign_type = AdvType.SEARCH
+        current_budget = (
+            budget_auto if target_campaign_type == AdvType.AUTO else budget_search
+        )
+        balance_response = await wb_manager_hub.wb_modifier.get_campaign_balance()
+        if not balance_response:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.BALANCE_NOT_GET,
+                campaign_type=target_campaign_type,
+                adv_id=target_adv_id,
+                spend_today=spend_today,
+                available_limit=limit - spend_today,
+                reason="Balance response is None",
+            )
+        _, balance_type_source = select_balance_source_from_response(
+            balance_response
+        )
+        async with sm(read_only=False) as session:
+            topup_log = await self._create_topup_entry(
+                session=session,
+                adv_setting_id=adv_setting.id,
+                adv_id=target_adv_id,
+                campaign_type=target_campaign_type,
+                date_msk=date_msk,
+                amount=planned_amount,
+                balance_type=balance_type_source,
+                budget_before=current_budget,
+                request_payload={
+                    "amount": planned_amount,
+                    "balance_type": balance_type_source,
+                    "campaign_type": target_campaign_type,
+                    "common_budget": True,
+                },
+            )
+        try:
+            deposit_result = await wb_manager_hub.wb_modifier.top_up_budget(
+                adv_id=target_adv_id,
+                amount=planned_amount,
+                balance_type=balance_type_source,
+                return_total=True,
+            )
+        except Exception as exc:  # pragma: no cover
+            logger.error(
+                "Auto budget common top-up failed for adv_id=%s: %s",
+                target_adv_id,
+                exc,
+                exc_info=True,
+            )
+            async with sm(read_only=False) as session:
+                await self._mark_topup_entry(
+                    session,
+                    topup_log,
+                    status="failed",
+                    reason=str(exc),
+                )
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.TOPUP_FAILED,
+                campaign_type=target_campaign_type,
+                adv_id=target_adv_id,
+                spend_today=spend_today,
+                planned_amount=planned_amount,
+                available_limit=limit - spend_today,
+                reason=str(exc),
+                budget_total_before=current_budget,
+                topup_id=topup_log.id,
+            )
+        verification_total = await self._verify_budget(
+            target_adv_id,
+            (current_budget or 0) + planned_amount,
+            wb_manager_hub=wb_manager_hub,
+        )
+        final_status = (
+            "success"
+            if verification_total is not None
+            else "unverified"
+        )
+        async with sm(read_only=False) as session:
+            await self._mark_topup_entry(
+                session,
+                topup_log,
+                status=final_status,
+                budget_after=verification_total,
+                response_payload=deposit_result.raw if deposit_result else {},
+                reason=None
+                if verification_total is not None
+                else "WB budget did not report expected growth",
+            )
+        result_status = (
+            AutoBudgetEnsureStatus.TOPPED_UP
+            if verification_total is not None
+            else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
+        )
+        return AutoBudgetEnsureResult(
+            status=result_status,
+            campaign_type=target_campaign_type,
+            adv_id=target_adv_id,
+            spend_today=spend_today,
+            planned_amount=planned_amount,
+            available_limit=limit - spend_today,
+            budget_total_before=current_budget,
+            budget_total_after=verification_total,
+            raw_deposit_response=deposit_result.raw if deposit_result else None,
+            topup_id=topup_log.id,
+        )
+
+    @staticmethod
     def _now_msk() -> datetime.datetime:
         return datetime.datetime.now(datetime.timezone.utc).astimezone(MSK_TZ)
 

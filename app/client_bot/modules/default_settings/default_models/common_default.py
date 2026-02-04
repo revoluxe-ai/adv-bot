@@ -41,6 +41,7 @@ class CampaignDefaultsV1:
     auto_update_white_list: bool = True
     auto_update_target_place: bool = True
     auto_budget_watchdog_enabled: bool = True
+    use_common_budget: bool = True
 
     # --- LEGACY / SANITATION ---
     target_ctr_mode: bool = False
