@@ -132,6 +132,7 @@ class WBShopDataManager:
             current_search_bids = search_adv_bids.get(search_adv_id)
             if current_search_bids is None:
                 logger.error('не получены текущие ставки для ComplexAdv.adv_id: " %s', complex_adv.adv_id)
+                continue
             complex_advs_with_bids.append(complex_adv)
             handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
             handlers.append(handler)
