@@ -52,14 +52,14 @@ async def toggle_common_budget_mode(
             values: dict[str, bool | int] = {"use_common_budget": new_status}
             if adv_setting is not None:
                 common = adv_setting.common_budget_daily_limit or 0
-                auto = getattr(adv_setting, "auto_budget_daily_limit", None)
-                search = getattr(adv_setting, "search_auto_budget_daily_limit", None)
-                if auto is None and search is None:
+                auto = getattr(adv_setting, "auto_budget_daily_limit", 0)
+                search = getattr(adv_setting, "search_auto_budget_daily_limit", 0)
+                if auto == 0 and search == 0:
                     values["auto_budget_daily_limit"] = common // 2
                     values["search_auto_budget_daily_limit"] = common - (common // 2)
-                elif auto is None:
+                elif auto == 0:
                     values["auto_budget_daily_limit"] = max(0, common - (search or 0))
-                elif search is None:
+                elif search == 0:
                     values["search_auto_budget_daily_limit"] = max(0, common - (auto or 0))
             stmt = (
                 update(AdvSetting)
