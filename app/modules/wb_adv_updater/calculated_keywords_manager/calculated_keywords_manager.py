@@ -29,6 +29,8 @@ from cashews import cache, noself  # pyright: ignore
 
 import typing
 
+from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
+
 if typing.TYPE_CHECKING:
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
@@ -269,7 +271,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=reason,
                     best_keyword_status=best_keyword_status
                 )
-            elif pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
+            elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
+                    pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
                 status = KeywordStatus.GOOD
                 reason = KeywordStatusReason.MORE_THEN_RATING_BY_ORDERS
                 state = KeywordState(status=status,
