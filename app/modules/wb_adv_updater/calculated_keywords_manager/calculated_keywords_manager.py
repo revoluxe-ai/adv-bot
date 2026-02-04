@@ -216,8 +216,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 best_keyword_status = True if pre_kw == best_keyword else False
                 if pre_kw.bidder_status == BidderKeywordStatus.BAD:
                     state = KeywordState(
-                        status=KeywordStatus.BAD,
-                        reason=KeywordStatusReason.BIDDER_BAD_STATUS,
                         status=KeywordStatus.GOOD,
                         reason=KeywordStatusReason.BEST_KEYWORD,
                         best_keyword_status=best_keyword_status
