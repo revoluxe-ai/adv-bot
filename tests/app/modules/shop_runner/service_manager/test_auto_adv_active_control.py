@@ -243,6 +243,8 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
     wb_modifier.start_auction_campaign.assert_not_called()
 
 
+
+
 @pytest.mark.asyncio
 async def test_auto_adv_active_control_common_budget_pauses_when_combined_spend_exceeds_limit():
     """При общем бюджете обе кампании ставятся на паузу, если суммарный расход >= лимита."""

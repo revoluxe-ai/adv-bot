@@ -6,6 +6,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 
 
 @pytest.mark.asyncio
