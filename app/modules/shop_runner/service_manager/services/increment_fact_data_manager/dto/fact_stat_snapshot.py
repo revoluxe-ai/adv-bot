@@ -48,6 +48,7 @@ class FactStatSnapshot(BaseModel):
             self.complex_adv_id,
             self.views_adv_sum,
             self.clicks_adv_sum,
+            self.carts_adv_sum,
             self.orders_adv_sum,
             self.spend_adv_sum_rub,
             self.orders_sum_adv_rub,
