@@ -7,7 +7,7 @@ from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
 from app.client_bot.user_interface.views.get_main_text import get_main_text
-from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
+from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
@@ -37,7 +37,8 @@ def get_shop_keyboard(
     # Добавляем кнопку админ-панели в самый верх, если пользователь - администратор
     if user_telegram_id in const.ADMINS:
         admin_button = InlineKeyboardButton(
-            text="Панель администратора", callback_data=AdminBonus(action="menu").pack()
+            text="Панель администратора",
+            callback_data=AdminPanel(action="menu").pack(),
         )
         keyboard_buttons.append([admin_button])
 
@@ -45,6 +46,12 @@ def get_shop_keyboard(
         text="Добавить магазин", callback_data=callbacks.ShopNew().pack()
     )
     keyboard_buttons.append([button])
+
+    user_balance_button = InlineKeyboardButton(
+        text="Мой баланс",
+        callback_data=callbacks.UserBalanceMenu().pack(),
+    )
+    keyboard_buttons.append([user_balance_button])
 
     # button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
     # keyboard_buttons.append([button])

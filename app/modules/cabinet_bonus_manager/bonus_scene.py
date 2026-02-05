@@ -491,10 +491,13 @@ class BonusScene(Scene, state="bonus_scene"):
         await message.answer("Введите shop_id кабинета для проверки бонусов:")
 
 
-def register_bonus_scene(router: Router):
-    """Регистрирует сцену для управления бонусами в указанном роутере"""
-    scene_registry = SceneRegistry(router)
-    scene_registry.add(BonusScene)
+def register_bonus_scene(router: Router, scene_registry: SceneRegistry | None = None):
+    """Регистрирует сцену для управления бонусами в указанном роутере.
+    Если scene_registry передан, сцена в него не добавляется (должна быть добавлена снаружи).
+    """
+    if scene_registry is None:
+        scene_registry = SceneRegistry(router)
+        scene_registry.add(BonusScene)
 
     router.message.register(
         BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS)

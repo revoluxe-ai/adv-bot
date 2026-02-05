@@ -125,7 +125,7 @@ class BillingEventManager:
         self,
         *,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         correlation_id: str | None = None,
         session: AsyncSession | None = None,
     ) -> None:

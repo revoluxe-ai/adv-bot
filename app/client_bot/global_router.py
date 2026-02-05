@@ -1,8 +1,16 @@
 from aiogram import Router
+from aiogram.fsm.scene import SceneRegistry
 from aiogram.utils import callback_answer
 
+from ..modules.admin_user_balance.scene import (
+    UserBalanceScene,
+    register_user_balance_scene,
+)
 from ..modules.balance_manager import add_balance_router
-from ..modules.cabinet_bonus_manager.bonus_scene import register_bonus_scene
+from ..modules.cabinet_bonus_manager.bonus_scene import (
+    BonusScene,
+    register_bonus_scene,
+)
 from .common_routers import common_router
 from .user_interface.handlers import start
 
@@ -11,13 +19,20 @@ global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )
 
+# Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
+# иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.
+scene_registry = SceneRegistry(global_router)
+scene_registry.add(BonusScene)
+scene_registry.add(UserBalanceScene)
+
 # ВАЖНО: порядок подключения роутеров критически важен для правильной обработки команды /start
 # Сначала регистрируем bonus_router и bonus_scene
 # bonus_router содержит обработчик команды /start, который очищает состояния модуля
 # Но не использует return, позволяя глобальному обработчику start.router выполниться
 global_router.include_router(start.router)
 # global_router.include_router(bonus_router)
-register_bonus_scene(global_router)
+register_bonus_scene(global_router, scene_registry=scene_registry)
+register_user_balance_scene(global_router, scene_registry=scene_registry)
 
 # Затем регистрируем глобальные обработчики, особенно важный /start
 
