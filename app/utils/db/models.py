@@ -5,6 +5,7 @@ __all__ = (
     "Payment",
     "UserBalancePayment",
     "UserBonusPayment",
+    "PassedGateReason",
 )
 
 import datetime
@@ -12,8 +13,10 @@ import typing
 
 from sqlalchemy import (
     BIGINT,
+    Boolean,
     Column,
     DateTime,
+    Enum as SAEnum,
     Float,
     ForeignKey,
     Index,
@@ -23,6 +26,8 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.utils.db.passed_gate_reason import PassedGateReason
 
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import (
@@ -61,6 +66,18 @@ class User(BaseTable):
     )
     user_bonus_payments: Mapped[list["UserBonusPayment"]] = relationship(
         "UserBonusPayment", back_populates="user", uselist=True
+    )
+    passed_gate: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    passed_gate_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    passed_gate_reason: Mapped[PassedGateReason | None] = mapped_column(
+        SAEnum(PassedGateReason), nullable=True
+    )
+    last_invite_issued_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, nullable=True
     )
     __table_args__ = (Index("user_telegram_id_index", user_telegram_id),)
 
