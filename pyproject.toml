@@ -1,6 +1,6 @@
 [tool.poetry.scripts]
-pyright-strict = "pyright:cli --project pyrightconfig_strict.json"
-pyright = "pyright:cli --project pyrightconfig.json"
+pyright = "app.pyright_entry:main"
+pyright-strict = "app.pyright_strict_entry:main"
 
 
 [tool.poetry]
@@ -166,6 +166,7 @@ factory-boy = "^3.3.3"
 cashews = "^7.4.4"
 types-pytz = "^2025.2.0.20251108"
 [tool.poetry.group.dev.dependencies]
+pyright = "^1.1.400"
 pytest = "8.0.2"
 alembic = "1.13.1"
 pytest-asyncio = "0.21.0"
