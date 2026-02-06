@@ -11,20 +11,30 @@ from app.modules.balance_manager.exceptions import (
     InvalidAmountError,
     UserNotFoundError,
 )
-from app.utils.db.models import UserBalancePayment
+from app.utils.db.models import UserBalancePayment, UserBonusPayment
 
 
 pytestmark = pytest.mark.asyncio
 
 
-def _make_user_with_balance(balance: float, user_id: int = 1):
-    """User с заданной суммой по user_balance_payments."""
+def _make_user_with_balance(
+    balance: float,
+    user_id: int = 1,
+    bonus: float = 0.0,
+):
+    """User с заданной суммой по user_balance_payments и опционально user_bonus_payments."""
     user = MagicMock()
     user.id = user_id
     user.user_telegram_id = 12345
     pay = MagicMock(spec=UserBalancePayment)
     pay.amount = balance
     user.user_balance_payments = [pay]
+    if bonus != 0:
+        bonus_pay = MagicMock(spec=UserBonusPayment)
+        bonus_pay.amount = bonus
+        user.user_bonus_payments = [bonus_pay]
+    else:
+        user.user_bonus_payments = []
     return user
 
 
@@ -64,30 +74,58 @@ def _make_async_cm(session):
 
 @patch("app.modules.balance_manager.balance_service.sm")
 async def test_transfer_user_balance_to_cabinet_success(mock_sm):
-    """Успешный перевод: достаточный баланс, создаются обе записи."""
+    """Успешный перевод: достаточный баланс, создаётся списание с баланса и зачисление на кабинет."""
     user = _make_user_with_balance(1000.0)
     cabinet = MagicMock()
     add_calls = []
     session, _ = _make_session_mock(user=user, cabinet=cabinet, add_calls=add_calls)
     mock_sm.return_value = _make_async_cm(session)
 
-    user_payment, cabinet_payment = await transfer_user_balance_to_cabinet(
-        user_telegram_id=12345,
-        cabinet_id=1,
-        amount=100.0,
+    user_balance_payment, user_bonus_payment, cabinet_payment = (
+        await transfer_user_balance_to_cabinet(
+            user_telegram_id=12345,
+            cabinet_id=1,
+            amount=100.0,
+        )
     )
 
     assert len(add_calls) == 2
-    first, second = add_calls[0], add_calls[1]
-    # UserBalancePayment: negative amount, operation_type transfer_to_cabinet
-    if hasattr(first, "amount") and first.amount < 0:
-        ubp, wbp = first, second
-    else:
-        wbp, ubp = first, second
-    assert ubp.amount == -100.0
-    assert ubp.operation_type == "transfer_to_cabinet"
-    assert wbp.amount == 100.0
-    assert wbp.wb_cabinet_id == 1
+    assert user_balance_payment is not None
+    assert user_balance_payment.amount == -100.0
+    assert user_balance_payment.operation_type == "transfer_to_cabinet"
+    assert user_bonus_payment is None
+    assert cabinet_payment.amount == 100.0
+    assert cabinet_payment.wb_cabinet_id == 1
+    session.commit.assert_awaited_once()
+
+
+@patch("app.modules.balance_manager.balance_service.sm")
+async def test_transfer_user_balance_to_cabinet_success_from_balance_and_bonus(
+    mock_sm,
+):
+    """Успешный перевод при достаточном (balance + bonus), но недостаточном только балансе."""
+    user = _make_user_with_balance(balance=30.0, bonus=80.0)
+    cabinet = MagicMock()
+    add_calls = []
+    session, _ = _make_session_mock(user=user, cabinet=cabinet, add_calls=add_calls)
+    mock_sm.return_value = _make_async_cm(session)
+
+    user_balance_payment, user_bonus_payment, cabinet_payment = (
+        await transfer_user_balance_to_cabinet(
+            user_telegram_id=12345,
+            cabinet_id=1,
+            amount=50.0,
+        )
+    )
+
+    assert len(add_calls) == 3
+    assert user_balance_payment is not None
+    assert user_balance_payment.amount == -30.0
+    assert user_bonus_payment is not None
+    assert user_bonus_payment.amount == -20.0
+    assert user_bonus_payment.operation_type == "transfer_to_cabinet"
+    assert cabinet_payment.amount == 50.0
+    assert cabinet_payment.wb_cabinet_id == 1
     session.commit.assert_awaited_once()
 
 
@@ -95,6 +133,28 @@ async def test_transfer_user_balance_to_cabinet_success(mock_sm):
 async def test_transfer_user_balance_to_cabinet_insufficient_balance(mock_sm):
     """Недостаточно средств на личном балансе -> InsufficientBalanceError."""
     user = _make_user_with_balance(50.0)
+    cabinet = MagicMock()
+    add_calls = []
+    session, _ = _make_session_mock(user=user, cabinet=cabinet, add_calls=add_calls)
+    mock_sm.return_value = _make_async_cm(session)
+
+    with pytest.raises(InsufficientBalanceError, match="Недостаточно средств"):
+        await transfer_user_balance_to_cabinet(
+            user_telegram_id=12345,
+            cabinet_id=1,
+            amount=100.0,
+        )
+
+    assert len(add_calls) == 0
+    session.commit.assert_not_awaited()
+
+
+@patch("app.modules.balance_manager.balance_service.sm")
+async def test_transfer_user_balance_to_cabinet_insufficient_total_balance_and_bonus(
+    mock_sm,
+):
+    """Недостаточно средств по сумме баланса и бонусов -> InsufficientBalanceError."""
+    user = _make_user_with_balance(balance=50.0, bonus=30.0)
     cabinet = MagicMock()
     add_calls = []
     session, _ = _make_session_mock(user=user, cabinet=cabinet, add_calls=add_calls)

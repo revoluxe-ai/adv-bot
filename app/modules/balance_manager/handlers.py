@@ -570,8 +570,8 @@ async def waiting_for_amount(
 
     if add_balance_source == "user_balance":
         try:
-            user_balance, _ = await get_user_balance(user_telegram_id)
-            available = user_balance
+            user_balance, user_bonus = await get_user_balance(user_telegram_id)
+            available = user_balance + user_bonus
         except Exception:
             available = 0.0
         if amount_int > available:
