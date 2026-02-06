@@ -101,4 +101,5 @@ class TargetPlaceDownExecutor(BaseExecutor):
         if new_place < current_target_place:
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         # Efficiency = 1 (выполнили одно изменение на 1)
+        # TODO: Тут надо переделать логику и включить возможность отрицательного efficiency, например, когда появились новые ограничения и нужно сделать противоположние задаче экзекутера действия
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)
