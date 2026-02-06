@@ -19,17 +19,18 @@ router = Router()
 sm = get_async_session_maker
 
 
-def _limit_attr_name(campaign_type: AdvType) -> str:
+def _limit_attr_name(campaign_type: AdvType | None) -> str:
+    if campaign_type is None:
+        return "common_budget_daily_limit"
     if campaign_type == AdvType.SEARCH:
         return "search_auto_budget_daily_limit"
-    elif campaign_type == AdvType.AUTO:
+    if campaign_type == AdvType.AUTO:
         return "auto_budget_daily_limit"
-    else:
-        raise ValueError("Invalid campaign type")
+    raise ValueError("Invalid campaign type")
 
 
-def _get_limit_value(adv_setting: AdvSetting, campaign_type: AdvType) -> int:
-    value = getattr(adv_setting, _limit_attr_name(campaign_type))
+def _get_limit_value(adv_setting: AdvSetting, campaign_type: AdvType | None) -> int:
+    value = getattr(adv_setting, _limit_attr_name(campaign_type), 0)
     return value or 0
 
 
@@ -61,15 +62,14 @@ async def open_activity_target(
 ):
     if callback.message is None:
         raise ValueError("Нет сообщения")
-    if not callback_data.campaign_type:
-        return
     adv_setting = await _load_adv_setting(callback_data.adv_setting_original_id)
-    current_limit = _get_limit_value(adv_setting, callback_data.campaign_type)
+    campaign_type = callback_data.campaign_type
+    current_limit = _get_limit_value(adv_setting, campaign_type)
     await messages.CampaignActivityTargetMenu(
         callback.bot,
         callback.message.chat.id,
         adv_setting,
-        callback_data.campaign_type,
+        campaign_type,
         current_limit,
     )()
 
@@ -89,7 +89,9 @@ async def start_limit_change(
     )
     await state.set_state(states.CampaignActivity.waiting_for_new_limit)
     await messages.CampaignActivityChangeLimit(
-        callback.bot, callback.message.chat.id, callback_data.campaign_type
+        callback.bot,
+        callback.message.chat.id,
+        callback_data.campaign_type,
     )()
 
 
@@ -100,21 +102,20 @@ async def turn_off_limit(
 ):
     if callback.message is None:
         raise ValueError("Нет сообщения")
-    if not callback_data.campaign_type:
-        return
+    campaign_type = callback_data.campaign_type
     async with sm(read_only=False) as session:
         adv_setting = await session.get(
             AdvSetting, callback_data.adv_setting_original_id
         )
         if not adv_setting:
             raise ValueError("AdvSetting not found")
-        setattr(adv_setting, _limit_attr_name(callback_data.campaign_type), 0)
+        setattr(adv_setting, _limit_attr_name(campaign_type), 0)
         await session.commit()
         await messages.CampaignActivityTargetMenu(
             callback.bot,
             callback.message.chat.id,
             adv_setting,
-            callback_data.campaign_type,
+            campaign_type,
             0,
         )()
 
@@ -124,13 +125,14 @@ async def set_new_limit(message: types.Message, state: FSMContext):
     data = await state.get_data()
     adv_setting_id = data.get("adv_setting_id")
     campaign_type_value = data.get("campaign_type")
-    if not adv_setting_id or not campaign_type_value:
+    if adv_setting_id is None:
         await message.answer("Произошла ошибка. Попробуйте ещё раз.")
         await state.clear()
         return
 
-
-    campaign_type = AdvType(campaign_type_value)
+    campaign_type: AdvType | None = (
+        AdvType(campaign_type_value) if campaign_type_value is not None else None
+    )
 
     try:
         limit = int(message.text.replace(",", ".").strip())

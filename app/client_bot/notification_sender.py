@@ -55,11 +55,13 @@ class NotificationSender:
             True if a bot successfully sent the message, False otherwise.
         """
         queue = await self._next_token_order()
+        
+        success: bool = False
         for token in queue:
             bot = self._ensure_bot(token)
             try:
                 _ = await bot.send_message(chat_id, text, **kwargs)
-                return True
+                success = True
             except (TelegramForbiddenError, TelegramBadRequest) as exc:
                 logger.warning(
                     "Skipping token %s while sending notification: %s",
@@ -74,13 +76,13 @@ class NotificationSender:
                     exc,
                     exc_info=True,
                 )
-                raise
-
-        logger.warning(
-            "All notification tokens failed to deliver message to chat %s",
-            chat_id,
-        )
-        return False
+                logger.error(
+                    "Failed to send notification with token %s: %s",
+                    token,
+                    exc,
+                    exc_info=True,
+                )
+        return success
 
 
 _notification_sender: NotificationSender | None = None

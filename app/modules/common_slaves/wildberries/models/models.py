@@ -444,8 +444,8 @@ class AdvSetting(BaseTable):
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
-        server_default="false",
+        default=True,
+        server_default="true",
         comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
     )  # поле от недоделанного модуля инкрементальной статистики
     min_block_position = mapped_column(Integer, nullable=True, default=0)
@@ -516,20 +516,20 @@ class AdvSetting(BaseTable):
     rec_system_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
-
+    # TODO: Завернуть server_default в text
     hide_zero_views_keywords: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
 
     max_balance_adding_for_day: Mapped[int] = mapped_column(
-        Integer, nullable=True, default=0, server_default="0"
+        Integer, nullable=True, default=0, server_default=text("0")
     )
 
     auto_budget_daily_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
-        server_default="0",
+        server_default=text("0"),
         comment="Автолимит РАСХОДА бюджета (руб/сутки) для автоматической кампании, 0 = отключено",
     )
     search_auto_budget_daily_limit: Mapped[int] = mapped_column(
@@ -538,6 +538,21 @@ class AdvSetting(BaseTable):
         default=0,
         server_default="0",
         comment="Автолимит РАСХОДА бюджета (руб/сутки) для аукционной кампании, 0 = отключено",
+    )
+
+    use_common_budget: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+        comment="Режим общего бюджета на обе РК (Поиск + Авто) для auto_budget_watchdog",
+    )
+    common_budget_daily_limit: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        default=0,
+        server_default=text('0'),
+        comment="Общий дневной лимит расхода (руб/сутки) на обе РК; при первом включении use_common_budget = сумма лимитов",
     )
 
     auto_adv_target_status: Mapped[bool | None] = mapped_column(

@@ -12,7 +12,8 @@ FROM
     WHERE complex_adv_id = %(complex_adv_id)s
       AND src_ts >= %(from_ts)s
       AND src_ts <= %(to_ts)s
+      AND event_date BETWEEN toDate(%(from_ts)s) AND toDate(%(to_ts)s)
     GROUP BY
-        complex_adv_id,
-        bucket_start
+        event_date,
+        event_id
 )

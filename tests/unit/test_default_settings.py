@@ -51,6 +51,7 @@ def test_apply_defaults_to_adv_setting():
         adv_setting.auto_budget_watchdog_enabled
         == defaults_v1.auto_budget_watchdog_enabled
     )
+    assert adv_setting.use_common_budget == defaults_v1.use_common_budget
     assert adv_setting.target_ctr_mode == defaults_v1.target_ctr_mode
     assert adv_setting.new_auto_min_ctr_mode == defaults_v1.new_auto_min_ctr_mode
     assert adv_setting.reset_place == defaults_v1.reset_place

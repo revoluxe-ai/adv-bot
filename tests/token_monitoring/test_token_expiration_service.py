@@ -27,6 +27,7 @@ class _InvalidExpiresToken(_DummyToken):
         raise ValueError("invalid JWT data")
 
 from app.modules.token_monitoring.services.token_expiration_service import (
+    _utcnow,
     TokenExpirationService,
     run_token_expiration_check,
     get_expiring_tokens_summary,
@@ -71,11 +72,10 @@ class TestTokenExpirationService:
         token = MagicMock(spec=WBToken)
         token.id = 1
         token.shop_id = shop_id
-        # Set expiry to exactly days_until_expiry days from now at midnight to avoid timing issues
-        now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        now = _utcnow()
         token.expires = now + datetime.timedelta(
-            days=days_until_expiry + 1
-        )  # +1 to ensure it's in the future
+            days=days_until_expiry, minutes=1
+        )
         token.categories = {"Контент", "Статистика"}
         token.read_only = False
         token.check_valid.return_value = True

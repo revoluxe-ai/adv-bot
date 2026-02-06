@@ -61,7 +61,7 @@ class IncrementFactDataManager:
         lock_value = f"{self._writer_id}:{uuid.uuid4().hex[:6]}"
 
         try:
-            current_snapshot = await self._stat_repository.fetch_current_snapshot(
+            current_snapshot: FactStatSnapshot | None = await self._stat_repository.fetch_current_snapshot(
                 shop_uuid,
                 complex_adv_id,
                 bucket_start,
@@ -168,6 +168,8 @@ class IncrementFactDataManager:
                 buy_outs_sum=delta["buy_outs_sum"],
                 src_ts=current_snapshot.src_ts,
                 version=current_snapshot.version,
+                event_date=current_snapshot.src_ts.date(),
+                event_id=current_snapshot.event_id,
             )
 
             start = time.perf_counter()

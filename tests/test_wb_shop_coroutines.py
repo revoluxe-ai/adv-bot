@@ -17,6 +17,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,

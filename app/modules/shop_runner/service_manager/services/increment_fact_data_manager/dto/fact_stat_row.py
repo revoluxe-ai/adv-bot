@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 
@@ -23,3 +23,5 @@ class FactStatRow:
     buy_outs_sum: int
     src_ts: datetime
     version: int
+    event_id: int
+    event_date: date
