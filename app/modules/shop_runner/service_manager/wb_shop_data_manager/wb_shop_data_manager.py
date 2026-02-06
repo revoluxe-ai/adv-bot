@@ -146,7 +146,7 @@ class WBShopDataManager:
         )
 
         successful_parts: list[WBAdvDataParts] = []
-        for adv, result in zip(complex_advs, results):
+        for adv, result in zip(complex_advs_with_bids, results):
             if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка сбора план-факта для adv_id=%s shop_id=%s: %s",
