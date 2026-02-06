@@ -7,7 +7,7 @@ from uuid import uuid4
 
 # pyright: reportUnusedCallResult=false
 import aiogram
-from aiogram import Router, types
+from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
@@ -276,7 +276,7 @@ async def confirm_add_user_balance(
     )
 
 
-@router.message(StateFilter(states.AddUserBalance.awaiting_amount))
+@router.message(StateFilter(states.AddUserBalance.awaiting_amount), F.text)
 async def waiting_for_user_amount(
     message: types.Message,
     state: FSMContext,
@@ -516,7 +516,7 @@ async def add_balance_from_user_balance(
     await bot.send_message(chat_id, text)
 
 
-@router.message(StateFilter(states.AddBalance.awaiting_amount))
+@router.message(StateFilter(states.AddBalance.awaiting_amount), F.text)
 async def waiting_for_amount(
     message: types.Message,
     state: FSMContext,

@@ -64,6 +64,7 @@ async def add_user_bonus(
     user_telegram_id: int,
     amount: float,
     description: str | None = None,
+    admin_user_id: int | None = None,
 ) -> UserBonusPayment:
     """
     Создаёт запись о начислении бонусов пользователю.
@@ -72,6 +73,8 @@ async def add_user_bonus(
         user_telegram_id: Telegram ID пользователя
         amount: Сумма бонусов (должна быть положительной)
         description: Описание операции (опционально)
+        admin_user_id: ID администратора (User.id или telegram_id), выполнившего
+            операцию; None для автоматических начислений (напр. при пополнении)
 
     Returns:
         UserBonusPayment: Созданная запись
@@ -101,6 +104,7 @@ async def add_user_bonus(
             description=description,
             transaction_date_time=datetime.now(),
             operation_type="add",
+            admin_user_id=admin_user_id,
         )
         session.add(payment)
         await session.commit()

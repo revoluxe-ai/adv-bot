@@ -207,7 +207,10 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
                 )
             elif operation == "add_bonus":
                 await add_user_bonus(
-                    user_telegram_id, amount, full_description
+                    user_telegram_id,
+                    amount,
+                    full_description,
+                    admin_user_id=admin_tg_id,
                 )
                 operation_text = (
                     f"✅ Пользователю {user_telegram_id} начислено бонусов: {amount:.0f} руб."
