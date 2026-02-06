@@ -1,6 +1,6 @@
 import uuid
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import patch
 
 import pytest
@@ -32,6 +32,9 @@ async def test_session_factory(async_engine: AsyncEngine):
         get_test_session,
     ), patch(
         "app.modules.balance_manager.handlers.sm",
+        get_test_session,
+    ), patch(
+        "app.modules.balance_manager.user_balance_service.sm",
         get_test_session,
     ):
         yield get_test_session

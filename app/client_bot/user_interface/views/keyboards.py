@@ -21,7 +21,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeCommonBidInSearchAdvStatus,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
-from app.modules.cabinet_bonus_manager.callbacks import AdminBonus, AdminPanel
+from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,

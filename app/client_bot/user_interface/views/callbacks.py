@@ -99,6 +99,18 @@ class Start(CallbackData, prefix="start"):
     pass
 
 
+class Gate(CallbackData, prefix="gate"):
+    """Коллбеки экрана гейта: invite_enter, pay_entry_amount, offer_open, restore_request."""
+
+    action: str
+
+
+class InviteShow(CallbackData, prefix="invite"):
+    """Показать инвайт (для приглашения). Только для passed_gate."""
+
+    action: str = "show"
+
+
 class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int

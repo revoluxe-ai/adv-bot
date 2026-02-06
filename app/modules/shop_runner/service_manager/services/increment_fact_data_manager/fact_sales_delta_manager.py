@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta
-from typing import Any, cast
-from uuid import UUID
 
 from zoneinfo import ZoneInfo
 
@@ -58,8 +56,11 @@ class FactSalesDeltaManager:
         per_day_orders = orders / period_seconds * scale_seconds
         per_day_carts = carts / period_seconds * scale_seconds
         if fact_method == FactMethods.BY_CARTS:
-            ratio = await self._cart_to_order_ratio(nmids, now, 24 * 14)
-            predicted_orders = per_day_carts * ratio
+            if nmids is None:
+               raise ValueError("nmids is required")
+            else:
+                ratio = await self._cart_to_order_ratio(nmids, now, 24 * 14)
+                predicted_orders = per_day_carts * ratio
         else:
             predicted_orders = per_day_orders
 

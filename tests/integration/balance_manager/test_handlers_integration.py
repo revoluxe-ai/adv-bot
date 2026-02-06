@@ -1,5 +1,6 @@
 """Интеграционные тесты для handlers с реальной БД и проверкой даты."""
 
+import json
 import uuid
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,19 +9,29 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_bot.const import GATE_ENTRY_AMOUNT
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.balance_manager.handlers import successful_payment_handler
 from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
+from app.utils.db.passed_gate_reason import PassedGateReason
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 
-async def _create_test_user(session: AsyncSession, user_telegram_id: int = 12345) -> User:
+async def _create_test_user(
+    session: AsyncSession,
+    user_telegram_id: int = 12345,
+    passed_gate: bool = True,
+) -> User:
     """Создает тестового пользователя."""
-    user = User(user_telegram_id=user_telegram_id, username="test_user")
+    user = User(
+        user_telegram_id=user_telegram_id,
+        username="test_user",
+        passed_gate=passed_gate,
+    )
     session.add(user)
     await session.flush()
     # Сервисы balance_service используют собственные сессии, поэтому данные должны быть закоммичены.
@@ -234,4 +245,62 @@ async def test_successful_payment_handler_user_not_found_integration(
         balance_payments_result = await async_session.execute(balance_payments_stmt)
         balance_payments = balance_payments_result.scalars().all()
         assert len(balance_payments) == 0
+
+
+@pytest.mark.asyncio
+async def test_successful_payment_gate_entry_sets_passed_gate(
+    async_session: AsyncSession,
+):
+    """При payload target=user и gate_entry=True и сумме GATE_ENTRY_AMOUNT выставляется passed_gate."""
+    user = await _create_test_user(
+        async_session, user_telegram_id=77777, passed_gate=False
+    )
+    assert user.passed_gate is False
+
+    test_date = date(2025, 6, 15)
+    payload = {"target": "user", "gate_entry": True}
+
+    with patch("app.modules.balance_manager.handlers.date") as mock_date_module, patch(
+        "app.modules.balance_manager.handlers.messages"
+    ) as mock_messages, patch(
+        "app.modules.balance_manager.handlers.ShopChoice"
+    ) as mock_shop_choice, patch(
+        "app.modules.balance_manager.handlers.settings"
+    ) as mock_settings:
+        mock_date_module.today.return_value = test_date
+        mock_date_module.side_effect = lambda *args: date(*args)  # type: ignore[misc]
+        mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 0.0
+
+        mock_message = MagicMock()
+        mock_message.chat.id = user.user_telegram_id
+        mock_message.successful_payment = MagicMock()
+        mock_message.successful_payment.total_amount = GATE_ENTRY_AMOUNT * 100
+        mock_message.successful_payment.invoice_payload = json.dumps(payload)
+        mock_message.answer = AsyncMock()
+
+        mock_state = MagicMock()
+        mock_state.get_data = AsyncMock(return_value={})
+
+        mock_bot = MagicMock()
+
+        async def _balance_updated_coro() -> None:
+            pass
+
+        # BalanceUpdated(bot, ...)() — возвращает callable, при вызове даёт coroutine
+        mock_messages.BalanceUpdated.return_value = lambda: _balance_updated_coro()
+        mock_shop_choice.return_value = AsyncMock()
+
+        mock_event_manager = AsyncMock()
+        await successful_payment_handler(
+            mock_message,
+            mock_state,
+            mock_bot,
+            billing_event_manager=mock_event_manager,
+        )
+
+    await async_session.refresh(user)
+    assert user.passed_gate is True
+    assert user.passed_gate_reason == PassedGateReason.BALANCE_TOP_UP
+    assert user.passed_gate_at is not None
+    mock_message.answer.assert_any_call("Оплата получена. Доступ открыт.")
 

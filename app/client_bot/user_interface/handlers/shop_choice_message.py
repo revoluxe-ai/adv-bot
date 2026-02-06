@@ -42,6 +42,13 @@ def get_shop_keyboard(
         )
         keyboard_buttons.append([admin_button])
 
+    invite_show_button = InlineKeyboardButton(
+        text="Показать инвайт",
+        callback_data=callbacks.InviteShow().pack(),
+    )
+    keyboard_buttons.append([invite_show_button])
+    
+
     button = InlineKeyboardButton(
         text="Добавить магазин", callback_data=callbacks.ShopNew().pack()
     )
@@ -53,6 +60,7 @@ def get_shop_keyboard(
     )
     keyboard_buttons.append([user_balance_button])
 
+    
     # button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
     # keyboard_buttons.append([button])
 

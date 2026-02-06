@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence, Any, cast
+from typing import Sequence
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
 
@@ -33,14 +33,13 @@ class RedisCommonBidValueManager(BaseRedisManager):
             for nmid in nmids:
                 key = self._get_key(adv_id, nmid)
                 _ = pipeline.get(key)
-            results = await pipeline.execute()  # pyright: ignore
-            raw_results: list[Any] = cast(list[Any], results)
+            raw_results = await pipeline.execute()  # pyright: ignore
 
         bids: dict[int, int] = {}
         for nmid, raw_value in zip(nmids, raw_results):
             if raw_value is None:
                 continue
-            
+
             val: str
             if isinstance(raw_value, bytes):
                 val = raw_value.decode()

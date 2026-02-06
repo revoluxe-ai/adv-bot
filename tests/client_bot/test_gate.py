@@ -1,0 +1,272 @@
+"""Unit-тесты для гейта: view (текст, клавиатура) и GateMiddleware."""
+
+from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock, patch
+from contextlib import asynccontextmanager
+
+import pytest
+
+from aiogram.types import CallbackQuery, Message, Chat
+from sqlalchemy.engine.result import Result
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+from app.client_bot.const import ADMINS, GATE_ENTRY_AMOUNT, SUPPORT_USER_NAME
+from app.client_bot.middlewars.gate import GateMiddleware
+from app.client_bot.user_interface.views.callbacks import Gate
+from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
+from app.utils.db.models import User
+
+
+@pytest.fixture(autouse=True)
+def mock_db_engines():
+    with patch("app.utils.db.session_maker.create_async_engine") as mock_create_engine:
+        mock_create_engine.return_value = AsyncMock()
+    with patch("app.utils.db.session_maker.get_ssl_context") as mock_ssl_context:
+        mock_ssl_context.return_value = None  # Return None for simplicity or a mock SSL context if needed
+    yield
+
+
+
+def make_session_context(
+    *,
+    user: User | None = None,
+    result: MagicMock | None = None,
+) -> tuple[AsyncMock, AsyncGenerator[AsyncSession, None]]:
+    session = AsyncMock(spec=AsyncSession)
+    result_mock = result or MagicMock(spec=Result)
+    if result is None:
+        result_mock.scalar_one_or_none.return_value = user
+    session.execute.return_value = result_mock
+    session.add = MagicMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+
+    @asynccontextmanager
+    async def session_cm(read_only: bool = False) -> AsyncGenerator[AsyncSession, None]:
+        yield session
+
+    return session, session_cm
+
+
+def test_get_gate_message_text_contains_header_and_entry_amount() -> None:
+    text = get_gate_message_text()
+    assert "Доступ закрыт" in text
+    assert "входной платёж" in text
+    assert str(GATE_ENTRY_AMOUNT) in text
+    assert "депозит" not in text
+    assert "пополнение" not in text
+
+
+def test_get_gate_message_text_with_custom_amount() -> None:
+    text = get_gate_message_text(entry_amount=999)
+    assert "999" in text
+
+
+def test_get_gate_keyboard_has_four_buttons() -> None:
+    kb = get_gate_keyboard()
+    assert len(kb.inline_keyboard) == 4
+    assert kb.inline_keyboard[0][0].text == "Ввести инвайт"
+    assert kb.inline_keyboard[0][0].callback_data == Gate(action="invite_enter").pack()
+    assert "Входной платёж" in kb.inline_keyboard[1][0].text
+    assert kb.inline_keyboard[1][0].callback_data == Gate(action="pay_entry_amount").pack()
+    assert kb.inline_keyboard[2][0].text == "Оферта"
+    assert kb.inline_keyboard[3][0].text == "Восстановить доступ"
+    assert kb.inline_keyboard[3][0].url is not None
+    assert kb.inline_keyboard[3][0].url.startswith(f"https://t.me/{SUPPORT_USER_NAME}")
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_passed_gate_calls_handler() -> None:
+    """При user.passed_gate=True middleware вызывает handler."""
+    user = MagicMock(spec=User)
+    user.passed_gate = True
+
+    session_mock, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=123, is_bot=False, username="test_user_123")
+    event.chat = MagicMock(spec=Chat, id=123)
+    data = {"bot": AsyncMock()}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_not_passed_sends_gate_screen() -> None:
+    """При user.passed_gate=False и обычном сообщении отправляется экран гейта."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    session_mock, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=456, is_bot=False, username="test_user_456")
+    event.chat = MagicMock(spec=Chat, id=456)
+    event.text = "любой текст"
+    event.successful_payment = None
+    bot = AsyncMock()
+    data = {"bot": bot}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_not_awaited() 
+    bot.send_message.assert_awaited_once()
+    call_args, call_kw = bot.send_message.call_args
+    text = call_args[1] if len(call_args) > 1 else call_kw.get("text", "")
+    assert "Доступ закрыт" in text
+    assert call_kw.get("reply_markup") is not None
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_gate_callback_passed_through() -> None:
+    """Callback с data gate:* пропускается при не пройденном гейте."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    session_mock, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=CallbackQuery)
+    event.from_user = MagicMock(id=789, is_bot=False, username="test_user_789")
+    event.data = Gate(action="invite_enter").pack()
+    event.message = MagicMock(spec=Message) 
+    event.message.chat = MagicMock(spec=Chat, id=789)
+    data = {"bot": AsyncMock()}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_admin_bypass() -> None:
+    """Админ (id in ADMINS) всегда пропускается."""
+    if not ADMINS:
+        pytest.skip("ADMINS пустой")
+    admin_id = ADMINS[0]
+
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    session_mock, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=admin_id, is_bot=False, username="test_admin_user")
+    event.chat = MagicMock(spec=Chat, id=admin_id)
+    event.text = "любой текст"
+    event.successful_payment = None
+    data = {"bot": AsyncMock()}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_new_user_creation_and_gate_screen() -> None:
+    """Новый пользователь создается и ему показывается экран гейта."""
+    middleware = GateMiddleware()
+    handler = AsyncMock()
+    telegram_id = 1011
+    username = "new_test_user"
+    chat_id = 1011
+    
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=telegram_id, is_bot=False, username=username)
+    event.chat = MagicMock(spec=Chat, id=chat_id)
+    event.successful_payment = None
+    
+    bot_mock = AsyncMock()
+    
+    session_mock, session_cm = make_session_context(user=None)
+
+    data = {"bot": bot_mock}
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        result = await middleware(handler, event, data)
+        assert result is None
+        
+        session_mock.add.assert_called_once()
+        added_user = session_mock.add.call_args[0][0]
+        assert isinstance(added_user, User)
+        assert added_user.user_telegram_id == telegram_id
+        assert added_user.username == username
+        assert added_user.adv_updater_user_chat_id == chat_id
+        session_mock.commit.assert_awaited_once()
+        session_mock.refresh.assert_awaited_once_with(added_user)
+        
+        bot_mock.send_message.assert_awaited_once()
+        call_args, call_kw = bot_mock.send_message.call_args
+        text = call_args[1] if len(call_args) > 1 else call_kw.get("text", "")
+        assert "Доступ закрыт" in text
+        assert call_kw.get("reply_markup") is not None
+        handler.assert_not_awaited() 
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_successful_payment_passes_through() -> None:
+    """Сообщение с successful_payment пропускается, даже если user.passed_gate=False."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    session_mock, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=12345, is_bot=False, username="test_user_12345")
+    event.chat = MagicMock(spec=Chat, id=12345)
+    event.successful_payment = MagicMock() # Simulate a successful payment
+    data = {"bot": AsyncMock()}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ):
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_none_telegram_id_passes_through() -> None:
+    """При telegram_id=None middleware вызывает handler без логики гейта."""
+    middleware = GateMiddleware()
+    handler = AsyncMock()
+    
+    event = MagicMock(spec=Message)
+    event.from_user = None # Simulate no from_user
+    
+    data = {"bot": AsyncMock()}
+
+    result = await middleware(handler, event, data)
+    handler.assert_awaited_once_with(event, data)
+    assert result is handler.return_value # Middleware should return the result of handler

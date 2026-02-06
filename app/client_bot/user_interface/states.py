@@ -84,3 +84,9 @@ class ShopMenuState(StatesGroup):
 
 class CampaignActivity(StatesGroup):
     waiting_for_new_limit = State()
+
+
+class GateInvite(StatesGroup):
+    """Ввод инвайт-кода на экране гейта."""
+
+    waiting_code = State()

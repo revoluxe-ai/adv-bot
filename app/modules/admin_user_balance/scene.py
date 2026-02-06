@@ -11,7 +11,6 @@ from aiogram.fsm.scene import Scene, SceneRegistry, SceneWizard, on
 from aiogram.types import CallbackQuery, Message
 
 from app.client_bot.const import ADMINS
-from app.client_bot.user_interface.views.keyboards import get_admin_keyboard
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
 from app.modules.admin_user_balance.keyboards import (
     get_confirm_keyboard,
@@ -153,7 +152,6 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
         state: FSMContext,
     ) -> None:
         """Переход к вводу суммы для пополнения баланса или бонусов."""
-        await callback.answer()
         self.state_context = state
         await state.update_data(operation=callback_data.action, action="amount")
         data = await state.get_data()
@@ -171,7 +169,6 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
     @on.callback_query(AdminUserBalance.filter(F.action == "menu"))
     async def back_to_telegram_id(self, callback: CallbackQuery, state: FSMContext) -> None:
         """Возврат к вводу telegram_id (другой пользователь)."""
-        await callback.answer()
         self.state_context = state
         await state.update_data(action="menu")
         if callback.message:
@@ -185,7 +182,6 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
         state: FSMContext,
     ) -> None:
         """Подтверждение: вызов сервиса и вывод результата."""
-        await callback.answer()
         data = await state.get_data()
         user_telegram_id = data.get("user_telegram_id")
         amount = data.get("amount")
@@ -254,7 +250,6 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
     @on.callback_query(AdminUserBalance.filter(F.action == "cancel"))
     async def process_cancel(self, callback: CallbackQuery, state: FSMContext) -> None:
         """Отмена: возврат к меню пользователя (баланс + кнопки)."""
-        await callback.answer()
         self.state_context = state
         data = await state.get_data()
         await state.update_data(action="menu")
@@ -272,8 +267,8 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
 
     @on.callback_query(AdminUserBalance.filter(F.action == "back"))
     async def process_exit(self, callback: CallbackQuery) -> None:
+        from app.client_bot.user_interface.views.keyboards import get_admin_keyboard
         """Выход в главное меню администратора."""
-        await callback.answer()
         logger.info("Выход из сцены пополнения баланса пользователей")
         if callback.message:
             await callback.message.edit_text(

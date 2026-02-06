@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-from datetime import date
+from datetime import UTC, date
 import json
 import logging
 from uuid import uuid4
@@ -15,7 +15,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from app.client_bot import const
-from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
+from app.client_bot.const import (
+    EMAIL_FOR_PAYMENT_RECEIPT,
+    GATE_ENTRY_AMOUNT,
+    OFFERTA_URL,
+)
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
 from app.client_bot.user_interface.views import callbacks
@@ -34,6 +38,7 @@ from app.modules.shop_menu.message import ShopMenu
 from app.payments.db.models import Payment
 from app.settings import settings
 from app.utils.db.models import User
+from app.utils.db.passed_gate_reason import PassedGateReason
 from app.utils.db.session_maker import get_async_session_maker
 from . import messages
 from ..billing.event_manager.event_manager import BillingEventManager
@@ -117,7 +122,7 @@ async def add_balance(
 
     text = (
         "Оплачивая сервис вы соглашаетесь с  [публичной офертой]"
-        "(https://docs.google.com/document/d/1SK9ixZO1LD3yc_-rzkE5K_uOG5qWNCO-4RwGd1fq24A/edit?usp=sharing)"
+        f"({OFFERTA_URL})"
         " и [пользовательским соглашением]"
         "(https://docs.google.com/document/d/1fyxx_X25WSZ7cridzbCTFTBXqzqltpla1ew4XOAPo7g/edit?usp=sharing)"
     )
@@ -209,7 +214,7 @@ async def add_user_balance_callback(
     )
     text = (
         "Пополнение личного баланса. Оплачивая сервис вы соглашаетесь с "
-        '<a href="https://docs.google.com/document/d/1SK9ixZO1LD3yc_-rzkE5K_uOG5qWNCO-4RwGd1fq24A/edit?usp=sharing">'
+        f'<a href="{OFFERTA_URL}">'
         "публичной офертой</a> и "
         '<a href="https://docs.google.com/document/d/1fyxx_X25WSZ7cridzbCTFTBXqzqltpla1ew4XOAPo7g/edit?usp=sharing">'
         "пользовательским соглашением</a>"
@@ -725,7 +730,7 @@ async def successful_payment_handler(
                 .options(joinedload(User.wb_user_cabinets))
             )
             result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
+            user = result.unique().scalar_one_or_none()
         if not user:
             logger.error("Пользователь с telegram_id %s не найден", message.chat.id)
             await billing_event_manager.emit_error_event(
@@ -787,6 +792,19 @@ async def successful_payment_handler(
                 "Failed to emit balance_topup_applied (user); continuing",
                 exc_info=exc,
             )
+        if parsed_payload.get("gate_entry") is True and cost == float(GATE_ENTRY_AMOUNT):
+            async with sm() as session:
+                stmt = select(User).where(User.user_telegram_id == message.chat.id)
+                result = await session.execute(stmt)
+                gate_user = result.scalar_one_or_none()
+                if gate_user is not None:
+                    gate_user.passed_gate = True
+                    gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
+                    now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
+                    gate_user.passed_gate_at = now_utc
+                    session.add(gate_user)
+                    await session.commit()
+            await message.answer("Оплата получена. Доступ открыт.")
         await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()
         await ShopChoice(bot, message.chat.id, user.wb_user_cabinets)()
         return
@@ -794,7 +812,7 @@ async def successful_payment_handler(
     # Ветка пополнения баланса кабинета
     if wb_cabinet_original_id is None and parsed_payload:
         cab_id_raw = parsed_payload.get("wb_cabinet_original_id")
-        if isinstance(cab_id_raw, (int, str)):
+        if isinstance(cab_id_raw, int | str):
             try:
                 wb_cabinet_original_id = int(cab_id_raw)
             except (TypeError, ValueError):

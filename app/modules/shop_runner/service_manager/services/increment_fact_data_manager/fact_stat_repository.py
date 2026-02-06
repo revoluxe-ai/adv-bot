@@ -37,7 +37,7 @@ class FactStatRepository:
                 )
         if not result.result_set:
             return None
-        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
+        row: dict[str, Any] = cast(dict[str, Any], result.first_item)  # pyright: ignore[reportUnknownMemberType]
         return CardCommonStat(
             open_card_sum=int(row["open_card_sum"]),
             carts_card_sum=int(row["carts_card_sum"]),
@@ -56,7 +56,7 @@ class FactStatRepository:
                 )
         if not result.result_set:
             return None
-        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
+        row: dict[str, Any] = cast(dict[str, Any], result.first_item)  # pyright: ignore[reportUnknownMemberType]
         return AdvCommonStat(
             views_adv_sum=int(row["views_adv_sum"]),
             clicks_adv_sum=int(row["clicks_adv_sum"]),
@@ -112,10 +112,9 @@ class FactStatRepository:
                 )
         if not result.result_rows:
             return None
-        column_names: tuple[Any, ...] = result.column_names
-        row_values = result.result_rows[0]
-        row: dict[str, Any] = cast(dict[str, Any],
-         dict(zip(column_names, row_values)))
+        column_names: tuple[str, ...] = cast(tuple[str, ...], result.column_names)  # pyright: ignore[reportUnknownMemberType]
+        row_values: tuple[Any, ...] = tuple(result.result_rows[0])
+        row: dict[str, Any] = dict(zip(column_names, row_values))
         return FactStatSnapshot.from_clickhouse(row)
 
     async def upsert_prev_fact_state(self, snapshot: FactStatSnapshot) -> None:
@@ -159,7 +158,9 @@ class FactStatRepository:
                 )
         if not result.result_rows:
             return None
-        row = dict(zip(result.column_names, result.result_rows[0]))
+        column_names: tuple[str, ...] = cast(tuple[str, ...], result.column_names)  # pyright: ignore[reportUnknownMemberType]
+        row_values: tuple[Any, ...] = tuple(result.result_rows[0])
+        row: dict[str, Any] = dict(zip(column_names, row_values))
         return FactStatSnapshot.from_clickhouse(row)
 
     async def aggregate_deltas_between(
@@ -181,7 +182,10 @@ class FactStatRepository:
                 )
         if not result.result_rows:
             return None
-        return dict(zip(result.column_names, result.result_rows[0]))
+        column_names: tuple[str, ...] = cast(tuple[str, ...], result.column_names)  # pyright: ignore[reportUnknownMemberType]
+        row_values: tuple[Any, ...] = tuple(result.result_rows[0])
+        final_result: dict[str, Any] = dict(zip(column_names, row_values))
+        return final_result
 
     async def has_zero_interval_record(
         self,

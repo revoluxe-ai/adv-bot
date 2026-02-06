@@ -6,9 +6,12 @@ __all__ = (
     "UserBalancePayment",
     "UserBonusPayment",
     "PassedGateReason",
+    "InviteStatus",
+    "Invite",
 )
 
 import datetime
+import enum
 import typing
 
 from sqlalchemy import (
@@ -28,6 +31,16 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.utils.db.passed_gate_reason import PassedGateReason
+
+
+class InviteStatus(str, enum.Enum):
+    """Статус инвайта."""
+
+    ACTIVE = "ACTIVE"
+    USED = "USED"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"
+
 
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import (
@@ -143,3 +156,22 @@ class RefLink(BaseTable):
         "User", secondary=user_reflink_association, backref="referred_by_links"
     )
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Invite(BaseTable):
+    """Инвайт-код для прохождения гейта или выдачи пользователю (invite:show)."""
+    code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    issued_to_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=True
+    )
+    issued_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    status: Mapped[InviteStatus] = mapped_column(
+        SAEnum(InviteStatus), nullable=False, default=InviteStatus.ACTIVE
+    )
+    used_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=True
+    )
+    used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (Index("ix_invites_code", "code", unique=True),)

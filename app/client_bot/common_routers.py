@@ -41,6 +41,7 @@ from .user_interface.handlers.keywords_positions_history import (
 from .user_interface.handlers import (
     admin_panel,
     add_black_phrases,
+    invite_show,
     add_white_phrases,
     adv_setting,
     change_cpm,
@@ -122,6 +123,7 @@ common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
+common_router.include_routers(invite_show.router)
 common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
