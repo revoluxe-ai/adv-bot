@@ -58,9 +58,6 @@ class WBShop:
                 tg.create_task(coroutines_manager.update_common_sale_stat())
                 tg.create_task(coroutines_manager.update_full_adv_stat())
                 tg.create_task(coroutines_manager.adv_settings_auto_update())
-                tg.create_task(
-                    coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
-                )
                 tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
                 tg.create_task(coroutines_manager.update_clusters_adv_stats_today())
                 tg.create_task(
