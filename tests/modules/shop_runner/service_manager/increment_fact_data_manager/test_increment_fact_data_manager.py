@@ -167,6 +167,8 @@ async def test_zero_interval_inserted_when_missing() -> None:
         buy_outs_sum=current_snapshot.buy_outs_sum,
         src_ts=current_snapshot.src_ts,
         version=current_snapshot.version,
+        event_date=current_snapshot.src_ts.date(),
+        event_id=current_snapshot.event_id,
     )
 
     writer.insert.assert_awaited_once_with(expected_row)

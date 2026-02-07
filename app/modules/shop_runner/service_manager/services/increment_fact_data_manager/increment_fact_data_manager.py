@@ -236,6 +236,8 @@ class IncrementFactDataManager:
             buy_outs_sum=snapshot.buy_outs_sum,
             src_ts=snapshot.src_ts,
             version=snapshot.version,
+            event_date=snapshot.src_ts.date(),
+            event_id=snapshot.event_id,
         )
 
     async def _ensure_zero_interval_recorded(

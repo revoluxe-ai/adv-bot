@@ -848,6 +848,32 @@ async def clickhouse_client(setup_test_database):
         SETTINGS index_granularity = 8192
     """)
 
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.fact_stat_states (
+            bucket_start DateTime,
+            shop_id String,
+            complex_adv_id Int64,
+            views_adv_sum Int64,
+            clicks_adv_sum Int64,
+            carts_adv_sum Int64,
+            orders_adv_sum Int64,
+            spend_adv_sum_rub Int64,
+            orders_sum_adv_rub Int64,
+            open_card_sum Int64,
+            carts_card_sum Int64,
+            orders_card_sum Int64,
+            orders_sum_card_rub Int64,
+            buy_outs_sum Int64,
+            src_ts DateTime,
+            version Int64,
+            event_date Date DEFAULT toDate(0),
+            event_id Int64 DEFAULT 0
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(event_date)
+        ORDER BY (complex_adv_id, event_date, event_id, src_ts)
+        SETTINGS index_granularity = 8192
+    """)
+
     # Создаём таблицу advkeyword (источник для Materialized Views)
     await client.command("""
         CREATE TABLE IF NOT EXISTS default_db.advkeyword (
