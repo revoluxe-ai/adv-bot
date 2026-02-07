@@ -643,12 +643,18 @@ class AutoBudgetService:
         spend_today = spend_auto + spend_search
         last_update_auto = await self._get_last_full_stat_update(adv_id_auto)
         last_update_search = await self._get_last_full_stat_update(adv_id_search)
-        last_full = last_update_auto
-        if last_update_search is not None and (
-            last_full is None or last_update_search > last_full
-        ):
-            last_full = last_update_search
-        if last_full is not None and now_msk > last_full + timedelta(
+        # Combined spend is trustworthy only when BOTH campaigns have fresh stats.
+        # Use the oldest (minimum) timestamp: if the stalest data is fresh, both are.
+        if last_update_auto is None or last_update_search is None:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                reason="Missing full adv stats for one or both campaigns",
+            )
+        last_full = min(last_update_auto, last_update_search)
+        if now_msk > last_full + timedelta(
             seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD
         ):
             return AutoBudgetEnsureResult(
