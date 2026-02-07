@@ -627,5 +627,17 @@ class Settings:
             return 60 * 60
         return int(value)
 
+
+    @property
+    def AUTO_SETTING_ACTIVE(self) -> bool:
+        value = os.getenv("AUTO_SETTING_ACTIVE")
+        if not value:
+            return True
+        value = value.lower()
+        if value == "true":
+            return True
+        return False
+
+
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()
