@@ -25,7 +25,9 @@ class ClickHouseFactStatWriter:
     orders_sum_card_rub,
     buy_outs_sum,
     src_ts,
-    version
+    version,
+    event_date,
+    event_id
 )
 VALUES (
     %(bucket_start)s,
@@ -43,7 +45,9 @@ VALUES (
     %(orders_sum_card_rub)s,
     %(buy_outs_sum)s,
     %(src_ts)s,
-    %(version)s
+    %(version)s,
+    %(event_date)s,
+    %(event_id)s
 )
 """
         params = {
@@ -63,6 +67,8 @@ VALUES (
             "buy_outs_sum": row.buy_outs_sum,
             "src_ts": row.src_ts,
             "version": row.version,
+            "event_date": row.event_date,
+            "event_id": row.event_id
         }
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:

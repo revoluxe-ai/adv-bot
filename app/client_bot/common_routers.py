@@ -15,6 +15,7 @@ from app.modules.predict_ctr_exponent_settings import (
 )
 from app.modules.hide_zero_views_toggle import HideZeroViewsToggleRouter
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuRouter
+from app.modules.white_list_mode_settings import router as WhiteListModeSettingsRouter
 from app.modules.shop_runner.auction_boost_mode_settings import (
     AuctionBoostModeSettingsRouter,
 )
@@ -64,6 +65,10 @@ from .user_interface.handlers import (
     strategy_setting,
     rec_system_mode_toggle,
     campaign_activity,
+    white_list_mode_toggle,
+)
+from .user_interface.handlers.common_budget_mode_toggle import (
+    router as common_budget_mode_toggle_router,
 )
 from .user_interface.handlers.incremental_stats_toggle import (
     router as incremental_stats_toggle_router,
@@ -84,6 +89,7 @@ if not settings.test_mode:
 
 _ = common_router.message.middleware.register(ReturnToStart())
 
+# Router includes reorganized for new module
 common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_routers(auto_updater_target_place_setting_router)
 common_router.include_routers(auto_updater_version_toggle_router)
@@ -95,6 +101,7 @@ common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
+common_router.include_routers(common_budget_mode_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)
@@ -106,6 +113,8 @@ common_router.include_routers(bidder_coroutine_type_toggle_router)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
 common_router.include_routers(rec_system_mode_toggle.router)
+common_router.include_routers(white_list_mode_toggle.router)
+common_router.include_routers(WhiteListModeSettingsRouter)
 common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)

@@ -1,7 +1,6 @@
 {
   "typeCheckingMode": "strict",
   "include": ["app"],
-  "exclude": ["tests", ".venv", "migrations"],
   "reportUnusedCallResult": "error",
   "reportMissingTypeStubs": "none",
   "reportUnknownVariableType": "warning",
@@ -9,5 +8,25 @@
   "reportUnknownMemberType": "warning",
   "pythonVersion": "3.11",
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "exclude": [
+    "app/core/mp/wb/api/generated",
+    "app/utils/redis_manager",
+    "app/utils/image_normalizer.py",
+    "adv-bot/app/utils",
+    "app/utils/image_master",
+    "app/utils/faiss_manager",
+    "app/utils/db/session_maker.py",
+    "app/modules/wb_adv_updater/word_to_vec_object.py",
+    "app/modules/wb_adv_updater/wb_manager.py",
+    "app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py",
+    "app/utils/graphic_positions_creator/graphic_positions_creator.py",
+    "tests",
+    ".venv",
+    "migrations",
+    "app/utils/redis_func_cache.py",
+    "app/utils/redis_cache.py"
+  ]
 }
+
+

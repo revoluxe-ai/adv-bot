@@ -4,6 +4,7 @@ from collections.abc import Callable, Awaitable
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
     KeywordGettingMode
 
@@ -51,6 +52,11 @@ class ComplexAdv:
     def __repr__(self):
         return str(self._adv_setting.id)
 
+    @property
+    def white_list_mode(self) -> WhiteListMode:
+        if not self._adv_setting.white_list_mode:
+            return WhiteListMode.ABOVE_MIN_RATING
+        return self._adv_setting.white_list_mode
 
     @property
     def updater_common_bid_in_search_adv_active_status(self)-> bool:
@@ -297,6 +303,14 @@ class ComplexAdv:
     @property
     def auto_budget_watchdog_enabled(self) -> bool:
         return bool(self._adv_setting.auto_budget_watchdog_enabled)
+
+    @property
+    def use_common_budget(self) -> bool:
+        return bool(self._adv_setting.use_common_budget)
+
+    @property
+    def common_budget_daily_limit(self) -> int | None:
+        return self._adv_setting.common_budget_daily_limit
 
     @property
     def search_adv_id(self) -> int | None:

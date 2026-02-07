@@ -1,6 +1,8 @@
 """Исполнитель для понижения целевой позиции (увеличение номера позиции)."""
 
 import logging
+import math
+
 from typing_extensions import override
 
 from sqlalchemy import update
@@ -14,10 +16,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from .redis_cache import LastTargetPlaceDownV2
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
-from . import utils
+from .redis_cache import LastTargetPlaceDownV2
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,9 @@ class TargetPlaceDownExecutor(BaseExecutor):
                 adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-
+        min_place_by_keywords: int | None = await self._get_min_place_by_keywords(ctx)
+        if not min_place_by_keywords:
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         redis_cache = LastTargetPlaceDownV2(ctx.complex_adv.adv_setting)
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
@@ -76,30 +79,10 @@ class TargetPlaceDownExecutor(BaseExecutor):
 
         # Понижаем позицию на 1 (увеличиваем номер)
         new_place = min(
-            current_target_place + 1, self.MIN_PLACE
-        )  # MIN_PLACE - это нижнее значение, большое число
-
-        best_keyword: CalculatedKeyword | None = await utils.get_best_keyword(
-            ctx.complex_adv
+            current_target_place + 1, self.MIN_PLACE, min_place_by_keywords
         )
-        if not best_keyword:
-            logger.debug(
-                "[adv_id=%s] TargetPlaceDown: не удалось получить лучший ключевик",
-                adv_id,
-            )
-            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        current_position = best_keyword.position
-        # TODO: Добавить проверку bid <= MIN_BID достигли физического лимита ставки
-        if (
-            current_position == 0 or current_position + 1 < new_place
-        ):  # логика в том, что если товар не спускается, то смысла нет дальше снижать ЦП
-            logger.debug(
-                "[adv_id=%s] TargetPlaceDown: текущее место (%s) уже ниже или равно новому целевому месту (%s), понижение не имеет смысла",
-                adv_id,
-                current_position,
-                new_place,
-            )
+        if new_place == current_target_place:
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Обновляем в БД
@@ -118,6 +101,18 @@ class TargetPlaceDownExecutor(BaseExecutor):
             current_target_place,
             new_place,
         )
-
+        if new_place < current_target_place:
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         # Efficiency = 1 (выполнили одно изменение на 1)
+        # TODO: Тут надо переделать логику и включить возможность отрицательного efficiency, например, когда появились новые ограничения и нужно сделать противоположние задаче экзекутера действия
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)
+
+    @staticmethod
+    async def _get_min_place_by_keywords(ctx: PipelineContext) -> int | None:
+        keywords = await ctx.complex_adv.get_keywords()
+        active_keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        if not active_keywords:
+            return None
+        min_place = max([kw.position for kw in active_keywords])
+        return math.floor(min_place + 0.5)
+

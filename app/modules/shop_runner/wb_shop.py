@@ -58,9 +58,6 @@ class WBShop:
                 tg.create_task(coroutines_manager.update_common_sale_stat())
                 tg.create_task(coroutines_manager.update_full_adv_stat())
                 tg.create_task(coroutines_manager.adv_settings_auto_update())
-                tg.create_task(
-                    coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
-                )
                 tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
                 tg.create_task(coroutines_manager.update_clusters_adv_stats_today())
                 tg.create_task(
@@ -73,6 +70,8 @@ class WBShop:
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
                 tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
                 tg.create_task(coroutines_manager.increment_fact_data_stats())
+                tg.create_task(coroutines_manager.white_list_tail_trimmer())
+                tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
             # (все StopShopUpdateException из группы соберутся сюда)

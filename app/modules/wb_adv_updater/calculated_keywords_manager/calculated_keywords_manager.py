@@ -8,7 +8,6 @@ from sqlalchemy import select
 
 
 from dependency_injector import providers
-from app.settings import settings
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
@@ -29,6 +28,8 @@ from cashews import cache, noself  # pyright: ignore
 
 
 import typing
+
+from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
 if typing.TYPE_CHECKING:
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
@@ -211,29 +212,19 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         from .dto.inner_dto.keyword_state import KeywordState
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
-            """Если нет белого списка, режем по заданному CTR-у"""
-            hard_min_ctr  = complex_adv.hard_min_ctr
-            if hard_min_ctr is None:
-                min_ctr = settings.DEFAULT_MIN_CTR
-            else:
-                min_ctr = hard_min_ctr
-            best_keyword = max(pre_keywords, key=attrgetter("ctr"))
+            """Если нет белого списка, то выключаем все ключи, кроме лучшего"""
+            best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
-                if pre_kw.bidder_status == BidderKeywordStatus.BAD:
-                    state = KeywordState(
-                        status=KeywordStatus.BAD,
-                        reason=KeywordStatusReason.BIDDER_BAD_STATUS,
-                        best_keyword_status=best_keyword_status
-                    )
-                elif pre_kw.ctr >= min_ctr:
+                if best_keyword_status:
                     state = KeywordState(
                         status=KeywordStatus.GOOD,
-                        reason=KeywordStatusReason.MORE_THEN_HARD_MIN_CTR,
-                        best_keyword_status=best_keyword_status)
+                        reason=KeywordStatusReason.BEST_KEYWORD,
+                        best_keyword_status=best_keyword_status
+                    )
                 else:
                     status = KeywordStatus.BAD
-                    reason = KeywordStatusReason.LESS_THEN_HARD_MIN_CTR
+                    reason = KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
                     state = KeywordState(
                         status=status,
                         reason=reason,
@@ -280,7 +271,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=reason,
                     best_keyword_status=best_keyword_status
                 )
-            elif pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
+            elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
+                    pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
                 status = KeywordStatus.GOOD
                 reason = KeywordStatusReason.MORE_THEN_RATING_BY_ORDERS
                 state = KeywordState(status=status,

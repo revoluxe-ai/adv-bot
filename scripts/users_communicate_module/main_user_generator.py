@@ -16,10 +16,16 @@ def get_test_users_iterator():
     return final_final_users_generator
 
 
-async def get_users_iterator() -> AsyncIterator[UserDTO]:
+async def get_users_iterator(
+    only_with_auto_campaign: bool = False,
+) -> AsyncIterator[UserDTO]:
     telegram_ids_filter = None
 
-    get_users_generator = get_users(batch_size=batch_size, telegram_ids_filter=telegram_ids_filter)
+    get_users_generator = get_users(
+        batch_size=batch_size,
+        telegram_ids_filter=telegram_ids_filter,
+        only_with_auto_campaign=only_with_auto_campaign,
+    )
 
     final_users_generator = get_users_generator
 

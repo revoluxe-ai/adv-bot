@@ -8,6 +8,7 @@ from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
+    CommonBudgetModeToggle,
     IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
@@ -38,6 +39,9 @@ from app.modules.predict_ctr_exponent_settings import (
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
+)
+from app.modules.white_list_mode_settings.telegram.main_callback import (
+    WhiteListModeMenu,
 )
 from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
     BidderCoroutineTypeToggle,
@@ -80,6 +84,12 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    white_list_button = InlineKeyboardButton(
+        text="Режимы Управления Белым Списком",
+        callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
+    )
+    _ = builder.row(white_list_button)
     incremental_stats_text = (
         "Включить инкрементальную статистику ПП"
         if not adv_setting.use_incremental_stats
@@ -483,27 +493,57 @@ def get_adv_setting_keyboard(
 def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Настроить Аукцион",
-            callback_data=callbacks.ManageCampaignActivity(
-                action="open",
-                adv_setting_original_id=adv_setting.id,
-                campaign_type=AdvType.SEARCH,
-            ).pack(),
+    use_common = getattr(adv_setting, "use_common_budget", False)
+    if use_common:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Настроить общий бюджет",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=None,
+                ).pack(),
+            )
         )
-    )
+    else:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Настроить Аукцион",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=AdvType.SEARCH,
+                ).pack(),
+            )
+        )
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Настроить Авто",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=AdvType.AUTO,
+                ).pack(),
+            )
+        )
 
-    _ =builder.row(
-        InlineKeyboardButton(
-            text="Настроить Авто",
-            callback_data=callbacks.ManageCampaignActivity(
-                action="open",
-                adv_setting_original_id=adv_setting.id,
-                campaign_type=AdvType.AUTO,
-            ).pack(),
+    if getattr(adv_setting, "auto_budget_watchdog_enabled", False):
+        use_common_budget = getattr(adv_setting, "use_common_budget", False)
+        common_budget_text = (
+            "Включить раздельный бюджет на каждую РК"
+            if use_common_budget
+            else "Включить общий бюджет на две РК"
         )
-    )
+        common_budget_callback = CommonBudgetModeToggle(
+            adv_setting_original_id=adv_setting.id,
+            new_status=not use_common_budget,
+        ).pack()
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=common_budget_text,
+                callback_data=common_budget_callback,
+            )
+        )
 
     _ = builder.row(
         InlineKeyboardButton(
@@ -517,7 +557,7 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
 
 def get_campaign_activity_target_keyboard(
     adv_setting: AdvSetting,
-    campaign_type: AdvType,
+    campaign_type: AdvType | None,
     current_limit: int,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()

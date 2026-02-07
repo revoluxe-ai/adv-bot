@@ -36,6 +36,8 @@ class _FakeComplexAdv:
         *,
         bot_active: bool = True,
         watchdog_enabled: bool = True,
+        use_common_budget: bool = False,
+        common_budget_daily_limit: int | None = None,
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -48,6 +50,8 @@ class _FakeComplexAdv:
         self.search_adv_id = search_adv_id
         self.auto_adv_active_status_str = WBAdvActiveStatus(auto_status)
         self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
+        self._use_common_budget = use_common_budget
+        self._common_budget_daily_limit = common_budget_daily_limit
 
     @property
     def adv_setting(self):
@@ -60,6 +64,14 @@ class _FakeComplexAdv:
     @property
     def search_auto_budget_daily_limit(self) -> int:
         return self._search_auto_budget_daily_limit
+
+    @property
+    def use_common_budget(self) -> bool:
+        return self._use_common_budget
+
+    @property
+    def common_budget_daily_limit(self) -> int | None:
+        return self._common_budget_daily_limit
 
 
 @pytest.mark.asyncio
@@ -229,6 +241,112 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
     wb_modifier.pause_auction_campaign.assert_awaited_once_with(overspend_adv)
     wb_modifier.start_auto_campaign.assert_not_called()
     wb_modifier.start_auction_campaign.assert_not_called()
+
+
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_common_budget_pauses_when_combined_spend_exceeds_limit():
+    """При общем бюджете обе кампании ставятся на паузу, если суммарный расход >= лимита."""
+    adv = _FakeComplexAdv(
+        auto_limit=0,
+        auto_status="started",
+        search_limit=0,
+        search_status="started",
+        auto_adv_id=11,
+        search_adv_id=12,
+        use_common_budget=True,
+        common_budget_daily_limit=200,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        for handler in handlers:
+            await handler()
+        return []
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    async def mock_spend(*args, **kwargs):
+        # auto_adv_id=11 -> 100, search_adv_id=12 -> 150, combined=250 >= 200
+        adv_id = args[0]
+        return 100.0 if adv_id == 11 else 150.0
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_spend),
+    ):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
+    """При общем бюджете обе кампании запускаются, если суммарный расход < лимита."""
+    adv = _FakeComplexAdv(
+        auto_limit=0,
+        auto_status="pause",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=13,
+        search_adv_id=14,
+        use_common_budget=True,
+        common_budget_daily_limit=500,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        for handler in handlers:
+            await handler()
+        return []
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    async def mock_spend(*args, **kwargs):
+        return 50.0
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_spend),
+    ):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auction_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.pause_auction_campaign.assert_not_called()
 
 
 @pytest.mark.asyncio

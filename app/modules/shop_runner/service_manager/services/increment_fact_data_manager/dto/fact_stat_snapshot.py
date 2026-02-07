@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import struct
 from datetime import datetime
 from typing import Any, ClassVar, Dict, List, Optional
 from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 
@@ -40,6 +41,30 @@ class FactStatSnapshot(BaseModel):
     buy_outs_sum: int
 
     model_config = ConfigDict(extra="forbid")
+
+    @property
+    def event_id(self) -> int:
+        parts = (
+            self.complex_adv_id,
+            self.views_adv_sum,
+            self.clicks_adv_sum,
+            self.carts_adv_sum,
+            self.orders_adv_sum,
+            self.spend_adv_sum_rub,
+            self.orders_sum_adv_rub,
+            self.open_card_sum,
+            self.carts_card_sum,
+            self.orders_card_sum,
+            self.orders_sum_card_rub,
+            self.buy_outs_sum,
+        )
+
+        raw = ":".join(map(str, parts)).encode("utf-8")
+
+        digest: bytes = hashlib.blake2b(raw, digest_size=8).digest()
+
+        return struct.unpack(">Q", digest)[0]
+
 
     def delta(self, prev: "FactStatSnapshot") -> Dict[str, int]:
         return {
