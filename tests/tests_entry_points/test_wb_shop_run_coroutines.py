@@ -13,6 +13,23 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 from app.modules.shop_runner.wb_shop import WBShop
 
 
+class _FakeTaskGroup:
+    """Fake asyncio.TaskGroup that records created tasks for test assertions."""
+
+    def __init__(self) -> None:
+        self.created: list[Any] = []
+
+    async def __aenter__(self) -> "_FakeTaskGroup":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        return False
+
+    def create_task(self, coro: Any) -> MagicMock:
+        self.created.append(coro)
+        return MagicMock()
+
+
 @pytest.mark.asyncio
 async def test_wb_shop_all_coroutines_launched(fake_redis):
     """Test that WBShop.run() launches all expected coroutines.
@@ -55,20 +72,6 @@ async def test_wb_shop_all_coroutines_launched(fake_redis):
     }
 
     wb_shop._alive_worker_run = AsyncMock()
-
-    class _FakeTaskGroup:
-        def __init__(self):
-            self.created: list[Any] = []
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def create_task(self, coro: Any):
-            self.created.append(coro)
-            return MagicMock()
 
     with (
         patch(
@@ -127,7 +130,7 @@ async def test_wb_shop_commented_coroutines_detection(fake_redis):
         "adv_settings_auto_update": AsyncMock(),
         "update_top_key_in_advs": AsyncMock(),
         "update_predict_ctr": AsyncMock(),
-    "auto_adv_active_control": AsyncMock(),
+        "auto_adv_active_control": AsyncMock(),
     }
 
     # Optional coroutines that might be commented during development

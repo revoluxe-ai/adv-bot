@@ -450,6 +450,152 @@ async def test_ensure_common_budget_locked_limit_reached_when_topups_exceed(
 
 
 @pytest.mark.asyncio
+async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
+    monkeypatch,
+) -> None:
+    """When Auto has fresh stats and Search has stale (or vice versa), reject with NOT_NEW_ADV_STATS."""
+    period = 600
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+    )
+    adv_setting = _build_common_adv_setting()
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+    stale = now - datetime.timedelta(seconds=period * 2)
+
+    async def mock_get_last_full(adv_id: int):
+        if adv_id == adv_setting.adv_id:
+            return now
+        return stale
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_last_full_stat_update",
+        AsyncMock(side_effect=mock_get_last_full),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums_common",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    result = await service._ensure_common_budget_locked(
+        adv_setting_id=adv_setting.id,
+        wb_manager_hub=MagicMock(),
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
+    assert result.reason == "Last full adv stats too old"
+
+
+@pytest.mark.asyncio
+async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats(
+    monkeypatch,
+) -> None:
+    """When both timestamps are stale, reject with NOT_NEW_ADV_STATS."""
+    period = 600
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+    )
+    adv_setting = _build_common_adv_setting()
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+    stale = now - datetime.timedelta(seconds=period * 2)
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_last_full_stat_update",
+        AsyncMock(return_value=stale),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums_common",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    result = await service._ensure_common_budget_locked(
+        adv_setting_id=adv_setting.id,
+        wb_manager_hub=MagicMock(),
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
+    assert result.reason == "Last full adv stats too old"
+
+
+@pytest.mark.asyncio
+async def test_ensure_common_budget_rejects_when_one_campaign_missing_stats(
+    monkeypatch,
+) -> None:
+    """When either timestamp is None, reject with NOT_NEW_ADV_STATS."""
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(),
+    )
+    adv_setting = _build_common_adv_setting()
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+
+    async def mock_get_last_full(adv_id: int):
+        if adv_id == adv_setting.adv_id:
+            return now
+        return None
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_last_full_stat_update",
+        AsyncMock(side_effect=mock_get_last_full),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums_common",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    result = await service._ensure_common_budget_locked(
+        adv_setting_id=adv_setting.id,
+        wb_manager_hub=MagicMock(),
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
+    assert result.reason == "Missing full adv stats for one or both campaigns"
+
+
+@pytest.mark.asyncio
 async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> None:
     period = 600
     monkeypatch.setattr(
