@@ -505,13 +505,13 @@ async def add_balance_from_user_balance(
     )
     await state.set_state(states.AddBalance.awaiting_amount)
     try:
-        user_balance, _ = await get_user_balance(chat_id)
-        available = user_balance
+        user_balance, user_bonus = await get_user_balance(chat_id)
+        available = user_balance + user_bonus
     except Exception:
         available = 0.0
     text = (
         f"Введите сумму для перевода с личного баланса на кабинет.\n"
-        f"Доступно (баланс): {available:.0f} руб."
+        f"Доступно (баланс + бонусы): {available:.0f} руб."
     )
     await bot.send_message(chat_id, text)
 
