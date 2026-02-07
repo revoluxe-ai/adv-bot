@@ -2,7 +2,7 @@ import asyncio
 from typing import AsyncGenerator
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import load_only, selectinload
 
 from app.modules.billing.pricer import Pricer
@@ -49,6 +49,7 @@ async def _fetch_user_batch(
     batch_size: int,
     last_id: int | None,
     telegram_ids_filter: list[int] | None,
+    only_with_auto_campaign: bool = False,
 ) -> list[User]:
     stmt = (
         select(User)
@@ -62,6 +63,23 @@ async def _fetch_user_batch(
         stmt = stmt.where(User.user_telegram_id.in_(telegram_ids_filter))
     if last_id is not None:
         stmt = stmt.where(User.id > last_id)
+    if only_with_auto_campaign:
+        has_auto = exists(
+            select(1)
+            .select_from(AdvSetting)
+            .join(WBCabinet, AdvSetting.wb_cabinet_id == WBCabinet.id)
+            .join(WBUserCabinet, WBUserCabinet.wb_cabinet_id == WBCabinet.id)
+            .where(
+                WBUserCabinet.user_id == User.id,
+                AdvSetting.bot_active.is_(True),
+                AdvSetting.automatic_version.in_([1, 2]),
+                or_(
+                    AdvSetting.auto_update_white_list.is_(True),
+                    AdvSetting.auto_update_target_place.is_(True),
+                ),
+            )
+        )
+        stmt = stmt.where(has_auto)
 
     stmt = stmt.order_by(User.id).limit(batch_size)
 
@@ -77,7 +95,11 @@ async def _fetch_user_batch(
     return users
 
 
-async def get_users(batch_size,  telegram_ids_filter = None) -> AsyncGenerator[UserDTO, None]:
+async def get_users(
+    batch_size: int,
+    telegram_ids_filter: list[int] | None = None,
+    only_with_auto_campaign: bool = False,
+) -> AsyncGenerator[UserDTO, None]:
     """
     Pull users in batches via short-lived sessions so no cursor stays open too long.
     """
@@ -86,7 +108,9 @@ async def get_users(batch_size,  telegram_ids_filter = None) -> AsyncGenerator[U
     last_id: int | None = None
 
     while True:
-        batch = await _fetch_user_batch(batch_size, last_id, telegram_ids_filter)
+        batch = await _fetch_user_batch(
+            batch_size, last_id, telegram_ids_filter, only_with_auto_campaign
+        )
         if not batch:
             break
 
