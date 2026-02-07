@@ -50,7 +50,9 @@ class TargetPlaceDownExecutor(BaseExecutor):
                 adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-        min_place_by_keywords: int = await self._get_min_place_by_keywords(ctx)
+        min_place_by_keywords: int | None = await self._get_min_place_by_keywords(ctx)
+        if not min_place_by_keywords:
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         redis_cache = LastTargetPlaceDownV2(ctx.complex_adv.adv_setting)
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
