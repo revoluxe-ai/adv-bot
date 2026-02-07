@@ -625,7 +625,7 @@ class AutoBudgetService:
                 campaign_type=AdvType.AUTO,
                 adv_id=None,
                 spend_today=0.0,
-                reason="Common budget mode is disabled",
+                reason="Search campaign (search_adv_id) is not configured",
             )
         if limit <= 0:
             return AutoBudgetEnsureResult(
