@@ -3,6 +3,8 @@
 
 # type: ignore
 import logging
+
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 import aiogram
 from aiogram import F, Router, types
@@ -717,31 +719,6 @@ async def change_keyword_hard_status(
 
         return
 
-
-@router.callback_query(callbacks.CheckPosition.filter())
-async def check_position(
-    callback: types.CallbackQuery,
-    callback_data: callbacks.CheckPosition,
-    bot: aiogram.Bot,
-):
-    await messages.LongTimeOperation(bot, callback.message.chat.id)()
-    keyword_setting_original_id = callback_data.keyword_setting_original_id
-    async with _sm() as session:
-        result = await session.execute(
-            select(KeywordSetting.text).where(
-                KeywordSetting.id == keyword_setting_original_id
-            )
-        )
-        text: str = result.scalar()
-        adv_setting_original_id = callback_data.adv_original_id
-        stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
-        result = await session.execute(stmt)
-        nmids: AdvSetting = result.scalar()  # type: ignore[attr-defined]
-        nmid = nmids[0]
-    await parser.add_wb_positions(text, {nmid}, delay=1)
-    await messages.KeywordSettingMessage(
-        bot, callback.message.chat.id, keyword_setting_original_id, 1
-    )()
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_by_query))
