@@ -1,6 +1,8 @@
 """Исполнитель для понижения целевой позиции (увеличение номера позиции)."""
 
 import logging
+import math
+
 from typing_extensions import override
 
 from sqlalchemy import update
@@ -14,10 +16,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from .redis_cache import LastTargetPlaceDownV2
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
-from . import utils
+from .redis_cache import LastTargetPlaceDownV2
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +104,13 @@ class TargetPlaceDownExecutor(BaseExecutor):
         # Efficiency = 1 (выполнили одно изменение на 1)
         # TODO: Тут надо переделать логику и включить возможность отрицательного efficiency, например, когда появились новые ограничения и нужно сделать противоположние задаче экзекутера действия
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)
+
+    @staticmethod
+    async def _get_min_place_by_keywords(ctx: PipelineContext) -> int | None:
+        keywords = await ctx.complex_adv.get_keywords()
+        active_keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        if not active_keywords:
+            return None
+        min_place = max([kw.position for kw in active_keywords])
+        return math.floor(min_place + 0.5)
+
