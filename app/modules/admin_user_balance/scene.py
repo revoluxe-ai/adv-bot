@@ -284,8 +284,8 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
 
     @on.callback_query(AdminUserBalance.filter(F.action == "back"))
     async def process_exit(self, callback: CallbackQuery) -> None:
-        from app.client_bot.user_interface.views.keyboards import get_admin_keyboard
         """Выход в главное меню администратора."""
+        from app.client_bot.user_interface.views.keyboards import get_admin_keyboard
         logger.info("Выход из сцены пополнения баланса пользователей")
         if callback.message:
             await callback.message.edit_text(
