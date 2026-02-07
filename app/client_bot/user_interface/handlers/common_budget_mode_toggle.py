@@ -20,7 +20,7 @@ async def toggle_common_budget_mode(
     new_status = callback_data.new_status
     adv_setting_id = callback_data.adv_setting_original_id
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         if new_status:
             result = await session.execute(
                 select(AdvSetting).where(AdvSetting.id == adv_setting_id)
