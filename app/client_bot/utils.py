@@ -3,6 +3,7 @@ import logging
 from io import StringIO
 
 from sqlalchemy import and_, select, Result
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 
@@ -167,6 +168,29 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         session.add(ref_link)
         await session.commit()
         return ref_link
+
+
+async def create_user(
+    session: AsyncSession,
+    user_telegram_id: int,
+    *,
+    username: str | None = None,
+    adv_updater_user_chat_id: int | None = None,
+    referral_link: RefLink | None = None,
+) -> User:
+    """Создаёт пользователя в БД и возвращает его. Сессия должна быть с read_only=False."""
+    user = User(
+        user_telegram_id=user_telegram_id,
+        username=username,
+        adv_updater_user_chat_id=adv_updater_user_chat_id,
+        wb_tokens=[],
+    )
+    session.add(user)
+    if referral_link is not None:
+        referral_link.referred_users.append(user)
+    await session.commit()
+    await session.refresh(user)
+    return user
 
 
 # TODO: Выпилить из кода парсер позиций

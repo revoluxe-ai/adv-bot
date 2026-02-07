@@ -37,7 +37,7 @@
     "app/modules/wb_adv_updater/phrases_processor.py",
     "app/modules/shop_runner/service_manager/services/update_commot_bid_in_search_advs_manager",
     "app/modules/shop_runner/wb_shop.py",
-    "app/modules/shop_runner/service_manager/increment_fact_data_manager",
+    "app/modules/shop_runner/service_manager/services/increment_fact_data_manager",
     "app/modules/shop_runner/service_manager/services/white_list_trimmer.py"
   ],
 

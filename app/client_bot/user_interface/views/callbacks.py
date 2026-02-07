@@ -99,6 +99,18 @@ class Start(CallbackData, prefix="start"):
     pass
 
 
+class Gate(CallbackData, prefix="gate"):
+    """Коллбеки экрана гейта: invite_enter, pay_entry_amount, offer_open, restore_request."""
+
+    action: str
+
+
+class InviteShow(CallbackData, prefix="invite"):
+    """Показать инвайт (для приглашения). Только для passed_gate."""
+
+    action: str = "show"
+
+
 class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
@@ -121,6 +133,27 @@ class AddBalance(CallbackData, prefix="add_balance"):
 
 class ConfirmAddBalance(CallbackData, prefix="confirm_add_balance"):
     wb_cabinet_original_id: int
+
+
+class AddBalanceByCard(CallbackData, prefix="add_balance_by_card"):
+    wb_cabinet_original_id: int
+
+
+class AddBalanceFromUserBalance(CallbackData, prefix="add_balance_from_user_balance"):
+    wb_cabinet_original_id: int
+
+
+class AddUserBalance(CallbackData, prefix="add_user_balance"):
+    pass
+
+
+class ConfirmAddUserBalance(CallbackData, prefix="confirm_add_user_balance"):
+    pass
+
+
+class UserBalanceMenu(CallbackData, prefix="user_balance_menu"):
+    """Открыть экран «Мой баланс» (баланс и бонусы пользователя)."""
+    pass
 
 
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):

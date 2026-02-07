@@ -7,10 +7,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram.types import Message, User as TelegramUser
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select
 
 from app.client_bot.user_interface.handlers.start.start import process_add_new_token
-from app.client_bot.user_interface import states
 from app.modules.common_slaves.wildberries.models import (
     WBToken,
     WBUserCabinet,

@@ -39,7 +39,9 @@ from .user_interface.handlers.keywords_positions_history import (
     KeywordsPositionsHistoryRouter,
 )
 from .user_interface.handlers import (
+    admin_panel,
     add_black_phrases,
+    invite_show,
     add_white_phrases,
     adv_setting,
     change_cpm,
@@ -82,6 +84,7 @@ common_router = Router()
 
 # admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
 common_router.include_routers(KeywordsPositionsHistoryRouter)
+common_router.include_routers(admin_panel.router)
 if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
@@ -120,6 +123,7 @@ common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
+common_router.include_routers(invite_show.router)
 common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)

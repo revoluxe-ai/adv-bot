@@ -42,7 +42,13 @@ min_sum = settings.MIN_SUM
 
 MIN_SUM = min_sum
 
+GATE_ENTRY_AMOUNT = MIN_SUM  # Default entry amount for the gate
+
+OFFERTA_URL = (
+    "https://docs.google.com/document/d/1SK9ixZO1LD3yc_-rzkE5K_uOG5qWNCO-4RwGd1fq24A/edit?usp=sharing"
+)
+
+PRICE_LINK = 'https://telegra.ph/Tarify-Servisa-Gorizont-Avtomatizaciya-vnutrennej-reklamy-WB-02-06'
+
 SUPPORT_LINK = "https://t.me/@skyline360_1"
-
-
-PRICE_LINK = "https://golnk.ru/pwN2L"
+SUPPORT_USER_NAME = "skyline360_1"  # username для лички (без @)

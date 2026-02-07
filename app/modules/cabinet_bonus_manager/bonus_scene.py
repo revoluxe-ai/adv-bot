@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.scene import Scene, SceneRegistry, SceneWizard, on
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy import select
 
 from app.client_bot.const import ADMINS
 from app.modules.cabinet_bonus_manager.bonus_service import (
@@ -24,6 +25,8 @@ from app.modules.cabinet_bonus_manager.keyboards import (
     get_confirm_keyboard,
     get_shop_bonus_keyboard,
 )
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -379,14 +382,31 @@ class BonusScene(Scene, state="bonus_scene"):
 
         description = data.get("description")
         wb_cabinet_original_id = callback_data.wb_cabinet_original_id
+        admin_tg_id = callback.from_user.id if callback.from_user else None
+        admin_note = (
+            f"Операция администратором (tg:{admin_tg_id})."
+            if admin_tg_id is not None
+            else "Операция администратором."
+        )
+        full_description = (
+            f"{admin_note} {description}".strip()
+            if description
+            else admin_note
+        )
+        admin_user_id: int | None = None
+        if admin_tg_id is not None:
+            async with get_async_session_maker() as session:
+                stmt = select(User.id).where(User.user_telegram_id == admin_tg_id)
+                result_stmt = await session.execute(stmt)
+                admin_user_id = result_stmt.scalar_one_or_none()
         try:
             operation = callback_data.operation
             if operation == "add":
                 result = await add_bonus(
                     wb_cabinet_original_id,
                     callback_data.amount,
-                    callback.from_user.id,
-                    description,
+                    admin_user_id,
+                    full_description,
                 )
                 operation_text = (
                     f"✅ Бонусы успешно добавлены в кабинет {shop_id}"
@@ -396,8 +416,8 @@ class BonusScene(Scene, state="bonus_scene"):
                 result = await subtract_bonus(
                     wb_cabinet_original_id,
                     callback_data.amount,
-                    callback.from_user.id,
-                    description,
+                    admin_user_id,
+                    full_description,
                 )
                 operation_text = (
                     f"✅ Бонусы успешно списаны с кабинета {shop_id}!\n"
@@ -405,7 +425,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 )
             elif operation == "reset":
                 result = await reset_bonus(
-                    wb_cabinet_original_id, callback.from_user.id, description
+                    wb_cabinet_original_id, admin_user_id, full_description
                 )
                 operation_text = f"✅ Бонусы кабинета {shop_id} успешно обнулены!"
             else:
@@ -491,10 +511,13 @@ class BonusScene(Scene, state="bonus_scene"):
         await message.answer("Введите shop_id кабинета для проверки бонусов:")
 
 
-def register_bonus_scene(router: Router):
-    """Регистрирует сцену для управления бонусами в указанном роутере"""
-    scene_registry = SceneRegistry(router)
-    scene_registry.add(BonusScene)
+def register_bonus_scene(router: Router, scene_registry: SceneRegistry | None = None):
+    """Регистрирует сцену для управления бонусами в указанном роутере.
+    Если scene_registry передан, сцена в него не добавляется (должна быть добавлена снаружи).
+    """
+    if scene_registry is None:
+        scene_registry = SceneRegistry(router)
+        scene_registry.add(BonusScene)
 
     router.message.register(
         BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS)

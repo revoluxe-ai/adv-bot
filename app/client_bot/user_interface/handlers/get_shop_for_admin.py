@@ -36,11 +36,14 @@ class AdminsGetShopFilter(BaseFilter):
         if not text:
             return False
 
-        # Проверяем, находится ли пользователь в сцене bonus_scene
+        # Не перехватывать ввод, если админ в сцене бонусов или пополнения баланса пользователей
         current_state = await state.get_state()
-        if current_state and "bonus_scene" in current_state:
+        if current_state and (
+            "bonus_scene" in current_state or "user_balance_scene" in current_state
+        ):
             logger.debug(
-                f"Сообщение {text} не обработано фильтром AdminsGetShopFilter, т.к. пользователь в bonus_scene"
+                "Сообщение не обработано фильтром AdminsGetShopFilter, "
+                "т.к. пользователь в bonus_scene или user_balance_scene"
             )
             return False
 

@@ -27,7 +27,7 @@ class NotEnoughMoneyMessage(TextWithKeyboard):
     def keyboard(self):
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
-            text="Пополнить баланс",
+            text="Пополнить баланс (Yookassa)",
             callback_data=callbacks.AddBalance(
                 wb_cabinet_original_id=self.__wb_cabinet_original_id
             ).pack(),

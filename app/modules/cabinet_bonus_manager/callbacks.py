@@ -1,6 +1,12 @@
 from aiogram.filters.callback_data import CallbackData
 
 
+class AdminPanel(CallbackData, prefix="admin_panel"):
+    """Callback для входа в панель администратора (показать выбор: кабинеты / пользователи)."""
+
+    action: str  # "menu"
+
+
 class AdminBonus(CallbackData, prefix="admin_bonus"):
     """Callback для кнопок управления бонусами"""
 

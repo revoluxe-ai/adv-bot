@@ -20,6 +20,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeRecSystemModeStatus,
     ChangeCommonBidInSearchAdvStatus,
 )
+from app.modules.admin_user_balance.callbacks import AdminUserBalance
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -1182,7 +1183,7 @@ def get_shop_menu_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="Пополнить баланс",
+            text="Пополнить баланс (Yookassa)",
             callback_data=callbacks.AddBalance(
                 wb_cabinet_original_id=wb_cabinet_original_id
             ).pack(),
@@ -1210,7 +1211,7 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     _ = builder.row(
         InlineKeyboardButton(
-            text="Пополнить баланс",
+            text="Пополнить баланс (Yookassa)",
             callback_data=callbacks.AddBalance(
                 wb_cabinet_original_id=wb_cabinet_original_id
             ).pack(),
@@ -1342,16 +1343,22 @@ def get_payment_keyboard_for_shops(
 
 def get_admin_keyboard() -> InlineKeyboardMarkup:
     """
-    Создает клавиатуру администратора с доступными административными функциями
+    Создает клавиатуру администратора: пополнение кабинетов (shop_id) или пользователей (telegram_id).
     """
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="💰 Управление бонусами",
+                    text="💰 Пополнение кабинетов",
                     callback_data=AdminBonus(action="menu").pack(),
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👤 Пополнение пользователей",
+                    callback_data=AdminUserBalance(action="menu").pack(),
+                )
+            ],
         ]
     )
     return keyboard
