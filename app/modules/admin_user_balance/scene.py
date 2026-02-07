@@ -16,12 +16,16 @@ from app.modules.admin_user_balance.keyboards import (
     get_confirm_keyboard,
     get_user_balance_keyboard,
 )
+from sqlalchemy import select
+
 from app.modules.balance_manager.exceptions import InvalidAmountError, UserNotFoundError
 from app.modules.balance_manager.user_balance_service import (
     add_user_balance,
     add_user_bonus,
     get_user_balance,
 )
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -194,44 +198,54 @@ class UserBalanceScene(Scene, state="user_balance_scene"):
                     reply_markup=get_user_balance_keyboard(),
                 )
             return
-        admin_tg_id = callback.from_user.id if callback.from_user else 0
-        admin_note = f"Пополнение администратором (tg:{admin_tg_id})."
+        admin_tg_id = callback.from_user.id if callback.from_user else None
+        admin_note = (
+            f"Пополнение администратором (tg:{admin_tg_id})."
+            if admin_tg_id is not None
+            else "Пополнение администратором."
+        )
         full_description = f"{admin_note} {description}" if description else admin_note
+        admin_user_id: int | None = None
+        if admin_tg_id is not None:
+            async with get_async_session_maker() as session:
+                stmt = select(User.id).where(User.user_telegram_id == admin_tg_id)
+                result = await session.execute(stmt)
+                admin_user_id = result.scalar_one_or_none()
         try:
             if operation == "add_balance":
-                await add_user_balance(
+                _ = await add_user_balance(
                     user_telegram_id, amount, full_description
                 )
                 operation_text = (
                     f"✅ Баланс пользователя {user_telegram_id} пополнен на {amount:.0f} руб."
                 )
             elif operation == "add_bonus":
-                await add_user_bonus(
+                _ = await add_user_bonus(
                     user_telegram_id,
                     amount,
                     full_description,
-                    admin_user_id=admin_tg_id,
+                    admin_user_id=admin_user_id,
                 )
                 operation_text = (
                     f"✅ Пользователю {user_telegram_id} начислено бонусов: {amount:.0f} руб."
                 )
             else:
                 if callback.message:
-                    await callback.message.edit_text(
+                    _ = await callback.message.edit_text(
                         "❌ Неизвестная операция.",
                         reply_markup=get_user_balance_keyboard(),
                     )
                 return
         except UserNotFoundError:
             if callback.message:
-                await callback.message.edit_text(
+                _ = await callback.message.edit_text(
                     f"❌ Пользователь с telegram_id {user_telegram_id} не найден.",
                     reply_markup=get_user_balance_keyboard(),
                 )
             return
         except InvalidAmountError as e:
             if callback.message:
-                await callback.message.edit_text(
+                _ = await callback.message.edit_text(
                     f"❌ Ошибка: {e}",
                     reply_markup=get_user_balance_keyboard(),
                 )

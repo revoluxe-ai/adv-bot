@@ -78,7 +78,10 @@ class User(BaseTable):
         "UserBalancePayment", back_populates="user", uselist=True
     )
     user_bonus_payments: Mapped[list["UserBonusPayment"]] = relationship(
-        "UserBonusPayment", back_populates="user", uselist=True
+        "UserBonusPayment",
+        back_populates="user",
+        uselist=True,
+        foreign_keys="UserBonusPayment.user_id",
     )
     passed_gate: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
@@ -128,7 +131,11 @@ class UserBonusPayment(BaseTable):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False
     )
-    user: Mapped["User"] = relationship("User", back_populates="user_bonus_payments")
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="user_bonus_payments",
+        foreign_keys=[user_id],
+    )
 
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -138,7 +145,9 @@ class UserBonusPayment(BaseTable):
     operation_type: Mapped[str] = mapped_column(
         String, nullable=False, server_default=text("'add'")
     )
-    admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    admin_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=True
+    )
 
     __table_args__ = (
         Index("idx_user_bonus_payment_user_id", "user_id"),

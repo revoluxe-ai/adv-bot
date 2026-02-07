@@ -73,8 +73,9 @@ async def add_user_bonus(
         user_telegram_id: Telegram ID пользователя
         amount: Сумма бонусов (должна быть положительной)
         description: Описание операции (опционально)
-        admin_user_id: ID администратора (User.id или telegram_id), выполнившего
-            операцию; None для автоматических начислений (напр. при пополнении)
+        admin_user_id: User.id администратора, выполнившего операцию; None для
+            автоматических начислений (напр. при пополнении). Должен быть
+            внутренний PK User, не telegram_id.
 
     Returns:
         UserBonusPayment: Созданная запись

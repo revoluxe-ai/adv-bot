@@ -142,7 +142,9 @@ class WBBonusPayment(BaseTable):
     operation_type: Mapped[str] = mapped_column(
         String, nullable=False, server_default=text("'subtract'")
     )
-    admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    admin_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=True
+    )
 
     __table_args__ = (
         Index("idx_wb_bonus_payment_cabinet_id", "wb_cabinet_id"),
