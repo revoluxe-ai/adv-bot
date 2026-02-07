@@ -592,6 +592,8 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 60)
     async def update_cluster_bids(self) -> None:
+        if not settings.AUTO_SETTING_ACTIVE:
+            return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = ClusterBidsManagerContainer(
@@ -702,6 +704,9 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 15)
     async def update_common_bid_in_search_adv(self) -> None:
+        if not settings.AUTO_SETTING_ACTIVE:
+            return None
+
         # TODO: Ускорить работу, как вариант - переделать на генераторы
         from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
