@@ -1359,6 +1359,12 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
                     callback_data=AdminUserBalance(action="menu").pack(),
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="🔙 Назад",
+                    callback_data=callbacks.Start().pack(),
+                )
+            ],
         ]
     )
     return keyboard

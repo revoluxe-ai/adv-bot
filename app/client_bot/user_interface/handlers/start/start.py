@@ -130,6 +130,47 @@ async def show_shops_list(
     return
 
 
+@router.callback_query(callbacks.ShopsListPaginator.filter())
+async def shops_list_paginator(
+    callback: CallbackQuery,
+    callback_data: callbacks.ShopsListPaginator,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Переключение страницы списка «Мои магазины»."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    page = callback_data.page if callback_data.page >= 1 else 1
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.scalar()
+        if user is None or not user.passed_gate:
+            _ = await bot.send_message(
+                chat_id,
+                get_gate_message_text(),
+                reply_markup=get_gate_keyboard(),
+            )
+            return
+        wb_user_cabinets = user.wb_user_cabinets
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
+        await ShopsListPage(
+            bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens, page=page
+        )()
+
+
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(
     callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext

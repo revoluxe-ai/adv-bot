@@ -105,6 +105,12 @@ class ShowShopsList(CallbackData, prefix="shops_list"):
     pass
 
 
+class ShopsListPaginator(CallbackData, prefix="shops_list_pg"):
+    """Переключение страницы списка «Мои магазины»."""
+
+    page: int
+
+
 class Gate(CallbackData, prefix="gate"):
     """Коллбеки экрана гейта: invite_enter, pay_entry_amount, offer_open, restore_request."""
 

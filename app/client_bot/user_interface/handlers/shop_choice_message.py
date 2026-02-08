@@ -15,6 +15,8 @@ SHOPS_LIST_PAGE_TITLE = ("Мои магазины: \n"
                          "✅ - Магазин подключен\n"
                          "❌ - Требуется замена токена\n")
 
+SHOPS_PER_PAGE = 20
+
 
 class MainMenu(TextWithKeyboard):
     """Главная страница после Start: «Мои магазины», инвайт, баланс, админка."""
@@ -78,10 +80,12 @@ class ShopsListPage(TextWithKeyboard):
         chat_id: int,
         all_shops: list[WBUserCabinet],
         shop_ids_with_active_tokens: set[str] | None = None,
+        page: int = 1,
     ):
         super().__init__(bot, chat_id)
         self.__all_shops = all_shops
         self.__shop_ids_with_active_tokens = shop_ids_with_active_tokens
+        self._page = page
         self.user_telegram_id = chat_id
 
     @property
@@ -94,6 +98,7 @@ class ShopsListPage(TextWithKeyboard):
             self.__all_shops,
             self.user_telegram_id,
             self.__shop_ids_with_active_tokens,
+            page=self._page,
         )
 
 
@@ -101,8 +106,9 @@ def get_shops_list_keyboard(
     all_shops: list[WBUserCabinet],
     user_telegram_id: int,
     shop_ids_with_active_tokens: set[str] | None = None,
+    page: int = 1,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура страницы «Мои магазины»: Добавить магазин, список, Назад."""
+    """Клавиатура страницы «Мои магазины»: Добавить магазин, список, пагинация, Назад."""
     keyboard_buttons = []
 
     add_shop_button = InlineKeyboardButton(
@@ -110,7 +116,11 @@ def get_shops_list_keyboard(
     )
     keyboard_buttons.append([add_shop_button])
 
-    for wb_user_cabinet in all_shops:
+    start_index = (page - 1) * SHOPS_PER_PAGE
+    end_index = start_index + SHOPS_PER_PAGE
+    shops_slice = all_shops[start_index:end_index]
+
+    for wb_user_cabinet in shops_slice:
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
         wb_cabinet = wb_user_cabinet.wb_cabinet
@@ -123,7 +133,7 @@ def get_shops_list_keyboard(
         )
         status_text = "✅" if is_active else "❌"
         full_shop_name = f"{shop_name} {status_text}" + ' ' * 1000
-        full_shop_name = full_shop_name[:30]
+        full_shop_name = full_shop_name[:100]
         button = InlineKeyboardButton(
             text=full_shop_name,
             callback_data=callbacks.Shop(
@@ -132,6 +142,24 @@ def get_shops_list_keyboard(
             ).pack(),
         )
         keyboard_buttons.append([button])
+
+    paginator_row: list[InlineKeyboardButton] = []
+    if page > 1:
+        paginator_row.append(
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data=callbacks.ShopsListPaginator(page=page - 1).pack(),
+            )
+        )
+    if len(all_shops) > end_index:
+        paginator_row.append(
+            InlineKeyboardButton(
+                text="Вперёд ➡️",
+                callback_data=callbacks.ShopsListPaginator(page=page + 1).pack(),
+            )
+        )
+    if paginator_row:
+        keyboard_buttons.append(paginator_row)
 
     back_button = InlineKeyboardButton(
         text="Назад",
