@@ -17,7 +17,7 @@ from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
     DeleteWbUserCabinet,
-    Start,
+    ShowShopsList,
     TurnBot,
     TurnWhiteListUpdate,
 )
@@ -508,7 +508,7 @@ class ShopMenu(TextWithKeyboard):
         builder.row(button)
 
         button = InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=Start().pack()
+            text="Вернуться к списку магазинов", callback_data=ShowShopsList().pack()
         )
         builder.row(button)
         return builder.as_markup()
