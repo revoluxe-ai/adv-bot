@@ -15,7 +15,11 @@ from sqlalchemy.exc import IntegrityError
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
+from app.client_bot.user_interface.handlers.shop_choice_message import (
+    MainMenu,
+    ShopsListPage,
+    ShopChoice,
+)
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
 )
@@ -80,9 +84,39 @@ async def callback_start_registration(
                 reply_markup=get_gate_keyboard(),
             )
             return
-        wb_user_cabinets = user.wb_user_cabinets
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await MainMenu(bot, chat_id)()
     return
+
+
+@router.callback_query(callbacks.ShowShopsList.filter())
+async def show_shops_list(
+    callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Показать страницу «Мои магазины»: Добавить магазин + список магазинов."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.scalar()
+    if user is None or not user.passed_gate:
+        _ = await bot.send_message(
+            chat_id,
+            get_gate_message_text(),
+            reply_markup=get_gate_keyboard(),
+        )
+        return
+    wb_user_cabinets = user.wb_user_cabinets
+    await ShopsListPage(bot, chat_id, wb_user_cabinets)()
 
 
 @router.callback_query(callbacks.ShopNew.filter())

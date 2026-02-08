@@ -99,6 +99,12 @@ class Start(CallbackData, prefix="start"):
     pass
 
 
+class ShowShopsList(CallbackData, prefix="shops_list"):
+    """Переход на страницу «Мои магазины» (список магазинов)."""
+
+    pass
+
+
 class Gate(CallbackData, prefix="gate"):
     """Коллбеки экрана гейта: invite_enter, pay_entry_amount, offer_open, restore_request."""
 
