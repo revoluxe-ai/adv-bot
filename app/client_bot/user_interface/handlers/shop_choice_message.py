@@ -10,7 +10,8 @@ from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
-SHOPS_LIST_PAGE_TITLE = ("Мои магазины: \n"
+SHOPS_LIST_PAGE_TITLE = ("Нажмите 'Добавить магазин' для начала использования"
+                         "Мои магазины: \n"
                          ""
                          "✅ - Магазин подключен\n"
                          "❌ - Требуется замена токена\n")
