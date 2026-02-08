@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from aiohttp import ClientSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
@@ -16,6 +17,21 @@ from .models.wb_cabinet import WBCabinet
 sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
+
+
+async def get_shop_ids_with_active_tokens(
+    session: AsyncSession, shop_ids: list[str]
+) -> set[str]:
+    """Return set of shop_id that have at least one WBToken with active=True."""
+    if not shop_ids:
+        return set()
+    stmt = (
+        select(WBToken.shop_id)
+        .where(WBToken.shop_id.in_(shop_ids), WBToken.active == True)
+        .distinct()
+    )
+    result = await session.execute(stmt)
+    return {s for s in result.scalars().all() if s is not None}
 
 
 token_check_righter = CheckRighter()

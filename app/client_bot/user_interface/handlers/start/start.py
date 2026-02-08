@@ -39,6 +39,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.settings import settings
@@ -108,15 +109,25 @@ async def show_shops_list(
         )
         result = await session.execute(stmt)
         user: User | None = result.scalar()
+        if user is None or not user.passed_gate:
+            pass
+        else:
+            wb_user_cabinets = user.wb_user_cabinets
+            shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+            shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+                shop_ids
+            )
+            await ShopsListPage(
+                bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
+            )()
+            return
     if user is None or not user.passed_gate:
         _ = await bot.send_message(
             chat_id,
             get_gate_message_text(),
             reply_markup=get_gate_keyboard(),
         )
-        return
-    wb_user_cabinets = user.wb_user_cabinets
-    await ShopsListPage(bot, chat_id, wb_user_cabinets)()
+    return
 
 
 @router.callback_query(callbacks.ShopNew.filter())
@@ -379,13 +390,20 @@ async def process_cabinet_api(
         async with sm() as session:
             stmt_for_wb_user_cabinet = (
                 select(WBUserCabinet)
+                .options(joinedload(WBUserCabinet.wb_cabinet))
                 .join(WBUserCabinet.user)
                 .where(User.user_telegram_id == user_telegram_id)
             )
             result = await session.execute(stmt_for_wb_user_cabinet)
             wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
+            shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+            shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+                shop_ids
+            )
 
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await ShopChoice(
+            bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
+        )()
         return None
 
 

@@ -14,6 +14,8 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
+logger = logging.getLogger(__name__)
+
 # Required rights for the bot to function properly
 REQUIRED_RIGHTS = {
     "Контент",  # Content
@@ -320,6 +322,48 @@ class TokenInfoService:
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
+    @staticmethod
+    async def _get_tokens_by_shop_ids(
+        session: AsyncSession, shop_ids: list[str]
+    ) -> dict[str, list[WBToken]]:
+        """Get all tokens for multiple shops in one query. Returns dict shop_id -> tokens."""
+        if not shop_ids:
+            return {}
+        stmt = select(WBToken).where(WBToken.shop_id.in_(shop_ids))
+        result = await session.execute(stmt)
+        tokens = list(result.scalars().all())
+        by_shop: dict[str, list[WBToken]] = {sid: [] for sid in shop_ids}
+        for t in tokens:
+            if t.shop_id is not None:
+                by_shop.setdefault(t.shop_id, []).append(t)
+        return by_shop
+
+    async def get_shop_ids_with_complete_token_status_batch(
+        self, session: AsyncSession, shop_ids: list[str]
+    ) -> set[str]:
+        """
+        Same logic as get_shop_token_status(shop_id).status == "Complete", but for
+        many shop_ids in one session and one query. Used to speed up the shops list.
+        """
+        if not shop_ids:
+            return set()
+        by_shop = await self._get_tokens_by_shop_ids(session, shop_ids)
+        out: set[str] = set()
+        for sid in shop_ids:
+            all_tokens = by_shop.get(sid) or []
+            token_infos = [TokenInfo.from_wb_token(t) for t in all_tokens]
+            valid_tokens = [
+                t
+                for t in token_infos
+                if t.is_valid and not t.is_expired and not t.is_read_only
+            ]
+            available_permissions: set[str] = set()
+            for t in valid_tokens:
+                available_permissions.update(t.categories)
+            missing = REQUIRED_RIGHTS - available_permissions
+            if len(missing) == 0 and valid_tokens:
+                out.add(sid)
+        return out
 
     @staticmethod
     async def _get_shop_name(session: AsyncSession, shop_id: str) -> str:
@@ -385,6 +429,23 @@ async def get_shop_token_status(shop_id: str) -> TokenStatusReport:
     """Get token status for a shop."""
     service = TokenInfoService()
     return await service.get_shop_token_status(shop_id)
+
+
+async def get_shop_ids_with_complete_token_status(
+    shop_ids: list[str],
+) -> set[str]:
+    """
+    Return set of shop_id for which token status is Complete (same logic as shop menu:
+    valid tokens, not expired, not read-only, all required permissions present).
+    Uses one DB session and one query for all shop_ids to avoid N round-trips.
+    """
+    if not shop_ids:
+        return set()
+    service = TokenInfoService()
+    async with service.session_maker() as session:
+        return await service.get_shop_ids_with_complete_token_status_batch(
+            session, shop_ids
+        )
 
 
 async def validate_shop_permissions(
