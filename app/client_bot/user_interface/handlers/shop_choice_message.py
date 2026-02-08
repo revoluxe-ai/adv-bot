@@ -48,17 +48,18 @@ def get_main_menu_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
     )
     keyboard_buttons.append([my_shops_button])
 
+    user_balance_button = InlineKeyboardButton(
+        text="Мой баланс",
+        callback_data=callbacks.UserBalanceMenu().pack(),
+    )
+    keyboard_buttons.append([user_balance_button])
+
     invite_show_button = InlineKeyboardButton(
         text="Показать инвайт",
         callback_data=callbacks.InviteShow().pack(),
     )
     keyboard_buttons.append([invite_show_button])
 
-    user_balance_button = InlineKeyboardButton(
-        text="Мой баланс",
-        callback_data=callbacks.UserBalanceMenu().pack(),
-    )
-    keyboard_buttons.append([user_balance_button])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
