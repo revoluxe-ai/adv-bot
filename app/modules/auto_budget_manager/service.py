@@ -700,9 +700,13 @@ class AutoBudgetService:
         budget_auto = info_auto.total
         info_search = await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_search)
         budget_search = info_search.total
-        combined_budget = (budget_auto or 0) + (budget_search or 0)
+        b_auto = budget_auto or 0
+        b_search = budget_search or 0
+        combined_budget = b_auto + b_search
         if (
-                0 < self._min_balance <= combined_budget
+            self._min_balance > 0
+            and b_auto >= self._min_balance
+            and b_search >= self._min_balance
         ):
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
