@@ -801,14 +801,13 @@ async def successful_payment_handler(
             async with sm() as session:
                 stmt = select(User).where(User.user_telegram_id == message.chat.id)
                 result = await session.execute(stmt)
-                gate_user = result.scalar_one_or_none()
-                if gate_user is not None:
-                    gate_user.passed_gate = True
-                    gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
-                    now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
-                    gate_user.passed_gate_at = now_utc
-                    session.add(gate_user)
-                    await session.commit()
+                gate_user = result.scalar_one()
+                gate_user.passed_gate = True
+                gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
+                now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
+                gate_user.passed_gate_at = now_utc
+                session.add(gate_user)
+                await session.commit()
             await message.answer("Оплата получена. Доступ открыт.")
         await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()
         shop_ids = [uc.wb_cabinet.shop_id for uc in user.wb_user_cabinets]
