@@ -1201,7 +1201,7 @@ def get_shop_menu_keyboard(
         )
     _ = builder.row(
         InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack()
+            text="Вернуться к списку магазинов", callback_data=callbacks.ShowShopsList().pack()
         )
     )
     return builder.as_markup()
@@ -1220,7 +1220,7 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="К списку магазинов", callback_data=callbacks.Start().pack()
+            text="К списку магазинов", callback_data=callbacks.ShowShopsList().pack()
         )
     )
 

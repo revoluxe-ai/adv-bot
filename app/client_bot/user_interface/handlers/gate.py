@@ -12,7 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT, GATE_ENTRY_AMOUNT, OFFERTA_URL
-from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
+from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.gate import get_gate_keyboard
@@ -163,7 +163,7 @@ async def gate_invite_process_code(
         if user_with_cabinets is not None
         else []
     )
-    await ShopChoice(bot, chat_id, cabinets)()
+    await MainMenu(bot, chat_id)()
 
 
 @router.callback_query(Gate.filter(F.action == "pay_entry_amount"))

@@ -4,7 +4,7 @@ from aiogram.types import Message
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
+from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -60,5 +60,5 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
                 reply_markup=get_gate_keyboard(),
             )
             return
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await MainMenu(bot, chat_id)()
     return

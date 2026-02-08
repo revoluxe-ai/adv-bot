@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import delete, select, update
 
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.handlers.shop_choice_message import ShopsListPage
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -43,7 +44,7 @@ async def delete_wb_user_cabinet(
         callback.message.chat.id, f"Кабинет {deleted_wb_user_cabinet.name} удален"  # type: ignore[attr-defined]
     )
 
-    await messages.ShopChoice(bot, callback.message.chat.id, wb_user_cabinets)()  # type: ignore[attr-defined]
+    await ShopsListPage(bot, callback.message.chat.id, wb_user_cabinets)()
 
     return
 

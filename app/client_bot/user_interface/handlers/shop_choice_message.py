@@ -10,8 +10,62 @@ from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
+SHOPS_LIST_PAGE_TITLE = "Мои магазины"
 
-class ShopChoice(TextWithKeyboard):
+
+class MainMenu(TextWithKeyboard):
+    """Главная страница после Start: «Мои магазины», инвайт, баланс, админка."""
+
+    parse_mode = ParseMode.HTML
+
+    def __init__(self, bot: Bot, chat_id: int):
+        super().__init__(bot, chat_id)
+        self.user_telegram_id = chat_id
+
+    @property
+    def text(self) -> str:
+        return get_main_text(self.user_telegram_id)
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return get_main_menu_keyboard(self.user_telegram_id)
+
+
+def get_main_menu_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура главной страницы: Мои магазины, Показать инвайт, Мой баланс, админка."""
+    keyboard_buttons = []
+
+    if user_telegram_id in const.ADMINS:
+        admin_button = InlineKeyboardButton(
+            text="Панель администратора",
+            callback_data=AdminPanel(action="menu").pack(),
+        )
+        keyboard_buttons.append([admin_button])
+
+    my_shops_button = InlineKeyboardButton(
+        text="Мои магазины",
+        callback_data=callbacks.ShowShopsList().pack(),
+    )
+    keyboard_buttons.append([my_shops_button])
+
+    invite_show_button = InlineKeyboardButton(
+        text="Показать инвайт",
+        callback_data=callbacks.InviteShow().pack(),
+    )
+    keyboard_buttons.append([invite_show_button])
+
+    user_balance_button = InlineKeyboardButton(
+        text="Мой баланс",
+        callback_data=callbacks.UserBalanceMenu().pack(),
+    )
+    keyboard_buttons.append([user_balance_button])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+
+class ShopsListPage(TextWithKeyboard):
+    """Страница «Мои магазины»: Добавить магазин, список магазинов, Назад."""
+
     parse_mode = ParseMode.HTML
 
     def __init__(self, bot: Bot, chat_id: int, all_shops: list[WBUserCabinet]):
@@ -21,48 +75,23 @@ class ShopChoice(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        return get_main_text(self.user_telegram_id)
+        return SHOPS_LIST_PAGE_TITLE
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
-        return get_shop_keyboard(self.__all_shops, self.user_telegram_id)
+        return get_shops_list_keyboard(self.__all_shops, self.user_telegram_id)
 
 
-def get_shop_keyboard(
-    all_shops: list[WBUserCabinet], user_telegram_id
+def get_shops_list_keyboard(
+    all_shops: list[WBUserCabinet], user_telegram_id: int
 ) -> InlineKeyboardMarkup:
-    # Создаем список для строк кнопок
+    """Клавиатура страницы «Мои магазины»: Добавить магазин, список, Назад."""
     keyboard_buttons = []
 
-    # Добавляем кнопку админ-панели в самый верх, если пользователь - администратор
-    if user_telegram_id in const.ADMINS:
-        admin_button = InlineKeyboardButton(
-            text="Панель администратора",
-            callback_data=AdminPanel(action="menu").pack(),
-        )
-        keyboard_buttons.append([admin_button])
-
-    invite_show_button = InlineKeyboardButton(
-        text="Показать инвайт",
-        callback_data=callbacks.InviteShow().pack(),
-    )
-    keyboard_buttons.append([invite_show_button])
-    
-
-    button = InlineKeyboardButton(
+    add_shop_button = InlineKeyboardButton(
         text="Добавить магазин", callback_data=callbacks.ShopNew().pack()
     )
-    keyboard_buttons.append([button])
-
-    user_balance_button = InlineKeyboardButton(
-        text="Мой баланс",
-        callback_data=callbacks.UserBalanceMenu().pack(),
-    )
-    keyboard_buttons.append([user_balance_button])
-
-    
-    # button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
-    # keyboard_buttons.append([button])
+    keyboard_buttons.append([add_shop_button])
 
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
@@ -74,10 +103,18 @@ def get_shop_keyboard(
                 wb_user_cabinet_original_id=wb_user_cabinet_original_id,
             ).pack(),
         )
-        # Добавляем кнопку в список строк кнопок
-        keyboard_buttons.append(
-            [button]
-        )  # Каждая кнопка в своем списке, т.е. каждая в новой строке
+        keyboard_buttons.append([button])
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-    return keyboard
+    back_button = InlineKeyboardButton(
+        text="Назад",
+        callback_data=callbacks.Start().pack(),
+    )
+    keyboard_buttons.append([back_button])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+
+class ShopChoice(ShopsListPage):
+    """Алиас для обратной совместимости: показывает страницу списка магазинов."""
+
+    pass
