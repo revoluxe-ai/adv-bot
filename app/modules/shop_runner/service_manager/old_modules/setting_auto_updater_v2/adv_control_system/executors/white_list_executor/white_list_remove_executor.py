@@ -93,6 +93,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             "[adv_id=%s] WhiteListRemove: удалён ключ '%s' (base_ctr=%.4f)",
             ctx.complex_adv.adv_id,
             worst_keyword.text,
+            worst_keyword.rating_by_orders or 0.0,
         )
 
         # Efficiency = 1 ключ удалён (на первом этапе всегда 1 действие)
