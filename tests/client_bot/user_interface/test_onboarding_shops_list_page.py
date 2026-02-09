@@ -1,0 +1,157 @@
+"""Unit tests for ShopsListPage and get_shops_list_keyboard."""
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from app.client_bot.user_interface.handlers.shop_choice_message import (
+    SHOPS_LIST_PAGE_TITLE,
+    ShopsListPage,
+    get_shops_list_keyboard,
+)
+from app.client_bot.user_interface.views import callbacks
+
+
+def _make_wb_user_cabinet(
+    name: str,
+    id: int,
+    shop_id: str,
+    active: bool = True,
+):
+    """Create mock WBUserCabinet with wb_cabinet."""
+    wb_cabinet = MagicMock()
+    wb_cabinet.shop_id = shop_id
+    wb_cabinet.active = active
+    uc = MagicMock()
+    uc.name = name
+    uc.id = id
+    uc.wb_cabinet = wb_cabinet
+    return uc
+
+
+def test_shops_list_page_text_equals_title() -> None:
+    """ShopsListPage.text equals SHOPS_LIST_PAGE_TITLE."""
+    page = ShopsListPage(bot=None, chat_id=1, all_shops=[])  # type: ignore[arg-type]
+    assert page.text == SHOPS_LIST_PAGE_TITLE
+    assert "Добавить магазин" in page.text
+    assert "✅" in page.text
+    assert "❌" in page.text
+
+
+def test_get_shops_list_keyboard_empty_list() -> None:
+    """Empty shops: Add shop button, Back button (Start), no pagination."""
+    kb = get_shops_list_keyboard([], 123)
+    rows = kb.inline_keyboard
+    assert len(rows) == 2  # Add shop + Back
+    assert rows[0][0].text == "➕Добавить магазин"
+    assert rows[0][0].callback_data == callbacks.ShopNew().pack()
+    assert rows[1][0].text == "Назад"
+    assert rows[1][0].callback_data == callbacks.Start().pack()
+
+
+def test_get_shops_list_keyboard_shop_active_token() -> None:
+    """active=True and shop_id in shop_ids_with_active_tokens -> button 'Name ✅'."""
+    uc = _make_wb_user_cabinet("Shop1", 1, "shop_1", active=True)
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens={"shop_1"})
+    rows = kb.inline_keyboard
+    assert rows[1][0].text.strip() == "Shop1 ✅"
+    assert (
+        rows[1][0].callback_data
+        == callbacks.Shop(action="select", wb_user_cabinet_original_id=1).pack()
+    )
+
+
+def test_get_shops_list_keyboard_shop_inactive_token() -> None:
+    """Otherwise -> button 'Name ❌'."""
+    uc = _make_wb_user_cabinet("Shop2", 2, "shop_2", active=True)
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=set())
+    rows = kb.inline_keyboard
+    assert rows[1][0].text.strip() == "Shop2 ❌"
+
+
+def test_get_shops_list_keyboard_shop_ids_none_uses_only_active() -> None:
+    """shop_ids_with_active_tokens=None: only active flag checked."""
+    uc = _make_wb_user_cabinet("Shop3", 3, "shop_3", active=True)
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=None)
+    rows = kb.inline_keyboard
+    assert rows[1][0].text.strip() == "Shop3 ✅"
+
+    uc_inactive = _make_wb_user_cabinet("Shop4", 4, "shop_4", active=False)
+    kb2 = get_shops_list_keyboard([uc_inactive], 123, shop_ids_with_active_tokens=None)
+    assert kb2.inline_keyboard[1][0].text.strip() == "Shop4 ❌"
+
+
+def test_get_shops_list_keyboard_pagination_25_shops_page1() -> None:
+    """25 shops, page=1: no ⬅️, has ➡️; 20 shops on page."""
+    shops = [_make_wb_user_cabinet(f"Shop{i}", i, f"shop_{i}") for i in range(25)]
+    kb = get_shops_list_keyboard(shops, 123, page=1)
+    rows = kb.inline_keyboard
+    # Add shop + 20 shops + paginator (only forward) + Back
+    assert len(rows) == 23
+    paginator_idx = 21
+    assert rows[paginator_idx][0].text == "Вперёд ➡️"
+    assert (
+        rows[paginator_idx][0].callback_data
+        == callbacks.ShopsListPaginator(page=2).pack()
+    )
+    assert rows[1][0].text.strip() == "Shop0 ✅"
+
+
+def test_get_shops_list_keyboard_pagination_45_shops_page2() -> None:
+    """45 shops, page=2: ⬅️ and ➡️ both; 20 shops on page 2."""
+    shops = [_make_wb_user_cabinet(f"Shop{i}", i, f"shop_{i}") for i in range(45)]
+    kb = get_shops_list_keyboard(shops, 123, page=2)
+    rows = kb.inline_keyboard
+    # Add shop + 20 shops + paginator (back + forward) + Back
+    assert len(rows) == 23
+    paginator_row = rows[21]
+    assert len(paginator_row) == 2
+    assert paginator_row[0].text == "⬅️ Назад"
+    assert paginator_row[1].text == "Вперёд ➡️"
+    assert rows[1][0].text.strip() == "Shop20 ✅"
+
+
+def test_get_shops_list_keyboard_no_pagination_20_shops() -> None:
+    """20 shops, page=1: no pagination."""
+    shops = [_make_wb_user_cabinet(f"Shop{i}", i, f"shop_{i}") for i in range(20)]
+    kb = get_shops_list_keyboard(shops, 123, page=1)
+    rows = kb.inline_keyboard
+    # Add shop + 20 shops + Back (no paginator row)
+    assert len(rows) == 22
+    assert rows[-1][0].text == "Назад"
+
+
+def test_get_shops_list_keyboard_shop_name_truncated_to_100() -> None:
+    """Shop button text truncated to 100 chars."""
+    long_name = "A" * 150
+    uc = _make_wb_user_cabinet(long_name, 1, "shop_1")
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=None)
+    btn_text = kb.inline_keyboard[1][0].text
+    assert len(btn_text) == 100
+    assert btn_text.startswith("A")  # truncated from long name
+
+
+def test_get_shops_list_keyboard_back_button_start_callback() -> None:
+    """Back button uses callbacks.Start().pack()."""
+    kb = get_shops_list_keyboard([], 123)
+    back_btn = kb.inline_keyboard[-1][0]
+    assert back_btn.callback_data == callbacks.Start().pack()
+
+
+@pytest.mark.asyncio
+async def test_shops_list_page_calls_bot_send_message() -> None:
+    """ShopsListPage(...)() calls bot.send_message with text and reply_markup."""
+    from unittest.mock import AsyncMock
+
+    bot = AsyncMock()
+    uc = _make_wb_user_cabinet("TestShop", 1, "shop_1")
+    page = ShopsListPage(bot, 999, [uc], shop_ids_with_active_tokens={"shop_1"})
+    await page()
+    bot.send_message.assert_awaited_once()
+    call_kw = bot.send_message.call_args[1]
+    assert call_kw["chat_id"] == 999
+    assert call_kw["text"] == SHOPS_LIST_PAGE_TITLE
+    km = call_kw["reply_markup"]
+    assert km is not None
+    assert len(km.inline_keyboard) >= 3  # Add, shop, Back
+    assert km.inline_keyboard[1][0].text.strip() == "TestShop ✅"
