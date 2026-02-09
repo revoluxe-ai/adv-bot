@@ -9,6 +9,7 @@ class HttpxClientHandler:
     _BASE_URLS: dict[SectionsEnum, str] = {
         SectionsEnum.ANALYTIC_AND_DATA: "https://seller-analytics-api.wildberries.ru",
         SectionsEnum.PROMOTION: "https://advert-api.wildberries.ru",
+        SectionsEnum.CONTENT: "https://content-api.wildberries.ru",
     }
 
     def __init__(self):

@@ -7,6 +7,7 @@ from .promotion_client import PromotionClient
 from .min_bids.adapter import MinBidsAdapter
 from .campaigns_info_v2 import CampaignsInfoV2Adapter
 from .common_bids.adapter import CommonBidsAdapter
+from .product_cards.adapter import ProductCardsAdapter
 
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "BalanceTypeNotSupportedError",
     "CampaignsInfoV2Adapter",
     "CommonBidsAdapter",
+    "ProductCardsAdapter",
 ]
 
