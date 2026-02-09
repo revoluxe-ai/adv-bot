@@ -45,6 +45,22 @@ logger = logging.getLogger(__name__)
 AdvType = Literal["auto", "auction", "complex"]
 
 
+def get_name_for_adv(nmid: int, card_name: str, adv_type: AdvType) -> str:
+    """Имя РК по шаблону: артикул + [Авто|Аукцион] + название из карточки (до 128 символов)."""
+    if adv_type not in get_args(AdvType):
+        raise ValueError(f"adv_type must be one of {get_args(AdvType)}")
+    if adv_type == "auto":
+        type_name = "Авто"
+    elif adv_type == "auction":
+        type_name = "Аукцион"
+    elif adv_type == "complex":
+        type_name = ""
+    else:
+        type_name = "НеизвестныйТипРК"
+    full_name = f"{nmid}{' ' + type_name if type_name else ''} {card_name}"[:128]
+    return full_name
+
+
 class MainAdvManager:
     def __init__(self, access: "WBCabinetAccess", client_session: ClientSession):
         self.access = access
@@ -102,7 +118,7 @@ class MainAdvManager:
             balance_type_int, balance_property_str = self._get_balance_type(balances)
         except NotEnoughBalanceOnShopError as exc:
             raise exc
-        auto_name = self.__get_name_for_adv(nmid, target_card, adv_type="auto")
+        auto_name = get_name_for_adv(nmid, target_card.name, adv_type="auto")
         auto_adv_id: int = await self._create_auto_adv(auto_name, [nmid])
 
         result: int = await self.wb_api.add_to_balance(
@@ -114,7 +130,7 @@ class MainAdvManager:
             balance_property_str,
             getattr(balances, balance_property_str) - 1000,
         )
-        auction_name = self.__get_name_for_adv(nmid, target_card, adv_type="auction")
+        auction_name = get_name_for_adv(nmid, target_card.name, adv_type="auction")
         search_adv_id = await self._create_search_adv(nmid, auction_name)
         result: int = await self.wb_api.add_to_balance(
             search_adv_id, balance_type_int, 1000
@@ -127,8 +143,8 @@ class MainAdvManager:
             getattr(balances, balance_property_str) - 1000,
         )
 
-        complex_adv_name = self.__get_name_for_adv(
-            nmid, target_card, adv_type="complex"
+        complex_adv_name = get_name_for_adv(
+            nmid, target_card.name, adv_type="complex"
         )
 
         async with sm(read_only=False) as session:
@@ -257,13 +273,13 @@ class MainAdvManager:
             if adv_settings:
                 for adv in adv_settings:
                     auto_adv_id = adv.adv_id
-                    search_adv_id = adv.search_adv_id
-                    adv_ids_rows.append(
-                        (
-                            auto_adv_id,
-                            search_adv_id,
+                    if search_adv_id := adv.search_adv_id:
+                        adv_ids_rows.append(
+                            (
+                                auto_adv_id,
+                                search_adv_id,
+                            )
                         )
-                    )
                 return adv_ids_rows
             else:
                 return []
@@ -293,18 +309,3 @@ class MainAdvManager:
             await session.execute(stmt)
             await session.commit()
 
-    @staticmethod
-    def __get_name_for_adv(nmid, target_card, adv_type: AdvType):
-        if adv_type not in get_args(AdvType):
-            raise ValueError(f"adv_type must be one of {get_args(AdvType)}")
-        base_name = target_card.name
-        if adv_type == "auto":
-            type_name = "Авто"
-        elif adv_type == "auction":
-            type_name = "Аукцион"
-        elif adv_type == "complex":
-            type_name = ""
-        else:
-            type_name = "НеизвестныйТипРК"
-        full_name = f"{nmid}{' ' + type_name if type_name else ''} {base_name}"[:128]
-        return full_name
