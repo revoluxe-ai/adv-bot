@@ -10,6 +10,7 @@ from app.core.mp.wb.api.adapter.promotion_client import (
     PromotionClient,
     FinanceAdapter,
     CommonBidsAdapter,
+    ProductCardsAdapter,
 )
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 from app.core.mp.wb.api.domain_managers import PromotionManager
@@ -77,6 +78,13 @@ class PromotionContainer(containers.DeclarativeContainer):
         request_limit_manager=_request_limit_manager,
     )
 
+    _product_cards_adapter = providers.Singleton(
+        ProductCardsAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
     _promotion_client = providers.Singleton(
         PromotionClient,
         minus_phrases_adapter=_minus_phrases_adapter,
@@ -87,6 +95,7 @@ class PromotionContainer(containers.DeclarativeContainer):
         campaigns_management_adapter=_campaigns_management_adapter,
         campaigns_info_v2_adapter=_campaigns_info_v2_adapter,
         common_bids_adapter=_common_bids_adapter,
+        product_cards_adapter=_product_cards_adapter,
     )
 
     promotion_domain_manager = providers.Singleton(

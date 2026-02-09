@@ -28,6 +28,10 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
     GetAdvV1BalanceResponse200,
     PatchAdvV0BidsBody,
 )
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    GetAdvV1SupplierSubjectsResponse200Type0Item,
+    PostAdvV2SupplierNmsResponse200Item,
+)
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
@@ -185,4 +189,77 @@ class PromotionManager:
             self._client.campaigns_management_adapter,
             adv_id=advert_id,
             new_name=new_name,
+        )
+
+    async def get_supplier_subjects(
+        self,
+        payment_type: str = "cpm",
+    ) -> list[GetAdvV1SupplierSubjectsResponse200Type0Item] | None:
+        """
+        Получить список предметов (категорий) поставщика для рекламы.
+
+        Возвращает предметы, по которым у поставщика есть карточки товаров,
+        доступные для добавления в рекламные кампании. Используется для
+        фильтрации и отображения товаров по категориям при настройке рекламы.
+
+        Args:
+            payment_type: Тип оплаты рекламы, например "cpm". По умолчанию "cpm".
+
+        Returns:
+            Список объектов с полями id (идентификатор предмета), name (название),
+            count (количество артикулов WB с данным предметом). None при ошибке
+            или пустом ответе.
+        """
+        return await self._client.product_cards_adapter.get_supplier_subjects(
+            payment_type=payment_type,
+        )
+
+    async def get_supplier_nms_available_for_adv(
+        self,
+        nm_ids: list[int],
+    ) -> list[PostAdvV2SupplierNmsResponse200Item] | None:
+        """
+        Проверить, какие номенклатуры доступны для добавления в рекламные кампании.
+
+        По переданному списку nm_id возвращает только те карточки поставщика,
+        которые можно добавить в рекламу (все кампании). Остальные номенклатуры
+        в ответ не входят.
+
+        Args:
+            nm_ids: Список номенклатурных идентификаторов (nm_id) для проверки.
+
+        Returns:
+            Список карточек с полями title (название), nm (артикул WB),
+            subject_id (идентификатор предмета). None при ошибке. При слишком
+            большом списке или невалидных данных API может вернуть 400 или 429 —
+            адаптер пробрасывает BadRequestError или TooManyRequests (лимит:
+            5 запросов в минуту, интервал 12 с).
+        """
+        return await self._client.product_cards_adapter.post_supplier_nms(
+            body=nm_ids,
+        )
+
+    async def get_nms_available_to_add_to_auto_campaign(
+        self,
+        adv_id: int,
+    ) -> list[int] | None:
+        """
+        Получить список nm_id, доступных для добавления в авторекламу по кампании.
+
+        По идентификатору кампании авторекламы возвращает номенклатуры, которые
+        ещё можно добавить в эту кампанию (карточки с единой ставкой).
+
+        Args:
+            adv_id: Идентификатор рекламной кампании (автореклама).
+
+        Returns:
+            Список номенклатурных идентификаторов (nm_id). None при ошибке или
+            пустом ответе.
+
+        Note:
+            В документации WB метод помечен как устаревающий; запланировано
+            удаление (см. release notes WB).
+        """
+        return await self._client.product_cards_adapter.get_auto_nms_to_add(
+            adv_id=adv_id,
         )

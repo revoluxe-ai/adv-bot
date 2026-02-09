@@ -76,6 +76,7 @@ class AuthClientHandler:
         sections_map = {
             SectionsEnum.PROMOTION: "Продвижение",
             SectionsEnum.ANALYTIC_AND_DATA: "Аналитика",
+            SectionsEnum.CONTENT: "Контент",
         }
 
         def func(token: WBToken):
