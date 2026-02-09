@@ -1,6 +1,7 @@
 from dependency_injector import containers, providers
 
 from app.core.mp.wb.api.adapter.promotion_client import (
+    CabinetAdvertsListAdapter,
     CampaignsManagementAdapter,
     CampaignsInfoV2Adapter,
     MinusPhrasesAdapter,
@@ -71,6 +72,13 @@ class PromotionContainer(containers.DeclarativeContainer):
         request_limit_manager=_request_limit_manager,
     )
 
+    _cabinet_adverts_list_adapter = providers.Singleton(
+        CabinetAdvertsListAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
     _common_bids_adapter = providers.Singleton(
         CommonBidsAdapter,
         base_url=_base_url,
@@ -94,6 +102,7 @@ class PromotionContainer(containers.DeclarativeContainer):
         finance_adapter=_finance_adapter,
         campaigns_management_adapter=_campaigns_management_adapter,
         campaigns_info_v2_adapter=_campaigns_info_v2_adapter,
+        cabinet_adverts_list_adapter=_cabinet_adverts_list_adapter,
         common_bids_adapter=_common_bids_adapter,
         product_cards_adapter=_product_cards_adapter,
     )
