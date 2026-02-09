@@ -24,7 +24,6 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "update_common_sale_stat",
         "update_full_adv_stat",
         "adv_settings_auto_update",
-        "delete_keywords_from_wl_by_mean_auto_ctr",
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
@@ -101,7 +100,6 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "update_common_sale_stat",
         "update_full_adv_stat",
         "adv_settings_auto_update",
-        "delete_keywords_from_wl_by_mean_auto_ctr",
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
@@ -150,14 +148,13 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    assert len(recorded_group.created) == 19
+    assert len(recorded_group.created) == 18
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
         "update_common_sale_stat",
         "update_full_adv_stat",
         "adv_settings_auto_update",
-        "delete_keywords_from_wl_by_mean_auto_ctr",
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",

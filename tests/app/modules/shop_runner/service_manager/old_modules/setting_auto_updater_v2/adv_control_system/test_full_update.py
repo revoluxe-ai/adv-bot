@@ -34,12 +34,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
                      updated_adv_setting.max_place > initial_target_place,
                      updated_adv_setting.exponent_predict_ctr > initial_exponent],
                                  )
-                             and not any ([new_white_list_size > white_list_size,
-                                  updated_adv_setting.max_place < initial_target_place,
-                                  updated_adv_setting.exponent_predict_ctr < initial_exponent]
-                      )
-
-
                          ),
                      (PlanData(orders=15, target_pay_for_order=120, max_pay_for_order=300, ), # Продаж больше чем надо и расход больше максимального
                       FactData(predict_orders=30, pay_for_order=250.0, original_orders=10,
@@ -56,11 +50,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
                               any([new_white_list_size < white_list_size,
                                    updated_adv_setting.max_place > initial_target_place,
                                    updated_adv_setting.exponent_predict_ctr > initial_exponent],
-                                  )
-                              and not any ([new_white_list_size > white_list_size,
-                                  updated_adv_setting.max_place < initial_target_place,
-                                  updated_adv_setting.exponent_predict_ctr < initial_exponent]
-                      )),
+                                  )),
                      (
 
                     PlanData(orders=15, target_pay_for_order=120, max_pay_for_order=300, ), # Продаж мало, расход меньше максимального
