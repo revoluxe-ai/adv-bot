@@ -170,6 +170,18 @@ class WBModifier:
         await self._control_campaign_by_type(
             complex_adv, adv_type, self._promotion_manager.stop_campaign
         )
+
+    async def rename_campaign(self, advert_id: int, new_name: str) -> None:
+        """Переименовать рекламную кампанию по её ID."""
+        await self._promotion_manager.rename_campaign(advert_id, new_name)
+
+    async def rename_campaign_by_type(
+        self, complex_adv: ComplexAdv, adv_type: AdvType, new_name: str
+    ) -> None:
+        """Переименовать кампанию заданного типа (авто или аукцион)."""
+        adv_id = complex_adv.get_adv_id_by_type(adv_type)
+        await self.rename_campaign(adv_id, new_name)
+
     @staticmethod
     async def _control_campaign_by_type(
         complex_adv: ComplexAdv,

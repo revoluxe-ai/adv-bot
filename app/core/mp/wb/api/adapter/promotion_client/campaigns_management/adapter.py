@@ -9,9 +9,7 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.a
     get_adv_v0_start,
     get_adv_v0_stop,
     patch_adv_v0_bids,
-)
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.campaigns_management.post_adv_v0_rename import (
-    asyncio_detailed as post_adv_v0_rename_asyncio_detailed,
+    post_adv_v0_rename,
 )
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     PatchAdvV0BidsBody,
@@ -47,12 +45,12 @@ class CampaignsManagementAdapter(BaseSectionAdapter):
             body=body,
         )
 
-    @retry_decorator(period=1, limit=2)
+    @retry_decorator(period=1, limit=5)
     async def rename_adv(self, adv_id: int, new_name: str) -> None:
         client = await self.auth_client_handler.get_proxy_client(self)
         body = PostAdvV0RenameBody(advert_id=adv_id, name=new_name)
         await with_raise_errors(
-            post_adv_v0_rename_asyncio_detailed,
+            post_adv_v0_rename.asyncio_detailed,
             client,
             body=body,
         )
