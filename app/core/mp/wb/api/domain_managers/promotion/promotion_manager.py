@@ -183,6 +183,30 @@ class PromotionManager:
             adv_id=advert_id,
         )
 
+    async def get_campaign_status(self, adv_id: int) -> int | None:
+        """Статус кампании на WB (например 7=завершена) или None, если не найдена."""
+        campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
+            [adv_id]
+        )
+        if not campaigns:
+            return None
+        return int(campaigns[0].status)
+
+    async def get_connect_existing_candidates(self, nmid: int):
+        """Кандидаты для подключения существующих РК по nmid (аукцион + авто)."""
+        from app.modules.connect_existing_advs.candidates_service import (
+            filter_and_classify_campaigns_by_nmid,
+        )
+
+        adv_ids = await self._client.cabinet_adverts_list_adapter.get_cabinet_adv_ids()
+        if adv_ids:
+            campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
+                adv_ids
+            )
+        else:
+            campaigns = await self._client.campaigns_info_v2_adapter.get_all_campaigns()
+        return filter_and_classify_campaigns_by_nmid(campaigns, nmid)
+
     async def rename_campaign(self, advert_id: int, new_name: str) -> None:
         """Переименовать рекламную кампанию WB."""
         await rename_adv_method(

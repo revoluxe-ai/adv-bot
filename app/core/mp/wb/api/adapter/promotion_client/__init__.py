@@ -1,3 +1,4 @@
+from .cabinet_adverts_list import CabinetAdvertsListAdapter
 from .campaigns_management.adapter import CampaignsManagementAdapter
 from .minus_phrases.adapter import MinusPhrasesAdapter
 from .normquery_stats.adapter import NormqueryStatsAdapter
@@ -11,6 +12,7 @@ from .product_cards.adapter import ProductCardsAdapter
 
 
 __all__ = [
+    "CabinetAdvertsListAdapter",
     "CampaignsManagementAdapter",
     "MinusPhrasesAdapter",
     "NormqueryStatsAdapter",
