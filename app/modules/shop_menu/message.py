@@ -16,6 +16,7 @@ from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefa
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
+    ConnectExistingAdvs,
     DeleteWbUserCabinet,
     ShowShopsList,
     TurnBot,
@@ -443,6 +444,14 @@ class ShopMenu(TextWithKeyboard):
         )
 
         builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="Подключить существующие кампании",
+            callback_data=ConnectExistingAdvs(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        _= builder.row(button)
 
         button = InlineKeyboardButton(
             text="Пополнить баланс",
