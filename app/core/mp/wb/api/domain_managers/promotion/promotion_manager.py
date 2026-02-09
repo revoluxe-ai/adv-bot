@@ -11,6 +11,7 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
 )
 from app.core.mp.wb.api.domain_managers.promotion.methods.campaign_control import (
     pause_adv as pause_adv_method,
+    rename_adv as rename_adv_method,
     start_adv as start_adv_method,
     stop_adv as stop_adv_method,
 )
@@ -176,4 +177,12 @@ class PromotionManager:
         await stop_adv_method(
             self._client.campaigns_management_adapter,
             adv_id=advert_id,
+        )
+
+    async def rename_campaign(self, advert_id: int, new_name: str) -> None:
+        """Переименовать рекламную кампанию WB."""
+        await rename_adv_method(
+            self._client.campaigns_management_adapter,
+            adv_id=advert_id,
+            new_name=new_name,
         )
