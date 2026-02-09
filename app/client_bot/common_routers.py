@@ -47,6 +47,7 @@ from .user_interface.handlers import (
     change_cpm,
     change_max_cpc,
     clusters,
+    connect_existing_advs,
     cpm_builder,
     download_keywords,
     exceptions,
@@ -115,6 +116,7 @@ common_router.include_routers(HideZeroViewsToggleRouter)
 common_router.include_routers(bidder_coroutine_type_toggle_router)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
+common_router.include_routers(connect_existing_advs.router)
 common_router.include_routers(rec_system_mode_toggle.router)
 common_router.include_routers(white_list_mode_toggle.router)
 common_router.include_routers(WhiteListModeSettingsRouter)
