@@ -12,7 +12,7 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 SHOPS_LIST_PAGE_TITLE = ("Нажмите 'Добавить магазин' для начала использования"
                          "Мои магазины: \n"
-                         ""
+                         "\n"
                          "✅ - Магазин подключен\n"
                          "❌ - Требуется замена токена\n")
 
