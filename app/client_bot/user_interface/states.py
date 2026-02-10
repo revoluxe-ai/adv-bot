@@ -19,10 +19,6 @@ class CreateNewAdvCompany(StatesGroup):
     waiting_for_nmids = State()
 
 
-class RefProgram(StatesGroup):
-    getting_name = State()
-
-
 class AdvSetting(StatesGroup):
     waiting_for_filter_by_query = State()
     waiting_for_filter_keywords = State()
