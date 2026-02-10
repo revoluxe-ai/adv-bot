@@ -2,14 +2,6 @@ from sqlalchemy import BIGINT, Column, ForeignKey, Table
 
 from app.utils.db.base import Base
 
-user_reflink_association = Table(
-    "user_reflink_association",
-    Base.metadata,
-    Column("user_id", BIGINT, ForeignKey("user.id"), primary_key=True),
-    Column("reflink_id", BIGINT, ForeignKey("reflink.id"), primary_key=True),
-)
-
-
 favorite_advs_association = Table(
     "favorite_advs_association",
     Base.metadata,
