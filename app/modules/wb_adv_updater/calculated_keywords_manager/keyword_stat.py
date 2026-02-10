@@ -17,6 +17,7 @@ class KeywordStat(BaseModel):
     expected_orders_from_cart: float = Field(alias="expected_orders_from_cart")
     expected_orders: float = Field(alias="expected_orders")
     final_rating: float = Field(alias="final_rating")
+    conversion_without_cpm: float = Field(alias="conversion_without_cpm")
     total_views: int = Field(alias="views_all_time")
     total_orders: int = Field(alias="orders_all_time")
 

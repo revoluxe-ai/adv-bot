@@ -14,6 +14,7 @@ class CalculatedKeyword(BaseModel):
     cluster_stat: KeywordStat
     state: KeywordState
     target_pay_for_order: float | None
+    above_rec_conversion: bool | None = None
 
 
     @property
@@ -72,6 +73,10 @@ class CalculatedKeyword(BaseModel):
     @property
     def rating_by_orders(self) -> float:
         return self.cluster_stat.final_rating
+
+    @property
+    def conversion_without_cpm(self) -> float:
+        return self.cluster_stat.conversion_without_cpm
 
     @property
     def views(self) -> int:

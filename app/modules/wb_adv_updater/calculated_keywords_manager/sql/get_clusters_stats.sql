@@ -307,6 +307,13 @@ SELECT
         * 100,
         0
     ) AS final_rating,
+    if(
+        b.ctr_eff IS NOT NULL,
+        b.ctr_eff
+            * if(ifNull(b.cart_eff, 0) = 0, 1, b.cart_eff)
+            * if(ifNull(b.order_eff, 0) = 0, 1, b.order_eff),
+        0.0
+    ) AS conversion_without_cpm,
     ifNull(ata.views_all_time, 0)     AS views_all_time,
     ifNull(ata.orders_all_time, 0)    AS orders_all_time,
     ifNull(ls.last_ts, toDateTime(0)) AS timestamp,
