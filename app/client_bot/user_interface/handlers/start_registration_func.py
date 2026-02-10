@@ -32,9 +32,6 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
                 username=message.from_user.username,
                 adv_updater_user_chat_id=message.chat.id,
             )
-            wb_user_cabinets = []
-        else:
-            wb_user_cabinets = user.wb_user_cabinets
         if isinstance(message, Message):
             chat_id = message.chat.id
         else:
