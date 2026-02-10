@@ -281,7 +281,7 @@ def setup_test_database(docker_compose_cmd):
                     )
                     from app.modules.wb_adv_updater.modules.balance_exp_informer.models import BalanceReminder
                     from app.modules.billing.event_manager.models import BillingEvent
-                    from app.utils.db.models import User
+                    from app.utils.db.models import User, Invite
 
                     # Таблицы
                     await conn.run_sync(Base.metadata.create_all)

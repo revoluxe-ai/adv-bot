@@ -60,9 +60,9 @@ class BillingEventManager:
                 await session_ctx.commit()
         else:
             await self._insert(session, values)
-
-    async def _insert(self, session: AsyncSession, values: dict[str, Any]) -> None:
-        await session.execute(insert(BillingEvent).values(**values))
+    @staticmethod
+    async def _insert(session: AsyncSession, values: dict[str, Any]) -> None:
+        _ = await session.execute(insert(BillingEvent).values(**values))
 
     async def emit_add_balance_click(
         self,
@@ -106,7 +106,7 @@ class BillingEventManager:
         self,
         *,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         correlation_id: str | None = None,
         payload: dict[str, Any] | None = None,
         session: AsyncSession | None = None,
@@ -125,7 +125,7 @@ class BillingEventManager:
         self,
         *,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         correlation_id: str | None = None,
         session: AsyncSession | None = None,
     ) -> None:
@@ -142,7 +142,7 @@ class BillingEventManager:
         self,
         *,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         amount_text: str,
         is_valid: bool,
         parsed_amount: float | None,
@@ -171,7 +171,7 @@ class BillingEventManager:
         self,
         *,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         amount: float,
         currency: str,
         payload: dict[str, Any] | None = None,
@@ -215,7 +215,7 @@ class BillingEventManager:
         *,
         user_id: int,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         amount: float,
         currency: str,
         correlation_id: str | None = None,
@@ -240,7 +240,7 @@ class BillingEventManager:
         *,
         user_id: int,
         user_telegram_id: int,
-        wb_cabinet_id: int,
+        wb_cabinet_id: int | None,
         amount: float,
         bonus_amount: float,
         correlation_id: str | None = None,

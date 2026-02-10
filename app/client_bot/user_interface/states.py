@@ -19,10 +19,6 @@ class CreateNewAdvCompany(StatesGroup):
     waiting_for_nmids = State()
 
 
-class RefProgram(StatesGroup):
-    getting_name = State()
-
-
 class AdvSetting(StatesGroup):
     waiting_for_filter_by_query = State()
     waiting_for_filter_keywords = State()
@@ -38,6 +34,11 @@ class ChangeMinViewsForPredictCTR(StatesGroup):
 
 class AddBalance(StatesGroup):
     awaiting_confirmation = State()
+    awaiting_payment_method = State()
+    awaiting_amount = State()
+
+
+class AddUserBalance(StatesGroup):
     awaiting_amount = State()
 
 
@@ -79,3 +80,19 @@ class ShopMenuState(StatesGroup):
 
 class CampaignActivity(StatesGroup):
     waiting_for_new_limit = State()
+
+
+class GateInvite(StatesGroup):
+    """Ввод инвайт-кода на экране гейта."""
+
+    waiting_code = State()
+
+
+class ConnectExistingAdvsStates(StatesGroup):
+    """Подключение существующих рекламных кампаний WB по NM-id."""
+
+    waiting_nmid = State()
+    confirm_type1 = State()  # показать РК по первому типу или «Создать РК»
+    confirm_type2 = State()  # показать РК по второму типу или «Создать РК»
+    waiting_confirm_create_both = State()  # обе отсутствуют — подтверждение create_complex_advs
+    waiting_confirm_continue_invalid = State()  # только авто без поиска — продолжить создание (деактивация + create)

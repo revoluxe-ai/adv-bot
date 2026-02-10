@@ -124,12 +124,10 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
     auto_budget_service_instance.ensure_common_budget = AsyncMock(return_value=None)
-
     async def mock_run_tasks(handlers, *args, **kwargs):
         return [await handler() for handler in handlers]
 
     wb_manager_hub = MagicMock()
-
     with patch(
         "app.modules.shop_runner.service_manager.manager.WBShopDataManager",
         return_value=wb_shop_data_manager_instance,
@@ -149,7 +147,6 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
         fake_wb_manager_hub = MagicMock()
         fake_wb_manager_hub.wb_data_manager = MagicMock()
         fake_wb_manager_hub.wb_manager = MagicMock()
-
         coroutines_manager = CoroutinesManager(
             wb_api,
             MagicMock(),

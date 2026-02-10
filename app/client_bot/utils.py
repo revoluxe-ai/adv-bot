@@ -2,7 +2,8 @@ import csv
 import logging
 from io import StringIO
 
-from sqlalchemy import and_, select, Result
+from sqlalchemy import select, Result
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 
@@ -12,7 +13,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
-from app.utils.db.models import RefLink, User
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
@@ -149,24 +150,24 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
     return csv_string
 
 
-async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink | None:
-    stmt = select(RefLink).where(
-        and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id)
+async def create_user(
+    session: AsyncSession,
+    user_telegram_id: int,
+    *,
+    username: str | None = None,
+    adv_updater_user_chat_id: int | None = None,
+) -> User:
+    """Создаёт пользователя в БД и возвращает его. Сессия должна быть с read_only=False."""
+    user = User(
+        user_telegram_id=user_telegram_id,
+        username=username,
+        adv_updater_user_chat_id=adv_updater_user_chat_id,
+        wb_tokens=[],
     )
-    async with _sm(read_only=False) as session:
-        result_ref_link = await session.execute(stmt)
-        ref_link = result_ref_link.scalar_one_or_none()
-        if ref_link:
-            return None
-        stmt_for_user_id = select(User.id).where(
-            User.user_telegram_id == user_telegram_id
-        )
-        result = await session.execute(stmt_for_user_id)
-        user_id: int = result.scalar_one()
-        ref_link = RefLink(name=ref_link_name, referrer_id=user_id)
-        session.add(ref_link)
-        await session.commit()
-        return ref_link
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user
 
 
 # TODO: Выпилить из кода парсер позиций

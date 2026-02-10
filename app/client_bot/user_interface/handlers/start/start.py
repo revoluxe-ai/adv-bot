@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Sequence
 
 import aiogram
 from aiogram import Router, types
@@ -7,7 +8,7 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from aiohttp import ClientSession
-from sqlalchemy import Select
+from sqlalchemy import Result, Select
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.exc import IntegrityError
@@ -15,11 +16,16 @@ from sqlalchemy.exc import IntegrityError
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
+from app.client_bot.user_interface.handlers.shop_choice_message import (
+    MainMenu,
+    ShopsListPage,
+    ShopChoice,
+)
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
 )
 from app.client_bot.user_interface.views import callbacks, messages
+from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.user_interface.views.callbacks import Action
 from app.core.wb_api.exceptions import ApiForbiddenError, NotValidTokenError
 from app.modules.common_slaves.wildberries import (
@@ -34,6 +40,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.settings import settings
@@ -68,19 +75,110 @@ async def callback_start_registration(
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User = result.scalar()
-
-        wb_user_cabinets = user.wb_user_cabinets
+        user: User | None = result.unique().scalar()
+        if callback.message is None:
+            return
         chat_id = callback.message.chat.id
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        if user is None or not user.passed_gate:
+            _= await bot.send_message(
+                chat_id,
+                get_gate_message_text(),
+                reply_markup=get_gate_keyboard(),
+            )
+            return
+        await MainMenu(bot, chat_id)()
     return
+
+
+@router.callback_query(callbacks.ShowShopsList.filter())
+async def show_shops_list(
+    callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Показать страницу «Мои магазины»: Добавить магазин + список магазинов."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.unique().scalar()
+        if user is None or not user.passed_gate:
+            pass
+        else:
+            wb_user_cabinets = user.wb_user_cabinets
+            shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+            shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+                shop_ids
+            )
+            await ShopsListPage(
+                bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
+            )()
+            return
+    if user is None or not user.passed_gate:
+        _ = await bot.send_message(
+            chat_id,
+            get_gate_message_text(),
+            reply_markup=get_gate_keyboard(),
+        )
+    return
+
+
+@router.callback_query(callbacks.ShopsListPaginator.filter())
+async def shops_list_paginator(
+    callback: CallbackQuery,
+    callback_data: callbacks.ShopsListPaginator,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Переключение страницы списка «Мои магазины»."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    page = callback_data.page if callback_data.page >= 1 else 1
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.unique().scalar()
+        if user is None or not user.passed_gate:
+            _ = await bot.send_message(
+                chat_id,
+                get_gate_message_text(),
+                reply_markup=get_gate_keyboard(),
+            )
+            return
+        wb_user_cabinets = user.wb_user_cabinets
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
+        await ShopsListPage(
+            bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens, page=page
+        )()
 
 
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(
     callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
 ) -> None:
-    await bot.send_message(
+    if callback_query.message is None:
+        return
+    _= await bot.send_message(
         callback_query.message.chat.id, "Добавление нового магазина (кабинета)"
     )
     await state.set_state(states.CabinetRegistration.cabinet_name)
@@ -90,10 +188,10 @@ async def add_shop(
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
 async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext):
-    catch_cab: WBUserCabinet | None = None
+    catch_cab: WBUserCabinet | None = None # type: ignore
     cabinet_name = message.text
     if cabinet_name is None or not cabinet_name.strip():
-        await bot.send_message(
+        _= await bot.send_message(
             message.chat.id,
             "Имя магазина (кабинета) не может быть пустым, отправьте название еще раз:",
         )
@@ -113,6 +211,8 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
         )
         result = await session.execute(stmt)
         user = result.scalar()
+        if not user:
+            raise ValueError("User not found")
     for cabinet in user.wb_user_cabinets:
         if cabinet.name == cabinet_name:
             catch_cab: WBUserCabinet = cabinet
@@ -124,7 +224,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
     else:
         cabinet_name = message.text
-        await state.update_data(cabinet_name=cabinet_name)
+        _= await state.update_data(cabinet_name=cabinet_name)
         await state.set_state(states.CabinetRegistration.api)
         await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
 
@@ -163,7 +263,7 @@ async def process_cabinet_api(
     # Предварительная простая валидация формата токена: отсекаем явно мусорные строки
     token_text = text.strip()
     if len(token_text) < 24:  # эвристика: валидные токены заметно длиннее
-        await bot.send_message(
+        _= await bot.send_message(
             chat_id,
             "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
@@ -174,7 +274,7 @@ async def process_cabinet_api(
     )
     if wb_token.read_only:
         logger.info("Token is read-only for user %s", user_telegram_id)
-        await bot.send_message(
+        _= await bot.send_message(
             chat_id,
             "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
         )
@@ -186,7 +286,7 @@ async def process_cabinet_api(
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
         logger.info("Invalid token (NotValidTokenError) for user %s", user_telegram_id)
-        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
         # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
         logger.info(
             "Sent invalid token message to user %s, keeping state", user_telegram_id
@@ -200,7 +300,7 @@ async def process_cabinet_api(
             e,
             exc_info=True,
         )
-        await bot.send_message(
+        _= await bot.send_message(
             chat_id,
             "Токен не валиден или произошла ошибка при его обработке. Попробуйте ввести токен еще раз.",
         )
@@ -213,14 +313,11 @@ async def process_cabinet_api(
     async with sm() as session:
         # TODO: Тут попала ошибка в код с проверкой существования токена.
         # Получаем ID пользователя
-        stmt_for_select_user_id: Select = select(User.id).where(
+        stmt_for_select_user_id: Select[tuple[int]] = select(User.id).where(
             User.user_telegram_id == user_telegram_id
         )
-        result = await session.execute(stmt_for_select_user_id)
-        user_id = result.scalar()
-        if user_id is None:
-            await bot.send_message(chat_id, "Ошибка: пользователь не найден.")
-            return None
+        result: Result[tuple[int]] = await session.execute(stmt_for_select_user_id)
+        user_id: int = result.scalar() # type: ignore
 
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
@@ -241,7 +338,7 @@ async def process_cabinet_api(
                 WBToken.shop_id == wb_token.shop_id,
             )
         )
-        result = await session.execute(stmt_for_wb_token)
+        result: Result[tuple[WBToken]] = await session.execute(stmt_for_wb_token)
         existing_token = result.scalar()
         if existing_token:
             # If token already exists, check ownership.
@@ -257,12 +354,12 @@ async def process_cabinet_api(
 
             if normalized_existing_user_id == user_id:
                 # Token already saved for the same user — nothing to change.
-                await bot.send_message(chat_id, "Этот токен уже есть в системе.")
+                _= await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
                 return None
             else:
                 # Token belongs to another user — users must have unique tokens.
-                await bot.send_message(
+                _= await bot.send_message(
                     chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
                 return None
@@ -273,23 +370,22 @@ async def process_cabinet_api(
         stmt_for_cabinet = select(WBCabinet).where(
             WBCabinet.shop_id == wb_token.shop_id
         )
-        result = await session.execute(stmt_for_cabinet)
-        wb_cabinet: WBCabinet | None = result.scalar()
-
+        result: Result[tuple[WBCabinet]] = await session.execute(stmt_for_cabinet)
+        wb_cabinet: WBCabinet = result.scalar()
         if wb_cabinet:
             await messages.CabinetExistsForUser(bot, chat_id)()
             if wb_cabinet.active is not True:
                 wb_cabinet.active = True
-            stmt_for_select_user_id = select(WBUserCabinet).where(
+            stmt_for_select_user_id: Select[tuple[WBUserCabinet]] = select(WBUserCabinet).where(
                 WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
                 WBUserCabinet.user_id == user_id,
             )
-            result = await session.execute(stmt_for_select_user_id)
+            result: Result[tuple[WBUserCabinet]] = await session.execute(stmt_for_select_user_id)
             wb_user_cabinet: WBUserCabinet | None = result.scalar_one_or_none()
             stmt_for_adv_setting = select(AdvSetting).where(
                 AdvSetting.wb_cabinet_id == wb_cabinet.id
             )
-            result = await session.execute(stmt_for_adv_setting)
+            result: Result[tuple[AdvSetting]] = await session.execute(stmt_for_adv_setting)
             adv_settings = result.scalars().all()
             if not wb_user_cabinet:
                 wb_user_cabinet = WBUserCabinet(
@@ -329,19 +425,25 @@ async def process_cabinet_api(
         wb_api = WBApi(access, client_session)
 
         shop_updater = ShopDataUpdater(wb_api)
-        await shop_updater.update_advs_data()
+        _ = await shop_updater.update_advs_data()
 
         # Показываем список кабинетов пользователя
-        async with sm() as session:
-            stmt_for_wb_user_cabinet = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.user)
-                .where(User.user_telegram_id == user_telegram_id)
-            )
-            result = await session.execute(stmt_for_wb_user_cabinet)
-            wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
+        stmt_for_wb_user_cabinet = (
+            select(WBUserCabinet)
+            .options(joinedload(WBUserCabinet.wb_cabinet))
+            .join(WBUserCabinet.user)
+            .where(User.user_telegram_id == user_telegram_id)
+        )
+        result_for_wb_user_cabinet = await session.execute(stmt_for_wb_user_cabinet)
+        wb_user_cabinets: Sequence[WBUserCabinet] = result_for_wb_user_cabinet.scalars().all()
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
 
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await ShopChoice(
+            bot, chat_id, list(wb_user_cabinets), shop_ids_with_active_tokens
+        )()
         return None
 
 
@@ -687,7 +789,7 @@ async def select_shop(
     return
 
 
-@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select))
+@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select)) # noqa
 async def shop_menu_process(
     callback: types.CallbackQuery,
     callback_data: callbacks.Shop,

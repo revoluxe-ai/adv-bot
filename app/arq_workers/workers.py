@@ -8,7 +8,11 @@ import logging
 
 from app.arq_workers.arq_redis_settings import arq_redis_settings
 from app.client_bot.bot import get_bot
-from app.modules.adv_creator.backend.tasks import create_complex_advs
+from app.modules.adv_creator.backend.tasks import (
+    create_auto_only,
+    create_complex_advs,
+    create_search_only,
+)
 from python_modules.logger import setup_logging
 
 # Настраиваем логирование
@@ -40,7 +44,9 @@ class WorkerSettings:
     """Настройки Arq."""
 
     functions = [
+        create_auto_only,
         create_complex_advs,
+        create_search_only,
     ]
     redis_settings = arq_redis_settings
     on_startup = startup

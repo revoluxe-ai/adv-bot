@@ -87,9 +87,11 @@ async def get_nmid(message: Message, state: FSMContext, bot: Bot):
         nmid_list = extract_nmid_list(text)
 
     if not nmid_list:
+        await state.clear()
         await bot.send_message(
             message.from_user.id,
-            "Не удалось извлечь артикулы. Проверьте формат данных и попробуйте еще раз.",
+            "Не удалось извлечь артикулы. Проверьте формат (только числа через пробел или запятую, без лишних символов). "
+            "Чтобы снова создать рекламу по артикулам, нажмите «Создать рекламу» в меню магазина.",
         )
         return
 

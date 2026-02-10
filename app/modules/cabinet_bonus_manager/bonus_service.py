@@ -36,8 +36,24 @@ async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
         return result.scalar_one_or_none()
 
 
+def _admin_desc_fallback(
+    default: str, description: str | None, admin_user_id: int | None
+) -> str:
+    """Fallback для description: description или default с ID если есть."""
+    if description:
+        return description
+    return (
+        f"{default} ID:{admin_user_id}"
+        if admin_user_id is not None
+        else default
+    )
+
+
 async def add_bonus(
-    wb_cabinet_original_id: int, amount: float, admin_user_id: int, description: str
+    wb_cabinet_original_id: int,
+    amount: float,
+    admin_user_id: int | None,
+    description: str,
 ) -> bool:
     """
     Пополнить бонусы кабинета по ID
@@ -45,8 +61,8 @@ async def add_bonus(
     Args:
         wb_cabinet_original_id: ID кабинета
         amount: Сумма бонусов для добавления (положительное число)
-        admin_user_id: ID администратора, выполняющего операцию
-        description: Описание операции
+        admin_user_id: User.id администратора (внутренний PK), выполняющего операцию
+        description: Описание операции (должно содержать tg админа для аудита)
 
     Returns:
         bool: True если операция успешна, False если кабинет не найден
@@ -61,14 +77,17 @@ async def add_bonus(
             if not cabinet:
                 return False
 
-            # Создаем запись о начислении бонусов
+            desc = _admin_desc_fallback(
+                "Пополнение бонусов администратором.",
+                description or None,
+                admin_user_id,
+            )
             bonus_payment = WBBonusPayment(
                 wb_cabinet_id=cabinet.id,
                 amount=amount,
                 operation_type="add",
                 admin_user_id=admin_user_id,
-                description=description
-                or f"Пополнение бонусов администратором ID:{admin_user_id}",
+                description=desc,
             )
             session.add(bonus_payment)
             await session.commit()
@@ -79,7 +98,10 @@ async def add_bonus(
 
 
 async def subtract_bonus(
-    cabinet_id: int, amount: float, admin_user_id: int, description: str | None = None
+    cabinet_id: int,
+    amount: float,
+    admin_user_id: int | None,
+    description: str | None = None,
 ) -> bool:
     """
     Снять бонусы с кабинета по ID
@@ -87,8 +109,8 @@ async def subtract_bonus(
     Args:
         cabinet_id: ID кабинета
         amount: Сумма бонусов для снятия (положительное число)
-        admin_user_id: ID администратора, выполняющего операцию
-        description: Описание операции
+        admin_user_id: User.id администратора (внутренний PK), выполняющего операцию
+        description: Описание операции (должно содержать tg админа для аудита)
 
     Returns:
         bool: True если операция успешна, False если кабинет не найден или недостаточно бонусов
@@ -96,56 +118,63 @@ async def subtract_bonus(
     if amount <= 0:
         raise ValueError("Сумма должна быть положительным числом")
     wb_cabinet = await get_cabinet_by_id(cabinet_id)
+    desc = _admin_desc_fallback(
+        "Снятие бонусов администратором.",
+        description,
+        admin_user_id,
+    )
     async with sm(read_only=False) as session:
         await session.begin()
         calculated_bonus = wb_cabinet.calculated_bonus
         if calculated_bonus < amount:
             raise ValueError("Недостаточно бонусов")
-        # Создаем запись о снятии бонусов
         bonus_payment = WBBonusPayment(
             wb_cabinet_id=wb_cabinet.id,
-            amount=-amount,  # Отрицательная сумма для снятия
+            amount=-amount,
             operation_type="subtract",
             admin_user_id=admin_user_id,
-            description=description
-            or f"Снятие бонусов администратором ID:{admin_user_id}",
+            description=desc,
         )
         session.add(bonus_payment)
         await session.commit()
         return True
 
 
-async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> bool:
+async def reset_bonus(
+    cabinet_id: int, admin_user_id: int | None, description: str
+) -> bool:
     """
     Обнулить бонусы кабинета по ID
 
     Args:
         cabinet_id: ID кабинета
-        admin_user_id: ID администратора, выполняющего операцию
-        description: Описание операции
+        admin_user_id: User.id администратора (внутренний PK), выполняющего операцию
+        description: Описание операции (должно содержать tg админа для аудита)
 
     Returns:
         bool: True если операция успешна, False если кабинет не найден
     """
     cabinet = await get_cabinet_by_id(cabinet_id)
+    desc = _admin_desc_fallback(
+        "Обнуление бонусов администратором.",
+        description or None,
+        admin_user_id,
+    )
     async with sm(read_only=False) as session:
         try:
             await session.begin()
             if not cabinet:
                 return False
-            # Проверяем расчетный баланс бонусов
             calculated_bonus = cabinet.calculated_bonus
             if calculated_bonus <= 0:
                 return True
 
-            # Создаем запись об обнулении бонусов с отрицательной суммой, равной текущему расчетному бонусу
             bonus_payment = WBBonusPayment(
                 wb_cabinet_id=cabinet.id,
                 amount=-calculated_bonus,
                 operation_type="reset",
                 admin_user_id=admin_user_id,
-                description=description
-                or f"Обнуление бонусов администратором ID:{admin_user_id}",
+                description=desc,
             )
             session.add(bonus_payment)
             await session.commit()

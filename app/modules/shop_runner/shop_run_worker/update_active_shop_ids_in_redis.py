@@ -13,12 +13,7 @@ from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
 async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
-        select(WBCabinet.shop_id)
-        .distinct()
-        .join(WBCabinet.adv_settings)
-        .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active),
-        )
+        select(WBCabinet.shop_id).where(WBCabinet.active)
     )
 
     shop_filter_list: list[str] = settings.SHOP_FILTER_LIST

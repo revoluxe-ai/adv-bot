@@ -7,6 +7,7 @@ __all__ = [
     "ExpiringToken",
     "PermissionValidation",
     "get_shop_token_status",
+    "get_shop_ids_with_complete_token_status",
     "validate_shop_permissions",
     "get_expiring_tokens_for_shop",
     "REQUIRED_RIGHTS",
@@ -31,6 +32,7 @@ from .token_info_service import (
     TokenInfoService,
     TokenStatusReport,
     get_expiring_tokens_for_shop,
+    get_shop_ids_with_complete_token_status,
     get_shop_token_status,
     validate_shop_permissions,
 )
