@@ -1,10 +1,10 @@
-from app.client_bot import const
 
 
 def get_main_text(user_telegram_id: int) -> str:
     text = f"""
-📈 Экономическое управление рекламой на Wildberries
+Ваш Телеграм ID: {user_telegram_id}\n
 
+📈 Экономическое управление рекламой на Wildberries \n
 Я управляю рекламой на Wildberries через экономику, а не через бесконечные ручные правки.
 
 🤖 Бот автоматически создаёт и ведёт поисковую рекламу и авторекламу:

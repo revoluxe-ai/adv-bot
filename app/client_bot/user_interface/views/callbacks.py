@@ -83,12 +83,6 @@ class CheckSubscribe(CallbackData, prefix="check_subscribe"):
     pass
 
 
-class RefProgram(CallbackData, prefix="ref_program"):
-    """select or new"""
-
-    action: str
-
-
 class OrderSubscribe(CallbackData, prefix="order_subscribe"):
     period_days: int
     price: int

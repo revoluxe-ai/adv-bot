@@ -1133,34 +1133,6 @@ def get_subscribe_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_ref_program_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Создать новую реф.ссылку",
-            callback_data=callbacks.RefProgram(action="new").pack(),
-        )
-    )
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Существующие ссылки и их имена",
-            callback_data=callbacks.RefProgram(action="select").pack(),
-        )
-    )
-    return builder.as_markup()
-
-
-def get_return_for_your_ref_links() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.RefProgram(action="return").pack()
-        )
-    )
-
-    return builder.as_markup()
-
-
 def get_shop_menu_keyboard(
     wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: bool
 ):
