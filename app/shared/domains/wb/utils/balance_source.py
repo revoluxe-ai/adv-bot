@@ -36,13 +36,10 @@ class BalanceResponse(Protocol):
     bonus: Any
 
 
-def select_balance_source(snapshot: BalanceSnapshot) -> tuple[int, str]:
-    if sum(snapshot.rows()[i][0] for i in range(3)) < 2000 and len(
-        [value for value, _ in snapshot.rows() if value >= 1000]
-    ) < 2:
-        raise NotEnoughBalanceOnShopError()
-
-    balance_rows = [row for row in snapshot.rows() if row[0] > 1000]
+def select_balance_source(
+    snapshot: BalanceSnapshot, *, min_required: int = 1000
+) -> tuple[int, str]:
+    balance_rows = [row for row in snapshot.rows() if row[0] >= min_required]
     if not balance_rows:
         raise NotEnoughBalanceOnShopError()
 
@@ -68,6 +65,8 @@ def balance_snapshot_from_response(response: BalanceResponse) -> BalanceSnapshot
 
 def select_balance_source_from_response(
     response: BalanceResponse,
+    *,
+    min_required: int = 1000,
 ) -> tuple[int, str]:
     snapshot = balance_snapshot_from_response(response)
-    return select_balance_source(snapshot)
+    return select_balance_source(snapshot, min_required=min_required)

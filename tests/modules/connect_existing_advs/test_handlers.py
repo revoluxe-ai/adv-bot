@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Chat, Message, User
 
 from app.client_bot.user_interface.states import ConnectExistingAdvsStates
 from app.client_bot.user_interface.views import callbacks
+from app.core.mp.wb.api.domain_managers import ProductCardInfo
 from app.modules.connect_existing_advs.candidates_service import (
     ConnectExistingCandidatesResult,
 )
@@ -15,11 +16,34 @@ from app.client_bot.user_interface.handlers import connect_existing_advs
 MODULE = "app.client_bot.user_interface.handlers.connect_existing_advs"
 
 
+def _make_hub_with_products_manager(
+    get_card_by_nmid_result: ProductCardInfo | Exception,
+) -> MagicMock:
+    """Create mock hub chain: container -> factory -> hub -> products_manager."""
+    products_manager = MagicMock()
+    if isinstance(get_card_by_nmid_result, Exception):
+        products_manager.get_card_by_nmid = AsyncMock(
+            side_effect=get_card_by_nmid_result
+        )
+    else:
+        products_manager.get_card_by_nmid = AsyncMock(
+            return_value=get_card_by_nmid_result
+        )
+    hub = MagicMock()
+    hub.wb_data_manager.products_manager = products_manager
+    factory = MagicMock()
+    factory.get_wb_manager_hub.return_value = hub
+    container = MagicMock()
+    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
+    return container
+
+
 def _make_callback(
     callback_data: callbacks.ConnectExistingAdvs
     | callbacks.ConnectExistingConfirmType1
     | callbacks.ConnectExistingConfirmType2
     | callbacks.ConnectExistingCreateBoth
+    | callbacks.ConnectExistingContinueDespiteInvalid
     | callbacks.ConnectExistingAdvsBackToShop,
     chat_id: int = 12345,
     from_user_id: int = 67890,
@@ -68,7 +92,7 @@ async def test_connect_existing_advs_start() -> None:
     bot.send_message.assert_called_once()
     call_args = bot.send_message.call_args
     assert call_args[0][0] == 111
-    assert "NM-id" in call_args[0][1] and "число" in call_args[0][1]
+    assert "артикул" in call_args[0][1].lower() and "число" in call_args[0][1]
 
 
 @pytest.mark.unit
@@ -81,11 +105,11 @@ async def test_connect_existing_advs_nmid_text_none() -> None:
     state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
     message = _make_message(chat_id=222, text=None)
 
-    await connect_existing_advs.connect_existing_advs_nmid(
-        message, bot, state, client_session=MagicMock()
-    )
+    await connect_existing_advs.connect_existing_advs_nmid(message, bot, state)
 
-    bot.send_message.assert_called_once_with(222, "Отправьте NM-id числом.")
+    bot.send_message.assert_called_once_with(
+        222, "Отправьте Артикул WB товара числом."
+    )
 
 
 @pytest.mark.unit
@@ -98,11 +122,11 @@ async def test_connect_existing_advs_nmid_not_int() -> None:
     state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
     message = _make_message(chat_id=222, text="abc")
 
-    await connect_existing_advs.connect_existing_advs_nmid(
-        message, bot, state, client_session=MagicMock()
-    )
+    await connect_existing_advs.connect_existing_advs_nmid(message, bot, state)
 
-    bot.send_message.assert_called_once_with(222, "NM-id должен быть целым числом.")
+    bot.send_message.assert_called_once_with(
+        222, "Артикул WB товара должен быть целым числом."
+    )
 
 
 @pytest.mark.unit
@@ -115,11 +139,11 @@ async def test_connect_existing_advs_nmid_zero() -> None:
     state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
     message = _make_message(chat_id=222, text="0")
 
-    await connect_existing_advs.connect_existing_advs_nmid(
-        message, bot, state, client_session=MagicMock()
-    )
+    await connect_existing_advs.connect_existing_advs_nmid(message, bot, state)
 
-    bot.send_message.assert_called_once_with(222, "NM-id должен быть больше 0.")
+    bot.send_message.assert_called_once_with(
+        222, "Артикул WB товара  должен быть больше 0."
+    )
 
 
 @pytest.mark.unit
@@ -141,7 +165,7 @@ async def test_connect_existing_advs_nmid_cabinet_not_found() -> None:
 
     with patch(f"{MODULE}.sm", mock_sm):
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     bot.send_message.assert_called_once_with(222, "Кабинет не найден.")
@@ -166,15 +190,18 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
+    container = _make_hub_with_products_manager(CardNotFoundInWB())
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls:
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock(side_effect=CardNotFoundInWB())
-        mock_wb_api_cls.return_value = mock_wb_api
+        f"{MODULE}.DIManager.create", mock_di_create
+    ):
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then error
@@ -203,18 +230,23 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls, patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=(100, 200)),
     ):
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock()
-        mock_wb_api_cls.return_value = mock_wb_api
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     state.clear.assert_called_once()
@@ -249,21 +281,26 @@ async def test_connect_existing_advs_nmid_success_both_empty() -> None:
         auto_candidates=[],
     )
 
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls, patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(return_value=empty_result),
     ):
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock()
-        mock_wb_api_cls.return_value = mock_wb_api
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     state.set_state.assert_called_once_with(
@@ -277,7 +314,7 @@ async def test_connect_existing_advs_nmid_success_both_empty() -> None:
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_get_candidates_api_forbidden() -> None:
     """nmid handler: get_connect_existing_candidates raises ApiForbiddenError -> send no access."""
-    from app.core.wb_api.exceptions import ApiForbiddenError
+    from app.core.mp.wb.api.excs import ApiForbiddenError
 
     bot = MagicMock()
     bot.send_message = AsyncMock()
@@ -292,21 +329,26 @@ async def test_connect_existing_advs_nmid_get_candidates_api_forbidden() -> None
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls, patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(side_effect=ApiForbiddenError("forbidden")),
     ):
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock()
-        mock_wb_api_cls.return_value = mock_wb_api
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then API error
@@ -334,21 +376,26 @@ async def test_connect_existing_advs_nmid_bad_request_path_not_found() -> None:
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls, patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(side_effect=BadRequestError("path not found")),
     ):
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock()
-        mock_wb_api_cls.return_value = mock_wb_api
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     state.set_state.assert_called_once_with(
@@ -387,21 +434,26 @@ async def test_connect_existing_advs_nmid_success_auction_only() -> None:
         auto_candidates=[],
     )
 
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        f"{MODULE}.super_cabinet_manager.get_access_for_wb_cabinet",
-        AsyncMock(),
-    ), patch(f"{MODULE}.WBApi") as mock_wb_api_cls, patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(return_value=result_with_auction),
     ):
-        mock_wb_api = MagicMock()
-        mock_wb_api.get_card_by_text = AsyncMock()
-        mock_wb_api_cls.return_value = mock_wb_api
         await connect_existing_advs.connect_existing_advs_nmid(
-            message, bot, state, client_session=MagicMock()
+            message, bot, state
         )
 
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.confirm_type1)
@@ -466,8 +518,8 @@ async def test_connect_existing_confirm_type1_adv_id_set() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_connect_existing_confirm_type2_adv_id_zero() -> None:
-    """confirm_type2: adv_id=0 -> message about auto РК next update."""
+async def test_connect_existing_confirm_type2_adv_id_zero_chosen_auction_none() -> None:
+    """confirm_type2: adv_id=0 with chosen_auction None -> 'Сначала выберите аукционную'."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -482,7 +534,7 @@ async def test_connect_existing_confirm_type2_adv_id_zero() -> None:
     )
 
     bot.send_message.assert_called_once()
-    assert "Создание авто-РК будет доступно" in bot.send_message.call_args[0][1]
+    assert "Сначала выберите аукционную" in bot.send_message.call_args[0][1]
 
 
 @pytest.mark.unit
@@ -515,8 +567,7 @@ async def test_connect_existing_confirm_type2_chosen_auction_none() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_confirm_type2_creates_adv_setting() -> None:
-    """confirm_type2: full flow, no existing AdvSetting -> create new, commit, message."""
-    from app.modules.common_slaves.wildberries.models import AdvSetting
+    """confirm_type2: full flow -> upsert by adv_id, commit, message."""
     from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
     bot = MagicMock()
@@ -535,33 +586,25 @@ async def test_connect_existing_confirm_type2_creates_adv_setting() -> None:
     )
     callback_data = callbacks.ConnectExistingConfirmType2(adv_id=20)
     mock_wb_cabinet = MagicMock(spec=WBCabinet)
+    mock_wb_cabinet.id = 1
     mock_session = MagicMock()
     mock_session.get = AsyncMock(return_value=mock_wb_cabinet)
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = None
-    mock_session.execute = AsyncMock(return_value=mock_result)
-    mock_session.add = MagicMock()
+    mock_session.execute = AsyncMock()
     mock_session.commit = AsyncMock()
     mock_sm = MagicMock()
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch(f"{MODULE}.sm", mock_sm), patch(
-        "app.client_bot.modules.default_settings.apply_defaults_to_adv_setting",
+        "app.modules.adv_creator.backend.main_manager.MainAdvManager._apply_default_settings_to_adv",
+        new_callable=AsyncMock,
     ):
         await connect_existing_advs.connect_existing_confirm_type2(
             callback, callback_data, bot, state
         )
 
     state.clear.assert_called_once()
-    mock_session.add.assert_called_once()
-    added = mock_session.add.call_args[0][0]
-    assert isinstance(added, AdvSetting)
-    assert added.adv_id == 20
-    assert added._search_adv_id == 10
-    # name follows template: nmid + card_name (fallback str(nmid) when no card_name in state)
-    assert added.name == "100 100"
-    assert added.nmids == [100]
+    mock_session.execute.assert_called_once()
     mock_session.commit.assert_called_once()
     bot.send_message.assert_called_once()
     assert "Кампании подключены" in bot.send_message.call_args[0][1]
@@ -644,6 +687,89 @@ async def test_connect_existing_create_both_confirm_enqueue() -> None:
     state.clear.assert_called_once()
     bot.send_message.assert_called_once()
     assert "добавлена в очередь" in bot.send_message.call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_continue_despite_invalid_confirm_enqueue() -> None:
+    """continue_despite_invalid: confirm enqueues create_search_only with existing_auto_adv_id."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "nmid": 100,
+            "shop_id": "shop_1",
+            "auto_candidates": [{"id": 5001, "name": "Auto campaign"}],
+        }
+    )
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingContinueDespiteInvalid(action="confirm"),
+        chat_id=333,
+        from_user_id=999,
+    )
+    callback_data = callbacks.ConnectExistingContinueDespiteInvalid(action="confirm")
+    mock_pool = MagicMock()
+    mock_pool.enqueue_job = AsyncMock()
+
+    with patch("arq.create_pool", AsyncMock(return_value=mock_pool)), patch(
+        "app.arq_workers.arq_redis_settings.arq_redis_settings",
+    ):
+        await connect_existing_advs.connect_existing_continue_despite_invalid(
+            callback, callback_data, bot, state
+        )
+
+    mock_pool.enqueue_job.assert_called_once_with(
+        "create_search_only", 100, "shop_1", 5001, 999
+    )
+    state.clear.assert_called_once()
+    bot.send_message.assert_called_once()
+    assert "добавлена в очередь" in bot.send_message.call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_confirm_type2_adv_id_zero_enqueues_create_auto_only() -> None:
+    """confirm_type2 with adv_id=0: enqueue create_auto_only, state.clear, queue message, ShopMenu."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "nmid": 200,
+            "shop_id": "shop_2",
+            "chosen_auction_adv_id": 7001,
+            "wb_user_cabinet_original_id": 42,
+        }
+    )
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingConfirmType2(adv_id=0),
+        chat_id=333,
+        from_user_id=999,
+    )
+    callback_data = callbacks.ConnectExistingConfirmType2(adv_id=0)
+    mock_pool = MagicMock()
+    mock_pool.enqueue_job = AsyncMock()
+    mock_shop_menu = MagicMock()
+    mock_shop_menu.return_value = AsyncMock()
+
+    with patch("arq.create_pool", AsyncMock(return_value=mock_pool)), patch(
+        "app.arq_workers.arq_redis_settings.arq_redis_settings",
+    ), patch(f"{MODULE}.ShopMenu", mock_shop_menu):
+        await connect_existing_advs.connect_existing_confirm_type2(
+            callback, callback_data, bot, state
+        )
+
+    mock_pool.enqueue_job.assert_called_once_with(
+        "create_auto_only", 200, "shop_2", 7001, 999
+    )
+    state.clear.assert_called_once()
+    bot.send_message.assert_called_once()
+    assert "добавлена в очередь" in bot.send_message.call_args[0][1]
+    mock_shop_menu.assert_called_once_with(bot, 333, state, 42)
+    mock_shop_menu.return_value.assert_called_once()
 
 
 @pytest.mark.unit

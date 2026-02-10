@@ -10,6 +10,7 @@ from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
+from app.core.mp.wb.api.excs import HttpTimeOutError, MaxAttemptsError
 from app.modules.adv_creator.backend.exc import (
     AdvExistsForNmidError,
 )
@@ -20,11 +21,167 @@ from app.modules.wb_adv_updater import data_manager
 logger = logging.getLogger(__name__)
 
 
+async def create_search_only(
+    ctx: dict[str, Any],
+    nmid: int,
+    shop_id: str,
+    existing_auto_adv_id: int,
+    user_telegram_id: int,
+) -> None:
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+        try:
+            await _create_search_only(
+                ctx, nmid, shop_id, existing_auto_adv_id, user_telegram_id
+            )
+        except ApiForbiddenError:
+            bot = get_bot()
+            await bot.send_message(
+                user_telegram_id,
+                f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}",
+            )
+            return
+        except Exception as e:
+            logger.error(
+                "Ошибка задачи create_search_only",
+                exc_info=True,
+            )
+            raise e
+
+
+async def _create_search_only(
+    ctx: dict[str, Any],
+    nmid: int,
+    shop_id: str,
+    existing_auto_adv_id: int,
+    user_telegram_id: int,
+) -> None:
+    from app.modules.shop_runner.modules.wb_api import WBApi
+
+    bot = ctx["bot"]
+    client_session = ctx["client_session"]
+    access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
+    manager = MainAdvManager(access, client_session)
+    async with aiohttp.ClientSession() as client_session:
+        wb_api = WBApi(access, client_session)
+        await data_manager.update_advs_data_from_wb_to_pg(wb_api)
+
+    await bot.send_message(
+        user_telegram_id,
+        "Создаю поисковую РК и подключаю к существующей авто-кампании.",
+    )
+    try:
+        search_adv_id = await manager.create_search_only(
+            bot, user_telegram_id, nmid, existing_auto_adv_id, hard_mode=True
+        )
+        await bot.send_message(
+            user_telegram_id,
+            f"Поисковая РК создана и подключена к авто-кампании. ID поиска: {search_adv_id}",
+        )
+    except CardsNotFoundForShopError:
+        await bot.send_message(
+            user_telegram_id,
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
+            f" проверьте правильность артикула!",
+        )
+    except NotEnoughBalanceOnShopError as exc:
+        adv_id = getattr(exc, "adv_id", None)
+        await bot.send_message(
+            user_telegram_id,
+            f"Недостаточно средств на балансе shop id: {shop_id}"
+            f" для пополнения РК для артикула {nmid}"
+            + (f" ADV ID: {adv_id}" if adv_id is not None else ""),
+        )
+    except (HttpTimeOutError, MaxAttemptsError):
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось выполнить запрос к Wildberries (таймаут или превышено число попыток). "
+            f"Попробуйте повторить позже или обратитесь в поддержку {const.SUPPORT_LINK}",
+        )
+
+
+async def create_auto_only(
+    ctx: dict[str, Any],
+    nmid: int,
+    shop_id: str,
+    existing_search_adv_id: int,
+    user_telegram_id: int,
+) -> None:
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+        try:
+            await _create_auto_only(
+                ctx, nmid, shop_id, existing_search_adv_id, user_telegram_id
+            )
+        except ApiForbiddenError:
+            bot = get_bot()
+            await bot.send_message(
+                user_telegram_id,
+                f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}",
+            )
+            return
+        except Exception as e:
+            logger.error(
+                "Ошибка задачи create_auto_only",
+                exc_info=True,
+            )
+            raise e
+
+
+async def _create_auto_only(
+    ctx: dict[str, Any],
+    nmid: int,
+    shop_id: str,
+    existing_search_adv_id: int,
+    user_telegram_id: int,
+) -> None:
+    from app.modules.shop_runner.modules.wb_api import WBApi
+
+    bot = ctx["bot"]
+    client_session = ctx["client_session"]
+    access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
+    manager = MainAdvManager(access, client_session)
+    async with aiohttp.ClientSession() as client_session:
+        wb_api = WBApi(access, client_session)
+        await data_manager.update_advs_data_from_wb_to_pg(wb_api)
+
+    await bot.send_message(
+        user_telegram_id,
+        "Создаю авто-РК и подключаю к существующей поисковой.",
+    )
+    try:
+        auto_adv_id = await manager.create_auto_only(
+            bot, user_telegram_id, nmid, existing_search_adv_id, hard_mode=True
+        )
+        await bot.send_message(
+            user_telegram_id,
+            f"Авто-РК создана и подключена. ID авто: {auto_adv_id}",
+        )
+    except CardsNotFoundForShopError:
+        await bot.send_message(
+            user_telegram_id,
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
+            f" проверьте правильность артикула!",
+        )
+    except NotEnoughBalanceOnShopError as exc:
+        adv_id = getattr(exc, "adv_id", None)
+        await bot.send_message(
+            user_telegram_id,
+            f"Недостаточно средств на балансе shop id: {shop_id}"
+            f" для пополнения РК для артикула {nmid}"
+            + (f" ADV ID: {adv_id}" if adv_id is not None else ""),
+        )
+    except (HttpTimeOutError, MaxAttemptsError):
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось выполнить запрос к Wildberries (таймаут или превышено число попыток). "
+            f"Попробуйте повторить позже или обратитесь в поддержку {const.SUPPORT_LINK}",
+        )
+
+
 async def create_complex_advs(
     ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     # TODO: Тут ошибка попала в прод: отсутствие импорта
-    async with await DIManager.create(AppContainer): # type:ignore[attr-defined]
+    async with await DIManager.create(AppContainer):  # type:ignore[attr-defined]
         try:
             await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
         except ApiForbiddenError:
@@ -108,6 +265,14 @@ async def _create_complex_advs(
         )
         del exc
 
+    except (HttpTimeOutError, MaxAttemptsError):
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось выполнить запрос к Wildberries (таймаут или превышено число попыток). "
+            f"Попробуйте повторить позже или обратитесь в поддержку {const.SUPPORT_LINK}",
+        )
+        return
+
     except AdvExistsForNmidError as exc:
         # Отправить сообщение с кнопками выбора
         from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -134,7 +299,7 @@ async def _create_complex_advs(
 
         builder = InlineKeyboardBuilder()
         if access.wb_cabinet is None:
-            raise ValueError('У доступа не установлен магазин')
+            raise ValueError("У доступа не установлен магазин")
         wb_original_cabinet_id = access.wb_cabinet.id
         assert isinstance(wb_original_cabinet_id, int)
         builder.row(

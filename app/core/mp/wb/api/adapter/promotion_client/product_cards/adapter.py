@@ -53,7 +53,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
             return None
         parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -84,7 +84,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
             return None
         parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -111,5 +111,5 @@ class ProductCardsAdapter(BaseSectionAdapter):
             return None
         parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None
