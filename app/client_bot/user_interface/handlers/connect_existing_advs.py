@@ -739,6 +739,14 @@ async def connect_existing_create_both(
         )
     finally:
         await state.clear()
+    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
+    if wb_user_cabinet_original_id is not None:
+        await ShopMenu(
+            bot,
+            int(callback.message.chat.id),
+            state,
+            wb_user_cabinet_original_id,
+        )()
 
 
 @router.callback_query(
@@ -808,6 +816,14 @@ async def connect_existing_continue_despite_invalid(
         )
     finally:
         await state.clear()
+    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
+    if wb_user_cabinet_original_id is not None:
+        await ShopMenu(
+            bot,
+            int(callback.message.chat.id),
+            state,
+            wb_user_cabinet_original_id,
+        )()
 
 
 @router.callback_query(callbacks.ConnectExistingAdvsBackToShop.filter())
