@@ -22,3 +22,11 @@ async def stop_adv(
     adv_id: int,
 ) -> None:
     await campaigns_management_adapter.stop_adv(adv_id)
+
+
+async def rename_adv(
+    campaigns_management_adapter: CampaignsManagementAdapter,
+    adv_id: int,
+    new_name: str,
+) -> None:
+    await campaigns_management_adapter.rename_adv(adv_id, new_name)

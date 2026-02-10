@@ -23,6 +23,7 @@ from app.client_bot.const import (
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
 from app.client_bot.user_interface.views import callbacks
+from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.balance_manager.balance_service import (
     get_cabinet_balance,
     process_payment_with_bonus,
@@ -727,7 +728,11 @@ async def successful_payment_handler(
             stmt = (
                 select(User)
                 .where(User.user_telegram_id == message.chat.id)
-                .options(joinedload(User.wb_user_cabinets))
+                .options(
+                    joinedload(User.wb_user_cabinets).joinedload(
+                        WBUserCabinet.wb_cabinet
+                    )
+                )
             )
             result = await session.execute(stmt)
             user = result.unique().scalar_one_or_none()
@@ -796,17 +801,22 @@ async def successful_payment_handler(
             async with sm() as session:
                 stmt = select(User).where(User.user_telegram_id == message.chat.id)
                 result = await session.execute(stmt)
-                gate_user = result.scalar_one_or_none()
-                if gate_user is not None:
-                    gate_user.passed_gate = True
-                    gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
-                    now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
-                    gate_user.passed_gate_at = now_utc
-                    session.add(gate_user)
-                    await session.commit()
+                gate_user = result.scalar_one()
+                gate_user.passed_gate = True
+                gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
+                now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
+                gate_user.passed_gate_at = now_utc
+                session.add(gate_user)
+                await session.commit()
             await message.answer("Оплата получена. Доступ открыт.")
         await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()
-        await ShopChoice(bot, message.chat.id, user.wb_user_cabinets)()
+        shop_ids = [uc.wb_cabinet.shop_id for uc in user.wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
+        await ShopChoice(
+            bot, message.chat.id, user.wb_user_cabinets, shop_ids_with_active_tokens
+        )()
         return
 
     # Ветка пополнения баланса кабинета

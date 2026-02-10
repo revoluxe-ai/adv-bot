@@ -1133,34 +1133,6 @@ def get_subscribe_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_ref_program_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Создать новую реф.ссылку",
-            callback_data=callbacks.RefProgram(action="new").pack(),
-        )
-    )
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Существующие ссылки и их имена",
-            callback_data=callbacks.RefProgram(action="select").pack(),
-        )
-    )
-    return builder.as_markup()
-
-
-def get_return_for_your_ref_links() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.RefProgram(action="return").pack()
-        )
-    )
-
-    return builder.as_markup()
-
-
 def get_shop_menu_keyboard(
     wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: bool
 ):
@@ -1201,7 +1173,7 @@ def get_shop_menu_keyboard(
         )
     _ = builder.row(
         InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack()
+            text="Вернуться к списку магазинов", callback_data=callbacks.ShowShopsList().pack()
         )
     )
     return builder.as_markup()
@@ -1220,7 +1192,7 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="К списку магазинов", callback_data=callbacks.Start().pack()
+            text="К списку магазинов", callback_data=callbacks.ShowShopsList().pack()
         )
     )
 
@@ -1357,6 +1329,12 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="👤 Пополнение пользователей",
                     callback_data=AdminUserBalance(action="menu").pack(),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔙 Назад",
+                    callback_data=callbacks.Start().pack(),
                 )
             ],
         ]

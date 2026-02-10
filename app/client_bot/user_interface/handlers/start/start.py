@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Sequence
 
 import aiogram
 from aiogram import Router, types
@@ -15,7 +16,11 @@ from sqlalchemy.exc import IntegrityError
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
+from app.client_bot.user_interface.handlers.shop_choice_message import (
+    MainMenu,
+    ShopsListPage,
+    ShopChoice,
+)
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
 )
@@ -35,6 +40,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.settings import settings
@@ -69,7 +75,7 @@ async def callback_start_registration(
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User | None = result.scalar()
+        user: User | None = result.unique().scalar()
         if callback.message is None:
             return
         chat_id = callback.message.chat.id
@@ -80,9 +86,90 @@ async def callback_start_registration(
                 reply_markup=get_gate_keyboard(),
             )
             return
-        wb_user_cabinets = user.wb_user_cabinets
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await MainMenu(bot, chat_id)()
     return
+
+
+@router.callback_query(callbacks.ShowShopsList.filter())
+async def show_shops_list(
+    callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Показать страницу «Мои магазины»: Добавить магазин + список магазинов."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.unique().scalar()
+        if user is None or not user.passed_gate:
+            pass
+        else:
+            wb_user_cabinets = user.wb_user_cabinets
+            shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+            shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+                shop_ids
+            )
+            await ShopsListPage(
+                bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
+            )()
+            return
+    if user is None or not user.passed_gate:
+        _ = await bot.send_message(
+            chat_id,
+            get_gate_message_text(),
+            reply_markup=get_gate_keyboard(),
+        )
+    return
+
+
+@router.callback_query(callbacks.ShopsListPaginator.filter())
+async def shops_list_paginator(
+    callback: CallbackQuery,
+    callback_data: callbacks.ShopsListPaginator,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Переключение страницы списка «Мои магазины»."""
+    await state.clear()
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    page = callback_data.page if callback_data.page >= 1 else 1
+    async with sm() as session:
+        stmt = (
+            select(User)
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
+            .where(User.user_telegram_id == user_id)
+        )
+        result = await session.execute(stmt)
+        user: User | None = result.unique().scalar()
+        if user is None or not user.passed_gate:
+            _ = await bot.send_message(
+                chat_id,
+                get_gate_message_text(),
+                reply_markup=get_gate_keyboard(),
+            )
+            return
+        wb_user_cabinets = user.wb_user_cabinets
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
+        await ShopsListPage(
+            bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens, page=page
+        )()
 
 
 @router.callback_query(callbacks.ShopNew.filter())
@@ -285,7 +372,6 @@ async def process_cabinet_api(
         )
         result: Result[tuple[WBCabinet]] = await session.execute(stmt_for_cabinet)
         wb_cabinet: WBCabinet = result.scalar()
-
         if wb_cabinet:
             await messages.CabinetExistsForUser(bot, chat_id)()
             if wb_cabinet.active is not True:
@@ -342,16 +428,22 @@ async def process_cabinet_api(
         _ = await shop_updater.update_advs_data()
 
         # Показываем список кабинетов пользователя
-        async with sm() as session:
-            stmt_for_wb_user_cabinet = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.user)
-                .where(User.user_telegram_id == user_telegram_id)
-            )
-            result = await session.execute(stmt_for_wb_user_cabinet)
-            wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
+        stmt_for_wb_user_cabinet = (
+            select(WBUserCabinet)
+            .options(joinedload(WBUserCabinet.wb_cabinet))
+            .join(WBUserCabinet.user)
+            .where(User.user_telegram_id == user_telegram_id)
+        )
+        result_for_wb_user_cabinet = await session.execute(stmt_for_wb_user_cabinet)
+        wb_user_cabinets: Sequence[WBUserCabinet] = result_for_wb_user_cabinet.scalars().all()
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
 
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await ShopChoice(
+            bot, chat_id, list(wb_user_cabinets), shop_ids_with_active_tokens
+        )()
         return None
 
 
@@ -697,7 +789,7 @@ async def select_shop(
     return
 
 
-@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select))
+@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select)) # noqa
 async def shop_menu_process(
     callback: types.CallbackQuery,
     callback_data: callbacks.Shop,
