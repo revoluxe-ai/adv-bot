@@ -24,10 +24,14 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
+KeywordSettingMessage,
+FilterByQuery
 )
 
 __all__ = [
     "AddNewTokenGet",
+    "FilterByQuery",
+    "KeywordSettingMessage",
     "AdvCompanyChoicing",
     "AdvKeywordsSetting",
     "AdvSettingMenu",

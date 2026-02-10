@@ -2,27 +2,31 @@
 
 import logging
 
-from aiohttp import ClientSession
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import load_only
 
 from app.client_bot.user_interface.states import ConnectExistingAdvsStates
 from app.client_bot.user_interface.views import callbacks
-from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.di.app_container import AppContainer
+from app.core.di.di_manager import DIManager
+from app.core.mp.wb.api.excs import ApiForbiddenError, BadRequestError
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
-from app.core.mp.wb.api.excs import BadRequestError
-from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.connect_existing_advs import get_connect_existing_candidates
 from app.modules.connect_existing_advs.candidates_service import (
     ConnectExistingCandidatesResult,
 )
-from app.modules.shop_runner.modules.wb_api import WBApi
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from app.modules.shop_menu.message import ShopMenu
@@ -39,23 +43,31 @@ async def _get_existing_adv_pair_not_done(
 ) -> tuple[int | None, int | None] | None:
     """Если есть в БД пара РК (Аукцион + Авто) по артикулу не в done — вернуть (adv_id, search_adv_id), иначе None."""
     async with sm(read_only=True) as session:
-        stmt = select(AdvSetting)\
-            .options(load_only(AdvSetting.adv_id, AdvSetting._search_adv_id, AdvSetting.name))\
+        stmt = (
+            select(AdvSetting)
+            .options(
+                load_only(AdvSetting.adv_id, AdvSetting._search_adv_id, AdvSetting.name)
+            )
             .where(
-            AdvSetting.wb_cabinet_id == wb_cabinet_id,
-            AdvSetting.nmids == [nmid],
-            AdvSetting.active_status != DONE_STATUS,
-        ).limit(1)
+                AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                AdvSetting.nmids == [nmid],
+                AdvSetting.active_status != DONE_STATUS,
+            )
+            .limit(1)
+        )
         result = await session.execute(stmt)
         adv = result.scalars().one_or_none()
     if adv is None:
         return None
     return adv.adv_id, adv.search_adv_id
 
+
 router = Router()
 
 
-def _serialize_candidates(result: ConnectExistingCandidatesResult) -> tuple[list[dict], list[dict]]:
+def _serialize_candidates(
+    result: ConnectExistingCandidatesResult,
+) -> tuple[list[dict], list[dict]]:
     """Serialize candidates for FSM state (id, name)."""
     auction = [{"id": c.id, "name": c.settings.name} for c in result.auction_candidates]
     auto = [{"id": c.id, "name": c.settings.name} for c in result.auto_candidates]
@@ -87,7 +99,6 @@ async def connect_existing_advs_nmid(
     message: Message,
     bot: Bot,
     state: FSMContext,
-    client_session: ClientSession,
 ) -> None:
     """Принять NM-id, проверить карточку на WB, получить кандидатов, показать первый тип (аукцион)."""
     if message.text is None:
@@ -97,10 +108,14 @@ async def connect_existing_advs_nmid(
     try:
         nmid = int(text)
     except ValueError:
-        await bot.send_message(message.chat.id, "Артикул WB товара должен быть целым числом.")
+        await bot.send_message(
+            message.chat.id, "Артикул WB товара должен быть целым числом."
+        )
         return
     if nmid <= 0:
-        await bot.send_message(message.chat.id, "Артикул WB товара  должен быть больше 0.")
+        await bot.send_message(
+            message.chat.id, "Артикул WB товара  должен быть больше 0."
+        )
         return
 
     data = await state.get_data()
@@ -121,9 +136,12 @@ async def connect_existing_advs_nmid(
 
     await bot.send_message(message.chat.id, WB_WAIT_MESSAGE)
     try:
-        access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-        wb_api = WBApi(access, client_session)
-        card = await wb_api.get_card_by_text(nmid)
+        async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            factory = (
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            )
+            hub = factory.get_wb_manager_hub(shop_id)
+            card = await hub.wb_data_manager.products_manager.get_card_by_nmid(nmid)
     except CardNotFoundInWB:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -181,7 +199,7 @@ async def connect_existing_advs_nmid(
         await state.update_data(
             existing_auto_id=existing_auto_id,
             existing_auction_id=existing_auction_id,
-            card_name=card.name,
+            card_name=card.name,  # ProductCardInfo.name
         )
 
     try:
@@ -238,7 +256,9 @@ async def connect_existing_advs_nmid(
 
     # Только авто без поиска — не считаем валидными; предлагаем продолжить создание (деактивация старых + create)
     if not auction_list and auto_list:
-        await state.set_state(ConnectExistingAdvsStates.waiting_confirm_continue_invalid)
+        await state.set_state(
+            ConnectExistingAdvsStates.waiting_confirm_continue_invalid
+        )
         lines = [
             "Без подключённой поисковой РК кампания не считается валидной.",
             "",
@@ -247,12 +267,14 @@ async def connect_existing_advs_nmid(
         ]
         for a in auto_list:
             lines.append(f"- Авто-РК: {a['id']}, Поисковая РК: не указана")
-        lines.extend([
-            "",
-            "Если вы уверены, что эти кампании не активны, вы можете продолжить создание новой кампании, "
-            "нажав на кнопку «✅ Продолжить создание». В случае продолжения уже существующие кампании "
-            "будут деактивированы в боте во избежание конфликтов и излишних расходов.",
-        ])
+        lines.extend(
+            [
+                "",
+                "Если вы уверены, что эти кампании не активны, вы можете продолжить создание новой кампании, "
+                "нажав на кнопку «✅ Продолжить создание». В случае продолжения уже существующие кампании "
+                "будут деактивированы в боте во избежание конфликтов и излишних расходов.",
+            ]
+        )
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -288,13 +310,17 @@ async def connect_existing_advs_nmid(
                 [
                     InlineKeyboardButton(
                         text="Да, создать обе",
-                        callback_data=callbacks.ConnectExistingCreateBoth(action="confirm").pack(),
+                        callback_data=callbacks.ConnectExistingCreateBoth(
+                            action="confirm"
+                        ).pack(),
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text="Нет",
-                        callback_data=callbacks.ConnectExistingCreateBoth(action="cancel").pack(),
+                        callback_data=callbacks.ConnectExistingCreateBoth(
+                            action="cancel"
+                        ).pack(),
                     )
                 ],
             ]
@@ -330,7 +356,9 @@ async def connect_existing_advs_nmid(
             [
                 InlineKeyboardButton(
                     text="Создать РК",
-                    callback_data=callbacks.ConnectExistingConfirmType2(adv_id=0).pack(),
+                    callback_data=callbacks.ConnectExistingConfirmType2(
+                        adv_id=0
+                    ).pack(),
                 )
             ]
         )
@@ -350,13 +378,17 @@ async def connect_existing_advs_nmid(
                 [
                     InlineKeyboardButton(
                         text="Подтвердить",
-                        callback_data=callbacks.ConnectExistingConfirmType1(adv_id=first["id"]).pack(),
+                        callback_data=callbacks.ConnectExistingConfirmType1(
+                            adv_id=first["id"]
+                        ).pack(),
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text="Создать РК",
-                        callback_data=callbacks.ConnectExistingConfirmType1(adv_id=0).pack(),
+                        callback_data=callbacks.ConnectExistingConfirmType1(
+                            adv_id=0
+                        ).pack(),
                     )
                 ],
             ]
@@ -372,7 +404,9 @@ async def connect_existing_advs_nmid(
                 [
                     InlineKeyboardButton(
                         text="Создать РК",
-                        callback_data=callbacks.ConnectExistingConfirmType1(adv_id=0).pack(),
+                        callback_data=callbacks.ConnectExistingConfirmType1(
+                            adv_id=0
+                        ).pack(),
                     )
                 ],
             ]
@@ -399,7 +433,9 @@ async def connect_existing_confirm_type1(
     if callback.message is None:
         return
     data = await state.get_data()
-    chosen_auction = callback_data.adv_id if callback_data.adv_id else None  # 0 = создать
+    chosen_auction = (
+        callback_data.adv_id if callback_data.adv_id else None
+    )  # 0 = создать
     await state.update_data(chosen_auction_adv_id=chosen_auction)
     if chosen_auction is None:
         # TODO (todo 4): создать аукционную РК
@@ -466,11 +502,54 @@ async def connect_existing_confirm_type2(
     data = await state.get_data()
     chosen_auto = callback_data.adv_id if callback_data.adv_id else None
     if chosen_auto is None:
-        # TODO (todo 4): создать авто РК
-        await bot.send_message(
-            callback.message.chat.id,
-            "Создание авто-РК будет доступно в следующем обновлении. Пока выберите существующую.",
-        )
+        chosen_auction = data.get("chosen_auction_adv_id")
+        nmid = data.get("nmid")
+        shop_id = data.get("shop_id")
+        wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
+        if chosen_auction is None:
+            await bot.send_message(
+                callback.message.chat.id,
+                "Сначала выберите аукционную кампанию.",
+            )
+            return
+        if nmid is None or shop_id is None:
+            await bot.send_message(
+                callback.message.chat.id, "Данные сессии потеряны. Начните заново."
+            )
+            return
+        try:
+            from arq import create_pool
+            from app.arq_workers.arq_redis_settings import arq_redis_settings
+
+            redis_task_pool = await create_pool(arq_redis_settings)
+            await redis_task_pool.enqueue_job(
+                "create_auto_only",
+                nmid,
+                shop_id,
+                chosen_auction,
+                callback.from_user.id,
+            )
+            await bot.send_message(
+                callback.message.chat.id,
+                "Задача на создание авто-РК добавлена в очередь. Ожидайте уведомления.",
+            )
+        except Exception as e:
+            logger.exception(
+                "connect_existing enqueue create_auto_only failed"
+            )
+            await bot.send_message(
+                callback.message.chat.id,
+                f"Не удалось поставить задачу: {e}",
+            )
+        finally:
+            await state.clear()
+        if wb_user_cabinet_original_id is not None:
+            await ShopMenu(
+                bot,
+                int(callback.message.chat.id),
+                state,
+                wb_user_cabinet_original_id,
+            )()
         return
 
     chosen_auction = data.get("chosen_auction_adv_id")
@@ -487,12 +566,12 @@ async def connect_existing_confirm_type2(
     card_name = data.get("card_name")
     if not card_name and shop_id:
         try:
-            access = await super_cabinet_manager.get_access_for_wb_cabinet(
-                wb_cabinet_id
-            )
-            async with ClientSession() as client_session:
-                wb_api = WBApi(access, client_session)
-                card = await wb_api.get_card_by_text(nmid)
+            async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                factory = (
+                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                )
+                hub = factory.get_wb_manager_hub(shop_id)
+                card = await hub.wb_data_manager.products_manager.get_card_by_nmid(nmid)
                 card_name = card.name
         except Exception as e:
             logger.warning("connect_existing could not fetch card for name: %s", e)
@@ -505,18 +584,37 @@ async def connect_existing_confirm_type2(
     auto_name = get_name_for_adv(nmid, card_name, "auto")
     auction_name = get_name_for_adv(nmid, card_name, "auction")
     complex_adv_name = get_name_for_adv(nmid, card_name, "complex")
+    auto_name_trunc = auto_name[:100]
+    auction_name_trunc = auction_name[:100]
 
-    if shop_id:
+    auction_candidates: list[dict] = data.get("auction_candidates") or []
+    auto_candidates: list[dict] = data.get("auto_candidates") or []
+    current_auction_name = next(
+        (c["name"] for c in auction_candidates if c["id"] == chosen_auction),
+        "",
+    )
+    current_auto_name = next(
+        (c["name"] for c in auto_candidates if c["id"] == chosen_auto),
+        "",
+    )
+    need_rename_auction = current_auction_name.strip() != auction_name_trunc.strip()
+    need_rename_auto = current_auto_name.strip() != auto_name_trunc.strip()
+
+    if shop_id and (need_rename_auction or need_rename_auto):
         try:
             from app.core.di.app_container import AppContainer
             from app.core.di.di_manager import DIManager
 
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-                factory = container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                factory = (
+                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                )
                 hub = factory.get_wb_manager_hub(shop_id)
                 pm = hub.wb_data_manager.promotion_manager
-                await pm.rename_campaign(chosen_auto, auto_name[:100])
-                await pm.rename_campaign(chosen_auction, auction_name[:100])
+                if need_rename_auction:
+                    await pm.rename_campaign(chosen_auction, auction_name_trunc)
+                if need_rename_auto:
+                    await pm.rename_campaign(chosen_auto, auto_name_trunc)
         except Exception as e:
             logger.exception("connect_existing rename_campaign failed")
             await bot.send_message(
@@ -525,59 +623,60 @@ async def connect_existing_confirm_type2(
                 "Проверьте названия в кабинете WB.",
             )
 
-    from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+    from app.modules.adv_creator.backend.main_manager import MainAdvManager
 
     async with sm(read_only=False) as session:
         wb_cabinet = await session.get(WBCabinet, wb_cabinet_id)
         if wb_cabinet is None:
             await bot.send_message(callback.message.chat.id, "Кабинет не найден.")
             return
-        stmt = select(AdvSetting).where(
-            AdvSetting.wb_cabinet_id == wb_cabinet_id,
-            AdvSetting.nmids == [nmid],
-        ).limit(1)
-        result = await session.execute(stmt)
-        existing = result.scalar_one_or_none()
-        if existing is not None:
-            existing.adv_id = chosen_auto
-            existing._search_adv_id = chosen_auction
-            existing.name = complex_adv_name
-            existing.active_status = "9"
-            existing.type = 8
-            existing.nmids = [nmid]
-            apply_defaults_to_adv_setting(existing, wb_cabinet)
-            logger.info(
-                "connect_existing updated existing AdvSetting id=%s nmid=%s auction=%s auto=%s",
-                existing.id,
-                nmid,
-                chosen_auction,
-                chosen_auto,
-            )
-        else:
-            adv_setting = AdvSetting(
-                adv_id=chosen_auto,
-                name=complex_adv_name,
-                wb_cabinet_id=wb_cabinet_id,
-                nmids=[nmid],
-                active_status="9",
-                type=8,
-                _search_adv_id=chosen_auction,
-            )
-            apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
-            session.add(adv_setting)
-            logger.info(
-                "connect_existing created new AdvSetting nmid=%s wb_cabinet_id=%s auction=%s auto=%s",
-                nmid,
-                wb_cabinet_id,
-                chosen_auction,
-                chosen_auto,
-            )
+        adv_data = {
+            "adv_id": chosen_auto,
+            "_search_adv_id": chosen_auction,
+            "max_place": 1,
+            "max_cpm": 250,
+            "reset_place": True,
+            "name": complex_adv_name,
+            "bidder_active": False,
+            "wb_cabinet_id": wb_cabinet.id,
+            "parsing_active": False,
+            "bot_active": True,
+            "auto_adv_target_status": False,
+            "auto_update_white_list": False,
+            "auto_update_target_place": False,
+            "active_status": "9",
+            "type": 8,
+            "nmids": [nmid],
+            "hard_min_ctr": 0.1,
+        }
+        insert_stmt = insert(AdvSetting).values(adv_data)
+        on_conflict_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=["adv_id"],
+            set_={k: v for k, v in adv_data.items() if k != "adv_id"},
+        )
+        await session.execute(on_conflict_stmt)
         await session.commit()
+        logger.info(
+            "connect_existing upserted AdvSetting adv_id=%s nmid=%s auction=%s",
+            chosen_auto,
+            nmid,
+            chosen_auction,
+        )
+
+    await MainAdvManager._apply_default_settings_to_adv(chosen_auto)
+    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
     await state.clear()
     await bot.send_message(
         callback.message.chat.id,
         f"Кампании подключены для артикула {nmid}. Аукцион: {chosen_auction}, Авто: {chosen_auto}.",
     )
+    if wb_user_cabinet_original_id is not None:
+        await ShopMenu(
+            bot,
+            int(callback.message.chat.id),
+            state,
+            wb_user_cabinet_original_id,
+        )()
 
 
 @router.callback_query(
@@ -612,7 +711,9 @@ async def connect_existing_create_both(
     nmid = data.get("nmid")
     shop_id = data.get("shop_id")
     if nmid is None or shop_id is None:
-        await bot.send_message(callback.message.chat.id, "Данные сессии потеряны. Начните заново.")
+        await bot.send_message(
+            callback.message.chat.id, "Данные сессии потеряны. Начните заново."
+        )
         return
     try:
         from arq import create_pool
@@ -671,27 +772,36 @@ async def connect_existing_continue_despite_invalid(
     data = await state.get_data()
     nmid = data.get("nmid")
     shop_id = data.get("shop_id")
+    auto_candidates = data.get("auto_candidates") or []
     if nmid is None or shop_id is None:
-        await bot.send_message(callback.message.chat.id, "Данные сессии потеряны. Начните заново.")
+        await bot.send_message(
+            callback.message.chat.id, "Данные сессии потеряны. Начните заново."
+        )
         return
+    if not auto_candidates:
+        await bot.send_message(callback.message.chat.id, "Нет данных об авто-кампании.")
+        return
+    existing_auto_adv_id = int(auto_candidates[0]["id"])
     try:
         from arq import create_pool
         from app.arq_workers.arq_redis_settings import arq_redis_settings
 
         redis_task_pool = await create_pool(arq_redis_settings)
         await redis_task_pool.enqueue_job(
-            "create_complex_advs",
+            "create_search_only",
             nmid,
             shop_id,
-            True,  # hard_mode: деактивировать существующие в боте и создать новые
+            existing_auto_adv_id,
             callback.from_user.id,
         )
         await bot.send_message(
             callback.message.chat.id,
-            "Задача на создание кампаний добавлена в очередь. Существующие кампании по этому артикулу будут деактивированы в боте. Ожидайте уведомления.",
+            "Задача на создание поисковой РК добавлена в очередь. Ожидайте уведомления.",
         )
     except Exception as e:
-        logger.exception("connect_existing enqueue create_complex_advs (continue despite invalid) failed")
+        logger.exception(
+            "connect_existing enqueue create_search_only (continue despite invalid) failed"
+        )
         await bot.send_message(
             callback.message.chat.id,
             f"Не удалось поставить задачу: {e}",
