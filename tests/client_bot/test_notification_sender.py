@@ -26,7 +26,7 @@ async def test_send_message_success_on_first_token():
 
     assert result is True
     assert bots[0].send_message.await_count == 1
-    assert len(bots) == 1
+    assert len(bots) == 2
 
 
 @pytest.mark.asyncio

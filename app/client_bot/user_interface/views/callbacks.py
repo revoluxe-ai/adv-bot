@@ -83,12 +83,6 @@ class CheckSubscribe(CallbackData, prefix="check_subscribe"):
     pass
 
 
-class RefProgram(CallbackData, prefix="ref_program"):
-    """select or new"""
-
-    action: str
-
-
 class OrderSubscribe(CallbackData, prefix="order_subscribe"):
     period_days: int
     price: int
@@ -97,6 +91,54 @@ class OrderSubscribe(CallbackData, prefix="order_subscribe"):
 
 class Start(CallbackData, prefix="start"):
     pass
+
+
+class ConnectExistingAdvs(CallbackData, prefix="connect_existing_advs"):
+    """Подключить существующие рекламные кампании WB к артикулу (NM-id)."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ConnectExistingConfirmType1(CallbackData, prefix="ce_confirm_t1"):
+    """Подтвердить выбор РК по первому типу (аукцион) или создать."""
+
+    adv_id: int = 0  # 0 = нажата «Создать РК»
+
+
+class ConnectExistingConfirmType2(CallbackData, prefix="ce_confirm_t2"):
+    """Подтвердить выбор РК по второму типу (авто) или создать."""
+
+    adv_id: int = 0  # 0 = нажата «Создать РК»
+
+
+class ConnectExistingCreateBoth(CallbackData, prefix="ce_create_both"):
+    """Подтверждение создания обеих кампаний (аукцион + авто) через create_complex_advs."""
+
+    action: str = "confirm"  # confirm | cancel
+
+
+class ConnectExistingContinueDespiteInvalid(CallbackData, prefix="ce_continue_inv"):
+    """Продолжить создание при наличии только авто-РК без поиска (деактивация старых + create_complex_advs)."""
+
+    action: str = "confirm"  # confirm | cancel
+
+
+class ConnectExistingAdvsBackToShop(CallbackData, prefix="ce_back_shop"):
+    """Вернуться в меню магазина из сценария «подключить существующие» (уже есть РК или отмена)."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ShowShopsList(CallbackData, prefix="shops_list"):
+    """Переход на страницу «Мои магазины» (список магазинов)."""
+
+    pass
+
+
+class ShopsListPaginator(CallbackData, prefix="shops_list_pg"):
+    """Переключение страницы списка «Мои магазины»."""
+
+    page: int
 
 
 class Gate(CallbackData, prefix="gate"):

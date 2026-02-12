@@ -15,6 +15,7 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.types import (
     Response,
+    UNSET,
 )
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 
@@ -47,3 +48,17 @@ class CampaignsInfoV2Adapter(BaseSectionAdapter):
                 campaigns.extend(parsed.adverts)
 
         return campaigns
+
+    @retry_decorator(period=1, limit=5)
+    async def get_all_campaigns(self) -> list[GetAdvertsAdvertsItem]:
+        """Fetch all campaigns via GET /api/advert/v2/adverts without ids (fallback when v1 list is empty)."""
+        client = await self.auth_client_handler.get_proxy_client(self)
+        response: Response[GetAdverts] = await with_raise_errors(
+            asyncio_detailed,
+            client,
+            ids=UNSET,
+        )
+        parsed = response.parsed
+        if isinstance(parsed, GetAdverts):
+            return list(parsed.adverts)
+        return []

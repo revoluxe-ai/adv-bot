@@ -22,7 +22,11 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 
 if typing.TYPE_CHECKING:
-    from app.core.mp.wb.api.domain_managers import AnalyticsManager, PromotionManager
+    from app.core.mp.wb.api.domain_managers import (
+        AnalyticsManager,
+        ProductsManager,
+        PromotionManager,
+    )
     from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_sales_funnel_products_history.dto import (
         CommonSaleStatRow,
     )
@@ -36,9 +40,23 @@ class NornQueryStat:
 
 class WBDataManager:
 
-    def __init__(self, analytics_manager: "AnalyticsManager", promotion_manager: "PromotionManager"):
+    def __init__(
+        self,
+        analytics_manager: "AnalyticsManager",
+        promotion_manager: "PromotionManager",
+        products_manager: "ProductsManager",
+    ):
         self._analytics_manager = analytics_manager
         self._promotion_manager = promotion_manager
+        self._products_manager = products_manager
+
+    @property
+    def promotion_manager(self) -> "PromotionManager":
+        return self._promotion_manager
+
+    @property
+    def products_manager(self) -> "ProductsManager":
+        return self._products_manager
 
     async def get_keywords_positions_from_wb_api(
         self,

@@ -393,19 +393,6 @@ async def get_adv_id_keyword_text_to_status(
     return adv_id_keyword_text_to_status
 
 
-@dataclass
-class ReferralStatistic:
-    name: str
-    referrals_count: int
-    total_payments: float
-
-
-@dataclass
-class ReferralLink:
-    name: str
-    link: str
-
-
 # async def get_min_ctr(adv: AdvSetting) -> float:
 #     from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
 #     ctr_manager = MinCtrManager(adv)

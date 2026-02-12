@@ -3,10 +3,13 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import delete, select, update
+from sqlalchemy.orm import joinedload
 
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.handlers.shop_choice_message import ShopsListPage
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
@@ -33,17 +36,27 @@ async def delete_wb_user_cabinet(
         deleted_wb_user_cabinet = deleted_wb_user_cabinet.scalars().first()
         stmt = (
             select(WBUserCabinet)
+            .options(joinedload(WBUserCabinet.wb_cabinet))
             .join(WBUserCabinet.user)
             .filter(User.user_telegram_id == user_telegram_id)
         )
         wb_user_cabinets = await session.execute(stmt)
         wb_user_cabinets = wb_user_cabinets.scalars().all()
+        shop_ids = [uc.wb_cabinet.shop_id for uc in wb_user_cabinets]
+        shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
+            shop_ids
+        )
         await session.commit()
     await bot.send_message(
         callback.message.chat.id, f"Кабинет {deleted_wb_user_cabinet.name} удален"  # type: ignore[attr-defined]
     )
 
-    await messages.ShopChoice(bot, callback.message.chat.id, wb_user_cabinets)()  # type: ignore[attr-defined]
+    await ShopsListPage(
+        bot,
+        callback.message.chat.id,  # type: ignore[union-attr]
+        list(wb_user_cabinets),
+        shop_ids_with_active_tokens,
+    )()
 
     return
 
