@@ -2,7 +2,7 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.command import 
     GetNormqueryStatsCommand,
 )
 
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.models import (
     V0GetNormQueryStatsRequest,
     V0GetNormQueryStatsRequestItemsItem,
 )

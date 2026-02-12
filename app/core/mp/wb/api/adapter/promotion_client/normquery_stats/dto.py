@@ -13,6 +13,7 @@ class NormqueryStat(BaseModel):
     orders: int
     cpc: float | None
     avr_pos: float | None
+    spend: float | None = None
 
 
 class NormqueryStatsDTO(BaseModel):

@@ -17,4 +17,5 @@ class RowStatDTO(BaseModel):
     cpc: float | None
     avr_pos: float | None
     date: date
+    spend: float | None = None
 
