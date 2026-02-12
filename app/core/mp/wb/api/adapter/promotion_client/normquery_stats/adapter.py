@@ -10,13 +10,18 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.get_normquery_stats import (
     command_to_bodies,
 )
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.search_clusters.post_adv_v0_normquery_stats import (
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.api.statistics.post_adv_v0_normquery_stats import (
     asyncio_detailed,
 )
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.raw_response_to_dto import raw_response_to_dto
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import V0GetNormQueryStatsResponse, \
-    V0GetNormQueryStatsItem, V0GetNormQueryStatsRequest
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import Response
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.models import (
+    V0GetNormQueryStatsResponse,
+    V0GetNormQueryStatsItem,
+    V0GetNormQueryStatsRequest,
+)
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.types import (
+    Response,
+)
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
 

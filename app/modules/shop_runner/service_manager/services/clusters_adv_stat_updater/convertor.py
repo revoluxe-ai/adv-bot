@@ -39,6 +39,7 @@ async def norn_query_dto_to_raw_stat_dto(norm_query_stat_dtos: Sequence["Normque
                 cpc=st.cpc,
                 wb_category=nmid_to_category[nmid],
                 date=stat_date,
+                spend=getattr(st, "spend", None),
             )
             rows_dto.append(row_dto)
     return rows_dto

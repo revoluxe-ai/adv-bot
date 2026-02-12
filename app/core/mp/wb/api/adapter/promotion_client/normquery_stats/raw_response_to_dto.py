@@ -1,8 +1,26 @@
-from typing import cast
+from typing import Union, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO, NormqueryStat
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import V0GetNormQueryStatsItem, \
-    V0GetNormQueryStatsItemStat
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.models import (
+    V0GetNormQueryStatsItem,
+    V0GetNormQueryStatsItemStat,
+)
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.types import (
+    UNSET,
+    Unset,
+)
+
+
+def _int_or_default(value: Union[int, float, Unset], default: int = 0) -> int:
+    return default if value is UNSET else int(value)
+
+
+def _nullable_int(value: Union[int, float, Unset]) -> int | None:
+    return None if value is UNSET else int(value)
+
+
+def _nullable_float(value: Union[int, float, Unset]) -> float | None:
+    return None if value is UNSET else float(value)
 
 
 def raw_response_to_dto(raw_stat: V0GetNormQueryStatsItem) -> NormqueryStatsDTO:
@@ -10,15 +28,16 @@ def raw_response_to_dto(raw_stat: V0GetNormQueryStatsItem) -> NormqueryStatsDTO:
     stats: list[V0GetNormQueryStatsItemStat] = raw_stat.stats if raw_stat.stats else []
     result_stats: list[NormqueryStat] = []
     for stat in stats:
-        norm_query = cast(str, stat.norm_query)
-        ctr = cast(float, stat.ctr)
-        cpc = cast(int, stat.cpc)
-        add_to_cart = cast(int, stat.atbs)
-        orders = cast(int, stat.orders)
-        cpm = cast(int, stat.cpm)
-        views = cast(int, stat.views)
-        clicks = cast(int, stat.clicks)
-        avr_pos = cast(float, stat.avg_pos)
+        norm_query = cast(str, stat.norm_query) if stat.norm_query is not UNSET else ""
+        ctr = _nullable_float(stat.ctr) or 0.0
+        cpm = _nullable_float(stat.cpm)
+        add_to_cart = _nullable_int(stat.atbs)
+        orders = _int_or_default(stat.orders)
+        cpc = _nullable_float(stat.cpc)
+        views = _int_or_default(stat.views)
+        clicks = _int_or_default(stat.clicks)
+        avr_pos = _nullable_float(stat.avg_pos)
+        spend = _nullable_float(stat.spend)
         result_stat = NormqueryStat(
             norm_query=norm_query,
             ctr=ctr,
@@ -29,6 +48,7 @@ def raw_response_to_dto(raw_stat: V0GetNormQueryStatsItem) -> NormqueryStatsDTO:
             avr_pos=avr_pos,
             views=views,
             clicks=clicks,
+            spend=spend,
         )
 
         result_stats.append(result_stat)

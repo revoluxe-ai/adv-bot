@@ -37,12 +37,9 @@ def run_generator(spec_path: Path, output_path: Path, meta: str, python_cmd: str
         str(spec_path),
         "--meta",
         meta,
-        "--output-path",
-        str(output_path),
-        "--overwrite",
     ]
     print(f"Running OpenAPI client generator: {' '.join(cmd)}", file=sys.stderr)
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=output_path)
 
 
 def run_transliteration(script_path: Path, input_path: Path, output_path: Path) -> None:
@@ -61,15 +58,17 @@ class SwaggerTarget:
     spec_filename: str
     target_root: Path
     package_name: str
+    skip_transliteration: bool = False
 
 
 SWAGGER_TARGETS: dict[str, SwaggerTarget] = {
     "promotion": SwaggerTarget(
         key="promotion",
-        spec_url="https://dev.wildberries.ru/yaml/ru/08-promotion.yaml",
+        spec_url="https://dev.wildberries.ru/api/swagger/yaml/en/08-promotion.yaml",
         spec_filename="08-promotion.yaml",
         target_root=REPO_ROOT / "app" / "core" / "mp" / "wb" / "api" / "generated" / "promotion",
         package_name="marketing_and_promotions_client",
+        skip_transliteration=True,
     ),
     "products": SwaggerTarget(
         key="products",
@@ -167,24 +166,28 @@ def main() -> int:
 
     download_spec(spec_url, spec_path)
 
-    translit_script = (REPO_ROOT / "scripts" / "translit_yaml.py").resolve()
-    run_transliteration(translit_script, spec_path, translit_spec_path)
+    if config.skip_transliteration:
+        spec_for_generator = spec_path
+    else:
+        translit_script = (REPO_ROOT / "scripts" / "translit_yaml.py").resolve()
+        run_transliteration(translit_script, spec_path, translit_spec_path)
+        spec_for_generator = translit_spec_path
 
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir)
-        run_generator(translit_spec_path, temp_path, args.meta, args.python_cmd)
+        run_generator(spec_for_generator, temp_path, args.meta, args.python_cmd)
         package_root.mkdir(parents=True, exist_ok=True)
         copy_generated_contents(temp_path, package_root)
 
-    print(
+    msg_lines = [
         "Client generation succeeded.",
         f"Spec saved to {spec_path}",
-        f"Transliterated spec saved to {translit_spec_path}",
         f"Generated package placed under {package_root}",
         f"Client version: v{version} (spec key: {target_key})",
-        sep="\n",
-        file=sys.stderr,
-    )
+    ]
+    if not config.skip_transliteration:
+        msg_lines.insert(2, f"Transliterated spec saved to {translit_spec_path}")
+    print("\n".join(msg_lines), file=sys.stderr)
     return 0
 
 
