@@ -1,7 +1,5 @@
 from collections.abc import Callable, Awaitable
 
-from optree import NONE_IS_LEAF
-
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
