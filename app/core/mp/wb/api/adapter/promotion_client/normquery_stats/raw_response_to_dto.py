@@ -12,15 +12,21 @@ from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.m
 
 
 def _int_or_default(value: Union[int, float, Unset], default: int = 0) -> int:
-    return default if value is UNSET else int(value)
+    if isinstance(value, Unset):
+        return default
+    return int(value)
 
 
 def _nullable_int(value: Union[int, float, Unset]) -> int | None:
-    return None if value is UNSET else int(value)
+    if isinstance(value, Unset):
+        return None
+    return int(value)
 
 
 def _nullable_float(value: Union[int, float, Unset]) -> float | None:
-    return None if value is UNSET else float(value)
+    if isinstance(value, Unset):
+        return None
+    return float(value)
 
 
 def raw_response_to_dto(raw_stat: V0GetNormQueryStatsItem) -> NormqueryStatsDTO:
