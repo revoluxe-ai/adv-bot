@@ -1,5 +1,4 @@
 from dependency_injector import containers, providers
-from poetry.console.commands import self
 
 from .corounines_manager.coroutines_manager import CommonCoroutineManager
 from .coroutines.fill_bids_by_positions.di import FillBidsByPositionsContainer
