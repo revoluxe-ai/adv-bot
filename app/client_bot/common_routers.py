@@ -63,6 +63,7 @@ from .user_interface.handlers import (
     auto_add_only_relevant_phrase_toggle,
     auto_budget_watchdog_toggle,
     common_bid_toggle,
+    individual_keywords_target_place_toggle,
     reset_place_setting,
     shop_settings,
     strategy_setting,
@@ -107,6 +108,7 @@ common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(common_budget_mode_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
+common_router.include_routers(individual_keywords_target_place_toggle.router)
 common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)

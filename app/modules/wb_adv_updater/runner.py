@@ -79,10 +79,6 @@ async def process_token_expiration_check() -> None:
             logger.exception('Ошибка процесса уведомлений о токенах')
             await asyncio.sleep(60)
 
-
-
-
-
 async def process_payment_for_advs() -> None:
     from app.modules.billing import (
         process_payment_for_advs as billing_process_payment_for_advs,

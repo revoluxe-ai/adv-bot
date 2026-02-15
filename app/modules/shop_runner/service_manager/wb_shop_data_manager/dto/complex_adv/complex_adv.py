@@ -1,5 +1,6 @@
 from collections.abc import Callable, Awaitable
 
+from optree import NONE_IS_LEAF
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
@@ -51,6 +52,19 @@ class ComplexAdv:
 
     def __repr__(self):
         return str(self._adv_setting.id)
+
+
+    @property
+    def min_target_position(self) -> int:
+        if self._adv_setting.min_target_position is None:
+            return 50
+        return self._adv_setting.min_target_position
+
+    @property
+    def individual_keywords_target_place_mode(self) -> bool:
+        if self._adv_setting.individual_keywords_target_place_mode is None:
+            return False
+        return self._adv_setting.individual_keywords_target_place_mode
 
     @property
     def white_list_mode(self) -> WhiteListMode:

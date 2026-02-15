@@ -21,6 +21,9 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+
+
+from sqlalchemy import text as sql_text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -610,6 +613,19 @@ class AdvSetting(BaseTable):
                                                            default=WhiteListMode.ABOVE_MIN_RATING,
                                                            server_default=WhiteListMode.ABOVE_MIN_RATING.name,)
 
+    individual_keywords_target_place_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=False,
+        server_default=text("false")
+    )
+    min_target_position: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=300,
+        server_default=text('300'),
+    )
+
     __table_args__ = (
         # Составной индекс для основного запроса
         Index(
@@ -718,6 +734,10 @@ class KeywordSetting(BaseTable):
     relevant: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    target_place: Mapped[int] = mapped_column(Integer,
+                                              default=2,
+                                              server_default=sql_text('2'),)
+
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
         Index("ix_text_adv_setting_id", "text", "adv_setting_id"),

@@ -24,8 +24,10 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
-KeywordSettingMessage,
-FilterByQuery
+    KeywordSettingMessage,
+    FilterByQuery,
+    KeywordTargetPlacePrompt,
+    KeywordTargetPlaceUpdated,
 )
 
 __all__ = [
@@ -56,4 +58,6 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+    "KeywordTargetPlacePrompt",
+    "KeywordTargetPlaceUpdated",
 ]

@@ -37,7 +37,14 @@ class TargetPlaceUpExecutor(BaseExecutor):
             ExecutionResult с результатом операции
         """
 
-        current_cpm = utils.get_current_cpm(ctx.complex_adv)
+        complex_adv = ctx.complex_adv
+        if complex_adv.individual_keywords_target_place_mode:
+            return ExecutionResult(
+                success=False,
+                efficiency=0,
+                used_power=0
+            )
+        current_cpm = utils.get_current_cpm(complex_adv)
         if current_cpm is None:
             logger.debug(
                 "[adv_id=%s] TargetPlaceDown: текущая ставка не установлена",

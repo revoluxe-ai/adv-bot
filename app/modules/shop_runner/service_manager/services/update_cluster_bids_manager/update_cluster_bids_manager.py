@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
@@ -236,23 +237,25 @@ class UpdateClusterBidsManager:
         ch_manager = ClickHouseManager()
         texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
 
-        keywords = await adv.get_keywords()
+        keywords: list[CalculatedKeyword] = await adv.get_keywords()
         keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
-
         keywords = [kw for kw in keywords if kw.text in texts_in_this_adv]
-
         map_datas: set[AdvIdItemCalculateData] = set()
         for nmid in adv.nmids:
             for kw in keywords:
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
+                if keyword_target_place := kw.target_place:
+                    target_position = keyword_target_place
+                else:
+                    target_position = adv.target_place
                 map_data = AdvIdItemCalculateData(
                     adv_id=search_adv_id,
                     nmid=nmid,
                     cluster=kw.text,
                     current_position=kw.position,
                     max_cpm=adv.max_user_cpm,
-                    target_position=adv.target_place,
+                    target_position=target_position,
                     step=adv.bid_cpm_step,
                     current_cpm=current_cpm,
                 )
