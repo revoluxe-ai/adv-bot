@@ -169,10 +169,25 @@ class Pricer:
         auto_version = adv.automatic_version or 0
         white_list_active = bool(adv.auto_update_white_list)
         target_place_active = bool(adv.auto_update_target_place)
+        individual_keywords_mode_active = bool(
+            adv.individual_keywords_target_place_mode
+        )
         if auto_version == 1:
-            return white_list_active or target_place_active
+            return any(
+                [
+                    white_list_active,
+                    target_place_active,
+                    individual_keywords_mode_active,
+                ]
+            )
         if auto_version == 2:
-            return white_list_active or target_place_active
+            return any(
+                [
+                    white_list_active,
+                    target_place_active,
+                    individual_keywords_mode_active,
+                ]
+            )
         return False
 
     @staticmethod

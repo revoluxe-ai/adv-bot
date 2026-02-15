@@ -88,9 +88,10 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
     indiv_place_mode = bool(adv_setting.individual_keywords_target_place_mode)
-    indiv_place_text = (
-        "Выкл. индивид. места запросов" if indiv_place_mode else "Вкл. индивид. места запросов"
-    )
+    if indiv_place_mode:
+        indiv_place_text = "Выключить индивид. места запросов"
+    else:
+        indiv_place_text = "$ Включить индивид. места запросов (платно, см. тарифы)"
     indiv_place_callback = IndividualKeywordsTargetPlaceToggle(
         adv_id=adv_setting.adv_id, new_status=not indiv_place_mode
     ).pack()

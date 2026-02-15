@@ -255,13 +255,23 @@ class ComplexAdv:
     @property
     def is_part_auto_setting_active(self) -> bool:
         adv = self._adv_setting
+        individual_keywords_mode_active = bool(
+            adv.individual_keywords_target_place_mode
+        )
         if self.auto_updater_version == 1:
-            return adv.auto_update_white_list or adv.auto_update_target_place
+            return any(
+                [
+                    adv.auto_update_white_list,
+                    adv.auto_update_target_place,
+                    individual_keywords_mode_active,
+                ]
+            )
         elif self.auto_updater_version == 2:
             return any(
                 [
                     adv.auto_update_white_list,
                     adv.auto_update_target_place,
+                    individual_keywords_mode_active,
                 ]
             )
         else:
