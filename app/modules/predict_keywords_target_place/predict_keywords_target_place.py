@@ -97,7 +97,7 @@ class PredictKeywordsTargetPlace:
                     continue
                 else:
                     if bid.timestamp > bid_2.timestamp:
-                        bad_indexes.add(index_2 + index)
+                        bad_indexes.add(index_2 + 1 + index)
                     else:
                         bad_indexes.add(index)
         normalized_items = []
