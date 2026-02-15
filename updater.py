@@ -33,7 +33,7 @@ run_own_process_list: list[AsyncEntry] = [
     #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
     run_update_all_keywords_on_wb,
     run_main_coroutines,
-    common_coroutine.run # pyright: ignore
+    common_coroutine.run # type: ignore # pyright: ignore
 ]
 
 
