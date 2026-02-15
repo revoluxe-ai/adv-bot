@@ -3,7 +3,6 @@ import json
 import logging
 import pstats
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
