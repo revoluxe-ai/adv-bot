@@ -22,10 +22,11 @@ class BidPosition:
 
     @property
     def pay_for_cart(self) -> float:
-        if not self.conv_carts_to_views:
-            raise AttributeError('conv_carts_to_views is None')
-        views_for_cart = 1/self.conv_carts_to_views
-        pay_for_cart = views_for_cart * self.bid/1000
+        conv = self.conv_carts_to_views
+        if conv is None or conv <= 0:
+            return float("inf")
+        views_for_cart = 1 / conv
+        pay_for_cart = views_for_cart * self.bid / 1000
         return pay_for_cart
 
 
