@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS default_db.clusters_adv_stats_test (
     cpc         Float64,
     avr_pos     Float64,
     date        Date,
+    spend       Nullable(Float64) DEFAULT NULL,
     timestamp   DateTime default now()
 ) ENGINE = MergeTree 
 PARTITION BY toYYYYMM(date)
@@ -52,19 +53,19 @@ async def test_get_position_history_returns_positions(clickhouse_client: AsyncCl
     # Колонки: adv_id, nmid, wb_category, norm_query, views, clicks, ctr, cpm, add_to_cart, orders, cpc, avr_pos, date, timestamp
     columns = [
         "adv_id", "nmid", "wb_category", "norm_query", "views", "clicks",
-        "ctr", "cpm", "add_to_cart", "orders", "cpc", "avr_pos", "date", "timestamp",
+        "ctr", "cpm", "add_to_cart", "orders", "cpc", "avr_pos", "date", "spend", "timestamp",
     ]
     
     rows = [
         # Две записи для "платье летнее" за сегодня - должны усредниться до 6.0
-        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 5.0, today, now],
-        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 7.0, today, now],
+        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 5.0, today, 0.0, now],
+        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 7.0, today, 0.0, now],
         # Одна запись для "платье летнее" за вчера
-        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 10.0, yesterday, now - timedelta(days=1)],
+        [1, nmid, "одежда", "платье летнее", 100, 10, 0.1, 50.0, 5, 2, 5.0, 10.0, yesterday, 0.0, now - timedelta(days=1)],
         # Одна запись для "юбка женская" за сегодня
-        [1, nmid, "одежда", "юбка женская", 100, 10, 0.1, 50.0, 5, 2, 5.0, 3.0, today, now],
+        [1, nmid, "одежда", "юбка женская", 100, 10, 0.1, 50.0, 5, 2, 5.0, 3.0, today, 0.0, now],
         # Запись для другого nmid - не должна попасть в результат
-        [1, 999999999, "одежда", "другой товар", 100, 10, 0.1, 50.0, 5, 2, 5.0, 1.0, today, now],
+        [1, 999999999, "одежда", "другой товар", 100, 10, 0.1, 50.0, 5, 2, 5.0, 1.0, today, 0.0, now],
     ]
     
     # Вставляем данные в ClickHouse

@@ -1,7 +1,5 @@
 __all__ = (
     "User",
-    "RefLink",
-    "user_reflink_association",
     "Payment",
     "UserBalancePayment",
     "UserBonusPayment",
@@ -17,7 +15,6 @@ import typing
 from sqlalchemy import (
     BIGINT,
     Boolean,
-    Column,
     DateTime,
     Enum as SAEnum,
     Float,
@@ -25,7 +22,6 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,10 +45,7 @@ if typing.TYPE_CHECKING:
         WBUserCabinet,
     )
 from app.payments.db.models import Payment
-from app.utils.db.assoc_tables import (
-    favorite_advs_association,
-    user_reflink_association,
-)
+from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 
 
@@ -64,9 +57,6 @@ class User(BaseTable):
         "WBUserCabinet", back_populates="user", cascade="all, delete-orphan"
     )
     adv_updater_user_chat_id: Mapped[int] = mapped_column(BIGINT, nullable=True)
-    referral_links: Mapped[list["RefLink"]] = relationship(
-        "RefLink", back_populates="referrer", cascade="all, delete-orphan"
-    )
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
     wb_tokens: Mapped[list["WBToken"]] = relationship(
         "WBToken", back_populates="user", cascade="all, delete-orphan"
@@ -155,16 +145,6 @@ class UserBonusPayment(BaseTable):
         Index("idx_user_bonus_payment_admin", "admin_user_id"),
         Index("idx_user_bonus_payment_operation", "operation_type"),
     )
-
-
-class RefLink(BaseTable):
-    name = Column(String, nullable=False)
-    referrer_id = Column(BIGINT, ForeignKey("user.id"))
-    referrer: Mapped["User"] = relationship("User", back_populates="referral_links")
-    referred_users: Mapped[list["User"]] = relationship(
-        "User", secondary=user_reflink_association, backref="referred_by_links"
-    )
-    created_at = Column(DateTime, server_default=func.now())
 
 
 class Invite(BaseTable):

@@ -791,6 +791,7 @@ async def clickhouse_client(setup_test_database):
             cpc Float64,
             avr_pos Float64,
             date Date,
+            spend Nullable(Float64) DEFAULT NULL,
             timestamp DateTime default now()
         ) ENGINE = MergeTree()
         PARTITION BY toYYYYMM(date)
