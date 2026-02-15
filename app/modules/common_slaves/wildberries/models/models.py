@@ -734,9 +734,10 @@ class KeywordSetting(BaseTable):
     relevant: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
-    target_place: Mapped[int] = mapped_column(Integer,
-                                              default=2,
-                                              server_default=sql_text('2'),)
+    target_place: Mapped[int | None] = mapped_column(Integer,
+                                                     nullable=True,
+                                                     default=None,
+                                              )
 
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
