@@ -142,7 +142,7 @@ WHERE dviews > 0
 
     try:
         async with get_clickhouse_client() as client:
-            await client.command(query)
+            await client.query(query)
         print(f"Successfully inserted adv deltas from {day_from_str} to {day_to_str}.")
     except Exception as e:
         print(f"Error inserting adv deltas: {e}")
