@@ -55,7 +55,7 @@ class ComplexAdv:
     @property
     def min_target_position(self) -> int:
         if self._adv_setting.min_target_position is None:
-            return 50
+            return 300
         return self._adv_setting.min_target_position
 
     @property
