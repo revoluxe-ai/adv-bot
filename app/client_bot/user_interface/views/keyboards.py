@@ -779,7 +779,7 @@ def get_keywords_setting_keyboard(
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
 
-        text += f"({round(keyword.rating_by_orders * 1000, 2)})"
+        text += f"({round(keyword.rating_by_orders * 1000, 2)})({round(keyword.pay_for_order_by_current_cpm, 2)})"
 
         inline_keyboard = [
             InlineKeyboardButton(
