@@ -70,14 +70,10 @@ async def test_gate_invite_successful_activation(
             res.rowcount = 1
         elif call_count[0] == 4:
             res.rowcount = 1
-        elif call_count[0] == 5:
             user.passed_gate = True
             user.passed_gate_reason = PassedGateReason.INVITE_CODE_ENTRY
             user.passed_gate_at = datetime.datetime.now(UTC).replace(tzinfo=None)
             user.wb_user_cabinets = []
-            res.unique.return_value = res
-            res.scalar_one_or_none.return_value = user
-            return res
         else:
             res.scalar_one_or_none.return_value = None
         return res

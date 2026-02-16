@@ -79,6 +79,10 @@ class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status")
     keyword_setting_original_id: int
 
 
+class ChangeKeywordTargetPlace(CallbackData, prefix="change_keyword_target_place"):
+    keyword_setting_original_id: int
+
+
 class CheckSubscribe(CallbackData, prefix="check_subscribe"):
     pass
 
@@ -366,6 +370,13 @@ class ChangeAuctionBidderActiveStatus(
 
 class ChangeCommonBidInSearchAdvStatus(
     CallbackData, prefix="change_common_bid_in_search_adv_status"
+):
+    adv_id: int
+    new_status: bool
+
+
+class IndividualKeywordsTargetPlaceToggle(
+    CallbackData, prefix="indiv_keywords_target_place_toggle"
 ):
     adv_id: int
     new_status: bool

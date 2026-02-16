@@ -27,10 +27,12 @@ class TasksManager:
         await self._stop_workers()
 
     async def run_queue(self, stop_event: asyncio.Event) -> None:
+        logger.debug(f"Starting task queue with {self._max_workers} workers")
         self._start_workers()
         try:
             _ = await stop_event.wait()
         finally:
+            logger.debug("Stopping task queue")
             await self._stop_workers()
 
     async def add_task(self, handler: Callable[[], Awaitable[Any]]) -> asyncio.Future[Any]:

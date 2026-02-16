@@ -72,9 +72,34 @@ async def test_create_complex_advs_upsert_logic(
             mock_session_context_manager.__aexit__.return_value = None
             return mock_session_context_manager
 
+        # Подменяем DIManager.create, чтобы использовать тестовый хаб вместо реального
+        di_manager_cm = AsyncMock()
+        container = MagicMock()
+        module_resources = MagicMock()
+        factory_container = MagicMock()
+        factory = MagicMock()
+        hub_mock = MagicMock()
+        hub_mock.wb_data_manager = MagicMock()
+        hub_mock.wb_data_manager.products_manager = MagicMock()
+        target_card = MagicMock()
+        target_card.name = "Тестовая карточка"
+        hub_mock.wb_data_manager.products_manager.get_card_by_nmid_for_db = AsyncMock(
+            return_value=(None, target_card)
+        )
+        factory_container.wb_manager_hub_factory.return_value = factory
+        factory.get_wb_manager_hub.return_value = hub_mock
+        module_resources.wb_manager_hub_factory_container = factory_container
+        container.module_resources = module_resources
+        di_manager_cm.__aenter__.return_value = container
+        di_manager_cm.__aexit__.return_value = None
+        mock_di_create = AsyncMock(return_value=di_manager_cm)
+
         with patch(
             "app.modules.adv_creator.backend.main_manager.sm",
             new=mock_get_async_session_maker,
+        ), patch(
+            "app.modules.adv_creator.backend.main_manager.DIManager.create",
+            new=mock_di_create,
         ):
             manager = MainAdvManager(access_mock, MagicMock())
             # Seed WBCabinet in test DB so __create_complex_advs can select it by id.
