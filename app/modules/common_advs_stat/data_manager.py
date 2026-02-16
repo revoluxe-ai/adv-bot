@@ -16,6 +16,9 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.shared.domains.wb.utils.additional_cost_per_order import (
+    compute_additional_cost_per_order,
+)
 
 _sm = get_async_session_maker
 
@@ -144,7 +147,7 @@ class CommonAdvsStatDataManager:
             - spend_for_keywords_in_auto_adv
         )
 
-        # Себестоимость заказа из доп. показов за последние 7 дней
+        # Себестоимость заказа из доп. показов за последние 7 дней (общая формула в shared)
         end_date_7 = datetime.now()
         start_date_7 = end_date_7 - timedelta(days=6)
         auto_stat_7d = await full_wb_adv_stat.get_stats_by_last_days(
@@ -157,11 +160,11 @@ class CommonAdvsStatDataManager:
             [adv_setting.adv_id], start_date_7, end_date_7
         )
         orders_kw_7d = sum(t[1] for t in kw_views_orders_7d.values())
-        addition_spend_7d = auto_stat_7d.spend - spend_kw_7d
-        addition_spend_7d = max(0.0, addition_spend_7d)
-        addition_orders_7d = max(0, auto_stat_7d.orders - orders_kw_7d) + 1
-        cost_per_order_from_additional_last_week: float  = (
-            addition_spend_7d / addition_orders_7d
+        cost_per_order_from_additional_last_week = compute_additional_cost_per_order(
+            auto_stat_7d.spend,
+            auto_stat_7d.orders,
+            spend_kw_7d,
+            orders_kw_7d,
         )
 
         from app.modules.wb_adv_updater import phrases_processor

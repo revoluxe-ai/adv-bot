@@ -5,6 +5,9 @@ from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
+from app.shared.domains.wb.utils.additional_cost_per_order import (
+    compute_additional_cost_per_order,
+)
 from app.shared.domains.wb.utils.cost_resolver import (
     resolve_target_cost_from_summary,
 )
@@ -112,11 +115,12 @@ class AutoAdvActiveControlService:
         )
 
         orders_kw = sum(orders for _, orders in kw_views_orders.values())
-        addition_spend = auto_stat.spend - spend_kw
-        addition_spend = max(0.0, addition_spend)
-        addition_orders = max(0, auto_stat.orders - orders_kw) + 1
-
-        return addition_spend / addition_orders
+        return compute_additional_cost_per_order(
+            auto_stat.spend,
+            auto_stat.orders,
+            spend_kw,
+            orders_kw,
+        )
 
     async def _auto_campaign_handler(
         self,
