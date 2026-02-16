@@ -110,6 +110,7 @@ class AutoAdvActiveControlService:
 
         orders_kw = sum(orders for _, orders in kw_views_orders.values())
         addition_spend = auto_stat.spend - spend_kw
+        addition_spend = max(0.0, addition_spend)
         addition_orders = max(0, auto_stat.orders - orders_kw) + 1
 
         return addition_spend / addition_orders
