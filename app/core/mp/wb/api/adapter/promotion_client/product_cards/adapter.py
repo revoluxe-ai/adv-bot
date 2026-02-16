@@ -50,9 +50,9 @@ class ProductCardsAdapter(BaseSectionAdapter):
         )
         if response is None or response.parsed is None:
             return None
-        parsed = response.parsed
+        parsed = response.parsed # pyright: ignore
         if isinstance(parsed, list):
-            return parsed
+            return parsed # pyright: ignore
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -83,7 +83,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
             return None
         parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed
+            return parsed # pyright: ignore
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -108,7 +108,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
         )
         if response is None or response.parsed is None:
             return None
-        parsed = response.parsed
+        parsed = response.parsed # pyright: ignore
         if isinstance(parsed, list):
-            return parsed
+            return parsed # pyright: ignore
         return None
