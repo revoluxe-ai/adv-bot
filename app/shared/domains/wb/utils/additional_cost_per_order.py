@@ -16,7 +16,7 @@ def compute_additional_cost_per_order(
 
     Формула:
     - addition_spend = max(0, auto_stat_spend - keyword_spend)
-    - addition_orders = max(0, auto_stat_orders - keyword_orders) + 1  (+1 избегает деления на 0)
+    - addition_orders = max(1, auto_stat_orders - keyword_orders)  (не меньше 1 — избегаем деления на 0)
     - return addition_spend / addition_orders
 
     Args:

@@ -488,7 +488,7 @@ async def test_average_order_cost_uses_additional_views():
     ) as views_orders_mock:
         result = await AutoAdvActiveControlService._get_average_order_cost(adv_id=42)
 
-    assert result == pytest.approx((1000.0 - 400.0) / (max(0, 10 - orders_kw) + 1))
+    assert result == pytest.approx((1000.0 - 400.0) / max(1, 10 - orders_kw))
     stats_mock.assert_awaited_once()
     spend_mock.assert_awaited_once()
     views_orders_mock.assert_awaited_once()
