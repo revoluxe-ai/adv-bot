@@ -34,6 +34,10 @@ from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
+from app.client_bot.user_interface.utils import (
+    format_target_place_display,
+    get_effective_keyword_target_place,
+)
 from ..helpers.wb_user_cabinet import get_wb_user_cabinet_id_or_none
 from ..views import callbacks, messages
 
@@ -837,20 +841,17 @@ async def change_keyword_target_place(
             )
         return
 
-    target_place_value = getattr(keyword_setting, "target_place", None)
+    value, source = get_effective_keyword_target_place(
+        keyword_setting,
+        keyword_setting.adv_setting,
+    )
+    current_value_display, _ = format_target_place_display(value, source)
+
     adv_default_value = (
         keyword_setting.adv_setting.max_place
         if keyword_setting.adv_setting
         else None
     )
-
-    if isinstance(target_place_value, int) and target_place_value > 0:
-        current_value_display = str(target_place_value)
-    elif isinstance(adv_default_value, int) and adv_default_value > 0:
-        current_value_display = str(adv_default_value)
-    else:
-        current_value_display = "Не задана"
-
     adv_default_display = (
         str(adv_default_value)
         if isinstance(adv_default_value, int) and adv_default_value > 0

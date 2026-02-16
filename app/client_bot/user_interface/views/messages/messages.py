@@ -28,6 +28,10 @@ from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
     TextWithKeyboardPagination,
 )
+from app.client_bot.user_interface.utils import (
+    format_target_place_display,
+    get_effective_keyword_target_place,
+)
 from app.client_bot.user_interface.views import callbacks, keyboards
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
@@ -734,18 +738,6 @@ class KeywordSettingMessage(TextWithKeyboard):
     def calculated_keyword(self) -> CalculatedKeyword:
         return self._calculated_keyword
 
-    def _get_target_place_display(self) -> tuple[str, str]:
-        target_place = getattr(self._keyword_setting, "target_place", None)
-        if isinstance(target_place, int) and target_place > 0:
-            return str(target_place), "индивидуальная"
-
-        adv_target_place = self._adv_setting.max_place
-        if isinstance(adv_target_place, int) and adv_target_place > 0:
-            return str(adv_target_place), "по кампании"
-
-        return "Не задана", "по умолчанию"
-
-
     @staticmethod
     def get_str_rus_hard_status(int_hard_status: int) -> str:
         if int_hard_status == 0:
@@ -767,7 +759,12 @@ class KeywordSettingMessage(TextWithKeyboard):
         nmids = list(self._adv_setting.nmids)
         nmids = [str(nmid) for nmid in nmids]
         nmids_str = ", ".join(nmids)
-        target_place_value, target_place_source = self._get_target_place_display()
+        value, source = get_effective_keyword_target_place(
+            self._keyword_setting, self._adv_setting
+        )
+        target_place_value, target_place_source = format_target_place_display(
+            value, source
+        )
         text = (
             f"📦 *Артикул:* {nmids_str}\n"
             f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"

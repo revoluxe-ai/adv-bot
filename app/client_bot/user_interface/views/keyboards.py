@@ -5,6 +5,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
+from app.client_bot.user_interface.utils import (
+    format_target_place_display,
+    get_effective_keyword_target_place,
+)
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
@@ -1136,18 +1140,8 @@ def get_keyword_setting_keyboard(
         ]
         buttons.append(button)
 
-    target_place_val = getattr(keyword, "target_place", None)
-    if isinstance(target_place_val, int) and target_place_val > 0:
-        target_place_value = str(target_place_val)
-        source_text = "индивидуальная"
-    else:
-        adv_tp = adv_setting.max_place
-        if isinstance(adv_tp, int) and adv_tp > 0:
-            target_place_value = str(adv_tp)
-            source_text = "по кампании"
-        else:
-            target_place_value = "Не задана"
-            source_text = "по умолчанию"
+    value, source = get_effective_keyword_target_place(keyword, adv_setting)
+    target_place_value, source_text = format_target_place_display(value, source)
     buttons.append(
         [
             InlineKeyboardButton(
