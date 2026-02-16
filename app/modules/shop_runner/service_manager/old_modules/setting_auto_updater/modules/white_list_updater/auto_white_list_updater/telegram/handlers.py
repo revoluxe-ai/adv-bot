@@ -1,9 +1,11 @@
 from aiogram import Bot, Router
 from aiogram.types import CallbackQuery
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
+from sqlalchemy import update
 
-from app.modules import balance_manager
+from app.modules.billing.paid_option_check import (
+    format_insufficient_funds_message,
+    get_adv_setting_and_check_funds_for_enabling,
+)
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -24,43 +26,28 @@ async def set_new_status_for_auto_update_list_setting(
 
     assert callback_query.message
     chat_id = callback_query.message.chat.id
+    pricer = Pricer()
 
     async with sm() as session:
         if new_status:
-            stmt = (
-                select(AdvSetting)
-                .options(selectinload(AdvSetting.wb_cabinet))
-                .where(AdvSetting.id == adv_setting_original_id)
-            )
-            adv_setting = await session.scalar(stmt)
-            if adv_setting is None:
-                await bot.send_message(chat_id, "РК не найдена")
-                return
-            if adv_setting.wb_cabinet is None:
-                await bot.send_message(
-                    chat_id, "Не удалось найти кабинет для кампании"
-                )
-                return
-            balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
-                adv_setting.wb_cabinet.id
-            )
-            available = balance + bonus
-            pricer = Pricer()
-            required_price = await pricer.get_price_for_day_if_enabling_auto_option(
+            _ = await get_adv_setting_and_check_funds_for_enabling(
                 session,
-                adv_setting.wb_cabinet.shop_id or "",
-                adv_setting.id,
-                override_white_list=True,
-            )
-            if available < required_price:
-                await bot.send_message(
+                adv_setting_id=adv_setting_original_id,
+                send_adv_not_found=lambda: bot.send_message(
+                    chat_id, "РК не найдена"
+                ),
+                send_no_cabinet=lambda: bot.send_message(
+                    chat_id, "Не удалось найти кабинет для кампании"
+                ),
+                get_required_price=lambda s, sid, aid: pricer.get_price_for_day_if_enabling_auto_option(
+                    s, sid, aid, override_white_list=True
+                ),
+                send_insufficient_funds=lambda req, av: bot.send_message(
                     chat_id,
-                    (
-                        f"Недостаточно средств для включения настройки: "
-                        f"нужно {required_price:.2f} ₽, доступно {available:.2f} ₽.\n"
-                        "Пополните баланс и попробуйте снова."
-                    ),
-                )
+                    format_insufficient_funds_message(req, av),
+                ),
+            )
+            if _ is None:
                 return
 
         stmt = (
