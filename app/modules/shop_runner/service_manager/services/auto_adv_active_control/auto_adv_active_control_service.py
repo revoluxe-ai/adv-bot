@@ -95,18 +95,27 @@ class AutoAdvActiveControlService:
         )
     @staticmethod
     async def _get_average_order_cost(adv_id: int) -> float | None:
-        now = datetime.now(MSK_TZ)
-        start_date = (now - timedelta(days=6)).replace(
-            hour=0, minute=0, second=0, microsecond=0
+        end_date = datetime.now(MSK_TZ)
+        start_date = end_date - timedelta(days=6)
+
+        auto_stat = await full_wb_adv_stat.get_stats_by_last_days(
+            [adv_id], start_date, end_date
         )
-        stats = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_id], start_date, now
+        spend_kw = await full_wb_adv_stat.get_keywords_spend(
+            [adv_id], start_date, end_date
         )
-        if stats.orders == 0:
-            orders = 1
-        else:
-            orders = stats.orders
-        return stats.spend / orders
+        kw_views_orders = await full_wb_adv_stat.get_keywords_views_orders_by_days(
+            [adv_id], start_date, end_date
+        )
+
+        orders_kw = sum(orders for _, orders in kw_views_orders.values())
+        addition_spend = auto_stat.spend - spend_kw
+        addition_orders = max(0, auto_stat.orders - orders_kw) + 1
+
+        if addition_orders <= 0:
+            return None
+
+        return addition_spend / addition_orders
 
     @staticmethod
     def _resolve_target_cost(summary: PlanFactSummary | None) -> float | None:
