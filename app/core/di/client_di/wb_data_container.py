@@ -14,7 +14,6 @@ from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 
 from app.core.mp.wb.api.domain_managers import (
     AnalyticsManager,
-    ProductsManager,
     PromotionManager,
 )
 from app.core.mp.wb.api.managers import WBDataManager, WBModifier
