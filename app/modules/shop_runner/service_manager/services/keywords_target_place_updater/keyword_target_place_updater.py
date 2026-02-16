@@ -4,6 +4,10 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class KeywordTargetPlaceUpdater:
 
@@ -28,7 +32,12 @@ class KeywordTargetPlaceUpdater:
             keywords = result.scalars().all()
             for keyword in keywords:
                 text = keyword.text
-                target_place = target_places.get(text.lower(), 2)
+                target_place = target_places.get(text.lower())
+                if target_place is None:
+                    # TODO: Продумать уведомление об ошибке (срочно настроить сбор логов)
+                    logger.error("No target place found for %s , adv_id: %s Set Default place = 2" ,
+                                 text, adv.adv_id)
+                    target_place = 2 # 2 - по опыту чаще всего наиболее рентабельное место
                 keyword.target_place = target_place
             await session.commit()
 
