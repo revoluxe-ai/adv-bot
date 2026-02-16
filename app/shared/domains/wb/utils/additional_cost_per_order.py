@@ -29,5 +29,5 @@ def compute_additional_cost_per_order(
         Себестоимость заказа из доп. показов (всегда >= 0, знаменатель не меньше 1).
     """
     addition_spend = max(0.0, auto_stat_spend - keyword_spend)
-    addition_orders = max(0, auto_stat_orders - keyword_orders) + 1
+    addition_orders = max(1, auto_stat_orders - keyword_orders)
     return addition_spend / addition_orders
