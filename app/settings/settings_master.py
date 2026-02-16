@@ -638,6 +638,13 @@ class Settings:
             return True
         return False
 
+    @property
+    def GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE(self) -> int:
+        value = os.getenv("GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE")
+        if not value:
+            return 2
+        return int(value)
+
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

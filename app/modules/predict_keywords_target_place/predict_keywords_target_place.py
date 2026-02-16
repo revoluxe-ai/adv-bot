@@ -4,7 +4,10 @@ from zoneinfo import ZoneInfo
 from .clickhouse_manager import ClickHouseManager
 from .clickhouse_manager.dto import ConvCartToViewsOnPosition
 from .clickhouse_manager.dto.bid_position import BidPosition
+from ...settings import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class PredictKeywordsTargetPlace:
     def __init__(self, clickhouse_manager: ClickHouseManager):
@@ -37,6 +40,10 @@ class PredictKeywordsTargetPlace:
                                                                 positions_size=positions_size)
         result_target_positions: dict[str, int] = {}
         for keyword, positions in bids_for_positions.items():
+            if not positions:
+                logger.error('Пустой список позиций для прогноза целевой позиции')
+                result_target_positions[keyword] = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
+                continue
             best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
             result_target_positions[keyword] = best_position.position
         return result_target_positions
