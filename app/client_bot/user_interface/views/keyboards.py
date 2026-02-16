@@ -19,6 +19,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeRecSystemModeStatus,
     ChangeCommonBidInSearchAdvStatus,
+    IndividualKeywordsTargetPlaceToggle,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
@@ -85,6 +86,21 @@ def get_adv_setting_keyboard(
     )
 
     _ = builder.row(button)
+
+    indiv_place_mode = bool(adv_setting.individual_keywords_target_place_mode)
+    if indiv_place_mode:
+        indiv_place_text = "Выключить индивид. места запросов"
+    else:
+        indiv_place_text = "$ Включить индивид. места запросов (платно, см. тарифы)"
+    indiv_place_callback = IndividualKeywordsTargetPlaceToggle(
+        adv_id=adv_setting.adv_id, new_status=not indiv_place_mode
+    ).pack()
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=indiv_place_text,
+            callback_data=indiv_place_callback,
+        )
+    )
 
     white_list_button = InlineKeyboardButton(
         text="Режимы Управления Белым Списком",
@@ -766,7 +782,6 @@ def get_keywords_setting_keyboard(
         orders = keyword.orders
         total_orders = keyword.total_orders
         total_orders = f"({add_to_cart}-{orders}-{total_orders})"
-
         text += total_orders
         text += "|"
         if keyword.position:
@@ -775,6 +790,13 @@ def get_keywords_setting_keyboard(
             text += ">"
         else:
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
+
+        if adv_setting.individual_keywords_target_place_mode:
+            if target_place := keyword.target_place:
+                text += f'->{target_place}'
+            else:
+                text += f'->Н>'
+
         cpm = int(keyword.cpm + 0.5) # плата за показы
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
@@ -782,11 +804,14 @@ def get_keywords_setting_keyboard(
                                 if keyword.pay_for_order_by_current_cpm != float('inf') else 'Б'
         text += f"({round(keyword.rating_by_orders * 1000, 2)})({pay_for_order})"
 
+        keyword_setting_original_id = keyword.keyword_setting_original_id
+        assert keyword_setting_original_id
+
         inline_keyboard = [
             InlineKeyboardButton(
                 text=text,
                 callback_data=callbacks.SettingKeyword(
-                    keyword_setting_original_id=keyword.keyword_setting_original_id,
+                    keyword_setting_original_id=keyword_setting_original_id,
                 ).pack(),
             )
         ]
@@ -1110,6 +1135,29 @@ def get_keyword_setting_keyboard(
             )
         ]
         buttons.append(button)
+
+    target_place_val = getattr(keyword, "target_place", None)
+    if isinstance(target_place_val, int) and target_place_val > 0:
+        target_place_value = str(target_place_val)
+        source_text = "индивидуальная"
+    else:
+        adv_tp = adv_setting.max_place
+        if isinstance(adv_tp, int) and adv_tp > 0:
+            target_place_value = str(adv_tp)
+            source_text = "по кампании"
+        else:
+            target_place_value = "Не задана"
+            source_text = "по умолчанию"
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text=f"Целевая позиция: {target_place_value} ({source_text}) — Изменить",
+                callback_data=callbacks.ChangeKeywordTargetPlace(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                ).pack(),
+            )
+        ]
+    )
 
     buttons.append(
         [

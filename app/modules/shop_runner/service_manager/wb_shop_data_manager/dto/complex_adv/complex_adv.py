@@ -1,6 +1,5 @@
 from collections.abc import Callable, Awaitable
 
-
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
@@ -51,6 +50,19 @@ class ComplexAdv:
 
     def __repr__(self):
         return str(self._adv_setting.id)
+
+
+    @property
+    def min_target_position(self) -> int:
+        if self._adv_setting.min_target_position is None:
+            return 300
+        return self._adv_setting.min_target_position
+
+    @property
+    def individual_keywords_target_place_mode(self) -> bool:
+        if self._adv_setting.individual_keywords_target_place_mode is None:
+            return False
+        return self._adv_setting.individual_keywords_target_place_mode
 
     @property
     def white_list_mode(self) -> WhiteListMode:
@@ -241,17 +253,18 @@ class ComplexAdv:
     @property
     def is_part_auto_setting_active(self) -> bool:
         adv = self._adv_setting
-        if self.auto_updater_version == 1:
-            return adv.auto_update_white_list or adv.auto_update_target_place
-        elif self.auto_updater_version == 2:
+        individual_keywords_mode_active = bool(
+            adv.individual_keywords_target_place_mode
+        )
+        if self.auto_updater_version in (1, 2):
             return any(
                 [
                     adv.auto_update_white_list,
                     adv.auto_update_target_place,
+                    individual_keywords_mode_active,
                 ]
             )
-        else:
-            raise RuntimeError("Not Implemented for this version")
+        raise RuntimeError("Not Implemented for this version")
 
     @property
     def adv_setting(self) -> AdvSetting:

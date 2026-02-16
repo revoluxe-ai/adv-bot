@@ -734,6 +734,17 @@ class KeywordSettingMessage(TextWithKeyboard):
     def calculated_keyword(self) -> CalculatedKeyword:
         return self._calculated_keyword
 
+    def _get_target_place_display(self) -> tuple[str, str]:
+        target_place = getattr(self._keyword_setting, "target_place", None)
+        if isinstance(target_place, int) and target_place > 0:
+            return str(target_place), "индивидуальная"
+
+        adv_target_place = self._adv_setting.max_place
+        if isinstance(adv_target_place, int) and adv_target_place > 0:
+            return str(adv_target_place), "по кампании"
+
+        return "Не задана", "по умолчанию"
+
 
     @staticmethod
     def get_str_rus_hard_status(int_hard_status: int) -> str:
@@ -756,11 +767,13 @@ class KeywordSettingMessage(TextWithKeyboard):
         nmids = list(self._adv_setting.nmids)
         nmids = [str(nmid) for nmid in nmids]
         nmids_str = ", ".join(nmids)
+        target_place_value, target_place_source = self._get_target_place_display()
         text = (
             f"📦 *Артикул:* {nmids_str}\n"
             f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"
             f"🔄 *Текущий статус ключа:* {calculated_keyword.status}\n\n"
-            f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n\n"
+            f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n"
+            f"🎯 *Целевая позиция:* {target_place_value} ({target_place_source})\n\n"
             f"📊 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
             f"📈 *Фактический CTR:* {self.fact_ctr * 100:.2f}%\n"
@@ -792,6 +805,30 @@ class KeywordSettingMessage(TextWithKeyboard):
             self._adv_setting,
             self._page,
         )
+
+
+class KeywordTargetPlacePrompt(Text):
+    def __init__(self, bot: Bot, chat_id: int, current_value: str, adv_default: str):
+        super().__init__(bot, chat_id)
+        self._current_value = current_value
+        self._adv_default = adv_default
+
+    @property
+    def text(self) -> str:
+        return (
+            f"Текущая целевая позиция: {self._current_value}. "
+            f"Введите новое целое число (0 — использовать позицию кампании {self._adv_default})."
+        )
+
+
+class KeywordTargetPlaceUpdated(Text):
+    def __init__(self, bot: Bot, chat_id: int, new_value: str):
+        super().__init__(bot, chat_id)
+        self._new_value = new_value
+
+    @property
+    def text(self) -> str:
+        return f"Целевая позиция обновлена: {self._new_value}."
 
 
 class GetNameOfNewAdvCompany(Text):

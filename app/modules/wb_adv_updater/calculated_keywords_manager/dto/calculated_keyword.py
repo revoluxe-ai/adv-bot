@@ -24,6 +24,10 @@ class CalculatedKeyword(BaseModel):
         return self.spend / self.clicks
 
     @property
+    def target_place(self) -> int | None:
+        return self.keyword_setting.target_place
+
+    @property
     def pay_for_order_by_current_cpm(self) -> float:
         if self.rating_by_orders == 0:
             return float('inf')

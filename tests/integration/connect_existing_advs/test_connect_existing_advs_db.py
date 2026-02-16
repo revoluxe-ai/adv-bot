@@ -75,6 +75,7 @@ async def  test_connect_existing_confirm_type2_creates_adv_setting_in_db(
             "nmid": nmid,
             "wb_cabinet_id": wb_cabinet.id,
             "chosen_auction_adv_id": chosen_auction_id,
+            "card_name": f"NM {nmid}",
         }
     )
     state.clear = AsyncMock()
@@ -102,6 +103,7 @@ async def  test_connect_existing_confirm_type2_creates_adv_setting_in_db(
     assert row is not None
     assert row.adv_id == chosen_auto_id
     assert row._search_adv_id == chosen_auction_id
+    # TODO: Тут явно какая-то ошибка
     assert row.name == f"{nmid} {nmid}"
     assert row.nmids == [nmid]
     assert row.active_status == "9"
