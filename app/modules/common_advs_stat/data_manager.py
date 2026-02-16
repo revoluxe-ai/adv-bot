@@ -158,6 +158,7 @@ class CommonAdvsStatDataManager:
         )
         orders_kw_7d = sum(t[1] for t in kw_views_orders_7d.values())
         addition_spend_7d = auto_stat_7d.spend - spend_kw_7d
+        addition_spend_7d = max(0.0, addition_spend_7d)
         addition_orders_7d = max(0, auto_stat_7d.orders - orders_kw_7d) + 1
         cost_per_order_from_additional_last_week: float  = (
             addition_spend_7d / addition_orders_7d
