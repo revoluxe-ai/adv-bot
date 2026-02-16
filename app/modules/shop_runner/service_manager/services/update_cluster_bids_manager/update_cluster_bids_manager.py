@@ -245,7 +245,7 @@ class UpdateClusterBidsManager:
             for kw in keywords:
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
-                if keyword_target_place := kw.target_place:
+                if adv.individual_keywords_target_place_mode and (keyword_target_place := kw.target_place):
                     target_position = keyword_target_place
                 else:
                     target_position = adv.target_place
