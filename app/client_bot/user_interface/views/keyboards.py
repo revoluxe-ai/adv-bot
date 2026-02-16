@@ -1135,16 +1135,16 @@ def get_keyword_setting_keyboard(
 
     target_place_val = getattr(keyword, "target_place", None)
     if isinstance(target_place_val, int) and target_place_val > 0:
-        target_place_value, uses_campaign_default = str(target_place_val), False
+        target_place_value = str(target_place_val)
+        source_text = "индивидуальная"
     else:
         adv_tp = adv_setting.max_place
-        target_place_value = (
-            str(adv_tp)
-            if isinstance(adv_tp, int) and adv_tp > 0
-            else "Не задана"
-        )
-        uses_campaign_default = True
-    source_text = "по кампании" if uses_campaign_default else "индивидуальная"
+        if isinstance(adv_tp, int) and adv_tp > 0:
+            target_place_value = str(adv_tp)
+            source_text = "по кампании"
+        else:
+            target_place_value = "Не задана"
+            source_text = "по умолчанию"
     buttons.append(
         [
             InlineKeyboardButton(
