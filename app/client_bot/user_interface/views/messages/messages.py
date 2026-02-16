@@ -770,10 +770,12 @@ class KeywordSettingMessage(TextWithKeyboard):
 
 
         text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders * 1000, 2)}\n"
+        text += f'Себестоимость заказа: {round(self._calculated_keyword.pay_for_order_by_current_cpm, 2)}\n'
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
             text += f"Выше конв. рек.: {rec_str}\n"
+
 
         pos = self.position
         if pos > 0:
