@@ -77,13 +77,6 @@ SWAGGER_TARGETS: dict[str, SwaggerTarget] = {
         target_root=REPO_ROOT / "app" / "core" / "mp" / "wb" / "api" / "generated" / "products",
         package_name="content_products_client",
     ),
-    "products": SwaggerTarget(
-        key="products",
-        spec_url="https://dev.wildberries.ru/api/swagger/yaml/ru/02-products.yaml",
-        spec_filename="02-products.yaml",
-        target_root=REPO_ROOT / "app" / "core" / "mp" / "wb" / "api" / "generated" / "products",
-        package_name="content_products_client",
-    ),
 }
 
 
