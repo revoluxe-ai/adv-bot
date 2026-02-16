@@ -219,10 +219,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
             rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
-        def _above_rec_conversion(pre_kw: PreCalculatedKeyword) -> bool | None:
+        def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
-            return pre_kw.cluster_stat.conversion_without_cpm > rec_conversion
+            return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
 
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
