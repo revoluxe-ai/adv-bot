@@ -12,6 +12,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost_from_context,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
@@ -57,7 +60,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Определение target_pay_for_order из plan/fact
-        target_pay_for_order = self._get_target_pay_for_order(ctx)
+        target_pay_for_order = resolve_target_cost_from_context(ctx)
 
         # Приоритетная проверка режима раскрутки рекомендаций
         # Только если доступны данные о стоимости (plan/fact), иначе используем анти-слив
@@ -167,28 +170,6 @@ class WhiteListRemoveExecutor(BaseExecutor):
             return ExecutionResult(success=True, efficiency=efficiency, used_power=removed_count)
 
         return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-
-    @staticmethod
-    def _get_target_pay_for_order(ctx: PipelineContext) -> float | None:
-        """Определяет целевой pay_for_order из плана и факта.
-
-        Args:
-            ctx: Контекст с планом и фактом
-
-        Returns:
-            Целевой pay_for_order или None если данные невалидны
-        """
-        try:
-            if not ctx.plan or not ctx.fact:
-                return None
-
-            # Логика выбора target/max в зависимости от выполнения плана
-            if ctx.fact.predict_orders >= ctx.plan.orders:
-                return ctx.plan.target_pay_for_order
-            else:
-                return ctx.plan.max_pay_for_order
-        except (AttributeError, TypeError):
-            return None
 
     @staticmethod
     def _filter_ineffective_keywords(

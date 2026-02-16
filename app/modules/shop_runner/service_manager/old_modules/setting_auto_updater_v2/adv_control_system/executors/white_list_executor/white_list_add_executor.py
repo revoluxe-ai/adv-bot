@@ -10,6 +10,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost_from_context,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
@@ -26,24 +29,6 @@ class WhiteListAddExecutor(BaseExecutor):
 
     PASS_TIME_SECONDS = 15 * 60  # 15 минут между изменениями
     PAY_PER_ORDER_THRESHOLD = 0.9  # 90% от целевой себестоимости заказа
-
-    @staticmethod
-    def _resolve_target_cost(ctx: PipelineContext) -> float:
-        """Определяет целевую себестоимость заказа в зависимости от выполнения плана.
-
-        Логика аналогична AutoAdvActiveControlService._resolve_target_cost:
-        - Если план по заказам выполнен → возвращаем target_pay_for_order
-        - Иначе → возвращаем max_pay_for_order
-
-        Args:
-            ctx: Контекст выполнения
-
-        Returns:
-            Целевая себестоимость заказа
-        """
-        if ctx.fact.predict_orders >= ctx.plan.orders:
-            return ctx.plan.target_pay_for_order
-        return ctx.plan.max_pay_for_order
 
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
         """Добавляет один ключ в белый список.
@@ -64,9 +49,12 @@ class WhiteListAddExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Проверка себестоимости заказа (90% от целевой)
-        target_cost = self._resolve_target_cost(ctx)
-        if target_cost <= 0:
-            raise ValueError('target cost не может быть меньше или = 0')
+        target_cost = resolve_target_cost_from_context(ctx)
+        if target_cost is None or target_cost <= 0:
+            logger.warning(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: невалидные данные план-факт, пропускаем"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         current_pay_for_order = ctx.fact.pay_for_order
         threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
 

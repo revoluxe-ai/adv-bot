@@ -5,9 +5,12 @@ from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost_from_summary,
+)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
-    PlanFactSummary,
+
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -115,21 +118,6 @@ class AutoAdvActiveControlService:
 
         return addition_spend / addition_orders
 
-    @staticmethod
-    def _resolve_target_cost(summary: PlanFactSummary | None) -> float | None:
-        if not summary:
-            return None
-        if (
-            summary.plan_orders is None
-            or summary.plan_target_pay_for_order is None
-            or summary.plan_max_pay_for_order is None
-        ):
-            return None
-        fact_orders = summary.fact_predict_orders or 0.0
-        if fact_orders >= summary.plan_orders:
-            return summary.plan_target_pay_for_order
-        return summary.plan_max_pay_for_order
-
     async def _auto_campaign_handler(
         self,
         adv: ComplexAdv,
@@ -189,7 +177,7 @@ class AutoAdvActiveControlService:
             return None
 
         plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(auto_adv_id)
-        target_cost = self._resolve_target_cost(plan_fact_summary)
+        target_cost = resolve_target_cost_from_summary(plan_fact_summary)
         if target_cost is None:
             if auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(
