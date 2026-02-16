@@ -760,7 +760,7 @@ def get_keywords_setting_keyboard(
         if keyword.relevant:
             text += "🟢"
         if adv_setting.rec_system_mode and keyword.above_rec_conversion is not None:
-            text += "П - " if keyword.above_rec_conversion else ""
+            text += "П-" if keyword.above_rec_conversion else ""
         text += f"""{clicks}/{views}/{round(ctr * 100, 2)}%"""
         add_to_cart = keyword.add_to_cart
         orders = keyword.orders
