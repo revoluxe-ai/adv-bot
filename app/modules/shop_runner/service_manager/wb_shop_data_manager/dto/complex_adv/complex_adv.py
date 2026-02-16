@@ -256,7 +256,7 @@ class ComplexAdv:
         individual_keywords_mode_active = bool(
             adv.individual_keywords_target_place_mode
         )
-        if self.auto_updater_version == 1:
+        if self.auto_updater_version in (1, 2):
             return any(
                 [
                     adv.auto_update_white_list,
@@ -264,16 +264,7 @@ class ComplexAdv:
                     individual_keywords_mode_active,
                 ]
             )
-        elif self.auto_updater_version == 2:
-            return any(
-                [
-                    adv.auto_update_white_list,
-                    adv.auto_update_target_place,
-                    individual_keywords_mode_active,
-                ]
-            )
-        else:
-            raise RuntimeError("Not Implemented for this version")
+        raise RuntimeError("Not Implemented for this version")
 
     @property
     def adv_setting(self) -> AdvSetting:
