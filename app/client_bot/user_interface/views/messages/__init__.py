@@ -25,9 +25,11 @@ from .messages import (
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
     KeywordSettingMessage,
-    FilterByQuery,
     KeywordTargetPlacePrompt,
     KeywordTargetPlaceUpdated,
+    FilterByQuery,
+    ManualCPMSetting,
+
 )
 
 __all__ = [
@@ -60,4 +62,5 @@ __all__ = [
     "WhitePhrasesAdded",
     "KeywordTargetPlacePrompt",
     "KeywordTargetPlaceUpdated",
+    "ManualCPMSetting",
 ]

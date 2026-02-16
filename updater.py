@@ -13,7 +13,7 @@ from app.common_coroutine import common_coroutine
 # Use direct imports to avoid any re-export typing issues
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
-    run_update_all_keywords_on_wb,
+    # run_update_all_keywords_on_wb, # dead code
 )
 from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging

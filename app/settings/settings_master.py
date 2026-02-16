@@ -495,7 +495,7 @@ class Settings:
     def SHOPS_WORKS_TLL(self) -> int:
         value = os.getenv("SHOPS_WORKS_TLL")
         if not value:
-            return 60 * 5
+            return 60
         else:
             return int(value)
 
