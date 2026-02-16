@@ -1,7 +1,6 @@
 """Адаптер методов WB Promotion API: предметы поставщика и номенклатура для рекламы."""
 
 from __future__ import annotations
-
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
 )
