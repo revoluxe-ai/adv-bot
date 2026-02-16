@@ -25,6 +25,25 @@ class WhiteListAddExecutor(BaseExecutor):
     """Добавляет наиболее эффективные релевантные ключевые слова в белый список."""
 
     PASS_TIME_SECONDS = 15 * 60  # 15 минут между изменениями
+    PAY_PER_ORDER_THRESHOLD = 0.9  # 90% от целевой себестоимости заказа
+
+    @staticmethod
+    def _resolve_target_cost(ctx: PipelineContext) -> float:
+        """Определяет целевую себестоимость заказа в зависимости от выполнения плана.
+
+        Логика аналогична AutoAdvActiveControlService._resolve_target_cost:
+        - Если план по заказам выполнен → возвращаем target_pay_for_order
+        - Иначе → возвращаем max_pay_for_order
+
+        Args:
+            ctx: Контекст выполнения
+
+        Returns:
+            Целевая себестоимость заказа
+        """
+        if ctx.fact.predict_orders >= ctx.plan.orders:
+            return ctx.plan.target_pay_for_order
+        return ctx.plan.max_pay_for_order
 
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
         """Добавляет один ключ в белый список.
@@ -41,6 +60,19 @@ class WhiteListAddExecutor(BaseExecutor):
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
                 f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: rate-limit не прошёл"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+
+        # Проверка себестоимости заказа (90% от целевой)
+        target_cost = self._resolve_target_cost(ctx)
+        current_pay_for_order = ctx.fact.pay_for_order
+        threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
+
+        if current_pay_for_order >= threshold:
+            logger.info(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: пропуск из-за высокой себестоимости заказа "
+                f"(текущая={current_pay_for_order:.2f}, порог={threshold:.2f} (90%), "
+                f"целевая={target_cost:.2f}, {current_pay_for_order / target_cost * 100:.1f}%)"
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
