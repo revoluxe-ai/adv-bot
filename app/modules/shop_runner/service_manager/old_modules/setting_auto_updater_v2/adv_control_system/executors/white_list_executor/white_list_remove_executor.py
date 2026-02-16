@@ -56,8 +56,12 @@ class WhiteListRemoveExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
+        # Определение target_pay_for_order из plan/fact
+        target_pay_for_order = self._get_target_pay_for_order(ctx)
+
         # Приоритетная проверка режима раскрутки рекомендаций
-        if ctx.complex_adv.rec_system_promotion_mode_active:
+        # Только если доступны данные о стоимости (plan/fact), иначе используем анти-слив
+        if ctx.complex_adv.rec_system_promotion_mode_active and target_pay_for_order is not None:
             keywords_below_rec = self._filter_below_rec_conversion(white_keywords)
             if keywords_below_rec:
                 # Логирование для каждого удаляемого ключа
@@ -91,9 +95,6 @@ class WhiteListRemoveExecutor(BaseExecutor):
                 )
 
                 return ExecutionResult(success=True, efficiency=efficiency, used_power=removed_count)
-
-        # Определение target_pay_for_order из plan/fact
-        target_pay_for_order = self._get_target_pay_for_order(ctx)
 
         # Ветвление логики в зависимости от наличия валидных данных
         if target_pay_for_order is not None:
