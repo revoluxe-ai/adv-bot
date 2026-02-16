@@ -216,7 +216,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
                 get_rec_conversion,
             )
-
+            # TODO: Придумать фоллбек для этой функции
             rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
