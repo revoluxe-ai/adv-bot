@@ -35,7 +35,6 @@ from .messages import (
 __all__ = [
     "AddNewTokenGet",
     "FilterByQuery",
-    "KeywordSettingMessage",
     "AdvCompanyChoicing",
     "AdvKeywordsSetting",
     "AdvSettingMenu",
@@ -60,6 +59,7 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+    "KeywordSettingMessage",
     "KeywordTargetPlacePrompt",
     "KeywordTargetPlaceUpdated",
     "ManualCPMSetting",

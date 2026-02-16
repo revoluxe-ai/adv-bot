@@ -16,6 +16,9 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.shared.domains.wb.utils.additional_cost_per_order import (
+    compute_additional_cost_per_order,
+)
 
 _sm = get_async_session_maker
 
@@ -43,6 +46,7 @@ class CommonAdvsStatData:
     full_adv_stat_for_last_days_for_auction: SmallFullAdvStat
     common_stat: CommonCardStat | None
     sales_predict_method: FactMethods
+    cost_per_order_from_additional_last_week: float | None
 
 
 class CommonAdvsStatDataManager:
@@ -142,6 +146,27 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auto_adv.spend
             - spend_for_keywords_in_auto_adv
         )
+
+        # Себестоимость заказа из доп. показов за последние 7 дней (общая формула в shared)
+        end_date_7 = datetime.now()
+        start_date_7 = end_date_7 - timedelta(days=6)
+        auto_stat_7d = await full_wb_adv_stat.get_stats_by_last_days(
+            [adv_setting.adv_id], start_date_7, end_date_7
+        )
+        spend_kw_7d = await full_wb_adv_stat.get_keywords_spend(
+            [adv_setting.adv_id], start_date_7, end_date_7
+        )
+        kw_views_orders_7d = await full_wb_adv_stat.get_keywords_views_orders_by_days(
+            [adv_setting.adv_id], start_date_7, end_date_7
+        )
+        orders_kw_7d = sum(t[1] for t in kw_views_orders_7d.values())
+        cost_per_order_from_additional_last_week = compute_additional_cost_per_order(
+            auto_stat_7d.spend,
+            auto_stat_7d.orders,
+            spend_kw_7d,
+            orders_kw_7d,
+        )
+
         from app.modules.wb_adv_updater import phrases_processor
         min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
         return CommonAdvsStatData(
@@ -161,6 +186,7 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auction=full_adv_stat_for_last_days_for_auction,
             common_stat=common_stat,
             sales_predict_method=adv_setting.sales_predict_method,
+            cost_per_order_from_additional_last_week=cost_per_order_from_additional_last_week,
         )
 
     async def _get_predict_orders_for_day(

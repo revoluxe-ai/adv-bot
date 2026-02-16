@@ -13,6 +13,7 @@ class KeywordStatusReason(StrEnum):
     MAX_CPC = "max_cpc"
     MORE_THEN_RATING_BY_ORDERS = auto()
     LESS_THEN_RATING_BY_ORDERS = auto()
+    BELOW_REC_CONVERSION = auto()
     WB_MIN_BID_TOO_HIGH = "wb_min_bid_too_high"
     BEST_KEYWORD = auto()
 

@@ -48,6 +48,7 @@ def _make_minimal_common_advs_stat_data(adv_setting: object) -> CommonAdvsStatDa
         full_adv_stat_for_last_days_for_auction=zero_stat,
         common_stat=None,
         sales_predict_method=FactMethods.DIRECT_SALES,
+        cost_per_order_from_additional_last_week=None,
     )
 
 

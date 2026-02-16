@@ -89,16 +89,15 @@ async def test_connect_existing_advs_start() -> None:
     state.clear.assert_called_once()
     state.update_data.assert_called_once_with(wb_user_cabinet_original_id=10)
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.waiting_nmid)
-    bot.send_message.assert_called_once()
-    call_args = bot.send_message.call_args
-    assert call_args[0][0] == 111
-    assert "артикул" in call_args[0][1].lower() and "число" in call_args[0][1]
+    bot.send_message.assert_called_once_with(
+        111, "Введите артикул WB товара — одно число, больше 0:"
+    )
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_text_none() -> None:
-    """nmid handler: message.text None -> send 'Отправьте NM-id числом.'."""
+    """nmid handler: message.text None -> send 'Отправьте Артикул WB товара числом.'."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -115,7 +114,7 @@ async def test_connect_existing_advs_nmid_text_none() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_not_int() -> None:
-    """nmid handler: non-int text -> 'NM-id должен быть целым числом'."""
+    """nmid handler: non-int text -> 'Артикул WB товара должен быть целым числом'."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -132,7 +131,7 @@ async def test_connect_existing_advs_nmid_not_int() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_zero() -> None:
-    """nmid handler: 0 -> 'NM-id должен быть больше 0'."""
+    """nmid handler: 0 -> 'Артикул WB товара должен быть больше 0'."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()

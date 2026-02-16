@@ -140,7 +140,10 @@ class KeywordStatFactory(factory.Factory):
     final_rating = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2)
     )
-    
+    conversion_without_cpm = factory.LazyFunction(
+        lambda: round(fake.pyfloat(min_value=0.0, max_value=1.0), 6)
+    )
+
     # Исторические данные (alias-имена)
     views_all_time = factory.LazyAttribute(
         lambda obj: fake.random_int(obj.views, obj.views * 10)

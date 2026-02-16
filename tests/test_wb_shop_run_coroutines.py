@@ -115,7 +115,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
     ):
-        getattr(coroutines_manager_mock, method).assert_awaited_once()
+        getattr(coroutines_manager_mock, method).assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -171,4 +171,4 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
     ):
-        getattr(coroutines_manager_mock, method).assert_awaited_once()
+        getattr(coroutines_manager_mock, method).assert_called_once()

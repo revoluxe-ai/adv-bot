@@ -775,6 +775,8 @@ def get_keywords_setting_keyboard(
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
             text += "🟢"
+        if adv_setting.rec_system_mode and keyword.above_rec_conversion is not None:
+            text += "П-" if keyword.above_rec_conversion else ""
         text += f"""{clicks}/{views}/{round(ctr * 100, 2)}%"""
         add_to_cart = keyword.add_to_cart
         orders = keyword.orders
@@ -798,8 +800,9 @@ def get_keywords_setting_keyboard(
         cpm = int(keyword.cpm + 0.5) # плата за показы
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
-
-        text += f"({round(keyword.rating_by_orders * 1000, 2)})"
+        pay_for_order = str((round(keyword.pay_for_order_by_current_cpm, 2))) \
+                                if keyword.pay_for_order_by_current_cpm != float('inf') else 'Б'
+        text += f"({round(keyword.rating_by_orders * 1000, 2)})({pay_for_order})"
 
         keyword_setting_original_id = keyword.keyword_setting_original_id
         assert keyword_setting_original_id
