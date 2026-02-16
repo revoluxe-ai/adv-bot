@@ -62,8 +62,41 @@ class WhiteListRemoveExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        def sort_func(kw: CalculatedKeyword) -> float:
-            return kw.rating_by_orders or 0
+        # Приоритетная проверка режима раскрутки рекомендаций
+        if ctx.complex_adv.rec_system_promotion_mode_active:
+            keywords_below_rec = self._filter_below_rec_conversion(white_keywords)
+            if keywords_below_rec:
+                # Логирование для каждого удаляемого ключа
+                for kw in keywords_below_rec:
+                    logger.info(
+                        "[adv_id=%s] WhiteListRemove (RecMode): удаляем '%s' "
+                        "(conversion=%.6f < rec_conversion, above_rec_conversion=False)",
+                        adv_id,
+                        kw.text,
+                        kw.conversion_without_cpm,
+                    )
+
+                # Массовое удаление из белого списка
+                keyword_ids = [kw.keyword_setting_original_id for kw in keywords_below_rec]
+                stmt = (
+                    update(KeywordSetting)
+                    .where(KeywordSetting.id.in_(keyword_ids))
+                    .values({"hard_status": 1})
+                )
+                await ctx.session.execute(stmt)
+                await ctx.session.commit()
+
+                removed_count = len(keywords_below_rec)
+                total_white_count = len(white_keywords)
+                efficiency = removed_count / total_white_count if total_white_count > 0 else 1.0
+
+                logger.info(
+                    "[adv_id=%s] WhiteListRemove (RecMode): успешно удалено %d ключей из БС",
+                    adv_id,
+                    removed_count,
+                )
+
+                return ExecutionResult(success=True, efficiency=efficiency, used_power=removed_count)
 
         # Сортируем по базовому CTR и оставляем всех кроме лучшего
         white_keywords.sort(
