@@ -25,7 +25,9 @@ from .messages import (
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
 KeywordSettingMessage,
-FilterByQuery
+FilterByQuery,
+ManualCPMSetting,
+
 )
 
 __all__ = [
@@ -56,4 +58,6 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+    "ManualCPMSetting",
+
 ]
