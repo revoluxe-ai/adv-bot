@@ -112,9 +112,6 @@ class AutoAdvActiveControlService:
         addition_spend = auto_stat.spend - spend_kw
         addition_orders = max(0, auto_stat.orders - orders_kw) + 1
 
-        if addition_orders <= 0:
-            return None
-
         return addition_spend / addition_orders
 
     @staticmethod
