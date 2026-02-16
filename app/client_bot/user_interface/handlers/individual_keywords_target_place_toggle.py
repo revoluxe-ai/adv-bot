@@ -1,7 +1,6 @@
 from aiogram import Bot, Router
 from aiogram.types import CallbackQuery
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot.user_interface.views.callbacks import IndividualKeywordsTargetPlaceToggle
@@ -11,25 +10,6 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
-
-
-async def _calculate_price_with_individual_mode(
-    session: AsyncSession,
-    adv_setting_id: int,
-    shop_id: str | None,
-    pricer: Pricer,
-) -> float:
-    if not shop_id:
-        return 0.0
-    async with session.begin_nested():
-        await session.execute(
-            update(AdvSetting)
-            .where(AdvSetting.id == adv_setting_id)
-            .values({"individual_keywords_target_place_mode": True})
-        )
-        await session.flush()
-        return await pricer.get_price_for_day_for_shop(session, shop_id)
-
 
 @router.callback_query(IndividualKeywordsTargetPlaceToggle.filter())
 async def toggle_individual_keywords_target_place(
@@ -67,11 +47,12 @@ async def toggle_individual_keywords_target_place(
                     adv_setting.wb_cabinet.id
                 )
                 available = balance + bonus
-                required_price = await _calculate_price_with_individual_mode(
-                    session,
-                    adv_setting.id,
-                    adv_setting.wb_cabinet.shop_id,
-                    pricer,
+                required_price = (
+                    await pricer.get_price_for_day_if_enabling_individual_mode(
+                        session,
+                        adv_setting.wb_cabinet.shop_id or "",
+                        adv_setting.id,
+                    )
                 )
                 if available < required_price:
                     await bot.send_message(
