@@ -1,7 +1,10 @@
+from datetime import date
 from typing import Awaitable, Callable
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
 )
@@ -459,3 +462,33 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
 
     wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
     wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_average_order_cost_uses_additional_views():
+    stats = SmallFullAdvStat(
+        views=0,
+        clicks=0,
+        spend=1000.0,
+        added_to_cart=0,
+        orders=10,
+        sum_price=0.0,
+    )
+    orders_kw = 4
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_stats_by_last_days",
+        new=AsyncMock(return_value=stats),
+    ) as stats_mock, patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_keywords_spend",
+        new=AsyncMock(return_value=400.0),
+    ) as spend_mock, patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_keywords_views_orders_by_days",
+        new=AsyncMock(return_value={date(2025, 1, 1): (10, orders_kw)}),
+    ) as views_orders_mock:
+        result = await AutoAdvActiveControlService._get_average_order_cost(adv_id=42)
+
+    assert result == pytest.approx((1000.0 - 400.0) / (max(0, 10 - orders_kw) + 1))
+    stats_mock.assert_awaited_once()
+    spend_mock.assert_awaited_once()
+    views_orders_mock.assert_awaited_once()
