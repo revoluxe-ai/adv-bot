@@ -192,3 +192,21 @@ The utility was initially created in the adv_control_system module but was moved
 - `tests/app/shared/__init__.py` - test package init
 
 The utility was moved to `app/shared/domains/wb/utils/` as it's a shared business logic utility for the WB domain, making it accessible to all modules that need to resolve target costs based on plan fulfillment.
+
+## File Structure
+
+```
+app/shared/domains/wb/utils/
+├── balance_source.py         (existing)
+├── cost_resolver.py          (NEW - extracted common logic)
+└── __init__.py
+
+tests/app/shared/domains/wb/utils/
+├── test_cost_resolver.py     (NEW - 18 comprehensive tests)
+└── __init__.py
+
+Updated imports in:
+├── app/modules/.../white_list_add_executor.py
+├── app/modules/.../white_list_remove_executor.py
+└── app/modules/.../auto_adv_active_control_service.py
+```
