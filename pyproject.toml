@@ -1,7 +1,7 @@
-[tool.poetry.scripts]
-pyright = "app.pyright_entry:main"
-pyright-strict = "app.pyright_strict_entry:main"
-
+#[tool.poetry.scripts]
+#pyright = "app.pyright_entry:main"
+#pyright-strict = "app.pyright_strict_entry:main"
+#
 
 [tool.poetry]
 name = "adv-bot"
