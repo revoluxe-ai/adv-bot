@@ -80,29 +80,43 @@ def create_mock_context(
 
 @pytest.mark.asyncio
 async def test_removes_keywords_with_below_rec_conversion():
-    """Проверка удаления ключей с above_rec_conversion = False при активном rec_system_mode."""
-    # Arrange
+    """Проверка удаления ключей с above_rec_conversion = False при активном rec_system_mode.
+
+    Требуются plan/fact, иначе resolve_target_cost_from_context возвращает None
+    и выполняется анти-слив-ветка вместо rec-mode; тест тогда проходил бы случайно.
+    """
+    # Arrange: plan/fact нужны, чтобы target_pay_for_order был не None и сработала rec-mode ветка
+    plan = MagicMock(spec=PlanData)
+    plan.target_pay_for_order = 100.0
+    plan.max_pay_for_order = 150.0
+    plan.orders = 10
+
+    fact = MagicMock(spec=FactData)
+    fact.predict_orders = 12.0
+
     keywords = [
         create_mock_keyword(1, "keyword1", above_rec_conversion=False, conversion_without_cpm=0.01),
         create_mock_keyword(2, "keyword2", above_rec_conversion=False, conversion_without_cpm=0.02),
         create_mock_keyword(3, "keyword3", above_rec_conversion=True, conversion_without_cpm=0.05),
     ]
-    
+
     ctx = create_mock_context(
         rec_system_mode_active=True,
         keywords=keywords,
+        plan=plan,
+        fact=fact,
     )
-    
+
     executor = WhiteListRemoveExecutor()
-    
+
     # Act
     result = await executor.execute(ctx)
-    
-    # Assert
+
+    # Assert: rec-mode ветка удаляет только ключи с above_rec_conversion=False (2 из 3)
     assert result.success is True
     assert result.used_power == 2  # Удалено 2 ключа с above_rec_conversion=False
-    assert result.efficiency == pytest.approx(2/3, rel=1e-6)  # 2 из 3 ключей
-    
+    assert result.efficiency == pytest.approx(2 / 3, rel=1e-6)  # 2 из 3 ключей
+
     # Проверяем, что был вызван execute для удаления
     ctx.session.execute.assert_called_once()
     ctx.session.commit.assert_called_once()
