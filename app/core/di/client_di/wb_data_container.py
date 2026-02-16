@@ -14,6 +14,7 @@ from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 
 from app.core.mp.wb.api.domain_managers import (
     AnalyticsManager,
+    ProductsManager,
     PromotionManager,
 )
 from app.core.mp.wb.api.managers import WBDataManager, WBModifier
@@ -46,10 +47,15 @@ class WBDataContainer(containers.DeclarativeContainer):
         _promotion_container.promotion_domain_manager
     )  # pyright: ignore
 
+    _products_domain_manager: Provider[ProductsManager] = (  # pyright: ignore
+        _products_container.products_domain_manager
+    )  # pyright: ignore
+
     wb_data_manager = providers.Singleton(
         WBDataManager,
         analytics_manager=_analytics_domain_manager,
         promotion_manager=_promotion_domain_manager,
+        products_manager=_products_domain_manager,
     )
 
     wb_promotion_manager = providers.Singleton(

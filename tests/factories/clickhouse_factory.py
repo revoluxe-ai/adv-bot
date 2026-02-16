@@ -39,6 +39,7 @@ class ClustersAdvStatsFactory(factory.Factory):
     avr_pos = 2.0
     date = factory.LazyFunction(date.today)
     timestamp = factory.LazyFunction(datetime.utcnow)
+    spend = factory.LazyFunction(lambda: 0.0)
 
 
 CLUSTERS_ADV_STATS_COLUMNS = [
@@ -55,6 +56,7 @@ CLUSTERS_ADV_STATS_COLUMNS = [
     "cpc",
     "avr_pos",
     "date",
+    "spend",
     "timestamp",
 ]
 
@@ -83,6 +85,7 @@ def build_clusters_adv_stats_rows(
                 record.cpc,
                 record.avr_pos,
                 record.date,
+                record.spend,
                 record.timestamp,
             ]
         )

@@ -44,6 +44,7 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             0.0,
             0.0,
             dt.date(2025, 11, 26),
+            0.0,
             dt.datetime(2025, 11, 26, 12, 0, 0),
         ),
         (
@@ -60,6 +61,7 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             0.0,
             0.0,
             dt.date(2025, 11, 26),
+            0.0,
             dt.datetime(2025, 11, 26, 12, 30, 0),
         ),
         (
@@ -76,6 +78,7 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             0.0,
             0.0,
             dt.date(2025, 11, 27),
+            0.0,
             dt.datetime(2025, 11, 27, 12, 0, 0),
         ),
         (
@@ -92,6 +95,7 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             0.0,
             0.0,
             dt.date(2025, 11, 27),
+            0.0,
             dt.datetime(2025, 11, 27, 12, 30, 0),
         ),
     ]
@@ -113,6 +117,7 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
             "cpc",
             "avr_pos",
             "date",
+            "spend",
             "timestamp",
         ],
     )

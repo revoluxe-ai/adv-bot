@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.core.mp.wb.api.adapter.abc_group_client import AbcAdapter
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
 from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
+from app.core.mp.wb.api.retry_decorator import retry_decorator
 from app.core.mp.wb.api.generated.products.v1.content_products_client.api.kartochki_tovarov import (
     post_content_v2_get_cards_list,
 )
@@ -28,6 +29,7 @@ class ContentProductCardsAdapter(ContentSectionAdapter):
     Обеспечивает получение списка карточек с пагинацией и фильтрами.
     """
 
+    @retry_decorator(period=2, limit=3)
     async def get_cards_list(
         self,
         body: PostContentV2GetCardsListBody,

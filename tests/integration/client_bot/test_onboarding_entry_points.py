@@ -14,6 +14,7 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 )
 from app.client_bot.user_interface.handlers.shop_settings import delete_wb_user_cabinet
 from app.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.views.gate import get_gate_message_text
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import Invite, InviteStatus, User
@@ -119,6 +120,63 @@ async def test_gate_invite_success_calls_main_menu(
 
         mock_main_menu.assert_called_once_with(bot, 88882)
         mock_main_menu.return_value.assert_awaited_once()
+
+
+async def test_start_registration_new_user_creates_user_and_shows_gate(
+    async_session,
+):
+    """New user (no record in DB): start_registration creates user, shows gate screen, does not call MainMenu."""
+    telegram_id = 88880
+    chat_id = 88880
+    # Ensure no user with this id (we do not create one)
+    stmt = select(User).where(User.user_telegram_id == telegram_id)
+    result = await async_session.execute(stmt)
+    assert result.scalar_one_or_none() is None
+
+    bot = AsyncMock()
+    state = MagicMock()
+    state.clear = AsyncMock()
+
+    message = MagicMock(spec=Message)
+    message.text = "/start"
+    message.chat = MagicMock(spec=Chat)
+    message.chat.id = chat_id
+    message.from_user = MagicMock(spec=TelegramUser)
+    message.from_user.id = telegram_id
+    message.from_user.username = "new_user_88880"
+
+    with patch(
+        "app.client_bot.user_interface.handlers.start_registration_func.sm"
+    ) as mock_sm, patch(
+        "app.client_bot.user_interface.handlers.start_registration_func.MainMenu"
+    ) as mock_main_menu:
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=async_session)
+        mock_cm.__aexit__ = AsyncMock(return_value=None)
+        mock_sm.return_value = mock_cm
+        mock_main_menu.return_value = AsyncMock()
+
+        await start_registration(message, bot, state)
+
+    # User must exist in DB with passed_gate=False (create_user already committed)
+    stmt2 = select(User).where(User.user_telegram_id == telegram_id)
+    result2 = await async_session.execute(stmt2)
+    user = result2.scalar_one_or_none()
+    assert user is not None
+    assert user.user_telegram_id == telegram_id
+    assert user.username == "new_user_88880"
+    assert user.passed_gate is False
+
+    # Gate screen was sent
+    bot.send_message.assert_awaited_once()
+    call_args, call_kw = bot.send_message.call_args
+    assert call_args[0] == chat_id
+    text = call_args[1] if len(call_args) > 1 else call_kw.get("text", "")
+    assert get_gate_message_text() in text or "Доступ" in text
+    assert call_kw.get("reply_markup") is not None
+
+    # MainMenu was not called (user has not passed gate)
+    mock_main_menu.assert_not_called()
 
 
 async def test_start_registration_passed_gate_calls_main_menu(

@@ -9,14 +9,12 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
 from sqlalchemy import select, update
-from sqlalchemy.orm import joinedload
 
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT, GATE_ENTRY_AMOUNT, OFFERTA_URL
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.gate import get_gate_keyboard
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.settings import settings
 from app.utils.db.models import Invite, InviteStatus, User
 from app.utils.db.passed_gate_reason import PassedGateReason
@@ -147,22 +145,6 @@ async def gate_invite_process_code(
         await session.commit()
 
     await state.clear()
-    # Показать старт-меню (выбор магазина)
-    async with _sm() as session:
-        stmt = (
-            select(User)
-            .options(
-                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
-            )
-            .where(User.user_telegram_id == telegram_id)
-        )
-        res = await session.execute(stmt)
-        user_with_cabinets: User | None = res.unique().scalar_one_or_none()
-    cabinets = (
-        list(user_with_cabinets.wb_user_cabinets)
-        if user_with_cabinets is not None
-        else []
-    )
     await MainMenu(bot, chat_id)()
 
 

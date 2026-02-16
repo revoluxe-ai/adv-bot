@@ -1,6 +1,7 @@
 """Адаптер методов WB Promotion API: предметы поставщика и номенклатура для рекламы."""
 
 from __future__ import annotations
+
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
 )
@@ -50,9 +51,9 @@ class ProductCardsAdapter(BaseSectionAdapter):
         )
         if response is None or response.parsed is None:
             return None
-        parsed = response.parsed # pyright: ignore
+        parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed # pyright: ignore
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -83,7 +84,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
             return None
         parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed # pyright: ignore
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None
 
     @retry_decorator(period=2, limit=3)
@@ -108,7 +109,7 @@ class ProductCardsAdapter(BaseSectionAdapter):
         )
         if response is None or response.parsed is None:
             return None
-        parsed = response.parsed # pyright: ignore
+        parsed = response.parsed
         if isinstance(parsed, list):
-            return parsed # pyright: ignore
+            return parsed # type: ignore[return-value] # https://github.com/microsoft/pyright/issues/3273
         return None

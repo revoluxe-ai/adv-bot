@@ -14,7 +14,6 @@ from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
 )
-from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
@@ -55,7 +54,7 @@ from app.shared.domains.wb.enums import (
     AdvType,
 )
 from app.utils import redis_manager
-from app.utils.db.models import RefLink, User
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
     RedisClusterBidsTimestampManager,
@@ -841,48 +840,6 @@ class NeedSubscribe(TextWithKeyboard):
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboards.get_subscribe_keyboard()
 
-
-class RefLinkGetName(Text):
-    @property
-    def text(self) -> str:
-        return "Введите название для новой реферальной ссылки. Название будете видеть только вы:"
-
-
-class RefLinkNameTooLong(Text):
-    @property
-    def text(self) -> str:
-        return "Название ссылки слишком длинное, должно быть не больше 30 символов. Попробуйте снова:"
-
-
-class RefLinkNameAlreadyExists(Text):
-    @property
-    def text(self) -> str:
-        return  "Такое название ссылки уже существует. Попробуйте снова:"
-
-
-class RefLinkCreated(TextWithKeyboard):
-    def __init__(self, bot: Bot, chat_id: int, ref_link: RefLink):
-        self._ref_link = ref_link
-        self._bot = bot
-        super().__init__(bot, chat_id)
-
-    async def __call__(self) -> None:
-        self._link = await deep_linking.create_start_link(
-            self._bot, str(self._ref_link.id)
-        )
-        return await super().__call__()
-
-    @property
-    def text(self) -> str:
-        return (
-            f"Ссылка {self._ref_link.name} успешно создана. \n\n"
-            f"Вот ссылка, по которой вы можете приглашать пользователей: "
-            f"{self._link}"
-        )
-
-    @property
-    def keyboard(self) -> InlineKeyboardMarkup:
-        return keyboards.get_return_for_your_ref_links()
 
 class OrderSubscribe(Text):
     @property

@@ -24,11 +24,13 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
-    KeywordSettingMessage
+    KeywordSettingMessage,
+    FilterByQuery
 )
 
 __all__ = [
     "AddNewTokenGet",
+    "FilterByQuery",
     "AdvCompanyChoicing",
     "AdvKeywordsSetting",
     "AdvSettingMenu",
@@ -53,5 +55,5 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
-"KeywordSettingMessage",
+    "KeywordSettingMessage",
 ]

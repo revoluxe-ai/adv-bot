@@ -79,7 +79,7 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
 
     column_names = [
         'adv_id', 'nmid', 'wb_category', 'norm_query', 'views', 'clicks', 'ctr',
-        'cpm', 'add_to_cart', 'orders', 'cpc', 'avr_pos', 'date'
+        'cpm', 'add_to_cart', 'orders', 'cpc', 'avr_pos', 'date', 'spend'
     ]
 
     # clickhouse_connect ожидает список списков/кортежей при использовании column_names
@@ -98,6 +98,7 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
             row.cpc if row.cpc is not None else 0.0,
             row.avr_pos if row.avr_pos is not None else 0.0,
             row.date,
+            row.spend,
         ]
         for row in stats
     ]
