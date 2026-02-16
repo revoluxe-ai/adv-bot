@@ -778,8 +778,9 @@ def get_keywords_setting_keyboard(
         cpm = int(keyword.cpm + 0.5) # плата за показы
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
-
-        text += f"({round(keyword.rating_by_orders * 1000, 2)})({round(keyword.pay_for_order_by_current_cpm, 2)})"
+        pay_for_order = str((round(keyword.pay_for_order_by_current_cpm, 2))) \
+                                if keyword.pay_for_order_by_current_cpm != float('inf') else 'Б'
+        text += f"({round(keyword.rating_by_orders * 1000, 2)})({pay_for_order})"
 
         inline_keyboard = [
             InlineKeyboardButton(
