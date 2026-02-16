@@ -43,7 +43,7 @@ class ClickHouseManager(BaseClickHouseManager):
                 row_dict = dict(zip(column_names, row))
                 keyword = row_dict['norm_query']
                 position = row_dict['pos_bin']
-                timestamp = row_dict['last_decision_source']
+                timestamp = row_dict['last_decision_time']
                 bid = row_dict['bid_cpm']
                 pos = BidPosition(keyword=keyword,
                                   position=position,
