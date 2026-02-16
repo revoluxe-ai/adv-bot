@@ -24,6 +24,7 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
+    KeywordSettingMessage
 )
 
 __all__ = [
@@ -52,4 +53,5 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+"KeywordSettingMessage",
 ]
