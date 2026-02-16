@@ -83,6 +83,7 @@ class AutoResetBidService:
         adv_id = auto_adv_id
         nm_bid_pairs = {nmid: target_cpm for nmid in nmids}
         await self._wb_modifier.update_auto_adv_cpm(adv_id, nm_bid_pairs)
+        return None
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
