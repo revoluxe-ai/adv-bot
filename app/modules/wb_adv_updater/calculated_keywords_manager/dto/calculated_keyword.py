@@ -25,6 +25,8 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def pay_for_order_by_current_cpm(self) -> float:
+        if self.rating_by_orders == 0:
+            return float('inf')
         last_cpm = self.cpm
         pay_for_order = 1 / self.rating_by_orders * last_cpm / 1000
         return pay_for_order
