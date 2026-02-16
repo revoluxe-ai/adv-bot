@@ -58,10 +58,6 @@ class WBDataManager:
     def products_manager(self) -> "ProductsManager":
         return self._products_manager
 
-    @property
-    def promotion_manager(self) -> "PromotionManager":
-        return self._promotion_manager
-
     async def get_keywords_positions_from_wb_api(
         self,
         nmid: int,
