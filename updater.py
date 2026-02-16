@@ -30,7 +30,6 @@ AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
 # Явная аннотация типов для списка корутин
 run_own_process_list: list[AsyncEntry] = [
     #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
-    run_update_all_keywords_on_wb,
     run_main_coroutines,
 ]
 
