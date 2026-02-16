@@ -65,6 +65,8 @@ class WhiteListAddExecutor(BaseExecutor):
 
         # Проверка себестоимости заказа (90% от целевой)
         target_cost = self._resolve_target_cost(ctx)
+        if target_cost <= 0:
+            raise ValueError('target cost не может быть меньше или = 0')
         current_pay_for_order = ctx.fact.pay_for_order
         threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
 
