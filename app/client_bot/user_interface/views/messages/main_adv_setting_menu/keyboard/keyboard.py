@@ -235,8 +235,8 @@ def get_adv_setting_keyboard(
             text=relevant_text, callback_data=relevant_callback
         )
         _ = builder.row(relevant_button)
-    from .buttoms import rec_system_bottom
-    rec_bottom =  rec_system_bottom.get(adv_setting, wb_user_cabinet)
+    from .buttoms import rec_system_button
+    rec_bottom =  rec_system_button.get(adv_setting, wb_user_cabinet)
     _ = builder.row(rec_bottom)
 
     # Добавляем кнопку переключения источника заказов для автоуправления
