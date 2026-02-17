@@ -50,6 +50,14 @@ def get_adv_setting_keyboard(
     in_favorites: bool,
 ):
     builder = InlineKeyboardBuilder()
+
+    button = InlineKeyboardButton(
+        text="План продаж",
+        callback_data=SalesPlanSettingsMenuCallback(adv_id=adv_setting.adv_id).pack(),
+    )
+
+    _ = builder.row(button)
+
     _ = builder.row(
         InlineKeyboardButton(
             text="Контроль ключевых слов по кампании",
@@ -58,13 +66,9 @@ def get_adv_setting_keyboard(
             ).pack(),
         )
     )
-
-    button = InlineKeyboardButton(
-        text="План продаж",
-        callback_data=SalesPlanSettingsMenuCallback(adv_id=adv_setting.adv_id).pack(),
-    )
-
-    _ = builder.row(button)
+    from .buttoms import rec_system_button
+    rec_bottom = rec_system_button.get(adv_setting, wb_user_cabinet)
+    _ = builder.row(rec_bottom)
 
     indiv_place_mode = bool(adv_setting.individual_keywords_target_place_mode)
     if indiv_place_mode:
@@ -235,9 +239,7 @@ def get_adv_setting_keyboard(
             text=relevant_text, callback_data=relevant_callback
         )
         _ = builder.row(relevant_button)
-    from .buttoms import rec_system_button
-    rec_bottom =  rec_system_button.get(adv_setting, wb_user_cabinet)
-    _ = builder.row(rec_bottom)
+
 
     # Добавляем кнопку переключения источника заказов для автоуправления
     if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
