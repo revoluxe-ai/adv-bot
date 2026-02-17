@@ -243,24 +243,6 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
     if adv_setting.automatic_version == 2:
-        # Новая кнопка для автоматического управления экспонентой
-        if adv_setting.auto_update_exponent:
-            exponent_text = "Выключить автоматическое управление экспонентой"
-            exponent_new_status = False
-        else:
-            exponent_text = "Включить автоматическое управление экспонентой"
-            exponent_new_status = True
-
-        exponent_callback = ChangeAutoUpdateExponentStatus(
-            adv_id=adv_setting.adv_id,
-            wb_user_cabinet_original_id=wb_user_cabinet.id,
-            new_status=exponent_new_status,
-        ).pack()
-        exponent_button = InlineKeyboardButton(
-            text=exponent_text, callback_data=exponent_callback
-        )
-        _ = builder.row(exponent_button)
-
         # Кнопка для auto_add_only_relevant_phrase
         if adv_setting.auto_add_only_relevant_phrase:
             relevant_text = "Выключить добавление только релевантных фраз"
