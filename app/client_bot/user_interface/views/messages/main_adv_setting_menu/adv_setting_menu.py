@@ -50,6 +50,8 @@ logger = logging.getLogger(__name__)
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
+    """Главное меню настройки Комплексной Кампании"""
+
     # parse_mode = ParseMode.HTML
 
     @inject
