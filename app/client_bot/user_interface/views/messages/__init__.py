@@ -2,7 +2,6 @@ from .adv_keyword_messages.adv_keyword_messages import AdvKeywordsSetting
 from .messages import (
     AddNewTokenGet,
     AdvCompanyChoicing,
-    AdvSettingMenu,
     AutoCPMSettingGetMaxCPM,
     AutoCPMSettingGetMinPosition,
     CabinetExistsForUser,
@@ -37,7 +36,6 @@ __all__ = [
     "FilterByQuery",
     "AdvCompanyChoicing",
     "AdvKeywordsSetting",
-    "AdvSettingMenu",
     "AutoCPMSettingGetMaxCPM",
     "AutoCPMSettingGetMinPosition",
     "CabinetExistsForUser",

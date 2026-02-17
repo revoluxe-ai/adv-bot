@@ -19,7 +19,6 @@ from app.client_bot.user_interface.views.callbacks import (
     PredictCTRModeToggle,
     SalesPredictMethodToggle,
     AutoUpdaterVersionToggle,
-    ChangeAutoUpdateExponentStatus,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeRecSystemModeStatus,
     ChangeCommonBidInSearchAdvStatus,
