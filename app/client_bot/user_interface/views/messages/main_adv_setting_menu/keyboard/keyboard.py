@@ -24,9 +24,7 @@ from app.modules.common_slaves.wildberries.models.models import (
     BidderCoroutineType,
     PredictCTRMode,
 )
-from app.modules.sales_plan_settings.telegram.main_callback import (
-    SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
-)
+
 from app.modules.white_list_mode_settings.telegram.main_callback import (
     WhiteListModeMenu,
 )
@@ -51,21 +49,21 @@ def get_adv_setting_keyboard(
 ):
     builder = InlineKeyboardBuilder()
 
-    button = InlineKeyboardButton(
-        text="План продаж",
-        callback_data=SalesPlanSettingsMenuCallback(adv_id=adv_setting.adv_id).pack(),
-    )
+    """План продаж"""
+    from .buttoms import sales_plan_button
+    _ = builder.row(sales_plan_button.get(adv_setting))
 
-    _ = builder.row(button)
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="Контроль ключевых слов по кампании",
+            text="➡ Контроль ключевых слов по кампании",
             callback_data=callbacks.SettingKeywords(
                 adv_original_id=adv_setting.id, type="by_adv"
             ).pack(),
         )
     )
+
+    """Рекомендательные системы (настройка)"""
     from .buttoms import rec_system_button
     rec_bottom = rec_system_button.get(adv_setting, wb_user_cabinet)
     _ = builder.row(rec_bottom)
