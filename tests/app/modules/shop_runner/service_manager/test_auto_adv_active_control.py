@@ -303,7 +303,7 @@ async def test_auto_adv_active_control_common_budget_pauses_when_combined_spend_
 
 @pytest.mark.asyncio
 async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
-    """При общем бюджете обе кампании запускаются, если суммарный расход < лимита."""
+    """При общем бюджете обе кампании запускаются, если суммарный расход < лимита и правило себестоимости выполняется."""
     adv = _FakeComplexAdv(
         auto_limit=0,
         auto_status="pause",
@@ -328,6 +328,16 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
 
     tasks_manager = MagicMock()
     plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=13,
+            plan_orders=10,
+            plan_target_pay_for_order=100,
+            plan_max_pay_for_order=200,
+            fact_predict_orders=12.0,
+            fact_pay_for_order=90.0,
+        )
+    )
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
         tasks_manager=tasks_manager,
@@ -343,6 +353,9 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
     ), patch(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
 
@@ -462,6 +475,177 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
 
     wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
     wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_does_not_start_when_avg_cost_above_target():
+    """Separate budget: PAUSE, budget OK, but avg_cost > target_cost -> start not called."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="pause",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=20,
+        search_adv_id=21,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        results = []
+        for handler in handlers:
+            results.append(await handler())
+        return results
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=20,
+            plan_orders=10,
+            plan_target_pay_for_order=100,
+            plan_max_pay_for_order=200,
+            fact_predict_orders=15.0,
+            fact_pay_for_order=110.0,
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=50.0),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        new=AsyncMock(return_value=150.0),
+    ):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_does_not_start_when_no_plan_fact():
+    """Separate budget: PAUSE, budget OK, but plan_fact returns None -> start not called."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="pause",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=22,
+        search_adv_id=23,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        results = []
+        for handler in handlers:
+            results.append(await handler())
+        return results
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=50.0),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        new=AsyncMock(return_value=80.0),
+    ):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target():
+    """Common budget: PAUSE, budget OK, but avg_cost > target_cost -> auto campaign not started."""
+    adv = _FakeComplexAdv(
+        auto_limit=0,
+        auto_status="pause",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=24,
+        search_adv_id=25,
+        use_common_budget=True,
+        common_budget_daily_limit=500,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        for handler in handlers:
+            await handler()
+        return []
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=24,
+            plan_orders=10,
+            plan_target_pay_for_order=100,
+            plan_max_pay_for_order=200,
+            fact_predict_orders=12.0,
+            fact_pay_for_order=90.0,
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    async def mock_spend(*args, **kwargs):
+        return 50.0
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_spend),
+    ), patch(
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        new=AsyncMock(return_value=150.0),
+    ):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.pause_auction_campaign.assert_not_called()
 
 
 @pytest.mark.asyncio
