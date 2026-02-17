@@ -770,7 +770,6 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"
             f"🔄 *Текущий статус ключа:* {calculated_keyword.status}\n\n"
             f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n"
-            f"🎯 *Целевая позиция:* {target_place_value} ({target_place_source})\n\n"
             f"📊 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
             f"📈 *Фактический CTR:* {self.fact_ctr * 100:.2f}%\n"
@@ -791,8 +790,10 @@ class KeywordSettingMessage(TextWithKeyboard):
             text += f"📈 *Позиция:* {round(pos, 2)}\n"
         else:
             text += "📈 *Позиция:* Нет на сайте\n"
-
-        text += f"""🕒 *Последнее данных по ключу:* {self.calculated_keyword.timestamp.strftime('%d-%m-%Y')}\n"""
+        text +=  f"🎯 *Целевая позиция:* {target_place_value} ({target_place_source})\n"
+        text += f'Расчетная ставка CPM: {round(self._calculated_keyword.cpm)}\n'
+        text += f"""🕒 *Последние данных по ключу:*
+                {self.calculated_keyword.timestamp.strftime('%d-%m-%Y:%H:%M:%S')}\n"""
         return text
 
     @property
