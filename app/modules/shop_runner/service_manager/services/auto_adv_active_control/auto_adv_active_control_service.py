@@ -168,7 +168,7 @@ class AutoAdvActiveControlService:
             plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
         )
         avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-            auto_adv_id, days=6
+            auto_adv_id,
         )
 
         if target_cost is None and auto_status == WBAdvActiveStatus.STARTED:
