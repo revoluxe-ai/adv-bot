@@ -129,7 +129,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 redis_client = get_redis_client()
                 adv_for_ts = SimpleNamespace(adv_id=search_adv_id)
                 set_bid_map = await get_set_bid_map(
-                    search_adv_id, nmids, texts, adv_for_ts, redis_client
+                    search_adv_id,
+                    nmids,
+                    texts,
+                    adv_for_ts, # pyright:ignore # noqa
+                    redis_client
                 )
             except Exception:  # noqa: BLE001
                 set_bid_map = {}

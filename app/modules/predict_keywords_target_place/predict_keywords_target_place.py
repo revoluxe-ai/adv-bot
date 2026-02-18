@@ -4,8 +4,11 @@ from zoneinfo import ZoneInfo
 from .clickhouse_manager import ClickHouseManager
 from .clickhouse_manager.dto import ConvCartToViewsOnPosition
 from .clickhouse_manager.dto.bid_position import BidPosition
+from ..common_slaves.wildberries.models.enums.target_position_mode import TargetPositionMode
 from ...settings import settings
 import logging
+
+from ...shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
 
@@ -14,26 +17,34 @@ class PredictKeywordsTargetPlace:
         self._clickhouse_manager = clickhouse_manager
 
 
-    async def get_keywords_target_position(self,*, nmid: int, min_bid: int, positions_size: int) -> dict[str, int]:
-
+    async def get_keywords_target_position(self, adv: WBAdvDTO, positions_size: int) -> dict[str, int]:
         assert positions_size <= 300, 'Количество позиций не может быть больше 300'
-
+        nmid = adv.main_nmid
+        try:
+             min_bid = adv.search_adv_min_bids[nmid]
+        except KeyError:
+            raise
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
                                                                   positions_size=positions_size)
         bids_for_positions: dict[str, list[BidPosition]] = \
             await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
+        target_position_mode = adv.target_position_mode
         return self._get_target_positions(convs_carts_to_views,
                                           bids_for_positions,
                                           min_bid,
-                                          positions_size)
+                                          positions_size,
+                                          target_position_mode
+                                          )
 
     def _get_target_positions(self,
                                     convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]],
                                     bids_for_positions: dict[str, list[BidPosition]],
                                     min_bid: int,
-                                    positions_size: int
+                                    positions_size: int,
+                                    target_position_mode: TargetPositionMode
                               ) -> dict[str, int]:
+
         bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
                                                                 convs_carts_to_views,
                                                                 min_bid=min_bid,
@@ -44,7 +55,12 @@ class PredictKeywordsTargetPlace:
                 logger.error('Пустой список позиций для прогноза целевой позиции')
                 result_target_positions[keyword] = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
                 continue
-            best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
+            if target_position_mode == TargetPositionMode.MIN_CPA:
+                best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
+            elif target_position_mode == TargetPositionMode.MAX_CART_TO_VIEWS_CONV:
+                best_position: BidPosition = min(positions, key=lambda p: p.conv_carts_to_views)
+            else:
+                raise NotImplementedError('Неизвестный мод целевой позиции')
             result_target_positions[keyword] = max(1, best_position.position)
         return result_target_positions
 
