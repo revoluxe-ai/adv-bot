@@ -13,16 +13,6 @@ from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
     CommonBudgetModeToggle,
-    IncrementalStatsToggle,
-    TurnBot,
-    OrdersSourceToggle,
-    PredictCTRModeToggle,
-    SalesPredictMethodToggle,
-    AutoUpdaterVersionToggle,
-    ChangeAutoAddOnlyRelevantPhraseStatus,
-    ChangeRecSystemModeStatus,
-    ChangeCommonBidInSearchAdvStatus,
-    IndividualKeywordsTargetPlaceToggle,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
@@ -31,31 +21,13 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
-from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
-from app.modules.common_slaves.wildberries.models.models import (
-    BidderCoroutineType,
-    PredictCTRMode,
-)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
-from app.modules.sales_plan_settings.telegram.main_callback import (
-    SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
-)
-from app.modules.white_list_mode_settings.telegram.main_callback import (
-    WhiteListModeMenu,
-)
-from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
-    BidderCoroutineTypeToggle,
-)
-from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
-    AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
-)
+
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
-    AutoUpdateWhiteListSetting,
     RelevantKeywordStatusSetting,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword

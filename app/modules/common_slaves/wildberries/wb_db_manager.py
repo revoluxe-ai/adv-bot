@@ -59,7 +59,7 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                 # Обновляем существующую запись через ORM
                 adv_setting = existing_adv_settings[adv.advertId]
                 # Комплексная РК (запись с _search_adv_id) хранит имя по шаблону «Артикул Название карточки» — не перезаписываем из WB
-                if adv_setting._search_adv_id is None:
+                if adv_setting._search_adv_id is None: # pyright: ignore #noqa
                     adv_setting.name = adv.name
                 adv_setting.wb_cabinet_id = wb_cabinet_id
                 adv_setting.nmids = adv.nmids
