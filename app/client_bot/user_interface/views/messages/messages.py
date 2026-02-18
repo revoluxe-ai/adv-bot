@@ -529,13 +529,26 @@ class KeywordSettingMessage(TextWithKeyboard):
 
         pos = self.position
         if pos > 0:
-            text += f"📈 *Позиция:* {round(pos, 2)}\n"
+            text += f"📈 *Позиция:* {round(pos)}\n"
         else:
             text += "📈 *Позиция:* Нет на сайте\n"
         text +=  f"🎯 *Целевая позиция:* {target_place_value} ({target_place_source})\n"
-        text += f'Расчетная ставка CPM: {round(self._calculated_keyword.cpm)}\n'
-        text += f"""🕒 *Последние данных по ключу:*
-                {self.calculated_keyword.timestamp.strftime('%d-%m-%Y:%H:%M:%S')}\n"""
+
+        def _cpm_line(label: str, cpm: int | float | None, dt: datetime | None) -> str:
+            if cpm is not None:
+                val = round(cpm)
+                date_str = dt.strftime("%d-%m-%Y %H:%M") if dt else ""
+                return f"{label}: {val}" + (f" ({date_str})" if date_str else "") + "\n"
+            return f"{label}: —\n"
+
+        kw = self._calculated_keyword
+        text += _cpm_line(
+            "Установленная ставка CPM",
+            kw.cpm_set_bid,
+            kw.cpm_set_bid_date,
+        )
+        text += _cpm_line("Расчетная CPM", kw.cpm_from_bid_log, kw.cpm_from_bid_log_date)
+        text += _cpm_line("CPM из исходной статистики", kw.cpm_from_stats, kw.cpm_from_stats_date)
         return text
 
     @property

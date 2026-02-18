@@ -2,10 +2,11 @@ import pytest
 from fakeredis.aioredis import FakeRedis
 
 from app.core.redis_manager_v2.redis_client import RedisClient
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_manager import (
+from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisClusterBidsManager,
 )
+from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     NewBid,
 )
@@ -48,6 +49,13 @@ def _make_bid(
     )
 
 
+def _to_entries(bids: list[NewBid]) -> list[ClusterBidEntry]:
+    return [
+        ClusterBidEntry(adv_id=b.adv_id, nmid=b.nmid, cluster=b.cluster, new_bid=b.new_bid)
+        for b in bids
+    ]
+
+
 @pytest.mark.asyncio
 async def test_remember_bids_persists_values(
     redis_cluster_bids_manager: RedisClusterBidsManager,
@@ -57,8 +65,9 @@ async def test_remember_bids_persists_values(
         _make_bid(adv_id=1, nmid=123, cluster="cluster-a", new_bid=5),
         _make_bid(adv_id=2, nmid=456, cluster="cluster-b", new_bid=9),
     ]
+    entries = _to_entries(bids)
 
-    await redis_cluster_bids_manager.remember_bids(bids)
+    await redis_cluster_bids_manager.remember_bids(entries)
 
     for bid in bids:
         key = redis_cluster_bids_manager._get_key(bid.adv_id, bid.nmid, bid.cluster)
@@ -73,8 +82,9 @@ async def test_remember_bids_sets_ttl(
     fake_redis: FakeRedis,
 ) -> None:
     bid = _make_bid(adv_id=5, nmid=777, cluster="ttl-cluster", new_bid=11)
+    entries = _to_entries([bid])
 
-    await redis_cluster_bids_manager_short_ttl.remember_bids([bid])
+    await redis_cluster_bids_manager_short_ttl.remember_bids(entries)
 
     key = redis_cluster_bids_manager_short_ttl._get_key(
         bid.adv_id,

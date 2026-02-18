@@ -330,7 +330,7 @@ def get_keywords_setting_keyboard(
             else:
                 text += f'->Н>'
 
-        cpm = int(keyword.cpm + 0.5) # плата за показы
+        cpm = int(keyword.cpm + 0.5)  # плата за показы
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
         pay_for_order = str((round(keyword.pay_for_order_by_current_cpm, 2))) \

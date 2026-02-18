@@ -65,3 +65,29 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
             for result in results
             if result is not None
         ]
+
+    async def get_calculated_keywords_map(
+        self, adv_id: int, texts: list[str]
+    ) -> dict[str, CalculatedKeyword]:
+        """
+        Batch get calculated keywords from Redis by adv_id and text list.
+        Returns dict text -> CalculatedKeyword for texts that exist in cache.
+        """
+        if not texts:
+            return {}
+        key = f"calculated_keywords:{adv_id}"
+        async with self.client.pipeline() as pipe:
+            for text in texts:
+                pipe.hget(name=key, key=text)
+            results = await pipe.execute()
+        out: dict[str, CalculatedKeyword] = {}
+        for text, raw in zip(texts, results):
+            if raw is None:
+                continue
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            try:
+                out[text] = CalculatedKeyword.model_validate(json.loads(raw))
+            except (json.JSONDecodeError, Exception):  # noqa: BLE001
+                continue
+        return out

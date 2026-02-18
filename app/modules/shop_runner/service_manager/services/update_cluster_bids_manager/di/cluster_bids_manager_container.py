@@ -8,9 +8,9 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
     WBManager,
 )
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import RedisClusterBidsTimestampManager
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_manager import (
+from app.modules.cluster_bids_redis import (
     RedisClusterBidsManager,
+    RedisClusterBidsTimestampManager,
 )
 
 

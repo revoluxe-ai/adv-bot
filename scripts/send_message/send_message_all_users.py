@@ -21,7 +21,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from scripts.get_users.filters.filters import get_users_by_telegram_id, get_test_users
 from scripts.send_message.utils.get_users_with_low_balance_and_near_last_payment import \
     get_users_with_low_balance_and_near_last_payment
-from scripts.send_message.utils.messages import message_6
+from scripts.send_message.utils.messages import message_7
 from scripts.users_communicate_module.main_user_generator import get_users_iterator, get_test_users_iterator
 from scripts.users_csv_exporter.dto import UserDTO
 
@@ -62,7 +62,7 @@ redis_semaphore = asyncio.Semaphore(1)
 
 async def send_message(user: UserDTO, bot: Bot) -> bool:
     user_id = user.telegram_id
-    message = message_6.Message
+    message = message_7.Message
     hash_ = sha256(str(message).encode()).hexdigest()
 
     # фильтр Влада
