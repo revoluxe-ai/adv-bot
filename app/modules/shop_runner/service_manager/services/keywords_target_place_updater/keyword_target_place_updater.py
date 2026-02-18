@@ -2,6 +2,7 @@ from sqlalchemy import select, Result
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
+from app.settings import settings
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -30,7 +31,7 @@ class KeywordTargetPlaceUpdater:
         return None
 
     @staticmethod
-    async def _set_new_target_places(adv: WBAdvDTO, target_places: dict[str, int]) -> None:
+    async def _set_new_target_places(adv: WBAdvDTO, target_places: dict[str, int | None]) -> None:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv.adv_setting_original_id)
         async with sm(read_only=False) as session:
             result: Result[tuple[KeywordSetting]] = await session.execute(stmt)
@@ -42,7 +43,7 @@ class KeywordTargetPlaceUpdater:
                     # TODO: Продумать уведомление об ошибке (срочно настроить сбор логов)
                     logger.error("No target place found for %s , adv_id: %s Set Default place = 2" ,
                                  text, adv.adv_id)
-                    target_place = 2 # 2 - по опыту чаще всего наиболее рентабельное место
+                    target_place = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE  # 2 - по опыту чаще всего наиболее рентабельное место
                 keyword.target_place = target_place
             await session.commit()
 
