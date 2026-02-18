@@ -17,9 +17,14 @@ class KeywordTargetPlaceUpdater:
 
     async def update_individual_keyword_target_places(self, adv: WBAdvDTO):
         nmid = adv.main_nmid
+        try:
+            min_bid = adv.search_adv_min_bids[nmid]
+        except KeyError:
+            logger.exception("Failed to find min_bid")
+            raise
         target_places: dict[str, int] = await self._predict_keyword_target_place.get_keywords_target_position(
             nmid=nmid,
-        min_bid=adv.search_adv_min_bids[nmid],
+        min_bid=min_bid,
         positions_size=adv.min_target_position)
         await self._set_new_target_places(adv, target_places)
         return None
