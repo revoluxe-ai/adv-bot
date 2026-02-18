@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import KeywordStat
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import  KeywordSettingDTO
+from .inner_dto.keyword_cpm_sources import KeywordCpmSources
 from .inner_dto.keyword_state import KeywordState
 from .states import KeywordStatus, KeywordStatusReason
 
@@ -15,6 +16,7 @@ class CalculatedKeyword(BaseModel):
     state: KeywordState
     target_pay_for_order: float | None
     above_rec_conversion: bool | None = None
+    cpm_sources: KeywordCpmSources | None = None
 
 
     @property
@@ -38,7 +40,35 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def cpm(self) -> float:
+        if self.cpm_sources is not None:
+            resolved = self.cpm_sources.resolved_cpm()
+            if resolved is not None:
+                return resolved
         return self.cluster_stat.cpm
+
+    @property
+    def cpm_set_bid(self) -> int | None:
+        return self.cpm_sources.cpm_set_bid if self.cpm_sources else None
+
+    @property
+    def cpm_set_bid_date(self) -> datetime | None:
+        return self.cpm_sources.cpm_set_bid_date if self.cpm_sources else None
+
+    @property
+    def cpm_from_bid_log(self) -> float | None:
+        return self.cpm_sources.cpm_from_bid_log if self.cpm_sources else None
+
+    @property
+    def cpm_from_bid_log_date(self) -> datetime | None:
+        return self.cpm_sources.cpm_from_bid_log_date if self.cpm_sources else None
+
+    @property
+    def cpm_from_stats(self) -> float | None:
+        return self.cpm_sources.cpm_from_stats if self.cpm_sources else None
+
+    @property
+    def cpm_from_stats_date(self) -> datetime | None:
+        return self.cpm_sources.cpm_from_stats_date if self.cpm_sources else None
 
     @property
     def add_to_cart(self) -> int:

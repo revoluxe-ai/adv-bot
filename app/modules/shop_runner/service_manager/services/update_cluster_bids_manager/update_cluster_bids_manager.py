@@ -9,13 +9,12 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_manager import (
-    RedisClusterBidsManager,
+from app.modules.cluster_bids_redis import (
     ClusterBidKey,
-)
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
+    RedisClusterBidsManager,
     RedisClusterBidsTimestampManager,
 )
+from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
@@ -299,9 +298,16 @@ class UpdateClusterBidsManager:
                     wb_error = result
         if wb_error is None:
             try:
-                await self._redis_cluster_bids_manager.remember_bids(
-                    update_bids_command.new_bids
-                )
+                entries = [
+                    ClusterBidEntry(
+                        adv_id=b.adv_id,
+                        nmid=b.nmid,
+                        cluster=b.cluster,
+                        new_bid=b.new_bid,
+                    )
+                    for b in update_bids_command.new_bids
+                ]
+                await self._redis_cluster_bids_manager.remember_bids(entries)
             except Exception as error:  # noqa: BLE001
                 logger.error("Не удалось сохранить ставки в Redis: %s", error)
 

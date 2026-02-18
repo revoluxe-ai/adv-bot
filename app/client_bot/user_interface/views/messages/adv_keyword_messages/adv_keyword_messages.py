@@ -1,5 +1,6 @@
 import logging
 import typing
+from datetime import datetime
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -55,6 +56,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         image: str,
         page: int,
         image_mode: str = "graphic",
+        cpm_date_map: dict[str, tuple[float | None, datetime | None]] | None = None,
     ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
@@ -67,6 +69,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
         self._last_saved_bids: dict[int, int] = {}
+        self._cpm_date_map = cpm_date_map
 
     @inject
     async def __call__(
@@ -182,12 +185,18 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
+        from app.client_bot.utils import build_cpm_date_map
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
             MinCtrManager,
         )
         min_ctr_manager = MinCtrManager(self._adv_setting)
 
         self._mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
+
+        if self._cpm_date_map is None and self._keywords:
+            self._cpm_date_map = await build_cpm_date_map(
+                self._adv_setting, self._keywords, redis_client
+            )
 
         result = await super().__call__()
         return result
