@@ -643,7 +643,10 @@ class Settings:
         value = os.getenv("GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE")
         if not value:
             return 2
-        return int(value)
+        parsed = int(value)
+        if parsed <= 0:
+            return 2
+        return parsed
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
