@@ -133,7 +133,9 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def position(self) -> float:
-        return self.cluster_stat.position
+        position = self.cluster_stat.position
+        position = max(round(position), 1)
+        return position
 
     @property
     def timestamp(self) -> datetime:
