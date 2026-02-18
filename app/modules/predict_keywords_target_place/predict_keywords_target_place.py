@@ -45,7 +45,7 @@ class PredictKeywordsTargetPlace:
                 result_target_positions[keyword] = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
                 continue
             best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
-            result_target_positions[keyword] = best_position.position
+            result_target_positions[keyword] = max(1, best_position.position)
         return result_target_positions
 
 
