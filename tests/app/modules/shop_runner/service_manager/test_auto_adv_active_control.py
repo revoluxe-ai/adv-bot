@@ -516,6 +516,9 @@ async def test_auto_adv_does_not_start_when_avg_cost_above_target():
         search_status="pause",
         auto_adv_id=20,
         search_adv_id=21,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
     )
 
     wb_modifier = MagicMock()
@@ -625,6 +628,9 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
         search_adv_id=25,
         use_common_budget=True,
         common_budget_daily_limit=500,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
     )
 
     wb_modifier = MagicMock()
