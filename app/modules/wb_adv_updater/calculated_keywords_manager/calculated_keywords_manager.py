@@ -42,6 +42,7 @@ if typing.TYPE_CHECKING:
 class _StatsWithBidLog:
     stats: list[KeywordStat]
     bid_log_map: dict[str, tuple[float, datetime]]
+    set_bid_map: dict[str, tuple[float, datetime | None]]
 
 
 P = ParamSpec("P")
@@ -91,6 +92,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         stats_with_bid_log: _StatsWithBidLog = results[1]
         stats = stats_with_bid_log.stats
         bid_log_map = stats_with_bid_log.bid_log_map
+        set_bid_map = stats_with_bid_log.set_bid_map
 
         pre_calculated_keywords = self.__create_pre_calculated_keywords(keyword_hard_statuses,
                                                                         stats,
@@ -98,7 +100,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         if not pre_calculated_keywords:
             return []
         pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
-            pre_calculated_keywords, bid_log_map
+            pre_calculated_keywords, bid_log_map, set_bid_map
         )
         calculated_keyword_list = await self.__get_calculated_keywords(complex_adv, pre_calculated_keywords)
         await self._set_calculated_keywords_in_redis_cache(complex_adv, calculated_keyword_list)
@@ -108,20 +110,39 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
     async def _get_all_stats(
         self, complex_adv: 'ComplexAdv', min_days: int, min_views: int
     ) -> _StatsWithBidLog:
+        from types import SimpleNamespace
+
         nmids = complex_adv.nmids
         stats = await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
         bid_log_map: dict[str, tuple[float, datetime]] = {}
+        set_bid_map: dict[str, tuple[float, datetime | None]] = {}
         search_adv_id = getattr(complex_adv, "search_adv_id", None)
         if search_adv_id is not None and stats:
             from app.modules.keyword_bid_from_log import get_latest_keyword_bids
+
             texts = [s.text for s in stats]
             bid_log_map = await get_latest_keyword_bids(search_adv_id, nmids, texts)
-        return _StatsWithBidLog(stats=stats, bid_log_map=bid_log_map)
+
+            from app.modules.cluster_bids_redis import get_redis_client, get_set_bid_map
+
+            try:
+                redis_client = get_redis_client()
+                adv_for_ts = SimpleNamespace(adv_id=search_adv_id)
+                set_bid_map = await get_set_bid_map(
+                    search_adv_id, nmids, texts, adv_for_ts, redis_client
+                )
+            except Exception:  # noqa: BLE001
+                set_bid_map = {}
+
+        return _StatsWithBidLog(
+            stats=stats, bid_log_map=bid_log_map, set_bid_map=set_bid_map
+        )
 
     @staticmethod
     def __enrich_pre_calculated_with_cpm_sources(
         pre_keywords: list[PreCalculatedKeyword],
         bid_log_map: dict[str, tuple[float, datetime]],
+        set_bid_map: dict[str, tuple[float, datetime | None]],
     ) -> list[PreCalculatedKeyword]:
         enriched: list[PreCalculatedKeyword] = []
         for pre_kw in pre_keywords:
@@ -131,9 +152,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             cpm_from_bid_log_date: datetime | None = None
             if bid_log is not None:
                 cpm_from_bid_log, cpm_from_bid_log_date = bid_log
+            set_bid = set_bid_map.get(text)
+            cpm_set_bid: int | None = None
+            cpm_set_bid_date: datetime | None = None
+            if set_bid is not None:
+                cpm_set_bid = int(set_bid[0])
+                cpm_set_bid_date = set_bid[1]
             sources = KeywordCpmSources(
-                cpm_set_bid=None,
-                cpm_set_bid_date=None,
+                cpm_set_bid=cpm_set_bid,
+                cpm_set_bid_date=cpm_set_bid_date,
                 cpm_from_bid_log=cpm_from_bid_log,
                 cpm_from_bid_log_date=cpm_from_bid_log_date,
                 cpm_from_stats=pre_kw.cluster_stat.cpm,

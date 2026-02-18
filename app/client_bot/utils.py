@@ -186,11 +186,6 @@ async def build_cpm_date_map(
     Build map text -> (cpm, date) for list display.
     Priority: 1) set bid (Redis), 2) bid_decision_log, 3) Redis calculated_keywords cache, 4) keyword.cpm/timestamp.
     """
-    from app.modules.cluster_bids_redis import (
-        ClusterBidKey,
-        RedisClusterBidsManager,
-        RedisClusterBidsTimestampManager,
-    )
     from app.modules.keyword_bid_from_log import get_latest_keyword_bids
     from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
         RedisCalculatedKeywordsCacheManager,
@@ -202,23 +197,11 @@ async def build_cpm_date_map(
     nmids = list(adv_setting.nmids or [])
 
     # 1) Set bid from Redis
-    set_bid_map: dict[str, tuple[float, datetime | None]] = {}
-    if search_adv_id is not None and nmids and texts:
-        keys = [
-            ClusterBidKey(adv_id=search_adv_id, nmid=nmid, cluster=text)
-            for nmid in nmids
-            for text in texts
-        ]
-        manager = RedisClusterBidsManager(redis_client=redis_client)
-        bids = await manager.get_bids(keys)
-        ts_manager = RedisClusterBidsTimestampManager(redis_client=redis_client)
-        set_bid_date = await ts_manager.get(adv_setting)
-        for text in texts:
-            for nmid in nmids:
-                k = ClusterBidKey(adv_id=search_adv_id, nmid=nmid, cluster=text)
-                if k in bids:
-                    set_bid_map[text] = (float(bids[k]), set_bid_date)
-                    break
+    from app.modules.cluster_bids_redis import get_set_bid_map
+
+    set_bid_map = await get_set_bid_map(
+        search_adv_id, nmids, texts, adv_setting, redis_client
+    )
 
     # 2) bid_decision_log (one call for all texts)
     bid_log_map: dict[str, tuple[float, datetime]] = {}
