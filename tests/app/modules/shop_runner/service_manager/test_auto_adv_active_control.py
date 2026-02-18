@@ -16,9 +16,20 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 
 class _FakeAdvSetting:
-    def __init__(self, active_status: str, adv_id: int | None = None):
+    def __init__(
+        self,
+        active_status: str,
+        adv_id: int | None = None,
+        *,
+        plan_for_sales_for_day: int | None = None,
+        target_price_for_order: int | float | None = None,
+        max_price_for_order: int | float | None = None,
+    ):
         self.active_status = active_status
         self.adv_id = adv_id
+        self.plan_for_sales_for_day = plan_for_sales_for_day
+        self.target_price_for_order = target_price_for_order
+        self.max_price_for_order = max_price_for_order
 
 
 class _FakeSearchAdv:
@@ -41,12 +52,21 @@ class _FakeComplexAdv:
         watchdog_enabled: bool = True,
         use_common_budget: bool = False,
         common_budget_daily_limit: int | None = None,
+        plan_for_sales_for_day: int | None = None,
+        target_price_for_order: int | float | None = None,
+        max_price_for_order: int | float | None = None,
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
         self._auto_budget_daily_limit = auto_limit
         self._search_auto_budget_daily_limit = search_limit
-        self._adv_setting = _FakeAdvSetting(active_status=auto_status, adv_id=auto_adv_id)
+        self._adv_setting = _FakeAdvSetting(
+            active_status=auto_status,
+            adv_id=auto_adv_id,
+            plan_for_sales_for_day=plan_for_sales_for_day,
+            target_price_for_order=target_price_for_order,
+            max_price_for_order=max_price_for_order,
+        )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
         self.auto_adv_id = auto_adv_id
@@ -86,6 +106,9 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         search_status="pause",
         auto_adv_id=1,
         search_adv_id=2,
+        plan_for_sales_for_day=1,
+        target_price_for_order=100,
+        max_price_for_order=200,
     )
     adv_to_pause = _FakeComplexAdv(
         auto_limit=0,
@@ -169,7 +192,7 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
     ):
         await service.ensure_campaigns_active(
@@ -235,7 +258,7 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
     ):
         await service.ensure_campaigns_active([overspend_adv])
@@ -313,6 +336,9 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
         search_adv_id=14,
         use_common_budget=True,
         common_budget_daily_limit=500,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
     )
 
     wb_modifier = MagicMock()
@@ -354,7 +380,7 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -412,7 +438,7 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -429,6 +455,9 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
         search_limit=0,
         search_status="pause",
         auto_adv_id=11,
+        plan_for_sales_for_day=10,
+        target_price_for_order=120,
+        max_price_for_order=220,
     )
 
     wb_modifier = MagicMock()
@@ -468,7 +497,7 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -526,7 +555,7 @@ async def test_auto_adv_does_not_start_when_avg_cost_above_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -575,7 +604,7 @@ async def test_auto_adv_does_not_start_when_no_plan_fact():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -637,7 +666,7 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_average_order_cost",
+        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -650,6 +679,10 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
 
 @pytest.mark.asyncio
 async def test_average_order_cost_uses_additional_views():
+    from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import (
+        full_wb_adv_stat,
+    )
+
     stats = SmallFullAdvStat(
         views=0,
         clicks=0,
@@ -661,16 +694,18 @@ async def test_average_order_cost_uses_additional_views():
     orders_kw = 4
 
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_stats_by_last_days",
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_stats_by_last_days",
         new=AsyncMock(return_value=stats),
     ) as stats_mock, patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_keywords_spend",
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_keywords_spend",
         new=AsyncMock(return_value=400.0),
     ) as spend_mock, patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_keywords_views_orders_by_days",
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_keywords_views_orders_by_days",
         new=AsyncMock(return_value={date(2025, 1, 1): (10, orders_kw)}),
     ) as views_orders_mock:
-        result = await AutoAdvActiveControlService._get_average_order_cost(adv_id=42)
+        result = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+            adv_id=42, days=6
+        )
 
     assert result == pytest.approx((1000.0 - 400.0) / max(1, 10 - orders_kw))
     stats_mock.assert_awaited_once()

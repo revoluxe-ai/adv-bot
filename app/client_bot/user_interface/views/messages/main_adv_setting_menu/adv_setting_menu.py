@@ -41,6 +41,13 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
+from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
 
 if TYPE_CHECKING:
@@ -183,16 +190,23 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
+
+        plan = PlanFactProvider.get_plan_data(self.adv)
+        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(self.adv.adv_id)
+        self._target_cost = resolve_target_cost(
+            plan.orders if plan else None,
+            plan.target_pay_for_order if plan else None,
+            plan.max_pay_for_order if plan else None,
+            plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+        )
+        self._avg_cost_additional = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+            self.adv.adv_id,
+        )
+
         return await super().__call__()
 
     @property
     def text(self) -> str:
-        max_cpc = self.adv.max_cpc
-        if not max_cpc:
-            max_cpc_text = "Максимальная стоимость клика не установлена"
-        else:
-            max_cpc_text = f"Максимальная стоимость клика: {max_cpc} р."
-
         # Determine predict CTR mode display text
         predict_ctr_mode = self.adv.predict_ctr_mode or PredictCTRMode.V1
         if predict_ctr_mode == PredictCTRMode.V1:
@@ -201,7 +215,36 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             # TODO: Добавить отображение фото в ключах
             predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
-        text = (
+        text = ""
+
+        if self.adv.rec_system_mode:
+            target_str = (
+                f"{round(self._target_cost)} р."
+                if self._target_cost is not None
+                else "Не задано"
+            )
+            avg_str = (
+                f"{round(self._avg_cost_additional)} р."
+                if self._avg_cost_additional is not None
+                else "Нет данных"
+            )
+
+
+            if self._target_cost is not None or self._avg_cost_additional is not None:
+                text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
+
+            if (
+                    self._avg_cost_additional is not None
+                    and self._target_cost is not None
+                    and self._avg_cost_additional > self._target_cost
+            ):
+                suggested = round(self._avg_cost_additional * 1.1, 0)
+                text += (
+                    "⚠️ Рек. системы (полки) не раскручиваются. "
+                    f"Рекомендуется макс.заказа >= {int(suggested)} р.\n"
+                )
+
+        text += (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус Авто: {self.adv.active_status}\n"
@@ -259,7 +302,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 stat_text += f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
 
             text += stat_text
-        text += f"{max_cpc_text}"
 
         return text
 

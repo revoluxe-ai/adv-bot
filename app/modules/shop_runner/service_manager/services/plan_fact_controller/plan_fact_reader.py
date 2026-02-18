@@ -28,7 +28,14 @@ class PlanFactReader:
     async def get_latest_plan_fact(
         self, adv_id: int
     ) -> PlanFactSummary | None:
+        """Возвращает последнюю запись план-факт по adv_id из ClickHouse.
 
+        Поля plan_* — снимок на момент записи в кеш; для расчёта целевой
+        себестоимости и иной бизнес-логики по плану используйте текущие
+        настройки AdvSetting (PlanFactProvider.get_plan_data). Из данного
+        метода для логики берите только факт: fact_predict_orders,
+        fact_pay_for_order.
+        """
         query = self._load_query()
 
         async with get_clickhouse_client() as client:

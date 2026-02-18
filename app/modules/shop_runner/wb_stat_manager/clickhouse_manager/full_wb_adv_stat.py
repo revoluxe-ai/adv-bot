@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Iterable
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import TypedDict
 
@@ -9,6 +9,9 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     SmallFullAdvStat,
     SmallFullAdvStatPerDay,
+)
+from app.shared.domains.wb.utils.additional_cost_per_order import (
+    compute_additional_cost_per_order,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
@@ -252,6 +255,40 @@ async def get_spend_by_last_days(
     except Exception:
         logger.error("Ошибка получения затрат из ClickHouse", exc_info=True)
         raise
+
+
+async def get_additional_cost_per_order_for_adv(
+    adv_id: int, days: int = 7
+) -> float | None:
+    """Средняя себестоимость заказа из дополнительных показов (полки/рек. системы) за период.
+
+    Args:
+        adv_id: ID авто-кампании
+        days: Количество дней (по умолчанию 7)
+
+    Returns:
+        Себестоимость заказа из доп. показов или None при ошибке
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days - 1)
+
+    auto_stat = await get_stats_by_last_days(
+        [adv_id], start_date, end_date
+    )
+    spend_kw = await get_keywords_spend(
+        [adv_id], start_date, end_date
+    )
+    kw_views_orders = await get_keywords_views_orders_by_days(
+        [adv_id], start_date, end_date
+    )
+
+    orders_kw = sum(orders for _, orders in kw_views_orders.values())
+    return compute_additional_cost_per_order(
+        auto_stat.spend,
+        auto_stat.orders,
+        spend_kw,
+        orders_kw,
+    )
 
 
 def _get_insert_query() -> str:

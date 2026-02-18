@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import Mock
 
 from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost,
     resolve_target_cost_from_context,
     resolve_target_cost_from_summary,
 )
@@ -219,3 +220,50 @@ class TestResolveTargetCostFromSummary:
 
         # 0 < 100, so should return max
         assert result == 800.0
+
+
+class TestResolveTargetCost:
+    """Tests for resolve_target_cost (scalar arguments)."""
+
+    def test_returns_target_when_plan_fulfilled(self):
+        """When plan is fulfilled, should return plan_target_pay_for_order."""
+        result = resolve_target_cost(100, 500.0, 800.0, 100.0)
+        assert result == 500.0
+
+    def test_returns_max_when_plan_not_fulfilled(self):
+        """When plan is not fulfilled, should return plan_max_pay_for_order."""
+        result = resolve_target_cost(100, 500.0, 800.0, 50.0)
+        assert result == 800.0
+
+    def test_returns_target_when_plan_exceeded(self):
+        """When plan is exceeded, should return plan_target_pay_for_order."""
+        result = resolve_target_cost(100, 500.0, 800.0, 150.0)
+        assert result == 500.0
+
+    def test_returns_none_when_plan_orders_is_none(self):
+        result = resolve_target_cost(None, 500.0, 800.0, 100.0)
+        assert result is None
+
+    def test_returns_none_when_plan_target_is_none(self):
+        result = resolve_target_cost(100, None, 800.0, 100.0)
+        assert result is None
+
+    def test_returns_none_when_plan_max_is_none(self):
+        result = resolve_target_cost(100, 500.0, None, 50.0)
+        assert result is None
+
+    def test_treats_none_fact_orders_as_zero(self):
+        """When fact_predict_orders is None, should treat as 0."""
+        result = resolve_target_cost(100, 500.0, 800.0, None)
+        assert result == 800.0
+
+    def test_boundary_fact_equals_plan_returns_target(self):
+        """When fact_predict_orders == plan_orders, should return target."""
+        result = resolve_target_cost(10, 100, 200, 10.0)
+        assert result == 100.0
+
+    def test_int_plan_values_returned_as_float(self):
+        """Result should be float for int plan values."""
+        result = resolve_target_cost(100, 500, 800, 100.0)
+        assert result == 500.0
+        assert isinstance(result, float)
