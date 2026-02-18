@@ -616,8 +616,8 @@ class AdvSetting(BaseTable):
     individual_keywords_target_place_mode: Mapped[bool] = mapped_column(
         Boolean,
         nullable=True,
-        default=True,
-        server_default=text("true")
+        default=False,
+        server_default=text("false")
     )
     min_target_position: Mapped[int] = mapped_column(
         Integer,
