@@ -42,7 +42,12 @@ AdvType = Literal["auto", "auction", "complex"]
 
 
 def get_name_for_adv(nmid: int, card_name: str, adv_type: AdvType) -> str:
-    """Имя РК по шаблону: артикул + [Авто|Аукцион] + название из карточки (до 128 символов)."""
+    """Имя РК по шаблону (до 128 символов).
+
+    - auto/auction: «Артикул Авто|Аукцион Название карточки» — для кампаний на стороне WB.
+    - complex: «Артикул Название карточки» — для сущности бота (комплексная РК, объединяющая
+      Авто и Аукцион); без слова Авто/Аукцион в середине.
+    """
     if adv_type not in get_args(AdvType):
         raise ValueError(f"adv_type must be one of {get_args(AdvType)}")
     if adv_type == "auto":

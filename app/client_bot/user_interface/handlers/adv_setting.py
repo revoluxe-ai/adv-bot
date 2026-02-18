@@ -22,6 +22,7 @@ from app.client_bot.modules.default_settings import apply_defaults_to_adv_settin
 
 from .. import states
 from ..views import callbacks, messages
+from ..views.messages.main_adv_setting_menu import AdvSettingMenu
 
 sm = get_async_session_maker
 
@@ -212,7 +213,7 @@ async def adv_handler(
         )
         return
 
-    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
@@ -273,7 +274,7 @@ async def turn_adv_on(
         )
         result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = result.scalar_one()
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
@@ -340,7 +341,7 @@ async def turn_adv_off(
         adv_setting.bot_active = False
         await session.commit()
 
-    await messages.AdvSettingMenu(
+    await AdvSettingMenu(
         bot,
         chat_id,
         wb_user_cabinet,
@@ -390,7 +391,7 @@ async def apply_campaign_defaults(
             )
             return
 
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
     return
 

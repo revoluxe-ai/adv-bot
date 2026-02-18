@@ -5,15 +5,10 @@ from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
-from app.shared.domains.wb.utils.additional_cost_per_order import (
-    compute_additional_cost_per_order,
-)
-from app.shared.domains.wb.utils.cost_resolver import (
-    resolve_target_cost_from_summary,
-)
+from app.modules.plan_fact.provider import PlanFactProvider
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
-
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -99,29 +94,6 @@ class AutoAdvActiveControlService:
             start_date,
             end_date,
         )
-    @staticmethod
-    async def _get_average_order_cost(adv_id: int) -> float | None:
-        end_date = datetime.now(MSK_TZ)
-        start_date = end_date - timedelta(days=6)
-
-        auto_stat = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_id], start_date, end_date
-        )
-        spend_kw = await full_wb_adv_stat.get_keywords_spend(
-            [adv_id], start_date, end_date
-        )
-        kw_views_orders = await full_wb_adv_stat.get_keywords_views_orders_by_days(
-            [adv_id], start_date, end_date
-        )
-
-        orders_kw = sum(orders for _, orders in kw_views_orders.values())
-        return compute_additional_cost_per_order(
-            auto_stat.spend,
-            auto_stat.orders,
-            spend_kw,
-            orders_kw,
-        )
-
     async def _auto_campaign_handler(
         self,
         adv: ComplexAdv,
@@ -185,11 +157,19 @@ class AutoAdvActiveControlService:
                 return None
             budget_ok = auto_limit > 0 and spend_today < auto_limit
 
+        plan = PlanFactProvider.get_plan_data(adv.adv_setting)
         plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(
             auto_adv_id
         )
-        target_cost = resolve_target_cost_from_summary(plan_fact_summary)
-        avg_cost = await self._get_average_order_cost(auto_adv_id)
+        target_cost = resolve_target_cost(
+            plan.orders if plan else None,
+            plan.target_pay_for_order if plan else None,
+            plan.max_pay_for_order if plan else None,
+            plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+        )
+        avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+            auto_adv_id,
+        )
 
         if target_cost is None and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(

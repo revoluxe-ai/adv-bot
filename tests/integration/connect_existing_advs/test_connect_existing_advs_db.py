@@ -103,8 +103,8 @@ async def  test_connect_existing_confirm_type2_creates_adv_setting_in_db(
     assert row is not None
     assert row.adv_id == chosen_auto_id
     assert row._search_adv_id == chosen_auction_id
-    # TODO: Тут явно какая-то ошибка
-    assert row.name == f"{nmid} {nmid}"
+    # name = get_name_for_adv(nmid, card_name, "complex") -> "100500 NM 100500" when card_name="NM 100500"
+    assert row.name == f"{nmid} NM {nmid}"
     assert row.nmids == [nmid]
     assert row.active_status == "9"
     assert row.type == 8

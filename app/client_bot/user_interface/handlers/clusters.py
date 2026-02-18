@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabin
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..views import callbacks, messages
+from ..views.messages.main_adv_setting_menu import AdvSettingMenu
 
 sm = get_async_session_maker
 
@@ -42,7 +43,7 @@ async def turn_clusters_on(
         )
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
     chat_id = callback.message.chat.id
-    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
 @router.callback_query(callbacks.TurnClusters.filter(F.action == "off"))
@@ -69,4 +70,4 @@ async def turn_clusters_off(
         )
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
     chat_id = callback.message.chat.id
-    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
