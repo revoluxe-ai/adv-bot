@@ -91,6 +91,38 @@ async def test_get_keywords_target_position_returns_best_position_when_valid_dat
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_keywords_target_position_never_returns_zero():
+    """When best_position.position is 0 or negative, result must be >= 1 (never 0)."""
+    mock_ch = AsyncMock()
+    ts = datetime.now()
+    mock_ch.get_conv_cart_to_views = AsyncMock(
+        return_value={
+            "kw1": [
+                ConvCartToViewsOnPosition(keyword="kw1", position=0, conv_cart_to_views=0.1),
+                ConvCartToViewsOnPosition(keyword="kw1", position=1, conv_cart_to_views=0.05),
+            ]
+        }
+    )
+    mock_ch.get_bids_for_positions = AsyncMock(
+        return_value={
+            "kw1": [
+                BidPosition(keyword="kw1", position=0, bid=60, timestamp=ts),
+                BidPosition(keyword="kw1", position=1, bid=80, timestamp=ts),
+            ]
+        }
+    )
+
+    predictor = PredictKeywordsTargetPlace(mock_ch)
+    result = await predictor.get_keywords_target_position(
+        nmid=12345, min_bid=50, positions_size=10
+    )
+
+    assert 0 not in result.values()
+    assert result["kw1"] >= 1
+
+
+@pytest.mark.unit
 def test_sort_bids_for_positions():
     """Сортировка ставок по position."""
     predictor = PredictKeywordsTargetPlace(None)

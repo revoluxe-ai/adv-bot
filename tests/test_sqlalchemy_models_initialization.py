@@ -137,6 +137,25 @@ class TestSQLAlchemyModelsInitialization:
         except Exception as e:
             pytest.fail(f"Failed to instantiate models: {e}")
 
+    def test_keyword_setting_target_place_rejects_zero_and_negative(self) -> None:
+        """KeywordSetting.target_place must be None or integer > 0; 0 and negative raise ValueError."""
+        from app.modules.common_slaves.wildberries.models.models import (
+            KeywordSetting,
+        )
+
+        keyword = KeywordSetting(text="test", adv_setting_id=1)  # type: ignore[no-untyped-call]
+        keyword.target_place = None
+        assert keyword.target_place is None
+
+        keyword.target_place = 1
+        assert keyword.target_place == 1
+
+        with pytest.raises(ValueError, match="target_place must be None or an integer > 0"):
+            keyword.target_place = 0
+
+        with pytest.raises(ValueError, match="target_place must be None or an integer > 0"):
+            keyword.target_place = -1
+
     def test_no_circular_import_issues(self) -> None:
         """Test that importing models in different orders doesn't cause issues"""
         try:
