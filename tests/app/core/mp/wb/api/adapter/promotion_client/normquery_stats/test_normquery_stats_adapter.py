@@ -1,29 +1,22 @@
+import datetime
+
 import pytest
 from unittest.mock import AsyncMock, patch
+
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.adapter import NormqueryStatsAdapter
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.get_normquery_stats import (
     command_to_bodies,
 )
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
     dto_to_command,
 )
-from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
-    dto_to_command,
-)
-from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
+from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
+from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.models import (
     V0GetNormQueryStatsRequest,
     V0GetNormQueryStatsResponse,
     V0GetNormQueryStatsItem,
     V0GetNormQueryStatsItemStat,
-    V0GetNormQueryStatsRequestItemsItem,
 )
-import datetime
-from app.core.mp.wb.api.httpx_client_handler import HttpxClientHandler
-from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.raw_response_to_dto import raw_response_to_dto
-from app.core.mp.wb.api.retry_decorator import retry_decorator
-from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
 
 
 @pytest.fixture
@@ -80,6 +73,7 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
         orders=2,
         cpc=0.5,
         avg_pos=3.0,
+        spend=10.0,
     )
 
     # TODO: Переделать запрос рейтинга ключей, чтобы брал превентивные данные более широко
@@ -122,4 +116,5 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
         assert result[0].stats[0].orders == 2
         assert result[0].stats[0].cpc == 0.5
         assert result[0].stats[0].avr_pos == 3.0
+        assert result[0].stats[0].spend == 10.0
 

@@ -23,6 +23,9 @@ class AdvSetting(StatesGroup):
     waiting_for_filter_by_query = State()
     waiting_for_filter_keywords = State()
 
+class KeywordTargetPlace(StatesGroup):
+    waiting_for_new_target_place = State()
+
 
 class ChangeMaxCPC(StatesGroup):
     waiting_for_new_max_cpc = State()

@@ -18,12 +18,14 @@ class DummyAdv:
         auto_update_white_list: bool | None = None,
         auto_update_target_place: bool | None = None,
         auto_update_exponent: bool | None = None,
+        individual_keywords_target_place_mode: bool | None = None,
     ):
         self.search_adv_id = search_adv_id
         self.automatic_version = automatic_version
         self.auto_update_white_list = auto_update_white_list
         self.auto_update_target_place = auto_update_target_place
         self.auto_update_exponent = auto_update_exponent
+        self.individual_keywords_target_place_mode = individual_keywords_target_place_mode
 
 
 class TestPricerTariffs:

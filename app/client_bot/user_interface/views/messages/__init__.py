@@ -2,7 +2,6 @@ from .adv_keyword_messages.adv_keyword_messages import AdvKeywordsSetting
 from .messages import (
     AddNewTokenGet,
     AdvCompanyChoicing,
-    AdvSettingMenu,
     AutoCPMSettingGetMaxCPM,
     AutoCPMSettingGetMinPosition,
     CabinetExistsForUser,
@@ -24,17 +23,19 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
-KeywordSettingMessage,
-FilterByQuery
+    KeywordSettingMessage,
+    KeywordTargetPlacePrompt,
+    KeywordTargetPlaceUpdated,
+    FilterByQuery,
+    ManualCPMSetting,
+
 )
 
 __all__ = [
     "AddNewTokenGet",
     "FilterByQuery",
-    "KeywordSettingMessage",
     "AdvCompanyChoicing",
     "AdvKeywordsSetting",
-    "AdvSettingMenu",
     "AutoCPMSettingGetMaxCPM",
     "AutoCPMSettingGetMinPosition",
     "CabinetExistsForUser",
@@ -56,4 +57,8 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+    "KeywordSettingMessage",
+    "KeywordTargetPlacePrompt",
+    "KeywordTargetPlaceUpdated",
+    "ManualCPMSetting",
 ]

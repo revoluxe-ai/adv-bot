@@ -495,7 +495,7 @@ class Settings:
     def SHOPS_WORKS_TLL(self) -> int:
         value = os.getenv("SHOPS_WORKS_TLL")
         if not value:
-            return 60 * 5
+            return 60
         else:
             return int(value)
 
@@ -637,6 +637,16 @@ class Settings:
         if value == "true":
             return True
         return False
+
+    @property
+    def GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE(self) -> int:
+        value = os.getenv("GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE")
+        if not value:
+            return 2
+        parsed = int(value)
+        if parsed <= 0:
+            return 2
+        return parsed
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

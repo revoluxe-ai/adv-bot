@@ -42,7 +42,15 @@ class TargetPlaceDownExecutor(BaseExecutor):
             ExecutionResult с результатом операции
         """
 
-        adv_setting: AdvSetting = ctx.complex_adv.adv_setting
+        complex_adv = ctx.complex_adv
+        if complex_adv.individual_keywords_target_place_mode:
+            return ExecutionResult(
+                success=False,
+                efficiency=0,
+                used_power=0
+            )
+
+        adv_setting: AdvSetting = complex_adv.adv_setting
         adv_id = adv_setting.adv_id
         if not ctx.complex_adv.is_target_position_control_enabled:
             logger.debug(

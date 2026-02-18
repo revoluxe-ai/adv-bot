@@ -10,6 +10,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost_from_context,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
@@ -25,6 +28,7 @@ class WhiteListAddExecutor(BaseExecutor):
     """Добавляет наиболее эффективные релевантные ключевые слова в белый список."""
 
     PASS_TIME_SECONDS = 15 * 60  # 15 минут между изменениями
+    PAY_PER_ORDER_THRESHOLD = 0.9  # 90% от целевой себестоимости заказа
 
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
         """Добавляет один ключ в белый список.
@@ -44,24 +48,45 @@ class WhiteListAddExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
+        # Проверка себестоимости заказа (90% от целевой)
+        target_cost = resolve_target_cost_from_context(ctx)
+        if target_cost is None or target_cost <= 0:
+            logger.warning(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: невалидные данные план-факт, пропускаем"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+        current_pay_for_order = ctx.fact.pay_for_order
+        threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
+
+        if current_pay_for_order >= threshold:
+            logger.info(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: пропуск из-за высокой себестоимости заказа "
+                f"(текущая={current_pay_for_order:.2f}, порог={threshold:.2f} (90%), "
+                f"целевая={target_cost:.2f}, {current_pay_for_order / target_cost * 100:.1f}%)"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+
         mean_auto_ctr: float | None = await ctx.complex_adv.get_mean_auto_ctr()
 
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
+            base_ok = keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
+            if not base_ok:
+                return False
+            if ctx.complex_adv.rec_system_promotion_mode_active and (
+                keyword.above_rec_conversion is  not True
+            ):
+                return False
             if ctx.complex_adv.auto_add_only_relevant_phrase:
                 return (
                     keyword.relevant
-                    and keyword.hard_status == 1
-                    and keyword.status == KeywordStatus.BAD
                     and (
                         keyword.ctr > mean_auto_ctr
                         if mean_auto_ctr is not None
                         else True
                     )
                 )
-            else:
-                # Любые фразы со статусом BAD и hard_status=1
-                return keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
+            return True
 
         keywords = await ctx.complex_adv.get_keywords()
         candidates = list(filter(candidate_filter, keywords))

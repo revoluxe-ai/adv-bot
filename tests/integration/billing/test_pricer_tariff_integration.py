@@ -136,6 +136,35 @@ async def test_auto_mode_applies_without_active_search_campaigns(
     assert details.total_per_month == 0.0
 
 
+async def test_auto_mode_triggered_by_individual_keyword_target_places(
+    async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
+):
+    wb_cabinet_id = 1
+    shop_id = "test_shop_id"
+
+    search = _make_search_adv(adv_id=90601, wb_cabinet_id=wb_cabinet_id)
+    auto = _make_auto_adv(
+        adv_id=90602,
+        wb_cabinet_id=wb_cabinet_id,
+        search_adv_id=search.adv_id,
+        automatic_version=1,
+        wl=False,
+        tp=False,
+    )
+    auto.individual_keywords_target_place_mode = True
+
+    async_session.add_all([search, auto])
+    await async_session.flush()
+
+    details = await Pricer().get_tariff_details(async_session, shop_id)
+
+    assert details.count == 1
+    assert details.mode == TariffMode.AUTO
+    assert details.price_per_adv == float(tariffs_for_auto_setting[1])
+    assert details.total_per_month == float(tariffs_for_auto_setting[1])
+
+
 async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
     async_session: AsyncSession,
     wb_cabinet: WBCabinet,

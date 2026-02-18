@@ -82,6 +82,7 @@ class CoroutinesManager:
         tasks_manager: TasksManager,
         plan_fact_reader: PlanFactReader | None = None,
         wb_manager_hub: WBManagerHub | None = None,
+
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -802,6 +803,40 @@ class CoroutinesManager:
                                  result)
 
         return None
+
+
+    @while_coroutine_decorator(5 * 60, 60)
+    async def update_individual_keyword_target_places(self):
+        from .services.keywords_target_place_updater import KeywordTargetPlaceUpdater
+        from app.modules.predict_keywords_target_place import (build_predict_keywords_target_place,
+                                                               PredictKeywordsTargetPlace)
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not complex_advs:
+            return None
+        complex_advs: list[ComplexAdv] = [adv for adv in complex_advs if adv.individual_keywords_target_place_mode]
+        wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+
+        predict_keyword_target_place: PredictKeywordsTargetPlace = build_predict_keywords_target_place()
+
+        updater = KeywordTargetPlaceUpdater(predict_keyword_target_place)
+        handlers: list[Callable[[], Awaitable[None]]] = []
+        for adv in wb_adv_dto:
+            handler = functools.partial(updater.update_individual_keyword_target_places, adv)
+            handlers.append(handler)
+
+        results = await run_tasks(
+            handlers=handlers,
+            max_workers=16,
+        )
+        for result, adv in zip(results,  wb_adv_dto):
+            if isinstance(result, BaseException):
+                logger.exception('Ошибка обновления keywords target places for adv_id:  %s',
+                                 adv.adv_id,)
+
+        return None
+
+
+
 
 
 # TODO: Переделать граф зависимостей

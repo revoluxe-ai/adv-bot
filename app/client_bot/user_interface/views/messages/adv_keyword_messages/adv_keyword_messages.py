@@ -164,6 +164,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             stat_data.full_adv_stat_for_last_days_for_auction
         )
         self.common_stat = stat_data.common_stat
+        self.cost_per_order_from_additional_last_week = (
+            stat_data.cost_per_order_from_additional_last_week
+        )
         if self._all_orders_for_last_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
         if self.image_mode == "graphic":
@@ -219,6 +222,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
             f"Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n"
+        )
+        if self.cost_per_order_from_additional_last_week is not None:
+            text += (
+                f"Себестоимость заказа из доп. показов (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
+            )
+        text += (
             f"Общие заказы: {self._all_orders_for_last_days}\n"
             f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"

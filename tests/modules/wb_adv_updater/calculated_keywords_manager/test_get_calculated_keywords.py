@@ -36,6 +36,7 @@ def complex_adv_mock():
     """Мок для ComplexAdv (для тестов с белым списком)."""
     mock = MagicMock()
     mock.hard_min_ctr = None
+    mock.rec_system_promotion_mode_active = False
     return mock
 
 
@@ -51,6 +52,7 @@ def complex_adv_with_hard_min_ctr():
     """Мок для ComplexAdv с заданным hard_min_ctr (для тестов без белого списка)."""
     mock = MagicMock()
     mock.hard_min_ctr = 0.05  # 5%
+    mock.rec_system_promotion_mode_active = False
     return mock
 
 

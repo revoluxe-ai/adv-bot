@@ -22,8 +22,23 @@ class WBAdvDTO:
     _current_common_bids_in_search_adv: dict[int, int] = field(alias='current_common_bids_in_search_adv') # артикул ->  ставка
 
     @property
+    def min_target_position(self) -> int:
+        return self._complex_adv.min_target_position
+
+
+    @property
     def adv_id(self) -> int:
         return self._complex_adv.adv_id
+
+    @property
+    def adv_setting_original_id(self) -> int:
+        return self._complex_adv.adv_setting_original_id
+
+
+    @property
+    def main_nmid(self) -> int:
+        return self._complex_adv.main_nmid
+
 
     @property
     def updater_common_bid_in_search_adv_active_status(self) -> bool:

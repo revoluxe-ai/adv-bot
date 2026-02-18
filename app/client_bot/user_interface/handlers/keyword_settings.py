@@ -34,6 +34,10 @@ from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
+from app.client_bot.user_interface.utils import (
+    format_target_place_display,
+    get_effective_keyword_target_place,
+)
 from ..helpers.wb_user_cabinet import get_wb_user_cabinet_id_or_none
 from ..views import callbacks, messages
 
@@ -290,7 +294,7 @@ async def setting_keywords_white_list(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "white_list"))
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "white_list")) # noqa
 async def setting_keywords_white_list(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -434,7 +438,7 @@ async def setting_keywords_by_adv(
 
 
 @router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "hide_keywords_is_not_relevant")
+    callbacks.SettingKeywords.filter( F.type == "hide_keywords_is_not_relevant") # noqa
 )
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
@@ -488,7 +492,7 @@ async def setting_keywords_hide_keywords_is_hard(
 
 
 @router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant")
+    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant") # noqa
 )
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
@@ -528,7 +532,7 @@ async def setting_keywords_hide_keywords_is_hard(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "by_adv"))
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "by_adv")) # noqa
 async def setting_keywords_by_adv(
     callback: callbacks.SettingKeywords,
     callback_data: callbacks.SettingKeywords,
@@ -600,7 +604,7 @@ async def setting_keywords_by_adv(
         chat_id,
         keywords,
         adv_setting,
-        wb_user_cabinet_original_id,
+        wb_user_cabinet_original_id, # noqa
         adv_choice_last_page,
         main_photos[0],
         page,
@@ -663,7 +667,7 @@ async def change_keyword_hard_status(
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(KeywordSetting.id == keyword_setting_original_id)
             )
-            keyword_setting: KeywordSetting | None = keyword_setting.scalar()
+            keyword_setting: KeywordSetting | None = keyword_setting.scalar() # noqa
             assert keyword_setting
             adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
             if new_hard_status >= 0:
@@ -677,7 +681,7 @@ async def change_keyword_hard_status(
             if search_adv_id := adv_setting.search_adv_id:
                 adv_ids.add(search_adv_id)
             elif new_hard_status == -1:
-                min_ctr = await data_manager.get_min_ctr(adv_setting)
+                min_ctr = await data_manager.get_min_ctr(adv_setting) # noqa
                 async with get_clickhouse_client() as client:
                     (
                         clicks,
@@ -812,7 +816,124 @@ async def reset_added_clicks(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F == "only_out_index"))
+@router.callback_query(callbacks.ChangeKeywordTargetPlace.filter())
+async def change_keyword_target_place(
+    callback_query: CallbackQuery,
+    callback_data: callbacks.ChangeKeywordTargetPlace,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    keyword_setting_original_id = callback_data.keyword_setting_original_id
+    async with _sm() as session:
+        stmt = (
+            select(KeywordSetting)
+            .options(selectinload(KeywordSetting.adv_setting))
+            .where(KeywordSetting.id == keyword_setting_original_id)
+        )
+        result = await session.execute(stmt)
+        keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
+
+    if keyword_setting is None:
+        if callback_query.message:
+            await bot.send_message(
+                callback_query.message.chat.id,
+                "Не удалось найти настройки ключевого слова.",
+            )
+        return
+
+    value, source = get_effective_keyword_target_place(
+        keyword_setting,
+        keyword_setting.adv_setting,
+    )
+    current_value_display, _ = format_target_place_display(value, source)
+
+    adv_default_value = (
+        keyword_setting.adv_setting.max_place
+        if keyword_setting.adv_setting
+        else None
+    )
+    adv_default_display = (
+        str(adv_default_value)
+        if isinstance(adv_default_value, int) and adv_default_value > 0
+        else "Не задана"
+    )
+
+    await state.update_data(keyword_setting_for_target_place=keyword_setting_original_id)
+    await state.set_state(states.KeywordTargetPlace.waiting_for_new_target_place)
+    if not callback_query.message:
+        return
+
+    await messages.KeywordTargetPlacePrompt(
+        bot,
+        callback_query.message.chat.id,
+        current_value_display,
+        adv_default_display,
+    )()
+
+
+@router.message(StateFilter(states.KeywordTargetPlace.waiting_for_new_target_place))
+async def keyword_target_place_value(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    data = await state.get_data()
+    keyword_setting_original_id = data.get("keyword_setting_for_target_place")
+    if not keyword_setting_original_id:
+        await bot.send_message(
+            message.chat.id,
+            "Не удалось определить ключ. Повторите выбор ключевого слова.",
+        )
+        await state.set_state()
+        return
+
+    text = message.text or ""
+    try:
+        target_place = int(text.strip())
+    except ValueError:
+        await bot.send_message(
+            message.chat.id,
+            "Введите целое число (0 — использовать позицию кампании).",
+        )
+        return
+    if target_place < 0:
+        await bot.send_message(message.chat.id, "Значение не может быть отрицательным.")
+        return
+
+    async with _sm(read_only=False) as session:
+        stmt = select(KeywordSetting).where(
+            KeywordSetting.id == keyword_setting_original_id
+        )
+        result = await session.execute(stmt)
+        keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
+        if keyword_setting is None:
+            await bot.send_message(
+                message.chat.id,
+                "Не удалось найти ключ. Повторите выбор ключевого слова.",
+            )
+            await state.set_state()
+            return
+        keyword_setting.target_place = target_place
+        await session.commit()
+
+    display_value = (
+        str(target_place)
+        if target_place > 0
+        else "0 (используется позиция кампании)"
+    )
+    await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
+
+    page = data.get("last_keyword_setting_page", 1)
+    await messages.KeywordSettingMessage(
+        bot,
+        message.chat.id,
+        keyword_setting_original_id,
+        page,
+    )()
+
+    await state.update_data(keyword_setting_for_target_place=None)
+    await state.set_state()
+
+
+@router.callback_query(callbacks.SettingKeywords.filter(F == "only_out_index")) # noqa
 async def show_only_on_out_index(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,

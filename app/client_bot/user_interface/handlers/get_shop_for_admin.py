@@ -8,7 +8,7 @@ from aiogram.types import Message
 from sqlalchemy.future import select
 
 from app.client_bot import const
-from app.client_bot.user_interface.views import messages
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
@@ -131,7 +131,7 @@ async def getting_adv_id(message: types.Message, bot: Bot, state: FSMContext) ->
         wb_user_cabinet = result.scalar()
     assert wb_user_cabinet
     assert adv
-    await messages.AdvSettingMenu(
+    await AdvSettingMenu(
         bot,
         chat_id,
         wb_user_cabinet,

@@ -36,7 +36,7 @@ class MockSessionMaker:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_connect_existing_confirm_type2_creates_adv_setting_in_db(
+async def  test_connect_existing_confirm_type2_creates_adv_setting_in_db(
     async_session: AsyncSession,
 ) -> None:
     """confirm_type2 creates new AdvSetting and persists to DB."""
@@ -75,6 +75,7 @@ async def test_connect_existing_confirm_type2_creates_adv_setting_in_db(
             "nmid": nmid,
             "wb_cabinet_id": wb_cabinet.id,
             "chosen_auction_adv_id": chosen_auction_id,
+            "card_name": f"NM {nmid}",
         }
     )
     state.clear = AsyncMock()
@@ -86,7 +87,9 @@ async def test_connect_existing_confirm_type2_creates_adv_setting_in_db(
     callback_data = callbacks.ConnectExistingConfirmType2(adv_id=chosen_auto_id)
 
     mock_sm = MockSessionMaker(async_session)
-    with patch(f"{MODULE}.sm", mock_sm):
+    with patch(f"{MODULE}.sm", mock_sm), patch(
+        "app.modules.adv_creator.backend.main_manager.sm", mock_sm
+    ):
         await connect_existing_advs.connect_existing_confirm_type2(
             callback, callback_data, bot, state
         )
@@ -100,7 +103,8 @@ async def test_connect_existing_confirm_type2_creates_adv_setting_in_db(
     assert row is not None
     assert row.adv_id == chosen_auto_id
     assert row._search_adv_id == chosen_auction_id
-    assert row.name == f"NM {nmid}"
+    # name = get_name_for_adv(nmid, card_name, "complex") -> "100500 NM 100500" when card_name="NM 100500"
+    assert row.name == f"{nmid} NM {nmid}"
     assert row.nmids == [nmid]
     assert row.active_status == "9"
     assert row.type == 8

@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -101,4 +102,4 @@ async def reset_white_list(
     await bot.send_message(
         callback.from_user.id, "Белый список сброшен, возвращаю меню кампании..."
     )
-    await messages.AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()
+    await AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()

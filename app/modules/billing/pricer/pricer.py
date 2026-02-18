@@ -70,6 +70,41 @@ class Pricer:
         details = await self.get_tariff_details(session, shop_id)
         return details.total_per_day
 
+    async def get_price_for_day_if_enabling_auto_option(
+        self,
+        session: AsyncSession,
+        shop_id: str,
+        adv_setting_id: int,
+        *,
+        override_white_list: bool = False,
+        override_target_place: bool = False,
+        override_individual_keywords: bool = False,
+    ) -> float:
+        """Цена за день для магазина при условии включения указанных опций нового тарифа у кампании adv_setting_id."""
+        details = await self.get_tariff_details(
+            session,
+            shop_id,
+            override_for_adv_id=adv_setting_id,
+            override_white_list=override_white_list,
+            override_target_place=override_target_place,
+            override_individual_keywords=override_individual_keywords,
+        )
+        return details.total_per_day
+
+    async def get_price_for_day_if_enabling_individual_mode(
+        self,
+        session: AsyncSession,
+        shop_id: str,
+        adv_setting_id: int,
+    ) -> float:
+        """Цена за день при включении individual_keywords_target_place_mode у кампании (удобная обёртка)."""
+        return await self.get_price_for_day_if_enabling_auto_option(
+            session,
+            shop_id,
+            adv_setting_id,
+            override_individual_keywords=True,
+        )
+
     def get_price_for_count_advs_in_cabinet_for_month(
         self, count_advs: int, tariff_table: dict[int, int] | None = None
     ) -> float:
@@ -82,9 +117,23 @@ class Pricer:
         return sum_payment / count_advs
 
     async def get_tariff_details(
-        self, session: AsyncSession, shop_id: str
+        self,
+        session: AsyncSession,
+        shop_id: str,
+        *,
+        override_for_adv_id: int | None = None,
+        override_white_list: bool = False,
+        override_target_place: bool = False,
+        override_individual_keywords: bool = False,
     ) -> TariffDetails:
-        context = await self.calculate_tariff_context(session, shop_id)
+        context = await self.calculate_tariff_context(
+            session,
+            shop_id,
+            override_for_adv_id=override_for_adv_id,
+            override_white_list=override_white_list,
+            override_target_place=override_target_place,
+            override_individual_keywords=override_individual_keywords,
+        )
         mode = TariffMode.AUTO if context.has_auto else TariffMode.OLD
         tariff_table = tariffs_for_auto_setting if mode == TariffMode.AUTO else self._tariffs
         price_per_adv = self._get_price_per_adv(context.count, tariff_table)
@@ -100,18 +149,39 @@ class Pricer:
 
     @staticmethod
     async def calculate_tariff_context(
-        session: AsyncSession, shop_id: str
+        session: AsyncSession,
+        shop_id: str,
+        *,
+        override_for_adv_id: int | None = None,
+        override_white_list: bool = False,
+        override_target_place: bool = False,
+        override_individual_keywords: bool = False,
     ) -> TariffContext:
         auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
         if not auto_advs:
+            if override_for_adv_id is not None:
+                return TariffContext(count=1, has_auto=True)
             return TariffContext(count=0, has_auto=False)
 
-        has_auto = any(Pricer.is_part_auto_setting_active(adv) for adv in auto_advs)
+        def _active(adv: AdvSetting) -> bool:
+            use_override = override_for_adv_id is not None and adv.id == override_for_adv_id
+            return Pricer.is_part_auto_setting_active(
+                adv,
+                override_white_list=override_white_list if use_override else False,
+                override_target_place=override_target_place if use_override else False,
+                override_individual_keywords=override_individual_keywords if use_override else False,
+            )
+
+        has_auto = any(_active(adv) for adv in auto_advs)
         active_auto_advs = await Pricer.fetch_tariff_auto_advs(
             session, shop_id, auto_advs=auto_advs
         )
+        count = len(active_auto_advs)
+        if has_auto and count == 0 and override_for_adv_id is not None:
+            if any(adv.id == override_for_adv_id for adv in auto_advs):
+                count = 1
 
-        return TariffContext(count=len(active_auto_advs), has_auto=has_auto)
+        return TariffContext(count=count, has_auto=has_auto)
 
     @staticmethod
     async def fetch_bot_active_advs(
@@ -165,14 +235,27 @@ class Pricer:
         return auto_advs
 
     @staticmethod
-    def is_part_auto_setting_active(adv: AdvSetting) -> bool:
+    def is_part_auto_setting_active(
+        adv: AdvSetting,
+        *,
+        override_white_list: bool = False,
+        override_target_place: bool = False,
+        override_individual_keywords: bool = False,
+    ) -> bool:
+        if override_white_list or override_target_place or override_individual_keywords:
+            return True
         auto_version = adv.automatic_version or 0
         white_list_active = bool(adv.auto_update_white_list)
         target_place_active = bool(adv.auto_update_target_place)
-        if auto_version == 1:
-            return white_list_active or target_place_active
-        if auto_version == 2:
-            return white_list_active or target_place_active
+        individual_keywords_mode_active = bool(adv.individual_keywords_target_place_mode)
+        if auto_version in (1, 2):
+            return any(
+                [
+                    white_list_active,
+                    target_place_active,
+                    individual_keywords_mode_active,
+                ]
+            )
         return False
 
     @staticmethod

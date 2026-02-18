@@ -43,6 +43,7 @@ class CommonAdvsStatData:
     full_adv_stat_for_last_days_for_auction: SmallFullAdvStat
     common_stat: CommonCardStat | None
     sales_predict_method: FactMethods
+    cost_per_order_from_additional_last_week: float | None
 
 
 class CommonAdvsStatDataManager:
@@ -142,6 +143,13 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auto_adv.spend
             - spend_for_keywords_in_auto_adv
         )
+
+        cost_per_order_from_additional_last_week = (
+            await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+                adv_setting.adv_id, days=7
+            )
+        )
+
         from app.modules.wb_adv_updater import phrases_processor
         min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
         return CommonAdvsStatData(
@@ -161,6 +169,7 @@ class CommonAdvsStatDataManager:
             full_adv_stat_for_last_days_for_auction=full_adv_stat_for_last_days_for_auction,
             common_stat=common_stat,
             sales_predict_method=adv_setting.sales_predict_method,
+            cost_per_order_from_additional_last_week=cost_per_order_from_additional_last_week,
         )
 
     async def _get_predict_orders_for_day(

@@ -210,31 +210,54 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                         pre_keywords: list[PreCalculatedKeyword]) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
+        # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
+        rec_conversion: float | None = None
+        if complex_adv.rec_system_promotion_mode_active:
+            from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
+                get_rec_conversion,
+            )
+            # TODO: Придумать фоллбек для этой функции
+            rec_conversion = await get_rec_conversion(complex_adv.adv_id)
+
+        def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
+            if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
+                return None
+            return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
+
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
             """Если нет белого списка, то выключаем все ключи, кроме лучшего"""
             best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
+                above_rec = _above_rec_conversion(pre_kw)
                 if best_keyword_status:
-                    state = KeywordState(
-                        status=KeywordStatus.GOOD,
-                        reason=KeywordStatusReason.BEST_KEYWORD,
-                        best_keyword_status=best_keyword_status
-                    )
+                    if above_rec is False:
+                        state = KeywordState(
+                            status=KeywordStatus.BAD,
+                            reason=KeywordStatusReason.BELOW_REC_CONVERSION,
+                            best_keyword_status=best_keyword_status,
+                        )
+                    else:
+                        state = KeywordState(
+                            status=KeywordStatus.GOOD,
+                            reason=KeywordStatusReason.BEST_KEYWORD,
+                            best_keyword_status=best_keyword_status,
+                        )
                 else:
-                    status = KeywordStatus.BAD
-                    reason = KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
                     state = KeywordState(
-                        status=status,
-                        reason=reason,
-                        best_keyword_status=best_keyword_status)
+                        status=KeywordStatus.BAD,
+                        reason=KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS,
+                        best_keyword_status=best_keyword_status,
+                    )
                 calculated_keyword = CalculatedKeyword(
                     adv_id=pre_kw.adv_id,
                     keyword_setting=pre_kw.keyword_setting,
                     cluster_stat=pre_kw.cluster_stat,
                     state=state,
-                 target_pay_for_order=complex_adv.target_pay_for_order,)
+                    target_pay_for_order=complex_adv.target_pay_for_order,
+                    above_rec_conversion=above_rec,
+                )
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
 
@@ -246,6 +269,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         for pre_kw in pre_keywords:
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
+            above_rec = _above_rec_conversion(pre_kw)
             if hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
@@ -273,24 +297,36 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 )
             elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
                     pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
-                status = KeywordStatus.GOOD
-                reason = KeywordStatusReason.MORE_THEN_RATING_BY_ORDERS
-                state = KeywordState(status=status,
-                                     reason=reason,
-                                     best_keyword_status=best_keyword_status)
+                if above_rec is False:
+                    status = KeywordStatus.BAD
+                    reason = KeywordStatusReason.BELOW_REC_CONVERSION
+                else:
+                    status = KeywordStatus.GOOD
+                    reason = KeywordStatusReason.MORE_THEN_RATING_BY_ORDERS
+                state = KeywordState(
+                    status=status,
+                    reason=reason,
+                    best_keyword_status=best_keyword_status,
+                )
             else:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
-                state = KeywordState(status=status,
-                                     reason=reason,
-                                     best_keyword_status=best_keyword_status)
+                state = KeywordState(
+                    status=status,
+                    reason=reason,
+                    best_keyword_status=best_keyword_status,
+                )
 
-            calculated_keyword_list.append(CalculatedKeyword(adv_id=pre_kw.adv_id,
-                                                         keyword_setting=pre_kw.keyword_setting,
-                                                         cluster_stat=pre_kw.cluster_stat,
-                                                         state=state,
-                                                         target_pay_for_order=complex_adv.target_pay_for_order
-                                                         ))
+            calculated_keyword_list.append(
+                CalculatedKeyword(
+                    adv_id=pre_kw.adv_id,
+                    keyword_setting=pre_kw.keyword_setting,
+                    cluster_stat=pre_kw.cluster_stat,
+                    state=state,
+                    target_pay_for_order=complex_adv.target_pay_for_order,
+                    above_rec_conversion=above_rec,
+                )
+            )
         return calculated_keyword_list
 
 

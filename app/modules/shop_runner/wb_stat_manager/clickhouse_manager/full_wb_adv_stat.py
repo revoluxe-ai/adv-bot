@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Iterable
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import TypedDict
 
@@ -9,6 +9,9 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     SmallFullAdvStat,
     SmallFullAdvStatPerDay,
+)
+from app.shared.domains.wb.utils.additional_cost_per_order import (
+    compute_additional_cost_per_order,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
@@ -254,6 +257,40 @@ async def get_spend_by_last_days(
         raise
 
 
+async def get_additional_cost_per_order_for_adv(
+    adv_id: int, days: int = 7
+) -> float | None:
+    """Средняя себестоимость заказа из дополнительных показов (полки/рек. системы) за период.
+
+    Args:
+        adv_id: ID авто-кампании
+        days: Количество дней (по умолчанию 7)
+
+    Returns:
+        Себестоимость заказа из доп. показов или None при ошибке
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days - 1)
+
+    auto_stat = await get_stats_by_last_days(
+        [adv_id], start_date, end_date
+    )
+    spend_kw = await get_keywords_spend(
+        [adv_id], start_date, end_date
+    )
+    kw_views_orders = await get_keywords_views_orders_by_days(
+        [adv_id], start_date, end_date
+    )
+
+    orders_kw = sum(orders for _, orders in kw_views_orders.values())
+    return compute_additional_cost_per_order(
+        auto_stat.spend,
+        auto_stat.orders,
+        spend_kw,
+        orders_kw,
+    )
+
+
 def _get_insert_query() -> str:
     query = """
     INSERT INTO default_db.full_adv_wb_stat (adv_id,
@@ -419,6 +456,73 @@ async def get_keywords_views_by_days(
     except Exception:
         logger.error(
             "Ошибка получения показов по ключам по дням из ClickHouse",
+            exc_info=True,
+        )
+        return {}
+
+
+async def get_keywords_views_orders_by_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+) -> dict[date, tuple[int, int]]:
+    """
+    Возвращает показы и заказы по ключевым словам по дням за период [start_date, end_date]
+    из агрегированных `mv_clusters_daily_agg`.
+
+    Returns:
+        dict[date, tuple[int, int]]: {дата: (views, orders)}
+    """
+
+    # TODO: Норм ли считать конверсию в полках по заказам за неделю или надо за 2 недели или через корзины?
+    import datetime as dt
+
+    if not adv_ids:
+        return {}
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+
+    query = f"""
+        WITH aggregated AS (
+            SELECT
+                date,
+                argMaxMerge(views_state) AS views,
+                argMaxMerge(orders_state) AS orders
+            FROM default_db.mv_clusters_daily_agg
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            date,
+            COALESCE(SUM(views), 0) AS total_views,
+            COALESCE(SUM(orders), 0) AS total_orders
+        FROM aggregated
+        GROUP BY date
+        ORDER BY date DESC
+    """
+
+    try:
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                rows = res.result_rows
+
+                result: dict[dt.date, tuple[int, int]] = {}
+                for row in rows:
+                    if row and len(row) >= 3 and row[0] is not None:
+                        date_val = row[0]
+                        views = int(row[1]) if row[1] is not None else 0
+                        orders = int(row[2]) if row[2] is not None else 0
+                        result[date_val] = (views, orders)
+                return result
+
+    except Exception:
+        logger.error(
+            "Ошибка получения показов и заказов по ключам по дням из ClickHouse",
             exc_info=True,
         )
         return {}
