@@ -3,7 +3,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from collections.abc import Awaitable, Callable
-from typing import Any, Generator, Protocol, Sequence, TypeVar, cast
+from typing import Generator, Protocol, Sequence, TypeVar, cast
 from typing_extensions import ParamSpec
 
 from sqlalchemy import select
@@ -27,7 +27,7 @@ from ...common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import  get_async_session_maker as sm
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from operator import  attrgetter
-from cashews import cache, noself  # pyright: ignore
+
 
 
 import typing
@@ -54,17 +54,6 @@ class _AsyncDecoratorFactory(Protocol):
         self, *, ttl: str, lock: bool
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         ...
-
-
-def _typed_noself_cache() -> _AsyncDecoratorFactory:
-    """Typed wrapper for ``cashews.noself(cache)``.
-
-    cashews doesn't ship strict typings for this decorator factory.
-    This helper preserves the signature of decorated async callables
-    for pyright/mypy.
-    """
-
-    return cast(Any, noself(cache))
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
@@ -225,7 +214,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             stats.append(stat)
         return stats
 
-    @_typed_noself_cache()(ttl="15m", lock=True)
     async def __get_keywords_stat_from_clickhouse(self,
                                                   nmids: list[int],
                                                   min_days: int,
