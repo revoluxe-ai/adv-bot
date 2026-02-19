@@ -55,6 +55,8 @@ class ComplexAdv:
 
     @property
     def target_position_mode(self) -> TargetPositionMode:
+        if self._target_pay_for_order is None:
+            return TargetPositionMode.MIN_CPA
         return self._adv_setting.target_position_mode
 
     @property
