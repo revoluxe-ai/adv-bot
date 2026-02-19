@@ -6,10 +6,9 @@ from datetime import datetime
 class BidPosition:
     keyword: str
     position: int
-    bid: int # стоимость 1000 показов
-    timestamp:  datetime
+    bid: int  # стоимость 1000 показов
+    timestamp: datetime
     _conv_carts_to_views: float | None = None
-
 
     @property
     def conv_carts_to_views(self) -> float | None:
@@ -17,8 +16,7 @@ class BidPosition:
 
     @conv_carts_to_views.setter
     def conv_carts_to_views(self, value):
-        self._conv_carts_to_views = value # сколько получаем корзин из 1 показа
-
+        self._conv_carts_to_views = value  # сколько получаем корзин из 1 показа
 
     @property
     def pay_for_cart(self) -> float:
@@ -28,5 +26,3 @@ class BidPosition:
         views_for_cart = 1 / conv
         pay_for_cart = views_for_cart * self.bid / 1000
         return pay_for_cart
-
-

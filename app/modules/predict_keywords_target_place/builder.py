@@ -1,8 +1,7 @@
-from .predict_keywords_target_place import PredictKeywordsTargetPlace
 from .di import PredictKeywordsTargetPlaceContainer
+from .predict_keywords_target_place import PredictKeywordsTargetPlace
 
 
 def build_predict_keywords_target_place() -> PredictKeywordsTargetPlace:
     container = PredictKeywordsTargetPlaceContainer()
-    manager: PredictKeywordsTargetPlace = container.predict_keywords_target_place_manager()
-    return manager
+    return container.predict_keywords_target_place_manager()
