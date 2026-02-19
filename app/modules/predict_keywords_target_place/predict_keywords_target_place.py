@@ -58,7 +58,7 @@ class PredictKeywordsTargetPlace:
             if target_position_mode == TargetPositionMode.MIN_CPA:
                 best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
             elif target_position_mode == TargetPositionMode.MAX_CART_TO_VIEWS_CONV:
-                best_position: BidPosition = min(positions, key=lambda p: p.conv_carts_to_views)
+                best_position: BidPosition = max(positions, key=lambda p: p.conv_carts_to_views)
             else:
                 raise NotImplementedError('Неизвестный мод целевой позиции')
             result_target_positions[keyword] = max(1, best_position.position)
