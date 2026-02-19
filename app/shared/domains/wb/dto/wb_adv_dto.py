@@ -2,6 +2,7 @@ from attr import define, field
 import typing
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.modules.common_slaves.wildberries.models.enums.target_position_mode import TargetPositionMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData, FactData
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -22,9 +23,12 @@ class WBAdvDTO:
     _current_common_bids_in_search_adv: dict[int, int] = field(alias='current_common_bids_in_search_adv') # артикул ->  ставка
 
     @property
+    def target_position_mode(self) -> TargetPositionMode:
+        return self._complex_adv.target_position_mode
+
+    @property
     def min_target_position(self) -> int:
         return self._complex_adv.min_target_position
-
 
     @property
     def adv_id(self) -> int:
