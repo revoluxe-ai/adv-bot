@@ -10,6 +10,8 @@ from app.modules.adv_creator.backend.main_manager import MainAdvManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
+pytestmark = pytest.mark.integration
+
 
 # access_mock и async_session теперь предоставляются через conftest.py
 

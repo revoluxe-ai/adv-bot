@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # TODO: Перенести все папки в tests/ и впредь поддерживать структуру тестов в одном месте
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 @pytest.mark.skip('Skipped: Test fails in CI environment due to unknown reasons - needs investigation')
