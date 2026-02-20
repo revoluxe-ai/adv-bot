@@ -27,32 +27,26 @@ class PredictKeywordsTargetPlace:
         bids_for_positions: dict[str, list[BidPosition]] = \
             await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
         target_position_mode = adv.target_position_mode
+        bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
+                                                                                              min_bid=min_bid,
+                                                                                              positions_size=positions_size)
 
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
                                                                   positions_size=positions_size)
-
-        target_positions = self._get_target_positions(convs_carts_to_views,
+        target_positions = self._get_target_positions(
+                                          convs_carts_to_views,
                                           bids_for_positions,
-                                          min_bid,
-                                          positions_size,
                                           target_position_mode
                                           )
-
-
         return target_positions
 
     def _get_target_positions(self,
                                     convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]],
                                     bids_for_positions: dict[str, list[BidPosition]],
-                                    min_bid: int,
-                                    positions_size: int,
                                     target_position_mode: TargetPositionMode
                               ) -> dict[str, int]:
 
-        bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
-                                                                min_bid=min_bid,
-                                                                positions_size=positions_size)
         bids_for_positions: dict[str, list[BidPosition]] = self._fill_positions_from_conv(bids_for_positions,
                                                                                           convs_carts_to_views)
         result_target_positions: dict[str, int] = {}
