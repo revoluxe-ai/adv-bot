@@ -118,7 +118,7 @@ class WBShopDataManager:
         if not complex_advs:
             return []
         min_bids, search_adv_bids = await asyncio.gather(
-            self._get_min_bids(complex_advs, cache_possible=False),
+            self._get_min_bids(complex_advs, cache_possible=True),
             self._get_search_adv_common_bids(complex_advs),
         )
         if min_bids is None:
