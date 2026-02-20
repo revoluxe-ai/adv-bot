@@ -16,6 +16,20 @@ class PredictKeywordsTargetPlace:
     def __init__(self, clickhouse_manager: ClickHouseManager):
         self._clickhouse_manager = clickhouse_manager
 
+    async def get_bids_for_positions(
+            self,
+            nmid: int,
+            min_bid: int,
+            positions_size: int = 300) -> dict[str, list[BidPosition]]:
+        bids_for_positions: dict[str, list[BidPosition]] = \
+            await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
+
+        bids_for_positions: dict[str, list[BidPosition]] = \
+            self._normalize_bids_for_positions(bids_for_positions,
+                                               min_bid=min_bid,
+                                               positions_size=positions_size)
+
+        return bids_for_positions
 
     async def get_keywords_target_position(self, adv: WBAdvDTO, positions_size: int) -> dict[str, int]:
         assert positions_size <= 300, 'Количество позиций не может быть больше 300'
@@ -24,12 +38,8 @@ class PredictKeywordsTargetPlace:
              min_bid = adv.search_adv_min_bids[nmid]
         except KeyError:
             raise
-        bids_for_positions: dict[str, list[BidPosition]] = \
-            await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
 
-        bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
-                                                                                              min_bid=min_bid,
-                                                                                              positions_size=positions_size)
+        bids_for_positions = await self.get_bids_for_positions(nmid=nmid, min_bid=min_bid)
 
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
@@ -204,6 +214,7 @@ class PredictKeywordsTargetPlace:
         else:
             return positions
         return positions[:catch_index + 1]
+
 
 
 
