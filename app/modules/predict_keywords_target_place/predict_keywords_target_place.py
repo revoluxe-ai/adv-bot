@@ -50,9 +50,10 @@ class PredictKeywordsTargetPlace:
                               ) -> dict[str, int]:
 
         bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
-                                                                convs_carts_to_views,
                                                                 min_bid=min_bid,
                                                                 positions_size=positions_size)
+        bids_for_positions: dict[str, list[BidPosition]] = self._fill_positions_from_conv(bids_for_positions,
+                                                                                          convs_carts_to_views)
         result_target_positions: dict[str, int] = {}
         for keyword, positions in bids_for_positions.items():
             if not positions:
@@ -71,7 +72,6 @@ class PredictKeywordsTargetPlace:
 
     def _normalize_bids_for_positions(self,
                                       bids_for_positions: dict[str, list[BidPosition]],
-                                      convs: dict[str, list[ConvCartToViewsOnPosition]],
                                       min_bid: int,
                                       positions_size: int
                                       ) -> dict[str, list[BidPosition]]:
@@ -81,13 +81,21 @@ class PredictKeywordsTargetPlace:
             item_normalized = self._normalize_bids_for_keyword(items,
                                                                min_bid=min_bid,
                                                                positions_size=positions_size)
+            normalized_bids_for_positions[key] = item_normalized
+        return normalized_bids_for_positions
+
+    def _fill_positions_from_conv(self, bids_for_positions, convs):
+        positions_filled_dict = {}
+        for key, items in bids_for_positions.items():
             convs_for_keyword = convs.get(key)
             if not convs_for_keyword:
                 continue
-            positions_filled = self._fill_positions_convs(item_normalized, convs_for_keyword)
+            positions_filled = self._fill_positions_convs(items, convs_for_keyword)
+            positions_filled_dict[key] = positions_filled
+        return positions_filled_dict
 
-            normalized_bids_for_positions[key] = positions_filled
-        return normalized_bids_for_positions
+
+
 
     def _normalize_bids_for_keyword(self,
                                     items: list[BidPosition],
@@ -200,6 +208,7 @@ class PredictKeywordsTargetPlace:
         else:
             return positions
         return positions[:catch_index + 1]
+
 
 
 
