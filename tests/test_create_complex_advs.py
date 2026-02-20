@@ -13,6 +13,8 @@ from app.modules.adv_creator.backend.exc import (
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def bot_mock():

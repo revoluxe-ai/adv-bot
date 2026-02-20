@@ -12,6 +12,8 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.modules.shop_runner.wb_shop import WBShop
 
+pytestmark = pytest.mark.integration
+
 
 async def _completed_coro() -> None:
     return None

@@ -6,6 +6,8 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import \
     detect_campaign_state, SalesStates
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.parametrize('plan, fact, expected_state',
                          [(PlanData( #  Мало продаж - большой расход
