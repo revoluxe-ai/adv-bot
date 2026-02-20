@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class WhiteListAddExecutor(BaseExecutor):
     """Добавляет наиболее эффективные релевантные ключевые слова в белый список."""
 
-    PASS_TIME_SECONDS = 15 * 60  # 15 минут между изменениями
+    PASS_TIME_SECONDS = 5 * 60  # 15 минут между изменениями
     PAY_PER_ORDER_THRESHOLD = 0.9  # 90% от целевой себестоимости заказа
 
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
