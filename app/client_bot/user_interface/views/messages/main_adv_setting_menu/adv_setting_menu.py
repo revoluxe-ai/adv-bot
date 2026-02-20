@@ -84,6 +84,32 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
+        self._plan_orders: int | None = None
+        self._fact_predict_orders: float | None = None
+
+    @staticmethod
+    def _format_status_for_display(status: str | None) -> str:
+        """Числовой код WB (4,9,11,7,8) или текст статуса → строка для отображения."""
+        if not status:
+            return "—"
+        # Коды WB: 4=ready_for_start, 9=started, 11=pause, 7=done, 8=refused
+        code_to_ru = {
+            "4": "готова к старту",
+            "9": "запущена",
+            "11": "пауза",
+            "7": "завершена",
+            "8": "отклонена",
+        }
+        if status in code_to_ru:
+            return code_to_ru[status]
+        text_to_ru = {
+            "ready_for_start": "готова к старту",
+            "started": "запущена",
+            "pause": "пауза",
+            "done": "завершена",
+            "refused": "отклонена",
+        }
+        return text_to_ru.get(status, status)
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -199,6 +225,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             plan.max_pay_for_order if plan else None,
             plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
         )
+        self._plan_orders = plan.orders if plan else None
+        self._fact_predict_orders = (
+            plan_fact_summary.fact_predict_orders if plan_fact_summary else None
+        )
         self._avg_cost_additional = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
             self.adv.adv_id,
         )
@@ -237,6 +267,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     self._avg_cost_additional is not None
                     and self._target_cost is not None
                     and self._avg_cost_additional > self._target_cost
+                    and self._fact_predict_orders < self._plan_orders
             ):
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
