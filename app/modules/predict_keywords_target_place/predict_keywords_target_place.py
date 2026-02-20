@@ -24,12 +24,13 @@ class PredictKeywordsTargetPlace:
              min_bid = adv.search_adv_min_bids[nmid]
         except KeyError:
             raise
-        convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
-            await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
-                                                                  positions_size=positions_size)
         bids_for_positions: dict[str, list[BidPosition]] = \
             await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
         target_position_mode = adv.target_position_mode
+
+        convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
+            await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
+                                                                  positions_size=positions_size)
 
         target_positions = self._get_target_positions(convs_carts_to_views,
                                           bids_for_positions,
