@@ -26,7 +26,7 @@ class PredictKeywordsTargetPlace:
             raise
         bids_for_positions: dict[str, list[BidPosition]] = \
             await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
-        target_position_mode = adv.target_position_mode
+
         bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
                                                                                               min_bid=min_bid,
                                                                                               positions_size=positions_size)
@@ -34,6 +34,7 @@ class PredictKeywordsTargetPlace:
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
                                                                   positions_size=positions_size)
+        target_position_mode = adv.target_position_mode
         target_positions = self._get_target_positions(
                                           convs_carts_to_views,
                                           bids_for_positions,
