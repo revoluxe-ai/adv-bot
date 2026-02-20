@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from sqlalchemy import update
 
-
+from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
     ExecutionResult,
@@ -44,11 +44,8 @@ class TargetPlaceDownExecutor(BaseExecutor):
 
         complex_adv = ctx.complex_adv
         if complex_adv.individual_keywords_target_place_mode:
-            return ExecutionResult(
-                success=False,
-                efficiency=0,
-                used_power=0
-            )
+            result = await self._set_min_cpa_mode(ctx)
+            return result
 
         adv_setting: AdvSetting = complex_adv.adv_setting
         adv_id = adv_setting.adv_id
@@ -123,4 +120,15 @@ class TargetPlaceDownExecutor(BaseExecutor):
             return None
         min_place = max([kw.position for kw in active_keywords])
         return math.floor(min_place + 0.5)
+
+    @staticmethod
+    async def _set_min_cpa_mode(ctx: PipelineContext) -> ExecutionResult:
+        if ctx.complex_adv.target_position_mode ==  TargetPositionMode.MIN_CPA:
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+        stmt = update(AdvSetting).where(AdvSetting.id == ctx.complex_adv.adv_setting_original_id)\
+        .values({'target_position_mode': TargetPositionMode.MIN_CPA})
+        await ctx.session.execute(stmt)
+        return ExecutionResult(success=True, efficiency=1.0, used_power=1)
+
+
 
