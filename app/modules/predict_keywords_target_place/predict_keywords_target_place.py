@@ -30,12 +30,16 @@ class PredictKeywordsTargetPlace:
         bids_for_positions: dict[str, list[BidPosition]] = \
             await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
         target_position_mode = adv.target_position_mode
-        return self._get_target_positions(convs_carts_to_views,
+
+        target_positions = self._get_target_positions(convs_carts_to_views,
                                           bids_for_positions,
                                           min_bid,
                                           positions_size,
                                           target_position_mode
                                           )
+
+
+        return target_positions
 
     def _get_target_positions(self,
                                     convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]],
@@ -188,7 +192,7 @@ class PredictKeywordsTargetPlace:
 
     @staticmethod
     def _trim_tail(positions: list[BidPosition], min_bid: int) -> list[BidPosition]:
-        positions.sort(key=lambda pos: pos.position)
+        positions.sort(key=lambda pos_: pos_.position)
         for index, pos in enumerate(positions):
             if pos.bid == min_bid:
                 catch_index = index
