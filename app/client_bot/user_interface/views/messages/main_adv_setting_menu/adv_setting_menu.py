@@ -41,12 +41,9 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
-from app.modules.plan_fact.provider import PlanFactProvider
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
+from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+    get_auto_campaign_cost_activity_metrics,
 )
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
 
@@ -84,8 +81,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
-        self._plan_orders: int | None = None
-        self._fact_predict_orders: float | None = None
+        self._is_campaign_active_by_cost: bool | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -124,8 +120,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             status = result.scalar_one_or_none()
             if not status:
                 status = "РК не найдена"
-            else:
-                str(status)
             return status
 
     async def __call__(self) -> Message:
@@ -217,21 +211,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._update_informer = last_auto_setting_inform
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
 
-        plan = PlanFactProvider.get_plan_data(self.adv)
-        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(self.adv.adv_id)
-        self._target_cost = resolve_target_cost(
-            plan.orders if plan else None,
-            plan.target_pay_for_order if plan else None,
-            plan.max_pay_for_order if plan else None,
-            plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+        cost_metrics = await get_auto_campaign_cost_activity_metrics(
+            self.adv,
         )
-        self._plan_orders = plan.orders if plan else None
-        self._fact_predict_orders = (
-            plan_fact_summary.fact_predict_orders if plan_fact_summary else None
-        )
-        self._avg_cost_additional = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-            self.adv.adv_id,
-        )
+        self._target_cost = cost_metrics.target_cost
+        self._avg_cost_additional = cost_metrics.avg_cost
+        self._is_campaign_active_by_cost = cost_metrics.is_active
 
         return await super().__call__()
 
@@ -263,12 +248,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._target_cost is not None or self._avg_cost_additional is not None:
                 text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
 
-            if (
-                    self._avg_cost_additional is not None
-                    and self._target_cost is not None
-                    and self._avg_cost_additional > self._target_cost
-                    and self._fact_predict_orders < self._plan_orders
-            ):
+            if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
                     "⚠️ Рек. системы (полки) не раскручиваются. "
