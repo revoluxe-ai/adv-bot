@@ -288,6 +288,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
 
+        auto_campaign_active: bool | None = None
+        rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
         if complex_adv.rec_system_promotion_mode_active:
             from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
@@ -295,7 +297,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             # TODO: Придумать фоллбек для этой функции
             auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
-            rec_conversion = await get_rec_conversion(complex_adv.adv_id)
+            if auto_campaign_active is not None:
+                rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
             if auto_campaign_active is False:
