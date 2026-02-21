@@ -49,7 +49,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class _AsyncDecoratorFactory(Protocol):
+class _AsyncDecoratorFactory(Protocol): # pyright: ignore
     def __call__(
         self, *, ttl: str, lock: bool
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
