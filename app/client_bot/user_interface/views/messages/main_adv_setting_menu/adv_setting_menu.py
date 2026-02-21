@@ -82,6 +82,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             redis_client
         )
         self._is_campaign_active_by_cost: bool | None = None
+        self._plan_set: bool = False
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -219,6 +220,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._target_cost = cost_metrics.target_cost
         self._avg_cost_additional = cost_metrics.avg_cost
         self._is_campaign_active_by_cost = cost_metrics.is_active
+        self._plan_set = cost_metrics.plan_set
 
         return await super().__call__()
 
@@ -235,6 +237,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = ""
 
         if self.adv.rec_system_mode:
+            if not self._plan_set:
+                text += "❗ План не задан!\n"
+
             target_str = (
                 f"{round(self._target_cost)} р."
                 if self._target_cost is not None
