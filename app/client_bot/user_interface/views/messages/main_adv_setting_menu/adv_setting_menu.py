@@ -125,7 +125,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     async def __call__(self) -> Message:
         auction_adv_id: int | None = self.adv.search_adv_id
         if auction_adv_id:
-             self._status_auction = await self._get_status_auction(auction_adv_id)
+             status_auction = await self._get_status_auction(auction_adv_id)
+             status_auction = self._format_status_for_display(status_auction)
+             self._status_auction = status_auction
         else:
             self._status_auction = "Не установлен"
         self._hard_min_ctr = self.adv.hard_min_ctr
@@ -258,7 +260,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text += (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
-            f"📌 Статус Авто: {self.adv.active_status}\n"
+            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}\n"
             f"📌 Статус Аукциона: {self._status_auction}\n")
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:
