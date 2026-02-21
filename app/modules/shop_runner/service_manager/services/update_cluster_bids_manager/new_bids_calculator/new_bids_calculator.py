@@ -13,7 +13,7 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     max_bid = calculation_input.max_bid
     min_bid: int | None = calculation_input.min_bid
     new_bid: int
-    if current_position > target_position or current_position == 0:
+    if current_position > target_position:
         new_bid = current_bid + step
     else:
         new_bid = current_bid - step
