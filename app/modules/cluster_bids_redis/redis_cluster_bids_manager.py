@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 from typing import Sequence
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
@@ -23,6 +25,14 @@ class ClusterBidEntry:
     nmid: int
     cluster: str
     new_bid: int
+    step: int | None = None
+    direct: str | None = None
+
+
+@dataclass(frozen=True)
+class ClusterBidState:
+    step: int | None
+    direct: str | None
 
 
 class RedisClusterBidsManager(BaseRedisManager):
@@ -32,6 +42,37 @@ class RedisClusterBidsManager(BaseRedisManager):
     def _get_key(self, adv_id: int, nmid: int, cluster: str) -> str:
         return f"{self.prefix}:{adv_id}:{nmid}:{cluster}"
 
+    @staticmethod
+    def _decode_raw(raw: str | bytes | None) -> tuple[int | None, ClusterBidState]:
+        if raw is None:
+            return None, ClusterBidState(step=None, direct=None)
+        if isinstance(raw, bytes):
+            raw = raw.decode()
+        try:
+            payload = json.loads(raw)
+        except (TypeError, ValueError):
+            try:
+                return int(raw), ClusterBidState(step=None, direct=None)
+            except (TypeError, ValueError):
+                return None, ClusterBidState(step=None, direct=None)
+        if not isinstance(payload, dict):
+            return None, ClusterBidState(step=None, direct=None)
+        bid_raw = payload.get("new_bid")
+        step_raw = payload.get("step")
+        direct_raw = payload.get("direct")
+        bid: int | None
+        step: int | None
+        try:
+            bid = int(bid_raw) if bid_raw is not None else None
+        except (TypeError, ValueError):
+            bid = None
+        try:
+            step = int(step_raw) if step_raw is not None else None
+        except (TypeError, ValueError):
+            step = None
+        direct = direct_raw if isinstance(direct_raw, str) else None
+        return bid, ClusterBidState(step=step, direct=direct)
+
     async def remember_bids(self, bids: Sequence[ClusterBidEntry]) -> None:
         if not bids:
             return
@@ -39,10 +80,16 @@ class RedisClusterBidsManager(BaseRedisManager):
         async with self._client.write_pipeline() as pipeline:  # type: ignore[reportUnknownMemberType]
             for bid in bids:
                 key = self._get_key(bid.adv_id, bid.nmid, bid.cluster)
+                payload: dict[str, Any] = {
+                    "new_bid": bid.new_bid,
+                    "step": bid.step,
+                    "direct": bid.direct,
+                }
+                payload_str = json.dumps(payload, ensure_ascii=False)
                 if ttl is not None:
-                    pipeline.set(key, bid.new_bid, ex=ttl)
+                    pipeline.set(key, payload_str, ex=ttl)
                 else:
-                    pipeline.set(key, bid.new_bid)
+                    pipeline.set(key, payload_str)
             await pipeline.execute()  # type: ignore[reportUnknownMemberType]
 
     async def get_bids(
@@ -57,15 +104,33 @@ class RedisClusterBidsManager(BaseRedisManager):
             raw_results: list[str | None] = await pipeline.execute()  # pyright: ignore
         bids: dict[ClusterBidKey, int] = {}
         for key, raw in zip(keys, raw_results):  # pyright: ignore
-            if raw is None:
-                continue
-            if isinstance(raw, bytes):
-                raw = raw.decode()
-            try:
-                bids[key] = int(raw)
-            except (TypeError, ValueError):
-                continue
+            bid, _ = self._decode_raw(raw)
+            if bid is not None:
+                bids[key] = bid
         return bids
 
+    async def get_bid_states(
+        self, keys: Sequence[ClusterBidKey]
+    ) -> dict[ClusterBidKey, ClusterBidState]:
+        if not keys:
+            return {}
+        async with self._client.read_pipeline() as pipeline:  # pyright: ignore
+            for key in keys:
+                redis_key = self._get_key(key.adv_id, key.nmid, key.cluster)
+                pipeline.get(redis_key)
+            raw_results: list[str | None] = await pipeline.execute()  # pyright: ignore
+        states: dict[ClusterBidKey, ClusterBidState] = {}
+        for key, raw in zip(keys, raw_results):  # pyright: ignore
+            _, state = self._decode_raw(raw)
+            if state.step is None and state.direct is None:
+                continue
+            states[key] = state
+        return states
 
-__all__ = ["RedisClusterBidsManager", "ClusterBidKey", "ClusterBidEntry"]
+
+__all__ = [
+    "RedisClusterBidsManager",
+    "ClusterBidKey",
+    "ClusterBidEntry",
+    "ClusterBidState",
+]
