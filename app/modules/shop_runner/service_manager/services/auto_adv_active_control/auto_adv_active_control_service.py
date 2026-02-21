@@ -162,7 +162,7 @@ class AutoAdvActiveControlService:
             adv.adv_setting,
             plan_fact_reader=self._plan_fact_reader,
         )
-
+        # TODO: Тут не понятно что делать, если cost_activity не доступно. Вообще, это ошибка какая-то, на всякий случай ничего не делаю
         if cost_activity is None:
             logger.info(
                 "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
