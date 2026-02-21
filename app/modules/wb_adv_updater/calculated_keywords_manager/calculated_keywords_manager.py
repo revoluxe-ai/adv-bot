@@ -284,16 +284,22 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                         pre_keywords: list[PreCalculatedKeyword]) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
+        from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+            is_auto_campaign_active,
+        )
+
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
-        rec_conversion: float | None = None
         if complex_adv.rec_system_promotion_mode_active:
             from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
                 get_rec_conversion,
             )
             # TODO: Придумать фоллбек для этой функции
+            auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
             rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
+            if auto_campaign_active is False:
+                return False
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
