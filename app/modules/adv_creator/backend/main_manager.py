@@ -157,7 +157,15 @@ class MainAdvManager:
                 )
             )
             result = await session.execute(stmt)
-            return {row[0] for row in result.all()}
+            out = {row[0] for row in result.all()}
+        # #region agent log
+        try:
+            _log = {"id": "log_get_all_adv_ids", "timestamp": __import__("time").time() * 1000, "location": "main_manager.py:get_all_adv_ids_for_nmid", "message": "DB adv_ids for nmid", "data": {"nmid": nmid, "wb_cabinet_id": wb_cabinet_id, "adv_ids": list(out)}, "hypothesisId": "D"}
+            open("debug-397632.log", "a", encoding="utf-8").write(__import__("json").dumps(_log, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        # #endregion
+        return out
 
     async def _create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
         wb_cabinet = self.access.wb_cabinet
@@ -216,7 +224,7 @@ class MainAdvManager:
                 "adv_id": auto_adv_id,
                 "_search_adv_id": search_adv_id,  # Исправлено на _search_adv_id
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,
@@ -268,6 +276,13 @@ class MainAdvManager:
         wb_cabinet_id = self.access.wb_cabinet.id
         all_adv_ids = await self.get_all_adv_ids_for_nmid(wb_cabinet_id, nmid)
         exist_adv_ids_rows = [(aid, None) for aid in all_adv_ids]
+        # #region agent log
+        try:
+            _log = {"id": "log_create_complex_advs_check", "timestamp": __import__("time").time() * 1000, "location": "main_manager.py:create_complex_advs", "message": "Before AdvExists check", "data": {"nmid": nmid, "hard_mode": hard_mode, "all_adv_ids": list(all_adv_ids), "exist_adv_ids_rows": exist_adv_ids_rows}, "hypothesisId": "E"}
+            open("debug-397632.log", "a", encoding="utf-8").write(__import__("json").dumps(_log, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        # #endregion
         if not hard_mode and all_adv_ids:
             raise AdvExistsForNmidError(exist_adv_ids_rows)
 
@@ -354,7 +369,7 @@ class MainAdvManager:
                 "adv_id": existing_auto_adv_id,
                 "_search_adv_id": search_adv_id,
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet_from_db.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,
@@ -446,7 +461,7 @@ class MainAdvManager:
                 "adv_id": auto_adv_id,
                 "_search_adv_id": existing_search_adv_id,
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet_from_db.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,
