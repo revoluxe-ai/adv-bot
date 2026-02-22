@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class WhiteListTrimmer:
 
     async def trim(self, complex_adv: ComplexAdv) -> None:
+        # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
         if complex_adv.auto_add_only_relevant_phrase:
             keywords = [kw for kw in keywords if not kw.is_relevant]
