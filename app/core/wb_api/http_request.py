@@ -107,15 +107,19 @@ def try_except_decorator(
                     await instance.set_next_token(method_name)
                     state["_current_pause"] = 0
                 except (
-                    TooManyRequests,
                     BadRequestError,
-                    UnknownApiRequestError,
+                    NotMatchWBApiError,
                     NotValidDataError,
+                    UnknownApiRequestError,
+                ):
+                    # Клиентские и неизвестные ошибки не ретраим — повтор не поможет.
+                    raise
+                except (
+                    TooManyRequests,
                     ClientOSError,
                     ServerDisconnectedError,
                     ClientResponseError,
                     ClientConnectionError,
-                    NotMatchWBApiError,
                 ) as e:
                     if state["_attempts"] >= max_attempts:
                         raise MaxAttemptsError(

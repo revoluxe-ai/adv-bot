@@ -86,10 +86,9 @@ def test_filter_and_classify_empty_list() -> None:
 
 
 @pytest.mark.unit
-def test_filter_by_status_excludes_done() -> None:
-    """Status 7 (done) and -1 (deleted) must be excluded."""
+def test_filter_by_status_includes_done() -> None:
+    """Status 7 (done) is now allowed so WB and bot show same campaigns."""
     nmid = 100
-    # Auction campaign but status done (7)
     item_done = _make_item(
         id=1,
         bid_type="manual",
@@ -101,6 +100,26 @@ def test_filter_by_status_excludes_done() -> None:
         status=GetAdvertsAdvertsItemStatus.VALUE_7,
     )
     result = filter_and_classify_campaigns_by_nmid([item_done], nmid)
+    assert len(result.auction_candidates) == 1
+    assert result.auction_candidates[0].id == 1
+    assert result.auto_candidates == []
+
+
+@pytest.mark.unit
+def test_filter_by_status_excludes_refused() -> None:
+    """Status 8 (refused/cancelled) must be excluded."""
+    nmid = 100
+    item_refused = _make_item(
+        id=1,
+        bid_type="unified",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=False,
+        recommendations=False,
+        shelf=False,
+        nmid=nmid,
+        status=GetAdvertsAdvertsItemStatus.VALUE_8,
+    )
+    result = filter_and_classify_campaigns_by_nmid([item_refused], nmid)
     assert result.auction_candidates == []
     assert result.auto_candidates == []
 

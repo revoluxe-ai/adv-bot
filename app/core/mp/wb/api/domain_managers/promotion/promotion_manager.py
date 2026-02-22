@@ -214,7 +214,13 @@ class PromotionManager:
         )
 
     async def get_campaign_status(self, adv_id: int) -> int | None:
-        """Статус кампании на WB (например 7=завершена) или None, если не найдена."""
+        """Статус кампании на WB (например 7=завершена) или None, если не найдена.
+
+        None возвращается, когда GET /api/advert/v2/adverts?ids=<adv_id> отдаёт пустой список.
+        Мы не передаём параметр statuses — фильтрации по статусу с нашей стороны нет.
+        Пустой ответ возможен: кампания удалена; или WB по своему правилу не возвращает
+        часть кампаний (например, завершённые) при запросе по ids — зависит от API WB.
+        """
         campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
             [adv_id]
         )
@@ -222,13 +228,23 @@ class PromotionManager:
             return None
         return int(campaigns[0].status)
 
-    async def get_connect_existing_candidates(self, nmid: int):
-        """Кандидаты для подключения существующих РК по nmid (аукцион + авто)."""
+    async def get_connect_existing_candidates(
+        self, nmid: int, extra_adv_ids: list[int] | None = None
+    ):
+        """Кандидаты для подключения существующих РК по nmid (аукцион + авто).
+
+        Используется тот же источник id, что и для регулярного обновления (update_advs_data_from_wb_to_pg):
+        1) GET /adv/v1/promotion/count (promotion_count) — список id кампаний типа 8 и 9.
+        2) GET /api/advert/v2/adverts (campaigns_info_v2) — полная инфа по id.
+        extra_adv_ids: id из БД по этому артикулу — добавляем к списку на случай рассинхрона.
+        """
         from app.modules.connect_existing_advs.candidates_service import (
             filter_and_classify_campaigns_by_nmid,
         )
 
-        adv_ids = await self._client.cabinet_adverts_list_adapter.get_cabinet_adv_ids()
+        adv_ids = await self._client.promotion_count_adapter.get_cabinet_adv_ids()
+        if extra_adv_ids:
+            adv_ids = list(set(adv_ids) | set(extra_adv_ids))
         if adv_ids:
             campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
                 adv_ids
@@ -243,6 +259,14 @@ class PromotionManager:
             self._client.campaigns_management_adapter,
             adv_id=advert_id,
             new_name=new_name,
+        )
+
+    async def set_auction_placement(
+        self, adv_id: int, *, search: bool = True, recommendations: bool = False
+    ) -> None:
+        """Установить размещение для поисковой (аукционной) кампании (поиск / рекомендации)."""
+        await self._client.campaigns_management_adapter.put_auction_placements(
+            adv_id, search=search, recommendations=recommendations
         )
 
     async def get_supplier_subjects(
