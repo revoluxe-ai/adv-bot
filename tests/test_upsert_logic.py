@@ -15,6 +15,8 @@ pytestmark = pytest.mark.integration
 
 # access_mock и async_session теперь предоставляются через conftest.py
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(name="access_mock")
 def _access_mock():  # pyright: ignore[reportUnusedFunction]

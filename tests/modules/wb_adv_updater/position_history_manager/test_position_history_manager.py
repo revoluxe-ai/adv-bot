@@ -34,6 +34,8 @@ ORDER BY (wb_category, nmid, norm_query, date, timestamp)
 SETTINGS index_granularity = 8192
 """
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_get_position_history_returns_positions(clickhouse_client: AsyncClient) -> None:

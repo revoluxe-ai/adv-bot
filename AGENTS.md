@@ -27,7 +27,10 @@
 ## Testing Guidelines
 - Pytest is the standard framework; async tests use `pytest-asyncio`.
 - File naming: `test_*.py`, `*_test.py`, or `tests.py`; functions `test_*`, classes `Test*`.
-- Use markers (`unit`, `integration`, `slow`, `sandbox`) and select via `-m`.
+- Every test is exactly one type: **unit** or **integration**. Unit = no real DB/Redis/ClickHouse (mocks only). Integration = uses real or test DB/Redis/ClickHouse or multi-component flow.
+- Markers are assigned by path (`tests/unit/` → unit, `tests/integration/` → integration) or default to unit; override with `@pytest.mark.unit` or `@pytest.mark.integration`.
+- Run by type: `poetry run pytest -m unit`, `poetry run pytest -m integration`. Optional markers: `slow`, `sandbox` (use with `-m`, e.g. `-m "integration and not slow"`).
+- Unit run does not start Docker or DB; the first delay is from loading the app/conftest. For quick feedback run a subset, e.g. `pytest -m unit tests/app/modules/auto_budget_manager/ -v` or `pytest -m unit -x` (stop on first failure).
 
 ## Commit & Pull Request Guidelines
 - Commit history follows Conventional Commits (e.g., `feat: add …`, `fix: …`, `refactor: …`).

@@ -469,22 +469,26 @@ def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config, items: list[pytest.Item]) -> None:
     """
-    Автоматически помечает интеграционные тесты маркером integration.
+    Каждый тест получает ровно один тип: unit или integration.
+    - tests/unit/ -> unit; tests/integration/ -> integration.
+    - Остальные без маркера типа -> unit по умолчанию.
     """
     for item in items:
-        if item.get_closest_marker("integration"):
+        has_unit = item.get_closest_marker("unit") is not None
+        has_integration = item.get_closest_marker("integration") is not None
+        if has_unit or has_integration:
             continue
         path = str(item.fspath).replace("\\", "/")
-        if (
-            "/integration/" in path
-            or "integration" in item.fspath.basename
-            or "/tests_entry_points/" in path
-        ):
+        if "/integration/" in path or "integration" in item.fspath.basename or "/tests_entry_points/" in path:
             item.add_marker(pytest.mark.integration)
-
-
+        elif "/tests/unit/" in path or path.endswith("/tests/unit"):
+            item.add_marker(pytest.mark.unit)
+        elif "/tests/integration/" in path or path.endswith("/tests/integration"):
+            item.add_marker(pytest.mark.integration)
+        else:
+            item.add_marker(pytest.mark.unit)
 @pytest.fixture
 def tokens_mock() -> list[MagicMock]:
     token_mock = MagicMock(spec=WBToken)
@@ -675,11 +679,15 @@ async def sm_generator(postgres_session):
 
 
 @pytest.fixture(autouse=True)
-async def clean_db():
+async def clean_db(request: pytest.FixtureRequest):
     """Очищает ключевые таблицы до и после каждого теста (не трогая event loop).
 
-    Для unit-тестов без поднятой Docker-БД — no-op.
+    Unit-тесты не запрашивают БД — для них фикстура сразу no-op (без задержек).
+    Для integration без поднятой Docker-БД — тоже no-op.
     """
+    if request.node.get_closest_marker("unit") is not None:
+        yield
+        return
     if not _TEST_DB_READY:
         yield
         return
