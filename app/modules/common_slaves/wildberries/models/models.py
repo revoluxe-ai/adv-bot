@@ -918,6 +918,7 @@ class KeywordSetting(BaseTable):
 
 
 class AdvTimeSettings(Base):  # type: ignore[valid-type]
+    # TODO: Тут косяк: надо использовать BaseTable
     __tablename__ = "adv_time_settings"
 
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
