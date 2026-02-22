@@ -13,6 +13,8 @@ from app.client_bot.user_interface.handlers.individual_keywords_target_place_tog
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
+pytestmark = pytest.mark.integration
+
 
 def _make_callback(adv_id: int, new_status: bool) -> tuple[SimpleNamespace, SimpleNamespace]:
     callback_query = SimpleNamespace(
