@@ -1,5 +1,6 @@
 import logging
 import typing
+from datetime import datetime
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -55,6 +56,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         image: str,
         page: int,
         image_mode: str = "graphic",
+        cpm_date_map: dict[str, tuple[float | None, datetime | None]] | None = None,
     ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
@@ -67,6 +69,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
         self._last_saved_bids: dict[int, int] = {}
+        self._cpm_date_map = cpm_date_map
 
     @inject
     async def __call__(
@@ -202,33 +205,30 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text = (
             str(self._adv_setting.name) + "\n"
             f"Авто: {self._adv_setting.active_status}\n"
-            f"Аукцион: {self._status_auction}\n"
+            f"Аук.: {self._status_auction}\n"
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
-            f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
+            f"ID Аук.: {self._adv_setting.search_adv_id}\n"
             f"Cтат. за 2 дня:\n")
 
         if self.min_rating_by_orders is not None:
-            t = f"Мин. рейтинг по заказам: {self.min_rating_by_orders * 100:.2f}%\n"
-        elif self.hard_min_ctr is not None:
-            t = f"Мин. CTR: {self.hard_min_ctr * 100:.2f}%\n"
+            t = f"Мин. рейтинг по зак.: {self.min_rating_by_orders * 100:.2f}%\n"
         else:
             t = '❗Ограничители не заданы!!!\n'
         text += t
         text +=(
             f"Стр.: {self._page}/{total_page + 1}\n"
-            f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr:.2f}\n"
             f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
-            f"Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n"
+            f"Расход на рек.(авто): {self.addition_spend_in_adv:.2f} р.\n"
         )
         if self.cost_per_order_from_additional_last_week is not None:
             text += (
-                f"Себестоимость заказа из доп. показов (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
+                f"Себес. зак. из доп. пок. (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
             )
         text += (
-            f"Общие заказы: {self._all_orders_for_last_days}\n"
+            f"Заказы: {self._all_orders_for_last_days}\n"
             f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
         )
@@ -238,7 +238,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting.orders_source_for_auto_mode
             == OrdersSourceForAutoMode.ADV_SUM
         ):
-            text += "📊 Ист. зак.: ТОЛЬКО рек. заказы\n"
+            text += "📊 Ист. зак.: ТОЛЬКО рек.\n"
             text += f"Сумм. заказы из рек.: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
         else:
             text += "📊 Ист. зак.: Общая стат. (вкл. органику)\n"
@@ -276,7 +276,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Прог. зак. в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
             f"Себес.: {round(self._fact_data.pay_for_order, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
-            f"Ср. CTR Рек.сис.: {self._mean_auto_ctr*100:.2f} "
         )
 
         text += self._common_stat_by_days
@@ -284,18 +283,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += "\n"
 
         text += (
-            f"\nСтавка из Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
+            f"\nCPM Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
         )
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         if self._adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
             text += f"Ставка из Аукциона: {self.auction_cpm}\n"
-        text += f"Целевая позиция: {self._adv_setting.max_place}\n"
-        max_cpm_str = (
-            str(self._adv_setting.max_cpm)
-            if self._adv_setting.max_cpm is not None
-            else "Не задана"
-        )
-        text += f"Максимальная ставка: {max_cpm_str}\n"
+        text += f"Цел. поз.: {self._adv_setting.max_place}\n"
         text += self._format_last_saved_bids()
         return text
 

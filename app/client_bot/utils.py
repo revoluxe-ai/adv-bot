@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import csv
 import logging
+from datetime import datetime
 from io import StringIO
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select, Result
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +19,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
+if TYPE_CHECKING:
+    from app.core.redis_manager_v2.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
@@ -170,4 +177,59 @@ async def create_user(
     return user
 
 
-# TODO: Выпилить из кода парсер позиций
+async def build_cpm_date_map(
+    adv_setting: AdvSetting,
+    keywords: list[CalculatedKeyword],
+    redis_client: "RedisClient",
+) -> dict[str, tuple[float | None, datetime | None]]:
+    """
+    Build map text -> (cpm, date) for list display.
+    Priority: 1) set bid (Redis), 2) bid_decision_log, 3) Redis calculated_keywords cache, 4) keyword.cpm/timestamp.
+    """
+    from app.modules.keyword_bid_from_log import get_latest_keyword_bids
+    from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+        RedisCalculatedKeywordsCacheManager,
+    )
+
+    texts = [kw.text for kw in keywords]
+    result: dict[str, tuple[float | None, datetime | None]] = {}
+    search_adv_id = getattr(adv_setting, "search_adv_id", None)
+    nmids = list(adv_setting.nmids or [])
+
+    # 1) Set bid from Redis
+    from app.modules.cluster_bids_redis import get_set_bid_map
+
+    set_bid_map = await get_set_bid_map(
+        search_adv_id, nmids, texts, adv_setting, redis_client
+    )
+
+    # 2) bid_decision_log (one call for all texts)
+    bid_log_map: dict[str, tuple[float, datetime]] = {}
+    if search_adv_id is not None and nmids and texts:
+        bid_log_map = await get_latest_keyword_bids(search_adv_id, nmids, texts)
+
+    # 3) Redis calculated_keywords cache
+    cache_map: dict[str, CalculatedKeyword] = {}
+    if texts:
+        cache_mgr = RedisCalculatedKeywordsCacheManager()
+        cache_map = await cache_mgr.get_calculated_keywords_map(adv_setting.adv_id, texts)
+
+    text_to_kw = {kw.text: kw for kw in keywords}
+
+    for text in texts:
+        if text in set_bid_map:
+            cpm, dt = set_bid_map[text]
+            result[text] = (cpm, dt)
+        elif text in bid_log_map:
+            cpm_curr, decision_time = bid_log_map[text]
+            result[text] = (cpm_curr, decision_time)
+        elif text in cache_map:
+            kw = cache_map[text]
+            result[text] = (kw.cpm, kw.timestamp)
+        elif text in text_to_kw:
+            kw = text_to_kw[text]
+            result[text] = (kw.cpm, kw.timestamp)
+        else:
+            result[text] = (None, None)
+
+    return result

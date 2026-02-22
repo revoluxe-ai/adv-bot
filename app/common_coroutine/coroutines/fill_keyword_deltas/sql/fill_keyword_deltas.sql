@@ -104,8 +104,8 @@ FROM
         FROM default_db.clusters_adv_stats
         WHERE timestamp >= t_from - toIntervalHour(overlap_hours)
           AND timestamp <  t_to
-          AND date >= toDate(t_from - toIntervalHour(overlap_hours))
-          AND date <= toDate(t_to)
+          AND date >= toDate(toTimezone(t_from - toIntervalHour(overlap_hours), 'Europe/Moscow'))
+          AND date <= toDate(toTimezone(t_to, 'Europe/Moscow'))
         GROUP BY adv_id, nmid, norm_query, ts5
     )
 )

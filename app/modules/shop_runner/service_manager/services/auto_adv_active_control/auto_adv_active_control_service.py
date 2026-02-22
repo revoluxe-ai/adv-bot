@@ -5,8 +5,6 @@ from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
 from app.core.mp.wb.api.managers import WBModifier
-from app.modules.plan_fact.provider import PlanFactProvider
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -16,6 +14,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
+from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+    is_auto_campaign_active,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,60 +158,34 @@ class AutoAdvActiveControlService:
                 return None
             budget_ok = auto_limit > 0 and spend_today < auto_limit
 
-        plan = PlanFactProvider.get_plan_data(adv.adv_setting)
-        plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(
-            auto_adv_id
+        cost_activity = await is_auto_campaign_active(
+            adv.adv_setting,
+            plan_fact_reader=self._plan_fact_reader,
         )
-        target_cost = resolve_target_cost(
-            plan.orders if plan else None,
-            plan.target_pay_for_order if plan else None,
-            plan.max_pay_for_order if plan else None,
-            plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
-        )
-        avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-            auto_adv_id,
-        )
+        # TODO: Тут не понятно что делать, если cost_activity не доступно. Вообще, это ошибка какая-то, на всякий случай ничего не делаю
+        if cost_activity is None:
+            logger.info(
+                "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
+                cost_log_suffix,
+                auto_adv_id,
+                adv.shop_id,
+            )
+            return None
 
-        if target_cost is None and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign%s due to no target cost adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            return None
-        if avg_cost is None and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign%s due to no avg cost adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            return None
         if (
-            target_cost is not None
-            and avg_cost is not None
-            and avg_cost > target_cost
+            cost_activity is False
             and auto_status == WBAdvActiveStatus.STARTED
         ):
             logger.info(
-                "Auto watchdog: pausing auto campaign%s due to high avg cost %.2f vs target %.2f adv_id=%s shop_id=%s",
+                "Auto watchdog: pausing auto campaign%s due to failed cost rule adv_id=%s shop_id=%s",
                 cost_log_suffix,
-                avg_cost,
-                target_cost,
                 auto_adv_id,
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auto_campaign(adv)
             return None
 
-        cost_rule_ok = (
-            target_cost is not None
-            and avg_cost is not None
-            and avg_cost <= target_cost
-        )
+        cost_rule_ok = cost_activity is True
         if (
             budget_ok
             and cost_rule_ok

@@ -1,7 +1,9 @@
 from __future__ import annotations
 import asyncio
+from dataclasses import dataclass
+from datetime import datetime
 from collections.abc import Awaitable, Callable
-from typing import Any, Generator, Protocol, Sequence, TypeVar, cast
+from typing import Generator, Protocol, Sequence, TypeVar, cast
 from typing_extensions import ParamSpec
 
 from sqlalchemy import select
@@ -19,12 +21,13 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     RedisKeywordBidderStatusManager,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
 from ...calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
 from ...common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import  get_async_session_maker as sm
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from operator import  attrgetter
-from cashews import cache, noself  # pyright: ignore
+
 
 
 import typing
@@ -35,26 +38,22 @@ if typing.TYPE_CHECKING:
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 
+@dataclass(frozen=True)
+class _StatsWithBidLog:
+    stats: list[KeywordStat]
+    bid_log_map: dict[str, tuple[float, datetime]]
+    set_bid_map: dict[str, tuple[float, datetime | None]]
+
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class _AsyncDecoratorFactory(Protocol):
+class _AsyncDecoratorFactory(Protocol): # pyright: ignore
     def __call__(
         self, *, ttl: str, lock: bool
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
         ...
-
-
-def _typed_noself_cache() -> _AsyncDecoratorFactory:
-    """Typed wrapper for ``cashews.noself(cache)``.
-
-    cashews doesn't ship strict typings for this decorator factory.
-    This helper preserves the signature of decorated async callables
-    for pyright/mypy.
-    """
-
-    return cast(Any, noself(cache))
 
 
 class _ClickHouseNamedResultsResponse(Protocol):
@@ -78,22 +77,98 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             self._get_all_keyword_setting(complex_adv),
             self._get_all_stats(complex_adv, min_days, min_views),
         )
-        keyword_hard_statuses:  list[KeywordHardStatus] = list(results[0])
-        stats = results[1]
+        keyword_hard_statuses: list[KeywordHardStatus] = list(results[0])
+        stats_with_bid_log: _StatsWithBidLog = results[1]
+        stats = stats_with_bid_log.stats
+        bid_log_map = stats_with_bid_log.bid_log_map
+        set_bid_map = stats_with_bid_log.set_bid_map
 
         pre_calculated_keywords = self.__create_pre_calculated_keywords(keyword_hard_statuses,
                                                                         stats,
                                                                         complex_adv)
         if not pre_calculated_keywords:
             return []
+        pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
+            pre_calculated_keywords, bid_log_map, set_bid_map
+        )
         calculated_keyword_list = await self.__get_calculated_keywords(complex_adv, pre_calculated_keywords)
         await self._set_calculated_keywords_in_redis_cache(complex_adv, calculated_keyword_list)
 
         return calculated_keyword_list
 
-    async def _get_all_stats(self, complex_adv: 'ComplexAdv', min_days: int, min_views: int):
+    async def _get_all_stats(
+        self, complex_adv: 'ComplexAdv', min_days: int, min_views: int
+    ) -> _StatsWithBidLog:
+        from types import SimpleNamespace
+
         nmids = complex_adv.nmids
-        return await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
+        stats = await self._get_keywords_stat_from_clickhouse(nmids, min_days, min_views)
+        bid_log_map: dict[str, tuple[float, datetime]] = {}
+        set_bid_map: dict[str, tuple[float, datetime | None]] = {}
+        search_adv_id = getattr(complex_adv, "search_adv_id", None)
+        if search_adv_id is not None and stats:
+            from app.modules.keyword_bid_from_log import get_latest_keyword_bids
+
+            texts = [s.text for s in stats]
+            bid_log_map = await get_latest_keyword_bids(search_adv_id, nmids, texts)
+
+            from app.modules.cluster_bids_redis import get_redis_client, get_set_bid_map
+
+            try:
+                redis_client = get_redis_client()
+                adv_for_ts = SimpleNamespace(adv_id=search_adv_id)
+                set_bid_map = await get_set_bid_map(
+                    search_adv_id,
+                    nmids,
+                    texts,
+                    adv_for_ts, # pyright:ignore # noqa
+                    redis_client
+                )
+            except Exception:  # noqa: BLE001
+                set_bid_map = {}
+
+        return _StatsWithBidLog(
+            stats=stats, bid_log_map=bid_log_map, set_bid_map=set_bid_map
+        )
+
+    @staticmethod
+    def __enrich_pre_calculated_with_cpm_sources(
+        pre_keywords: list[PreCalculatedKeyword],
+        bid_log_map: dict[str, tuple[float, datetime]],
+        set_bid_map: dict[str, tuple[float, datetime | None]],
+    ) -> list[PreCalculatedKeyword]:
+        enriched: list[PreCalculatedKeyword] = []
+        for pre_kw in pre_keywords:
+            text = pre_kw.keyword_setting.text
+            bid_log = bid_log_map.get(text)
+            cpm_from_bid_log: float | None = None
+            cpm_from_bid_log_date: datetime | None = None
+            if bid_log is not None:
+                cpm_from_bid_log, cpm_from_bid_log_date = bid_log
+            set_bid = set_bid_map.get(text)
+            cpm_set_bid: int | None = None
+            cpm_set_bid_date: datetime | None = None
+            if set_bid is not None:
+                cpm_set_bid = int(set_bid[0])
+                cpm_set_bid_date = set_bid[1]
+            sources = KeywordCpmSources(
+                cpm_set_bid=cpm_set_bid,
+                cpm_set_bid_date=cpm_set_bid_date,
+                cpm_from_bid_log=cpm_from_bid_log,
+                cpm_from_bid_log_date=cpm_from_bid_log_date,
+                cpm_from_stats=pre_kw.cluster_stat.cpm,
+                cpm_from_stats_date=pre_kw.cluster_stat.timestamp,
+            )
+            enriched.append(
+                PreCalculatedKeyword(
+                    adv_id=pre_kw.adv_id,
+                    keyword_setting=pre_kw.keyword_setting,
+                    cluster_stat=pre_kw.cluster_stat,
+                    bidder_status=pre_kw.bidder_status,
+                    cpm_sources=sources,
+                )
+            )
+        return enriched
 
     async def _get_keywords_stat_from_clickhouse(self,
                                                   nmids: list[int],
@@ -139,7 +214,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             stats.append(stat)
         return stats
 
-    @_typed_noself_cache()(ttl="15m", lock=True)
     async def __get_keywords_stat_from_clickhouse(self,
                                                   nmids: list[int],
                                                   min_days: int,
@@ -210,16 +284,25 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                         pre_keywords: list[PreCalculatedKeyword]) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
-        # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
+        from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+            is_auto_campaign_active,
+        )
+
+        auto_campaign_active: bool | None = None
         rec_conversion: float | None = None
+        # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
         if complex_adv.rec_system_promotion_mode_active:
             from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
                 get_rec_conversion,
             )
             # TODO: Придумать фоллбек для этой функции
-            rec_conversion = await get_rec_conversion(complex_adv.adv_id)
+            auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
+            if auto_campaign_active is not None:
+                rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
+            if auto_campaign_active is False:
+                return None # None - не применяем вообще это правило
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
@@ -257,6 +340,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     state=state,
                     target_pay_for_order=complex_adv.target_pay_for_order,
                     above_rec_conversion=above_rec,
+                    cpm_sources=pre_kw.cpm_sources,
                 )
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
@@ -325,6 +409,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     state=state,
                     target_pay_for_order=complex_adv.target_pay_for_order,
                     above_rec_conversion=above_rec,
+                    cpm_sources=pre_kw.cpm_sources,
                 )
             )
         return calculated_keyword_list

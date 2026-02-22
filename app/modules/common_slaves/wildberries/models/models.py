@@ -22,14 +22,12 @@ from sqlalchemy import (
     text,
 )
 
-
-from sqlalchemy import text as sql_text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
 from .bidder_mode import BidderMode
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
@@ -625,6 +623,11 @@ class AdvSetting(BaseTable):
         default=300,
         server_default=text('300'),
     )
+
+    target_position_mode: Mapped[TargetPositionMode] = mapped_column(SAEnum(TargetPositionMode),
+                                                                     nullable=True,
+                                                                     default=TargetPositionMode.MIN_CPA,
+                                                                     server_default=TargetPositionMode.MIN_CPA.name)
 
     __table_args__ = (
         # Составной индекс для основного запроса

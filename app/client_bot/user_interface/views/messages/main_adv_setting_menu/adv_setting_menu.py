@@ -41,12 +41,9 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
-from app.modules.plan_fact.provider import PlanFactProvider
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
+from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+    get_auto_campaign_cost_activity_metrics,
 )
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
 
@@ -84,6 +81,32 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
+        self._is_campaign_active_by_cost: bool | None = None
+        self._plan_set: bool = False
+
+    @staticmethod
+    def _format_status_for_display(status: str | None) -> str:
+        """Числовой код WB (4,9,11,7,8) или текст статуса → строка для отображения."""
+        if not status:
+            return "—"
+        # Коды WB: 4=ready_for_start, 9=started, 11=pause, 7=done, 8=refused
+        code_to_ru = {
+            "4": "готова к старту",
+            "9": "запущена",
+            "11": "пауза",
+            "7": "завершена",
+            "8": "отклонена",
+        }
+        if status in code_to_ru:
+            return code_to_ru[status]
+        text_to_ru = {
+            "ready_for_start": "готова к старту",
+            "started": "запущена",
+            "pause": "пауза",
+            "done": "завершена",
+            "refused": "отклонена",
+        }
+        return text_to_ru.get(status, status)
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -98,14 +121,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             status = result.scalar_one_or_none()
             if not status:
                 status = "РК не найдена"
-            else:
-                str(status)
             return status
 
     async def __call__(self) -> Message:
         auction_adv_id: int | None = self.adv.search_adv_id
         if auction_adv_id:
-             self._status_auction = await self._get_status_auction(auction_adv_id)
+             status_auction = await self._get_status_auction(auction_adv_id)
+             status_auction = self._format_status_for_display(status_auction)
+             self._status_auction = status_auction
         else:
             self._status_auction = "Не установлен"
         self._hard_min_ctr = self.adv.hard_min_ctr
@@ -191,17 +214,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._update_informer = last_auto_setting_inform
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
 
-        plan = PlanFactProvider.get_plan_data(self.adv)
-        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(self.adv.adv_id)
-        self._target_cost = resolve_target_cost(
-            plan.orders if plan else None,
-            plan.target_pay_for_order if plan else None,
-            plan.max_pay_for_order if plan else None,
-            plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+        cost_metrics = await get_auto_campaign_cost_activity_metrics(
+            self.adv,
         )
-        self._avg_cost_additional = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-            self.adv.adv_id,
-        )
+        self._target_cost = cost_metrics.target_cost
+        self._avg_cost_additional = cost_metrics.avg_cost
+        self._is_campaign_active_by_cost = cost_metrics.is_active
+        self._plan_set = cost_metrics.plan_set
 
         return await super().__call__()
 
@@ -218,6 +237,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = ""
 
         if self.adv.rec_system_mode:
+            if not self._plan_set:
+                text += "❗ План не задан!\n"
+
             target_str = (
                 f"{round(self._target_cost)} р."
                 if self._target_cost is not None
@@ -233,11 +255,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._target_cost is not None or self._avg_cost_additional is not None:
                 text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
 
-            if (
-                    self._avg_cost_additional is not None
-                    and self._target_cost is not None
-                    and self._avg_cost_additional > self._target_cost
-            ):
+            if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
                     "⚠️ Рек. системы (полки) не раскручиваются. "
@@ -247,7 +265,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text += (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
-            f"📌 Статус Авто: {self.adv.active_status}\n"
+            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}\n"
             f"📌 Статус Аукциона: {self._status_auction}\n")
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:

@@ -58,6 +58,7 @@ from .user_interface.handlers import (
     min_views_for_ml_predict_ctr,
     orders_source_toggle,
     predict_ctr_mode_toggle,
+    target_position_mode_toggle,
     sales_predict_method_toggle,
     auto_update_exponent_toggle,
     auto_add_only_relevant_phrase_toggle,
@@ -102,6 +103,7 @@ common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
+common_router.include_routers(target_position_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)

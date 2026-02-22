@@ -192,7 +192,7 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
     ):
         await service.ensure_campaigns_active(
@@ -258,7 +258,7 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
     ):
         await service.ensure_campaigns_active([overspend_adv])
@@ -380,7 +380,7 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -438,7 +438,7 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -497,7 +497,7 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -558,7 +558,7 @@ async def test_auto_adv_does_not_start_when_avg_cost_above_target():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -607,7 +607,7 @@ async def test_auto_adv_does_not_start_when_no_plan_fact():
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
     ):
         await service.ensure_campaigns_active([adv])
@@ -672,7 +672,7 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
         "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
     ):
         await service.ensure_campaigns_active([adv])

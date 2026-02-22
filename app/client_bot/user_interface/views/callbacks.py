@@ -313,6 +313,11 @@ class PredictCTRModeToggle(CallbackData, prefix="predict_ctr_mode_toggle"):
     adv_setting_original_id: int
 
 
+class TargetPositionModeToggle(CallbackData, prefix="target_position_mode_toggle"):
+    new_mode: str  # value of TargetPositionMode (min_cpa / max_cart_to_views_conv)
+    adv_setting_original_id: int
+
+
 class SalesPredictMethodToggle(CallbackData, prefix="sales_predict_method_toggle"):
     new_method: FactMethods
     adv_setting_original_id: int
