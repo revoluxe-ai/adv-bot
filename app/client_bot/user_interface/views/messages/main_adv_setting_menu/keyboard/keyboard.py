@@ -153,6 +153,14 @@ def get_adv_setting_keyboard(
         )
     )
 
+    button = InlineKeyboardButton(
+        text="Управление ставкой",
+        callback_data=callbacks.CPMSettingMenu(
+            action="to_cpm_setting_page", adv_original_id=adv_setting.id
+        ).pack(),
+    )
+    _ = builder.row(button)
+
     watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
     watchdog_button = InlineKeyboardButton(
         text=(
@@ -322,13 +330,6 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
 
-    button = InlineKeyboardButton(
-        text="Управление ставкой",
-        callback_data=callbacks.CPMSettingMenu(
-            action="to_cpm_setting_page", adv_original_id=adv_setting.id
-        ).pack(),
-    )
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",
