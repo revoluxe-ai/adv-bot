@@ -70,7 +70,7 @@ class WhiteListAddExecutor(BaseExecutor):
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if keyword.hard_status != 1:
                 return False
-            if keyword.status == KeywordStatus.BAD:
+            if keyword.status == KeywordStatus.GOOD:
                  return False
             if ctx.complex_adv.auto_add_only_relevant_phrase and not keyword.relevant:
                  return False
