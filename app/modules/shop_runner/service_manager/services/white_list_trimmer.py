@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 class WhiteListTrimmer:
 
-    async def trim(self, complex_adv: ComplexAdv) -> None:
+    async def  trim(self, complex_adv: ComplexAdv) -> None:
         # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
         if complex_adv.auto_add_only_relevant_phrase:
-            keywords = [kw for kw in keywords if not kw.is_relevant]
+            keywords = [kw for kw in keywords if not kw.relevant]
         top_key_in_auto_position: int | None = self._get_top_key_in_auto_position(keywords)
         if top_key_in_auto_position is None:
             return None
