@@ -65,7 +65,7 @@ class WhiteListAddExecutor(BaseExecutor):
                 f"целевая={target_cost:.2f}, {current_pay_for_order / target_cost * 100:.1f}%)"
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-
+        # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if keyword.hard_status != 1:
