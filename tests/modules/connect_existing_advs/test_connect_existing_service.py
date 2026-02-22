@@ -48,4 +48,6 @@ async def test_get_connect_existing_candidates_calls_hub_and_returns_result() ->
 
     assert result is expected
     mock_factory.get_wb_manager_hub.assert_called_once_with("shop_1")
-    mock_pm.get_connect_existing_candidates.assert_called_once_with(12345)
+    mock_pm.get_connect_existing_candidates.assert_called_once_with(
+        12345, extra_adv_ids=None
+    )

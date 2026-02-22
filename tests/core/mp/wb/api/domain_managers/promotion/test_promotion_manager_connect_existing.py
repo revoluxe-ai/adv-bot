@@ -74,19 +74,19 @@ def _make_auction_item(item_id: int, nmid: int) -> GetAdvertsAdvertsItem:
 @pytest.mark.asyncio
 async def test_get_connect_existing_candidates_flow() -> None:
     """get_connect_existing_candidates calls adapters and returns classified result."""
-    mock_cabinet_list = AsyncMock(return_value=[1, 2])
+    mock_promotion_count = AsyncMock(return_value=[1, 2])
     auction_item = _make_auction_item(item_id=1, nmid=100)
     mock_campaigns_info = AsyncMock(return_value=[auction_item])
 
     mock_client = MagicMock(spec=PromotionClient)
-    mock_client.cabinet_adverts_list_adapter.get_cabinet_adv_ids = mock_cabinet_list
+    mock_client.promotion_count_adapter.get_cabinet_adv_ids = mock_promotion_count
     mock_client.campaigns_info_v2_adapter.get_campaigns_info = mock_campaigns_info
 
     manager = PromotionManager(promotion_client=mock_client)
     result = await manager.get_connect_existing_candidates(100)
 
     assert isinstance(result, ConnectExistingCandidatesResult)
-    mock_cabinet_list.assert_called_once()
+    mock_promotion_count.assert_called_once()
     mock_campaigns_info.assert_called_once_with([1, 2])
     assert len(result.auction_candidates) == 1
     assert result.auction_candidates[0].id == 1

@@ -1075,7 +1075,7 @@ async def test_connect_existing_continue_despite_invalid_confirm_empty_auto_cand
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_confirm_type2_adv_id_zero_enqueues_create_auto_only() -> None:
-    """confirm_type2 with adv_id=0: enqueue create_auto_only, state.clear, queue message, ShopMenu."""
+    """confirm_type2 with adv_id=0: enqueue create_auto_only, state.clear, queue message; ShopMenu not shown."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -1112,8 +1112,7 @@ async def test_connect_existing_confirm_type2_adv_id_zero_enqueues_create_auto_o
     state.clear.assert_called_once()
     bot.send_message.assert_called_once()
     assert "добавлена в очередь" in bot.send_message.call_args[0][1]
-    mock_shop_menu.assert_called_once_with(bot, 333, state, 42)
-    mock_shop_menu.return_value.assert_called_once()
+    mock_shop_menu.assert_not_called()
 
 
 @pytest.mark.unit
