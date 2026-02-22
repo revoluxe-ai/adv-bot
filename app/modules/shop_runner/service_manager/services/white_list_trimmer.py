@@ -16,7 +16,8 @@ class WhiteListTrimmer:
         # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
         if complex_adv.auto_add_only_relevant_phrase:
-            keywords = [kw for kw in keywords if not kw.relevant]
+            keywords = [kw for kw in keywords if kw.relevant]
+        keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
         top_key_in_auto_position: int | None = self._get_top_key_in_auto_position(keywords)
         if top_key_in_auto_position is None:
             return None
