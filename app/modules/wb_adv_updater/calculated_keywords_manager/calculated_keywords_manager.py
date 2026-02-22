@@ -302,7 +302,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
             if auto_campaign_active is False:
-                return None
+                return None # None - не применяем вообще это правило
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
