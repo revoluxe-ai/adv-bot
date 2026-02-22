@@ -73,10 +73,10 @@ class WhiteListAddExecutor(BaseExecutor):
             base_ok = keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
             if not base_ok:
                 return False
-            if ctx.complex_adv.rec_system_promotion_mode_active and (
-                keyword.above_rec_conversion is  not True
-            ):
-                return False
+            if (ctx.complex_adv.rec_system_promotion_mode_active
+                and keyword.above_rec_conversion is  not True
+                and ctx.complex_adv.auto_adv_active_status):
+                    return False
             if ctx.complex_adv.auto_add_only_relevant_phrase:
                 return (
                     keyword.relevant
