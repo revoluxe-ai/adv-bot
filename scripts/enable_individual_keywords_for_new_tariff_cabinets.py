@@ -71,7 +71,8 @@ async def _run(dry_run: bool) -> None:
                 .values(individual_keywords_target_place_mode=True)
             )
             r = await session.execute(update_stmt)
-            count = r.rowcount # pyright:ignore # type: ignore
+            count = r.rowcount
+            count = getattr(count, "rowcount")
             adv_settings_updated += count
             if count > 0:
                 LOG.info(
