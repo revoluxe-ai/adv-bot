@@ -321,19 +321,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
                 above_rec = _above_rec_conversion(pre_kw)
-                if not best_keyword_status or pre_kw not in relevant_phrases:
-                    if above_rec is False:
-                        state = KeywordState(
-                            status=KeywordStatus.BAD,
-                            reason=KeywordStatusReason.BELOW_REC_CONVERSION,
-                            best_keyword_status=best_keyword_status,
-                        )
-                    else:
-                        state = KeywordState(
-                            status=KeywordStatus.GOOD,
-                            reason=KeywordStatusReason.BEST_KEYWORD,
-                            best_keyword_status=best_keyword_status,
-                        )
+                if not best_keyword_status or pre_kw not in relevant_phrases or above_rec is False:
+                    state = KeywordState(
+                        status=KeywordStatus.BAD,
+                        reason=KeywordStatusReason.BELOW_REC_CONVERSION,
+                        best_keyword_status=best_keyword_status,
+                    )
                 else:
                     state = KeywordState(
                         status=KeywordStatus.BAD,
