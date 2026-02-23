@@ -8,6 +8,7 @@ from app.client_bot.user_interface.handlers.time_settings.logic import (
     allowed_now_from_db_state,
 )
 from app.client_bot.user_interface.handlers.time_settings.repository import (
+    TimeSettingsDbState,
     TimeSettingsRepository,
 )
 from app.core.mp.wb.api.managers import WBModifier
@@ -57,15 +58,25 @@ class AutoAdvActiveControlService:
         start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
+        time_settings_by_adv: dict[int, TimeSettingsDbState | None] = {}
+        async with get_session_maker(read_only=True) as session:
+            for adv in complex_advs:
+                aid = adv.adv_setting.id
+                if aid not in time_settings_by_adv:
+                    time_settings_by_adv[aid] = await _time_settings_repo.load_for_adv(
+                        session, aid
+                    )
+
         for adv in complex_advs:
+            db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
-                lambda complex_adv=adv: self._auto_campaign_handler(
-                    complex_adv, start_of_day, end_of_day
+                lambda complex_adv=adv, ds=db_state: self._auto_campaign_handler(
+                    complex_adv, start_of_day, end_of_day, db_state=ds
                 )
             )
             handlers.append(
-                lambda complex_adv=adv: self._search_campaign_handler(
-                    complex_adv, start_of_day, end_of_day
+                lambda complex_adv=adv, ds=db_state: self._search_campaign_handler(
+                    complex_adv, start_of_day, end_of_day, db_state=ds
                 )
             )
 
@@ -108,15 +119,13 @@ class AutoAdvActiveControlService:
         adv: ComplexAdv,
         start_of_day: datetime,
         end_of_day: datetime,
+        *,
+        db_state: TimeSettingsDbState | None,
     ) -> None:
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
 
-        async with get_session_maker(read_only=True) as session:
-            db_state = await _time_settings_repo.load_for_adv(
-                session, adv.adv_setting.id
-            )
         time_allowed = (
             allowed_now_from_db_state(db_state) if db_state else True
         )
@@ -229,6 +238,8 @@ class AutoAdvActiveControlService:
         adv: ComplexAdv,
         start_of_day: datetime,
         end_of_day: datetime,
+        *,
+        db_state: TimeSettingsDbState | None,
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
@@ -236,10 +247,6 @@ class AutoAdvActiveControlService:
 
         search_status = adv.search_adv_active_status_str
 
-        async with get_session_maker(read_only=True) as session:
-            db_state = await _time_settings_repo.load_for_adv(
-                session, adv.adv_setting.id
-            )
         time_allowed = (
             allowed_now_from_db_state(db_state) if db_state else True
         )
