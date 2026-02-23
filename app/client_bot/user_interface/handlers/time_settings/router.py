@@ -97,6 +97,12 @@ async def _apply_db_patch(
         return
 
     if action == "toggle_schedule":
+        if state.schedule_enabled:
+            await repo.patch_week_masks(
+                session=session,
+                adv_setting_id=adv_setting_id,
+                masks_by_dow=week_masks_from_state(state),
+            )
         await repo.patch_schedule_enabled(
             session=session,
             adv_setting_id=adv_setting_id,
