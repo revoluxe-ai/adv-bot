@@ -85,7 +85,7 @@ class UpdateClusterBidsManager:
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
         local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
         remote_data: BidderUpdateData = await self._get_data_from_wb_api(advs, local_data)
-        predict_bids_data: dict[int, dict[int, dict[str, dict[int, int]]] | None] = (
+        predict_bids_data: dict[int, (dict[int, dict[str, dict[int, int]]] | None)] = (
             await self._get_predict_bids_data(advs, remote_data.min_bids.search)
         )
 
@@ -244,7 +244,11 @@ class UpdateClusterBidsManager:
                     prev_direct = DirectEnum(prev_state.direct)
                 except ValueError:
                     prev_direct = None
-            predict_bids_data_for_adv = calculate_data.predict_bids_data.get(adv_id)
+            predict_bids_data_for_adv = (
+                calculate_data.predict_bids_data.get(adv_id)
+                if calculate_data.predict_bids_data is not None
+                else None
+            )
             predict_target_bids = (
                 predict_bids_data_for_adv.get(nmid)
                 if isinstance(predict_bids_data_for_adv, dict)
