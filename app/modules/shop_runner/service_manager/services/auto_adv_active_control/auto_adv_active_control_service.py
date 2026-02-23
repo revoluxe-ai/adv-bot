@@ -113,7 +113,7 @@ class AutoAdvActiveControlService:
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
 
-        async with get_session_maker() as session:
+        async with get_session_maker(read_only=True) as session:
             db_state = await _time_settings_repo.load_for_adv(
                 session, adv.adv_setting.id
             )
