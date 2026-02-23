@@ -414,7 +414,7 @@ class UpdateClusterBidsManager:
         predict_keywords_target_manager_container = PredictKeywordsTargetPlaceContainer()
         predict_target_place_manager: PredictKeywordsTargetPlace = \
             predict_keywords_target_manager_container.predict_keywords_target_place_manager()
-        adv_result: dict[int, dict[int, dict[str, dict[int, int]]] | None] = {}
+        adv_result: dict[int, dict[int, dict[str, dict[int, int]]]] = {}
         for adv in advs:
             search_adv_id = adv.auction_adv_id
             if search_adv_id is None:
