@@ -16,6 +16,20 @@ class PredictKeywordsTargetPlace:
     def __init__(self, clickhouse_manager: ClickHouseManager):
         self._clickhouse_manager = clickhouse_manager
 
+    async def get_bids_for_positions(
+            self,
+            nmid: int,
+            min_bid: int,
+            positions_size: int = 300) -> dict[str, list[BidPosition]]:
+        bids_for_positions: dict[str, list[BidPosition]] = \
+            await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
+
+        bids_for_positions: dict[str, list[BidPosition]] = \
+            self._normalize_bids_for_positions(bids_for_positions,
+                                               min_bid=min_bid,
+                                               positions_size=positions_size)
+
+        return bids_for_positions
 
     async def get_keywords_target_position(self, adv: WBAdvDTO, positions_size: int) -> dict[str, int]:
         assert positions_size <= 300, 'Количество позиций не может быть больше 300'
@@ -24,31 +38,28 @@ class PredictKeywordsTargetPlace:
              min_bid = adv.search_adv_min_bids[nmid]
         except KeyError:
             raise
+
+        bids_for_positions = await self.get_bids_for_positions(nmid=nmid, min_bid=min_bid)
+
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
                                                                   positions_size=positions_size)
-        bids_for_positions: dict[str, list[BidPosition]] = \
-            await self._clickhouse_manager.get_bids_for_positions(nmid=nmid)
         target_position_mode = adv.target_position_mode
-        return self._get_target_positions(convs_carts_to_views,
+        target_positions = self._get_target_positions(
+                                          convs_carts_to_views,
                                           bids_for_positions,
-                                          min_bid,
-                                          positions_size,
                                           target_position_mode
                                           )
+        return target_positions
 
     def _get_target_positions(self,
                                     convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]],
                                     bids_for_positions: dict[str, list[BidPosition]],
-                                    min_bid: int,
-                                    positions_size: int,
                                     target_position_mode: TargetPositionMode
                               ) -> dict[str, int]:
 
-        bids_for_positions: dict[str, list[BidPosition]] = self._normalize_bids_for_positions(bids_for_positions,
-                                                                convs_carts_to_views,
-                                                                min_bid=min_bid,
-                                                                positions_size=positions_size)
+        bids_for_positions: dict[str, list[BidPosition]] = self._fill_positions_from_conv(bids_for_positions,
+                                                                                          convs_carts_to_views)
         result_target_positions: dict[str, int] = {}
         for keyword, positions in bids_for_positions.items():
             if not positions:
@@ -67,7 +78,6 @@ class PredictKeywordsTargetPlace:
 
     def _normalize_bids_for_positions(self,
                                       bids_for_positions: dict[str, list[BidPosition]],
-                                      convs: dict[str, list[ConvCartToViewsOnPosition]],
                                       min_bid: int,
                                       positions_size: int
                                       ) -> dict[str, list[BidPosition]]:
@@ -77,13 +87,21 @@ class PredictKeywordsTargetPlace:
             item_normalized = self._normalize_bids_for_keyword(items,
                                                                min_bid=min_bid,
                                                                positions_size=positions_size)
+            normalized_bids_for_positions[key] = item_normalized
+        return normalized_bids_for_positions
+
+    def _fill_positions_from_conv(self, bids_for_positions, convs):
+        positions_filled_dict = {}
+        for key, items in bids_for_positions.items():
             convs_for_keyword = convs.get(key)
             if not convs_for_keyword:
                 continue
-            positions_filled = self._fill_positions_convs(item_normalized, convs_for_keyword)
+            positions_filled = self._fill_positions_convs(items, convs_for_keyword)
+            positions_filled_dict[key] = positions_filled
+        return positions_filled_dict
 
-            normalized_bids_for_positions[key] = positions_filled
-        return normalized_bids_for_positions
+
+
 
     def _normalize_bids_for_keyword(self,
                                     items: list[BidPosition],
@@ -188,7 +206,7 @@ class PredictKeywordsTargetPlace:
 
     @staticmethod
     def _trim_tail(positions: list[BidPosition], min_bid: int) -> list[BidPosition]:
-        positions.sort(key=lambda pos: pos.position)
+        positions.sort(key=lambda pos_: pos_.position)
         for index, pos in enumerate(positions):
             if pos.bid == min_bid:
                 catch_index = index
@@ -196,6 +214,8 @@ class PredictKeywordsTargetPlace:
         else:
             return positions
         return positions[:catch_index + 1]
+
+
 
 
 

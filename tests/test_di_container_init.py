@@ -4,6 +4,8 @@ import pytest
 
 from app.core.di.app_container import AppContainer
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_di_container_init():
