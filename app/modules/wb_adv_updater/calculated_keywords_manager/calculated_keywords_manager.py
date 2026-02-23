@@ -314,7 +314,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 relevant_phrases = [kw for kw in pre_keywords if kw.relevant]
             else:
                 relevant_phrases = pre_keywords
-            best_keyword = max(relevant_phrases, key=attrgetter("rating_by_orders"))
+            if not relevant_phrases:
+                best_keyword = None
+            else:
+                best_keyword = max(relevant_phrases, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
                 above_rec = _above_rec_conversion(pre_kw)
