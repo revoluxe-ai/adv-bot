@@ -421,6 +421,7 @@ class UpdateClusterBidsManager:
                 continue
             if adv.individual_keywords_target_place_mode is None:
                 adv_result[search_adv_id] = None
+                continue
             nmid_result = {}
             for nmid in adv.nmids:
                 bid_positions_result:  dict[str, list[BidPosition]] = \
