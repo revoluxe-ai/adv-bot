@@ -1,9 +1,13 @@
 """Интеграционные тесты для PredictKeywordsTargetPlace."""
 
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
+from app.modules.common_slaves.wildberries.models.enums.target_position_mode import (
+    TargetPositionMode,
+)
 from app.modules.predict_keywords_target_place.clickhouse_manager import ClickHouseManager
 from app.modules.predict_keywords_target_place.predict_keywords_target_place import (
     PredictKeywordsTargetPlace,
@@ -11,6 +15,15 @@ from app.modules.predict_keywords_target_place.predict_keywords_target_place imp
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
 TEST_NMID = 999001
+
+
+def _make_fake_adv(nmid: int = TEST_NMID, min_bid: int = 50):
+    """Минимальный объект adv для вызова get_keywords_target_position(adv, positions_size)."""
+    return SimpleNamespace(
+        main_nmid=nmid,
+        search_adv_min_bids={nmid: min_bid},
+        target_position_mode=TargetPositionMode.MIN_CPA,
+    )
 
 
 async def _ensure_predict_tables(clickhouse_client):
@@ -85,9 +98,10 @@ async def test_get_keywords_target_position_empty_data(clickhouse_client):
 
     manager = ClickHouseManager()
     predictor = PredictKeywordsTargetPlace(manager)
+    adv = _make_fake_adv()
 
     result = await predictor.get_keywords_target_position(
-        nmid=TEST_NMID, min_bid=50, positions_size=10
+        adv=adv, positions_size=10
     )
 
     assert result == {}
@@ -154,9 +168,10 @@ async def test_get_keywords_target_position_with_bid_data_only(clickhouse_client
 
     manager = ClickHouseManager()
     predictor = PredictKeywordsTargetPlace(manager)
+    adv = _make_fake_adv()
 
     result = await predictor.get_keywords_target_position(
-        nmid=TEST_NMID, min_bid=50, positions_size=10
+        adv=adv, positions_size=10
     )
 
     assert isinstance(result, dict)
@@ -313,9 +328,10 @@ async def test_get_keywords_target_position_full_e2e(clickhouse_client):
 
     manager = ClickHouseManager()
     predictor = PredictKeywordsTargetPlace(manager)
+    adv = _make_fake_adv()
 
     result = await predictor.get_keywords_target_position(
-        nmid=TEST_NMID, min_bid=50, positions_size=10
+        adv=adv, positions_size=10
     )
 
     assert isinstance(result, dict)

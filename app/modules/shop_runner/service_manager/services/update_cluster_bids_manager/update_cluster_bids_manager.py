@@ -85,8 +85,11 @@ class UpdateClusterBidsManager:
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
         local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
         remote_data: BidderUpdateData = await self._get_data_from_wb_api(advs, local_data)
-        predict_bids_data: dict[int, dict[int, dict[str, dict[int, int]]]] \
-            = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
+        predict_bids_data: dict[
+            int, (dict[int, dict[str, dict[int, int]]] | None)
+        ] = await self._get_predict_bids_data(
+            advs, remote_data.min_bids.search
+        )
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -412,16 +415,20 @@ class UpdateClusterBidsManager:
 
     @staticmethod
     async def _get_predict_bids_data(
-                                     advs: list[ComplexAdv],
-                                     auction_min_bids_by_nmid: dict[int, int]) \
-        -> dict[int, dict[int, dict[str, dict[int, int]]]]:
+        advs: list[ComplexAdv],
+        auction_min_bids_by_nmid: dict[int, int],
+    ) -> dict[int, (dict[int, dict[str, dict[int, int]]] | None)]:
         predict_keywords_target_manager_container = PredictKeywordsTargetPlaceContainer()
-        predict_target_place_manager: PredictKeywordsTargetPlace = \
+        predict_target_place_manager: PredictKeywordsTargetPlace = (
             predict_keywords_target_manager_container.predict_keywords_target_place_manager()
-        adv_result: dict[int, dict[int, dict[str, dict[int, int]]]] = {}
+        )
+        adv_result: dict[int, (dict[int, dict[str, dict[int, int]]] | None)] = {}
         for adv in advs:
             search_adv_id = adv.auction_adv_id
             if search_adv_id is None:
+                continue
+            if adv.individual_keywords_target_place_mode is False:
+                adv_result[search_adv_id] = None
                 continue
             nmid_result = {}
             for nmid in adv.nmids:

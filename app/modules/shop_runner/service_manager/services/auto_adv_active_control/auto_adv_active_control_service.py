@@ -1,9 +1,38 @@
+"""Сервис управления активностью РК: бюджет, расписание, пауза/запуск.
+
+Как это устроено (задумано):
+
+- Ограничения показов по времени (расписание по часам/дням и период по датам)
+  настраиваются пользователем в боте для любой кампании (кнопка «Ограничения
+  показов по времени» в меню настроек РК).
+
+- Применяются эти ограничения только здесь — в AutoAdvActiveControlService.
+  Другие фоновые сервисы (бидер и т.д.) их не учитывают.
+
+- В ensure_campaigns_active обрабатываются только кампании с включённым
+  «Контролем активности кампании» (auto_budget_watchdog_enabled=True). Для них
+  сервис подгружает настройки времени из БД и при «сейчас вне расписания»
+  ставит РК на паузу (авто и/или поиск). Для кампаний без включённого контроля
+  ограничения по времени из БД нигде не проверяются.
+
+Итог: ограничения по времени — часть механизма «контроль активности»: пользователь
+может заранее настроить расписание; оно начнёт действовать после включения
+«Контроля активности кампании». Кнопка настроек времени показывается всем —
+это задумано (настройка «на будущее»).
+"""
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
+from app.client_bot.user_interface.handlers.time_settings.logic import (
+    allowed_now_from_db_state,
+)
+from app.client_bot.user_interface.handlers.time_settings.repository import (
+    TimeSettingsDbState,
+    TimeSettingsRepository,
+)
 from app.core.mp.wb.api.managers import WBModifier
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -17,13 +46,21 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     is_auto_campaign_active,
 )
+from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+_time_settings_repo = TimeSettingsRepository()
 
 
 class AutoAdvActiveControlService:
+    """Управление активностью РК: пауза/запуск по бюджету и расписанию.
+
+    Обрабатывает только кампании с bot_active и auto_budget_watchdog_enabled.
+    Для них применяет лимиты бюджета и ограничения по времени (расписание/даты).
+    """
+
     def __init__(
         self,
         wb_modifier: WBModifier,
@@ -35,10 +72,18 @@ class AutoAdvActiveControlService:
         self._plan_fact_reader = plan_fact_reader or PlanFactReader() # просят тесты, потом все это исправить, техдолг
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
+        """Привести активность РК в соответствие с бюджетом и расписанием.
+
+        Обрабатываются только кампании с включённым «Контролем активности»
+        (auto_budget_watchdog_enabled). Для них загружаются настройки времени
+        из БД; при выходе за расписание/даты РК ставится на паузу. Ограничения
+        по времени нигде больше не применяются — только в этом сервисе.
+        """
         complex_advs = [
             adv
             for adv in advs
-            if adv.bot_active and adv.auto_budget_watchdog_enabled
+            if adv.bot_active
+            and adv.auto_budget_watchdog_enabled  # управление активностью РК: бюджет, пополнение, расписание
         ]
         if not complex_advs:
             return None
@@ -49,15 +94,24 @@ class AutoAdvActiveControlService:
         start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
+        unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
+        # Настройки времени применяются только для этих РК (с включённым контролем)
+        time_settings_by_adv: dict[int, TimeSettingsDbState | None] = {}
+        async with get_session_maker(read_only=True) as session:
+            time_settings_by_adv = await _time_settings_repo.load_for_adv_ids(
+                session, unique_adv_ids
+            )
+
         for adv in complex_advs:
+            db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
-                lambda complex_adv=adv: self._auto_campaign_handler(
-                    complex_adv, start_of_day, end_of_day
+                lambda complex_adv=adv, ds=db_state: self._auto_campaign_handler(
+                    complex_adv, start_of_day, end_of_day, db_state=ds
                 )
             )
             handlers.append(
-                lambda complex_adv=adv: self._search_campaign_handler(
-                    complex_adv, start_of_day, end_of_day
+                lambda complex_adv=adv, ds=db_state: self._search_campaign_handler(
+                    complex_adv, start_of_day, end_of_day, db_state=ds
                 )
             )
 
@@ -100,10 +154,26 @@ class AutoAdvActiveControlService:
         adv: ComplexAdv,
         start_of_day: datetime,
         end_of_day: datetime,
+        *,
+        db_state: TimeSettingsDbState | None,
     ) -> None:
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
+
+        # Расписание/даты из настроек времени; без настроек — показы разрешены
+        time_allowed = (
+            allowed_now_from_db_state(db_state) if db_state else True
+        )
+        if not time_allowed:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign (time schedule) adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return None
 
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
@@ -204,12 +274,28 @@ class AutoAdvActiveControlService:
         adv: ComplexAdv,
         start_of_day: datetime,
         end_of_day: datetime,
+        *,
+        db_state: TimeSettingsDbState | None,
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
             return None
 
         search_status = adv.search_adv_active_status_str
+
+        # Расписание/даты из настроек времени; без настроек — показы разрешены
+        time_allowed = (
+            allowed_now_from_db_state(db_state) if db_state else True
+        )
+        if not time_allowed:
+            if search_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auction campaign (time schedule) adv_id=%s shop_id=%s",
+                    adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auction_campaign(adv)
+            return None
 
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
