@@ -12,8 +12,12 @@ logger = logging.getLogger(__name__)
 
 class WhiteListTrimmer:
 
-    async def trim(self, complex_adv: ComplexAdv) -> None:
+    async def  trim(self, complex_adv: ComplexAdv) -> None:
+        # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
+        if complex_adv.auto_add_only_relevant_phrase:
+            keywords = [kw for kw in keywords if kw.relevant]
+        keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
         top_key_in_auto_position: int | None = self._get_top_key_in_auto_position(keywords)
         if top_key_in_auto_position is None:
             return None
@@ -29,6 +33,7 @@ class WhiteListTrimmer:
         replacement_ids: list[int] = []
         if complex_adv.white_list_mode == WhiteListMode.REPLACE_ON_TRIM:
             replacement_ids = self._collect_replacement_candidates(
+                complex_adv=complex_adv,
                 keywords=keywords,
                 removed_ids=set(candidates_to_auto_ids),
                 removed_count=len(candidates_to_auto_ids),
@@ -61,6 +66,7 @@ class WhiteListTrimmer:
 
     @staticmethod
     def _collect_replacement_candidates(
+        complex_adv: ComplexAdv,
         keywords: list[CalculatedKeyword],
         removed_ids: set[int],
         removed_count: int,
@@ -77,11 +83,18 @@ class WhiteListTrimmer:
         start_index = max(white_indices_after_trim) + 1 if white_indices_after_trim else 0
 
         replacement_ids: list[int] = []
+        # TODO: Централизовать по всему проекту отбор кандидатов в белый список!
         for kw in keywords[start_index:]:
             if kw.hard_status != 1:
                 continue
+            if complex_adv.auto_add_only_relevant_phrase and not kw.relevant:
+                continue
             kw_id = kw.keyword_setting_original_id
             if kw_id in removed_ids:
+                continue
+            if (complex_adv.rec_system_promotion_mode_active
+                    and kw.above_rec_conversion is False
+                    and complex_adv.auto_adv_active_status):
                 continue
             replacement_ids.append(kw_id)
             if len(replacement_ids) >= removed_count:

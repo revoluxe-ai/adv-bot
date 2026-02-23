@@ -128,6 +128,7 @@ class TargetPlaceDownExecutor(BaseExecutor):
         stmt = update(AdvSetting).where(AdvSetting.id == ctx.complex_adv.adv_setting_original_id)\
         .values({'target_position_mode': TargetPositionMode.MIN_CPA})
         await ctx.session.execute(stmt)
+        await ctx.session.commit()
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)
 
 

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class WhiteListAddExecutor(BaseExecutor):
     """Добавляет наиболее эффективные релевантные ключевые слова в белый список."""
 
-    PASS_TIME_SECONDS = 5 * 60  # 15 минут между изменениями
+    PASS_TIME_SECONDS = 5 * 60  # 5 минут между изменениями
     PAY_PER_ORDER_THRESHOLD = 0.9  # 90% от целевой себестоимости заказа
 
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
@@ -65,27 +65,19 @@ class WhiteListAddExecutor(BaseExecutor):
                 f"целевая={target_cost:.2f}, {current_pay_for_order / target_cost * 100:.1f}%)"
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-
-        mean_auto_ctr: float | None = await ctx.complex_adv.get_mean_auto_ctr()
-
+        # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
-            base_ok = keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
-            if not base_ok:
+            if keyword.hard_status != 1:
                 return False
-            if ctx.complex_adv.rec_system_promotion_mode_active and (
-                keyword.above_rec_conversion is  not True
-            ):
-                return False
-            if ctx.complex_adv.auto_add_only_relevant_phrase:
-                return (
-                    keyword.relevant
-                    and (
-                        keyword.ctr > mean_auto_ctr
-                        if mean_auto_ctr is not None
-                        else True
-                    )
-                )
+            if keyword.status == KeywordStatus.GOOD:
+                 return False
+            if ctx.complex_adv.auto_add_only_relevant_phrase and not keyword.relevant:
+                 return False
+            if (ctx.complex_adv.rec_system_promotion_mode_active
+                and keyword.above_rec_conversion is False
+                and ctx.complex_adv.auto_adv_active_status):
+                    return False
             return True
 
         keywords = await ctx.complex_adv.get_keywords()

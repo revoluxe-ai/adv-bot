@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 from typing import Sequence
+from typing import cast
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
 
@@ -44,32 +45,37 @@ class RedisClusterBidsManager(BaseRedisManager):
 
     @staticmethod
     def _decode_raw(raw: str | bytes | None) -> tuple[int | None, ClusterBidState]:
+        def _parse_int(value: object) -> int | None:
+            if value is None or isinstance(value, bool):
+                return None
+            if isinstance(value, int):
+                return value
+            if isinstance(value, (float, str)):
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+            return None
+
+        empty_state = ClusterBidState(step=None, direct=None)
         if raw is None:
-            return None, ClusterBidState(step=None, direct=None)
+            return None, empty_state
         if isinstance(raw, bytes):
             raw = raw.decode()
         try:
             payload = json.loads(raw)
         except (TypeError, ValueError):
             try:
-                return int(raw), ClusterBidState(step=None, direct=None)
+                return int(raw), empty_state
             except (TypeError, ValueError):
-                return None, ClusterBidState(step=None, direct=None)
+                return None, empty_state
         if not isinstance(payload, dict):
-            return None, ClusterBidState(step=None, direct=None)
-        bid_raw = payload.get("new_bid")
-        step_raw = payload.get("step")
-        direct_raw = payload.get("direct")
-        bid: int | None
-        step: int | None
-        try:
-            bid = int(bid_raw) if bid_raw is not None else None
-        except (TypeError, ValueError):
-            bid = None
-        try:
-            step = int(step_raw) if step_raw is not None else None
-        except (TypeError, ValueError):
-            step = None
+            return _parse_int(payload), empty_state
+
+        payload_obj = cast(dict[str, object], payload)
+        bid = _parse_int(payload_obj.get("new_bid"))
+        step = _parse_int(payload_obj.get("step"))
+        direct_raw = payload_obj.get("direct")
         direct = direct_raw if isinstance(direct_raw, str) else None
         return bid, ClusterBidState(step=step, direct=direct)
 

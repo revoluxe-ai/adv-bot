@@ -16,6 +16,7 @@ class KeywordStatusReason(StrEnum):
     BELOW_REC_CONVERSION = auto()
     WB_MIN_BID_TOO_HIGH = "wb_min_bid_too_high"
     BEST_KEYWORD = auto()
+    NOT_RELEVANT_PHRASE = auto()
 
 class KeywordStatus(StrEnum):
     GOOD = "good"
