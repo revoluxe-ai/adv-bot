@@ -243,7 +243,11 @@ class UpdateClusterBidsManager:
                     prev_direct = DirectEnum(prev_state.direct)
                 except ValueError:
                     prev_direct = None
-            predict_bids_data_for_adv = calculate_data.predict_bids_data.get(adv_id)
+            predict_bids_data_for_adv = (
+                calculate_data.predict_bids_data.get(adv_id)
+                if calculate_data.predict_bids_data is not None
+                else None
+            )
             predict_target_bids = (
                 predict_bids_data_for_adv.get(nmid)
                 if isinstance(predict_bids_data_for_adv, dict)
