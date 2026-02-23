@@ -236,7 +236,7 @@ class AutoAdvActiveControlService:
 
         search_status = adv.search_adv_active_status_str
 
-        async with get_session_maker() as session:
+        async with get_session_maker(read_only=True) as session:
             db_state = await _time_settings_repo.load_for_adv(
                 session, adv.adv_setting.id
             )
