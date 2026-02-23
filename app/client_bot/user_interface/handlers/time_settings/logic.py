@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .repository import TimeSettingsDbState
+from .repository import FULL_DAY_MASK, TimeSettingsDbState
 from .state import TimeSettingsState, normalize_date_enabled
 
 DAY_NAMES = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
@@ -88,7 +88,8 @@ def allowed_now_from_db_state(
     time_ok = True
     if db_state.schedule_enabled:
         dow = moment.weekday()
-        mask = db_state.masks_by_dow.get(dow, 0)
+        # Missing DOW = all hours allowed (match hydrate_state_from_db / TimeSettingsState default)
+        mask = db_state.masks_by_dow.get(dow, FULL_DAY_MASK)
         time_ok = (mask & (1 << moment.hour)) != 0
 
     date_ok = True
