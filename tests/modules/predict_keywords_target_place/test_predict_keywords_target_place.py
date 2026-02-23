@@ -234,7 +234,7 @@ def test_fill_positions_convs_raises_raznye_kluchi():
 
 @pytest.mark.unit
 def test_normalize_bids_for_positions_zapolnyaet_convs():
-    """_normalize_bids_for_positions должен использовать convs.get(key) и заполнять conv_carts_to_views."""
+    """Нормализация + _fill_positions_from_conv заполняют conv_carts_to_views."""
     predictor = PredictKeywordsTargetPlace(None)
     ts = datetime.now()
     bids = {
@@ -251,9 +251,10 @@ def test_normalize_bids_for_positions_zapolnyaet_convs():
             ConvCartToViewsOnPosition("kw1", 3, 0.15),
         ],
     }
-    result = predictor._normalize_bids_for_positions(
-        bids, convs, min_bid=50, positions_size=5
+    normalized = predictor._normalize_bids_for_positions(
+        bids, min_bid=50, positions_size=5
     )
+    result = predictor._fill_positions_from_conv(normalized, convs)
 
     assert "kw1" in result
     for pos in result["kw1"]:
