@@ -420,7 +420,7 @@ class UpdateClusterBidsManager:
             search_adv_id = adv.auction_adv_id
             if search_adv_id is None:
                 continue
-            if adv.individual_keywords_target_place_mode is None:
+            if adv.individual_keywords_target_place_mode is False:
                 adv_result[search_adv_id] = None
                 continue
             nmid_result = {}
