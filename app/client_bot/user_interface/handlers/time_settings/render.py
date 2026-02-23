@@ -14,7 +14,7 @@ from .logic import (
     count_enabled_hours,
     format_day_summary,
 )
-from .state import TimeSettingsSession, TimeSettingsState
+from .state import TimeSettingsSession, TimeSettingsState, normalize_date_enabled
 
 
 def _pack(
@@ -54,6 +54,7 @@ def render_screen(session: TimeSettingsSession) -> tuple[str, InlineKeyboardMark
 
 
 def render_screen_a(state: TimeSettingsState, sid: str) -> tuple[str, InlineKeyboardMarkup]:
+    normalize_date_enabled(state)
     time_mode = (
         "Отключено (показы в любые часы)"
         if not state.schedule_enabled
