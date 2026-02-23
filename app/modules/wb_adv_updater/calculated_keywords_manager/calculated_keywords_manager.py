@@ -310,11 +310,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
             """Если нет белого списка, то выключаем все ключи, кроме лучшего"""
-            best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
+            if complex_adv.auto_add_only_relevant_phrase:
+                relevant_phrases = [kw for kw in pre_keywords if kw.relevant]
+            else:
+                relevant_phrases = pre_keywords
+            best_keyword = max(relevant_phrases, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
                 above_rec = _above_rec_conversion(pre_kw)
-                if best_keyword_status:
+                if not best_keyword_status or pre_kw not in relevant_phrases:
                     if above_rec is False:
                         state = KeywordState(
                             status=KeywordStatus.BAD,
@@ -354,7 +358,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
             above_rec = _above_rec_conversion(pre_kw)
-            if hard_status == 3:
+
+            if complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
+                state = KeywordState(
+                    status=KeywordStatus.BAD,
+                    reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
+                    best_keyword_status=best_keyword_status,
+                )
+            elif hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
                 best_keyword_status = True if pre_kw==best_keyword else False
