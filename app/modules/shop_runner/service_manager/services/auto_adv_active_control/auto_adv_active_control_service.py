@@ -47,7 +47,8 @@ class AutoAdvActiveControlService:
         complex_advs = [
             adv
             for adv in advs
-            if adv.bot_active and adv.auto_budget_watchdog_enabled
+            if adv.bot_active \
+               and adv.auto_budget_watchdog_enabled # настройка отвечает за управление активностью РК в целом: от пополнения бюджета до активности
         ]
         if not complex_advs:
             return None
