@@ -234,7 +234,7 @@ def test_fill_positions_convs_raises_raznye_kluchi():
 
 @pytest.mark.unit
 def test_normalize_bids_for_positions_zapolnyaet_convs():
-    """После normalize + _fill_positions_from_conv у позиций заполняется conv_carts_to_views."""
+    """Нормализация + _fill_positions_from_conv заполняют conv_carts_to_views."""
     predictor = PredictKeywordsTargetPlace(None)
     ts = datetime.now()
     bids = {
