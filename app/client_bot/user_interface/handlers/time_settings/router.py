@@ -344,7 +344,6 @@ async def time_settings_callback(
             state.selected_dow = callback_data.dow
         if callback_data.h is not None:
             toggle_hour(state, state.selected_dow, callback_data.h)
-            only_markup = True
             state.current_screen = "C"
     elif action == "day_on":
         set_day(state, state.selected_dow, enabled=True)
