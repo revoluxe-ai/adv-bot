@@ -66,6 +66,62 @@ class TimeSettingsRepository:
             masks_by_dow=masks_by_dow,
         )
 
+    async def load_for_adv_ids(
+        self,
+        session: AsyncSession,
+        adv_setting_ids: list[int],
+    ) -> dict[int, TimeSettingsDbState | None]:
+        """Load time settings for multiple adv_setting_ids in 2 queries (batch)."""
+        if not adv_setting_ids:
+            return {}
+
+        settings_stmt = sa.select(AdvTimeSettings).where(
+            AdvTimeSettings.adv_setting_id.in_(adv_setting_ids)
+        )
+        settings_result = await session.execute(settings_stmt)
+        settings_by_id = {
+            int(row.adv_setting_id): row for row in settings_result.scalars().all()
+        }
+
+        mask_stmt = sa.select(
+            AdvTimeWeekMask.adv_setting_id,
+            AdvTimeWeekMask.dow,
+            AdvTimeWeekMask.hours_mask,
+        ).where(AdvTimeWeekMask.adv_setting_id.in_(adv_setting_ids))
+        mask_result = await session.execute(mask_stmt)
+        masks_by_adv: dict[int, dict[int, int]] = {}
+        for adv_id, dow, mask in mask_result.all():
+            aid = int(adv_id)
+            masks_by_adv.setdefault(aid, {})[int(dow)] = int(mask)
+
+        result: dict[int, TimeSettingsDbState | None] = {}
+        for aid in adv_setting_ids:
+            settings_row = settings_by_id.get(aid)
+            masks = masks_by_adv.get(aid, {})
+
+            if settings_row is None and not masks:
+                result[aid] = None
+                continue
+            if settings_row is None:
+                result[aid] = TimeSettingsDbState(
+                    schedule_enabled=False,
+                    date_enabled=False,
+                    date_start=None,
+                    date_end=None,
+                    timezone="Europe/Moscow",
+                    masks_by_dow=masks,
+                )
+                continue
+            result[aid] = TimeSettingsDbState(
+                schedule_enabled=bool(settings_row.schedule_enabled),
+                date_enabled=bool(settings_row.date_enabled),
+                date_start=settings_row.date_start,
+                date_end=settings_row.date_end,
+                timezone=settings_row.timezone,
+                masks_by_dow=masks,
+            )
+        return result
+
     async def patch_toggle_hour(
         self,
         session: AsyncSession,

@@ -58,14 +58,12 @@ class AutoAdvActiveControlService:
         start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
+        unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
         time_settings_by_adv: dict[int, TimeSettingsDbState | None] = {}
         async with get_session_maker(read_only=True) as session:
-            for adv in complex_advs:
-                aid = adv.adv_setting.id
-                if aid not in time_settings_by_adv:
-                    time_settings_by_adv[aid] = await _time_settings_repo.load_for_adv(
-                        session, aid
-                    )
+            time_settings_by_adv = await _time_settings_repo.load_for_adv_ids(
+                session, unique_adv_ids
+            )
 
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
