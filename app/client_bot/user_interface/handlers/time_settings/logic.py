@@ -83,6 +83,7 @@ def allowed_now_from_db_state(
     """Проверка «разрешено ли сейчас» по данным из БД (для фоновых сервисов)."""
     tz = ZoneInfo(db_state.timezone)
     moment = now if now is not None else datetime.now(tz)
+    moment = moment.astimezone(tz)  # расписание и даты в timezone настроек (МСК)
     date_today = moment.date()
 
     time_ok = True
