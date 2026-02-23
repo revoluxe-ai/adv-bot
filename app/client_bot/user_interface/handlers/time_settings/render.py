@@ -67,6 +67,12 @@ def render_screen_a(state: TimeSettingsState, sid: str) -> tuple[str, InlineKeyb
     title = "⏰ Ограничения показов"
     if state.adv_setting_id is None:
         title += " (демо)"
+    # Для привязанной к РК сессии напоминаем: ограничения действуют при включённом контроле активности
+    apply_note = (
+        "\nПрименяются при включённом «Контроле активности кампании»."
+        if state.adv_setting_id is not None
+        else ""
+    )
     text = (
         f"{title}\n"
         f"Ограничение по часам: {time_mode}\n"
@@ -75,6 +81,7 @@ def render_screen_a(state: TimeSettingsState, sid: str) -> tuple[str, InlineKeyb
         f"Сейчас: {allowed_label}\n"
         f"Включено часов: {enabled_hours}/168\n"
         f"Активных дней: {active_days}/7"
+        f"{apply_note}"
     )
 
     builder = InlineKeyboardBuilder()

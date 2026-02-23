@@ -1,3 +1,9 @@
+"""Хранение и загрузка настроек времени показов (AdvTimeSettings, AdvTimeWeekMask).
+
+Данные используются при отображении экранов настроек в боте и при проверке
+расписания в AutoAdvActiveControlService (только для РК с включённым контролем
+активности).
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

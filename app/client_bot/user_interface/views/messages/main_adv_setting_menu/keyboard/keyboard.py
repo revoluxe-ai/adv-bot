@@ -153,6 +153,8 @@ def get_adv_setting_keyboard(
             callback_data=activity_callback,
         )
     )
+    # Ограничения по времени настраиваются для любой РК; применяются только при
+    # включённом «Контроле активности кампании» (см. AutoAdvActiveControlService).
     _ = builder.row(
         InlineKeyboardButton(
             text="⏰ Ограничения показов по времени",

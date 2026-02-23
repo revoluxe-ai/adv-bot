@@ -80,7 +80,14 @@ def allowed_now_from_db_state(
     *,
     now: datetime | None = None,
 ) -> bool:
-    """Проверка «разрешено ли сейчас» по данным из БД (для фоновых сервисов)."""
+    """Проверка «разрешено ли сейчас» по данным из БД (для фоновых сервисов).
+
+    Учитывает расписание по часам/дням недели и период по датам (date_start/
+    date_end). Вызывается только из AutoAdvActiveControlService для кампаний
+    с включённым «Контролем активности» (auto_budget_watchdog_enabled).
+    Другие сервисы (бидер и т.д.) ограничения по времени не проверяют —
+    это задумано: применение расписания привязано к механизму контроля активности.
+    """
     tz = ZoneInfo(db_state.timezone)
     moment = now if now is not None else datetime.now(tz)
     moment = moment.astimezone(tz)  # расписание и даты в timezone настроек (МСК)

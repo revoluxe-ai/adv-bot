@@ -1,3 +1,25 @@
+"""Сервис управления активностью РК: бюджет, расписание, пауза/запуск.
+
+Как это устроено (задумано):
+
+- Ограничения показов по времени (расписание по часам/дням и период по датам)
+  настраиваются пользователем в боте для любой кампании (кнопка «Ограничения
+  показов по времени» в меню настроек РК).
+
+- Применяются эти ограничения только здесь — в AutoAdvActiveControlService.
+  Другие фоновые сервисы (бидер и т.д.) их не учитывают.
+
+- В ensure_campaigns_active обрабатываются только кампании с включённым
+  «Контролем активности кампании» (auto_budget_watchdog_enabled=True). Для них
+  сервис подгружает настройки времени из БД и при «сейчас вне расписания»
+  ставит РК на паузу (авто и/или поиск). Для кампаний без включённого контроля
+  ограничения по времени из БД нигде не проверяются.
+
+Итог: ограничения по времени — часть механизма «контроль активности»: пользователь
+может заранее настроить расписание; оно начнёт действовать после включения
+«Контроля активности кампании». Кнопка настроек времени показывается всем —
+это задумано (настройка «на будущее»).
+"""
 from __future__ import annotations
 
 import logging
@@ -33,6 +55,12 @@ _time_settings_repo = TimeSettingsRepository()
 
 
 class AutoAdvActiveControlService:
+    """Управление активностью РК: пауза/запуск по бюджету и расписанию.
+
+    Обрабатывает только кампании с bot_active и auto_budget_watchdog_enabled.
+    Для них применяет лимиты бюджета и ограничения по времени (расписание/даты).
+    """
+
     def __init__(
         self,
         wb_modifier: WBModifier,
@@ -44,11 +72,18 @@ class AutoAdvActiveControlService:
         self._plan_fact_reader = plan_fact_reader or PlanFactReader() # просят тесты, потом все это исправить, техдолг
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
+        """Привести активность РК в соответствие с бюджетом и расписанием.
+
+        Обрабатываются только кампании с включённым «Контролем активности»
+        (auto_budget_watchdog_enabled). Для них загружаются настройки времени
+        из БД; при выходе за расписание/даты РК ставится на паузу. Ограничения
+        по времени нигде больше не применяются — только в этом сервисе.
+        """
         complex_advs = [
             adv
             for adv in advs
-            if adv.bot_active \
-               and adv.auto_budget_watchdog_enabled # настройка отвечает за управление активностью РК в целом: от пополнения бюджета до активности
+            if adv.bot_active
+            and adv.auto_budget_watchdog_enabled  # управление активностью РК: бюджет, пополнение, расписание
         ]
         if not complex_advs:
             return None
@@ -60,6 +95,7 @@ class AutoAdvActiveControlService:
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
         unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
+        # Настройки времени применяются только для этих РК (с включённым контролем)
         time_settings_by_adv: dict[int, TimeSettingsDbState | None] = {}
         async with get_session_maker(read_only=True) as session:
             time_settings_by_adv = await _time_settings_repo.load_for_adv_ids(
@@ -125,6 +161,7 @@ class AutoAdvActiveControlService:
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
 
+        # Расписание/даты из настроек времени; без настроек — показы разрешены
         time_allowed = (
             allowed_now_from_db_state(db_state) if db_state else True
         )
@@ -246,6 +283,7 @@ class AutoAdvActiveControlService:
 
         search_status = adv.search_adv_active_status_str
 
+        # Расписание/даты из настроек времени; без настроек — показы разрешены
         time_allowed = (
             allowed_now_from_db_state(db_state) if db_state else True
         )
