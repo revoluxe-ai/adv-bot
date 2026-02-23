@@ -84,26 +84,6 @@ def get_or_create_session(
     return session
 
 
-def get_session(
-    user_id: int,
-    adv_setting_id: int | None,
-) -> TimeSettingsSession | None:
-    key = make_session_key(user_id, adv_setting_id)
-    session = _SESSIONS.get(key)
-    if session is None:
-        return None
-    now = _now_moscow()
-    if now - session.updated_at > SESSION_TTL:
-        _SESSIONS.pop(key, None)
-        return None
-    session.updated_at = now
-    return session
-
-
-def touch_session(session: TimeSettingsSession) -> None:
-    session.updated_at = _now_moscow()
-
-
 def normalize_date_enabled(state: TimeSettingsState) -> None:
     if state.date_start is None and state.date_end is None:
         state.date_enabled = False
