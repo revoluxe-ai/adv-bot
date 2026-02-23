@@ -158,16 +158,16 @@ def render_screen_c(state: TimeSettingsState, sid: str) -> tuple[str, InlineKeyb
     builder.row(
         InlineKeyboardButton(text="➕ Диапазон", callback_data=_pack(sid, "to_range"))
     )
-    for hour in range(24):
-        enabled = hour in state.week[dow]
-        label = f"{'✓' if enabled else '·'} {hour:02d}"
-        builder.add(
+    # Add 24 hour buttons in 4 rows of 6 (adjust() would flatten prior rows too)
+    for row_start in range(0, 24, 6):
+        hour_buttons = [
             InlineKeyboardButton(
-                text=label,
+                text=f"{'✓' if hour in state.week[dow] else '·'} {hour:02d}",
                 callback_data=_pack(sid, "toggle_hour", dow=dow, h=hour),
             )
-        )
-    builder.adjust(6)
+            for hour in range(row_start, row_start + 6)
+        ]
+        builder.row(*hour_buttons)
     builder.row(
         InlineKeyboardButton(
             text="📋 Копировать этот день",
@@ -244,27 +244,26 @@ def render_screen_copy(state: TimeSettingsState, sid: str) -> tuple[str, InlineK
     )
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="Источник", callback_data=_pack(sid, "noop")))
-    for dow in range(7):
-        mark = "● " if dow == source else ""
-        builder.add(
+    builder.row(
+        *[
             InlineKeyboardButton(
-                text=f"{mark}{DAY_NAMES[dow]}",
+                text=f"{'● ' if dow == source else ''}{DAY_NAMES[dow]}",
                 callback_data=_pack(sid, "copy_source", dow=dow),
             )
-        )
-    builder.adjust(7)
+            for dow in range(7)
+        ]
+    )
     builder.row(InlineKeyboardButton(text="Назначение", callback_data=_pack(sid, "noop")))
-    for dow in range(7):
-        if dow == source:
-            continue
-        mark = "✓ " if dow in state.copy_targets else ""
-        builder.add(
+    builder.row(
+        *[
             InlineKeyboardButton(
-                text=f"{mark}{DAY_NAMES[dow]}",
+                text=f"{'✓ ' if dow in state.copy_targets else ''}{DAY_NAMES[dow]}",
                 callback_data=_pack(sid, "copy_target", dow=dow),
             )
-        )
-    builder.adjust(6)
+            for dow in range(7)
+            if dow != source
+        ]
+    )
     builder.row(
         InlineKeyboardButton(text="✅ Применить", callback_data=_pack(sid, "copy_apply")),
         InlineKeyboardButton(text="Очистить выбор", callback_data=_pack(sid, "copy_clear")),
