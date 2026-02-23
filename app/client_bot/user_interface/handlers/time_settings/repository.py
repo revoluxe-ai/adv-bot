@@ -166,13 +166,14 @@ class TimeSettingsRepository:
     ) -> None:
         if not target_dows:
             return
-        stmt = (
-            sa.update(AdvTimeWeekMask)
-            .where(
-                AdvTimeWeekMask.adv_setting_id == adv_setting_id,
-                AdvTimeWeekMask.dow.in_(target_dows),
-            )
-            .values(hours_mask=source_mask)
+        rows = [
+            {"adv_setting_id": adv_setting_id, "dow": dow, "hours_mask": source_mask}
+            for dow in target_dows
+        ]
+        stmt = pg_insert(AdvTimeWeekMask).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[AdvTimeWeekMask.adv_setting_id, AdvTimeWeekMask.dow],
+            set_={"hours_mask": stmt.excluded.hours_mask},
         )
         await session.execute(stmt)
 

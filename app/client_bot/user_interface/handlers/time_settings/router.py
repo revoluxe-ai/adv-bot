@@ -268,7 +268,9 @@ async def time_settings_callback(
     if action == "to_week":
         state.current_screen = "B"
     elif action == "to_day":
-        state.selected_dow = callback_data.dow or 0
+        state.selected_dow = (
+            callback_data.dow if callback_data.dow is not None else 0
+        )
         state.current_screen = "C"
     elif action == "to_dates":
         state.current_screen = "D"
@@ -277,7 +279,9 @@ async def time_settings_callback(
     elif action == "to_copy":
         state.current_screen = "COPY"
     elif action == "copy_from_day":
-        state.copy_source = callback_data.dow or state.selected_dow
+        state.copy_source = (
+            callback_data.dow if callback_data.dow is not None else state.selected_dow
+        )
         state.copy_targets = set()
         state.current_screen = "COPY"
     elif action == "to_range":
