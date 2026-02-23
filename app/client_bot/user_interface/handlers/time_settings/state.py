@@ -45,7 +45,9 @@ class TimeSettingsSession:
 SessionKey = tuple[int, int]
 
 _SESSIONS: dict[SessionKey, TimeSettingsSession] = {}
-_ADV_LOCKS: dict[int, asyncio.Lock] = {}
+# (lock, last_used_at) — entries cleaned when unlocked and older than LOCK_TTL
+_ADV_LOCKS: dict[int, tuple[asyncio.Lock, datetime]] = {}
+LOCK_TTL = timedelta(hours=24)
 
 
 def make_session_key(user_id: int, adv_setting_id: int | None) -> SessionKey:
@@ -96,7 +98,7 @@ def find_session_by_message(user_id: int, message_id: int) -> TimeSettingsSessio
         if key_user_id != user_id:
             continue
         if now - session.updated_at > SESSION_TTL:
-            _SESSIONS.pop(key, None)
+            _ = _SESSIONS.pop(key, None)
             continue
         if session.session_message_id == message_id:
             session.updated_at = now
@@ -104,11 +106,24 @@ def find_session_by_message(user_id: int, message_id: int) -> TimeSettingsSessio
     return None
 
 
+def _cleanup_adv_locks(now: datetime) -> None:
+    """Remove lock entries that are unlocked and older than LOCK_TTL."""
+    for key in list(_ADV_LOCKS):
+        lock, last_used = _ADV_LOCKS[key]
+        if not lock.locked() and (now - last_used) > LOCK_TTL:
+            _ = _ADV_LOCKS.pop(key, None)
+
+
 def get_adv_lock(adv_setting_id: int) -> asyncio.Lock:
-    lock = _ADV_LOCKS.get(adv_setting_id)
-    if lock is None:
+    now = _now_moscow()
+    _cleanup_adv_locks(now)
+    entry = _ADV_LOCKS.get(adv_setting_id)
+    if entry is None:
         lock = asyncio.Lock()
-        _ADV_LOCKS[adv_setting_id] = lock
+        _ADV_LOCKS[adv_setting_id] = (lock, now)
+        return lock
+    lock, _ = entry
+    _ADV_LOCKS[adv_setting_id] = (lock, now)
     return lock
 
 
