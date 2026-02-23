@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aiogram import Router
+from aiogram import Router, flags
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -220,6 +220,7 @@ async def time_settings_demo(message: Message) -> None:
 
 
 @router.callback_query(TS.filter())
+@flags.callback_answer(disabled=True)
 async def time_settings_callback(
     callback: CallbackQuery,
     callback_data: TS,
@@ -472,16 +473,16 @@ async def time_settings_callback(
                     await db_session.commit()
                 except Exception:
                     await db_session.rollback()
-                    await callback.answer(
-                        "Не удалось сохранить, попробуйте ещё раз",
-                        show_alert=False,
-                    )
                     await _reload_state_from_db(
                         session=db_session,
                         callback=callback,
                         adv_setting_id=state.adv_setting_id,
                     )
-                    await _redraw(callback, only_markup=False)
+                    await _redraw(
+                        callback,
+                        only_markup=False,
+                        alert="Не удалось сохранить, попробуйте ещё раз",
+                    )
                     return
 
     await _redraw(callback, only_markup=only_markup, alert=alert)
