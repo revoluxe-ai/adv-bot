@@ -80,8 +80,13 @@ async def test_copy_day_updates_only_targets() -> None:
 
     assert session.execute.await_count == 1
     sql = _sql(session.execute.await_args.args[0])
-    assert "UPDATE adv_time_week_mask" in sql
-    assert "IN (1, 2, 4)" in sql
+    assert "INSERT INTO adv_time_week_mask" in sql
+    assert "ON CONFLICT" in sql
+    assert "DO UPDATE" in sql
+    # Only target dows 1, 2, 4 with adv_setting_id=7 and source_mask=123
+    assert "(7, 1, 123)" in sql
+    assert "(7, 2, 123)" in sql
+    assert "(7, 4, 123)" in sql
 
 
 def test_clear_dates_turns_date_enabled_off_when_both_empty() -> None:
