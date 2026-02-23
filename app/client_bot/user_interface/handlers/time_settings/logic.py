@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from .repository import TimeSettingsDbState
 from .state import TimeSettingsState, normalize_date_enabled
 
 DAY_NAMES = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
@@ -69,6 +70,32 @@ def allowed_now(state: TimeSettingsState) -> bool:
         if state.date_start is not None and date_today < state.date_start:
             date_ok = False
         if state.date_end is not None and date_today > state.date_end:
+            date_ok = False
+
+    return time_ok and date_ok
+
+
+def allowed_now_from_db_state(
+    db_state: TimeSettingsDbState,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Проверка «разрешено ли сейчас» по данным из БД (для фоновых сервисов)."""
+    tz = ZoneInfo(db_state.timezone)
+    moment = now if now is not None else datetime.now(tz)
+    date_today = moment.date()
+
+    time_ok = True
+    if db_state.schedule_enabled:
+        dow = moment.weekday()
+        mask = db_state.masks_by_dow.get(dow, 0)
+        time_ok = (mask & (1 << moment.hour)) != 0
+
+    date_ok = True
+    if db_state.date_enabled:
+        if db_state.date_start is not None and date_today < db_state.date_start:
+            date_ok = False
+        if db_state.date_end is not None and date_today > db_state.date_end:
             date_ok = False
 
     return time_ok and date_ok

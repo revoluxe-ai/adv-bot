@@ -4,6 +4,12 @@ import logging
 from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
+from app.client_bot.user_interface.handlers.time_settings.logic import (
+    allowed_now_from_db_state,
+)
+from app.client_bot.user_interface.handlers.time_settings.repository import (
+    TimeSettingsRepository,
+)
 from app.core.mp.wb.api.managers import WBModifier
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -17,10 +23,12 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     is_auto_campaign_active,
 )
+from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+_time_settings_repo = TimeSettingsRepository()
 
 
 class AutoAdvActiveControlService:
@@ -104,6 +112,23 @@ class AutoAdvActiveControlService:
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
+
+        async with get_session_maker() as session:
+            db_state = await _time_settings_repo.load_for_adv(
+                session, adv.adv_setting.id
+            )
+        time_allowed = (
+            allowed_now_from_db_state(db_state) if db_state else True
+        )
+        if not time_allowed:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign (time schedule) adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            return None
 
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
@@ -210,6 +235,23 @@ class AutoAdvActiveControlService:
             return None
 
         search_status = adv.search_adv_active_status_str
+
+        async with get_session_maker() as session:
+            db_state = await _time_settings_repo.load_for_adv(
+                session, adv.adv_setting.id
+            )
+        time_allowed = (
+            allowed_now_from_db_state(db_state) if db_state else True
+        )
+        if not time_allowed:
+            if search_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auction campaign (time schedule) adv_id=%s shop_id=%s",
+                    adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auction_campaign(adv)
+            return None
 
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
