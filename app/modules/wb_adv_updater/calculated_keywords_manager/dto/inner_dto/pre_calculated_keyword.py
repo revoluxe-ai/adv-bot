@@ -27,3 +27,8 @@ class PreCalculatedKeyword(BaseModel):
     @property
     def hard_status(self) -> int:
         return self.keyword_setting.hard_status
+
+
+    @property
+    def relevant(self) -> bool:
+        return self.keyword_setting.relevant

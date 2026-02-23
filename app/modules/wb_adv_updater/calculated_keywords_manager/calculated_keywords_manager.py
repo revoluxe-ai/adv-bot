@@ -49,7 +49,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class _AsyncDecoratorFactory(Protocol):
+class _AsyncDecoratorFactory(Protocol): # pyright: ignore
     def __call__(
         self, *, ttl: str, lock: bool
     ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
@@ -288,6 +288,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
 
+        auto_campaign_active: bool | None = None
+        rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
         if complex_adv.rec_system_promotion_mode_active:
             from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
@@ -295,11 +297,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             # TODO: Придумать фоллбек для этой функции
             auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
-            rec_conversion = await get_rec_conversion(complex_adv.adv_id)
+            if auto_campaign_active is not None:
+                rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
             if auto_campaign_active is False:
-                return False
+                return None # None - не применяем вообще это правило
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
@@ -307,11 +310,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
             """Если нет белого списка, то выключаем все ключи, кроме лучшего"""
-            best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
+            if complex_adv.auto_add_only_relevant_phrase:
+                relevant_phrases = [kw for kw in pre_keywords if kw.relevant]
+            else:
+                relevant_phrases = pre_keywords
+            best_keyword = max(relevant_phrases, key=attrgetter("rating_by_orders"))
             for pre_kw in pre_keywords:
                 best_keyword_status = True if pre_kw == best_keyword else False
                 above_rec = _above_rec_conversion(pre_kw)
-                if best_keyword_status:
+                if not best_keyword_status or pre_kw not in relevant_phrases:
                     if above_rec is False:
                         state = KeywordState(
                             status=KeywordStatus.BAD,
@@ -351,7 +358,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
             above_rec = _above_rec_conversion(pre_kw)
-            if hard_status == 3:
+
+            if complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
+                state = KeywordState(
+                    status=KeywordStatus.BAD,
+                    reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
+                    best_keyword_status=best_keyword_status,
+                )
+            elif hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
                 best_keyword_status = True if pre_kw==best_keyword else False

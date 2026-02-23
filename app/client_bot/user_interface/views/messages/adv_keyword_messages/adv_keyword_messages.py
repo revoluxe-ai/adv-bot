@@ -185,18 +185,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
-        from app.client_bot.utils import build_cpm_date_map
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
             MinCtrManager,
         )
         min_ctr_manager = MinCtrManager(self._adv_setting)
 
         self._mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
-
-        if self._cpm_date_map is None and self._keywords:
-            self._cpm_date_map = await build_cpm_date_map(
-                self._adv_setting, self._keywords, redis_client
-            )
 
         result = await super().__call__()
         return result

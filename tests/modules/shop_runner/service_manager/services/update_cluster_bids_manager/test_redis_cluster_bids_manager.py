@@ -129,6 +129,20 @@ async def test_get_bids_returns_values(
 
 
 @pytest.mark.asyncio
+async def test_get_bids_reads_legacy_plain_integer_value(
+    redis_cluster_bids_manager: RedisClusterBidsManager,
+    fake_redis: FakeRedis,
+) -> None:
+    key = ClusterBidKey(adv_id=30, nmid=3001, cluster="legacy")
+    redis_key = redis_cluster_bids_manager._get_key(key.adv_id, key.nmid, key.cluster)
+    await fake_redis.set(redis_key, b"500")
+
+    bids = await redis_cluster_bids_manager.get_bids([key])
+
+    assert bids == {key: 500}
+
+
+@pytest.mark.asyncio
 async def test_get_bids_skips_missing_and_invalid(
     redis_cluster_bids_manager: RedisClusterBidsManager,
     fake_redis: FakeRedis,

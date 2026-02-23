@@ -133,4 +133,5 @@ class TargetPlaceUpExecutor(BaseExecutor):
         stmt = update(AdvSetting).where(AdvSetting.id == ctx.complex_adv.adv_setting_original_id) \
             .values({'target_position_mode': TargetPositionMode.MAX_CART_TO_VIEWS_CONV})
         await ctx.session.execute(stmt)
+        await ctx.session.commit()
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)

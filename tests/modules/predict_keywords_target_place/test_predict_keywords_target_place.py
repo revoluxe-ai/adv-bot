@@ -1,10 +1,13 @@
 """Unit-тесты для PredictKeywordsTargetPlace."""
 
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.modules.common_slaves.wildberries.models.enums.target_position_mode import (
+    TargetPositionMode,
+)
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
     BidPosition,
     ConvCartToViewsOnPosition,
@@ -12,6 +15,14 @@ from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
 from app.modules.predict_keywords_target_place.predict_keywords_target_place import (
     PredictKeywordsTargetPlace,
 )
+
+
+def _make_adv(main_nmid: int = 12345, min_bid: int = 50) -> MagicMock:
+    adv = MagicMock()
+    adv.main_nmid = main_nmid
+    adv.search_adv_min_bids = {main_nmid: min_bid}
+    adv.target_position_mode = TargetPositionMode.MIN_CPA
+    return adv
 
 
 @pytest.mark.unit
@@ -23,9 +34,8 @@ async def test_get_keywords_target_position_calls_ch_manager():
     mock_ch.get_bids_for_positions = AsyncMock(return_value={})
 
     predictor = PredictKeywordsTargetPlace(mock_ch)
-    result = await predictor.get_keywords_target_position(
-        nmid=12345, min_bid=50, positions_size=10
-    )
+    adv = _make_adv(main_nmid=12345, min_bid=50)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     mock_ch.get_conv_cart_to_views.assert_called_once_with(nmid=12345, positions_size=10)
     mock_ch.get_bids_for_positions.assert_called_once_with(nmid=12345)
@@ -41,9 +51,8 @@ async def test_get_keywords_target_position_returns_empty_when_empty_data():
     mock_ch.get_bids_for_positions = AsyncMock(return_value={})
 
     predictor = PredictKeywordsTargetPlace(mock_ch)
-    result = await predictor.get_keywords_target_position(
-        nmid=12345, min_bid=50, positions_size=10
-    )
+    adv = _make_adv(main_nmid=12345, min_bid=50)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert result == {}
 
@@ -83,9 +92,8 @@ async def test_get_keywords_target_position_returns_best_position_when_valid_dat
     )
 
     predictor = PredictKeywordsTargetPlace(mock_ch)
-    result = await predictor.get_keywords_target_position(
-        nmid=12345, min_bid=50, positions_size=10
-    )
+    adv = _make_adv(main_nmid=12345, min_bid=50)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert result == {"kw1": 1}
 
@@ -114,9 +122,8 @@ async def test_get_keywords_target_position_never_returns_zero():
     )
 
     predictor = PredictKeywordsTargetPlace(mock_ch)
-    result = await predictor.get_keywords_target_position(
-        nmid=12345, min_bid=50, positions_size=10
-    )
+    adv = _make_adv(main_nmid=12345, min_bid=50)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert 0 not in result.values()
     assert result["kw1"] >= 1

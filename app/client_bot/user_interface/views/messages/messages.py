@@ -954,7 +954,7 @@ class CPMSetting(TextWithKeyboard):
         step = self.adv_setting.bidder_step
         step = step if step else DEFAULT_BIDDER_STEP
         bottom = InlineKeyboardButton(
-            text=f"Изменить шаг ставки ({step})",
+            text=f"Изменить Максимальный шаг ставки ({step})",
             callback_data=callbacks.CPMSettingMenu(
                 action="change_cpm_step", adv_original_id=self.adv_setting.id
             ).pack(),

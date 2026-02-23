@@ -39,6 +39,8 @@ def _resolve_predict_bid(calculation_input: CalculationInput) -> int | None:
 def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     current_bid = calculation_input.current_bid
     current_position = calculation_input.current_position
+    if current_position < 1: # фоллбек на всякий случай
+        current_position  = 1
     direct = _resolve_direct(current_position, calculation_input.target_position)
     effective_step = _resolve_effective_step(calculation_input, direct)
     predict_bid_for_target_position = _resolve_predict_bid(calculation_input)
