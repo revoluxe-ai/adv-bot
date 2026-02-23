@@ -132,6 +132,10 @@ def get_adv_lock(adv_setting_id: int) -> asyncio.Lock:
     return lock
 
 
+def _mask_to_hours(mask: int) -> set[int]:
+    return {hour for hour in range(24) if mask & (1 << hour)}
+
+
 def hydrate_state_from_db(
     adv_setting_id: int,
     db_state: TimeSettingsDbState | None,
@@ -146,8 +150,7 @@ def hydrate_state_from_db(
     state.timezone = db_state.timezone
     for dow in range(7):
         if dow in db_state.masks_by_dow:
-            mask = db_state.masks_by_dow[dow]
-            state.week[dow] = {hour for hour in range(24) if mask & (1 << hour)}
+            state.week[dow] = _mask_to_hours(db_state.masks_by_dow[dow])
     normalize_date_enabled(state)
     return state
 

@@ -195,18 +195,8 @@ def hours_to_mask(hours: set[int]) -> int:
     return mask
 
 
-def mask_to_hours(mask: int) -> set[int]:
-    return {hour for hour in range(24) if mask & (1 << hour)}
-
-
 def week_masks_from_state(state: TimeSettingsState) -> dict[int, int]:
     return {dow: hours_to_mask(hours) for dow, hours in state.week.items()}
-
-
-def apply_masks_to_state(state: TimeSettingsState, masks_by_dow: dict[int, int]) -> None:
-    for dow in range(7):
-        if dow in masks_by_dow:
-            state.week[dow] = mask_to_hours(masks_by_dow[dow])
 
 
 def range_to_mask(start: int, end: int) -> int:
