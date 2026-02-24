@@ -389,6 +389,7 @@ class IndividualKeywordsTargetPlaceToggle(
 
 class ApplyCampaignDefaults(CallbackData, prefix="apply_adv_defaults"):
     adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
 
 
 class ChangeShopDefaultMaxCPM(CallbackData, prefix="change_shop_default_max_cpm"):
