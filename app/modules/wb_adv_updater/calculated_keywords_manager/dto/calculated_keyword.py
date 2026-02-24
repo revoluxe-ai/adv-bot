@@ -108,6 +108,29 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def rating_by_orders(self) -> float:
+        """Рейтинг ключевой фразы по заказам (эффективность с учётом CPM).
+
+        Значение берётся из ``cluster_stat.final_rating``, которое вычисляется в SQL
+        (см. ``calculated_keywords_manager/sql/get_clusters_stats.sql``, алиас ``final_rating``).
+
+        **Формула в SQL:**
+        - Если ``last_cpm > 0`` и задан ``ctr_eff``:
+          ``final_rating = (ctr_eff * cart_eff * order_eff) / last_cpm * 100``.
+        - Иначе: ``0``.
+        - ``cart_eff`` и ``order_eff`` при отсутствии подставляются как 1.
+
+        **Слагаемые (CTE ``baes`` в том же SQL):**
+        - **ctr_eff** — байесовская оценка CTR по последним 500 показам из тиков (L2,
+          ``adv_events_ticks``), с prior по кампании (views/clicks за 7d).
+        - **cart_eff** — эффективность «клик → корзина» за 7 дней: байесовская оценка
+          (carts+1) / (clicks - carts + prior_clicks), prior по кампании за 7d/14d.
+        - **order_eff** — эффективность «корзина → заказ» за 14 дней: (orders+1) /
+          (carts - orders + prior_carts).
+
+        Итог: рейтинг — это «конверсия по воронке» (CTR × корзина × заказ), нормированная
+        на последний CPM и умноженная на 100; чем выше значение, тем выгоднее фраза с точки
+        зрения заказов на рубль расходов.
+        """
         return self.cluster_stat.final_rating
 
     @property
