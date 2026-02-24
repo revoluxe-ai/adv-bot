@@ -180,7 +180,8 @@ def get_adv_setting_keyboard(
         button = InlineKeyboardButton(
             text="Применить дефолтные настройки",
             callback_data=callbacks.ApplyCampaignDefaults(
-                adv_setting_original_id=adv_setting.id
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
             ).pack(),
         )
         _ = builder.row(button)

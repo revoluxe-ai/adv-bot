@@ -377,8 +377,7 @@ async def apply_campaign_defaults(
         )
 
         # Обновить меню кампании
-        data = await state.get_data()
-        wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
+        wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
         async with sm() as session_read:
             wb_user_cabinet = await session_read.execute(
                 select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)

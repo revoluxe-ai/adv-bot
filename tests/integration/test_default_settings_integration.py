@@ -206,7 +206,10 @@ async def test_apply_campaign_defaults_single_active_campaign(
     await async_session.refresh(adv_setting)
 
     # Вызываем хэндлер
-    callback_data = ApplyCampaignDefaults(adv_setting_original_id=adv_setting.id)
+    callback_data = ApplyCampaignDefaults(
+        adv_setting_original_id=adv_setting.id,
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+    )
     telegram_user = TelegramUser(
         id=wb_user_cabinet.user.user_telegram_id,
         is_bot=False,
@@ -282,7 +285,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     initial_adv_setting_state = {key: getattr(adv_setting_inactive, key) for key in adv_setting_inactive.__table__.columns.keys()}
 
     # Вызываем хэндлер для неактивной кампании
-    callback_data = ApplyCampaignDefaults(adv_setting_original_id=adv_setting_inactive.id)
+    callback_data = ApplyCampaignDefaults(
+        adv_setting_original_id=adv_setting_inactive.id,
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+    )
     telegram_user = TelegramUser(
         id=wb_user_cabinet.user.user_telegram_id,
         is_bot=False,
