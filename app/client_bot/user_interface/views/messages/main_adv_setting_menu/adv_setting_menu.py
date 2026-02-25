@@ -39,8 +39,9 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
     RedisCommonBidTimestampManager,
 )
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+    CampaignActivityCommand,
+    CampaignActivityReason,
     RedisCampaignActivityReasonManager,
-    reason_code_to_display_text,
 )
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
@@ -358,33 +359,31 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             self.adv.bot_active
             and getattr(self.adv, "auto_budget_watchdog_enabled", False)
         )
-        if management_enabled:
-            reason_auto_str = (
-                reason_code_to_display_text(self._reason_auto.reason_code.value)
-                if self._reason_auto
-                else "—"
-            )
-            reason_search_str = (
-                reason_code_to_display_text(self._reason_search.reason_code.value)
-                if self._reason_search
-                else "—"
-            )
-        else:
-            reason_auto_str = "Упр откл"
-            reason_search_str = "Упр откл"
 
-        reason_auction_display = (
-            "Не подключен"
-            if not self.adv.search_adv_id
-            else reason_search_str
-        )
+        def _status_suffix(reason: CampaignActivityReason | None) -> str:
+            if not management_enabled:
+                return " (управление отключено)"
+            if reason is None:
+                return ""
+            label = (
+                "запущена ботом"
+                if reason.command == CampaignActivityCommand.STARTED
+                else "на паузе"
+            )
+            ts: str = reason.updated_at.strftime("%d.%m.%Y %H:%M")
+            return f" ({label}, {ts})"
+
+        suffix_auto = _status_suffix(self._reason_auto)
+        if not self.adv.search_adv_id:
+            suffix_auction = " (не подключен)"
+        else:
+            suffix_auction = _status_suffix(self._reason_search)
+
         text += (
             f"📢 Камп: {self.adv.name}\n"
             f"🆔 ID камп: {self.adv.adv_id}\n"
-            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}\n"
-            f"📌 Статус Аук: {self._status_auction}\n"
-            f"Причина Авто: {reason_auto_str}\n"
-            f"Причина Аук: {reason_auction_display}\n"
+            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
+            f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
         )
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:

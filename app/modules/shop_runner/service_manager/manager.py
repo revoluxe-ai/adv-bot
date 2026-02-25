@@ -681,7 +681,7 @@ class CoroutinesManager:
                     campaign_type,
             )
 
-    @while_coroutine_decorator(1 * 30, 60)
+    @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:

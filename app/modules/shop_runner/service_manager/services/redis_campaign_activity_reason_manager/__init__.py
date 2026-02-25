@@ -13,7 +13,6 @@ __all__ = [
     "AutoReasonCode",
     "CampaignActivityCommand",
     "CampaignActivityReason",
-    "CommonReasonCode",
     "RedisCampaignActivityReasonManager",
     "parse_reason_code",
     "reason_code_to_display_text",
