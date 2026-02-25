@@ -373,7 +373,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 if reason.command == CampaignActivityCommand.STARTED
                 else "на паузе"
             )
-            ts: str = reason.updated_at.strftime("%d.%m.%Y %H:%M")
+            dt = reason.updated_at
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            dt_msk = dt.astimezone(MSK_TZ)
+            ts = dt_msk.strftime("%d.%m.%Y %H:%M")
             return f" ({label}, {ts})"
 
         suffix_auto = _status_suffix(self._reason_auto)
