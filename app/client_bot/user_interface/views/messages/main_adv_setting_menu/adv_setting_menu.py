@@ -39,9 +39,9 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
     RedisCommonBidTimestampManager,
 )
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
-    CampaignActivityCommand,
     CampaignActivityReason,
     RedisCampaignActivityReasonManager,
+    reason_code_to_display_text,
 )
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
@@ -368,11 +368,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 return " (управление отключено)"
             if reason is None:
                 return ""
-            label = (
-                "запущена ботом"
-                if reason.command == CampaignActivityCommand.STARTED
-                else "на паузе"
-            )
+            label = reason_code_to_display_text(reason.reason_code.value)
             dt = reason.updated_at
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
