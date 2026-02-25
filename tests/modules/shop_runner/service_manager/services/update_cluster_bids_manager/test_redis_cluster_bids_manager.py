@@ -1,3 +1,4 @@
+import json
 import pytest
 from fakeredis.aioredis import FakeRedis
 
@@ -8,6 +9,7 @@ from app.modules.cluster_bids_redis import (
 )
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
+    DirectEnum,
     NewBid,
 )
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import (
@@ -39,6 +41,8 @@ def _make_bid(
     nmid: int,
     cluster: str,
     new_bid: int = 10,
+    step: int = 1,
+    direct: DirectEnum = DirectEnum.UP,
 ) -> NewBid:
     return NewBid(
         new_bid=new_bid,
@@ -46,12 +50,21 @@ def _make_bid(
         nmid=nmid,
         cluster=cluster,
         bidder_keyword_status=BidderKeywordStatus.GOOD,
+        step=step,
+        direct=direct,
     )
 
 
 def _to_entries(bids: list[NewBid]) -> list[ClusterBidEntry]:
     return [
-        ClusterBidEntry(adv_id=b.adv_id, nmid=b.nmid, cluster=b.cluster, new_bid=b.new_bid)
+        ClusterBidEntry(
+            adv_id=b.adv_id,
+            nmid=b.nmid,
+            cluster=b.cluster,
+            new_bid=b.new_bid,
+            step=b.step,
+            direct=b.direct.value if b.direct else None,
+        )
         for b in bids
     ]
 
@@ -71,9 +84,11 @@ async def test_remember_bids_persists_values(
 
     for bid in bids:
         key = redis_cluster_bids_manager._get_key(bid.adv_id, bid.nmid, bid.cluster)
-        stored_value = await fake_redis.get(key)
-        assert stored_value is not None
-        assert int(stored_value) == bid.new_bid
+        raw = await fake_redis.get(key)
+        assert raw is not None
+        s = raw.decode() if isinstance(raw, bytes) else raw
+        stored = json.loads(s)
+        assert stored["new_bid"] == bid.new_bid
 
 
 @pytest.mark.asyncio
@@ -95,7 +110,10 @@ async def test_remember_bids_sets_ttl(
     expected_ttl = redis_cluster_bids_manager_short_ttl._resolve_ttl()
 
     assert 0 < ttl_value <= expected_ttl  # TTL должен быть установлен
-    assert int(await fake_redis.get(key)) == bid.new_bid
+    raw = await fake_redis.get(key)
+    s = raw.decode() if isinstance(raw, bytes) else raw
+    stored = json.loads(s)
+    assert stored["new_bid"] == bid.new_bid
 
 
 @pytest.mark.asyncio

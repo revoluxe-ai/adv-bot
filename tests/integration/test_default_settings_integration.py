@@ -243,7 +243,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     with (
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
-        patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+        patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
     ):
         await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
 
@@ -309,7 +309,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     mock_menu_instance = AsyncMock()
     with (
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
-        patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+        patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
     ):
         await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
 
@@ -420,7 +420,7 @@ async def test_turn_adv_on_applies_defaults(
         mock_menu_instance = AsyncMock()
         with (
             patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
-            patch("app.client_bot.user_interface.handlers.adv_setting.messages.AdvSettingMenu", return_value=mock_menu_instance),
+            patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
         ):
             await turn_adv_on(callback_query, mock_state, callback_data, mock_bot)
 
