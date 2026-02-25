@@ -38,6 +38,10 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
     RedisCommonBidTimestampManager,
 )
+from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+    RedisCampaignActivityReasonManager,
+    reason_code_to_display_text,
+)
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
@@ -81,6 +85,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
+        self._redis_campaign_activity_reason_manager = (
+            RedisCampaignActivityReasonManager(redis_client)
+        )
+        self._reason_auto = None
+        self._reason_search = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
 
@@ -222,6 +231,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._is_campaign_active_by_cost = cost_metrics.is_active
         self._plan_set = cost_metrics.plan_set
 
+        self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
+            self.adv.adv_id, "auto"
+        )
+        if self.adv.search_adv_id:
+            self._reason_search = await self._redis_campaign_activity_reason_manager.get(
+                self.adv.search_adv_id, "search"
+            )
+        else:
+            self._reason_search = None
+
         return await super().__call__()
 
     @property
@@ -262,11 +281,38 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     f"Рекомендуется макс.заказа >= {int(suggested)} р.\n"
                 )
 
+        management_enabled = bool(
+            self.adv.bot_active
+            and getattr(self.adv, "auto_budget_watchdog_enabled", False)
+        )
+        if management_enabled:
+            reason_auto_str = (
+                reason_code_to_display_text(self._reason_auto.reason_code.value)
+                if self._reason_auto
+                else "—"
+            )
+            reason_search_str = (
+                reason_code_to_display_text(self._reason_search.reason_code.value)
+                if self._reason_search
+                else "—"
+            )
+        else:
+            reason_auto_str = "Управление отключено"
+            reason_search_str = "Управление отключено"
+
+        reason_auction_display = (
+            "Не подключен"
+            if not self.adv.search_adv_id
+            else reason_search_str
+        )
         text += (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}\n"
-            f"📌 Статус Аукциона: {self._status_auction}\n")
+            f"📌 Статус Аукциона: {self._status_auction}\n"
+            f"Причина Авто: {reason_auto_str}\n"
+            f"Причина Аукциона: {reason_auction_display}\n"
+        )
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:
             text += f"🎯 Мин. Рейтинг по заказам для кампании: {round(self._min_rating_by_orders * 1000, 2)}\n"

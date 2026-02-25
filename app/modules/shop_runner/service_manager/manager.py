@@ -60,6 +60,9 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
 from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
+from .services.redis_campaign_activity_reason_manager import (
+    RedisCampaignActivityReasonManager,
+)
 from .services.auto_reset_bid_service import AutoResetBidService
 from .services.clusters_adv_stat_updater.clusters_adv_stat_updater import (
     ClustersAdvStatUpdater,
@@ -118,6 +121,9 @@ class CoroutinesManager:
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()
         self._increment_fact_data_manager = IncrementFactDataManager(
             redis_client_wrapper,
+        )
+        self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
+            redis_client_wrapper
         )
 
     @staticmethod
@@ -684,6 +690,7 @@ class CoroutinesManager:
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
         )
         await service.ensure_campaigns_active(advs)
         return None
