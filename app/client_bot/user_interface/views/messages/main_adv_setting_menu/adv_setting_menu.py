@@ -299,9 +299,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 if self._spend_auto_today is None and self._spend_search_today is None:
                     text += "Общий бюджет: потрачено: нет данных\n"
                 else:
-                    remaining = max(0, limit - int(spend))
+                    spend_rounded = int(round(spend))
+                    remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Общий бюджет: потрачено {int(round(spend))} р., "
+                        f"Общий бюджет: потрачено {spend_rounded} р., "
                         f"осталось {remaining} р. (лимит {limit} р./сут)\n"
                     )
             else:
@@ -310,9 +311,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 if self._spend_auto_today is None:
                     text += "Авто: потр: нет данных\n"
                 else:
-                    remaining_auto = max(0, auto_limit - int(spend_auto))
+                    spend_auto_rounded = int(round(spend_auto))
+                    remaining_auto = max(0, auto_limit - spend_auto_rounded)
                     text += (
-                        f"Авто: потрачено {int(round(spend_auto))} р., "
+                        f"Авто: потрачено {spend_auto_rounded} р., "
                         f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
                     )
                 if self.adv.search_adv_id:
@@ -321,9 +323,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     if self._spend_search_today is None:
                         text += "Аук: потр: нет данных\n"
                     else:
-                        remaining_search = max(0, search_limit - int(spend_search))
+                        spend_search_rounded = int(round(spend_search))
+                        remaining_search = max(0, search_limit - spend_search_rounded)
                         text += (
-                            f"Аук: потр {int(round(spend_search))} р., "
+                            f"Аук: потр {spend_search_rounded} р., "
                             f"ост {remaining_search} р. (лим {search_limit} р/с)\n"
                         )
                 else:
@@ -393,7 +396,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             text += "Огран не заданы!"
 
-        text += 'Посл.обнов:\n'
+        text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
+        text += "Посл.обнов:\n"
 
         text += (
             f"воронки: {self.last_update_common_stat_str}\n"
