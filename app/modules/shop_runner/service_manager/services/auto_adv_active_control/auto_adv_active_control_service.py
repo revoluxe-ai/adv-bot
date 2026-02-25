@@ -163,6 +163,13 @@ class AutoAdvActiveControlService:
                     AutoReasonCode("common_limit_0"),
                 )
                 return None
+            if common_limit == 0 and auto_status != WBAdvActiveStatus.STARTED:
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode("common_limit_0"),
+                )
+                return None
             if 0 < common_limit <= combined_spend and auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auto campaign (common spend %.2f >= limit %s) adv_id=%s shop_id=%s",
@@ -172,6 +179,13 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auto_campaign(adv)
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode("common_spend_exceeded"),
+                )
+                return None
+            if 0 < common_limit <= combined_spend and auto_status != WBAdvActiveStatus.STARTED:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
@@ -192,6 +206,11 @@ class AutoAdvActiveControlService:
                     auto_adv_id, CampaignActivityCommand.PAUSE, AutoReasonCode.AUTO_LIMIT_0
                 )
                 return None
+            if auto_limit == 0 and auto_status != WBAdvActiveStatus.STARTED:
+                await self._set_auto_reason(
+                    auto_adv_id, CampaignActivityCommand.PAUSE, AutoReasonCode.AUTO_LIMIT_0
+                )
+                return None
             spend_today = await self._get_spend_for_adv(
                 auto_adv_id, start_of_day, end_of_day
             )
@@ -204,6 +223,13 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auto_campaign(adv)
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode.AUTO_SPEND_EXCEEDED,
+                )
+                return None
+            if 0 < auto_limit <= spend_today and auto_status != WBAdvActiveStatus.STARTED:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
@@ -231,10 +257,7 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        if (
-            cost_activity is False
-            and auto_status == WBAdvActiveStatus.STARTED
-        ):
+        if cost_activity is False and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto watchdog: pausing auto campaign%s due to failed cost rule adv_id=%s shop_id=%s",
                 cost_log_suffix,
@@ -242,6 +265,13 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.COST_RULE_FAILED,
+            )
+            return None
+        if cost_activity is False and auto_status != WBAdvActiveStatus.STARTED:
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.PAUSE,
@@ -262,6 +292,12 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.start_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.STARTED,
+                AutoReasonCode.BUDGET_OK_COST_OK,
+            )
+        elif budget_ok and cost_rule_ok and auto_status == WBAdvActiveStatus.STARTED:
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.STARTED,
@@ -302,6 +338,13 @@ class AutoAdvActiveControlService:
                     AuctionReasonCode("common_limit_0"),
                 )
                 return None
+            if common_limit == 0 and search_status != WBAdvActiveStatus.STARTED:
+                await self._set_search_reason(
+                    adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AuctionReasonCode("common_limit_0"),
+                )
+                return None
             if 0 < common_limit <= combined_spend and search_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auction campaign (common spend %.2f >= limit %s) adv_id=%s shop_id=%s",
@@ -311,6 +354,13 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auction_campaign(adv)
+                await self._set_search_reason(
+                    adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AuctionReasonCode("common_spend_exceeded"),
+                )
+                return None
+            if 0 < common_limit <= combined_spend and search_status != WBAdvActiveStatus.STARTED:
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.PAUSE,
@@ -327,6 +377,16 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.start_auction_campaign(adv)
+                await self._set_search_reason(
+                    adv_id,
+                    CampaignActivityCommand.STARTED,
+                    AuctionReasonCode.COMMON_OK,
+                )
+            elif (
+                common_limit > 0
+                and combined_spend < common_limit
+                and search_status == WBAdvActiveStatus.STARTED
+            ):
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.STARTED,
@@ -366,6 +426,12 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AuctionReasonCode.SEARCH_LIMIT_OK,
             )
+        elif search_limit > 0 and search_status == WBAdvActiveStatus.STARTED:
+            await self._set_search_reason(
+                adv_id,
+                CampaignActivityCommand.STARTED,
+                AuctionReasonCode.SEARCH_LIMIT_OK,
+            )
         elif search_limit == 0 and search_status == WBAdvActiveStatus.STARTED:
             logger.info(
                 "Auto budget watcher: pausing auction campaign adv_id=%s shop_id=%s",
@@ -373,6 +439,12 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auction_campaign(adv)
+            await self._set_search_reason(
+                adv_id,
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.SEARCH_LIMIT_0,
+            )
+        elif search_limit == 0 and search_status != WBAdvActiveStatus.STARTED:
             await self._set_search_reason(
                 adv_id,
                 CampaignActivityCommand.PAUSE,
