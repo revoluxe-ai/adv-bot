@@ -24,7 +24,7 @@ from sqlalchemy import (
 
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
@@ -741,6 +741,14 @@ class KeywordSetting(BaseTable):
                                                      nullable=True,
                                                      default=None,
                                               )
+
+    @validates("target_place")
+    def _validate_target_place(self, _key: str, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("target_place must be None or an integer > 0")
+        return value
 
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
