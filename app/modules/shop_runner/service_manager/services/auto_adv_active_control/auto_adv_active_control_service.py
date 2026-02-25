@@ -242,18 +242,15 @@ class AutoAdvActiveControlService:
             adv.adv_setting,
             plan_fact_reader=self._plan_fact_reader,
         )
-        # TODO: Тут не понятно что делать, если cost_activity не доступно. Вообще, это ошибка какая-то, на всякий случай ничего не делаю
+        # When cost_activity is None we do not change campaign state (do nothing).
+        # Do not record PAUSE here — the campaign may still be running; recording PAUSE
+        # would make the UI show "на паузе" and contradict the real WB status.
         if cost_activity is None:
             logger.info(
                 "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
                 cost_log_suffix,
                 auto_adv_id,
                 adv.shop_id,
-            )
-            await self._set_auto_reason(
-                auto_adv_id,
-                CampaignActivityCommand.PAUSE,
-                AutoReasonCode.COST_DATA_INSUFFICIENT,
             )
             return None
 
