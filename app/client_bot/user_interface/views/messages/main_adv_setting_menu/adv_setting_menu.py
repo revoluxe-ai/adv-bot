@@ -289,7 +289,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if use_common:
                 limit = self.adv.common_budget_daily_limit or 0
                 spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
-                if self._spend_auto_today is None and self._spend_search_today is None:
+                if self._spend_auto_today is None or self._spend_search_today is None:
                     text += "Общий бюджет: потрачено: нет данных\n"
                 else:
                     spend_rounded = int(round(spend))
