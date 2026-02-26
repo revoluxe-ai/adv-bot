@@ -70,6 +70,7 @@ from .user_interface.handlers import (
     strategy_setting,
     rec_system_mode_toggle,
     campaign_activity,
+    time_settings,
     white_list_mode_toggle,
 )
 from .user_interface.handlers.common_budget_mode_toggle import (
@@ -135,6 +136,7 @@ common_router.include_routers(clusters.router)
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
+common_router.include_routers(time_settings.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)

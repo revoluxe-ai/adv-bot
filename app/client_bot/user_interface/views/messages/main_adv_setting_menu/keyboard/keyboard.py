@@ -35,6 +35,7 @@ from app.modules.white_list_mode_settings.telegram.main_callback import (
 from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbacks import (
     BidderCoroutineTypeToggle,
 )
+from app.client_bot.user_interface.handlers.time_settings.callbacks import TS
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
 )
@@ -152,6 +153,14 @@ def get_adv_setting_keyboard(
             callback_data=activity_callback,
         )
     )
+    # Ограничения по времени настраиваются для любой РК; применяются только при
+    # включённом «Контроле активности кампании» (см. AutoAdvActiveControlService).
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="⏰ Ограничения показов по времени",
+            callback_data=TS(a="open", adv=adv_setting.id).pack(),
+        )
+    )
 
     button = InlineKeyboardButton(
         text="Управление ставкой",
@@ -180,7 +189,8 @@ def get_adv_setting_keyboard(
         button = InlineKeyboardButton(
             text="Применить дефолтные настройки",
             callback_data=callbacks.ApplyCampaignDefaults(
-                adv_setting_original_id=adv_setting.id
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
             ).pack(),
         )
         _ = builder.row(button)

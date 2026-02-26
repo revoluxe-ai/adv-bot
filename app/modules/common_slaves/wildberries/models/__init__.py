@@ -8,6 +8,8 @@ __all__ = [
     "WBBalancePayment",
     "WBBonusPayment",
     "AdvKeyword",
+    "AdvTimeSettings",
+    "AdvTimeWeekMask",
     "WBCabinet",
     "WBAutoBudgetTopUp",
 ]
@@ -22,6 +24,8 @@ from .models import (
     WBBalancePayment,
     WBBonusPayment,
     AdvKeyword,
+    AdvTimeSettings,
+    AdvTimeWeekMask,
 )
 
 from .wb_auto_budget_topup import WBAutoBudgetTopUp

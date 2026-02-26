@@ -11,7 +11,9 @@ from jwt import DecodeError
 from sqlalchemy import (
     BIGINT,
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -33,7 +35,7 @@ from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
-from app.utils.db.base import BaseTable
+from app.utils.db.base import Base, BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .white_list_mode import WhiteListMode
@@ -900,3 +902,60 @@ class KeywordSetting(BaseTable):
 #             position.total_orders = None
 #
 #         return position
+
+
+class AdvTimeSettings(Base):  # type: ignore[valid-type]
+    __tablename__ = "adv_time_settings"
+
+    id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
+    adv_setting_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("advsetting.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    schedule_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    date_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    date_start: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    date_end: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    timezone: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="Europe/Moscow",
+        server_default=text("'Europe/Moscow'"),
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "date_start IS NULL OR date_end IS NULL OR date_start <= date_end",
+            name="ck_adv_time_settings_date_range",
+        ),
+    )
+
+
+class AdvTimeWeekMask(Base):  # type: ignore[valid-type]
+    __tablename__ = "adv_time_week_mask"
+
+    adv_setting_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("advsetting.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    dow: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    hours_mask: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    __table_args__ = (
+        CheckConstraint("dow BETWEEN 0 AND 6", name="ck_adv_time_week_mask_dow"),
+    )
