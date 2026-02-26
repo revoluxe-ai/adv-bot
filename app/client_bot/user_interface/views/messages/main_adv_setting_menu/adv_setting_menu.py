@@ -172,13 +172,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_update_keyword_stat: datetime | None = (
             await self._get_last_update_keyword_stat(self.adv.adv_id)
         )
-        if last_update_keyword_stat:
-            self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-        else:
-            self.last_update_keyword_stat_str = "Нет данных"
-
         last_update_common_stat: datetime | None = (
             await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
         )
