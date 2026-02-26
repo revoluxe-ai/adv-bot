@@ -360,7 +360,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if not management_enabled:
                 return " (управление отключено)"
             if reason is None:
-                return ""
+                return " (Нет данных)"
             label = reason_code_to_display_text(reason.reason_code.value)
             dt = reason.updated_at
             if dt.tzinfo is None:
