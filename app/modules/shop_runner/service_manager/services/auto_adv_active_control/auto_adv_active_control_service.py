@@ -230,14 +230,14 @@ class AutoAdvActiveControlService:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AutoReasonCode("common_limit_0"),
+                    AutoReasonCode.COMMON_LIMIT_0,
                 )
                 return None
             if common_limit == 0 and auto_status != WBAdvActiveStatus.STARTED:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AutoReasonCode("common_limit_0"),
+                    AutoReasonCode.COMMON_LIMIT_0,
                 )
                 return None
             if 0 < common_limit <= combined_spend and auto_status == WBAdvActiveStatus.STARTED:
@@ -252,14 +252,14 @@ class AutoAdvActiveControlService:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AutoReasonCode("common_spend_exceeded"),
+                    AutoReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
             if 0 < common_limit <= combined_spend and auto_status != WBAdvActiveStatus.STARTED:
                 await self._set_auto_reason(
                     auto_adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AutoReasonCode("common_spend_exceeded"),
+                    AutoReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
             budget_ok = common_limit > 0 and combined_spend < common_limit
@@ -418,14 +418,14 @@ class AutoAdvActiveControlService:
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AuctionReasonCode("common_limit_0"),
+                    AuctionReasonCode.COMMON_LIMIT_0,
                 )
                 return None
             if common_limit == 0 and search_status != WBAdvActiveStatus.STARTED:
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AuctionReasonCode("common_limit_0"),
+                    AuctionReasonCode.COMMON_LIMIT_0,
                 )
                 return None
             if 0 < common_limit <= combined_spend and search_status == WBAdvActiveStatus.STARTED:
@@ -440,14 +440,14 @@ class AutoAdvActiveControlService:
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AuctionReasonCode("common_spend_exceeded"),
+                    AuctionReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
             if 0 < common_limit <= combined_spend and search_status != WBAdvActiveStatus.STARTED:
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.PAUSE,
-                    AuctionReasonCode("common_spend_exceeded"),
+                    AuctionReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
             if common_limit > 0 and combined_spend < common_limit and search_status in [
