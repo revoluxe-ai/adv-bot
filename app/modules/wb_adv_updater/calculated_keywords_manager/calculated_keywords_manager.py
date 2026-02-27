@@ -343,14 +343,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
             above_rec = _above_rec_conversion(pre_kw)
-
-            if complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
-                state = KeywordState(
-                    status=KeywordStatus.BAD,
-                    reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
-                    best_keyword_status=best_keyword_status,
-                )
-            elif hard_status == 4:
+            if hard_status == 4:
                 status = KeywordStatus.GOOD
                 reason = KeywordStatusReason.ALWAYS_ON
                 state = KeywordState(
@@ -358,6 +351,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=reason,
                     best_keyword_status=best_keyword_status,
                 )
+
+            elif complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
+                state = KeywordState(
+                    status=KeywordStatus.BAD,
+                    reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
+                    best_keyword_status=best_keyword_status,
+                )
+
             elif hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
