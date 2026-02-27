@@ -37,6 +37,7 @@ def complex_adv_mock():
     mock = MagicMock()
     mock.hard_min_ctr = None
     mock.rec_system_promotion_mode_active = False
+    mock.auto_add_only_relevant_phrase = False
     return mock
 
 
@@ -89,6 +90,45 @@ async def test_no_whitelist_all_keywords_pass_ctr(complex_adv_with_hard_min_ctr)
         assert result_by_text[f"keyword_{i}"].status == KeywordStatus.BAD
         assert result_by_text[f"keyword_{i}"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
         assert result_by_text[f"keyword_{i}"].best_keyword_status is False
+
+
+@pytest.mark.asyncio
+async def test_no_whitelist_always_on_gets_good(complex_adv_with_hard_min_ctr):
+    """Без белого списка: ключ с hard_status=4 (фикс.фразы) -> GOOD, ALWAYS_ON."""
+    adv_id = 12345
+    pre_keywords = [
+        PreCalculatedKeywordFactory(
+            adv_id=adv_id,
+            keyword_setting__hard_status=HardStatus.ALWAYS_ON,
+            keyword_setting__text="fixed_phrase",
+            cluster_stat__views=500,
+            cluster_stat__clicks=10,
+            cluster_stat__final_rating=30.0,
+            cluster_stat__norm_query="fixed_phrase",
+            bidder_keyword_status=BidderKeywordStatus.GOOD,
+        ),
+        PreCalculatedKeywordFactory(
+            adv_id=adv_id,
+            keyword_setting__hard_status=HardStatus.IN_TEST,
+            keyword_setting__text="in_test_phrase",
+            cluster_stat__views=500,
+            cluster_stat__clicks=10,
+            cluster_stat__final_rating=20.0,
+            cluster_stat__norm_query="in_test_phrase",
+            bidder_keyword_status=BidderKeywordStatus.GOOD,
+        ),
+    ]
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_with_hard_min_ctr, pre_keywords
+    )
+
+    assert len(result) == 2
+    result_by_text = {kw.text: kw for kw in result}
+    assert result_by_text["fixed_phrase"].status == KeywordStatus.GOOD
+    assert result_by_text["fixed_phrase"].reason == KeywordStatusReason.ALWAYS_ON
+    assert result_by_text["in_test_phrase"].status == KeywordStatus.BAD
+    assert result_by_text["in_test_phrase"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
 
 
 @pytest.mark.asyncio

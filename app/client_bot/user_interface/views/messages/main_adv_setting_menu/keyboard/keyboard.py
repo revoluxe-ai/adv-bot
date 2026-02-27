@@ -360,6 +360,15 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
+            text="Добавить в фикс.фразы (всегда вкл)",
+            callback_data=callbacks.AddFixedPhrases(
+                adv_setting_id=adv_setting.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
             text="Добавить РЕЛЕВАНТНЫЕ фразы",
             callback_data=callbacks.AddRelevantPhrases(
                 adv_setting_id=adv_setting.id

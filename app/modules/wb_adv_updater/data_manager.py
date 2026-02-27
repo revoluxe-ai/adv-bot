@@ -510,6 +510,43 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
         await session.commit()
 
 
+# hard_status=4: фикс.фразы (всегда вкл), не переводить в чёрный список
+ALWAYS_ON_HARD_STATUS = 4
+
+
+async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
+    async with _sm(read_only=False) as session:
+        for text in keywords:
+            stmt = (
+                select(KeywordSetting)
+                .join(KeywordSetting.adv_setting)
+                .where(
+                    and_(KeywordSetting.text == text, AdvSetting.id == adv_setting_id)
+                )
+            )
+            result = await session.execute(stmt)
+            keyword_setting = result.scalar()
+            if not keyword_setting:
+                adv_keyword = AdvKeyword(
+                    text=text,
+                    adv_setting_id=adv_setting_id,
+                    views=0,
+                    clicks=0,
+                    spend=0,
+                    date=datetime.now().date(),  # noqa
+                )
+
+                keyword_setting = KeywordSetting(
+                    text=text,
+                    adv_setting_id=adv_setting_id,
+                )
+                keyword_setting.adv_keywords.append(adv_keyword)
+                session.add(keyword_setting)
+            keyword_setting.hard_status = ALWAYS_ON_HARD_STATUS
+            keyword_setting.relevant = True
+        await session.commit()
+
+
 async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None:
     await redis_manager.set_black_phrases(adv_setting_id, keywords)  # type: ignore[attr-defined]
     async with _sm(read_only=False) as session:
@@ -523,6 +560,8 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()
         for keyword_setting in keyword_settings:
+            if keyword_setting.hard_status == ALWAYS_ON_HARD_STATUS:
+                continue
             for black_phrase in keywords:
                 black_phrase_text = black_phrase.lower().strip()
                 if "'" in black_phrase_text or '"' in black_phrase_text:

@@ -310,11 +310,18 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         if not white_list:
             for pre_kw in pre_keywords:
-                state = KeywordState(
-                    status=KeywordStatus.BAD,
-                    reason=KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS,
-                    best_keyword_status=False,
-                )
+                if pre_kw.hard_status == 4:
+                    state = KeywordState(
+                        status=KeywordStatus.GOOD,
+                        reason=KeywordStatusReason.ALWAYS_ON,
+                        best_keyword_status=pre_kw == max(pre_keywords, key=attrgetter("rating_by_orders")),
+                    )
+                else:
+                    state = KeywordState(
+                        status=KeywordStatus.BAD,
+                        reason=KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS,
+                        best_keyword_status=False,
+                    )
                 calculated_keyword = CalculatedKeyword(
                     adv_id=pre_kw.adv_id,
                     keyword_setting=pre_kw.keyword_setting,
@@ -341,6 +348,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 state = KeywordState(
                     status=KeywordStatus.BAD,
                     reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
+                    best_keyword_status=best_keyword_status,
+                )
+            elif hard_status == 4:
+                status = KeywordStatus.GOOD
+                reason = KeywordStatusReason.ALWAYS_ON
+                state = KeywordState(
+                    status=status,
+                    reason=reason,
                     best_keyword_status=best_keyword_status,
                 )
             elif hard_status == 3:

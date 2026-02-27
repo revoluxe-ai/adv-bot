@@ -23,6 +23,8 @@ WHITE_LIST = 2
 
 TURN_OFF = 3
 
+ALWAYS_ON = 4  # фикс.фразы (всегда вкл)
+
 PARSING_PRICE = 15
 
 AUTO_BIDDER_PRICE = 25
