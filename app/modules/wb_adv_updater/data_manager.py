@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.functions import coalesce
 
+from app.client_bot.const import ALWAYS_ON
 from app.exc import (
     CardNotFoundInDB,
 )
@@ -510,10 +511,6 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
         await session.commit()
 
 
-# hard_status=4: фикс.фразы (всегда вкл), не переводить в чёрный список
-ALWAYS_ON_HARD_STATUS = 4
-
-
 async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
         for text in keywords:
@@ -542,7 +539,7 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 )
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
-            keyword_setting.hard_status = ALWAYS_ON_HARD_STATUS
+            keyword_setting.hard_status = ALWAYS_ON
             keyword_setting.relevant = True
         await session.commit()
 
@@ -560,7 +557,7 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()
         for keyword_setting in keyword_settings:
-            if keyword_setting.hard_status == ALWAYS_ON_HARD_STATUS:
+            if keyword_setting.hard_status == ALWAYS_ON:
                 continue
             for black_phrase in keywords:
                 black_phrase_text = black_phrase.lower().strip()
