@@ -130,7 +130,7 @@ async def run_bidder_process_for_adv(
     user_max_cpm = adv_setting.max_cpm
     if not user_max_cpm:
         return None
-    white_list = [kw for kw in keywords if kw.hard_status == 2]
+    white_list = [kw for kw in keywords if kw.hard_status in (2, 4)]
     best_keyword = data_manager.get_best_keyword(white_list)
     if not best_keyword:
         return None

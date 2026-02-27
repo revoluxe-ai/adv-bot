@@ -32,6 +32,8 @@ class RelevantPhraseManager:
             templator = NotRelevantTemplate(json_template_data)
 
             for keyword_setting in keyword_settings:
+                if keyword_setting.hard_status == 4:  # фикс.фразы — не переводить в чёрный список
+                    continue
                 text = str(keyword_setting.text)
                 if not templator.is_relevant(text):
                     keyword_setting.hard_status = 0

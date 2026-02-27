@@ -714,10 +714,11 @@ class AdvSetting(BaseTable):
 
 class KeywordSetting(BaseTable):
     """hard_status
-    0 - black listA
+    0 - black list
     1 - in test
     2 - white list
-
+    3 - turn off
+    4 - фикс.фразы (всегда вкл, не отключаются, не зависят от белого списка)
     """
 
     text: Mapped[str] = mapped_column(String, nullable=False)
