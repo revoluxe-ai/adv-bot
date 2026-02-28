@@ -387,7 +387,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         elif self._hard_min_ctr is not None:
             text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
         else:
-            text += "Огран не заданы!"
+            text += "Огран не заданы!\n"
 
         text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
         text += "Посл.обнов:\n"
