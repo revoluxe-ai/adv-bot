@@ -105,7 +105,7 @@ class AutoAdvActiveControlService:
 
         unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
         # Настройки времени применяются только для этих РК (с включённым контролем)
-        time_settings_by_adv: dict[int, TimeSettingsDbState | None] = {}
+        time_settings_by_adv: dict[int, TimeSettingsDbState | None]
         async with get_session_maker(read_only=True) as session:
             time_settings_by_adv = await _time_settings_repo.load_for_adv_ids(
                 session, unique_adv_ids
