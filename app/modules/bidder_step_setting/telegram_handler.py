@@ -53,6 +53,6 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         )
         await session.execute(query)
         await session.commit()
-    await message.answer(f"Максимальный Шаг ставки для изменен на {new_step}")
+    await message.answer(f"Максимальный шаг ставки изменён на {new_step}")
     await state.set_state(None)
     return
