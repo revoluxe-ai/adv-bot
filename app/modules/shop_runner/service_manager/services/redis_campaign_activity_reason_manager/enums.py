@@ -25,6 +25,7 @@ class AutoReasonCode(StrEnum):
     AUTO_SPEND_EXCEEDED = "auto_spend_exceeded"
     COST_DATA_INSUFFICIENT = "cost_data_insufficient"
     COST_RULE_FAILED = "cost_rule_failed"
+    TIME_SCHEDULE = "time_schedule"
     BUDGET_OK_COST_OK = "budget_ok_cost_ok"
 
 
@@ -37,6 +38,7 @@ class AuctionReasonCode(StrEnum):
     SEARCH_SPEND_EXCEEDED = "search_spend_exceeded"
     SEARCH_LIMIT_OK = "search_limit_ok"
     SEARCH_LIMIT_0 = "search_limit_0"
+    TIME_SCHEDULE = "time_schedule"
 
 
 CampaignReasonCode = AutoReasonCode | AuctionReasonCode

@@ -209,6 +209,11 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.TIME_SCHEDULE,
+            )
             return None
 
         if adv.use_common_budget:
@@ -397,6 +402,11 @@ class AutoAdvActiveControlService:
                     adv.shop_id,
                 )
                 await self._wb_modifier.pause_auction_campaign(adv)
+            await self._set_search_reason(
+                adv_id,
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.TIME_SCHEDULE,
+            )
             return None
 
         if adv.use_common_budget:

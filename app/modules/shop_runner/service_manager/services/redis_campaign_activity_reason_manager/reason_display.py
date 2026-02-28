@@ -18,12 +18,14 @@ REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     AutoReasonCode.AUTO_SPEND_EXCEEDED.value: "Лимит Авто исчерпан",
     AutoReasonCode.COST_DATA_INSUFFICIENT.value: "Недостаточно данных по себестоимости",
     AutoReasonCode.COST_RULE_FAILED.value: "Правило по себестоимости не выполнено",
+    AutoReasonCode.TIME_SCHEDULE.value: "Вне расписания показов",
     AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюджет и себестоимость в норме, запущена",
     # Auction
     AuctionReasonCode.COMMON_OK.value: "Общий бюджет в норме, запущена",
     AuctionReasonCode.SEARCH_SPEND_EXCEEDED.value: "Лимит Аукциона исчерпан",
     AuctionReasonCode.SEARCH_LIMIT_OK.value: "Лимит Аукциона в норме, запущена",
     AuctionReasonCode.SEARCH_LIMIT_0.value: "Лимит Аукциона не задан",
+    AuctionReasonCode.TIME_SCHEDULE.value: "Вне расписания показов",
 }
 
 
