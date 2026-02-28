@@ -169,9 +169,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         image = images[0]
         self.image = image
 
-        last_update_keyword_stat: datetime | None = (
-            await self._get_last_update_keyword_stat(self.adv.adv_id)
-        )
+        # last_update_keyword_stat: datetime | None = (
+        #     await self._get_last_update_keyword_stat(self.adv.adv_id)
+        # ) TODO: Разобраться что за данные, почему не используются
         last_update_common_stat: datetime | None = (
             await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
         )
