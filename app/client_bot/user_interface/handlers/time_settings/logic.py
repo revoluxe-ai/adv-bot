@@ -175,9 +175,10 @@ def shift_date(base: date, delta_days: int) -> date:
 def set_date_value(state: TimeSettingsState, mode: str, value: date) -> None:
     if mode == "start":
         state.date_start = value
-    if mode == "end":
+        state.date_enabled = True
+    elif mode == "end":
         state.date_end = value
-    state.date_enabled = True
+        state.date_enabled = True
 
 
 def clear_date_value(state: TimeSettingsState, mode: str) -> None:
