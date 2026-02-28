@@ -507,7 +507,6 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        calculated_keyword = self.calculated_keyword
         keyword_text = self._keyword_setting.text
         keyword_text = re.sub(r"([_*[\]()~>`#+\-=|{}.!])", r"\\\1", keyword_text)  # type: ignore
         nmids = list(self._adv_setting.nmids)
