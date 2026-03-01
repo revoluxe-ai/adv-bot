@@ -1,4 +1,5 @@
 import datetime
+import math
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -386,9 +387,12 @@ def get_keywords_setting_keyboard(
         cpm = int(keyword.cpm + 0.5)  # плата за показы
         text += f"({cpm})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
-        conv_views_to_orders = str((round(keyword.conv_views_to_orders*1000, 2))) \
-                                if keyword.conv_views_to_orders != float('inf') else 'Б'
-        pay_for_order = str((round(keyword.pay_for_order, 2)))
+        conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
+        pay_for_order = (
+            str(round(keyword.pay_for_order, 2))
+            if not math.isinf(keyword.pay_for_order)
+            else "Б"
+        )
         text += f"({conv_views_to_orders})({round(keyword.orders_per_1000_rub, 2)})({pay_for_order})"
 
         keyword_setting_original_id = keyword.keyword_setting_original_id
