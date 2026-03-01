@@ -109,4 +109,6 @@ class AdvStrategySelector:
             for keyword in keywords
             if keyword.above_rec_conversion is True and keyword.hard_status not in {0, 3}
         ]
+        # При пустом candidates all() даёт True намеренно: включать нечего, дальше двигать
+        # товар можно только за счёт повышения конверсии → выбираем MAX_CONV.
         return all(keyword.status == KeywordStatus.GOOD for keyword in candidates)
