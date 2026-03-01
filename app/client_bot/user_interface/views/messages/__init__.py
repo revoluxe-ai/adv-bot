@@ -30,6 +30,7 @@ from .messages import (
     KeywordTargetPlaceUpdated,
     FilterByQuery,
     ManualCPMSetting,
+    StrategyMenuMessage
 
 )
 
@@ -65,4 +66,5 @@ __all__ = [
     "KeywordTargetPlacePrompt",
     "KeywordTargetPlaceUpdated",
     "ManualCPMSetting",
+    "StrategyMenuMessage"
 ]
