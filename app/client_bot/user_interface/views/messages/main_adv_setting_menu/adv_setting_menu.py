@@ -388,7 +388,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             text += "Огран не заданы!\n"
 
-        text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
         text += "Посл.обнов:\n"
 
         text += (
