@@ -8,6 +8,7 @@ import pytest
 from app.modules.common_slaves.wildberries.models.enums.target_position_mode import (
     TargetPositionMode,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.predict_keywords_target_place.clickhouse_manager import ClickHouseManager
 from app.modules.predict_keywords_target_place.predict_keywords_target_place import (
     PredictKeywordsTargetPlace,
@@ -17,12 +18,17 @@ from app.utils.ch_semaphore import anti_ch_crash_semaphore
 TEST_NMID = 999001
 
 
-def _make_adv_mock(nmid: int = TEST_NMID, min_bid: int = 50):
+def _make_adv_mock(
+    nmid: int = TEST_NMID,
+    min_bid: int = 50,
+    strategy: Strategy = Strategy.MIN_CPO,
+):
     """Минимальный mock adv для get_keywords_target_position(adv, positions_size)."""
     adv = MagicMock()
     adv.main_nmid = nmid
     adv.search_adv_min_bids = {nmid: min_bid}
     adv.target_position_mode = TargetPositionMode.MIN_CPA
+    adv.strategy = strategy
     return adv
 
 

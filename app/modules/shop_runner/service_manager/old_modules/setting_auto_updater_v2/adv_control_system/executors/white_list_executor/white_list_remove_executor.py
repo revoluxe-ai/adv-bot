@@ -116,9 +116,9 @@ class WhiteListRemoveExecutor(BaseExecutor):
 
             # Логирование для каждого удаляемого ключа
             for kw in keywords_to_remove:
-                if kw.rating_by_orders <= 0:
+                if kw.orders_per_1000_rub <= 0:
                     logger.info(
-                        "[adv_id=%s] WhiteListRemove: удаляем '%s' (rating_by_orders=0, нет заказов)",
+                        "[adv_id=%s] WhiteListRemove: удаляем '%s' (orders_per_1000_rub=0, нет заказов)",
                         adv_id,
                         kw.text,
                     )
@@ -127,7 +127,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
                         "[adv_id=%s] WhiteListRemove: удаляем '%s' (pay_for_order=%.2f > target=%.2f)",
                         adv_id,
                         kw.text,
-                        kw.pay_for_order_by_current_cpm,
+                        kw.pay_for_order,
                         target_pay_for_order,
                     )
         else:
@@ -188,14 +188,14 @@ class WhiteListRemoveExecutor(BaseExecutor):
         keywords_to_remove: list[CalculatedKeyword] = []
 
         for kw in white_keywords:
-            # Ключи без заказов (rating_by_orders <= 0) удаляем в первую очередь
-            if kw.rating_by_orders <= 0:
+            # Ключи без заказов (orders_per_1000_rub <= 0) удаляем в первую очередь
+            if kw.orders_per_1000_rub <= 0:
                 keywords_to_remove.append(kw)
                 continue
 
             # Для ключей с заказами проверяем pay_for_order
 
-            pay_for_order = kw.pay_for_order_by_current_cpm
+            pay_for_order = kw.pay_for_order
             if pay_for_order > target_pay_for_order:
                 keywords_to_remove.append(kw)
 
@@ -234,8 +234,8 @@ class WhiteListRemoveExecutor(BaseExecutor):
         if not white_keywords:
             return []
 
-        # Находим лучший ключ по rating_by_orders
-        best_keyword = max(white_keywords, key=lambda kw: kw.rating_by_orders or 0)
+        # Находим лучший ключ по рейтингу (стратегия: конверсия или заказы на 1000₽)
+        best_keyword = max(white_keywords, key=lambda kw: kw.rating or 0)
 
         # Удаляем все кроме лучшего
         keywords_to_remove = [kw for kw in white_keywords if kw != best_keyword]

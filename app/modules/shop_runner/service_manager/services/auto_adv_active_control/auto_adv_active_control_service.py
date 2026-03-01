@@ -216,6 +216,16 @@ class AutoAdvActiveControlService:
             )
             return None
 
+        if not adv.rec_system_promotion_mode_active:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign (rec_system mode off) adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+            )
+                await self._wb_modifier.pause_auto_campaign(adv)
+
+            return None
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
             spend_auto = await self._get_spend_for_adv(

@@ -35,6 +35,7 @@ def _make_minimal_common_advs_stat_data(adv_setting: object) -> CommonAdvsStatDa
         adv_setting=adv_setting,
         keywords=[],
         min_rating_by_orders=None,
+        min_orders_per_1000_rub=None,
         hard_min_ctr=None,
         auto_cpm=0,
         auction_cpm=None,

@@ -31,6 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
 from .bidder_mode import BidderMode
+from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.settings import settings
@@ -630,6 +631,14 @@ class AdvSetting(BaseTable):
                                                                      nullable=True,
                                                                      default=TargetPositionMode.MIN_CPA,
                                                                      server_default=TargetPositionMode.MIN_CPA.name)
+
+    strategy: Mapped[Strategy] = mapped_column(SAEnum(Strategy),
+                                               nullable=True,
+                                               default=Strategy.MIN_CPO,
+                                               server_default=Strategy.MIN_CPO.name)
+    auto_update_strategy: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=True, server_default=text("true")
+    )
 
     __table_args__ = (
         # Составной индекс для основного запроса

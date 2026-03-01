@@ -412,7 +412,7 @@ def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | N
     if not keywords:
         return None
     best_keyword = sorted(
-        keywords, key=lambda x: x.rating_by_orders, reverse=True
+        keywords, key=lambda x: x.rating or 0, reverse=True
     )[0]
 
     return best_keyword

@@ -145,6 +145,8 @@ common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defi
 common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
+# TODO(legacy-remove): модуль содержит legacy callbacks.StrategySetting;
+# удалить legacy-ветку после стабилизации нового экрана StrategyMenu.
 common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene

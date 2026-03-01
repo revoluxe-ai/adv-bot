@@ -87,27 +87,6 @@ def get_adv_setting_keyboard(
             callback_data=indiv_place_callback,
         )
     )
-
-    current_target_pos_mode = getattr(
-        adv_setting, "target_position_mode", None
-    ) or TargetPositionMode.MIN_CPA
-    if current_target_pos_mode == TargetPositionMode.MIN_CPA:
-        target_pos_text = "Перек. на Цель. Поз. По Макс. Конв"
-        new_target_pos_mode = TargetPositionMode.MAX_CART_TO_VIEWS_CONV.value
-    else:
-        target_pos_text = "Перек. на Цель. Поз. По Мин. CPA"
-        new_target_pos_mode = TargetPositionMode.MIN_CPA.value
-    target_pos_callback = TargetPositionModeToggle(
-        new_mode=new_target_pos_mode,
-        adv_setting_original_id=adv_setting.id,
-    ).pack()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text=target_pos_text,
-            callback_data=target_pos_callback,
-        )
-    )
-
     white_list_button = InlineKeyboardButton(
         text="Режимы Управления Белым Списком",
         callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
@@ -159,6 +138,15 @@ def get_adv_setting_keyboard(
         InlineKeyboardButton(
             text="⏰ Ограничения показов по времени",
             callback_data=TS(a="open", adv=adv_setting.id).pack(),
+        )
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Стратегия РК",
+            callback_data=callbacks.StrategyMenu(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+            ).pack(),
         )
     )
 

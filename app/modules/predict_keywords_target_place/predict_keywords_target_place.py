@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from .clickhouse_manager import ClickHouseManager
 from .clickhouse_manager.dto import ConvCartToViewsOnPosition
 from .clickhouse_manager.dto.bid_position import BidPosition
-from ..common_slaves.wildberries.models.enums.target_position_mode import TargetPositionMode
+from ..common_slaves.wildberries.models.enums.strategy import Strategy
 from ...settings import settings
 import logging
 
@@ -44,18 +44,18 @@ class PredictKeywordsTargetPlace:
         convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = \
             await self._clickhouse_manager.get_conv_cart_to_views(nmid=nmid,
                                                                   positions_size=positions_size)
-        target_position_mode = adv.target_position_mode
+        strategy = adv.strategy
         target_positions = self._get_target_positions(
                                           convs_carts_to_views,
                                           bids_for_positions,
-                                          target_position_mode
+                                          strategy
                                           )
         return target_positions
 
     def _get_target_positions(self,
                                     convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]],
                                     bids_for_positions: dict[str, list[BidPosition]],
-                                    target_position_mode: TargetPositionMode
+                                    strategy: Strategy
                               ) -> dict[str, int]:
 
         bids_for_positions: dict[str, list[BidPosition]] = self._fill_positions_from_conv(bids_for_positions,
@@ -66,12 +66,12 @@ class PredictKeywordsTargetPlace:
                 logger.error('Пустой список позиций для прогноза целевой позиции')
                 result_target_positions[keyword] = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
                 continue
-            if target_position_mode == TargetPositionMode.MIN_CPA:
+            if strategy == Strategy.MIN_CPO:
                 best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
-            elif target_position_mode == TargetPositionMode.MAX_CART_TO_VIEWS_CONV:
+            elif strategy == Strategy.MAX_CONV:
                 best_position: BidPosition = max(positions, key=lambda p: p.conv_carts_to_views)
             else:
-                raise NotImplementedError('Неизвестный мод целевой позиции')
+                raise NotImplementedError(f'Неизвестная стратегия выбора целевой позиции: {strategy}')
             result_target_positions[keyword] = max(1, best_position.position)
         return result_target_positions
 

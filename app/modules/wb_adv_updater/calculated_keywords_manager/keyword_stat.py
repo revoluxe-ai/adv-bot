@@ -1,9 +1,22 @@
+"""Сырые метрики кластера из запроса (get_clusters_stats.sql).
+
+CPM приходит из того же запроса (last_cpm из mv_clusters_last_state) и передаётся
+в каскад как шаг «stats»: set_bid → bid_log → stats. Без него рейтинг ключей
+и orders_per_1000_rub не считаются (каскад даёт 0), ломаются whitelist и тесты.
+orders_per_1000_rub считается выше по стеку в PreCalculatedKeyword/CalculatedKeyword.
+"""
 from datetime import datetime
 
 from pydantic import BaseModel, Field
 
 
 class KeywordStat(BaseModel):
+    """Статистика по ключу из ClickHouse: показы, клики, spend, conv_views_to_orders, cpm.
+
+    cpm — последний CPM по ключу из CH; используется как третий шаг каскада CPM
+    (шаг «stats») для расчёта рейтинга и orders_per_1000_rub.
+    """
+
     text: str = Field(alias="norm_query")
     position: float = Field(alias="position")
     timestamp: datetime = Field(alias="timestamp")
@@ -16,13 +29,13 @@ class KeywordStat(BaseModel):
     base_cart_to_order_conv: float = Field(alias="base_cart_to_order_conv")
     expected_orders_from_cart: float = Field(alias="expected_orders_from_cart")
     expected_orders: float = Field(alias="expected_orders")
-    final_rating: float = Field(alias="final_rating")
-    conversion_without_cpm: float = Field(alias="conversion_without_cpm")
+    conv_views_to_orders: float = Field(alias="conversion_without_cpm")
     total_views: int = Field(alias="views_all_time")
     total_orders: int = Field(alias="orders_all_time")
 
     model_config = {
-        "populate_by_name": True, # позволяет загружать данные как по имени, так и по алиасу
+        "populate_by_name": True,
+        "extra": "ignore",
     }
 
     @property

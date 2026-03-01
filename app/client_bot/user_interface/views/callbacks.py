@@ -260,9 +260,17 @@ class ResetAddedClicks(CallbackData, prefix="reset_added_clicks"):
     adv_setting_original_id: int
 
 
+# TODO(legacy-remove): legacy callback связан с target_ctr_mode, оставить
+# до полного выпиливания старого интерфейса strategy_setting.
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int
+
+
+class StrategyMenu(CallbackData, prefix="strategy_menu"):
+    action: str
+    adv_setting_original_id: int
+    strategy: str | None = None
 
 
 class ResetWhiteList(CallbackData, prefix="reset_white_list"):
