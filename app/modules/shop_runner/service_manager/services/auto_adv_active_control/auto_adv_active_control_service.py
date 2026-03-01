@@ -222,9 +222,13 @@ class AutoAdvActiveControlService:
                     "Auto budget watcher: pausing auto campaign (rec_system mode off) adv_id=%s shop_id=%s",
                     auto_adv_id,
                     adv.shop_id,
-            )
+                )
                 await self._wb_modifier.pause_auto_campaign(adv)
-
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.REC_SYSTEM_MODE_OFF,
+            )
             return None
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
