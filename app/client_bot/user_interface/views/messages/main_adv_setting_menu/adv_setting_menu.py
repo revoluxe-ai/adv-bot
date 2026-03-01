@@ -27,7 +27,6 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_update_state_manager import (
@@ -276,12 +275,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def text(self) -> str:
         # Determine predict CTR mode display text
-        predict_ctr_mode = self.adv.predict_ctr_mode or PredictCTRMode.V1
-        if predict_ctr_mode == PredictCTRMode.V1:
-            predict_ctr_mode_text = "v1 (по ID кампании)"
-        else:
-            # TODO: Добавить отображение фото в ключах
-            predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
 
