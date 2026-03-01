@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence, Iterable, Any
+from typing import Sequence, Iterable
 
 from redis.client import Pipeline
 
@@ -18,7 +18,7 @@ class RedisCommonBidValueManager(BaseRedisManager):
         if not bids:
             return None
         ttl = self._resolve_ttl()
-        pipeline: Pipeline[Any]
+        pipeline: Pipeline
         async with self._client.write_pipeline() as pipeline:  # type: ignore[reportUnknownMemberType]
             for nmid, bid in bids.items():
                 key = self._get_key(adv_id, nmid)
