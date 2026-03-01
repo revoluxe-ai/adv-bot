@@ -74,7 +74,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
                         "(conversion=%.6f < rec_conversion, above_rec_conversion=False)",
                         adv_id,
                         kw.text,
-                        kw.conversion_without_cpm,
+                        kw.rating
                     )
 
                 # Массовое удаление из белого списка
