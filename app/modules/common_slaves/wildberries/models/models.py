@@ -425,7 +425,7 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
-    hard_min_ctr: Mapped[float | None] = mapped_column(
+    hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется
         Float,
         nullable=True,
         default=settings.DEFAULT_MIN_CTR,
