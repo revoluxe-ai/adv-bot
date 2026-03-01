@@ -149,7 +149,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
              self._status_auction = status_auction
         else:
             self._status_auction = "Не установлен"
-        self._hard_min_ctr = self.adv.hard_min_ctr
         keywords = await utils.get_keywords_for_keyboard(self.adv)
         self._min_rating: float | None = phrases_processor.get_min_rating(keywords)
         self._min_orders_per_1000_rub: float | None = (
