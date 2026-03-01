@@ -286,6 +286,7 @@ class CalculatedKeywordFactory(factory.Factory):
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     state = factory.SubFactory(KeywordStateFactory)
     target_pay_for_order = factory.LazyFunction(lambda: fake.random_int(100, 1000))
+    rating = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2))
 
     @factory.lazy_attribute
     def _sync_text(self):
