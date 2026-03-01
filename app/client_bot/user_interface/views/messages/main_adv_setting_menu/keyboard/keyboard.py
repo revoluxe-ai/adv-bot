@@ -13,7 +13,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeCommonBidInSearchAdvStatus,
     IndividualKeywordsTargetPlaceToggle,
-    TargetPositionModeToggle,
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -21,7 +20,6 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums import (
     OrdersSourceForAutoMode,
-    TargetPositionMode,
 )
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import (
