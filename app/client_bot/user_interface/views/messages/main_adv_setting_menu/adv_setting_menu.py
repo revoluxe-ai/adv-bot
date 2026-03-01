@@ -383,8 +383,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_orders_per_1000_rub is not None:
             text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
-        elif self._hard_min_ctr is not None:
-            text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
         else:
             text += "Огран не заданы!\n"
 
