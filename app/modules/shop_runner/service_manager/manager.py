@@ -885,7 +885,6 @@ class CoroutinesManager:
                     "Ошибка вычисления target strategy, shop_id=%s: %s",
                     self.shop_id,
                     result,
-                    exc_info=True,
                 )
                 continue
             adv, selection = result
