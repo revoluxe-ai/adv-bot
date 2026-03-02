@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _show_strategy_menu(bot: Bot, chat_id: int, adv_setting_original_id: int) -> None:
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         adv_setting = await session.get(AdvSetting, adv_setting_original_id)
         if adv_setting is None:
             await bot.send_message(chat_id, "РК не найдена.")
