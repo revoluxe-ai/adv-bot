@@ -57,7 +57,7 @@ def get_adv_setting_keyboard(
     _ = builder.row(sales_plan_button.get(adv_setting))
 
     button = InlineKeyboardButton(
-        text="Изменение ранжирования",
+        text="Анализ Изменения Ранжирования",
         callback_data=callbacks.RaiseCardAnalyze(
             adv_setting_original_id=adv_setting.id,
             action="menu",
