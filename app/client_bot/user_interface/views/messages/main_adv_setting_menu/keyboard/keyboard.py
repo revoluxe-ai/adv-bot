@@ -56,6 +56,24 @@ def get_adv_setting_keyboard(
     from .buttoms import sales_plan_button
     _ = builder.row(sales_plan_button.get(adv_setting))
 
+    button = InlineKeyboardButton(
+        text="Изменение ранжирования",
+        callback_data=callbacks.RaiseCardAnalyze(
+            adv_setting_original_id=adv_setting.id,
+            action="menu",
+        ).pack(),
+    )
+    _ = builder.row(button)
+
+    button = InlineKeyboardButton(
+        text="Задать/Изменить максимальную стоимость клика",
+        callback_data=callbacks.ChangeMaxCPC(
+            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
+        ).pack(),
+    )
+
+    _ = builder.row(button)
+
 
     _ = builder.row(
         InlineKeyboardButton(
@@ -379,23 +397,7 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-    button = InlineKeyboardButton(
-        text="Анализ раскрутки",
-        callback_data=callbacks.RaiseCardAnalyze(
-            adv_setting_original_id=adv_setting.id,
-            action="menu",
-        ).pack(),
-    )
-    _ = builder.row(button)
 
-    button = InlineKeyboardButton(
-        text="Задать/Изменить максимальную стоимость клика",
-        callback_data=callbacks.ChangeMaxCPC(
-            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Изменить мин. кол-во просмотров для ИИ-прогноза CTR",
