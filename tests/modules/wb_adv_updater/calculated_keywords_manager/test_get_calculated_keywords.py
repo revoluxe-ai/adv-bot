@@ -1,7 +1,7 @@
 """Тесты для метода CalculatedKeywordsManager.__get_calculated_keywords.
 
 Метод имеет два основных алгоритма:
-1. Без белого списка: лучший по rating_by_orders -> GOOD (BEST_KEYWORD), остальные -> BAD (LESS_THEN_RATING_BY_ORDERS)
+1. Без белого списка: все ключевые слова -> BAD (LESS_THEN_RATING_BY_ORDERS), best_keyword_status=False
 2. С белым списком: фильтрация по rating_by_orders и hard_status (при white_list_mode=ABOVE_MIN_RATING)
 
 Это unit-тесты, не требующие базы данных.
@@ -37,6 +37,7 @@ def complex_adv_mock():
     mock = MagicMock()
     mock.hard_min_ctr = None
     mock.rec_system_promotion_mode_active = False
+    mock.auto_add_only_relevant_phrase = False
     return mock
 
 
@@ -57,15 +58,14 @@ def complex_adv_with_hard_min_ctr():
 
 
 # ============================================================================
-# Тесты без белого списка (best по rating_by_orders -> 1 GOOD, остальные BAD)
+# Тесты без белого списка (все -> BAD, best_keyword_status=False)
 # ============================================================================
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_all_keywords_pass_ctr(complex_adv_with_hard_min_ctr):
-    """Без белого списка: лучший по rating_by_orders -> GOOD (BEST_KEYWORD), остальные BAD."""
+    """Без белого списка: все ключевые слова -> BAD (LESS_THEN_RATING_BY_ORDERS)."""
     adv_id = 12345
-    # final_rating 50, 51, 52 -> лучший keyword_2 (52)
     pre_keywords = [
         PreCalculatedKeywordFactory(
             adv_id=adv_id,
@@ -86,18 +86,54 @@ async def test_no_whitelist_all_keywords_pass_ctr(complex_adv_with_hard_min_ctr)
 
     assert len(result) == 3
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["keyword_2"].status == KeywordStatus.GOOD
-    assert result_by_text["keyword_2"].reason == KeywordStatusReason.BEST_KEYWORD
-    assert result_by_text["keyword_2"].best_keyword_status is True
-    for i in (0, 1):
+    for i in (0, 1, 2):
         assert result_by_text[f"keyword_{i}"].status == KeywordStatus.BAD
         assert result_by_text[f"keyword_{i}"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
         assert result_by_text[f"keyword_{i}"].best_keyword_status is False
 
 
 @pytest.mark.asyncio
+async def test_no_whitelist_always_on_gets_good(complex_adv_with_hard_min_ctr):
+    """Без белого списка: ключ с hard_status=4 (фикс.фразы) -> GOOD, ALWAYS_ON."""
+    adv_id = 12345
+    pre_keywords = [
+        PreCalculatedKeywordFactory(
+            adv_id=adv_id,
+            keyword_setting__hard_status=HardStatus.ALWAYS_ON,
+            keyword_setting__text="fixed_phrase",
+            cluster_stat__views=500,
+            cluster_stat__clicks=10,
+            cluster_stat__final_rating=30.0,
+            cluster_stat__norm_query="fixed_phrase",
+            bidder_keyword_status=BidderKeywordStatus.GOOD,
+        ),
+        PreCalculatedKeywordFactory(
+            adv_id=adv_id,
+            keyword_setting__hard_status=HardStatus.IN_TEST,
+            keyword_setting__text="in_test_phrase",
+            cluster_stat__views=500,
+            cluster_stat__clicks=10,
+            cluster_stat__final_rating=20.0,
+            cluster_stat__norm_query="in_test_phrase",
+            bidder_keyword_status=BidderKeywordStatus.GOOD,
+        ),
+    ]
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_with_hard_min_ctr, pre_keywords
+    )
+
+    assert len(result) == 2
+    result_by_text = {kw.text: kw for kw in result}
+    assert result_by_text["fixed_phrase"].status == KeywordStatus.GOOD
+    assert result_by_text["fixed_phrase"].reason == KeywordStatusReason.ALWAYS_ON
+    assert result_by_text["in_test_phrase"].status == KeywordStatus.BAD
+    assert result_by_text["in_test_phrase"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+
+
+@pytest.mark.asyncio
 async def test_no_whitelist_some_keywords_fail_ctr(complex_adv_with_hard_min_ctr):
-    """Без белого списка: лучший по rating -> GOOD (BEST_KEYWORD), остальные BAD."""
+    """Без белого списка: оба ключевых слова -> BAD."""
     adv_id = 12345
     good_kw = PreCalculatedKeywordFactory(
         adv_id=adv_id,
@@ -126,9 +162,9 @@ async def test_no_whitelist_some_keywords_fail_ctr(complex_adv_with_hard_min_ctr
 
     assert len(result) == 2
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["good_keyword"].status == KeywordStatus.GOOD
-    assert result_by_text["good_keyword"].reason == KeywordStatusReason.BEST_KEYWORD
-    assert result_by_text["good_keyword"].best_keyword_status is True
+    assert result_by_text["good_keyword"].status == KeywordStatus.BAD
+    assert result_by_text["good_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+    assert result_by_text["good_keyword"].best_keyword_status is False
     assert result_by_text["bad_keyword"].status == KeywordStatus.BAD
     assert result_by_text["bad_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
     assert result_by_text["bad_keyword"].best_keyword_status is False
@@ -136,7 +172,7 @@ async def test_no_whitelist_some_keywords_fail_ctr(complex_adv_with_hard_min_ctr
 
 @pytest.mark.asyncio
 async def test_no_whitelist_two_keywords_best_by_rating(complex_adv_mock):
-    """Без белого списка: два слова — лучший по rating_by_orders -> GOOD, второй BAD."""
+    """Без белого списка: оба слова -> BAD."""
     adv_id = 12345
     good_kw = PreCalculatedKeywordFactory(
         adv_id=adv_id,
@@ -164,15 +200,15 @@ async def test_no_whitelist_two_keywords_best_by_rating(complex_adv_mock):
 
     assert len(result) == 2
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["good_keyword"].status == KeywordStatus.GOOD
-    assert result_by_text["good_keyword"].reason == KeywordStatusReason.BEST_KEYWORD
+    assert result_by_text["good_keyword"].status == KeywordStatus.BAD
+    assert result_by_text["good_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
     assert result_by_text["bad_keyword"].status == KeywordStatus.BAD
     assert result_by_text["bad_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_best_keyword_by_rating(complex_adv_with_hard_min_ctr):
-    """Без белого списка: best_keyword определяется по максимальному rating_by_orders (final_rating)."""
+    """Без белого списка: оба ключевых слова -> BAD, best_keyword_status=False."""
     adv_id = 12345
     best_kw = PreCalculatedKeywordFactory(
         adv_id=adv_id,
@@ -189,7 +225,7 @@ async def test_no_whitelist_best_keyword_by_rating(complex_adv_with_hard_min_ctr
         keyword_setting__text="normal_keyword",
         cluster_stat__views=1000,
         cluster_stat__clicks=100,
-        cluster_stat__final_rating=60.0,  # выше -> best по rating
+        cluster_stat__final_rating=60.0,
         cluster_stat__norm_query="normal_keyword",
     )
     pre_keywords = [best_kw, normal_kw]
@@ -199,8 +235,8 @@ async def test_no_whitelist_best_keyword_by_rating(complex_adv_with_hard_min_ctr
     )
 
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["normal_keyword"].best_keyword_status is True
-    assert result_by_text["normal_keyword"].status == KeywordStatus.GOOD
+    assert result_by_text["normal_keyword"].best_keyword_status is False
+    assert result_by_text["normal_keyword"].status == KeywordStatus.BAD
     assert result_by_text["best_keyword"].best_keyword_status is False
     assert result_by_text["best_keyword"].status == KeywordStatus.BAD
 
@@ -212,7 +248,7 @@ async def test_no_whitelist_best_keyword_by_rating(complex_adv_with_hard_min_ctr
 
 @pytest.mark.asyncio
 async def test_no_whitelist_single_keyword(complex_adv_with_hard_min_ctr):
-    """Без БС, 1 ключевое слово -> GOOD (BEST_KEYWORD), best_keyword_status=True."""
+    """Без БС, 1 ключевое слово -> BAD (LESS_THEN_RATING_BY_ORDERS)."""
     adv_id = 12345
     single_kw = PreCalculatedKeywordFactory(
         adv_id=adv_id,
@@ -229,14 +265,14 @@ async def test_no_whitelist_single_keyword(complex_adv_with_hard_min_ctr):
     )
 
     assert len(result) == 1
-    assert result[0].status == KeywordStatus.GOOD
-    assert result[0].reason == KeywordStatusReason.BEST_KEYWORD
-    assert result[0].best_keyword_status is True
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+    assert result[0].best_keyword_status is False
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_ten_keywords_mixed_ctr(complex_adv_with_hard_min_ctr):
-    """Без БС, 10 слов: best по rating_by_orders (final_rating=50+i -> keyword_9) -> 1 GOOD, 9 BAD."""
+    """Без БС, 10 слов: все -> BAD."""
     adv_id = 12345
     keywords = [
         PreCalculatedKeywordFactory(
@@ -257,10 +293,7 @@ async def test_no_whitelist_ten_keywords_mixed_ctr(complex_adv_with_hard_min_ctr
 
     assert len(result) == 10
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["keyword_9"].status == KeywordStatus.GOOD
-    assert result_by_text["keyword_9"].reason == KeywordStatusReason.BEST_KEYWORD
-    assert result_by_text["keyword_9"].best_keyword_status is True
-    for i in range(9):
+    for i in range(10):
         assert result_by_text[f"keyword_{i}"].status == KeywordStatus.BAD
         assert result_by_text[f"keyword_{i}"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
         assert result_by_text[f"keyword_{i}"].best_keyword_status is False
@@ -268,7 +301,7 @@ async def test_no_whitelist_ten_keywords_mixed_ctr(complex_adv_with_hard_min_ctr
 
 @pytest.mark.asyncio
 async def test_no_whitelist_twenty_keywords_all_good(complex_adv_with_hard_min_ctr):
-    """Без БС, 20 слов с одинаковым rating: 1 GOOD (первый по max), 19 BAD."""
+    """Без БС, 20 слов: все -> BAD."""
     adv_id = 12345
     keywords = [
         PreCalculatedKeywordFactory(
@@ -288,19 +321,18 @@ async def test_no_whitelist_twenty_keywords_all_good(complex_adv_with_hard_min_c
     )
 
     assert len(result) == 20
-    result_by_text = {kw.text: kw for kw in result}
     good_count = sum(1 for kw in result if kw.status == KeywordStatus.GOOD)
     bad_count = sum(1 for kw in result if kw.status == KeywordStatus.BAD)
-    assert good_count == 1
-    assert bad_count == 19
-    best = next(kw for kw in result if kw.best_keyword_status is True)
-    assert best.status == KeywordStatus.GOOD
-    assert best.reason == KeywordStatusReason.BEST_KEYWORD
+    assert good_count == 0
+    assert bad_count == 20
+    for kw in result:
+        assert kw.best_keyword_status is False
+        assert kw.reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_twenty_keywords_all_bad(complex_adv_with_hard_min_ctr):
-    """Без БС, 20 слов с одинаковым rating: 1 GOOD (best), 19 BAD."""
+    """Без БС, 20 слов: все -> BAD."""
     adv_id = 12345
     keywords = [
         PreCalculatedKeywordFactory(
@@ -322,18 +354,16 @@ async def test_no_whitelist_twenty_keywords_all_bad(complex_adv_with_hard_min_ct
     assert len(result) == 20
     good_count = sum(1 for kw in result if kw.status == KeywordStatus.GOOD)
     bad_count = sum(1 for kw in result if kw.status == KeywordStatus.BAD)
-    assert good_count == 1
-    assert bad_count == 19
+    assert good_count == 0
+    assert bad_count == 20
     for kw in result:
-        if kw.status == KeywordStatus.BAD:
-            assert kw.reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
-    best = next(kw for kw in result if kw.best_keyword_status is True)
-    assert best.status == KeywordStatus.GOOD
+        assert kw.reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+        assert kw.best_keyword_status is False
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_fifty_keywords(complex_adv_with_hard_min_ctr):
-    """Без БС, 50 слов с одинаковым rating: 1 GOOD, 49 BAD; best по rating (первый при равенстве)."""
+    """Без БС, 50 слов: все -> BAD."""
     adv_id = 12345
     keywords = [
         PreCalculatedKeywordFactory(
@@ -355,16 +385,16 @@ async def test_no_whitelist_fifty_keywords(complex_adv_with_hard_min_ctr):
     assert len(result) == 50
     good_count = sum(1 for kw in result if kw.status == KeywordStatus.GOOD)
     bad_count = sum(1 for kw in result if kw.status == KeywordStatus.BAD)
-    assert good_count == 1
-    assert bad_count == 49
-    best = next(kw for kw in result if kw.best_keyword_status is True)
-    assert best.status == KeywordStatus.GOOD
-    assert best.reason == KeywordStatusReason.BEST_KEYWORD
+    assert good_count == 0
+    assert bad_count == 50
+    for kw in result:
+        assert kw.best_keyword_status is False
+        assert kw.reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
 
 
 @pytest.mark.asyncio
 async def test_no_whitelist_with_blacklist_keywords(complex_adv_with_hard_min_ctr):
-    """Без БС: все слова обрабатываются одинаково; best по rating -> GOOD, остальные BAD."""
+    """Без БС: оба слова -> BAD (нет ни одного в белом списке)."""
     adv_id = 12345
     blacklist_kw = PreCalculatedKeywordFactory(
         adv_id=adv_id,
@@ -391,9 +421,9 @@ async def test_no_whitelist_with_blacklist_keywords(complex_adv_with_hard_min_ct
 
     assert len(result) == 2
     result_by_text = {kw.text: kw for kw in result}
-    assert result_by_text["in_test_keyword"].status == KeywordStatus.GOOD
-    assert result_by_text["in_test_keyword"].reason == KeywordStatusReason.BEST_KEYWORD
-    assert result_by_text["in_test_keyword"].best_keyword_status is True
+    assert result_by_text["in_test_keyword"].status == KeywordStatus.BAD
+    assert result_by_text["in_test_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+    assert result_by_text["in_test_keyword"].best_keyword_status is False
     assert result_by_text["blacklist_keyword"].status == KeywordStatus.BAD
     assert result_by_text["blacklist_keyword"].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
     assert result_by_text["blacklist_keyword"].best_keyword_status is False

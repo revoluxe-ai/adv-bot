@@ -210,6 +210,10 @@ class AddWhitePhrases(CallbackData, prefix="add_white_phrases"):
     adv_setting_id: int
 
 
+class AddFixedPhrases(CallbackData, prefix="add_fixed_phrases"):
+    adv_setting_id: int
+
+
 class TurnParsing(CallbackData, prefix="turn_parsing"):
     action: str
     adv_original_id: int
@@ -389,6 +393,7 @@ class IndividualKeywordsTargetPlaceToggle(
 
 class ApplyCampaignDefaults(CallbackData, prefix="apply_adv_defaults"):
     adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
 
 
 class ChangeShopDefaultMaxCPM(CallbackData, prefix="change_shop_default_max_cpm"):

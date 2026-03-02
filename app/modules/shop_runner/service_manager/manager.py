@@ -60,6 +60,9 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
 from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
+from .services.redis_campaign_activity_reason_manager import (
+    RedisCampaignActivityReasonManager,
+)
 from .services.auto_reset_bid_service import AutoResetBidService
 from .services.clusters_adv_stat_updater.clusters_adv_stat_updater import (
     ClustersAdvStatUpdater,
@@ -118,6 +121,9 @@ class CoroutinesManager:
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()
         self._increment_fact_data_manager = IncrementFactDataManager(
             redis_client_wrapper,
+        )
+        self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
+            redis_client_wrapper
         )
 
     @staticmethod
@@ -242,7 +248,9 @@ class CoroutinesManager:
             return None
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
-        advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
+        # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
+        # в фильтре только проверку активности аукциона
+        advs = [adv for adv in advs if adv.search_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
@@ -673,7 +681,7 @@ class CoroutinesManager:
                     campaign_type,
             )
 
-    @while_coroutine_decorator(1 * 30, 60)
+    @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -684,6 +692,7 @@ class CoroutinesManager:
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
         )
         await service.ensure_campaigns_active(advs)
         return None

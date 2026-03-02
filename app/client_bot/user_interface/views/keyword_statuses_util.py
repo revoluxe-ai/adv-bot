@@ -11,8 +11,9 @@ def get_hard_status(keyword: CalculatedKeyword) -> str:
         return 'БС'
     if keyword.hard_status == 3:
         return 'O'
-    else:
-        raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
+    if keyword.hard_status == 4:
+        return 'ФФ'
+    raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
 
 
 def get_dynamic_status(keyword: CalculatedKeyword) -> str:
@@ -26,6 +27,8 @@ def get_dynamic_status(keyword: CalculatedKeyword) -> str:
     elif reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS:
         status = "(НР)"
     elif reason == KeywordStatusReason.WHITE_LIST:
+        status = ""
+    elif reason == KeywordStatusReason.ALWAYS_ON:
         status = ""
     elif reason == KeywordStatusReason.MAX_POSITION:
         status = "(ЦП)"

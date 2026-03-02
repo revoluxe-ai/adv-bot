@@ -26,7 +26,7 @@ async def change_cpm_step(
     await state.update_data(adv_original_id=adv_original_id)
     await state.set_state("waiting_for_new_step")
     message = callback.message
-    await message.answer(f"Введите новое значение шага ставки (до {MAX_STEP}):")
+    await message.answer(f"Введите новое значение макс. шага ставки (до {MAX_STEP}):")
 
 
 @router.message(StateFilter("waiting_for_new_step"))
@@ -53,6 +53,6 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         )
         await session.execute(query)
         await session.commit()
-    await message.answer(f"Шаг ставки для изменен на {new_step}")
+    await message.answer(f"Максимальный шаг ставки изменён на {new_step}")
     await state.set_state(None)
     return

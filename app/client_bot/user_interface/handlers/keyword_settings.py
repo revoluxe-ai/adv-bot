@@ -672,7 +672,7 @@ async def change_keyword_hard_status(
             adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
             if new_hard_status >= 0:
                 keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
-                if new_hard_status == 2:
+                if new_hard_status == 2 or new_hard_status == const.ALWAYS_ON:
                     keyword_setting.relevant = True  # type: ignore[attr-defined]
                 elif new_hard_status == 0:
                     keyword_setting.relevant = False  # type: ignore[attr-defined]

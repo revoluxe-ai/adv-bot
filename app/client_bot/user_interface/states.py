@@ -54,6 +54,10 @@ class AddWhitePhrases(StatesGroup):
     waiting_for_white_phrases = State()
 
 
+class AddFixedPhrases(StatesGroup):
+    waiting_for_fixed_phrases = State()
+
+
 class CPMSetting(StatesGroup):
     waiting_for_min_position = State()
     waiting_for_max_cpm = State()

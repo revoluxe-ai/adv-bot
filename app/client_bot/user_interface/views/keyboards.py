@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
-from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
+from app.client_bot.const import ALWAYS_ON, AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
     get_effective_keyword_target_place,
@@ -621,6 +621,31 @@ def get_keyword_setting_keyboard(
             )
         ]
         buttons.append(button)
+
+    if keyword.hard_status != ALWAYS_ON:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="Добавить в фикс.фразы (всегда вкл)",
+                    callback_data=callbacks.ChangeKeywordHardStatus(
+                        new_hard_status=ALWAYS_ON,
+                        keyword_setting_original_id=keyword_setting_original_id,
+                    ).pack(),
+                )
+            ]
+        )
+    else:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="Убрать из фикс.фраз",
+                    callback_data=callbacks.ChangeKeywordHardStatus(
+                        new_hard_status=AUTO_MODE,
+                        keyword_setting_original_id=keyword_setting_original_id,
+                    ).pack(),
+                )
+            ]
+        )
 
     if keyword.relevant:
         text = "Удалить из релевантных фраз"

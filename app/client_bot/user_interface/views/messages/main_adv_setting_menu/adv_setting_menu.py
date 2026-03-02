@@ -1,10 +1,10 @@
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
-from datetime import datetime
+from datetime import date as date_type
+from datetime import datetime, time, timedelta, timezone
 from operator import attrgetter
 from typing import TYPE_CHECKING
-from datetime import date as date_type
 from aiogram import Bot
 from aiogram.types import (
     Message,
@@ -38,9 +38,15 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
     RedisCommonBidTimestampManager,
 )
+from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+    CampaignActivityReason,
+    RedisCampaignActivityReasonManager,
+    reason_code_to_display_text,
+)
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
 )
@@ -51,6 +57,8 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+MSK_TZ = timezone(timedelta(hours=3))
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -81,8 +89,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
+        self._redis_campaign_activity_reason_manager = (
+            RedisCampaignActivityReasonManager(redis_client)
+        )
+        self._reason_auto = None
+        self._reason_search = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
+        self._spend_auto_today: float | None = None
+        self._spend_search_today: float | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -154,16 +169,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         image = images[0]
         self.image = image
 
-        last_update_keyword_stat: datetime | None = (
-            await self._get_last_update_keyword_stat(self.adv.adv_id)
-        )
-        if last_update_keyword_stat:
-            self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-        else:
-            self.last_update_keyword_stat_str = "Нет данных"
-
+        # last_update_keyword_stat: datetime | None = (
+        #     await self._get_last_update_keyword_stat(self.adv.adv_id)
+        # ) TODO: Разобраться что за данные, почему не используются
         last_update_common_stat: datetime | None = (
             await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
         )
@@ -222,6 +230,42 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._is_campaign_active_by_cost = cost_metrics.is_active
         self._plan_set = cost_metrics.plan_set
 
+        self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
+            self.adv.adv_id, "auto"
+        )
+        if self.adv.search_adv_id:
+            self._reason_search = await self._redis_campaign_activity_reason_manager.get(
+                self.adv.search_adv_id, "search"
+            )
+        else:
+            self._reason_search = None
+
+        if getattr(self.adv, "auto_budget_watchdog_enabled", False):
+            now_msk = datetime.now(MSK_TZ)
+            start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
+            end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
+            try:
+                self._spend_auto_today = await full_wb_adv_stat.get_spend_by_last_days(
+                    [self.adv.adv_id], start_of_day, end_of_day
+                )
+            except Exception:
+                logger.exception("Ошибка получения расхода Авто за день из ClickHouse")
+                self._spend_auto_today = None
+            if self.adv.search_adv_id:
+                try:
+                    self._spend_search_today = (
+                        await full_wb_adv_stat.get_spend_by_last_days(
+                            [self.adv.search_adv_id], start_of_day, end_of_day
+                        )
+                    )
+                except Exception:
+                    logger.exception(
+                        "Ошибка получения расхода Аукциона за день из ClickHouse"
+                    )
+                    self._spend_search_today = None
+            else:
+                self._spend_search_today = 0.0
+
         return await super().__call__()
 
     @property
@@ -235,6 +279,52 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
+
+        watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
+        if not watchdog_enabled:
+            text += "Авто-акт. РК: выкл\n"
+        else:
+            text += "Авто-акт. РК: включено\n"
+            use_common = getattr(self.adv, "use_common_budget", False)
+            if use_common:
+                limit = self.adv.common_budget_daily_limit or 0
+                spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
+                if self._spend_auto_today is None or self._spend_search_today is None:
+                    text += "Общий бюджет: потрачено: нет данных\n"
+                else:
+                    spend_rounded = int(round(spend))
+                    remaining = max(0, limit - spend_rounded)
+                    text += (
+                        f"Общий бюджет: потрачено {spend_rounded} р., "
+                        f"осталось {remaining} р. (лимит {limit} р./сут)\n"
+                    )
+            else:
+                auto_limit = self.adv.auto_budget_daily_limit or 0
+                spend_auto = self._spend_auto_today or 0
+                if self._spend_auto_today is None:
+                    text += "Авто: потр: нет данных\n"
+                else:
+                    spend_auto_rounded = int(round(spend_auto))
+                    remaining_auto = max(0, auto_limit - spend_auto_rounded)
+                    text += (
+                        f"Авто: потрачено {spend_auto_rounded} р., "
+                        f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
+                    )
+                if self.adv.search_adv_id:
+                    search_limit = self.adv.search_auto_budget_daily_limit or 0
+                    spend_search = self._spend_search_today or 0
+                    if self._spend_search_today is None:
+                        text += "Аук: потр: нет данных\n"
+                    else:
+                        spend_search_rounded = int(round(spend_search))
+                        remaining_search = max(0, search_limit - spend_search_rounded)
+                        text += (
+                            f"Аук: потр {spend_search_rounded} р., "
+                            f"ост {remaining_search} р. (лим {search_limit} р/с)\n"
+                        )
+                else:
+                    if self._spend_auto_today is not None:
+                        text += "\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
@@ -251,48 +341,73 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 else "Нет данных"
             )
 
-
             if self._target_cost is not None or self._avg_cost_additional is not None:
                 text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. системы (полки) не раскручиваются. "
-                    f"Рекомендуется макс.заказа >= {int(suggested)} р.\n"
+                    "⚠️ Рек. системы (полки) не раскр. "
+                    f"Рек. макс.заказа >= {int(suggested)} р.\n"
                 )
 
+        management_enabled = bool(
+            self.adv.bot_active
+            and getattr(self.adv, "auto_budget_watchdog_enabled", False)
+        )
+
+        def _status_suffix(reason: CampaignActivityReason | None) -> str:
+            if not management_enabled:
+                return " (управление отключено)"
+            if reason is None:
+                return " (Нет данных)"
+            label = reason_code_to_display_text(reason.reason_code.value)
+            dt = reason.updated_at
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            dt_msk = dt.astimezone(MSK_TZ)
+            ts = dt_msk.strftime("%d.%m.%Y %H:%M")
+            return f" ({label}, {ts})"
+
+        suffix_auto = _status_suffix(self._reason_auto)
+        if not self.adv.search_adv_id:
+            suffix_auction = " (не подключен)"
+        else:
+            suffix_auction = _status_suffix(self._reason_search)
+
         text += (
-            f"📢 Кампания: {self.adv.name}\n"
-            f"🆔 ID кампании: {self.adv.adv_id}\n"
-            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}\n"
-            f"📌 Статус Аукциона: {self._status_auction}\n")
+            f"📢 Камп: {self.adv.name}\n"
+            f"🆔 ID камп: {self.adv.adv_id}\n"
+            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
+            f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
+        )
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:
-            text += f"🎯 Мин. Рейтинг по заказам для кампании: {round(self._min_rating_by_orders * 1000, 2)}\n"
+            text += f"🎯 Мин. Рейтинг по зак.: {round(self._min_rating_by_orders * 1000, 2)}\n"
         elif self._hard_min_ctr is not None:
             text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
         else:
-            text += f"Ограничители не заданы!"
+            text += "Огран не заданы!\n"
+
+        text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
+        text += "Посл.обнов:\n"
 
         text += (
-            f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
-            f"Посл. обнов. обобщенной статистики Ключей: {self.last_update_keyword_stat_str}\n"
-            f"Посл. обнов. воронки: {self.last_update_common_stat_str}\n"
-            f"Посл. обнов. полной рек.стат.: {self.full_stat_update_time}\n"
-            f"Посл. обнов. минус-слов в авто: {self.keywords_status_last_update_auto_adv}\n"
-            f"Посл. обнов. минус-слов в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"Посл. обнов. ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
-            f"Посл. обнов. общей ставки аукциона: {self.last_common_bid_update_str}\n"
-            f"Посл. автом. добав. ключа в БС:"
+            f"воронки: {self.last_update_common_stat_str}\n"
+            f"рек.стат.: {self.full_stat_update_time}\n"
+            f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
+            f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
+            f"ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
+            f"общей ставки аук: {self.last_common_bid_update_str}\n"
+            f"добав ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
-            f"Посл. автом. удал. ключа из БС:"
+            f"удал. ключа из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"Посл. авт. повыш. цел. позиции:"
+            f"повыш. цел. позиции:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"Посл. авт. пониж. целевой позиции:"
+            f"пониж. целевой позиции:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"Посл. доб верхнего ключа в БС:"
+            f"доб верхнего ключа в БС:"
             f" {self._update_informer.update_top_key_str}\n"
         )
 
@@ -302,8 +417,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             days_stat: list[DayStats] = sorted(
                 adv_stat.days, key=attrgetter("date")
             )
-            stat_text = "Статистика по дням:\n"
-            stat_text += "Дата | Заказы | Себестоимость заказа\n"
+            stat_text = "Стат по дням:\n"
+            stat_text += "Дата | Зак | Себес заказа\n"
             stat_text += "--------------------------------\n"
 
             def reverse_date(date_: date_type) -> str:

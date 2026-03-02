@@ -490,12 +490,23 @@ class KeywordSettingMessage(TextWithKeyboard):
             return "Белый список"
         elif int_hard_status == 3:
             return "Отключен"
-        else:
-            raise ValueError(f"Неизвестный хард-статус ключа: {int_hard_status}")
+        elif int_hard_status == 4:
+            return "Фикс.фразы (всегда вкл)"
+        raise ValueError(f"Неизвестный хард-статус ключа: {int_hard_status}")
+
+    def _display_status_from_db_and_cache(self) -> KeywordStatus:
+        """Текущий статус для отображения: из БД (keyword_setting) для 0/3/4, иначе из кеша."""
+        hard = self._keyword_setting.hard_status
+        if hard == 4:
+            return KeywordStatus.GOOD
+        if hard == 3:
+            return KeywordStatus.BAD
+        if hard == 0:
+            return KeywordStatus.BAD
+        return self._calculated_keyword.status
 
     @property
     def text(self) -> str:
-        calculated_keyword = self.calculated_keyword
         keyword_text = self._keyword_setting.text
         keyword_text = re.sub(r"([_*[\]()~>`#+\-=|{}.!])", r"\\\1", keyword_text)  # type: ignore
         nmids = list(self._adv_setting.nmids)
@@ -507,10 +518,12 @@ class KeywordSettingMessage(TextWithKeyboard):
         target_place_value, target_place_source = format_target_place_display(
             value, source
         )
+        hard_status_for_display = self._keyword_setting.hard_status
+        display_status = self._display_status_from_db_and_cache()
         text = (
             f"📦 *Артикул:* {nmids_str}\n"
-            f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"
-            f"🔄 *Текущий статус ключа:* {calculated_keyword.status}\n\n"
+            f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(hard_status_for_display)}\n"
+            f"🔄 *Текущий статус ключа:* {display_status}\n\n"
             f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n"
             f"📊 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
@@ -835,6 +848,42 @@ class WhitePhrasesAdded(TextWithKeyboard):
     @property
     def text(self) -> str:
         return "Фразы добавлены в белый список, можете ввести еще фразы или вернуться в настройки РК"
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+class WaitingForFixedPhrases(TextWithKeyboard):
+    async def __call__(self, adv_setting_id: int):
+        self.adv_setting_id: int = adv_setting_id
+        await super().__call__()
+
+    @property
+    def text(self):
+        return """
+Отправьте список фраз (через перенос строки), которые нужно добавить в фикс.фразы (всегда вкл).
+Например:
+
+платье женское
+платье вечернее
+
+Фразы будут всегда включены и не зависят от белого списка. Учитывается точное соответствие.
+"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+class FixedPhrasesAdded(TextWithKeyboard):
+    async def __call__(self, adv_setting_id: int):
+        self.adv_setting_id: int = adv_setting_id
+        await super().__call__()
+
+    @property
+    def text(self) -> str:
+        return "Фразы добавлены в фикс.фразы (всегда вкл). Можете ввести ещё или вернуться в настройки РК"
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
