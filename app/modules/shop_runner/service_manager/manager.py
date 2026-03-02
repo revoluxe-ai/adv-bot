@@ -880,7 +880,7 @@ class CoroutinesManager:
 
         strategy_updates: list[tuple[int, int, Strategy, Strategy, str]] = []
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка вычисления target strategy, shop_id=%s: %s",
                     self.shop_id,
