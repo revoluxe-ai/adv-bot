@@ -19,6 +19,7 @@ class CalculatedKeyword(BaseModel):
     cluster_stat: KeywordStat
     state: KeywordState
     # Рейтинг для сортировки (по Mode: conv_views_to_orders или orders_per_1000_rub). Заполняется менеджером из pre_kw.rating.
+    # Кеш в Redis постоянно обновляется при перерасчёте ключей, поэтому старые записи без rating не накапливаются и проблем быть не должно.
     rating: float
     target_pay_for_order: float | None
     above_rec_conversion: bool | None = None
