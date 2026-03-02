@@ -332,7 +332,7 @@ def get_keywords_setting_keyboard(
         if sort_mode_ in ["by_adv", "only_out_index"]:
 
             kws_.sort(
-                key=lambda x: x.rating, reverse=True
+                key=lambda x: x.rating or 0, reverse=True
             )
 
             return kws_
@@ -340,7 +340,7 @@ def get_keywords_setting_keyboard(
         elif sort_mode_ == "white_list":
 
             def sort_func(kw_: CalculatedKeyword) -> float:
-                return kw_.rating
+                return kw_.rating or 0
 
             return sorted(kws_, key=sort_func, reverse=True)
 
