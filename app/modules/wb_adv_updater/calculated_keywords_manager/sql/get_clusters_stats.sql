@@ -54,13 +54,15 @@ all_time_agg AS (
 ),
 
 /* ================================================================
-   3) LAST STATE — как было (берётся из last_state MV)
+   3) LAST STATE — из last_state MV (позиция, время, последний CPM).
+   last_cpm нужен для каскада CPM (шаг «stats»): без него рейтинг ключей
+   и orders_per_1000_rub не считаются — тесты и whitelist-логика ломаются.
    ================================================================ */
 last_state AS (
     SELECT
         text,
         argMaxMerge(last_avg_pos_state) AS last_avg_pos,
-        argMaxMerge(last_cpm_state)     AS last_cpm,
+        argMaxMerge(last_cpm_state)    AS last_cpm,
         maxMerge(last_ts_state)         AS last_ts
     FROM default_db.mv_clusters_last_state
     WHERE nmid IN {nmids:Array(UInt64)}
@@ -278,6 +280,8 @@ baes AS (
 
 /* ================================================================
    10) FINAL
+   cpm — последний CPM из last_state; питает каскад (шаг «stats») для
+   расчёта рейтинга и orders_per_1000_rub в PreCalculatedKeyword/CalculatedKeyword.
    ================================================================ */
 SELECT
     agg.text AS norm_query,
@@ -287,6 +291,7 @@ SELECT
     ifNull(agg.add_to_cart_sum, 0) AS add_to_cart,
     ifNull(agg.orders_sum, 0)      AS orders,
     ifNull(agg.spend_sum, 0.0)     AS spend,
+    ifNull(ls.last_cpm, 0.0)       AS cpm,
     cb.cart_to_order_conv AS base_cart_to_order_conv,
     greatest(ifNull(agg.add_to_cart_sum, 0) - ifNull(agg.orders_sum, 0), 0)
         * cb.cart_to_order_conv AS expected_orders_from_cart,
@@ -296,18 +301,6 @@ SELECT
             * cb.cart_to_order_conv
     ) AS expected_orders,
     if(
-        ifNull(ls.last_cpm, 0) > 0
-        AND b.ctr_eff IS NOT NULL,
-        (
-            b.ctr_eff
-            * if(ifNull(b.cart_eff, 0) = 0, 1, b.cart_eff)
-            * if(ifNull(b.order_eff, 0) = 0, 1, b.order_eff)
-        )
-        / ls.last_cpm
-        * 100,
-        0
-    ) AS final_rating,
-    if(
         b.ctr_eff IS NOT NULL,
         b.ctr_eff
             * if(ifNull(b.cart_eff, 0) = 0, 1, b.cart_eff)
@@ -316,12 +309,11 @@ SELECT
     ) AS conversion_without_cpm,
     ifNull(ata.views_all_time, 0)     AS views_all_time,
     ifNull(ata.orders_all_time, 0)    AS orders_all_time,
-    ifNull(ls.last_ts, toDateTime(0)) AS timestamp,
-    ifNull(ls.last_cpm, 0.0)          AS cpm
+    ifNull(ls.last_ts, toDateTime(0)) AS timestamp
 FROM agg_stats AS agg
 LEFT JOIN baes           AS b   ON b.text = agg.text
 LEFT JOIN last_state     AS ls  ON ls.text = agg.text
 LEFT JOIN final_pos_real AS fpr ON fpr.text = agg.text
 LEFT JOIN all_time_agg   AS ata ON ata.text = agg.text
 CROSS JOIN cart_conv_base AS cb
-ORDER BY final_rating DESC
+ORDER BY conversion_without_cpm DESC

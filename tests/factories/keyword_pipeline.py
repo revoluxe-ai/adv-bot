@@ -47,6 +47,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
     KeywordStatusReason,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.enum import KeywordRatingMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
     KeywordSettingDTO,
 )
@@ -104,13 +105,25 @@ class KeywordSettingDTOFactory(factory.Factory):
 
 class KeywordStatFactory(factory.Factory):
     """Factory для KeywordStat.
-    
+
     KeywordStat использует pydantic Field(alias=...), поэтому при создании
     нужно использовать alias-имена (norm_query, views_all_time, orders_all_time).
+    cpm приходит из get_clusters_stats и питает каскад (шаг «stats»). При
+    передаче final_rating подставляются conv_views_to_orders=final_rating/1_000_000
+    и cpm=1.0, чтобы рейтинг (orders_per_1000_rub = conv × 1_000_000 / cpm)
+    совпадал с final_rating.
     """
 
     class Meta:
         model = KeywordStat
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if "final_rating" in kwargs:
+            fr = float(kwargs.pop("final_rating"))
+            kwargs["conv_views_to_orders"] = fr / 1_000_000.0
+            kwargs.setdefault("cpm", 1.0)
+        return super()._create(model_class, *args, **kwargs)
 
     # Используем alias-имена для pydantic модели
     norm_query = factory.LazyFunction(lambda: fake.word())
@@ -126,8 +139,8 @@ class KeywordStatFactory(factory.Factory):
     orders = factory.LazyAttribute(lambda obj: fake.random_int(0, max(1, obj.add_to_cart)))
     spend = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=10.0, max_value=5000.0), 2))
     cpc = factory.LazyFunction(lambda: fake.random_int(50, 500))
-    cpm = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=50.0, max_value=500.0), 2))
-    
+
+    cpm = factory.LazyFunction(lambda: 1.0)
     # Расчётные поля
     base_cart_to_order_conv = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.1, max_value=0.8), 3)
@@ -141,7 +154,7 @@ class KeywordStatFactory(factory.Factory):
     final_rating = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2)
     )
-    conversion_without_cpm = factory.LazyFunction(
+    conv_views_to_orders = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=1.0), 6)
     )
 
@@ -205,6 +218,7 @@ class PreCalculatedKeywordFactory(factory.Factory):
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     target_pay_for_order = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=10.0, max_value=300.0), 2))
     bidder_status = factory.LazyFunction(lambda: BidderKeywordStatus.GOOD)
+    rating_mode = factory.LazyFunction(lambda: KeywordRatingMode.BY_MIN_CPO)
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
@@ -222,13 +236,17 @@ class PreCalculatedKeywordFactory(factory.Factory):
             for key, value in list(kwargs.items()):
                 if key.startswith('cluster_stat__'):
                     cluster_stat_kwargs[key.replace('cluster_stat__', '')] = value
-            
+
             if 'norm_query' not in cluster_stat_kwargs:
                 cluster_stat_kwargs['norm_query'] = keyword_setting.text
-            
+            if 'final_rating' in cluster_stat_kwargs:
+                fr = cluster_stat_kwargs['final_rating']
+                cluster_stat_kwargs.setdefault('conv_views_to_orders', fr / 1_000_000.0)
+                cluster_stat_kwargs.setdefault('cpm', 1.0)
+
             kwargs['cluster_stat'] = KeywordStatFactory(**cluster_stat_kwargs)
             kwargs = {k: v for k, v in kwargs.items() if not k.startswith('cluster_stat__')}
-        
+
         return super()._create(model_class, *args, **kwargs)
 
 

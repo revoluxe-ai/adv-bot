@@ -14,6 +14,7 @@ from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keywor
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
 from .dto.states import KeywordStatus, KeywordStatusReason
+from .enum import KeywordRatingMode
 from .keyword_stat import KeywordStat
 from app.core.clickhouse_manager import BaseClickHouseManager
 from app.core.clikhouse_client_manager import  get_clickhouse_client
@@ -32,7 +33,9 @@ from operator import  attrgetter
 
 import typing
 
+from ...common_slaves.wildberries.models.enums.strategy import Strategy
 from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
+
 
 if typing.TYPE_CHECKING:
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
@@ -137,6 +140,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         bid_log_map: dict[str, tuple[float, datetime]],
         set_bid_map: dict[str, tuple[float, datetime | None]],
     ) -> list[PreCalculatedKeyword]:
+        """Подставляет источники CPM для каскада: set_bid → bid_log → stats.
+
+        Шаг «stats» питается из get_clusters_stats (cluster_stat.cpm). Без него
+        resolved_cpm часто 0 → рейтинг и orders_per_1000_rub нулевые, ломаются
+        whitelist и тесты. Дата по stats не хранится в KeywordStat — передаём None.
+        """
         enriched: list[PreCalculatedKeyword] = []
         for pre_kw in pre_keywords:
             text = pre_kw.keyword_setting.text
@@ -151,13 +160,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             if set_bid is not None:
                 cpm_set_bid = int(set_bid[0])
                 cpm_set_bid_date = set_bid[1]
+            # CPM из get_clusters_stats (last_cpm по ключу) — третий шаг каскада
+            cpm_from_stats: float | None = pre_kw.cluster_stat.cpm
             sources = KeywordCpmSources(
                 cpm_set_bid=cpm_set_bid,
                 cpm_set_bid_date=cpm_set_bid_date,
                 cpm_from_bid_log=cpm_from_bid_log,
                 cpm_from_bid_log_date=cpm_from_bid_log_date,
-                cpm_from_stats=pre_kw.cluster_stat.cpm,
-                cpm_from_stats_date=pre_kw.cluster_stat.timestamp,
+                cpm_from_stats=cpm_from_stats,
+                cpm_from_stats_date=None,
             )
             enriched.append(
                 PreCalculatedKeyword(
@@ -165,6 +176,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     keyword_setting=pre_kw.keyword_setting,
                     cluster_stat=pre_kw.cluster_stat,
                     bidder_status=pre_kw.bidder_status,
+                    rating_mode=pre_kw.rating_mode,
                     cpm_sources=sources,
                 )
             )
@@ -247,17 +259,27 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             -> list[PreCalculatedKeyword]:
         from .convertor import  keyword_setting_to_keyword_setting_dto
         text_to_stat = {stat.text: stat for stat in stats}
+
+        if complex_adv.strategy == Strategy.MIN_CPO:
+            rating_mode = KeywordRatingMode.BY_MIN_CPO
+        elif complex_adv.strategy == Strategy.MAX_CONV:
+            rating_mode = KeywordRatingMode.BY_MAX_CONV
+        else:
+            raise ValueError(f'Not implemented strategy: {complex_adv.strategy}')
+
         keywords: list[PreCalculatedKeyword] = []
         for keyword_hard_status in keyword_hard_statuses:
             keyword_setting = keyword_hard_status.keyword_setting
             stat = text_to_stat.get(keyword_setting.text)
+
             if stat:
                 keyword_setting_dto = keyword_setting_to_keyword_setting_dto(keyword_setting)
                 calculated_keyword = PreCalculatedKeyword(
                     keyword_setting=keyword_setting_dto,
                     cluster_stat=stat,
                     adv_id=complex_adv.adv_id,
-                    bidder_status=keyword_hard_status.bidder_keyword_status
+                    rating_mode=rating_mode,
+                    bidder_status=keyword_hard_status.bidder_keyword_status,
                 )
                 keywords.append(calculated_keyword)
         return keywords
@@ -305,11 +327,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 return None # None - не применяем вообще это правило
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
-            return pre_kw_.cluster_stat.conversion_without_cpm > rec_conversion
+            return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
 
         white_and_fix_list = [kw for kw in pre_keywords if kw.hard_status in [2, 4]]
         if not white_and_fix_list:
-            best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
+            best_keyword = max(pre_keywords, key=attrgetter("rating"))
             for pre_kw in pre_keywords:
                 if pre_kw.hard_status == 4:
                     state = KeywordState(
@@ -331,16 +353,17 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     target_pay_for_order=complex_adv.target_pay_for_order,
                     above_rec_conversion=None,
                     cpm_sources=pre_kw.cpm_sources,
+                    rating=pre_kw.rating,
                 )
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
 
         """Основной алгоритм"""
         white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
-        white_list.sort(key=lambda kw: kw.rating_by_orders)
-        best_keyword = max(pre_keywords, key=attrgetter("rating_by_orders"))
+        white_list.sort(key=lambda kw: kw.rating)
+        best_keyword = max(pre_keywords, key=attrgetter("rating"))
         worst_keyword = white_list[0]
-        rating_by_orders_of_worst_keyword = worst_keyword.rating_by_orders
+        rating_of_worst_keyword = worst_keyword.rating
         for pre_kw in pre_keywords:
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
@@ -387,7 +410,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     best_keyword_status=best_keyword_status
                 )
             elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
-                    pre_kw.rating_by_orders >= rating_by_orders_of_worst_keyword:
+                    pre_kw.rating >= rating_of_worst_keyword:
                 if above_rec is False:
                     status = KeywordStatus.BAD
                     reason = KeywordStatusReason.BELOW_REC_CONVERSION
@@ -417,6 +440,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     target_pay_for_order=complex_adv.target_pay_for_order,
                     above_rec_conversion=above_rec,
                     cpm_sources=pre_kw.cpm_sources,
+                    rating=pre_kw.rating,
                 )
             )
         return calculated_keyword_list

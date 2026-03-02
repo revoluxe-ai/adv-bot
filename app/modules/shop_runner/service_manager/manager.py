@@ -12,10 +12,12 @@ from typing import (
 
 from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
+from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.auto_budget_manager import (
     AutoBudgetEnsureResult,
@@ -71,6 +73,8 @@ from .services.clusters_adv_stat_updater.di import ClustersAdvStatUpdaterContain
 from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_from_wl_by_mean_auto_ctr_manager import (
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
+from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +129,7 @@ class CoroutinesManager:
         self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
             redis_client_wrapper
         )
+        self._adv_strategy_selector = AdvStrategySelector()
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -849,8 +854,94 @@ class CoroutinesManager:
 
         return None
 
+    @while_coroutine_decorator(60, 1)
+    async def change_adv_strategy(self):
+        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not complex_advs:
+            return None
 
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
+        if not complex_advs:
+            return None
 
+        handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StrategySelection | None]]]] = []
+        for adv in complex_advs:
+            handlers.append(
+                lambda complex_adv=adv: self._resolve_strategy_selection(complex_adv)
+            )
+
+        max_workers = self._max_workers_for(len(handlers), cap=16)
+        results = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+            tasks_manager=self._tasks_manager,
+        )
+
+        strategy_updates: list[tuple[int, int, Strategy, Strategy, str]] = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "Ошибка вычисления target strategy, shop_id=%s: %s",
+                    self.shop_id,
+                    result,
+                    exc_info=True,
+                )
+                continue
+            adv, selection = result
+            if selection is None:
+                continue
+            current_strategy = adv.strategy
+            if current_strategy == selection.strategy:
+                continue
+            strategy_updates.append(
+                (
+                    adv.adv_setting_original_id,
+                    adv.adv_id,
+                    current_strategy,
+                    selection.strategy,
+                    selection.reason,
+                )
+            )
+
+        if not strategy_updates:
+            return None
+
+        await self._apply_strategy_updates(strategy_updates)
+        return None
+
+    async def _resolve_strategy_selection(
+        self,
+        complex_adv: ComplexAdv,
+    ) -> tuple[ComplexAdv, StrategySelection | None]:
+        selection = await self._adv_strategy_selector.select_target_strategy(
+            complex_adv,
+            plan_fact_reader=self._plan_fact_reader,
+        )
+        return complex_adv, selection
+
+    async def _apply_strategy_updates(
+        self,
+        strategy_updates: list[tuple[int, int, Strategy, Strategy, str]],
+    ) -> None:
+        async with sm() as session:
+            for adv_setting_id, adv_id, from_strategy, to_strategy, reason in strategy_updates:
+                stmt = (
+                    update(AdvSetting)
+                    .where(AdvSetting.id == adv_setting_id)
+                    .values({"strategy": to_strategy})
+                )
+                _ = await session.execute(stmt)
+                logger.info(
+                    "Изменена стратегия РК, shop_id=%s, adv_id=%s, adv_setting_id=%s, %s -> %s, reason=%s",
+                    self.shop_id,
+                    adv_id,
+                    adv_setting_id,
+                    from_strategy,
+                    to_strategy,
+                    reason,
+                )
+            await session.commit()
 
 
 # TODO: Переделать граф зависимостей

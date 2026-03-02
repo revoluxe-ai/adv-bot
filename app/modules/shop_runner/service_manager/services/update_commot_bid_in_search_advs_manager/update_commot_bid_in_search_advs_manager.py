@@ -76,7 +76,7 @@ class UpdateCommotBidInSearchAdvsManager:
         keywords = adv.keywords
         if not keywords:
             return None
-        keywords.sort(key=lambda k: k.rating_by_orders, reverse=True)
+        keywords.sort(key=lambda k: k.rating or 0, reverse=True)
         top_key = keywords[0]
         cpm_of_top_key = top_key.cpm
         return cpm_of_top_key

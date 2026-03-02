@@ -38,6 +38,9 @@ from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers.keywords_positions_history import (
     KeywordsPositionsHistoryRouter,
 )
+from .user_interface.handlers.raise_card_analyze import (
+    raise_card_analyze_router,
+)
 from .user_interface.handlers import (
     admin_panel,
     add_black_phrases,
@@ -88,6 +91,7 @@ common_router = Router()
 
 # admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
 common_router.include_routers(KeywordsPositionsHistoryRouter)
+common_router.include_routers(raise_card_analyze_router)
 common_router.include_routers(admin_panel.router)
 if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
@@ -145,6 +149,8 @@ common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defi
 common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
+# TODO(legacy-remove): модуль содержит legacy callbacks.StrategySetting;
+# удалить legacy-ветку после стабилизации нового экрана StrategyMenu.
 common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene

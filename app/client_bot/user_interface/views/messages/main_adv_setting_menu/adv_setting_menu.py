@@ -17,6 +17,9 @@ from app.client_bot import utils
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
+from app.client_bot.user_interface.views.messages.strategy_display import (
+    format_adv_strategy,
+)
 from . import keyboard
 from app.core.redis_manager_v2.redis_client import RedisClient
 
@@ -24,7 +27,6 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_update_state_manager import (
@@ -146,9 +148,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
              self._status_auction = status_auction
         else:
             self._status_auction = "Не установлен"
-        self._hard_min_ctr = self.adv.hard_min_ctr
         keywords = await utils.get_keywords_for_keyboard(self.adv)
-        self._min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
+        self._min_rating: float | None = phrases_processor.get_min_rating(keywords)
+        self._min_orders_per_1000_rub: float | None = (
+            phrases_processor.get_min_orders_per_1000_rub(keywords)
+        )
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -271,12 +275,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def text(self) -> str:
         # Determine predict CTR mode display text
-        predict_ctr_mode = self.adv.predict_ctr_mode or PredictCTRMode.V1
-        if predict_ctr_mode == PredictCTRMode.V1:
-            predict_ctr_mode_text = "v1 (по ID кампании)"
-        else:
-            # TODO: Добавить отображение фото в ключах
-            predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
 
@@ -361,7 +359,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 return " (управление отключено)"
             if reason is None:
                 return " (Нет данных)"
-            label = reason_code_to_display_text(reason.reason_code.value)
+            label = reason_code_to_display_text(reason.reason_code)
             dt = reason.updated_at
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
@@ -380,16 +378,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"🆔 ID камп: {self.adv.adv_id}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
+            f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
         )
             # TODO: Попала ошибка в код, пытался сделать .2f строке
-        if self._min_rating_by_orders is not None:
-            text += f"🎯 Мин. Рейтинг по зак.: {round(self._min_rating_by_orders * 1000, 2)}\n"
-        elif self._hard_min_ctr is not None:
-            text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
+        if self._min_orders_per_1000_rub is not None:
+            text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
         else:
             text += "Огран не заданы!\n"
 
-        text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
         text += "Посл.обнов:\n"
 
         text += (

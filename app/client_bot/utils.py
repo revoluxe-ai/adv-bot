@@ -142,7 +142,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 turn_on,
                 hard_status,
                 str(first_position),
-                str(round(keyword.rating_by_orders * 100, 4)).replace(".", ","),
+                str(round(keyword.orders_per_1000_rub, 4)).replace(".", ","),
                 str(keyword.total_orders if keyword.total_orders else 0),
             ]
         )

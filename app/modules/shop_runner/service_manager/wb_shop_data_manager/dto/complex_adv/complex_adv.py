@@ -3,6 +3,7 @@ from collections.abc import Callable, Awaitable
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
@@ -51,6 +52,21 @@ class ComplexAdv:
 
     def __repr__(self):
         return str(self._adv_setting.id)
+
+
+    @property
+    def strategy(self) -> Strategy:
+        if self._adv_setting.strategy is None:
+            return Strategy.MIN_CPO
+        return self._adv_setting.strategy
+
+    @property
+    def auto_update_strategy(self) -> bool:
+        auto_update_strategy = self._adv_setting.auto_update_strategy
+        if auto_update_strategy is None:
+            return True
+        else:
+            return auto_update_strategy
 
 
     @property

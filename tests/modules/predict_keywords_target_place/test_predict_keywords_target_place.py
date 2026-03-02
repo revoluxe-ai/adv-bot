@@ -8,6 +8,7 @@ import pytest
 from app.modules.common_slaves.wildberries.models.enums.target_position_mode import (
     TargetPositionMode,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
     BidPosition,
     ConvCartToViewsOnPosition,
@@ -17,11 +18,16 @@ from app.modules.predict_keywords_target_place.predict_keywords_target_place imp
 )
 
 
-def _make_adv(main_nmid: int = 12345, min_bid: int = 50) -> MagicMock:
+def _make_adv(
+    main_nmid: int = 12345,
+    min_bid: int = 50,
+    strategy: Strategy = Strategy.MIN_CPO,
+) -> MagicMock:
     adv = MagicMock()
     adv.main_nmid = main_nmid
     adv.search_adv_min_bids = {main_nmid: min_bid}
     adv.target_position_mode = TargetPositionMode.MIN_CPA
+    adv.strategy = strategy
     return adv
 
 
@@ -92,10 +98,40 @@ async def test_get_keywords_target_position_returns_best_position_when_valid_dat
     )
 
     predictor = PredictKeywordsTargetPlace(mock_ch)
-    adv = _make_adv(main_nmid=12345, min_bid=50)
+    adv = _make_adv(main_nmid=12345, min_bid=50, strategy=Strategy.MIN_CPO)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert result == {"kw1": 1}
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_keywords_target_position_returns_best_conv_when_strategy_max_conv():
+    """При MAX_CONV выбор идет только по conv_carts_to_views, без учета ставки."""
+    mock_ch = AsyncMock()
+    ts = datetime.now()
+    mock_ch.get_conv_cart_to_views = AsyncMock(
+        return_value={
+            "kw1": [
+                ConvCartToViewsOnPosition(keyword="kw1", position=1, conv_cart_to_views=0.1),
+                ConvCartToViewsOnPosition(keyword="kw1", position=2, conv_cart_to_views=0.2),
+            ]
+        }
+    )
+    mock_ch.get_bids_for_positions = AsyncMock(
+        return_value={
+            "kw1": [
+                BidPosition(keyword="kw1", position=1, bid=60, timestamp=ts),
+                BidPosition(keyword="kw1", position=2, bid=300, timestamp=ts),
+            ]
+        }
+    )
+
+    predictor = PredictKeywordsTargetPlace(mock_ch)
+    adv = _make_adv(main_nmid=12345, min_bid=50, strategy=Strategy.MAX_CONV)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
+
+    assert result == {"kw1": 2}
 
 
 @pytest.mark.unit
