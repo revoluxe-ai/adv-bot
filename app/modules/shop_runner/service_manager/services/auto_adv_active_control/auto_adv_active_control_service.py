@@ -216,6 +216,10 @@ class AutoAdvActiveControlService:
             )
             return None
 
+        # Авто-кампанию ведём только при включённом режиме продвижения полок (rec_system_mode).
+        # rec_system_mode по умолчанию False — кампании без явного включения полок остаются на паузе
+        # по дизайну продукта: логика контроля активности и стратегий завязана на полки (сначала
+        # самые дешёвые места, затем конверсия). Это не баг, а намеренное ограничение.
         if not adv.rec_system_promotion_mode_active:
             if auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(
