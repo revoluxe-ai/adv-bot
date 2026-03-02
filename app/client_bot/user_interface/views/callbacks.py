@@ -206,6 +206,14 @@ class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
 
 
+class RaiseCardAnalyze(CallbackData, prefix="raise_card_analyze"):
+    """Анализ раскрутки карточки: меню, результат, по дням, бакеты, что делать дальше."""
+
+    adv_setting_original_id: int
+    action: str | None = "menu"  # menu | result | by_days | buckets | what_next
+    nmid: int | None = None
+
+
 class AddWhitePhrases(CallbackData, prefix="add_white_phrases"):
     adv_setting_id: int
 

@@ -380,6 +380,15 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
     button = InlineKeyboardButton(
+        text="Анализ раскрутки",
+        callback_data=callbacks.RaiseCardAnalyze(
+            adv_setting_original_id=adv_setting.id,
+            action="menu",
+        ).pack(),
+    )
+    _ = builder.row(button)
+
+    button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
         callback_data=callbacks.ChangeMaxCPC(
             action="to_max_cpc_change_page", adv_original_id=adv_setting.id
