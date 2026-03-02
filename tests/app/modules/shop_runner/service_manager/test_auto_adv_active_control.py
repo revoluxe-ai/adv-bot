@@ -30,10 +30,11 @@ class _FakeAdvSetting:
         active_status: str,
         adv_id: int | None = None,
         *,
+        adv_setting_id: int | None = None,
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
-
+        rec_system_mode: bool = True,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -254,13 +255,15 @@ async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode
         tasks_manager=MagicMock(),
         plan_fact_reader=MagicMock(spec=PlanFactReader),
     )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
