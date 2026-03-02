@@ -151,9 +151,8 @@ class KeywordStatFactory(factory.Factory):
     expected_orders = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=10.0), 2)
     )
-    final_rating = factory.LazyFunction(
-        lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2)
-    )
+    # final_rating is not a default: when passed, _create derives conv_views_to_orders and cpm from it.
+    # When omitted, conv_views_to_orders (and cpm) from declarations below are used; tests can pass them explicitly.
     conv_views_to_orders = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=1.0), 6)
     )
