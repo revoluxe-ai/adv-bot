@@ -50,7 +50,7 @@ async def toggle_auto_strategy(
         if adv_setting is None:
             await bot.send_message(callback.message.chat.id, "РК не найдена.")
             return
-        current_value = bool(getattr(adv_setting, "auto_update_strategy", True))
+        current_value = adv_setting.auto_update_strategy
         setattr(adv_setting, "auto_update_strategy", not current_value)
         await session.commit()
 
