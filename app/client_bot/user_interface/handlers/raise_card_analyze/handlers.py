@@ -134,39 +134,20 @@ async def _run_analysis_and_reply(
     """Send 'Считаю…', then run analysis (or get cache), format and edit."""
     progress_msg = await message.answer("Считаю…")
     chat_id = message.chat.id
-    # Plan: bid_decision_log may use search_adv_id (auction)
     adv_id = adv.search_adv_id or adv.adv_id
-
-    ch_manager = RaiseCardAnalyzeClickHouseManager()
-    service = CampaignGrowthAnalysisService(ch_manager)
-    cache = RaiseCardAnalyzeCache(redis_client)
-
-    is_cold = True  # cold = daily series (есть у всех); normal = weekly (часто пусто)
-    calc_profile = "cold" if is_cold else "normal"
-    trend_mode = "7v7" if is_cold else "wow"
-    window_days = WINDOW_DAYS_FOR_K_COLD if is_cold else WINDOW_DAYS_FOR_K_NORMAL
-    series_days = SERIES_DAYS_COLD if is_cold else (SERIES_WEEKS_NORMAL * 7)
-    min_d = MIN_D_VIEWS_COLD if is_cold else MIN_D_VIEWS_NORMAL
-
     try:
-        payload = None
-        for k_src in ("item", "adv", "category", "global"):
-            cached = await cache.get(
-                adv_id, nmid, calc_profile, k_src, window_days, series_days, min_d, trend_mode
-            )
-            if cached:
-                payload = cached
-                break
-        if not payload:
-            payload = await service.run_full_analysis(adv_id, nmid, is_cold=is_cold)
-            await cache.set(
-                adv_id, nmid, calc_profile, payload["k_result"].k_source,
-                window_days, series_days, min_d, trend_mode, payload
-            )
+        payload = await _get_payload(adv_id, nmid, redis_client, is_cold=True)
     except Exception:
         logger.exception("Raise card analyze failed")
         raise
-
+    if not payload:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=progress_msg.message_id,
+            text="Нет данных.",
+            reply_markup=get_return_to_adv_setting_keyboard(adv.id),
+        )
+        return
     user_id = message.from_user.id if message.from_user else message.chat.id
     text = format_raise_card_result(payload, adv.id, view="by_days", user_id=user_id)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
