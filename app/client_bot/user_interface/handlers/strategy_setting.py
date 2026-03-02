@@ -50,8 +50,9 @@ async def toggle_auto_strategy(
         if adv_setting is None:
             await bot.send_message(callback.message.chat.id, "РК не найдена.")
             return
-        current_value = adv_setting.auto_update_strategy
-        setattr(adv_setting, "auto_update_strategy", not current_value)
+        # None is treated as auto-enabled (True); only False is manual
+        current_is_auto = adv_setting.auto_update_strategy is not False
+        adv_setting.auto_update_strategy = not current_is_auto
         await session.commit()
 
     await _show_strategy_menu(bot, callback.message.chat.id, adv_setting_original_id)
@@ -78,7 +79,9 @@ async def set_manual_strategy(
             await bot.send_message(callback.message.chat.id, "РК не найдена.")
             return
 
-        auto_update_strategy = bool(getattr(adv_setting, "auto_update_strategy", True))
+        # None means auto-enabled (same as True); only False is manual
+        #TODO: Тут надо совместить текущую логику с дефолтом в CompexAdv
+        auto_update_strategy = getattr(adv_setting, "auto_update_strategy", True) is not False
         if auto_update_strategy:
             await bot.send_message(
                 callback.message.chat.id,

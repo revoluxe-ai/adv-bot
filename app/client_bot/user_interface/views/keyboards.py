@@ -152,7 +152,8 @@ def get_campaign_activity_target_keyboard(
 
 def get_strategy_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    auto_update_strategy = bool(getattr(adv_setting, "auto_update_strategy", True))
+    # None means auto-enabled (same as True); only False is manual
+    auto_update_strategy = getattr(adv_setting, "auto_update_strategy", True) is not False
     strategy = adv_setting.strategy or Strategy.MIN_CPO
 
     _ = builder.row(
