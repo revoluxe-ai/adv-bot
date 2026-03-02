@@ -329,8 +329,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
 
-        white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
-        if not white_list:
+        white_and_fix_list = [kw for kw in pre_keywords if kw.hard_status in [2, 4]]
+        if not white_and_fix_list:
             best_keyword = max(pre_keywords, key=attrgetter("rating"))
             for pre_kw in pre_keywords:
                 if pre_kw.hard_status == 4:
@@ -359,6 +359,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             return calculated_keyword_list
 
         """Основной алгоритм"""
+        white_list = [kw for kw in pre_keywords if kw.hard_status == 2]
         white_list.sort(key=lambda kw: kw.rating)
         best_keyword = max(pre_keywords, key=attrgetter("rating"))
         worst_keyword = white_list[0]
