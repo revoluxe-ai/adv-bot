@@ -315,20 +315,6 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    # Добавляем кнопку переключения режима прогноза CTR
-    if adv_setting.predict_ctr_mode == PredictCTRMode.V1:
-        text = "Переключить на режим прогноза CTR v2 (по артикулам)"
-        new_mode = PredictCTRMode.V2
-    else:
-        text = "Переключить на режим прогноза CTR v1 (по ID кампании)"
-        new_mode = PredictCTRMode.V1
-
-    callback = PredictCTRModeToggle(
-        new_mode=new_mode, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
-
     # Кнопка переключения версии АвтоАпдейтера
     if adv_setting.automatic_version == 1:
         text = "Переключить на АвтоАпдейтер V2"
@@ -342,7 +328,6 @@ def get_adv_setting_keyboard(
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
-
 
 
     button = InlineKeyboardButton(
@@ -398,16 +383,6 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
 
-
-    button = InlineKeyboardButton(
-        text="Изменить мин. кол-во просмотров для ИИ-прогноза CTR",
-        callback_data=callbacks.ChangeMinViewsForPredictCTR(
-            adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
-
     if adv_setting.reset_place is not None and adv_setting.reset_place:
         button = InlineKeyboardButton(
             text="Выключить сброс позиций",
@@ -425,21 +400,6 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(button)
 
-    if adv_setting.clusters_mode is not None and not adv_setting.clusters_mode:
-        button = InlineKeyboardButton(
-            text="Включить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="on", adv_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Отключить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="off", adv_original_id=adv_setting.id
-            ).pack(),
-        )
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
