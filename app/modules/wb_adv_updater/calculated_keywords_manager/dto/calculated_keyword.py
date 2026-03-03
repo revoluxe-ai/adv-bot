@@ -38,9 +38,9 @@ class CalculatedKeyword(BaseModel):
         return self.keyword_setting.target_place
 
     @property
-    def pay_for_order(self) -> float:
+    def pay_for_order(self) -> float | None:
         """Себестоимость одного заказа (руб.), при текущем CPM. CPO = 1000 / orders_per_1000_rub."""
-        return calc_pay_for_order(self.orders_per_1000_rub, self.spend)
+        return calc_pay_for_order(self.orders_per_1000_rub)
 
 
     @property

@@ -16,8 +16,8 @@ def calc_orders_per_1000_rub(conv_views_to_orders: float, cpm: float | None) -> 
     return conv_views_to_orders * 1_000_000.0 / cpm
 
 
-def calc_pay_for_order(orders_per_1000_rub: float, spend: float) -> float:
+def calc_pay_for_order(orders_per_1000_rub: float) -> float | None:
     """Себестоимость одного заказа (руб.). CPO = 1000 / orders_per_1000_rub."""
     if orders_per_1000_rub == 0:
-        return spend
+        return None
     return 1000.0 / orders_per_1000_rub

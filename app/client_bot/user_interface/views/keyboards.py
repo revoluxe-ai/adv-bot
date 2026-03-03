@@ -1,5 +1,4 @@
 import datetime
-import math
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -394,8 +393,8 @@ def get_keywords_setting_keyboard(
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
         pay_for_order = (
             str(round(keyword.pay_for_order, 2))
-            if not math.isinf(keyword.pay_for_order)
-            else "Б"
+            if keyword.pay_for_order is not None
+            else "НЗ"
         )
         text += f"({conv_views_to_orders})({round(keyword.orders_per_1000_rub, 2)})({pay_for_order})"
 
