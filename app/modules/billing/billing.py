@@ -200,7 +200,8 @@ async def __process_single_cabinet(
 
     # # Быстрая проверка идемпотентности по Redis
     if skip_by_redis:
-        if await redis_manager.get_billing_process_for_day(cabinet_id, current_dt):
+        redis_flagged = await redis_manager.get_billing_process_for_day(cabinet_id, current_dt)
+        if redis_flagged:
             result["reason"] = "redis_flag_skip"
             return result
 
@@ -358,16 +359,16 @@ async def __process_single_cabinet(
                         campaign.auto_update_target_place = False
                 wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
             else:
-                # Первый день в минусе или в пределах 7 дней: списание в минус
+                # Первый день в минусе или в пределах 7 дней: списание в минус.
+                # Один WBBalancePayment на день (unique idx_unique_daily_auto_balance_charge).
                 use_b = min(calculated_bonus, price_for_shop_for_day)
                 use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
                 shortfall = price_for_shop_for_day - use_b - use_bal
                 if use_b > 0:
                     add_bonus(use_b)
-                if use_bal > 0:
-                    add_balance(use_bal)
-                if shortfall > 0:
-                    add_balance(shortfall)
+                total_balance_debit = use_bal + shortfall
+                if total_balance_debit > 0:
+                    add_balance(total_balance_debit)
                 payment_successful = True
 
         if payment_successful:
