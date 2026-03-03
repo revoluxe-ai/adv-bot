@@ -295,13 +295,8 @@ async def __process_single_cabinet(
         calculated_bonus = float(wb_cabinet.calculated_bonus or 0)  # type: ignore[truthy-function]
         calculated_balance = float(wb_cabinet.calculated_balance or 0)  # type: ignore[truthy-function]
         payment_successful = False
-        balance_went_negative_at = getattr(
-            wb_cabinet, "balance_went_negative_at", None
-        )
-
-        # Пополнение: баланс снова >= 0 — выходим из режима минуса
-        if balance_went_negative_at is not None and calculated_balance + calculated_bonus >= 0:
-            wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
+        # Не сбрасываем balance_went_negative_at до оплаты: иначе минимальное
+        # пополнение (total >= 0, но < price) обнулит счётчик грации.
 
         def add_bonus(amt: float) -> None:
             session.add(
