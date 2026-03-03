@@ -15,7 +15,7 @@ from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
 from .dto.states import KeywordStatus, KeywordStatusReason
 from .enum import KeywordRatingMode
-from .keyword_stat import KeywordStat
+from .keyword_stat import KeywordStat, make_zero_keyword_stat
 from app.core.clickhouse_manager import BaseClickHouseManager
 from app.core.clikhouse_client_manager import  get_clickhouse_client
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
@@ -271,17 +271,17 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         for keyword_hard_status in keyword_hard_statuses:
             keyword_setting = keyword_hard_status.keyword_setting
             stat = text_to_stat.get(keyword_setting.text)
-
-            if stat:
-                keyword_setting_dto = keyword_setting_to_keyword_setting_dto(keyword_setting)
-                calculated_keyword = PreCalculatedKeyword(
-                    keyword_setting=keyword_setting_dto,
-                    cluster_stat=stat,
-                    adv_id=complex_adv.adv_id,
-                    rating_mode=rating_mode,
-                    bidder_status=keyword_hard_status.bidder_keyword_status,
-                )
-                keywords.append(calculated_keyword)
+            if not stat:
+                stat = make_zero_keyword_stat(keyword_setting.text)
+            keyword_setting_dto = keyword_setting_to_keyword_setting_dto(keyword_setting)
+            calculated_keyword = PreCalculatedKeyword(
+                keyword_setting=keyword_setting_dto,
+                cluster_stat=stat,
+                adv_id=complex_adv.adv_id,
+                rating_mode=rating_mode,
+                bidder_status=keyword_hard_status.bidder_keyword_status,
+            )
+            keywords.append(calculated_keyword)
         return keywords
 
     async def _get_all_keyword_setting(self, complex_adv: 'ComplexAdv') -> list[KeywordHardStatus]:
