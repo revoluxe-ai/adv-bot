@@ -17,6 +17,7 @@ SessionFactory = Callable[..., AsyncContextManager[AsyncSession]]
 class BillingEventManager:
     _SOURCE_CLIENT_BOT = "client_bot"
     _SOURCE_BALANCE_INFORMER = "balance_exp_informer"
+    _SOURCE_NEGATIVE_BALANCE_INFORMER = "negative_balance_informer"
 
     def __init__(self, session_factory: SessionFactory = sm):
         self._session_factory = session_factory
@@ -300,6 +301,91 @@ class BillingEventManager:
             shop_id=shop_id,
             payload={"reminder_ids": reminder_ids, "error": error},
             correlation_id=correlation_id,
+            session=session,
+        )
+
+    async def emit_negative_balance_reminder_sent(
+        self,
+        *,
+        user_id: int,
+        user_telegram_id: int,
+        wb_cabinet_id: int,
+        shop_id: str,
+        days_left: int,
+        shop_name: str,
+        correlation_id: str | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await self.emit(
+            event_type=EventType.NEGATIVE_BALANCE_REMINDER_SENT,
+            source=self._SOURCE_NEGATIVE_BALANCE_INFORMER,
+            user_id=user_id,
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_id,
+            shop_id=shop_id,
+            payload={"days_left": days_left, "shop_name": shop_name},
+            correlation_id=correlation_id,
+            session=session,
+        )
+
+    async def emit_negative_balance_reminder_failed(
+        self,
+        *,
+        user_id: int,
+        user_telegram_id: int | None,
+        shop_id: str | None,
+        error: str,
+        correlation_id: str | None = None,
+        session: AsyncSession | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        details = {"error": error}
+        if payload:
+            details.update(payload)
+        await self.emit(
+            event_type=EventType.NEGATIVE_BALANCE_REMINDER_FAILED,
+            source=self._SOURCE_NEGATIVE_BALANCE_INFORMER,
+            user_id=user_id,
+            user_telegram_id=user_telegram_id,
+            shop_id=shop_id,
+            payload=details,
+            correlation_id=correlation_id,
+            session=session,
+        )
+
+    async def emit_balance_grace_exceeded_sent(
+        self,
+        *,
+        user_id: int,
+        user_telegram_id: int,
+        wb_cabinet_id: int,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await self.emit(
+            event_type=EventType.BALANCE_GRACE_EXCEEDED_SENT,
+            source=self._SOURCE_BALANCE_INFORMER,
+            user_id=user_id,
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_id,
+            session=session,
+        )
+
+    async def emit_balance_grace_exceeded_failed(
+        self,
+        *,
+        user_id: int,
+        user_telegram_id: int | None,
+        wb_cabinet_id: int,
+        error: str,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await self.emit(
+            event_type=EventType.BALANCE_GRACE_EXCEEDED_FAILED,
+            source=self._SOURCE_BALANCE_INFORMER,
+            user_id=user_id,
+            user_telegram_id=user_telegram_id,
+            wb_cabinet_id=wb_cabinet_id,
+            payload={"error": error},
             session=session,
         )
 

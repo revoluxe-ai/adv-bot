@@ -2,21 +2,26 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.client_bot.notification_sender import get_notification_sender
+from app.modules.billing.event_manager.event_manager import BillingEventManager
+
 from app.modules.billing.di import BillingContainer
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    WBUserCabinet,
     WBBalancePayment,
     WBBonusPayment,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.utils.db.models import User
 from .models import AdvPayment
 from .redis_lock import RedisLock
 from .redis_manager import RedisManager
@@ -55,6 +60,74 @@ async def _load_cabinet_with_relations(
     )
     result = await session.execute(stmt)
     return result.unique().scalar_one_or_none()
+
+
+GRACE_EXCEEDED_MESSAGE = (
+    "Кампании отключены: баланс был в минусе более 7 дней. "
+    "Пополните баланс, чтобы снова включить управление рекламой."
+)
+
+
+async def _notify_grace_exceeded(cabinet_id: int) -> None:
+    """Отправить уведомление пользователям кабинета об отключении из-за минуса > 7 дней."""
+    event_manager = BillingEventManager()
+    sender = get_notification_sender()
+    async with sm() as session:
+        stmt = (
+            select(User.id, User.user_telegram_id)
+            .select_from(WBUserCabinet)
+            .join(User, User.id == WBUserCabinet.user_id)
+            .where(
+                WBUserCabinet.wb_cabinet_id == cabinet_id,
+                User.user_telegram_id.is_not(None),
+            )
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+    for user_id, chat_id in rows:
+        if chat_id is None:
+            continue
+        try:
+            success = await sender.send_message(int(chat_id), GRACE_EXCEEDED_MESSAGE)
+            if success:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_sent(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id),
+                        wb_cabinet_id=cabinet_id,
+                        session=session,
+                    )
+                    await session.commit()
+            else:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_failed(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id),
+                        wb_cabinet_id=cabinet_id,
+                        error="send_message returned False",
+                        session=session,
+                    )
+                    await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "Grace exceeded notification failed for cabinet %s user %s: %s",
+                cabinet_id,
+                user_id,
+                exc,
+                exc_info=True,
+            )
+            try:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_failed(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id) if chat_id else None,
+                        wb_cabinet_id=cabinet_id,
+                        error=str(exc),
+                        session=session,
+                    )
+                    await session.commit()
+            except Exception as emit_exc:
+                logger.warning("Emit grace_exceeded_failed failed: %s", emit_exc)
 
 
 async def _safe_commit(
@@ -131,6 +204,7 @@ async def __process_single_cabinet(
             result["reason"] = "redis_flag_skip"
             return result
 
+    grace_exceeded_cabinet_id: int | None = None
     try:
         wb_cabinet = await _load_cabinet_with_relations(session, cabinet_id)
         if wb_cabinet is None:
@@ -221,6 +295,13 @@ async def __process_single_cabinet(
         calculated_bonus = float(wb_cabinet.calculated_bonus or 0)  # type: ignore[truthy-function]
         calculated_balance = float(wb_cabinet.calculated_balance or 0)  # type: ignore[truthy-function]
         payment_successful = False
+        balance_went_negative_at = getattr(
+            wb_cabinet, "balance_went_negative_at", None
+        )
+
+        # Пополнение: баланс снова >= 0 — выходим из режима минуса
+        if balance_went_negative_at is not None and calculated_balance + calculated_bonus >= 0:
+            wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
 
         def add_bonus(amt: float) -> None:
             session.add(
@@ -261,14 +342,55 @@ async def __process_single_cabinet(
                 add_balance(remaining)
             payment_successful = True
         else:
-            # Недостаточно средств — деактивируем кампании
-            for campaign in wb_cabinet.adv_settings:
-                if campaign.bot_active:
-                    campaign.bot_active = False
-                    campaign.auto_update_white_list = False
-                    campaign.auto_update_target_place = False
+            # Недостаточно средств: 7-дневная грация в минус или деактивация
+            neg_at = getattr(wb_cabinet, "balance_went_negative_at", None)
+            now_utc = current_dt if current_dt.tzinfo else current_dt.replace(tzinfo=timezone.utc)
+            neg_date = neg_at.date() if neg_at is not None else None
+            current_date = current_dt.date()
+            days_since_negative = (
+                (current_date - neg_date).days if neg_date is not None else 0
+            )
+
+            if neg_at is None:
+                # Первый день в минусе: разрешаем списание в минус
+                wb_cabinet.balance_went_negative_at = now_utc  # type: ignore[attr-defined]
+                use_b = min(calculated_bonus, price_for_shop_for_day)
+                use_bal = min(calculated_balance, price_for_shop_for_day - use_b)
+                shortfall = price_for_shop_for_day - use_b - use_bal
+                if use_b > 0:
+                    add_bonus(use_b)
+                if use_bal > 0:
+                    add_balance(use_bal)
+                if shortfall > 0:
+                    add_balance(shortfall)
+                payment_successful = True
+            elif days_since_negative >= 7:
+                # Грация истекла — деактивируем кампании
+                grace_exceeded_cabinet_id = cabinet_id
+                for campaign in wb_cabinet.adv_settings:
+                    if campaign.bot_active:
+                        campaign.bot_active = False
+                        campaign.auto_update_white_list = False
+                        campaign.auto_update_target_place = False
+                wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
+            else:
+                # В пределах 7 дней — снова списываем в минус
+                use_b = min(calculated_bonus, price_for_shop_for_day)
+                use_bal = min(calculated_balance, price_for_shop_for_day - use_b)
+                shortfall = price_for_shop_for_day - use_b - use_bal
+                if use_b > 0:
+                    add_bonus(use_b)
+                if use_bal > 0:
+                    add_balance(use_bal)
+                if shortfall > 0:
+                    add_balance(shortfall)
+                payment_successful = True
 
         if payment_successful:
+            # После успешного списания баланс >= 0 — сбрасываем грацию минуса
+            total_after = calculated_bonus + calculated_balance - price_for_shop_for_day
+            if total_after >= 0:
+                wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
             price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns)
             for campaign in cabinet_campaigns:
                 exists_payment = await session.scalar(
@@ -291,6 +413,16 @@ async def __process_single_cabinet(
         # Фиксация БД (укороченный helper)
         if not await _safe_commit(session, result, cabinet_id):
             return result
+
+        if grace_exceeded_cabinet_id is not None:
+            try:
+                await _notify_grace_exceeded(grace_exceeded_cabinet_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Cabinet %s: notify_grace_exceeded failed: %s",
+                    grace_exceeded_cabinet_id,
+                    exc,
+                )
 
         # Отметка времени последнего успешного списания (best-effort, по shop_id)
         if payment_successful:
