@@ -44,13 +44,13 @@ class CalculatedKeyword(BaseModel):
 
 
     @property
-    def cpm(self) -> float:
+    def cpm(self) -> float | None:
         """CPM только из каскада (Redis set_bid → bid_log → stats). Без fallback на SQL."""
         if self.cpm_sources is not None:
             resolved = self.cpm_sources.resolved_cpm()
             if resolved is not None:
                 return resolved
-        return 0.0
+        return None
 
     @property
     def cpm_set_bid(self) -> int | None:
