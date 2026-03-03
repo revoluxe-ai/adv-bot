@@ -329,6 +329,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
 
+        pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
         white_list = [kw for kw in pre_keywords if kw.hard_status in [2]]
         if not white_list:
             best_keyword = max(pre_keywords, key=attrgetter("rating"))
@@ -358,7 +359,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
 
-        white_list.sort(key=lambda kw: kw.rating or 0)
         best_keyword = max(pre_keywords, key=attrgetter("rating") or 0)
         worst_keyword = min(white_list, key=attrgetter("rating") or 0)
         rating_of_worst_keyword = worst_keyword.rating
