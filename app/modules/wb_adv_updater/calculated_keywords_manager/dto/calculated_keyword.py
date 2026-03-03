@@ -115,12 +115,10 @@ class CalculatedKeyword(BaseModel):
     @property
     def orders_per_1000_rub(self) -> float:
         """Заказов на 1000 руб. рекламы (= conv × 1_000_000 / CPM). CPM из каскада."""
-        return calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
-
-    @property
-    def rating_by_orders(self) -> float:
-        """Обратная совместимость: заказов на 100₽ (= orders_per_1000_rub / 10)."""
-        return self.orders_per_1000_rub / 10.0
+        result =  calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
+        if result is None:
+            return 0.0
+        return result
 
     @property
     def conv_views_to_orders(self) -> float:
