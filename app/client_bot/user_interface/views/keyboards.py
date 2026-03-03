@@ -384,9 +384,12 @@ def get_keywords_setting_keyboard(
                 text += f'->{target_place}'
             else:
                 text += f'->Н>'
-
-        cpm = int(keyword.cpm + 0.5)  # плата за показы
-        text += f"({cpm})"
+        cpm: float | None = keyword.cpm
+        if cpm is not None:
+            cpm_text = str(int(cpm + 0.5))
+        else:
+            cpm_text = "?"
+        text += cpm_text
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
         pay_for_order = (
