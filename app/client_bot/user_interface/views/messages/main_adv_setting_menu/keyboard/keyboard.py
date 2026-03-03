@@ -7,7 +7,6 @@ from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
-    PredictCTRModeToggle,
     SalesPredictMethodToggle,
     AutoUpdaterVersionToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
@@ -24,7 +23,6 @@ from app.modules.common_slaves.wildberries.models.enums import (
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import (
     BidderCoroutineType,
-    PredictCTRMode,
 )
 
 from app.modules.white_list_mode_settings.telegram.main_callback import (

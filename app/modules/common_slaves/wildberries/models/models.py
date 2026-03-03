@@ -416,6 +416,9 @@ class AdvSetting(BaseTable):
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
     nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
+    black_phrases: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default=text("'[]'")
+    )
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",

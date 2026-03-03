@@ -64,7 +64,7 @@ async def test_change_adv_strategy_updates_only_started_and_enabled_campaigns() 
         strategy=Strategy.MIN_CPO,
         bot_active=True,
         auto_adv_active_status=False,
-        auto_update_strategy=True,
+        auto_update_strategy=False,
     )
     adv_disabled = _make_adv(
         adv_setting_original_id=4,

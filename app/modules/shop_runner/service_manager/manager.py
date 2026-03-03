@@ -12,7 +12,7 @@ from typing import (
 
 from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
-from sqlalchemy import update
+from sqlalchemy import or_, update
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -880,12 +880,11 @@ class CoroutinesManager:
 
         strategy_updates: list[tuple[int, int, Strategy, Strategy, str]] = []
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка вычисления target strategy, shop_id=%s: %s",
                     self.shop_id,
                     result,
-                    exc_info=True,
                 )
                 continue
             adv, selection = result
@@ -926,12 +925,28 @@ class CoroutinesManager:
     ) -> None:
         async with sm() as session:
             for adv_setting_id, adv_id, from_strategy, to_strategy, reason in strategy_updates:
+                # Only update if auto_update_strategy is still on; otherwise user may have
+                # disabled it and set strategy manually in the bot UI (race with change_adv_strategy).
                 stmt = (
                     update(AdvSetting)
                     .where(AdvSetting.id == adv_setting_id)
+                    .where(
+                        or_(
+                            AdvSetting.auto_update_strategy.is_(True),
+                            AdvSetting.auto_update_strategy.is_(None),
+                        )
+                    )
                     .values({"strategy": to_strategy})
                 )
-                _ = await session.execute(stmt)
+                result = await session.execute(stmt)
+                if getattr(result, "rowcount", -1) == 0:
+                    logger.debug(
+                        "Стратегия РК не обновлена (auto_update_strategy выключен), "
+                        "shop_id=%s, adv_setting_id=%s",
+                        self.shop_id,
+                        adv_setting_id,
+                    )
+                    continue
                 logger.info(
                     "Изменена стратегия РК, shop_id=%s, adv_id=%s, adv_setting_id=%s, %s -> %s, reason=%s",
                     self.shop_id,

@@ -20,6 +20,7 @@ from app.client_bot.user_interface.message_templates.templates import (
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from . import keyboard
 from app.core.redis_manager_v2.redis_client import RedisClient
 
@@ -380,11 +381,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
             f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
         )
-            # TODO: Попала ошибка в код, пытался сделать .2f строке
-        if self._min_orders_per_1000_rub is not None:
-            text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
+        strategy = self.adv.strategy or Strategy.MIN_CPO
+        if strategy == Strategy.MIN_CPO:
+            if self._min_orders_per_1000_rub is not None:
+                text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
+            else:
+                text += "Огран не заданы!\n"
         else:
-            text += "Огран не заданы!\n"
+            if self._min_rating is not None:
+                text += f"🎯 Мин. конверсия (показы→заказы) для кампании: {round(self._min_rating * 100, 2)}%\n"
+            else:
+                text += "Огран не заданы!\n"
 
         text += "Посл.обнов:\n"
 

@@ -335,8 +335,9 @@ class StrategyMenuMessage(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        auto_update_strategy = bool(
-            getattr(self._adv_setting, "auto_update_strategy", True)
+        # None means auto-enabled (same as True); only False is manual
+        auto_update_strategy = (
+            getattr(self._adv_setting, "auto_update_strategy", True) is not False
         )
         current_strategy = self._adv_setting.strategy or Strategy.MIN_CPO
         mode_label = "Автоматический" if auto_update_strategy else "Ручной"

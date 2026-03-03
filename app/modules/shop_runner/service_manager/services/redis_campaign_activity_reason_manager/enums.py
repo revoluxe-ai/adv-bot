@@ -26,6 +26,7 @@ class AutoReasonCode(StrEnum):
     COST_DATA_INSUFFICIENT = "cost_data_insufficient"
     COST_RULE_FAILED = "cost_rule_failed"
     TIME_SCHEDULE = "time_schedule"
+    REC_SYSTEM_MODE_OFF = "rec_system_mode_off"
     BUDGET_OK_COST_OK = "budget_ok_cost_ok"
 
 

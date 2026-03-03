@@ -45,14 +45,20 @@ class PreCalculatedKeyword(BaseModel):
     @property
     def orders_per_1000_rub(self) -> float:
         """Заказов на 1000 руб. (= conv × 1_000_000 / CPM). Чем больше — тем лучше."""
-        return calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
+        result = calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
+        if result is None:
+            return 0.0
+        return result
 
     @property
     def rating(self) -> float:
         """Метрика для сортировки/сравнения: по Mode — conv_views_to_orders или orders_per_1000_rub (чем больше, тем лучше)."""
         if self.rating_mode == KeywordRatingMode.BY_MAX_CONV:
             return self.conv_views_to_orders
-        return self.orders_per_1000_rub
+        elif self.rating_mode == KeywordRatingMode.BY_MIN_CPO:
+            return self.orders_per_1000_rub
+        else:
+            raise NotImplementedError(f"Unknown rating mode: {self.rating_mode}")
 
     @property
     def hard_status(self) -> int:

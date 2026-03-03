@@ -29,6 +29,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.utils import redis_manager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
@@ -545,35 +546,12 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
 
 
 async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, keywords)  # type: ignore[attr-defined]
-    async with _sm(read_only=False) as session:
-        stmt = (
-            select(KeywordSetting)
-            .join(KeywordSetting.adv_setting)
-            .where(
-                AdvSetting.id == int(adv_setting_id), KeywordSetting.hard_status != 0
-            )
-        )
-        result = await session.execute(stmt)
-        keyword_settings = result.scalars().all()
-        for keyword_setting in keyword_settings:
-            if keyword_setting.hard_status == ALWAYS_ON:
-                continue
-            for black_phrase in keywords:
-                black_phrase_text = black_phrase.lower().strip()
-                if "'" in black_phrase_text or '"' in black_phrase_text:
-                    black_phrase_text = black_phrase_text.replace("'", "''").replace(
-                        '"', '""'
-                    )
-                    if black_phrase_text == keyword_setting.text:
-                        keyword_setting.hard_status = 0
-                        break
-                else:
-                    if black_phrase_text in keyword_setting.text:
-                        keyword_setting.hard_status = 0
-                        break
-
-        await session.commit()
+    async with _sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
+    manager = RelevantPhraseManager(adv)
+    await manager.update_black_phrases(keywords)
 
 #
 # async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -> bool:
@@ -593,7 +571,12 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
 
 
 async def reset_black_phrases(adv_setting_id: int) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, [])  # type: ignore[attr-defined]
+    async with _sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
+    manager = RelevantPhraseManager(adv)
+    await manager.update_black_phrases([])
 
 
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:

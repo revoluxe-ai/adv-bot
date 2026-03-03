@@ -29,7 +29,6 @@ class CommonAdvsStatData:
 
     adv_setting: AdvSetting
     keywords: list[CalculatedKeyword]
-    min_rating_by_orders: float | None
     min_orders_per_1000_rub: float | None
     hard_min_ctr: float | None
     auto_cpm: int
@@ -152,14 +151,12 @@ class CommonAdvsStatDataManager:
         )
 
         from app.modules.wb_adv_updater import phrases_processor
-        min_rating_by_orders: float | None = phrases_processor.get_min_rating(keywords)
         min_orders_per_1000_rub: float | None = phrases_processor.get_min_orders_per_1000_rub(
             keywords
         )
         return CommonAdvsStatData(
             adv_setting=adv_setting,
             keywords=keywords,
-            min_rating_by_orders=min_rating_by_orders,
             min_orders_per_1000_rub=min_orders_per_1000_rub,
             hard_min_ctr=adv_setting.hard_min_ctr,
             auto_cpm=adv_setting.cpm,

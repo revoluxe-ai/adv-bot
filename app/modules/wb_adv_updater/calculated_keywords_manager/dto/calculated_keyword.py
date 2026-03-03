@@ -19,6 +19,7 @@ class CalculatedKeyword(BaseModel):
     cluster_stat: KeywordStat
     state: KeywordState
     # Рейтинг для сортировки (по Mode: conv_views_to_orders или orders_per_1000_rub). Заполняется менеджером из pre_kw.rating.
+    # Кеш в Redis постоянно обновляется при перерасчёте ключей, поэтому старые записи без rating не накапливаются и проблем быть не должно.
     rating: float
     target_pay_for_order: float | None
     above_rec_conversion: bool | None = None
@@ -43,13 +44,13 @@ class CalculatedKeyword(BaseModel):
 
 
     @property
-    def cpm(self) -> float:
+    def cpm(self) -> float | None:
         """CPM только из каскада (Redis set_bid → bid_log → stats). Без fallback на SQL."""
         if self.cpm_sources is not None:
             resolved = self.cpm_sources.resolved_cpm()
             if resolved is not None:
                 return resolved
-        return 0.0
+        return None
 
     @property
     def cpm_set_bid(self) -> int | None:
@@ -114,12 +115,10 @@ class CalculatedKeyword(BaseModel):
     @property
     def orders_per_1000_rub(self) -> float:
         """Заказов на 1000 руб. рекламы (= conv × 1_000_000 / CPM). CPM из каскада."""
-        return calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
-
-    @property
-    def rating_by_orders(self) -> float:
-        """Обратная совместимость: заказов на 100₽ (= orders_per_1000_rub / 10)."""
-        return self.orders_per_1000_rub / 10.0
+        result =  calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
+        if result is None:
+            return 0.0
+        return result
 
     @property
     def conv_views_to_orders(self) -> float:

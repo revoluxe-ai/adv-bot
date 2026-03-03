@@ -6,13 +6,13 @@ CPM = стоимость за 1000 показов (руб.). За 1000 ₽ по�
 """
 
 
-def calc_orders_per_1000_rub(conv_views_to_orders: float, cpm: float) -> float:
+def calc_orders_per_1000_rub(conv_views_to_orders: float, cpm: float | None) -> float | None:
     """Заказов на 1000 руб. рекламы при данной конверсии и CPM.
 
     CPM — руб. за 1000 показов. При CPM <= 0 возвращает 0.
     """
-    if cpm <= 0:
-        return 0.0
+    if cpm is None or cpm <= 0:
+        return None
     return conv_views_to_orders * 1_000_000.0 / cpm
 
 

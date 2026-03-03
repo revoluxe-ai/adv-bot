@@ -152,7 +152,8 @@ def get_campaign_activity_target_keyboard(
 
 def get_strategy_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    auto_update_strategy = bool(getattr(adv_setting, "auto_update_strategy", True))
+    # None means auto-enabled (same as True); only False is manual
+    auto_update_strategy = getattr(adv_setting, "auto_update_strategy", True) is not False
     strategy = adv_setting.strategy or Strategy.MIN_CPO
 
     _ = builder.row(
@@ -331,7 +332,7 @@ def get_keywords_setting_keyboard(
         if sort_mode_ in ["by_adv", "only_out_index"]:
 
             kws_.sort(
-                key=lambda x: x.rating, reverse=True
+                key=lambda x: x.rating or 0, reverse=True
             )
 
             return kws_
@@ -339,7 +340,7 @@ def get_keywords_setting_keyboard(
         elif sort_mode_ == "white_list":
 
             def sort_func(kw_: CalculatedKeyword) -> float:
-                return kw_.rating
+                return kw_.rating or 0
 
             return sorted(kws_, key=sort_func, reverse=True)
 
@@ -383,9 +384,12 @@ def get_keywords_setting_keyboard(
                 text += f'->{target_place}'
             else:
                 text += f'->Н>'
-
-        cpm = int(keyword.cpm + 0.5)  # плата за показы
-        text += f"({cpm})"
+        cpm: float | None = keyword.cpm
+        if cpm is not None:
+            cpm_text = str(int(cpm + 0.5))
+        else:
+            cpm_text = "?"
+        text += f"({cpm_text})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
         pay_for_order = (

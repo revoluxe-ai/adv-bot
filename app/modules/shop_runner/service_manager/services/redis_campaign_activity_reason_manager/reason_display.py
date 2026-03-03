@@ -19,6 +19,7 @@ REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     AutoReasonCode.COST_DATA_INSUFFICIENT.value: "Недостаточно данных по себестоимости",
     AutoReasonCode.COST_RULE_FAILED.value: "Правило по себестоимости не выполнено",
     AutoReasonCode.TIME_SCHEDULE.value: "Вне расписания показов",
+    AutoReasonCode.REC_SYSTEM_MODE_OFF.value: "Режим раскрутки выключен",
     AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюджет и себестоимость в норме, запущена",
     # Auction
     AuctionReasonCode.COMMON_OK.value: "Общий бюджет в норме, запущена",
