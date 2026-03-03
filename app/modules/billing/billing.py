@@ -352,21 +352,9 @@ async def __process_single_cabinet(
             )
 
             if neg_at is None:
-                # Первый день в минусе: разрешаем списание в минус
                 wb_cabinet.balance_went_negative_at = now_utc  # type: ignore[attr-defined]
-                use_b = min(calculated_bonus, price_for_shop_for_day)
-                # Кламп снизу 0: при уже отрицательном балансе не учитываем его в shortfall
-                use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
-                shortfall = price_for_shop_for_day - use_b - use_bal
-                if use_b > 0:
-                    add_bonus(use_b)
-                if use_bal > 0:
-                    add_balance(use_bal)
-                if shortfall > 0:
-                    add_balance(shortfall)
-                payment_successful = True
-            elif days_since_negative >= 7:
-                # Грация истекла — деактивируем кампании
+            if days_since_negative >= 7:
+                # Грация истекла — деактивируем кампании (не списываем)
                 grace_exceeded_cabinet_id = cabinet_id
                 for campaign in wb_cabinet.adv_settings:
                     if campaign.bot_active:
@@ -375,9 +363,8 @@ async def __process_single_cabinet(
                         campaign.auto_update_target_place = False
                 wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
             else:
-                # В пределах 7 дней — снова списываем в минус
+                # Первый день в минусе или в пределах 7 дней: списание в минус
                 use_b = min(calculated_bonus, price_for_shop_for_day)
-                # Кламп снизу 0: при уже отрицательном балансе не учитываем его в shortfall
                 use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
                 shortfall = price_for_shop_for_day - use_b - use_bal
                 if use_b > 0:
