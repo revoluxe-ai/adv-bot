@@ -359,8 +359,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             return calculated_keyword_list
 
         white_list.sort(key=lambda kw: kw.rating)
-        best_keyword = max(pre_keywords, key=attrgetter("rating"))
-        worst_keyword = white_list[0]
+        best_keyword = max(pre_keywords, key=lambda kw: kw.rating or 0)
+        worst_keyword = min(pre_keywords, key=lambda kw: kw.rating or 0)
         rating_of_worst_keyword = worst_keyword.rating
         for pre_kw in pre_keywords:
             best_keyword_status = True if pre_kw == best_keyword else False
