@@ -309,7 +309,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
             is_auto_campaign_active,
         )
-
+        pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
@@ -358,7 +358,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
 
-        white_list.sort(key=lambda kw: kw.rating)
+
         best_keyword = max(pre_keywords, key=lambda kw: kw.rating or 0)
         worst_keyword = min(pre_keywords, key=lambda kw: kw.rating or 0)
         rating_of_worst_keyword = worst_keyword.rating
