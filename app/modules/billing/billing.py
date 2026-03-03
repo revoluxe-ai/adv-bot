@@ -355,7 +355,8 @@ async def __process_single_cabinet(
                 # Первый день в минусе: разрешаем списание в минус
                 wb_cabinet.balance_went_negative_at = now_utc  # type: ignore[attr-defined]
                 use_b = min(calculated_bonus, price_for_shop_for_day)
-                use_bal = min(calculated_balance, price_for_shop_for_day - use_b)
+                # Кламп снизу 0: при уже отрицательном балансе не учитываем его в shortfall
+                use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
                 shortfall = price_for_shop_for_day - use_b - use_bal
                 if use_b > 0:
                     add_bonus(use_b)
@@ -376,7 +377,8 @@ async def __process_single_cabinet(
             else:
                 # В пределах 7 дней — снова списываем в минус
                 use_b = min(calculated_bonus, price_for_shop_for_day)
-                use_bal = min(calculated_balance, price_for_shop_for_day - use_b)
+                # Кламп снизу 0: при уже отрицательном балансе не учитываем его в shortfall
+                use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
                 shortfall = price_for_shop_for_day - use_b - use_bal
                 if use_b > 0:
                     add_bonus(use_b)
