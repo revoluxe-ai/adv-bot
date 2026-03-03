@@ -41,7 +41,6 @@ async def toggle_hide_zero_views(
         result = await session.execute(query)
         adv_setting: AdvSetting = result.scalar_one()
 
-    # Отправляем подтверждение
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
@@ -51,6 +50,10 @@ async def toggle_hide_zero_views(
         else "Скрытие ключей без рекламных просмотров отключено"
     )
 
+    # Всплывающая надпись и снятие индикатора с кнопки
+    await callback_query.answer(text=status_str)
+
+    # Дублируем надпись в чат, затем загружаем страницу с ключами
     await bot.send_message(chat_id, status_str)
 
     # Перерисовываем страницу ключей
