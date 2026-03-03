@@ -218,7 +218,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if self.min_orders_per_1000_rub is not None:
             t = f"Мин. зак. на 1000₽: {round(self.min_orders_per_1000_rub, 2)}\n"
         else:
-            t = '❗Ограничители не заданы!!!\n'
+            t = 'Не достаточно данных для оценки заказов!!!\n'
         text += t
         text +=(
             f"Стр.: {self._page}/{total_page + 1}\n"
