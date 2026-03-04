@@ -10,6 +10,7 @@ from ..bids_for_positions_manager.builder import build_bids_for_positions_manage
 class PredictKeywordsTargetPlaceContainer(containers.DeclarativeContainer):
     _clickhouse_manager = providers.Singleton(ClickHouseManager)
     _bids_for_positions_manager = providers.Singleton(build_bids_for_positions_manager)
+    bids_for_positions_manager = _bids_for_positions_manager
     predict_keywords_target_place_manager = providers.Singleton(
         PredictKeywordsTargetPlace,
         clickhouse_manager=_clickhouse_manager,
