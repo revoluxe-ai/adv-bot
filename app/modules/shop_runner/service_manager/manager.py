@@ -797,6 +797,7 @@ class CoroutinesManager:
     async def white_list_tail_trimmer(self):
         from .services.white_list_trimmer import WhiteListTrimmer
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
         complex_advs = [
             adv
