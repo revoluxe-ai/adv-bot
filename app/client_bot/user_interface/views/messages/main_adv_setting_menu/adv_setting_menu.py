@@ -154,6 +154,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._min_orders_per_1000_rub: float | None = (
             phrases_processor.get_min_orders_per_1000_rub(keywords)
         )
+        self._strategy = self.adv.strategy or Strategy.MIN_CPO
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
