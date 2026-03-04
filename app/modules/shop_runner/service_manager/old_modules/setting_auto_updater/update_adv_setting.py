@@ -31,6 +31,8 @@ async def update_adv_setting(
 ) -> bool:
     white_list_update_manager = WhiteListUpdateManager(adv)
     target_place_update_manager = TargetPlaceUpdater(adv)
+    if fact_data.pay_for_order is None:
+        return False
     if fact_data.pay_for_order > plan_data.max_pay_for_order:
         (
             change_success_delete_phrase,
