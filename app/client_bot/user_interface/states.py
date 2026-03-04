@@ -81,6 +81,10 @@ class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
 
 
+class SetCommonBidManual(StatesGroup):
+    waiting_for_bid = State()
+
+
 class ShopDefaultMaxCPM(StatesGroup):
     waiting_for_new_default_max_cpm = State()
 
