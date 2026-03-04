@@ -458,8 +458,8 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         handlers: list[Callable[[], Awaitable[Any]]] = [
-            lambda complex_adv=adv: minus_phrase_manager.update_minus_phrases(
-                complex_adv
+            lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
+                complex_adv_
             )
             for adv in complex_advs
         ]
