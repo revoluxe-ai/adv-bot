@@ -150,10 +150,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._status_auction = "Не установлен"
         keywords = await utils.get_keywords_for_keyboard(self.adv)
-        self._min_rating: float | None = phrases_processor.get_min_rating(keywords)
-        self._min_orders_per_1000_rub: float | None = (
-            phrases_processor.get_min_orders_per_1000_rub(keywords)
-        )
+        self._min_orders_per_1000_rub = phrases_processor.get_min_orders_per_1000_rub(keywords)
+        self._min_conv_views_to_orders = phrases_processor.get_min_conv_views_to_orders(keywords)
         self._strategy = self.adv.strategy or Strategy.MIN_CPO
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
