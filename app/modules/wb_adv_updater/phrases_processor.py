@@ -331,27 +331,47 @@ async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeywor
     keyword_manager = CalculatedKeywordsManager()
     # TODO: Вроде как сейчас WB позволяет внутри РК управлять каждым артикулом отдельно
     keywords: list[CalculatedKeyword]  = await keyword_manager.get_calculated_keywords(complex_adv)
-    keywords = sorted(keywords, key=lambda kw: kw.rating, reverse=True)
+    keywords = sorted(keywords, key=lambda kw: kw.rating or 0, reverse=True)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
     await keywords_redis_cache_manager.set_calculated_keywords(
         keywords, complex_adv.adv_id
     )
-
     return keywords
 
 
 def get_min_rating(keywords: list[CalculatedKeyword]) -> float | None:
+    """Минимальный рейтинг среди ключей в белом списке. Ключи с rating is None не учитываются."""
+    white_list = [kw for kw in keywords if kw.hard_status == 2]
+    with_rating: list[CalculatedKeyword] = [kw for kw in white_list if kw.rating is not None]
+    if not with_rating:
+        return None
+    ratings: list[float] = [kw.rating for kw in with_rating if kw.rating is not None]
+    return min(ratings)
+
+
+def get_white_list(
+    keywords: list[CalculatedKeyword],
+) -> list[CalculatedKeyword] | None:
+    """За один проход по белому списку: (мин. зак. на 1000₽, мин. конверсия показы→заказы)."""
     white_list = [kw for kw in keywords if kw.hard_status == 2]
     if not white_list:
         return None
-    white_list.sort(key=lambda kw: kw.rating)
-    worst_kw = white_list[0]
-    return worst_kw.rating
+    return white_list
 
 
 def get_min_orders_per_1000_rub(keywords: list[CalculatedKeyword]) -> float | None:
-    """Минимум заказов на 1000₽ среди ключей в белом списке (для отображения «Мин. зак. на 1000₽»)."""
-    white_list = [kw for kw in keywords if kw.hard_status == 2]
+    """Минимум заказов на 1000₽ среди ключей в белом списке."""
+    white_list = get_white_list(keywords)
     if not white_list:
         return None
-    return min(kw.orders_per_1000_rub for kw in white_list)
+    result = min(kw.orders_per_1000_rub for kw in white_list)
+    return result
+
+
+def get_min_conv_views_to_orders(keywords: list[CalculatedKeyword]) -> float | None:
+    """Минимум конверсии показы→заказы (доля) среди ключей в белом списке. Для «зак. на 1000 показов» умножать на 1000."""
+    white_list = get_white_list(keywords)
+    if not white_list:
+        return None
+    result = min(kw.conv_views_to_orders for kw in white_list)
+    return result
