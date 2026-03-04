@@ -329,6 +329,7 @@ class CoroutinesManager:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
         # в фильтре только проверку активности аукциона
