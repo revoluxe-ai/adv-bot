@@ -861,6 +861,7 @@ class CoroutinesManager:
             return None
 
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
         if not complex_advs:
             return None
