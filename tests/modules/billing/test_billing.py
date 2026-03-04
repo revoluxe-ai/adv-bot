@@ -111,7 +111,9 @@ async def test_process_single_cabinet_insufficient_funds_first_day_negative(
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
-    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()):
+    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()), patch.object(
+        billing, "_notify_days_until_block", new=AsyncMock()
+    ):
         mock_session.scalar.return_value = 0
         result = await billing.__process_single_cabinet(
             session=mock_session,
@@ -129,19 +131,18 @@ async def test_process_single_cabinet_insufficient_funds_first_day_negative(
 async def test_process_single_cabinet_grace_exceeded_deactivates(
     mock_session, mock_pricer, mock_redis_manager, active_adv
 ):
-    """Недостаточно средств и balance_went_negative_at >= 7 дней назад — деактивируем кампании.
-    Баланс оставляем отрицательным, иначе в начале обработки сбросится флаг (пополнение).
-    """
+    """Недостаточно средств, balance_after_charge < -7*price — деактивируем кампании, не сбрасываем neg_at."""
     from datetime import timezone
 
     neg_at = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     cab = _make_cabinet(
         bonus=0.0,
-        balance=-50.0,
+        balance=-800.0,
         advs=[active_adv],
         balance_went_negative_at=neg_at,
     )
     mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    # balance_after_charge = -800 - 100 = -900 < -700 → deactivate
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
@@ -157,7 +158,120 @@ async def test_process_single_cabinet_grace_exceeded_deactivates(
     assert result["payment_successful"] is False
     assert result["reason"] == "deactivated"
     assert active_adv.bot_active is False
-    assert cab.balance_went_negative_at is None
+    assert cab.balance_went_negative_at is not None  # не сбрасываем (фикс бага)
+
+
+async def test_process_single_cabinet_negative_within_limit_charges(
+    mock_session, mock_pricer, mock_redis_manager, active_adv
+):
+    """В пределах лимита минуса: списание в минус, кампании остаются активными."""
+    cab = _make_cabinet(
+        bonus=0.0, balance=-200.0, advs=[active_adv], balance_went_negative_at=None
+    )
+    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    # balance_after_charge = -300, limit -700 → charge
+
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_notify_days_until_block", new=AsyncMock()):
+        mock_session.scalar.return_value = 0
+        result = await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 2, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
+    assert result["payment_successful"] is True
+    assert result["reason"] == "success"
+    assert active_adv.bot_active is True
+
+
+async def test_process_single_cabinet_negative_at_boundary_charges(
+    mock_session, mock_pricer, mock_redis_manager, active_adv
+):
+    """Граница ровно на лимите (-700): списание допускается."""
+    cab = _make_cabinet(
+        bonus=0.0, balance=-600.0, advs=[active_adv], balance_went_negative_at=None
+    )
+    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    # balance_after_charge = -700, limit -700 → still allowed (>= -700 in sense of not <)
+
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_notify_days_until_block", new=AsyncMock()):
+        mock_session.scalar.return_value = 0
+        result = await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 2, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
+    assert result["payment_successful"] is True
+    assert result["reason"] == "success"
+    assert active_adv.bot_active is True
+
+
+async def test_process_single_cabinet_grace_exceeded_rerun_no_charge(
+    mock_session, mock_pricer, mock_redis_manager, active_adv
+):
+    """Повторный запуск после превышения лимита: снова деактивация, без списания, neg_at не сбрасывается."""
+    from datetime import timezone
+
+    neg_at = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    cab = _make_cabinet(
+        bonus=0.0,
+        balance=-800.0,
+        advs=[active_adv],
+        balance_went_negative_at=neg_at,
+    )
+    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    add_count_before = mock_session.add.call_count
+
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()):
+        mock_session.scalar.return_value = 0
+        result = await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 9, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
+    assert result["payment_successful"] is False
+    assert result["reason"] == "deactivated"
+    assert cab.balance_went_negative_at is not None
+    # Не должно быть новых add (WBBalancePayment / AdvPayment за этот день)
+    assert mock_session.add.call_count == add_count_before
+
+
+async def test_process_single_cabinet_negative_calls_notify_days_until_block(
+    mock_session, mock_pricer, mock_redis_manager, active_adv
+):
+    """При списании в минус в пределах лимита вызывается _notify_days_until_block с верным days_left."""
+    cab = _make_cabinet(
+        bonus=0.0, balance=10.0, advs=[active_adv], balance_went_negative_at=None
+    )
+    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    # balance_after_charge = -90, max_allowed_negative = 700, room = 610, days_left = 6
+
+    notify_mock = AsyncMock()
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()), patch.object(
+        billing, "_notify_days_until_block", new=notify_mock
+    ):
+        mock_session.scalar.return_value = 0
+        await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 2, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
+    notify_mock.assert_awaited_once_with(cab.id, 6)
 
 
 async def test_process_single_cabinet_zero_price(
