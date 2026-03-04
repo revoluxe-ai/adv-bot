@@ -160,8 +160,6 @@ class ComplexAdv:
 
     @keyword_getting_mode.setter
     def keyword_getting_mode(self, value: KeywordGettingMode):
-        if not isinstance(value, KeywordGettingMode):
-            raise ValueError()
         self._keyword_getting_mode = value
 
     @property
