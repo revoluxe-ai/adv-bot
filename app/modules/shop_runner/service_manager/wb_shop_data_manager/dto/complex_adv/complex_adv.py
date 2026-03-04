@@ -65,8 +65,7 @@ class ComplexAdv:
         auto_update_strategy = self._adv_setting.auto_update_strategy
         if auto_update_strategy is None:
             return True
-        else:
-            return auto_update_strategy
+        return auto_update_strategy
 
 
     @property
@@ -161,8 +160,6 @@ class ComplexAdv:
 
     @keyword_getting_mode.setter
     def keyword_getting_mode(self, value: KeywordGettingMode):
-        if not isinstance(value, KeywordGettingMode):
-            raise ValueError()
         self._keyword_getting_mode = value
 
     @property

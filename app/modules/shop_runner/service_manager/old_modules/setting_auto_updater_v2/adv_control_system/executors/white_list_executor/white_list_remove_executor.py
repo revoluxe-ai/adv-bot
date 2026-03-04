@@ -196,7 +196,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             # Для ключей с заказами проверяем pay_for_order
 
             pay_for_order = kw.pay_for_order
-            if pay_for_order > target_pay_for_order:
+            if pay_for_order is None or pay_for_order > target_pay_for_order:
                 keywords_to_remove.append(kw)
 
 

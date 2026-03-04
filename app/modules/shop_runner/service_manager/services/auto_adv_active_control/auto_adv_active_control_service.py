@@ -220,6 +220,8 @@ class AutoAdvActiveControlService:
         # rec_system_mode по умолчанию False — кампании без явного включения полок остаются на паузе
         # по дизайну продукта: логика контроля активности и стратегий завязана на полки (сначала
         # самые дешёвые места, затем конверсия). Это не баг, а намеренное ограничение.
+        # Ранний выход только из этого обработчика; аукцион (поиск) обрабатывается отдельно
+        # в _search_campaign_handler, который вызывается тем же ensure_campaigns_active.
         if not adv.rec_system_promotion_mode_active:
             if auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(

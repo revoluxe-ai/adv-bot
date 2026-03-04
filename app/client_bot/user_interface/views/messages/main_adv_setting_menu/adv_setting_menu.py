@@ -150,10 +150,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._status_auction = "Не установлен"
         keywords = await utils.get_keywords_for_keyboard(self.adv)
-        self._min_rating: float | None = phrases_processor.get_min_rating(keywords)
-        self._min_orders_per_1000_rub: float | None = (
-            phrases_processor.get_min_orders_per_1000_rub(keywords)
-        )
+        self._min_orders_per_1000_rub = phrases_processor.get_min_orders_per_1000_rub(keywords)
+        self._min_conv_views_to_orders = phrases_processor.get_min_conv_views_to_orders(keywords)
+        self._strategy = self.adv.strategy or Strategy.MIN_CPO
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -374,24 +373,30 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             suffix_auction = _status_suffix(self._reason_search)
 
+        id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подключено"
+        id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подключено"
         text += (
             f"📢 Камп: {self.adv.name}\n"
-            f"🆔 ID камп: {self.adv.adv_id}\n"
+            f"🆔 ID Авто: {id_auto}\n"
+            f"🆔 ID Аукциона: {id_auction}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
             f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
         )
-        strategy = self.adv.strategy or Strategy.MIN_CPO
-        if strategy == Strategy.MIN_CPO:
-            if self._min_orders_per_1000_rub is not None:
-                text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
-            else:
-                text += "Огран не заданы!\n"
-        else:
-            if self._min_rating is not None:
-                text += f"🎯 Мин. конверсия (показы→заказы) для кампании: {round(self._min_rating * 100, 2)}%\n"
-            else:
-                text += "Огран не заданы!\n"
+        mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "
+        mark_conv = "▶ " if self._strategy == Strategy.MAX_CONV else "  "
+        val_1000rub = (
+            round(self._min_orders_per_1000_rub, 2)
+            if self._min_orders_per_1000_rub is not None
+            else "—"
+        )
+        val_1000views = (
+            round(self._min_conv_views_to_orders * 1000, 2)
+            if self._min_conv_views_to_orders is not None
+            else "—"
+        )
+        text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
+        text += f"{mark_conv}Мин. зак. на 1000 показов: {val_1000views}\n"
 
         text += "Посл.обнов:\n"
 

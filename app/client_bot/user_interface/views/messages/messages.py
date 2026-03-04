@@ -571,7 +571,12 @@ class KeywordSettingMessage(TextWithKeyboard):
 
         text += f'Заказов на 1000 показов: {round(self._calculated_keyword.conv_views_to_orders * 1000, 2)}\n'
         text += f"Заказов на 1000₽: {round(self._calculated_keyword.orders_per_1000_rub, 2)}\n"
-        text += f'Себес. заказа: {round(self._calculated_keyword.pay_for_order, 2)}\n'
+        pay_for_order = self._calculated_keyword.pay_for_order
+        if pay_for_order is not None:
+            pay_for_order_str = f"{pay_for_order:.2f}"
+        else:
+            pay_for_order_str = 'Не определен (нет заказов)'
+        text += f'Себес. заказа: {pay_for_order_str}\n'
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"

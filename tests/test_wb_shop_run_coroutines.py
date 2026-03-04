@@ -38,6 +38,7 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "increment_fact_data_stats",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
+        "change_adv_strategy",
     ]
 
     manager = MagicMock()
@@ -116,6 +117,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "white_list_tail_trimmer",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
+        "change_adv_strategy",
     ):
         getattr(coroutines_manager_mock, method).assert_called_once()
 
@@ -152,7 +154,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    assert len(recorded_group.created) == 19
+    assert len(recorded_group.created) == 20
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
@@ -172,5 +174,6 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         "white_list_tail_trimmer",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
+        "change_adv_strategy",
     ):
         getattr(coroutines_manager_mock, method).assert_called_once()

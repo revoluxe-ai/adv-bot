@@ -484,7 +484,16 @@ class KeywordsWithBest:
 
     def __init__(self, keywords: list[CalculatedKeyword]):
         self.keywords = keywords
-        self._best: CalculatedKeyword | None = None
+        self._best: CalculatedKeyword | None = (
+            max(keywords, key=lambda kw: getattr(kw, "rating", 0) or 0)
+            if keywords
+            else None
+        )
+
+    @property
+    def best(self) -> CalculatedKeyword | None:
+        """Keyword с наивысшим rating (для сортировки)."""
+        return self._best
 
     def __iter__(self):
         return iter(self.keywords)
@@ -505,7 +514,7 @@ def generate_keywords_with_best(
     Пример:
         result = generate_keywords_with_best(count=3)
         keywords = result.keywords  # список всех keywords
-        best = result.best  # keyword с наивысшим rating_by_orders
+        best = result.best  # keyword с наивысшим rating
 
     Args:
         count: количество ключевых слов для генерации
@@ -526,6 +535,7 @@ def generate_keywords_with_best(
         CalculatedKeywordFactory(
             adv_id=_adv_id,
             cluster_stat__final_rating=round(rating, 2),
+            rating=round(rating, 2),
             keyword_setting__hard_status=HardStatus.IN_TEST,
         )
         for rating in ratings
