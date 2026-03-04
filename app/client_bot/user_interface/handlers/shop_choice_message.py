@@ -9,6 +9,7 @@ from app.client_bot.user_interface.views.callbacks import Action
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.settings import settings
 
 SHOPS_LIST_PAGE_TITLE = ("Нажмите 'Добавить магазин' для начала использования"
                          "Мои магазины: \n"
@@ -59,12 +60,12 @@ def get_main_menu_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
         callback_data=callbacks.UserBalanceMenu().pack(),
     )
     keyboard_buttons.append([user_balance_button])
-
-    invite_show_button = InlineKeyboardButton(
-        text="Показать инвайт",
-        callback_data=callbacks.InviteShow().pack(),
-    )
-    keyboard_buttons.append([invite_show_button])
+    if settings.invite_gate:
+        invite_show_button = InlineKeyboardButton(
+            text="Показать инвайт",
+            callback_data=callbacks.InviteShow().pack(),
+        )
+        keyboard_buttons.append([invite_show_button])
 
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)

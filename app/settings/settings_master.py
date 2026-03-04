@@ -88,6 +88,18 @@ class Settings:
         raise Exception("Не верное значение в POLLING_MODE")
 
     @property
+    def invite_gate(self) -> bool:
+        value = os.environ.get("INVITE_GATE")
+        if value is None:
+            return False
+        value = value.lower()
+        if value == "false":
+            return False
+        elif value == "true":
+            return True
+        raise Exception("Не верное значение в INVITE_GATE")
+
+    @property
     def version(self) -> str | None:
         value = os.environ.get("VERSION")
         return value

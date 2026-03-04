@@ -79,7 +79,7 @@ async def callback_start_registration(
         if callback.message is None:
             return
         chat_id = callback.message.chat.id
-        if user is None or not user.passed_gate:
+        if (user is None or not user.passed_gate) and settings.invite_gate:
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
@@ -122,7 +122,7 @@ async def show_shops_list(
                 bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
             )()
             return
-    if user is None or not user.passed_gate:
+    if (user is None or not user.passed_gate) and settings.invite_gate:
         _ = await bot.send_message(
             chat_id,
             get_gate_message_text(),
@@ -155,7 +155,7 @@ async def shops_list_paginator(
         )
         result = await session.execute(stmt)
         user: User | None = result.unique().scalar()
-        if user is None or not user.passed_gate:
+        if (user is None or not user.passed_gate) and settings.invite_gate:
             _ = await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
