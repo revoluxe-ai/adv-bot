@@ -551,8 +551,8 @@ class CoroutinesManager:
             complex_advs, operation_name="update_minus_phrases_in_advs"
         )
         handlers: list[Callable[[], Awaitable[Any]]] = [
-            lambda complex_adv=adv: minus_phrase_manager.update_minus_phrases(
-                complex_adv
+            lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
+                complex_adv_
             )
             for adv in complex_advs
         ]
