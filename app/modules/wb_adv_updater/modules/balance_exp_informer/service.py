@@ -18,6 +18,7 @@ from app.modules.billing.event_manager.dto.event_type import EventType
 from app.modules.billing.event_manager.event_manager import (
     BillingEventManager,
 )
+from app.modules.billing.billing import GRACE_MAX_NEGATIVE_DAYS
 from app.modules.billing.event_manager.models import BillingEvent
 from app.modules.billing.pricer.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
@@ -415,8 +416,7 @@ class BalanceReminderService:
         _ = await session.execute(stmt)
 
     async def send_negative_balance_reminders(self) -> None:
-        """Отправить ежедневные напоминания о минусовом балансе (7-дневная грация)."""
-        today = billing_today()
+        """Отправить ежедневные напоминания о минусовом балансе (грация по балансу: 7× дневной расход)."""
         async with self._session_factory() as session:
             stmt = (
                 select(
@@ -462,9 +462,33 @@ class BalanceReminderService:
                 if balance + bonus >= 0:
                     continue
                 sample = cab_rows[0]
-                neg_at = sample.balance_went_negative_at
-                neg_date = neg_at.date() if neg_at else today
-                days_left = max(0, 7 - (today - neg_date).days)
+                shop_id = getattr(sample, "shop_id", None) if sample else None
+                price_for_shop_for_day: float = 0.0
+                if shop_id:
+                    try:
+                        price_for_shop_for_day = await self._pricer.get_price_for_day_for_shop(
+                            session, shop_id
+                        )
+                    except Exception as exc:
+                        self._logger.debug(
+                            "Negative reminder: get_price_for_day_for_shop(%s) failed: %s",
+                            shop_id,
+                            exc,
+                        )
+                # Align with billing: deactivation is balance-based (grace = 7× daily spend).
+                # Same formula as billing._process_cabinet: room = balance + max_allowed_negative.
+                max_allowed_negative = (
+                    price_for_shop_for_day * GRACE_MAX_NEGATIVE_DAYS
+                    if price_for_shop_for_day > 0
+                    else 0.0
+                )
+                total_balance = float(balance) + float(bonus)
+                room = total_balance + max_allowed_negative
+                days_left = (
+                    max(0, int(room // price_for_shop_for_day))
+                    if price_for_shop_for_day > 0
+                    else 0
+                )
                 shop_name = (sample.shop_name or "").strip() or f"Кабинет {wb_cabinet_id}"
                 for row in cab_rows:
                     if row.chat_id is None:
