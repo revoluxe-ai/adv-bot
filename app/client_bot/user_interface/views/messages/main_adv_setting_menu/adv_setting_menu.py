@@ -381,17 +381,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
             f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
         )
-        strategy = self.adv.strategy or Strategy.MIN_CPO
-        if strategy == Strategy.MIN_CPO:
-            if self._min_orders_per_1000_rub is not None:
-                text += f"🎯 Мин. зак. на 1000₽ для кампании: {round(self._min_orders_per_1000_rub, 2)}\n"
-            else:
-                text += "Огран не заданы!\n"
-        else:
-            if self._min_rating is not None:
-                text += f"🎯 Мин. конверсия (показы→заказы) для кампании: {round(self._min_rating * 100, 2)}%\n"
-            else:
-                text += "Огран не заданы!\n"
+        mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "
+        mark_conv = "▶ " if self._strategy == Strategy.MAX_CONV else "  "
+        val_1000rub = (
+            round(self._min_orders_per_1000_rub, 2)
+            if self._min_orders_per_1000_rub is not None
+            else "—"
+        )
+        val_1000views = (
+            round(self._min_conv_views_to_orders * 1000, 2)
+            if self._min_conv_views_to_orders is not None
+            else "—"
+        )
+        text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
+        text += f"{mark_conv}Мин. зак. на 1000 показов: {val_1000views}\n"
 
         text += "Посл.обнов:\n"
 
