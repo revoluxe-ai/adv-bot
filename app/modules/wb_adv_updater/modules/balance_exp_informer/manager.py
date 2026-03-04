@@ -67,8 +67,9 @@ async def balance_expiration_informer_tick(
       - либо вызывает service.update() и затем спит.
     """
     now = datetime.now(ZoneInfo("Europe/Moscow"))
+    in_window = in_send_window_msk(now, cfg.send_hour_msk, cfg.window_end_hour_msk)
 
-    if not in_send_window_msk(now, cfg.send_hour_msk, cfg.window_end_hour_msk):
+    if not in_window:
         sleep_sec = seconds_until_next_send_hour_msk(now, cfg.send_hour_msk)
         await asyncio.sleep(sleep_sec + _jitter(cfg.sleep_jitter_seconds))
         return
