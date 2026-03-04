@@ -31,6 +31,10 @@ class ChangeMaxCPC(StatesGroup):
     waiting_for_new_max_cpc = State()
 
 
+class ChangeAutoBid(StatesGroup):
+    waiting_for_new_bid = State()
+
+
 class ChangeMinViewsForPredictCTR(StatesGroup):
     waiting_for_new_min_views = State()
 

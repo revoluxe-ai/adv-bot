@@ -47,6 +47,7 @@ from .user_interface.handlers import (
     invite_show,
     add_white_phrases,
     adv_setting,
+    change_auto_bid,
     change_cpm,
     change_max_cpc,
     clusters,
@@ -148,6 +149,7 @@ common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(change_max_cpc.router)
+common_router.include_routers(change_auto_bid.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 # TODO(legacy-remove): модуль содержит legacy callbacks.StrategySetting;
 # удалить legacy-ветку после стабилизации нового экрана StrategyMenu.
