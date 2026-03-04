@@ -766,7 +766,6 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         if not complex_advs:
             return None
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         if not complex_advs:
             return None
 
