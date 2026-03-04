@@ -339,16 +339,6 @@ async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeywor
     return keywords
 
 
-def get_min_rating(keywords: list[CalculatedKeyword]) -> float | None:
-    """Минимальный рейтинг среди ключей в белом списке. Ключи с rating is None не учитываются."""
-    white_list = [kw for kw in keywords if kw.hard_status == 2]
-    with_rating: list[CalculatedKeyword] = [kw for kw in white_list if kw.rating is not None]
-    if not with_rating:
-        return None
-    ratings: list[float] = [kw.rating for kw in with_rating if kw.rating is not None]
-    return min(ratings)
-
-
 def get_white_list(
     keywords: list[CalculatedKeyword],
 ) -> list[CalculatedKeyword] | None:
