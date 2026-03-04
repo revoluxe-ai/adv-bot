@@ -14,6 +14,15 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
+_SERVICE_MODULE = (
+    "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service"
+)
+
+
+async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
+    """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
+    return {aid: None for aid in adv_ids}
+
 
 class _FakeAdvSetting:
     def __init__(
@@ -21,15 +30,19 @@ class _FakeAdvSetting:
         active_status: str,
         adv_id: int | None = None,
         *,
+        adv_setting_id: int | None = None,
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
+        rec_system_mode: bool = True,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
+        self.id = adv_setting_id if adv_setting_id is not None else (adv_id if adv_id is not None else 0)
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
+        self.rec_system_mode = rec_system_mode
 
 
 class _FakeSearchAdv:
@@ -55,6 +68,7 @@ class _FakeComplexAdv:
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
+        rec_system_mode: bool = True,
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -66,6 +80,7 @@ class _FakeComplexAdv:
             plan_for_sales_for_day=plan_for_sales_for_day,
             target_price_for_order=target_price_for_order,
             max_price_for_order=max_price_for_order,
+            rec_system_mode=rec_system_mode,
         )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
@@ -95,6 +110,10 @@ class _FakeComplexAdv:
     @property
     def common_budget_daily_limit(self) -> int | None:
         return self._common_budget_daily_limit
+
+    @property
+    def rec_system_promotion_mode_active(self) -> bool:
+        return self._adv_setting.rec_system_mode
 
 
 @pytest.mark.asyncio
@@ -185,16 +204,18 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         }
         return mapping.get(adv_id)
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active(
             [adv_to_start, adv_to_pause, ignored_adv]
         )
@@ -204,6 +225,49 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv_to_pause)
     wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv_to_pause)
     assert run_tasks_call["tasks_manager"] is tasks_manager
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode_off():
+    """When rec_system (shelf promotion) mode is off, auto campaign is paused and not started."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=50,
+        search_status="pause",
+        auto_adv_id=10,
+        search_adv_id=11,
+        rec_system_mode=False,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        for handler in handlers:
+            await handler()
+        return []
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=MagicMock(spec=PlanFactReader),
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -251,16 +315,18 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
         adv_id = args[0]
         return 150.0 if adv_id == 7 else 200.0
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=0.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([overspend_adv])
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(overspend_adv)
@@ -309,13 +375,15 @@ async def test_auto_adv_active_control_common_budget_pauses_when_combined_spend_
         adv_id = args[0]
         return 100.0 if adv_id == 11 else 150.0
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
@@ -373,16 +441,18 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
     async def mock_spend(*args, **kwargs):
         return 50.0
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
@@ -431,16 +501,18 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
         plan_fact_reader=plan_fact_reader,
     )
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
@@ -490,16 +562,18 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
         plan_fact_reader=plan_fact_reader,
     )
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=0.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
@@ -551,16 +625,18 @@ async def test_auto_adv_does_not_start_when_avg_cost_above_target():
         plan_fact_reader=plan_fact_reader,
     )
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.start_auto_campaign.assert_not_called()
@@ -600,16 +676,18 @@ async def test_auto_adv_does_not_start_when_no_plan_fact():
         plan_fact_reader=plan_fact_reader,
     )
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(return_value=50.0),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.start_auto_campaign.assert_not_called()
@@ -665,16 +743,18 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
     async def mock_spend(*args, **kwargs):
         return 50.0
 
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.run_tasks",
+        f"{_SERVICE_MODULE}.run_tasks",
         new=mock_run_tasks,
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.AutoAdvActiveControlService._get_spend_for_adv",
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
         new=AsyncMock(side_effect=mock_spend),
     ), patch(
-        "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=150.0),
-    ):
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.start_auto_campaign.assert_not_called()

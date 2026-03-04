@@ -331,7 +331,7 @@ async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeywor
     keyword_manager = CalculatedKeywordsManager()
     # TODO: Вроде как сейчас WB позволяет внутри РК управлять каждым артикулом отдельно
     keywords: list[CalculatedKeyword]  = await keyword_manager.get_calculated_keywords(complex_adv)
-    keywords = sorted(keywords, key=lambda kw: kw.rating_by_orders, reverse=True)
+    keywords = sorted(keywords, key=lambda kw: kw.rating, reverse=True)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
     await keywords_redis_cache_manager.set_calculated_keywords(
         keywords, complex_adv.adv_id
@@ -340,10 +340,18 @@ async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeywor
     return keywords
 
 
-def get_min_rating_by_orders(keywords: list[CalculatedKeyword]) -> float | None:
+def get_min_rating(keywords: list[CalculatedKeyword]) -> float | None:
     white_list = [kw for kw in keywords if kw.hard_status == 2]
     if not white_list:
         return None
-    white_list.sort(key=lambda kw: kw.rating_by_orders)
+    white_list.sort(key=lambda kw: kw.rating)
     worst_kw = white_list[0]
-    return worst_kw.rating_by_orders
+    return worst_kw.rating
+
+
+def get_min_orders_per_1000_rub(keywords: list[CalculatedKeyword]) -> float | None:
+    """Минимум заказов на 1000₽ среди ключей в белом списке (для отображения «Мин. зак. на 1000₽»)."""
+    white_list = [kw for kw in keywords if kw.hard_status == 2]
+    if not white_list:
+        return None
+    return min(kw.orders_per_1000_rub for kw in white_list)

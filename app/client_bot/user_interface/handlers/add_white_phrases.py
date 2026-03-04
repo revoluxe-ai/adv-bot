@@ -45,6 +45,30 @@ async def waiting_for_white_phrases(message, bot: Bot, state: FSMContext):
     await messages.WhitePhrasesAdded(bot, message.from_user.id)(adv_setting_id)
 
 
+@router.callback_query(callbacks.AddFixedPhrases.filter())
+async def add_fixed_phrases(
+    callback: CallbackQuery,
+    bot: Bot,
+    callback_data: callbacks.AddFixedPhrases,
+    state: FSMContext,
+):
+    adv_setting_id = callback_data.adv_setting_id
+    await state.update_data(last_adv_setting_id=adv_setting_id)
+    await state.set_state(states.AddFixedPhrases.waiting_for_fixed_phrases)
+    await messages.WaitingForFixedPhrases(bot, callback.from_user.id)(adv_setting_id)
+
+
+@router.message(StateFilter(states.AddFixedPhrases.waiting_for_fixed_phrases))
+async def waiting_for_fixed_phrases(message, bot: Bot, state: FSMContext):
+    text = message.text
+    keywords = text.split("\n")
+    keywords = [k.strip().lower() for k in keywords]
+    data = await state.get_data()
+    adv_setting_id = data["last_adv_setting_id"]
+    await data_manager.add_fixed_phrases(keywords, adv_setting_id)
+    await messages.FixedPhrasesAdded(bot, message.from_user.id)(adv_setting_id)
+
+
 @router.callback_query(callbacks.AddRelevantPhrases.filter())
 async def add_relevant_phrases(
     callback: CallbackQuery,

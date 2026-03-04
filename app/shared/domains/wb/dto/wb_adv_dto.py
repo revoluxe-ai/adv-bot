@@ -2,6 +2,7 @@ from attr import define, field
 import typing
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.enums.target_position_mode import TargetPositionMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData, FactData
 
@@ -25,6 +26,10 @@ class WBAdvDTO:
     @property
     def target_position_mode(self) -> TargetPositionMode:
         return self._complex_adv.target_position_mode
+
+    @property
+    def strategy(self) -> Strategy:
+        return self._complex_adv.strategy
 
     @property
     def min_target_position(self) -> int:

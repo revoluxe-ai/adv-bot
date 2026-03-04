@@ -12,10 +12,12 @@ from typing import (
 
 from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
+from sqlalchemy import or_, update
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.auto_budget_manager import (
     AutoBudgetEnsureResult,
@@ -60,6 +62,9 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
 from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
+from .services.redis_campaign_activity_reason_manager import (
+    RedisCampaignActivityReasonManager,
+)
 from .services.auto_reset_bid_service import AutoResetBidService
 from .services.clusters_adv_stat_updater.clusters_adv_stat_updater import (
     ClustersAdvStatUpdater,
@@ -68,6 +73,8 @@ from .services.clusters_adv_stat_updater.di import ClustersAdvStatUpdaterContain
 from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_from_wl_by_mean_auto_ctr_manager import (
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
+from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +126,10 @@ class CoroutinesManager:
         self._increment_fact_data_manager = IncrementFactDataManager(
             redis_client_wrapper,
         )
+        self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
+            redis_client_wrapper
+        )
+        self._adv_strategy_selector = AdvStrategySelector()
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -242,7 +253,9 @@ class CoroutinesManager:
             return None
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
-        advs = [adv for adv in advs if adv.search_adv_active_status or adv.auto_adv_active_status]
+        # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
+        # в фильтре только проверку активности аукциона
+        advs = [adv for adv in advs if adv.search_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
@@ -673,7 +686,7 @@ class CoroutinesManager:
                     campaign_type,
             )
 
-    @while_coroutine_decorator(1 * 30, 60)
+    @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -684,6 +697,7 @@ class CoroutinesManager:
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
         )
         await service.ensure_campaigns_active(advs)
         return None
@@ -786,7 +800,12 @@ class CoroutinesManager:
         from .services.white_list_trimmer import WhiteListTrimmer
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
-        complex_advs = [adv for adv in complex_advs if adv.white_list_mode == WhiteListMode.TAIL_TRIMMING]
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if adv.white_list_mode
+            in (WhiteListMode.TAIL_TRIMMING, WhiteListMode.REPLACE_ON_TRIM)
+        ]
         if not complex_advs:
             return None
         trimmer = WhiteListTrimmer()
@@ -835,8 +854,109 @@ class CoroutinesManager:
 
         return None
 
+    @while_coroutine_decorator(60, 1)
+    async def change_adv_strategy(self):
+        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        if not complex_advs:
+            return None
 
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
+        if not complex_advs:
+            return None
 
+        handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StrategySelection | None]]]] = []
+        for adv in complex_advs:
+            handlers.append(
+                lambda complex_adv=adv: self._resolve_strategy_selection(complex_adv)
+            )
+
+        max_workers = self._max_workers_for(len(handlers), cap=16)
+        results = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+            tasks_manager=self._tasks_manager,
+        )
+
+        strategy_updates: list[tuple[int, int, Strategy, Strategy, str]] = []
+        for result in results:
+            if isinstance(result, BaseException):
+                logger.error(
+                    "Ошибка вычисления target strategy, shop_id=%s: %s",
+                    self.shop_id,
+                    result,
+                )
+                continue
+            adv, selection = result
+            if selection is None:
+                continue
+            current_strategy = adv.strategy
+            if current_strategy == selection.strategy:
+                continue
+            strategy_updates.append(
+                (
+                    adv.adv_setting_original_id,
+                    adv.adv_id,
+                    current_strategy,
+                    selection.strategy,
+                    selection.reason,
+                )
+            )
+
+        if not strategy_updates:
+            return None
+
+        await self._apply_strategy_updates(strategy_updates)
+        return None
+
+    async def _resolve_strategy_selection(
+        self,
+        complex_adv: ComplexAdv,
+    ) -> tuple[ComplexAdv, StrategySelection | None]:
+        selection = await self._adv_strategy_selector.select_target_strategy(
+            complex_adv,
+            plan_fact_reader=self._plan_fact_reader,
+        )
+        return complex_adv, selection
+
+    async def _apply_strategy_updates(
+        self,
+        strategy_updates: list[tuple[int, int, Strategy, Strategy, str]],
+    ) -> None:
+        async with sm() as session:
+            for adv_setting_id, adv_id, from_strategy, to_strategy, reason in strategy_updates:
+                # Only update if auto_update_strategy is still on; otherwise user may have
+                # disabled it and set strategy manually in the bot UI (race with change_adv_strategy).
+                stmt = (
+                    update(AdvSetting)
+                    .where(AdvSetting.id == adv_setting_id)
+                    .where(
+                        or_(
+                            AdvSetting.auto_update_strategy.is_(True),
+                            AdvSetting.auto_update_strategy.is_(None),
+                        )
+                    )
+                    .values({"strategy": to_strategy})
+                )
+                result = await session.execute(stmt)
+                if getattr(result, "rowcount", -1) == 0:
+                    logger.debug(
+                        "Стратегия РК не обновлена (auto_update_strategy выключен), "
+                        "shop_id=%s, adv_setting_id=%s",
+                        self.shop_id,
+                        adv_setting_id,
+                    )
+                    continue
+                logger.info(
+                    "Изменена стратегия РК, shop_id=%s, adv_id=%s, adv_setting_id=%s, %s -> %s, reason=%s",
+                    self.shop_id,
+                    adv_id,
+                    adv_setting_id,
+                    from_strategy,
+                    to_strategy,
+                    reason,
+                )
+            await session.commit()
 
 
 # TODO: Переделать граф зависимостей

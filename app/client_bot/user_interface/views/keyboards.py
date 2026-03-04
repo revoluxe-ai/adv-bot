@@ -1,10 +1,11 @@
 import datetime
+import math
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
-from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
+from app.client_bot.const import ALWAYS_ON, AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
     get_effective_keyword_target_place,
@@ -21,6 +22,7 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
@@ -145,6 +147,59 @@ def get_campaign_activity_target_keyboard(
         )
     )
 
+    return builder.as_markup()
+
+
+def get_strategy_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    # None means auto-enabled (same as True); only False is manual
+    auto_update_strategy = getattr(adv_setting, "auto_update_strategy", True) is not False
+    strategy = adv_setting.strategy or Strategy.MIN_CPO
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=(
+                "Выключить авто-выбор стратегии"
+                if auto_update_strategy
+                else "Включить авто-выбор стратегии"
+            ),
+            callback_data=callbacks.StrategyMenu(
+                action="toggle_auto",
+                adv_setting_original_id=adv_setting.id,
+            ).pack(),
+        )
+    )
+
+    if not auto_update_strategy:
+        min_cpo_active = "✅ " if strategy == Strategy.MIN_CPO else ""
+        max_conv_active = "✅ " if strategy == Strategy.MAX_CONV else ""
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=f"{min_cpo_active}MIN_CPO (минимальная себестоимость заказа)",
+                callback_data=callbacks.StrategyMenu(
+                    action="set_strategy",
+                    adv_setting_original_id=adv_setting.id,
+                    strategy=Strategy.MIN_CPO.value,
+                ).pack(),
+            )
+        )
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=f"{max_conv_active}MAX_CONV (максимум конверсии)",
+                callback_data=callbacks.StrategyMenu(
+                    action="set_strategy",
+                    adv_setting_original_id=adv_setting.id,
+                    strategy=Strategy.MAX_CONV.value,
+                ).pack(),
+            )
+        )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Вернуться к настройкам кампании",
+            callback_data=callbacks.Adv(adv_original_id=adv_setting.id).pack(),
+        )
+    )
     return builder.as_markup()
 
 
@@ -277,7 +332,7 @@ def get_keywords_setting_keyboard(
         if sort_mode_ in ["by_adv", "only_out_index"]:
 
             kws_.sort(
-                key=lambda x: x.rating_by_orders, reverse=True
+                key=lambda x: x.rating or 0, reverse=True
             )
 
             return kws_
@@ -285,7 +340,7 @@ def get_keywords_setting_keyboard(
         elif sort_mode_ == "white_list":
 
             def sort_func(kw_: CalculatedKeyword) -> float:
-                return kw_.rating_by_orders
+                return kw_.rating or 0
 
             return sorted(kws_, key=sort_func, reverse=True)
 
@@ -329,13 +384,20 @@ def get_keywords_setting_keyboard(
                 text += f'->{target_place}'
             else:
                 text += f'->Н>'
-
-        cpm = int(keyword.cpm + 0.5)  # плата за показы
-        text += f"({cpm})"
+        cpm: float | None = keyword.cpm
+        if cpm is not None:
+            cpm_text = str(int(cpm + 0.5))
+        else:
+            cpm_text = "?"
+        text += f"({cpm_text})"
         text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
-        pay_for_order = str((round(keyword.pay_for_order_by_current_cpm, 2))) \
-                                if keyword.pay_for_order_by_current_cpm != float('inf') else 'Б'
-        text += f"({round(keyword.rating_by_orders * 1000, 2)})({pay_for_order})"
+        conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
+        pay_for_order = (
+            str(round(keyword.pay_for_order, 2))
+            if not math.isinf(keyword.pay_for_order)
+            else "Б"
+        )
+        text += f"({conv_views_to_orders})({round(keyword.orders_per_1000_rub, 2)})({pay_for_order})"
 
         keyword_setting_original_id = keyword.keyword_setting_original_id
         assert keyword_setting_original_id
@@ -621,6 +683,31 @@ def get_keyword_setting_keyboard(
             )
         ]
         buttons.append(button)
+
+    if keyword.hard_status != ALWAYS_ON:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="Добавить в фикс.фразы (всегда вкл)",
+                    callback_data=callbacks.ChangeKeywordHardStatus(
+                        new_hard_status=ALWAYS_ON,
+                        keyword_setting_original_id=keyword_setting_original_id,
+                    ).pack(),
+                )
+            ]
+        )
+    else:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="Убрать из фикс.фраз",
+                    callback_data=callbacks.ChangeKeywordHardStatus(
+                        new_hard_status=AUTO_MODE,
+                        keyword_setting_original_id=keyword_setting_original_id,
+                    ).pack(),
+                )
+            ]
+        )
 
     if keyword.relevant:
         text = "Удалить из релевантных фраз"

@@ -469,6 +469,22 @@ def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Автоматически помечает интеграционные тесты маркером integration.
+    """
+    for item in items:
+        if item.get_closest_marker("integration"):
+            continue
+        path = str(item.fspath).replace("\\", "/")
+        if (
+            "/integration/" in path
+            or "integration" in item.fspath.basename
+            or "/tests_entry_points/" in path
+        ):
+            item.add_marker(pytest.mark.integration)
+
+
 @pytest.fixture
 def tokens_mock() -> list[MagicMock]:
     token_mock = MagicMock(spec=WBToken)

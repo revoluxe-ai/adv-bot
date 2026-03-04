@@ -1,3 +1,3 @@
-from .redis_manager import RedisManager
+# Redis storage for black_phrases was removed; data lives in AdvSetting.black_phrases (Postgres).
 
-__all__ = ["RedisManager"]
+__all__: list[str] = []

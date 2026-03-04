@@ -61,6 +61,9 @@ class WBCabinet(BaseTable):
                                                  nullable=False,
                                                  default=settings.DEFAULT_MAX_CPM,
                                                  server_default=text(str(settings.DEFAULT_MAX_CPM)))
+    balance_went_negative_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),

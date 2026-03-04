@@ -2,7 +2,11 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import KeywordStat
-from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import  KeywordSettingDTO
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import KeywordSettingDTO
+from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
+    calc_orders_per_1000_rub,
+    calc_pay_for_order,
+)
 from .inner_dto.keyword_cpm_sources import KeywordCpmSources
 from .inner_dto.keyword_state import KeywordState
 from .states import KeywordStatus, KeywordStatusReason
@@ -14,6 +18,9 @@ class CalculatedKeyword(BaseModel):
     keyword_setting: KeywordSettingDTO
     cluster_stat: KeywordStat
     state: KeywordState
+    # Рейтинг для сортировки (по Mode: conv_views_to_orders или orders_per_1000_rub). Заполняется менеджером из pre_kw.rating.
+    # Кеш в Redis постоянно обновляется при перерасчёте ключей, поэтому старые записи без rating не накапливаются и проблем быть не должно.
+    rating: float
     target_pay_for_order: float | None
     above_rec_conversion: bool | None = None
     cpm_sources: KeywordCpmSources | None = None
@@ -25,26 +32,25 @@ class CalculatedKeyword(BaseModel):
             return None
         return self.spend / self.clicks
 
+
     @property
     def target_place(self) -> int | None:
         return self.keyword_setting.target_place
 
     @property
-    def pay_for_order_by_current_cpm(self) -> float:
-        if self.rating_by_orders == 0:
-            return float('inf')
-        last_cpm = self.cpm
-        pay_for_order = 1 / self.rating_by_orders * last_cpm / 1000
-        return pay_for_order
+    def pay_for_order(self) -> float:
+        """Себестоимость одного заказа (руб.), при текущем CPM. CPO = 1000 / orders_per_1000_rub."""
+        return calc_pay_for_order(self.orders_per_1000_rub)
 
 
     @property
-    def cpm(self) -> float:
+    def cpm(self) -> float | None:
+        """CPM только из каскада (Redis set_bid → bid_log → stats). Без fallback на SQL."""
         if self.cpm_sources is not None:
             resolved = self.cpm_sources.resolved_cpm()
             if resolved is not None:
                 return resolved
-        return self.cluster_stat.cpm
+        return None
 
     @property
     def cpm_set_bid(self) -> int | None:
@@ -107,12 +113,17 @@ class CalculatedKeyword(BaseModel):
         return self.keyword_setting.text
 
     @property
-    def rating_by_orders(self) -> float:
-        return self.cluster_stat.final_rating
+    def orders_per_1000_rub(self) -> float:
+        """Заказов на 1000 руб. рекламы (= conv × 1_000_000 / CPM). CPM из каскада."""
+        result =  calc_orders_per_1000_rub(self.conv_views_to_orders, self.cpm)
+        if result is None:
+            return 0.0
+        return result
 
     @property
-    def conversion_without_cpm(self) -> float:
-        return self.cluster_stat.conversion_without_cpm
+    def conv_views_to_orders(self) -> float:
+        """Конверсия показы→заказы (доля)."""
+        return self.cluster_stat.conv_views_to_orders
 
     @property
     def views(self) -> int:

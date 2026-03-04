@@ -106,6 +106,8 @@ class CommonStatDataManager:
                 continue
             orders = common_stat.orders
             add_to_cart = common_stat.add_to_cart
+            organic_cart = max(0, add_to_cart - stat.added_to_cart)
+            organic_orders = max(0, orders - stat.orders)
 
             mean_pay_for_order = stat.spend / (orders if orders else 1)
 
@@ -118,10 +120,10 @@ class CommonStatDataManager:
                 mean_orders_for_fraction_day = None
 
             count_orders = orders
-            text_row = f"{date_str}: Корз.: {add_to_cart} Зак.: {count_orders}"
+            text_row = f"{date_str}: Корз.:{add_to_cart}({organic_cart}) Зак.:{count_orders}"
             if mean_orders_for_fraction_day:
                 text_row += f"({mean_orders_for_fraction_day})"
-            text_row += "шт."
+            text_row += f"({organic_orders})шт."
             text_row += f"Себеc: {mean_pay_for_order:.2f}р."
 
             # Дополнительные показы автокампании (за вычетом показов по ключевым запросам)

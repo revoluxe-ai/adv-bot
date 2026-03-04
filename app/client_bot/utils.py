@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select, Result
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
+from app.client_bot.const import ALWAYS_ON, AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -115,6 +115,8 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             hard_status = "БС"
         elif keyword.hard_status == AUTO_MODE:
             hard_status = "А"
+        elif keyword.hard_status == ALWAYS_ON:
+            hard_status = "ФФ"
         else:
             raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
 
@@ -140,7 +142,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 turn_on,
                 hard_status,
                 str(first_position),
-                str(round(keyword.rating_by_orders * 100, 4)).replace(".", ","),
+                str(round(keyword.orders_per_1000_rub, 4)).replace(".", ","),
                 str(keyword.total_orders if keyword.total_orders else 0),
             ]
         )

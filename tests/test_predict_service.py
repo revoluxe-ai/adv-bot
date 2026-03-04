@@ -13,6 +13,8 @@ import logging
 import grpc  # type: ignore
 import pytest
 
+pytestmark = pytest.mark.integration
+
 from app.modules.grpcs.predict_ctr_service.grpc_service.predict_ctr_service_pb2 import (
     PredictCtrRequest,
 )

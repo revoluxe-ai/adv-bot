@@ -17,7 +17,7 @@ class WhiteListUpdater:
         ):
             raise NotEnoughKeywordsError("Not enough keywords for white list update. ")
         assert [isinstance(keyword, CalculatedKeyword) for keyword in keywords]
-        keywords.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
+        keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
         top_keyword: CalculatedKeyword = keywords[0]
 
         stmt = (

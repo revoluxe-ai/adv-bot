@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .update_bids_command import DirectEnum
 
 
 @dataclass(frozen=True)
@@ -12,3 +16,6 @@ class CalculationInput:
     step: int
     max_bid: int
     min_bid: int | None
+    predict_target_bids: dict[str, dict[int, int]] | None
+    prev_direct: "DirectEnum | None" = None
+    prev_step: int | None = None

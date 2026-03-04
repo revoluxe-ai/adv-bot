@@ -15,13 +15,15 @@ class WhiteListModeKeyboards:
         builder = InlineKeyboardBuilder()
 
         labels = [
-            "Срезание хвоста (Для АвтоУправления)",
+            "Срезание хвоста",
+            "Срезание хвоста с Замещением (Для АвтоУправления)",
             "Активация только ключей из БС (Рек для Ручной работы)",
             "Свободная активация ключей",
         ]
 
         modes = [
             WhiteListMode.TAIL_TRIMMING,
+            WhiteListMode.REPLACE_ON_TRIM,
             WhiteListMode.ACTIVE_ONLY_WHITE_LIST,
             WhiteListMode.ABOVE_MIN_RATING,
         ]

@@ -6,7 +6,7 @@
 Примеры использования:
     # Простое создание
     kw = CalculatedKeywordFactory()
-    
+
     # С конкретными параметрами
     kw = CalculatedKeywordFactory(
         keyword_setting__text="платье",
@@ -15,10 +15,10 @@
         cluster_stat__clicks=50,
         state__status=KeywordStatus.GOOD,
     )
-    
+
     # Batch создание
     keywords = CalculatedKeywordFactory.create_batch(10)
-    
+
     # С готовыми объектами (для сложных случаев)
     kw = CalculatedKeywordFactory(
         keyword_setting=my_dto,
@@ -47,6 +47,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
     KeywordStatusReason,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.enum import KeywordRatingMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
     KeywordSettingDTO,
 )
@@ -71,6 +72,7 @@ class HardStatus(IntEnum):
     IN_TEST = 1  # в тестировании
     WHITELIST = 2  # белый список
     TURN_OFF = 3  # отключён
+    ALWAYS_ON = 4  # фикс.фразы (всегда вкл)
 
 
 # ============================================================================
@@ -103,13 +105,25 @@ class KeywordSettingDTOFactory(factory.Factory):
 
 class KeywordStatFactory(factory.Factory):
     """Factory для KeywordStat.
-    
+
     KeywordStat использует pydantic Field(alias=...), поэтому при создании
     нужно использовать alias-имена (norm_query, views_all_time, orders_all_time).
+    cpm приходит из get_clusters_stats и питает каскад (шаг «stats»). При
+    передаче final_rating подставляются conv_views_to_orders=final_rating/1_000_000
+    и cpm=1.0, чтобы рейтинг (orders_per_1000_rub = conv × 1_000_000 / cpm)
+    совпадал с final_rating.
     """
 
     class Meta:
         model = KeywordStat
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if "final_rating" in kwargs:
+            fr = float(kwargs.pop("final_rating"))
+            kwargs["conv_views_to_orders"] = fr / 1_000_000.0
+            kwargs.setdefault("cpm", 1.0)
+        return super()._create(model_class, *args, **kwargs)
 
     # Используем alias-имена для pydantic модели
     norm_query = factory.LazyFunction(lambda: fake.word())
@@ -117,7 +131,7 @@ class KeywordStatFactory(factory.Factory):
     timestamp = factory.LazyFunction(
         lambda: fake.date_time_between(start_date="-30d", end_date="now", tzinfo=timezone.utc)
     )
-    
+
     # Статистика с логичными зависимостями
     views = factory.LazyFunction(lambda: fake.random_int(100, 10000))
     clicks = factory.LazyAttribute(lambda obj: fake.random_int(1, max(1, int(obj.views * 0.1))))
@@ -125,8 +139,8 @@ class KeywordStatFactory(factory.Factory):
     orders = factory.LazyAttribute(lambda obj: fake.random_int(0, max(1, obj.add_to_cart)))
     spend = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=10.0, max_value=5000.0), 2))
     cpc = factory.LazyFunction(lambda: fake.random_int(50, 500))
-    cpm = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=50.0, max_value=500.0), 2))
-    
+
+    cpm = factory.LazyFunction(lambda: 1.0)
     # Расчётные поля
     base_cart_to_order_conv = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.1, max_value=0.8), 3)
@@ -137,10 +151,9 @@ class KeywordStatFactory(factory.Factory):
     expected_orders = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=10.0), 2)
     )
-    final_rating = factory.LazyFunction(
-        lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2)
-    )
-    conversion_without_cpm = factory.LazyFunction(
+    # final_rating is not a default: when passed, _create derives conv_views_to_orders and cpm from it.
+    # When omitted, conv_views_to_orders (and cpm) from declarations below are used; tests can pass them explicitly.
+    conv_views_to_orders = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=0.0, max_value=1.0), 6)
     )
 
@@ -176,20 +189,20 @@ class KeywordStateFactory(factory.Factory):
 
 class PreCalculatedKeywordFactory(factory.Factory):
     """Factory для PreCalculatedKeyword.
-    
+
     PreCalculatedKeyword - промежуточный объект перед расчётом статуса ключевого слова.
     Содержит keyword_setting, cluster_stat и adv_id.
-    
+
     Примеры:
         # Простое создание
         pre_kw = PreCalculatedKeywordFactory()
-        
+
         # С конкретным CTR (views=1000, clicks=100 -> ctr=0.1)
         pre_kw = PreCalculatedKeywordFactory(
             cluster_stat__views=1000,
             cluster_stat__clicks=100,
         )
-        
+
         # Whitelist keyword
         pre_kw = PreCalculatedKeywordFactory(
             keyword_setting__hard_status=HardStatus.WHITELIST,
@@ -204,6 +217,7 @@ class PreCalculatedKeywordFactory(factory.Factory):
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     target_pay_for_order = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=10.0, max_value=300.0), 2))
     bidder_status = factory.LazyFunction(lambda: BidderKeywordStatus.GOOD)
+    rating_mode = factory.LazyFunction(lambda: KeywordRatingMode.BY_MIN_CPO)
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
@@ -214,20 +228,24 @@ class PreCalculatedKeywordFactory(factory.Factory):
         # Backward compatibility: allow bidder_keyword_status alias from tests
         if 'bidder_keyword_status' in kwargs and 'bidder_status' not in kwargs:
             kwargs['bidder_status'] = kwargs.pop('bidder_keyword_status')
-        
+
         # Если cluster_stat не передан, но есть keyword_setting, синхронизируем text
         if cluster_stat is None and keyword_setting is not None:
             cluster_stat_kwargs = {}
             for key, value in list(kwargs.items()):
                 if key.startswith('cluster_stat__'):
                     cluster_stat_kwargs[key.replace('cluster_stat__', '')] = value
-            
+
             if 'norm_query' not in cluster_stat_kwargs:
                 cluster_stat_kwargs['norm_query'] = keyword_setting.text
-            
+            if 'final_rating' in cluster_stat_kwargs:
+                fr = cluster_stat_kwargs['final_rating']
+                cluster_stat_kwargs.setdefault('conv_views_to_orders', fr / 1_000_000.0)
+                cluster_stat_kwargs.setdefault('cpm', 1.0)
+
             kwargs['cluster_stat'] = KeywordStatFactory(**cluster_stat_kwargs)
             kwargs = {k: v for k, v in kwargs.items() if not k.startswith('cluster_stat__')}
-        
+
         return super()._create(model_class, *args, **kwargs)
 
 
@@ -238,23 +256,23 @@ class PreCalculatedKeywordFactory(factory.Factory):
 
 class CalculatedKeywordFactory(factory.Factory):
     """Основная Factory для CalculatedKeyword.
-    
+
     Примеры:
         # Простое создание
         kw = CalculatedKeywordFactory()
-        
+
         # С конкретным статусом
         kw = CalculatedKeywordFactory(
             state__status=KeywordStatus.GOOD,
             keyword_setting__hard_status=HardStatus.WHITELIST,
         )
-        
+
         # С конкретной статистикой
         kw = CalculatedKeywordFactory(
             cluster_stat__views=1000,
             cluster_stat__clicks=100,
         )
-        
+
         # Batch создание
         keywords = CalculatedKeywordFactory.create_batch(10)
     """
@@ -267,6 +285,7 @@ class CalculatedKeywordFactory(factory.Factory):
     cluster_stat = factory.SubFactory(KeywordStatFactory)
     state = factory.SubFactory(KeywordStateFactory)
     target_pay_for_order = factory.LazyFunction(lambda: fake.random_int(100, 1000))
+    rating = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0.0, max_value=100.0), 2))
 
     @factory.lazy_attribute
     def _sync_text(self):
@@ -283,7 +302,7 @@ class CalculatedKeywordFactory(factory.Factory):
         # Извлекаем или создаём keyword_setting
         keyword_setting = kwargs.get('keyword_setting')
         cluster_stat = kwargs.get('cluster_stat')
-        
+
         # Если cluster_stat не передан, но есть keyword_setting, синхронизируем text
         if cluster_stat is None and keyword_setting is not None:
             # Получаем параметры для cluster_stat
@@ -291,15 +310,15 @@ class CalculatedKeywordFactory(factory.Factory):
             for key, value in list(kwargs.items()):
                 if key.startswith('cluster_stat__'):
                     cluster_stat_kwargs[key.replace('cluster_stat__', '')] = value
-            
+
             # Устанавливаем norm_query из keyword_setting.text
             if 'norm_query' not in cluster_stat_kwargs:
                 cluster_stat_kwargs['norm_query'] = keyword_setting.text
-            
+
             kwargs['cluster_stat'] = KeywordStatFactory(**cluster_stat_kwargs)
             # Удаляем обработанные параметры
             kwargs = {k: v for k, v in kwargs.items() if not k.startswith('cluster_stat__')}
-        
+
         return super()._create(model_class, *args, **kwargs)
 
 
@@ -310,7 +329,7 @@ class CalculatedKeywordFactory(factory.Factory):
 
 class GoodKeywordFactory(CalculatedKeywordFactory):
     """Фабрика для хороших ключевых слов (whitelist, GOOD status)."""
-    
+
     keyword_setting = factory.SubFactory(
         KeywordSettingDTOFactory,
         hard_status=HardStatus.WHITELIST,
@@ -330,7 +349,7 @@ class GoodKeywordFactory(CalculatedKeywordFactory):
 
 class BadKeywordFactory(CalculatedKeywordFactory):
     """Фабрика для плохих ключевых слов (blacklist, BAD status)."""
-    
+
     keyword_setting = factory.SubFactory(
         KeywordSettingDTOFactory,
         hard_status=HardStatus.BLACKLIST,
@@ -350,7 +369,7 @@ class BadKeywordFactory(CalculatedKeywordFactory):
 
 class TestingKeywordFactory(CalculatedKeywordFactory):
     """Фабрика для ключевых слов в тестировании."""
-    
+
     keyword_setting = factory.SubFactory(
         KeywordSettingDTOFactory,
         hard_status=HardStatus.IN_TEST,
@@ -364,7 +383,7 @@ class TestingKeywordFactory(CalculatedKeywordFactory):
 
 class BestKeywordFactory(GoodKeywordFactory):
     """Фабрика для лучшего ключевого слова."""
-    
+
     state = factory.SubFactory(
         KeywordStateFactory,
         status=KeywordStatus.GOOD,
@@ -386,18 +405,18 @@ class BestKeywordFactory(GoodKeywordFactory):
 
 def make_calculated_keyword(**kwargs) -> CalculatedKeyword:
     """Создаёт CalculatedKeyword с Faker-данными.
-    
+
     Обёртка над CalculatedKeywordFactory для обратной совместимости.
-    
+
     Args:
         **kwargs: Параметры для CalculatedKeywordFactory
-        
+
     Returns:
         CalculatedKeyword с заданными или сгенерированными данными
     """
     # Преобразуем плоские параметры в nested формат Factory Boy
     factory_kwargs = {}
-    
+
     # Маппинг плоских параметров на nested
     flat_to_nested = {
         'text': 'keyword_setting__text',
@@ -420,14 +439,14 @@ def make_calculated_keyword(**kwargs) -> CalculatedKeyword:
         'best_keyword_status': 'state__best_keyword_status',
         'reason': 'state__reason',
     }
-    
+
     for flat_key, nested_key in flat_to_nested.items():
         if flat_key in kwargs:
             factory_kwargs[nested_key] = kwargs.pop(flat_key)
-    
+
     # Добавляем оставшиеся параметры как есть
     factory_kwargs.update(kwargs)
-    
+
     return CalculatedKeywordFactory(**factory_kwargs)
 
 
@@ -466,13 +485,6 @@ class KeywordsWithBest:
     def __init__(self, keywords: list[CalculatedKeyword]):
         self.keywords = keywords
         self._best: CalculatedKeyword | None = None
-
-    @property
-    def best(self) -> CalculatedKeyword:
-        """Возвращает keyword с наивысшим rating_by_orders."""
-        if self._best is None:
-            self._best = max(self.keywords, key=lambda kw: kw.rating_by_orders)
-        return self._best
 
     def __iter__(self):
         return iter(self.keywords)

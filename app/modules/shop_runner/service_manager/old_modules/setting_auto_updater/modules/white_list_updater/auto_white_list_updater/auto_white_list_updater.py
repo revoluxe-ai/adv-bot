@@ -45,7 +45,7 @@ class WhiteListUpdateManager:
         white_keywords: list[CalculatedKeyword] = [
             kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
         ]
-        white_keywords.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
+        white_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
         if not white_keywords:
             return False, True
         down_key: CalculatedKeyword = white_keywords[-1]
@@ -96,7 +96,7 @@ class WhiteListUpdateManager:
         if not keywords_for_adding:
             return False, True
 
-        keywords_for_adding.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
+        keywords_for_adding.sort(key=lambda kw: kw.rating or 0, reverse=True)
         keyword_for_adding = keywords_for_adding[0]
 
         async with sm() as session:

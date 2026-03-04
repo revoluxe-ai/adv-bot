@@ -39,6 +39,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBBalancePayment,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
@@ -327,6 +328,43 @@ class CampaignActivityChangeLimit(Text):
         )
 
 
+class StrategyMenuMessage(TextWithKeyboard):
+    def __init__(self, bot: Bot, chat_id: int, adv_setting: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+
+    @property
+    def text(self) -> str:
+        # None means auto-enabled (same as True); only False is manual
+        auto_update_strategy = (
+            getattr(self._adv_setting, "auto_update_strategy", True) is not False
+        )
+        current_strategy = self._adv_setting.strategy or Strategy.MIN_CPO
+        mode_label = "Автоматический" if auto_update_strategy else "Ручной"
+        if current_strategy == Strategy.MIN_CPO:
+            strategy_label = "MIN_CPO (минимальная себестоимость заказа)"
+        else:
+            strategy_label = "MAX_CONV (максимум конверсии)"
+
+        return (
+            f"Стратегия кампании «{self._adv_setting.name}»\n"
+            f"Текущий режим: {mode_label}\n"
+            f"Текущая стратегия: {strategy_label}\n\n"
+            "Как это работает:\n"
+            "• MIN_CPO — приоритет минимальной себестоимости заказа.\n"
+            "• MAX_CONV — приоритет максимальной конверсии/объема заказов.\n"
+            "• В авто-режиме бот сам переключает стратегию по факту выполнения плана,\n"
+            "  целевой себестоимости и состоянию кампании.\n"
+            "• В ручном режиме стратегия фиксируется вручную и не переключается автоматически.\n\n"
+            "Рекомендуется держать авто-режим включенным и переходить в ручной только для\n"
+            "временных гипотез/тестов."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_strategy_menu_keyboard(self._adv_setting)
+
+
 class CabinetNameExists(Text):
     @property
     def text(self) -> str:
@@ -490,12 +528,23 @@ class KeywordSettingMessage(TextWithKeyboard):
             return "Белый список"
         elif int_hard_status == 3:
             return "Отключен"
-        else:
-            raise ValueError(f"Неизвестный хард-статус ключа: {int_hard_status}")
+        elif int_hard_status == 4:
+            return "Фикс.фразы (всегда вкл)"
+        raise ValueError(f"Неизвестный хард-статус ключа: {int_hard_status}")
+
+    def _display_status_from_db_and_cache(self) -> KeywordStatus:
+        """Текущий статус для отображения: из БД (keyword_setting) для 0/3/4, иначе из кеша."""
+        hard = self._keyword_setting.hard_status
+        if hard == 4:
+            return KeywordStatus.GOOD
+        if hard == 3:
+            return KeywordStatus.BAD
+        if hard == 0:
+            return KeywordStatus.BAD
+        return self._calculated_keyword.status
 
     @property
     def text(self) -> str:
-        calculated_keyword = self.calculated_keyword
         keyword_text = self._keyword_setting.text
         keyword_text = re.sub(r"([_*[\]()~>`#+\-=|{}.!])", r"\\\1", keyword_text)  # type: ignore
         nmids = list(self._adv_setting.nmids)
@@ -507,10 +556,12 @@ class KeywordSettingMessage(TextWithKeyboard):
         target_place_value, target_place_source = format_target_place_display(
             value, source
         )
+        hard_status_for_display = self._keyword_setting.hard_status
+        display_status = self._display_status_from_db_and_cache()
         text = (
             f"📦 *Артикул:* {nmids_str}\n"
-            f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"
-            f"🔄 *Текущий статус ключа:* {calculated_keyword.status}\n\n"
+            f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(hard_status_for_display)}\n"
+            f"🔄 *Текущий статус ключа:* {display_status}\n\n"
             f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n"
             f"📊 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
@@ -518,9 +569,9 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"💰 *Расход:* {self.spend:.2f} ₽\n"
         )
 
-
-        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders * 1000, 2)}\n"
-        text += f'Себестоимость заказа: {round(self._calculated_keyword.pay_for_order_by_current_cpm, 2)}\n'
+        text += f'Заказов на 1000 показов: {round(self._calculated_keyword.conv_views_to_orders * 1000, 2)}\n'
+        text += f"Заказов на 1000₽: {round(self._calculated_keyword.orders_per_1000_rub, 2)}\n"
+        text += f'Себес. заказа: {round(self._calculated_keyword.pay_for_order, 2)}\n'
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
@@ -841,6 +892,42 @@ class WhitePhrasesAdded(TextWithKeyboard):
         return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
 
 
+class WaitingForFixedPhrases(TextWithKeyboard):
+    async def __call__(self, adv_setting_id: int):
+        self.adv_setting_id: int = adv_setting_id
+        await super().__call__()
+
+    @property
+    def text(self):
+        return """
+Отправьте список фраз (через перенос строки), которые нужно добавить в фикс.фразы (всегда вкл).
+Например:
+
+платье женское
+платье вечернее
+
+Фразы будут всегда включены и не зависят от белого списка. Учитывается точное соответствие.
+"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+class FixedPhrasesAdded(TextWithKeyboard):
+    async def __call__(self, adv_setting_id: int):
+        self.adv_setting_id: int = adv_setting_id
+        await super().__call__()
+
+    @property
+    def text(self) -> str:
+        return "Фразы добавлены в фикс.фразы (всегда вкл). Можете ввести ещё или вернуться в настройки РК"
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
 class CPMSetting(TextWithKeyboard):
     @inject
     def __init__(
@@ -954,7 +1041,7 @@ class CPMSetting(TextWithKeyboard):
         step = self.adv_setting.bidder_step
         step = step if step else DEFAULT_BIDDER_STEP
         bottom = InlineKeyboardButton(
-            text=f"Изменить шаг ставки ({step})",
+            text=f"Изменить Максимальный шаг ставки ({step})",
             callback_data=callbacks.CPMSettingMenu(
                 action="change_cpm_step", adv_original_id=self.adv_setting.id
             ).pack(),

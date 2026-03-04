@@ -7,6 +7,7 @@ class KeywordStatusReason(StrEnum):
     BLACK_LIST = "black_list"
     WHITE_LIST = "white_list"
     TURN_OFF = "turn_off"
+    ALWAYS_ON = "always_on"
     MORE_THEN_HARD_MIN_CTR = auto()
     LESS_THEN_HARD_MIN_CTR = auto()
     MAX_CPM = "max_cpm"
@@ -16,6 +17,7 @@ class KeywordStatusReason(StrEnum):
     BELOW_REC_CONVERSION = auto()
     WB_MIN_BID_TOO_HIGH = "wb_min_bid_too_high"
     BEST_KEYWORD = auto()
+    NOT_RELEVANT_PHRASE = auto()
 
 class KeywordStatus(StrEnum):
     GOOD = "good"

@@ -87,7 +87,7 @@ class AdvSettingAutoUpdater:
             return None
         assert keywords
         keywords.sort(
-            key=lambda kw: kw.rating_by_orders, reverse=True
+            key=lambda kw: kw.rating or 0, reverse=True
         )  # ignore: type: ignore # predict_ctr не может быть
         # None здесь. Надо переделать CalculatedKeyword, чтобы у него не было полей с None, как минимум для predict_ctr
         first_kw = keywords[0]

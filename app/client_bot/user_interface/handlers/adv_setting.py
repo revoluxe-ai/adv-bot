@@ -256,6 +256,15 @@ async def turn_adv_on(
             wb_cabinet.id
         )
         sum_balance = balance + bonus
+        if sum_balance < 0:
+            await bot.send_message(
+                callback.message.chat.id,
+                "Баланс в минусе. Новые РК активировать нельзя. Пополните баланс или деактивируйте кампании в настройках магазина.",
+            )
+            await ShopMenu(
+                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
+            )()
+            return
         if not sum_balance >= price_for_adv_for_day:
             await bot.send_message(callback.message.chat.id, "Недостаточно средств")
             await ShopMenu(
@@ -377,8 +386,7 @@ async def apply_campaign_defaults(
         )
 
         # Обновить меню кампании
-        data = await state.get_data()
-        wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
+        wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
         async with sm() as session_read:
             wb_user_cabinet = await session_read.execute(
                 select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)

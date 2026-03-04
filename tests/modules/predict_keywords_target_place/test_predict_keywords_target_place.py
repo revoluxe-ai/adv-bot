@@ -1,12 +1,12 @@
 """Unit tests for PredictKeywordsTargetPlace."""
 
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.modules.bids_for_positions_manager.dto import BidPositionRow
-from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
     BidPosition,
     ConvCartToViewsOnPosition,
@@ -16,17 +16,15 @@ from app.modules.predict_keywords_target_place.predict_keywords_target_place imp
 )
 
 
-def _make_mock_adv(
-    nmid: int = 12345,
+def _make_adv(
+    main_nmid: int = 12345,
     min_bid: int = 50,
-    positions_size: int = 10,
-    target_position_mode: TargetPositionMode = TargetPositionMode.MIN_CPA,
-):
-    adv = AsyncMock()
-    adv.main_nmid = nmid
-    adv.search_adv_min_bids = {nmid: min_bid}
-    adv.min_target_position = positions_size
-    adv.target_position_mode = target_position_mode
+    strategy: Strategy = Strategy.MIN_CPO,
+) -> MagicMock:
+    adv = MagicMock()
+    adv.main_nmid = main_nmid
+    adv.search_adv_min_bids = {main_nmid: min_bid}
+    adv.strategy = strategy
     return adv
 
 
@@ -40,7 +38,7 @@ async def test_get_keywords_target_position_calls_ch_and_bids_manager():
     mock_bids_manager.get_bid_positions_normalized = AsyncMock(return_value={})
 
     predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
-    adv = _make_mock_adv()
+    adv = _make_adv(main_nmid=12345, min_bid=50)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     mock_ch.get_conv_cart_to_views.assert_called_once_with(nmid=12345, positions_size=10)
@@ -60,7 +58,7 @@ async def test_get_keywords_target_position_returns_empty_when_empty_data():
     mock_bids_manager.get_bid_positions_normalized = AsyncMock(return_value={})
 
     predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
-    adv = _make_mock_adv()
+    adv = _make_adv(main_nmid=12345, min_bid=50)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert result == {}
@@ -100,10 +98,41 @@ async def test_get_keywords_target_position_returns_best_position_when_valid_dat
     )
 
     predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
-    adv = _make_mock_adv()
+    adv = _make_adv(main_nmid=12345, min_bid=50, strategy=Strategy.MIN_CPO)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert result == {"kw1": 1}
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_keywords_target_position_returns_best_conv_when_strategy_max_conv():
+    """При MAX_CONV выбор идет только по conv_carts_to_views, без учета ставки."""
+    mock_ch = AsyncMock()
+    ts = datetime.now()
+    mock_ch.get_conv_cart_to_views = AsyncMock(
+        return_value={
+            "kw1": [
+                ConvCartToViewsOnPosition(keyword="kw1", position=1, conv_cart_to_views=0.1),
+                ConvCartToViewsOnPosition(keyword="kw1", position=2, conv_cart_to_views=0.2),
+            ]
+        }
+    )
+    mock_bids_manager = AsyncMock()
+    mock_bids_manager.get_bid_positions_normalized = AsyncMock(
+        return_value={
+            "kw1": [
+                BidPositionRow("kw1", 1, 60, ts),
+                BidPositionRow("kw1", 2, 300, ts),
+            ]
+        }
+    )
+
+    predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
+    adv = _make_adv(main_nmid=12345, min_bid=50, strategy=Strategy.MAX_CONV)
+    result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
+
+    assert result == {"kw1": 2}
 
 
 @pytest.mark.unit
@@ -131,7 +160,7 @@ async def test_get_keywords_target_position_never_returns_zero():
     )
 
     predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
-    adv = _make_mock_adv(target_position_mode=TargetPositionMode.MIN_CPA)
+    adv = _make_adv(main_nmid=12345, min_bid=50)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
     assert 0 not in result.values()

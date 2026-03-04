@@ -23,11 +23,14 @@ from .messages import (
     WaitingForRelevantPhrases,
     WaitingForWhitePhrases,
     WhitePhrasesAdded,
+    WaitingForFixedPhrases,
+    FixedPhrasesAdded,
     KeywordSettingMessage,
     KeywordTargetPlacePrompt,
     KeywordTargetPlaceUpdated,
     FilterByQuery,
     ManualCPMSetting,
+    StrategyMenuMessage
 
 )
 
@@ -57,8 +60,11 @@ __all__ = [
     "WaitingForRelevantPhrases",
     "WaitingForWhitePhrases",
     "WhitePhrasesAdded",
+    "WaitingForFixedPhrases",
+    "FixedPhrasesAdded",
     "KeywordSettingMessage",
     "KeywordTargetPlacePrompt",
     "KeywordTargetPlaceUpdated",
     "ManualCPMSetting",
+    "StrategyMenuMessage"
 ]

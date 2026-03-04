@@ -3,6 +3,7 @@ from collections.abc import Callable, Awaitable
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
@@ -54,7 +55,24 @@ class ComplexAdv:
 
 
     @property
-    def target_position_mode(self) -> TargetPositionMode:
+    def strategy(self) -> Strategy:
+        if self._adv_setting.strategy is None:
+            return Strategy.MIN_CPO
+        return self._adv_setting.strategy
+
+    @property
+    def auto_update_strategy(self) -> bool:
+        auto_update_strategy = self._adv_setting.auto_update_strategy
+        if auto_update_strategy is None:
+            return True
+        else:
+            return auto_update_strategy
+
+
+    @property
+    def target_position_mode(self) -> TargetPositionMode: # для ключевых запросов
+        if self._adv_setting.target_position_mode is None:
+            return TargetPositionMode.MIN_CPA
         return self._adv_setting.target_position_mode
 
     @property
@@ -319,7 +337,7 @@ class ComplexAdv:
         return self._adv_setting.search_auto_budget_daily_limit
 
     @property
-    def auto_budget_watchdog_enabled(self) -> bool:
+    def auto_budget_watchdog_enabled(self) -> bool: # настройка отвечает за управление активностью РК в целом: от пополнения бюджета до активности
         return bool(self._adv_setting.auto_budget_watchdog_enabled)
 
     @property

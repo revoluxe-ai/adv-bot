@@ -11,7 +11,9 @@ from jwt import DecodeError
 from sqlalchemy import (
     BIGINT,
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -24,16 +26,17 @@ from sqlalchemy import (
 
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
 from .bidder_mode import BidderMode
+from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
-from app.utils.db.base import BaseTable
+from app.utils.db.base import Base, BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .white_list_mode import WhiteListMode
@@ -413,6 +416,9 @@ class AdvSetting(BaseTable):
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
     nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
+    black_phrases: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default=text("'[]'")
+    )
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",
@@ -422,7 +428,7 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
-    hard_min_ctr: Mapped[float | None] = mapped_column(
+    hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется
         Float,
         nullable=True,
         default=settings.DEFAULT_MIN_CTR,
@@ -629,6 +635,14 @@ class AdvSetting(BaseTable):
                                                                      default=TargetPositionMode.MIN_CPA,
                                                                      server_default=TargetPositionMode.MIN_CPA.name)
 
+    strategy: Mapped[Strategy] = mapped_column(SAEnum(Strategy),
+                                               nullable=True,
+                                               default=Strategy.MIN_CPO,
+                                               server_default=Strategy.MIN_CPO.name)
+    auto_update_strategy: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=True, server_default=text("true")
+    )
+
     __table_args__ = (
         # Составной индекс для основного запроса
         Index(
@@ -712,10 +726,11 @@ class AdvSetting(BaseTable):
 
 class KeywordSetting(BaseTable):
     """hard_status
-    0 - black listA
+    0 - black list
     1 - in test
     2 - white list
-
+    3 - turn off
+    4 - фикс.фразы (всегда вкл, не отключаются, не зависят от белого списка)
     """
 
     text: Mapped[str] = mapped_column(String, nullable=False)
@@ -741,6 +756,14 @@ class KeywordSetting(BaseTable):
                                                      nullable=True,
                                                      default=None,
                                               )
+
+    @validates("target_place")
+    def _validate_target_place(self, _key: str, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("target_place must be None or an integer > 0")
+        return value
 
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
@@ -892,3 +915,60 @@ class KeywordSetting(BaseTable):
 #             position.total_orders = None
 #
 #         return position
+
+
+class AdvTimeSettings(Base):  # type: ignore[valid-type]
+    __tablename__ = "adv_time_settings"
+
+    id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
+    adv_setting_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("advsetting.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    schedule_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    date_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    date_start: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    date_end: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    timezone: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="Europe/Moscow",
+        server_default=text("'Europe/Moscow'"),
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "date_start IS NULL OR date_end IS NULL OR date_start <= date_end",
+            name="ck_adv_time_settings_date_range",
+        ),
+    )
+
+
+class AdvTimeWeekMask(Base):  # type: ignore[valid-type]
+    __tablename__ = "adv_time_week_mask"
+
+    adv_setting_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("advsetting.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    dow: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    hours_mask: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    __table_args__ = (
+        CheckConstraint("dow BETWEEN 0 AND 6", name="ck_adv_time_week_mask_dow"),
+    )

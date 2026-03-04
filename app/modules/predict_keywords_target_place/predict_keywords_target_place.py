@@ -1,12 +1,9 @@
 import logging
 
-
 from app.modules.bids_for_positions_manager.dto import BidPositionRow
 from ..bids_for_positions_manager.bids_for_positions_manager import BidsForPositionsManager
 
-from ..common_slaves.wildberries.models.enums.target_position_mode import (
-    TargetPositionMode,
-)
+from ..common_slaves.wildberries.models.enums.strategy import Strategy
 from ...settings import settings
 from ...shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
@@ -46,8 +43,8 @@ class PredictKeywordsTargetPlace:
             )
         )
         bids_with_convs = self._map_rows_to_bid_positions(rows, convs_carts_to_views)
-        target_position_mode = adv.target_position_mode
-        return self._get_target_positions(bids_with_convs, target_position_mode)
+        strategy = adv.strategy
+        return self._get_target_positions(bids_with_convs, strategy)
 
     def _map_rows_to_bid_positions(
         self,
@@ -75,7 +72,7 @@ class PredictKeywordsTargetPlace:
     def _get_target_positions(
         self,
         bids_for_positions: dict[str, list[BidPosition]],
-        target_position_mode: TargetPositionMode,
+        strategy: Strategy,
     ) -> dict[str, int]:
         """Expects already normalized bids with conv_carts_to_views filled."""
         result_target_positions: dict[str, int] = {}
@@ -86,16 +83,18 @@ class PredictKeywordsTargetPlace:
                     settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
                 )
                 continue
-            if target_position_mode == TargetPositionMode.MIN_CPA:
+            if strategy == Strategy.MIN_CPO:
                 best_position: BidPosition = min(
                     positions, key=lambda p: p.pay_for_cart
                 )
-            elif target_position_mode == TargetPositionMode.MAX_CART_TO_VIEWS_CONV:
+            elif strategy == Strategy.MAX_CONV:
                 best_position = max(
                     positions, key=lambda p: p.conv_carts_to_views or 0.0
                 )
             else:
-                raise NotImplementedError("Неизвестный мод целевой позиции")
+                raise NotImplementedError(
+                    f"Неизвестная стратегия выбора целевой позиции: {strategy}"
+                )
             result_target_positions[keyword] = max(1, best_position.position)
         return result_target_positions
 

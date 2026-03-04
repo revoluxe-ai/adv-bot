@@ -55,7 +55,14 @@ def inactive_adv():
     return adv
 
 
-def _make_cabinet(cabinet_id=100, shop_id=123, bonus=100.0, balance=50.0, advs=None):
+def _make_cabinet(
+    cabinet_id=100,
+    shop_id=123,
+    bonus=100.0,
+    balance=50.0,
+    advs=None,
+    balance_went_negative_at=None,
+):
     cab = MagicMock()
     cab.id = cabinet_id
     cab.shop_id = shop_id
@@ -64,6 +71,7 @@ def _make_cabinet(cabinet_id=100, shop_id=123, bonus=100.0, balance=50.0, advs=N
     cab.balance_payments = []
     cab.bonus_payments = []
     cab.adv_settings = advs or []
+    cab.balance_went_negative_at = balance_went_negative_at
     return cab
 
 
@@ -92,15 +100,18 @@ async def test_process_single_cabinet_bonus_success(
     mock_pricer.get_price_for_day_for_shop.assert_awaited_once()
 
 
-async def test_process_single_cabinet_insufficient_funds(
+async def test_process_single_cabinet_insufficient_funds_first_day_negative(
     mock_session, mock_pricer, mock_redis_manager, active_adv
 ):
-    cab = _make_cabinet(bonus=0.0, balance=10.0, advs=[active_adv])
+    """Недостаточно средств, balance_went_negative_at=None: первый день в минус — списываем в минус, кампании активны."""
+    cab = _make_cabinet(
+        bonus=0.0, balance=10.0, advs=[active_adv], balance_went_negative_at=None
+    )
     mock_pricer.get_price_for_day_for_shop.return_value = 100.0
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
-    ):
+    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()):
         mock_session.scalar.return_value = 0
         result = await billing.__process_single_cabinet(
             session=mock_session,
@@ -109,10 +120,44 @@ async def test_process_single_cabinet_insufficient_funds(
             pricer=mock_pricer,
             redis_manager=mock_redis_manager,
         )
+    assert result["payment_successful"] is True
+    assert result["reason"] == "success"
+    assert active_adv.bot_active is True
+    assert cab.balance_went_negative_at is not None
+
+
+async def test_process_single_cabinet_grace_exceeded_deactivates(
+    mock_session, mock_pricer, mock_redis_manager, active_adv
+):
+    """Недостаточно средств и balance_went_negative_at >= 7 дней назад — деактивируем кампании.
+    Баланс оставляем отрицательным, иначе в начале обработки сбросится флаг (пополнение).
+    """
+    from datetime import timezone
+
+    neg_at = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    cab = _make_cabinet(
+        bonus=0.0,
+        balance=-50.0,
+        advs=[active_adv],
+        balance_went_negative_at=neg_at,
+    )
+    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_notify_grace_exceeded", new=AsyncMock()):
+        mock_session.scalar.return_value = 0
+        result = await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 9, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
     assert result["payment_successful"] is False
-    assert result["reason"] in {"deactivated", "no_payment"}
-    # Кампания деактивирована
+    assert result["reason"] == "deactivated"
     assert active_adv.bot_active is False
+    assert cab.balance_went_negative_at is None
 
 
 async def test_process_single_cabinet_zero_price(

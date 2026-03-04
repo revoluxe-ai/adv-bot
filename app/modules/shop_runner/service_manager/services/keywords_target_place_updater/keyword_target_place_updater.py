@@ -37,6 +37,8 @@ class KeywordTargetPlaceUpdater:
                     logger.error("No target place found for %s , adv_id: %s Set Default place = 2" ,
                                  text, adv.adv_id)
                     target_place = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE  # 2 - по опыту чаще всего наиболее рентабельное место
+                elif target_place <= 0: # TODO: На всяк случай, выпилить
+                    target_place = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
                 keyword.target_place = target_place
             await session.commit()
 
