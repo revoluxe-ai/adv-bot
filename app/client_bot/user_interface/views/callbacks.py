@@ -406,6 +406,11 @@ class ChangeCommonBidInSearchAdvStatus(
     new_status: bool
 
 
+class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
 class IndividualKeywordsTargetPlaceToggle(
     CallbackData, prefix="indiv_keywords_target_place_toggle"
 ):

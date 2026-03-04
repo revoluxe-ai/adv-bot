@@ -11,6 +11,7 @@ from app.client_bot.user_interface.views.callbacks import (
     AutoUpdaterVersionToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeCommonBidInSearchAdvStatus,
+    SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
 )
 from app.modules.common_slaves.wildberries.models import (
@@ -136,6 +137,8 @@ def get_adv_setting_keyboard(
     _ = builder.row(
         InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
     )
+
+    
 
     activity_callback = callbacks.ManageCampaignActivity(
         action="menu", adv_setting_original_id=adv_setting.id
@@ -414,6 +417,20 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+
+
+    if adv_setting.search_adv_id:
+        set_common_bid_callback = SetCommonBidManual(
+            adv_setting_original_id=adv_setting.id,
+            wb_user_cabinet_original_id=wb_user_cabinet.id,
+        ).pack()
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Установить общую ставку (аукцион)",
+                callback_data=set_common_bid_callback,
+            )
+        )
+
 
     button = InlineKeyboardButton(
         text="Обновить минус-слова",
