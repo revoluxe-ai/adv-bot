@@ -1045,6 +1045,7 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         if not complex_advs:
             return None
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs: list[ComplexAdv] = [adv for adv in complex_advs if adv.individual_keywords_target_place_mode]
         complex_advs, _ = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_individual_keyword_target_places"
