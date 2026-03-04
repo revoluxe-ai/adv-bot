@@ -240,8 +240,16 @@ class BalanceReminderService:
                     continue
 
                 balance, bonus = await get_cabinet_balance(wb_cabinet_id)
-                total_balance = balance + bonus
-                days_left = total_balance / avg_daily_spend
+                total_balance = float(balance) + float(bonus)
+                # Align with billing: "days until block" uses grace = 7× daily spend.
+                # When balance >= 0: days until zero = balance / daily.
+                # When balance < 0: room = balance + 7× daily, days_left = room // daily (same as billing).
+                if total_balance >= 0:
+                    days_left = total_balance / avg_daily_spend
+                else:
+                    max_allowed_negative = avg_daily_spend * GRACE_MAX_NEGATIVE_DAYS
+                    room = total_balance + max_allowed_negative
+                    days_left = room / avg_daily_spend
                 days_left = max(0, int(days_left))
                 level = pick_level(days_left)
                 if level is None:
