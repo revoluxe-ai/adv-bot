@@ -614,29 +614,29 @@ class AdvSetting(BaseTable):
                                                            default=WhiteListMode.ABOVE_MIN_RATING,
                                                            server_default=WhiteListMode.ABOVE_MIN_RATING.name,)
 
-    individual_keywords_target_place_mode: Mapped[bool] = mapped_column(
+    individual_keywords_target_place_mode: Mapped[bool | None] = mapped_column(
         Boolean,
         nullable=True,
         default=False,
         server_default=text("false")
     )
-    min_target_position: Mapped[int] = mapped_column(
+    min_target_position: Mapped[int | None] = mapped_column(
         Integer,
         nullable=False,
         default=300,
         server_default=text('300'),
     )
 
-    target_position_mode: Mapped[TargetPositionMode] = mapped_column(SAEnum(TargetPositionMode),
+    target_position_mode: Mapped[TargetPositionMode  | None] = mapped_column(SAEnum(TargetPositionMode),
                                                                      nullable=True,
                                                                      default=TargetPositionMode.MIN_CPA,
                                                                      server_default=TargetPositionMode.MIN_CPA.name)
 
-    strategy: Mapped[Strategy] = mapped_column(SAEnum(Strategy),
+    strategy: Mapped[Strategy | None] = mapped_column(SAEnum(Strategy),
                                                nullable=True,
                                                default=Strategy.MIN_CPO,
                                                server_default=Strategy.MIN_CPO.name)
-    auto_update_strategy: Mapped[bool] = mapped_column(
+    auto_update_strategy: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
     )
 
