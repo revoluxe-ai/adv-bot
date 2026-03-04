@@ -44,6 +44,9 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
     ):
         return None
 
+    if fact.pay_for_order is None:
+        return None
+
     # OVERSPEND: перерасход — расходы выше максимума
     if fact.pay_for_order > plan.max_pay_for_order:
         return SalesStates.OVERSPEND
