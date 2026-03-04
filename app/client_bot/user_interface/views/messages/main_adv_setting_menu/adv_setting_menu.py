@@ -373,9 +373,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             suffix_auction = _status_suffix(self._reason_search)
 
+        id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подключено"
+        id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подключено"
         text += (
             f"📢 Камп: {self.adv.name}\n"
-            f"🆔 ID камп: {self.adv.adv_id}\n"
+            f"🆔 ID Авто: {id_auto}\n"
+            f"🆔 ID Аукциона: {id_auction}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
             f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
