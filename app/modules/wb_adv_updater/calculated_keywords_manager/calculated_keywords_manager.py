@@ -328,8 +328,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
-
         pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
+
         white_list = [kw for kw in pre_keywords if kw.hard_status in [2]]
         if not white_list:
             best_keyword = max(pre_keywords, key=attrgetter("rating"))
@@ -374,6 +374,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=reason,
                     best_keyword_status=best_keyword_status,
                 )
+            elif pre_kw.rating is None:
+                state = KeywordState(
+                    status=KeywordStatus.BAD,
+                    reason=KeywordStatusReason.RATING_IS_NONE,
+                    best_keyword_status=best_keyword_status,
+                )
 
             elif complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
                 state = KeywordState(
@@ -381,7 +387,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
                     best_keyword_status=best_keyword_status,
                 )
-
             elif hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
@@ -408,7 +413,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     best_keyword_status=best_keyword_status
                 )
             elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
-                    pre_kw.rating >= rating_of_worst_keyword:
+                    rating_of_worst_keyword is not None and pre_kw.rating >= rating_of_worst_keyword:
                 if above_rec is False:
                     status = KeywordStatus.BAD
                     reason = KeywordStatusReason.BELOW_REC_CONVERSION
