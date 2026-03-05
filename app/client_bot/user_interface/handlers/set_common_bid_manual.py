@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from app.client_bot import const
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
@@ -237,7 +238,8 @@ async def set_common_bid_manual_apply(
             adv_setting_original_id,
         )
         await state.set_state(None)
-        await message.answer(f"Ошибка при обновлении ставки на стороне WB: {e}")
+        await message.answer(f"Ошибка при обновлении ставки на стороне WB,"
+                             f" при повторении ошибки обратитесь в поддержку -> {const.SUPPORT_LINK}")
         return
 
     await state.set_state(None)
