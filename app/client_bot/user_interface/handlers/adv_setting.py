@@ -15,14 +15,24 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+from app.core.di.app_container import AppContainer
+from app.core.di.di_manager import DIManager
 from app.modules.shop_menu.message import ShopMenu
+from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
+    MinusPhraseManagerContainer,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
+    WBShopDataManager,
+)
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 
 from .. import states
 from ..views import callbacks, messages
 from ..views.messages.main_adv_setting_menu import AdvSettingMenu
+from ... import const
 
 sm = get_async_session_maker
 
@@ -402,6 +412,94 @@ async def apply_campaign_defaults(
         await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
     return
+
+
+@router.callback_query(callbacks.WBUpdate.filter(F.action == "update_minus_keywords"))
+async def wb_update_minus_keywords(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.WBUpdate,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+    adv_setting_original_id = callback_data.adv_setting_original_id
+
+    await callback.answer()
+    await bot.send_message(chat_id, "Обновляю минус-слова…")
+
+    async with sm(read_only=True) as session:
+        result = await session.execute(
+            select(AdvSetting)
+            .options(joinedload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv_setting_original_id)
+        )
+        adv_setting: AdvSetting | None = result.scalar_one_or_none()
+
+    if adv_setting is None:
+        await bot.send_message(chat_id, "Кампания не найдена.")
+        return
+    wb_cabinet = getattr(adv_setting, "wb_cabinet", None)
+    if wb_cabinet is None:
+        await bot.send_message(chat_id, "У кампании не задан кабинет WB.")
+        return
+    shop_id = wb_cabinet.shop_id
+    if not shop_id:
+        await bot.send_message(chat_id, "У кабинета не задан shop_id.")
+        return
+
+    try:
+        async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            factory = (
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            )
+            hub = factory.get_wb_manager_hub(shop_id)
+            tasks_manager = TasksManager(max_workers=1)
+            wb_shop_data_manager = WBShopDataManager(
+                wb_cabinet=wb_cabinet,
+                tasks_manager=tasks_manager,
+                wb_api_data_manager=hub.wb_data_manager,
+                wb_manager=hub.wb_manager,
+            )
+            complex_advs = await wb_shop_data_manager.get_complex_advs()
+            complex_adv = next(
+                (a for a in complex_advs if a.adv_setting_original_id == adv_setting_original_id),
+                None,
+            )
+            if complex_adv is None:
+                await bot.send_message(
+                    chat_id,
+                    "Кампания не найдена среди активных комплексов (нет поисковой РК или nmids).",
+                )
+            elif not complex_adv.bot_active:
+                await bot.send_message(
+                    chat_id,
+                    "Включите бота для кампании, затем повторите обновление минус-слов.",
+                )
+            else:
+                minus_phrase_manager = MinusPhraseManagerContainer(
+                    _wb_api_manager_hub=hub
+                ).minus_phrase_manager()
+                await minus_phrase_manager.update_minus_phrases(complex_adv)
+                await bot.send_message(chat_id, "Минус-слова обновлены.")
+    except Exception as e:
+        logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
+        await bot.send_message(
+            chat_id,
+            f"Не удалось обновить минус-слова, обратитесь в поддержку -> {const.SUPPORT_LINK} \n\n",
+        )
+
+    data = await state.get_data()
+    wb_user_cabinet_id = data.get("last_wb_user_cabinet_original_id")
+    if wb_user_cabinet_id is not None:
+        async with sm(read_only=True) as session:
+            result = await session.execute(
+                select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_id)
+            )
+            wb_user_cabinet = result.scalar_one_or_none()
+        if wb_user_cabinet is not None:
+            await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
 @router.callback_query(callbacks.ApplyDefaultsForShop.filter())
