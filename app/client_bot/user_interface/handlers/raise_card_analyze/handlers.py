@@ -148,7 +148,7 @@ async def _run_analysis_and_reply(
             reply_markup=get_return_to_adv_setting_keyboard(adv.id),
         )
         return
-    user_id = message.from_user.id if message.from_user else message.chat.id
+    user_id = message.from_user.id
     text = format_raise_card_result(payload, adv.id, view="by_days", user_id=user_id)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Анализ по неделям", callback_data=callbacks.RaiseCardAnalyze(
