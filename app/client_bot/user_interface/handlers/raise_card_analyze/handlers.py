@@ -148,6 +148,8 @@ async def _run_analysis_and_reply(
             reply_markup=get_return_to_adv_setting_keyboard(adv.id),
         )
         return
+    if message.from_user is None:
+        return
     user_id = message.from_user.id
     text = format_raise_card_result(payload, adv.id, view="by_days", user_id=user_id)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
