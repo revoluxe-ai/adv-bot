@@ -199,7 +199,7 @@ async def set_common_bid_manual_apply(
         return
 
     complex_adv = _build_complex_adv(adv_setting, search_adv_setting, shop_id)
-    nmids = list(adv_setting.nmids) or []
+    nmids = adv_setting.nmids
     if not nmids:
         await state.set_state(None)
         await message.answer("В кампании нет товаров (nmids).")
