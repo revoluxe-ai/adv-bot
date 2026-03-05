@@ -121,9 +121,9 @@ class CommonStatDataManager:
 
             count_orders = orders
             text_row = f"{date_str}: Корз.:{add_to_cart}({organic_cart}) Зак.:{count_orders}"
+            text_row += f"({organic_orders})шт."
             if mean_orders_for_fraction_day:
                 text_row += f"({mean_orders_for_fraction_day})"
-            text_row += f"({organic_orders})шт."
             text_row += f"Себеc: {mean_pay_for_order:.2f}р."
 
             # Дополнительные показы автокампании (за вычетом показов по ключевым запросам)
