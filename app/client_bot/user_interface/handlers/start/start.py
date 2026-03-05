@@ -110,7 +110,7 @@ async def show_shops_list(
         )
         result = await session.execute(stmt)
         user: User | None = result.unique().scalar()
-        if user is None or not user.passed_gate:
+        if user is None or (settings.invite_gate and not user.passed_gate):
             pass
         else:
             wb_user_cabinets = user.wb_user_cabinets
