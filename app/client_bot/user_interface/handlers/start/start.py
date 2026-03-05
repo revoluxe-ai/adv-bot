@@ -154,8 +154,8 @@ async def shops_list_paginator(
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User | None = result.unique().scalar()
-        if (user is None or not user.passed_gate) and settings.invite_gate:
+        user: User = result.unique().scalar()
+        if not user.passed_gate and settings.invite_gate:
             _ = await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
