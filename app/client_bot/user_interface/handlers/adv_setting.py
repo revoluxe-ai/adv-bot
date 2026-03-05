@@ -32,6 +32,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from .. import states
 from ..views import callbacks, messages
 from ..views.messages.main_adv_setting_menu import AdvSettingMenu
+from ... import const
 
 sm = get_async_session_maker
 
@@ -477,7 +478,7 @@ async def wb_update_minus_keywords(
         logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
             chat_id,
-            f"Не удалось обновить минус-слова: {e!s}",
+            f"Не удалось обновить минус-слова, обратитесь в поддержку -> {const.SUPPORT_LINK} \n\n",
         )
 
     data = await state.get_data()
