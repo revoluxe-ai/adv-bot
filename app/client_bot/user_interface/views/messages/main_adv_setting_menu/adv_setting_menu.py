@@ -359,7 +359,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 return " (управление отключено)"
             if reason is None:
                 return " (Нет данных)"
-            label = reason_code_to_display_text(reason.reason_code)
+            label = reason_code_to_display_text(str(reason.reason_code.value))
             dt = reason.updated_at
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
