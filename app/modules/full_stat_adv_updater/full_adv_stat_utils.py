@@ -112,13 +112,37 @@ def filter_full_adv_stat_to_dates(
     return result
 
 
+def _booster_stat_date_to_date(s: str) -> date | None:
+    """Parse BoosterStats.date (API: ISO date or datetime like 2023-10-07T00:00:00Z) to date."""
+    if not s:
+        return None
+    s = s.strip()
+    if len(s) < 10:
+        return None
+    # Date-only "YYYY-MM-DD"
+    if s[4] == "-" and s[7] == "-":
+        try:
+            return date.fromisoformat(s[:10])
+        except ValueError:
+            pass
+    try:
+        # Datetime with optional Z
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return dt.date()
+    except ValueError:
+        return None
+
+
 def _filter_booster_stats_to_dates(
     booster_stats: list[BoosterStats] | None,
     requested_set: set[date],
 ) -> list[BoosterStats] | None:
-    """Keep only booster stats whose date is in requested_set (date as str)."""
+    """Keep only booster stats whose date is in requested_set."""
     if not booster_stats:
         return None
-    requested_str = {d.isoformat() for d in requested_set}
-    filtered = [b for b in booster_stats if b.date in requested_str]
+    filtered = [
+        b
+        for b in booster_stats
+        if _booster_stat_date_to_date(b.date) in requested_set
+    ]
     return filtered if filtered else None
