@@ -520,7 +520,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         }
         for source_name, dt in source_dt_map.items():
             if dt is None:
-                return True, f"{source_name}: нет данных"
+                # Align with StatsFreshnessGuard.evaluate: missing timestamp = stats not yet
+                # collected (e.g. new campaign). Do NOT treat as emergency.
+                return False, None
             if dt.tzinfo is None:
                 dt_utc = dt.replace(tzinfo=timezone.utc)
             else:
