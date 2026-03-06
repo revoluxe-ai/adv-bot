@@ -103,6 +103,7 @@ class FullstatsAdapter(BaseSectionAdapter):
             if i > 0:
                 await asyncio.sleep(FULLSTATS_V3_RATE_LIMIT_INTERVAL_SEC)
             chunk = adv_ids[i : i + MAX_IDS_PER_REQUEST]
+            items: list[FullStatsItem] = []
             for attempt in range(FULLSTATS_V3_MAX_CHUNK_RETRIES):
                 try:
                     items = await self._request_chunk(chunk, begin_date, end_date)
