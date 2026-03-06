@@ -8,6 +8,7 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     BoosterStats,
     DayStats,
     FullAdvStat,
+    compute_aggregate_ctr_cpc_cr,
 )
 
 
@@ -53,17 +54,18 @@ def filter_full_adv_stat_to_dates(
         filtered_days.sort(key=lambda d: _day_stats_date(d))
 
         if not filtered_days:
+            ctr0, cpc0, cr0 = compute_aggregate_ctr_cpc_cr(0, 0, 0.0, 0)
             result.append(
                 FullAdvStat(
                     dates=[d.isoformat() for d in sorted(requested_dates)],
                     views=0,
                     clicks=0,
-                    ctr=0.0,
-                    cpc=0.0,
+                    ctr=ctr0,
+                    cpc=cpc0,
                     sum=0.0,
                     atbs=0,
                     orders=0,
-                    cr=0.0,
+                    cr=cr0,
                     shks=0,
                     sum_price=0.0,
                     days=[],
@@ -83,9 +85,7 @@ def filter_full_adv_stat_to_dates(
         shks = sum(d.shks for d in filtered_days)
         sum_price = sum(d.sum_price for d in filtered_days)
 
-        ctr = (clicks / views * 100.0) if views else 0.0
-        cpc = (sum_ / clicks) if clicks else 0.0
-        cr = (orders / clicks * 100.0) if clicks else 0.0
+        ctr, cpc, cr = compute_aggregate_ctr_cpc_cr(views, clicks, sum_, orders)
 
         dates_str = [d.isoformat() for d in sorted(_day_stats_date(d) for d in filtered_days)]
 
