@@ -373,7 +373,7 @@ class AdvMixin(WBAPIProtocol):
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
-        if dates is None:
+        if not dates:
             return None
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
