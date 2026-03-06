@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
 from typing import Any
 
@@ -18,12 +19,54 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     Response,
 )
-from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats, FullAdvStat
 
 from .mapper import full_stats_item_to_full_adv_stat
 
 MAX_IDS_PER_REQUEST = 50
 MAX_DAYS_PER_REQUEST = 31
+
+SingleRangeFetcher = Callable[
+    [list[int], date, date], Awaitable[list[FullAdvStat]]
+]
+
+
+async def fetch_fullstats_with_windowing(
+    adv_ids: list[int],
+    begin_date: date,
+    end_date: date,
+    single_range_fetcher: SingleRangeFetcher,
+) -> list[FullAdvStat]:
+    """
+    Fetch fullstats with 31-day windowing and merge-by-advertId.
+    single_range_fetcher(adv_ids, begin_date, end_date) must return stats for one
+    date range (caller is responsible for 50-id chunking inside the fetcher).
+    """
+    if not adv_ids:
+        return []
+
+    total_days = (end_date - begin_date).days + 1
+    if total_days <= MAX_DAYS_PER_REQUEST:
+        return await single_range_fetcher(adv_ids, begin_date, end_date)
+
+    windows: list[tuple[date, date]] = []
+    w_begin = begin_date
+    while w_begin <= end_date:
+        w_end = min(w_begin + timedelta(days=MAX_DAYS_PER_REQUEST - 1), end_date)
+        windows.append((w_begin, w_end))
+        w_begin = w_end + timedelta(days=1)
+
+    merged_by_id: dict[int, FullAdvStat] = {}
+    for w_begin, w_end in windows:
+        chunk_stats = await single_range_fetcher(adv_ids, w_begin, w_end)
+        for stat in chunk_stats:
+            aid = stat.advertId
+            if aid not in merged_by_id:
+                merged_by_id[aid] = stat
+            else:
+                merged_by_id[aid] = _merge_full_adv_stat(merged_by_id[aid], stat)
+
+    return list(merged_by_id.values())
 
 
 class FullstatsAdapter(BaseSectionAdapter):
@@ -36,34 +79,9 @@ class FullstatsAdapter(BaseSectionAdapter):
         end_date: date,
     ) -> list[FullAdvStat]:
         """Fetch full stats for campaigns; chunks by 50 ids and 31-day windows."""
-        if not adv_ids:
-            return []
-
-        total_days = (end_date - begin_date).days + 1
-        if total_days <= MAX_DAYS_PER_REQUEST:
-            return await self._get_full_adv_stat_single_range(adv_ids, begin_date, end_date)
-
-        # Split into 31-day windows and merge by advertId
-        windows: list[tuple[date, date]] = []
-        w_begin = begin_date
-        while w_begin <= end_date:
-            w_end = min(w_begin + timedelta(days=MAX_DAYS_PER_REQUEST - 1), end_date)
-            windows.append((w_begin, w_end))
-            w_begin = w_end + timedelta(days=1)
-
-        merged_by_id: dict[int, FullAdvStat] = {}
-        for w_begin, w_end in windows:
-            chunk_stats = await self._get_full_adv_stat_single_range(
-                adv_ids, w_begin, w_end
-            )
-            for stat in chunk_stats:
-                aid = stat.advertId
-                if aid not in merged_by_id:
-                    merged_by_id[aid] = stat
-                else:
-                    merged_by_id[aid] = _merge_full_adv_stat(merged_by_id[aid], stat)
-
-        return list(merged_by_id.values())
+        return await fetch_fullstats_with_windowing(
+            adv_ids, begin_date, end_date, self._get_full_adv_stat_single_range
+        )
 
     async def _get_full_adv_stat_single_range(
         self,
