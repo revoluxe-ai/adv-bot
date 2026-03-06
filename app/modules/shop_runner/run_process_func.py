@@ -8,7 +8,7 @@ from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
 
 
-from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -90,9 +90,21 @@ async def _run_shop_task(
         await wb_shop.run()
     except StopShopUpdateException:
         return None
-    except ApiForbiddenError:
-        await _deactivate_cabinet()
-        return None
+    except BaseExceptionGroup as eg:
+        api_forbidden = eg.subgroup(lambda e: isinstance(e, ApiForbiddenError))
+        if api_forbidden is not None:
+            if any(
+                getattr(e, "text", None) == NO_FREE_TOKENS_MESSAGE
+                for e in api_forbidden.exceptions
+            ):
+                await _deactivate_cabinet()
+                return None
+        raise eg
+    except ApiForbiddenError as e:
+        if e.text == NO_FREE_TOKENS_MESSAGE:
+            await _deactivate_cabinet()
+            return None
+        raise e
     except NotFoundActiveAdvCompany:
         return None
     except Exception as exc:
