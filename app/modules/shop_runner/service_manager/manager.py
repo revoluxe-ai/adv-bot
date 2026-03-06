@@ -298,7 +298,9 @@ class CoroutinesManager:
             all_adv_ids.update(adv.all_adv_ids)
         full_stats: list[FullAdvStat] = (
             await wb_data_getter.get_full_adv_stat_for_adv_ids(
-                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
+                self._wb_manager_hub.wb_data_manager,
+                all_adv_ids,
+                threshold_dates=settings.FULL_STAT_THRESHOLD_DATES,
             )
         )
         if full_stats:

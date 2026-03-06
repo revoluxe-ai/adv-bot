@@ -149,33 +149,19 @@ class AdvertApi(ABC_WB_API):
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
-        dates = [date.isoformat() for date in dates]
-        url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
-        query_data = []
-        for adv_id in adv_ids:
-            query_data.append({"id": adv_id, "dates": dates})
-
-        response_text = await requests(
-            self.session,
-            "POST",
-            url,
-            json_data=query_data,
-            headers=self.headers.standart,
-        )
-        answer = json.loads(response_text)
-        full_stats = []
-        if not answer:
+        if not dates:
             return None
-        for data in answer:
-            try:
-                full_stat = FullAdvStat(**data)
-            except Exception as e:
-                logger.error(
-                    "Ошибка валидации данных по статистике рекламы", exc_info=True
-                )
-                raise e
-            full_stats.append(full_stat)
-        return full_stats
+        from app.modules.full_stat_adv_updater.fullstats_v3_legacy import (
+            fetch_fullstats_v3,
+        )
+
+        begin_date = min(dates)
+        end_date = max(dates)
+        headers = self.headers.standart
+        stats = await fetch_fullstats_v3(
+            self.session, headers, adv_ids, begin_date, end_date
+        )
+        return stats if stats else None
 
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
@@ -183,8 +169,8 @@ class AdvertApi(ABC_WB_API):
     ) -> list[FullAdvStat] | None:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
-        full_stats = []
-        part_len = 100
+        full_stats: list[FullAdvStat] = []
+        part_len = 50  # v3 API limit
         adv_ids = list(adv_ids)
         for i in range(0, len(adv_ids), part_len):
             part_of_adv_ids = adv_ids[i : i + part_len]
