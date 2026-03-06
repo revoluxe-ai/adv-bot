@@ -21,6 +21,7 @@ def _make_adv(
     bot_active: bool = True,
     auto_adv_active_status: bool = True,
     auto_update_strategy: bool = True,
+    is_part_auto_setting_active: bool = True,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         adv_setting_original_id=adv_setting_original_id,
@@ -29,6 +30,7 @@ def _make_adv(
         bot_active=bot_active,
         auto_adv_active_status=auto_adv_active_status,
         auto_update_strategy=auto_update_strategy,
+        is_part_auto_setting_active=is_part_auto_setting_active,
     )
 
 
@@ -65,6 +67,7 @@ async def test_change_adv_strategy_updates_only_started_and_enabled_campaigns() 
         bot_active=True,
         auto_adv_active_status=False,
         auto_update_strategy=False,
+        is_part_auto_setting_active=False,
     )
     adv_disabled = _make_adv(
         adv_setting_original_id=4,
@@ -97,9 +100,15 @@ async def test_change_adv_strategy_updates_only_started_and_enabled_campaigns() 
             results.append(await handler())
         return results
 
+    async def _mock_split_fresh(self, candidates, *, operation_name):
+        return candidates, []
+
     with patch(
         "app.modules.shop_runner.service_manager.manager.run_tasks",
         new=_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
+        _mock_split_fresh,
     ):
         await manager.change_adv_strategy.__wrapped__(manager)
 
@@ -112,6 +121,7 @@ async def test_change_adv_strategy_updates_only_started_and_enabled_campaigns() 
 def test_complex_adv_auto_update_strategy_defaults_to_true_when_field_missing() -> None:
     adv_setting = SimpleNamespace(
         strategy=Strategy.MIN_CPO,
+        auto_update_strategy=None,
     )
     complex_adv = ComplexAdv(
         adv_setting=adv_setting,

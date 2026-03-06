@@ -28,6 +28,7 @@ def create_mock_keyword(
     orders_per_1000_rub: float = 10.0,
     pay_for_order: float = 100.0,
     best_keyword_status: bool = False,
+    views: int = 1,
 ) -> CalculatedKeyword:
     """Создает мок CalculatedKeyword."""
     keyword = MagicMock(spec=CalculatedKeyword)
@@ -42,6 +43,7 @@ def create_mock_keyword(
     keyword.rating = rating_by_orders  # для анти-слив (max по rating)
     keyword.best_keyword_status = best_keyword_status
     keyword.status = KeywordStatus.GOOD
+    keyword.views = views  # для фильтра white_keywords (kw.views > 0)
     return keyword
 
 
