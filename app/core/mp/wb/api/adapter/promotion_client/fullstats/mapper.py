@@ -17,16 +17,20 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
 
 
 def _parse_date(value: Any) -> datetime:
-    """Parse date from API (string or datetime) to datetime."""
+    """Parse date from API (string or datetime) to naive datetime.
+
+    Handles ISO 8601 with any timezone (Z, +HH:MM, -HH:MM). Returns naive
+    datetime so that day-level stats are consistent (WB works in Moscow time).
+    """
     if isinstance(value, datetime):
-        return value
+        return value.replace(tzinfo=None) if value.tzinfo else value
     if isinstance(value, str):
-        s = value.replace("Z", "+00:00").split("+")[0].split(".")[0].strip()
-        if len(s) == 10:
-            return datetime.strptime(s, "%Y-%m-%d")
-        if "T" in s:
-            return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S")
-        return datetime.strptime(s[:10], "%Y-%m-%d")
+        s = value.strip()
+        # fromisoformat supports Z, +HH:MM, -HH:MM; strip to naive for app use
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
     raise TypeError(f"Unexpected date type: {type(value)}")
 
 
