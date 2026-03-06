@@ -470,11 +470,12 @@ class BalanceReminderService:
                     )
             for user_id, raw_items in user_bundles.items():
                 seen_cabs: set[int] = set()
-                items = [
-                    (sn, cid, dl)
-                    for sn, cid, dl in raw_items
-                    if cid not in seen_cabs and not seen_cabs.add(cid)
-                ]
+                items: list[tuple[str, int, int]] = []
+                for sn, cid, dl in raw_items:
+                    if cid in seen_cabs:
+                        continue
+                    seen_cabs.add(cid)
+                    items.append((sn, cid, dl))
                 if not items:
                     continue
                 chat_id = next(
