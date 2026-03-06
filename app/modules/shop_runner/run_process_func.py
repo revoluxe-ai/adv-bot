@@ -103,6 +103,7 @@ async def _run_shop_task(
     except ApiForbiddenError as e:
         if e.text == NO_FREE_TOKENS_MESSAGE:
             await _deactivate_cabinet()
+            # ЕСЛИ БУДУТ ДРУГИЕ ОШИБКИ, то они проглотся без выброса - таки задуманно
             return None
         raise e
     except NotFoundActiveAdvCompany:
