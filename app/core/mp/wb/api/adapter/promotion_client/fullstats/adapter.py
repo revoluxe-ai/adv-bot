@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
@@ -12,7 +11,6 @@ from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
 )
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
-from app.core.mp.wb.api.excs import TooManyRequests
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.statistics.get_adv_v3_fullstats import (
     asyncio_detailed as get_adv_v3_fullstats_async,
 )
@@ -24,15 +22,12 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.t
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats, FullAdvStat
 
+from .chunked import run_chunked_single_range
 from .mapper import full_stats_item_to_full_adv_stat
 
 logger = logging.getLogger(__name__)
 
-MAX_IDS_PER_REQUEST = 50
 MAX_DAYS_PER_REQUEST = 31
-# v3 fullstats: 3 requests/minute, 20s between requests
-FULLSTATS_V3_RATE_LIMIT_INTERVAL_SEC = 20
-FULLSTATS_V3_MAX_CHUNK_RETRIES = 10
 
 SingleRangeFetcher = Callable[
     [list[int], date, date], Awaitable[list[FullAdvStat]]
@@ -98,32 +93,18 @@ class FullstatsAdapter(BaseSectionAdapter):
         end_date: date,
     ) -> list[FullAdvStat]:
         """One date range (<= 31 days); chunk adv_ids by 50. Rate-limited and per-chunk retry on 429."""
-        result: list[FullAdvStat] = []
-        for i in range(0, len(adv_ids), MAX_IDS_PER_REQUEST):
-            if i > 0:
-                await asyncio.sleep(FULLSTATS_V3_RATE_LIMIT_INTERVAL_SEC)
-            chunk = adv_ids[i : i + MAX_IDS_PER_REQUEST]
-            items: list[FullStatsItem] = []
-            for attempt in range(FULLSTATS_V3_MAX_CHUNK_RETRIES):
-                try:
-                    items = await self._request_chunk(chunk, begin_date, end_date)
-                    break
-                except TooManyRequests as e:
-                    wait = e.next_pause or FULLSTATS_V3_RATE_LIMIT_INTERVAL_SEC
-                    if attempt + 1 >= FULLSTATS_V3_MAX_CHUNK_RETRIES:
-                        raise
-                    logger.warning(
-                        "fullstats v3 chunk 429, waiting %ss (attempt %s/%s)",
-                        wait,
-                        attempt + 1,
-                        FULLSTATS_V3_MAX_CHUNK_RETRIES,
-                    )
-                    await asyncio.sleep(wait)
-            for item in items:
-                result.append(
-                    full_stats_item_to_full_adv_stat(item, begin_date, end_date)
-                )
-        return result
+
+        async def fetcher(
+            chunk: list[int], b: date, e: date
+        ) -> list[FullAdvStat]:
+            items = await self._request_chunk(chunk, b, e)
+            return [
+                full_stats_item_to_full_adv_stat(item, b, e) for item in items
+            ]
+
+        return await run_chunked_single_range(
+            adv_ids, begin_date, end_date, fetcher
+        )
 
     async def _request_chunk(
         self,
