@@ -1,6 +1,6 @@
 """Integration tests for onboarding handlers: callback_start_registration, show_shops_list, shops_list_paginator."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiogram.types import CallbackQuery, Chat, Message, User as TelegramUser
@@ -117,7 +117,9 @@ async def test_callback_start_registration_not_passed_gate_shows_gate(
 
     callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 99993)
 
-    await callback_start_registration(callback, bot, state)
+    with patch("app.client_bot.user_interface.handlers.start.start.settings") as mock_settings:
+        mock_settings.invite_gate = True
+        await callback_start_registration(callback, bot, state)
 
     bot.send_message.assert_awaited_once()
     call_args, call_kw = bot.send_message.call_args
@@ -166,7 +168,9 @@ async def test_show_shops_list_not_passed_gate_shows_gate(
         user.user_telegram_id, callbacks.ShowShopsList().pack(), 99995
     )
 
-    await show_shops_list(callback, bot, state)
+    with patch("app.client_bot.user_interface.handlers.start.start.settings") as mock_settings:
+        mock_settings.invite_gate = True
+        await show_shops_list(callback, bot, state)
 
     bot.send_message.assert_awaited_once()
     call_args, call_kw = bot.send_message.call_args
@@ -256,7 +260,9 @@ async def test_shops_list_paginator_not_passed_gate_shows_gate(
     )
     callback_data = callbacks.ShopsListPaginator.unpack(callback.data)
 
-    await shops_list_paginator(callback, callback_data, bot, state)
+    with patch("app.client_bot.user_interface.handlers.start.start.settings") as mock_settings:
+        mock_settings.invite_gate = True
+        await shops_list_paginator(callback, callback_data, bot, state)
 
     bot.send_message.assert_awaited_once()
     call_args, call_kw = bot.send_message.call_args

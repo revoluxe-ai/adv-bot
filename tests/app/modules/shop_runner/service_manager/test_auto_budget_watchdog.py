@@ -60,6 +60,9 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
 
     wb_manager_hub = MagicMock()
 
+    async def mock_split_fresh(self, candidates, *, operation_name):
+        return candidates, []
+
     with patch(
         "app.modules.shop_runner.service_manager.manager.WBShopDataManager",
         return_value=wb_shop_data_manager_instance,
@@ -72,6 +75,9 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
     ), patch(
         "app.modules.shop_runner.service_manager.manager.run_tasks",
         new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
+        new=mock_split_fresh,
     ):
         plan_fact_reader = MagicMock(spec=PlanFactReader)
         plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
@@ -129,6 +135,9 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
         return [await handler() for handler in handlers]
 
     wb_manager_hub = MagicMock()
+    async def mock_split_fresh(self, candidates, *, operation_name):
+        return candidates, []
+
     with patch(
         "app.modules.shop_runner.service_manager.manager.WBShopDataManager",
         return_value=wb_shop_data_manager_instance,
@@ -141,6 +150,9 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     ), patch(
         "app.modules.shop_runner.service_manager.manager.run_tasks",
         new=mock_run_tasks,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
+        new=mock_split_fresh,
     ):
         plan_fact_reader = MagicMock(spec=PlanFactReader)
         plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
