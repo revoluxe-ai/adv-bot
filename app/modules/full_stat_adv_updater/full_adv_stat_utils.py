@@ -87,7 +87,8 @@ def filter_full_adv_stat_to_dates(
 
         ctr, cpc, cr = compute_aggregate_ctr_cpc_cr(views, clicks, sum_, orders)
 
-        dates_str = [d.isoformat() for d in sorted(_day_stats_date(d) for d in filtered_days)]
+        # dates must always match originally requested_dates (v2 semantics)
+        dates_str = [d.isoformat() for d in sorted(requested_dates)]
 
         result.append(
             FullAdvStat(
