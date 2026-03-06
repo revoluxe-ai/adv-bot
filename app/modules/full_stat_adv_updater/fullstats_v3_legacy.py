@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://advert-api.wildberries.ru"
 MAX_IDS_PER_REQUEST = 50
-MAX_DAYS_PER_REQUEST = 31
 
 
 async def fetch_fullstats_v3(
@@ -30,44 +29,23 @@ async def fetch_fullstats_v3(
     Fetch fullstats via GET /adv/v3/fullstats (chunks of 50 ids, 31-day windows).
     Uses aiohttp session; for hub-based code use hub.wb_data_manager.get_full_adv_stat instead.
     """
+    from app.core.mp.wb.api.adapter.promotion_client.fullstats.adapter import (
+        fetch_fullstats_with_windowing,
+    )
     from app.core.mp.wb.api.adapter.promotion_client.fullstats.mapper import (
         full_stats_item_to_full_adv_stat,
     )
-    from app.core.mp.wb.api.adapter.promotion_client.fullstats.adapter import (
-        _merge_full_adv_stat,
-    )
 
-    if not adv_ids:
-        return []
-
-    total_days = (end_date - begin_date).days + 1
-    if total_days <= MAX_DAYS_PER_REQUEST:
+    async def single_range_fetcher(
+        ids: list[int], b: date, e: date
+    ) -> list[FullAdvStat]:
         return await _fetch_single_range(
-            session, headers, adv_ids, begin_date, end_date,
-            full_stats_item_to_full_adv_stat,
+            session, headers, ids, b, e, full_stats_item_to_full_adv_stat
         )
 
-    windows: list[tuple[date, date]] = []
-    w_begin = begin_date
-    while w_begin <= end_date:
-        w_end = min(w_begin + timedelta(days=MAX_DAYS_PER_REQUEST - 1), end_date)
-        windows.append((w_begin, w_end))
-        w_begin = w_end + timedelta(days=1)
-
-    merged_by_id: dict[int, FullAdvStat] = {}
-    for w_begin, w_end in windows:
-        chunk_stats = await _fetch_single_range(
-            session, headers, adv_ids, w_begin, w_end,
-            full_stats_item_to_full_adv_stat,
-        )
-        for stat in chunk_stats:
-            aid = stat.advertId
-            if aid not in merged_by_id:
-                merged_by_id[aid] = stat
-            else:
-                merged_by_id[aid] = _merge_full_adv_stat(merged_by_id[aid], stat)
-
-    return list(merged_by_id.values())
+    return await fetch_fullstats_with_windowing(
+        adv_ids, begin_date, end_date, single_range_fetcher
+    )
 
 
 async def _fetch_single_range(
