@@ -46,7 +46,31 @@ def filter_full_adv_stat_to_dates(
     """
     requested_set = set(requested_dates)
     if not requested_set:
-        return stats
+        # "Filter to zero dates" => return one zeroed-out FullAdvStat per input (no unfiltered data).
+        result = []
+        ctr0, cpc0, cr0 = compute_aggregate_ctr_cpc_cr(0, 0, 0.0, 0)
+        for stat in stats:
+            result.append(
+                FullAdvStat(
+                    dates=[],
+                    views=0,
+                    clicks=0,
+                    ctr=ctr0,
+                    cpc=cpc0,
+                    sum=0.0,
+                    atbs=0,
+                    orders=0,
+                    cr=cr0,
+                    shks=0,
+                    sum_price=0.0,
+                    days=[],
+                    boosterStats=_filter_booster_stats_to_dates(
+                        stat.boosterStats, requested_set
+                    ),
+                    advertId=stat.advertId,
+                )
+            )
+        return result
 
     result: list[FullAdvStat] = []
     for stat in stats:

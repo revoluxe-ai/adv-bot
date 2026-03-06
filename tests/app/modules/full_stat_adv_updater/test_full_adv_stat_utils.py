@@ -34,6 +34,52 @@ def test_requested_dates_are_contiguous_non_contiguous() -> None:
     assert requested_dates_are_contiguous(dates) is False
 
 
+def test_filter_full_adv_stat_to_dates_empty_requested_dates() -> None:
+    """Empty requested_dates returns zeroed-out stats (one per input), not unfiltered data."""
+    day1 = DayStats(
+        date=datetime(2025, 3, 1),
+        views=10,
+        clicks=1,
+        ctr=10.0,
+        cpc=5.0,
+        sum=5.0,
+        atbs=0,
+        orders=0,
+        cr=0.0,
+        shks=0,
+        sum_price=0.0,
+    )
+    stat = FullAdvStat(
+        dates=["2025-03-01"],
+        views=10,
+        clicks=1,
+        ctr=10.0,
+        cpc=5.0,
+        sum=5.0,
+        atbs=0,
+        orders=0,
+        cr=0.0,
+        shks=0,
+        sum_price=0.0,
+        days=[day1],
+        boosterStats=None,
+        advertId=42,
+    )
+    filtered = filter_full_adv_stat_to_dates([stat], [])
+    assert len(filtered) == 1
+    out = filtered[0]
+    assert out.advertId == 42
+    assert out.dates == []
+    assert out.days == []
+    assert out.views == 0
+    assert out.clicks == 0
+    assert out.sum == 0.0
+    assert out.orders == 0
+    assert out.atbs == 0
+    assert out.shks == 0
+    assert out.sum_price == 0.0
+
+
 def test_filter_full_adv_stat_to_dates_non_contiguous() -> None:
     """Filter re-aggregates to only requested dates (day 1 and day 31)."""
     day1 = DayStats(
