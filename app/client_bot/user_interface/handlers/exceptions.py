@@ -44,24 +44,24 @@ async def network_error_handler(
     )
 
 
-@admin_router.errors(ExceptionTypeFilter(TelegramBadRequest))
-async def error_handler_for_telegram_bad_request_exception(
-    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
-) -> None:
-    await state.set_state()
-    message = error_event.update.message
-    if message is None:
-        assert error_event.update.callback_query
-        assert error_event.update.callback_query.message
-        assert error_event.update.callback_query.message.chat
-        chat_id = int(error_event.update.callback_query.message.chat.id)
-    else:
-        chat_id = message.chat.id
-    await bot.send_message(
-        chat_id=chat_id,
-        text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
-        f"проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}",
-    )
+# @admin_router.errors(ExceptionTypeFilter(TelegramBadRequest))
+# async def error_handler_for_telegram_bad_request_exception(
+#     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
+# ) -> None:
+#     await state.set_state()
+#     message = error_event.update.message
+#     if message is None:
+#         assert error_event.update.callback_query
+#         assert error_event.update.callback_query.message
+#         assert error_event.update.callback_query.message.chat
+#         chat_id = int(error_event.update.callback_query.message.chat.id)
+#     else:
+#         chat_id = message.chat.id
+#     await bot.send_message(
+#         chat_id=chat_id,
+#         text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
+#         f"проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}",
+#     )
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
