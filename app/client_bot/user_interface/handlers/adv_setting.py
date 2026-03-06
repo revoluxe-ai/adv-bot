@@ -1,6 +1,6 @@
 import logging
 import aiogram
-from typing import Sequence
+from typing import Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -8,6 +8,7 @@ from sqlalchemy import Result
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.core.di.wb_manager_hub import WBManagerHub, WBManagerHubFactory
 from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
@@ -451,10 +452,11 @@ async def wb_update_minus_keywords(
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-            factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            factory = cast(
+                WBManagerHubFactory,
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory(), # pyright: ignore
             )
-            hub = factory.get_wb_manager_hub(shop_id)
+            hub: WBManagerHub  = factory.get_wb_manager_hub(shop_id)
             tasks_manager = TasksManager(max_workers=1)
             wb_shop_data_manager = WBShopDataManager(
                 wb_cabinet=wb_cabinet,
@@ -483,7 +485,7 @@ async def wb_update_minus_keywords(
                 ).minus_phrase_manager()
                 await minus_phrase_manager.update_minus_phrases(complex_adv)
                 await bot.send_message(chat_id, "Минус-слова обновлены.")
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
             chat_id,
