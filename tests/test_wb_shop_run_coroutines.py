@@ -30,6 +30,7 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
         "update_cluster_bids",
+        "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
         "auto_adv_active_control",
@@ -108,6 +109,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
         "update_cluster_bids",
+        "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
         "auto_adv_active_control",
@@ -154,7 +156,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    assert len(recorded_group.created) == 20
+    assert len(recorded_group.created) == 21
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
@@ -165,6 +167,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
         "update_cluster_bids",
+        "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
         "auto_adv_active_control",

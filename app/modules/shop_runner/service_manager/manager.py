@@ -16,6 +16,7 @@ from sqlalchemy import or_, update
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    KeywordSetting,
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
@@ -41,6 +42,9 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
+)
+from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_manager import (
+    RedisClusterStatTimestampManager,
 )
 
 from app.settings import settings
@@ -74,6 +78,15 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from .services.stats_freshness_guard import StatsFreshnessGuard, StatsFreshnessState
+from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
+    DirectEnum,
+    NewBid,
+    UpdateBidsCommand,
+)
+from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import (
+    BidderKeywordStatus,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
@@ -114,6 +127,13 @@ class CoroutinesManager:
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client=redis_client_wrapper
         )
+        self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
+            redis_client=redis_client_wrapper
+        )
+        self._stats_freshness_guard = StatsFreshnessGuard(
+            common_stat_timestamp_manager=self._redis_common_stat_timestamp_manager,
+            cluster_stat_timestamp_manager=self._redis_cluster_stat_timestamp_manager,
+        )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
         )
@@ -135,6 +155,56 @@ class CoroutinesManager:
     def _max_workers_for(handler_count: int, cap: int) -> int:
         return max(1, min(handler_count, cap))
 
+    async def _split_advs_by_stats_freshness(
+        self,
+        advs: list[ComplexAdv],
+        *,
+        operation_name: str,
+    ) -> tuple[list[ComplexAdv], list[ComplexAdv]]:
+        if not advs:
+            return [], []
+        handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StatsFreshnessState]]]] = [
+            lambda adv_=adv: self._evaluate_adv_freshness(adv_) for adv in advs
+        ]
+        results = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
+            return_exceptions=True,
+        )
+        fresh: list[ComplexAdv] = []
+        stale_over_6h: list[ComplexAdv] = []
+        for adv, result in zip(advs, results):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "Stats freshness evaluation failed, skip automation: shop_id=%s adv_id=%s op=%s err=%s",
+                    self.shop_id,
+                    adv.adv_id,
+                    operation_name,
+                    result,
+                )
+                continue
+            _, state = result
+            if state.is_stale_over_6h:
+                stale_over_6h.append(adv)
+            if state.is_fresh:
+                fresh.append(adv)
+            else:
+                logger.debug(
+                    "Automation skipped by stale stats: shop_id=%s adv_id=%s op=%s reason=%s",
+                    self.shop_id,
+                    adv.adv_id,
+                    operation_name,
+                    state.reason,
+                )
+        return fresh, stale_over_6h
+
+    async def _evaluate_adv_freshness(
+        self, adv: ComplexAdv
+    ) -> tuple[ComplexAdv, StatsFreshnessState]:
+        state = await self._stats_freshness_guard.evaluate(adv)
+        return adv, state
+
     @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
@@ -149,6 +219,9 @@ class CoroutinesManager:
             for adv in advs
             if adv.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
         ]
+        advs, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="update_cpm_bid"
+        )
         if not advs:
             return None
         logger.debug("Обновляю ставки для магазина %s", self.shop_id)
@@ -198,9 +271,12 @@ class CoroutinesManager:
         container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
 
-        await updater.update_last_week_stats(advs)
+        updated_nmids = await updater.update_last_week_stats(advs)
+        nmid_to_adv_ids: dict[int, set[int]] = {}
         for adv in advs:
-            for adv_id in adv.all_adv_ids:
+            nmid_to_adv_ids.setdefault(adv.main_nmid, set()).update(adv.all_adv_ids)
+        for nmid in updated_nmids:
+            for adv_id in nmid_to_adv_ids.get(nmid, set()):
                 await self._redis_common_stat_timestamp_manager.set(adv_id)
         return None
 
@@ -257,6 +333,9 @@ class CoroutinesManager:
         # в фильтре только проверку активности аукциона
         advs = [adv for adv in advs if adv.search_adv_active_status]
         advs = [adv for adv in advs if adv.bot_active]
+        advs, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="adv_settings_auto_update"
+        )
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
         handlers: list[Callable[[], Awaitable[Any]]] = []
@@ -290,6 +369,9 @@ class CoroutinesManager:
         advs_with_whitelist = [
             adv for adv in advs if adv.auto_update_white_list
         ]
+        advs_with_whitelist, _ = await self._split_advs_by_stats_freshness(
+            advs_with_whitelist, operation_name="update_top_key_in_advs"
+        )
         if not advs_with_whitelist:
             return None
 
@@ -342,6 +424,12 @@ class CoroutinesManager:
             and adv.is_white_list_control_enabled
             and adv.bot_active
         ]
+        complex_advs_with_white_list_by_mean_auto_ctr_active, _ = (
+            await self._split_advs_by_stats_freshness(
+                complex_advs_with_white_list_by_mean_auto_ctr_active,
+                operation_name="delete_keywords_from_wl_by_mean_auto_ctr",
+            )
+        )
 
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
@@ -457,6 +545,9 @@ class CoroutinesManager:
 
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs, _ = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="update_minus_phrases_in_advs"
+        )
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv=adv: minus_phrase_manager.update_minus_phrases(
                 complex_adv
@@ -510,6 +601,9 @@ class CoroutinesManager:
                 )
             )
         ]
+        candidates, _ = await self._split_advs_by_stats_freshness(
+            candidates, operation_name="auto_budget_watchdog"
+        )
         if not candidates:
             return None
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
@@ -590,8 +684,11 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
 
-        await updater.update_today_stats(complex_advs)
+        updated_adv_ids = await updater.update_today_stats(complex_advs)
+        for adv_id in updated_adv_ids:
+            await self._redis_cluster_stat_timestamp_manager.set(adv_id)
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
@@ -624,9 +721,112 @@ class CoroutinesManager:
                and adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
         ]
         advs = [adv for adv in advs if adv.search_adv_active_status]
+        advs, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="update_cluster_bids"
+        )
         if not advs:
             return None
         await update_clusters_bid_manager.update_cluster_bids(advs)
+        return None
+
+    @while_coroutine_decorator(60 * 5, 60)
+    async def handle_stats_stale_emergency(self) -> None:
+        """Emergency mode: stale stats over 6 hours => keep one top key and min bid."""
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        if not complex_advs:
+            return None
+        _, stale_over_6h = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="handle_stats_stale_emergency"
+        )
+        if not stale_over_6h:
+            return None
+
+        handlers: list[Callable[[], Awaitable[None]]] = [
+            lambda adv_=adv: self._apply_stats_stale_emergency(adv_) for adv in stale_over_6h
+        ]
+        results = await run_tasks(
+            handlers,
+            max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
+            return_exceptions=True,
+        )
+        for adv, result in zip(stale_over_6h, results):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "Emergency stale-stats handling failed: shop_id=%s adv_id=%s err=%s",
+                    self.shop_id,
+                    adv.adv_id,
+                    result,
+                    exc_info=True,
+                )
+        return None
+
+    async def _apply_stats_stale_emergency(self, complex_adv: ComplexAdv) -> None:
+        keywords = await complex_adv.get_keywords()
+        candidates = [kw for kw in keywords if kw.hard_status in (1, 2)]
+        if not candidates:
+            return None
+        top_keyword = max(candidates, key=lambda kw: kw.rating or 0)
+        top_keyword_id = top_keyword.keyword_setting_original_id
+        candidate_ids = [kw.keyword_setting_original_id for kw in candidates]
+        demote_ids = [kw_id for kw_id in candidate_ids if kw_id != top_keyword_id]
+
+        async with sm(read_only=False) as session:
+            if demote_ids:
+                stmt_demote = (
+                    update(KeywordSetting)
+                    .where(KeywordSetting.id.in_(demote_ids))
+                    .values(hard_status=1)
+                )
+                await session.execute(stmt_demote)
+            stmt_promote = (
+                update(KeywordSetting)
+                .where(KeywordSetting.id == top_keyword_id)
+                .values(hard_status=2)
+            )
+            await session.execute(stmt_promote)
+            await session.commit()
+
+        await self._set_min_search_bid_for_keyword(complex_adv, top_keyword.text)
+        logger.warning(
+            "Emergency stale-stats mode applied: shop_id=%s adv_id=%s top_keyword=%s",
+            self.shop_id,
+            complex_adv.adv_id,
+            top_keyword.text,
+        )
+        return None
+
+    async def _set_min_search_bid_for_keyword(
+        self, complex_adv: ComplexAdv, keyword_text: str
+    ) -> None:
+        search_adv_id = complex_adv.auction_adv_id
+        if search_adv_id is None:
+            return None
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        min_bids = await wb_manager_hub.wb_manager.get_min_bids(
+            [complex_adv], cache_possible=True
+        )
+        new_bids: list[NewBid] = []
+        for nmid in complex_adv.nmids:
+            min_bid = min_bids.search.get(nmid)
+            if min_bid is None:
+                continue
+            new_bids.append(
+                NewBid(
+                    new_bid=int(min_bid),
+                    adv_id=search_adv_id,
+                    nmid=nmid,
+                    cluster=keyword_text,
+                    bidder_keyword_status=BidderKeywordStatus.GOOD,
+                    step=0,
+                    direct=DirectEnum.DOWN,
+                )
+            )
+        if not new_bids:
+            return None
+        command = UpdateBidsCommand(new_bids=new_bids)
+        await wb_manager_hub.wb_modifier.set_cluster_bids_for_adv(command)
         return None
 
     @while_coroutine_decorator(5 * 60, 60)
@@ -689,6 +889,9 @@ class CoroutinesManager:
     @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="auto_adv_active_control"
+        )
         if not advs:
             return None
 
@@ -705,6 +908,9 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 60 * 4, 60)
     async def auto_reset_bid_for_auto_adv(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="auto_reset_bid_for_auto_adv"
+        )
         if not advs:
             return None
 
@@ -735,6 +941,9 @@ class CoroutinesManager:
                 adv.bidder_active and
                 adv.updater_common_bid_in_search_adv_active_status and
                 adv.search_adv_active_status is True]
+        complex_advs, _ = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="update_common_bid_in_search_adv"
+        )
         advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
 
         if not advs:
@@ -806,6 +1015,9 @@ class CoroutinesManager:
             if adv.white_list_mode
             in (WhiteListMode.TAIL_TRIMMING, WhiteListMode.REPLACE_ON_TRIM)
         ]
+        complex_advs, _ = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="white_list_tail_trimmer"
+        )
         if not complex_advs:
             return None
         trimmer = WhiteListTrimmer()
@@ -833,6 +1045,9 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs: list[ComplexAdv] = [adv for adv in complex_advs if adv.individual_keywords_target_place_mode]
+        complex_advs, _ = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="update_individual_keyword_target_places"
+        )
         wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
 
         predict_keyword_target_place: PredictKeywordsTargetPlace = build_predict_keywords_target_place()
@@ -862,6 +1077,9 @@ class CoroutinesManager:
 
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
+        complex_advs, _ = await self._split_advs_by_stats_freshness(
+            complex_advs, operation_name="change_adv_strategy"
+        )
         if not complex_advs:
             return None
 

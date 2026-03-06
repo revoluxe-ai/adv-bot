@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
@@ -32,6 +33,17 @@ class CommonStatDataManager:
         keywords_views_by_day = await full_wb_adv_stat.get_keywords_views_by_days(
             [auto_adv_id], start_date, end_date
         )
+
+        # #region agent log
+        _today = datetime.datetime.now().date()
+        _dates_concatenated = [d.strftime("%Y-%m-%d") for d in (s.date for s in concatenate_stat)]
+        _dates_common = [d.strftime("%Y-%m-%d") for d in (c.date for c in common_card_stat)]
+        try:
+            with open("debug-1361b9.log", "a", encoding="utf-8") as _f:
+                _f.write(json.dumps({"sessionId": "1361b9", "hypothesisId": "A_B_C", "location": "common_stat_data_manager.get_days_static_text", "message": "WB stats dates", "data": {"last_days": last_days, "start_date": start_date.strftime("%Y-%m-%d"), "end_date": end_date.strftime("%Y-%m-%d"), "today": _today.strftime("%Y-%m-%d"), "dates_concatenated": _dates_concatenated, "dates_common": _dates_common, "today_in_concatenated": _today.strftime("%Y-%m-%d") in _dates_concatenated, "today_in_common": _today.strftime("%Y-%m-%d") in _dates_common}, "timestamp": int(datetime.datetime.now().timestamp() * 1000)}, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        # #endregion
 
         text_stat = "\n\nСтатистика по дням:\n"
         text_stat += await self._get_days_static_text(
@@ -95,21 +107,44 @@ class CommonStatDataManager:
         date_to_common_stat: dict[datetime.date, CommonCardStat] = {
             cs.date: cs for cs in common_card_stats
         }
+        date_to_adv_stat: dict[datetime.date, SmallFullAdvStatPerDay] = {
+            stat.date: stat for stat in concatenated_adv_stat_result
+        }
+        all_dates = sorted(set(date_to_common_stat).union(date_to_adv_stat))
 
         text = ""
         today_date = datetime.datetime.now().date()
-        for stat in concatenated_adv_stat_result:
-            date = stat.date
+        for date in all_dates:
             date_str = date.strftime("%d.%m.%Y")
             common_stat: CommonCardStat | None = date_to_common_stat.get(date)
             if not common_stat:
+                # #region agent log
+                try:
+                    with open("debug-1361b9.log", "a", encoding="utf-8") as _f:
+                        _f.write(json.dumps({"sessionId": "1361b9", "hypothesisId": "B", "location": "common_stat_data_manager._get_days_static_text", "message": "skip day no common_stat", "data": {"date": date.strftime("%Y-%m-%d"), "is_today": date == today_date}, "timestamp": int(datetime.datetime.now().timestamp() * 1000)}, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass
+                # #endregion
                 continue
+            adv_stat = date_to_adv_stat.get(date)
+            if not adv_stat:
+                # #region agent log
+                try:
+                    with open("debug-1361b9.log", "a", encoding="utf-8") as _f:
+                        _f.write(json.dumps({"sessionId": "1361b9", "runId": "post-fix", "hypothesisId": "FIX_RENDER_UNION_DATES", "location": "common_stat_data_manager._get_days_static_text", "message": "render day from common_stat without adv_stat", "data": {"date": date.strftime("%Y-%m-%d"), "is_today": date == today_date}, "timestamp": int(datetime.datetime.now().timestamp() * 1000)}, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass
+                # #endregion
+
+            adv_added_to_cart = adv_stat.added_to_cart if adv_stat else 0
+            adv_orders = adv_stat.orders if adv_stat else 0
+            adv_spend = adv_stat.spend if adv_stat else 0.0
             orders = common_stat.orders
             add_to_cart = common_stat.add_to_cart
-            organic_cart = max(0, add_to_cart - stat.added_to_cart)
-            organic_orders = max(0, orders - stat.orders)
+            organic_cart = max(0, add_to_cart - adv_added_to_cart)
+            organic_orders = max(0, orders - adv_orders)
 
-            mean_pay_for_order = stat.spend / (orders if orders else 1)
+            mean_pay_for_order = adv_spend / (orders if orders else 1)
 
             if date == today_date:
                 now = datetime.datetime.now()

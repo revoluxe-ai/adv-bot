@@ -26,14 +26,14 @@ class ClustersAdvStatUpdater:
     def __init__(self, wb_manager_hub: "WBManagerHub"):
         self._wb_manager_hub = wb_manager_hub
 
-    async def update_today_stats(self, complex_advs: list[ComplexAdv]) -> None:
+    async def update_today_stats(self, complex_advs: list[ComplexAdv]) -> set[int]:
         """
         Обновляет статистику кластеров за сегодня (без проверки наличия данных).
         
         Предназначен для частого вызова в отдельной корутине.
         """
         if not complex_advs:
-            return
+            return set()
         
         today = date.today()
         stats = await self._get_stats_for_day(complex_advs, today)
@@ -41,6 +41,8 @@ class ClustersAdvStatUpdater:
             await ch.update_clusters_adv_stats(stats)
             logger.info("Обновлена статистика за сегодня: %d записей", len(stats))
             await self._create_keyword_setting(complex_advs, stats)
+            return {stat.adv_id for stat in stats}
+        return set()
 
 
     async def update_past_days_stats(

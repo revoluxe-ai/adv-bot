@@ -49,6 +49,9 @@ from app.modules.shop_runner.service_manager.services.redis_campaign_activity_re
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
+from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_manager import (
+    RedisClusterStatTimestampManager,
+)
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
@@ -89,6 +92,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client
         )
+        self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
+            redis_client
+        )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
@@ -101,6 +107,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._plan_set: bool = False
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
+        self._emergency_mode_active: bool = False
+        self._emergency_mode_reason: str | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -176,8 +184,23 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # last_update_keyword_stat: datetime | None = (
         #     await self._get_last_update_keyword_stat(self.adv.adv_id)
         # ) TODO: Разобраться что за данные, почему не используются
+        adv_id = self.adv.adv_id
         last_update_common_stat: datetime | None = (
-            await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
+            await self._redis_common_stat_timestamp_manager.get(adv_id)
+        )
+        last_update_keyword_stat: datetime | None = (
+            await self._get_last_update_keyword_stat(adv_id)
+        )
+        last_update_cluster_stat: datetime | None = (
+            await self._redis_cluster_stat_timestamp_manager.get(adv_id)
+        )
+        (
+            self._emergency_mode_active,
+            self._emergency_mode_reason,
+        ) = self._resolve_emergency_mode_status(
+            keyword_stat_updated_at=last_update_keyword_stat,
+            common_stat_updated_at=last_update_common_stat,
+            cluster_stat_updated_at=last_update_cluster_stat,
         )
         if last_update_common_stat:
             self.last_update_common_stat_str = last_update_common_stat.strftime(
@@ -277,6 +300,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # Determine predict CTR mode display text
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
+        if self._emergency_mode_active:
+            text += (
+                "🚨🚨🚨 АВАРИЙНЫЙ РЕЖИМ 🚨🚨🚨\n"
+                "СТАТА НЕ СВЕЖАЯ > 6 ЧАСОВ\n"
+                "АВТОМАТИКА ОГРАНИЧЕНА ДО ВОССТАНОВЛЕНИЯ СТАТЫ\n"
+            )
+            if self._emergency_mode_reason:
+                text += f"Причина: {self._emergency_mode_reason}\n"
+            text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
@@ -472,3 +504,27 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     async def _get_last_full_stat_update(adv_id: int) -> datetime | None:
         last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
         return last_full_stat_update
+
+    @staticmethod
+    def _resolve_emergency_mode_status(
+        *,
+        keyword_stat_updated_at: datetime | None,
+        common_stat_updated_at: datetime | None,
+        cluster_stat_updated_at: datetime | None,
+    ) -> tuple[bool, str | None]:
+        now = datetime.now(timezone.utc)
+        source_dt_map = {
+            "рекламная стата": keyword_stat_updated_at,
+            "общая стата": common_stat_updated_at,
+            "кластерная стата": cluster_stat_updated_at,
+        }
+        for source_name, dt in source_dt_map.items():
+            if dt is None:
+                return True, f"{source_name}: нет данных"
+            if dt.tzinfo is None:
+                dt_utc = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt_utc = dt.astimezone(timezone.utc)
+            if now - dt_utc > timedelta(hours=6):
+                return True, f"{source_name}: нет обновлений > 6 часов"
+        return False, None
