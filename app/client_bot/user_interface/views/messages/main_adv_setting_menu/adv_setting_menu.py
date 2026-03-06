@@ -30,10 +30,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
-from app.modules.wb_update_state_manager import (
-    AdvActiveKeywordUpdateStateManager,
-    KeywordStatUpdateState,
-)
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
     RedisClusterBidsTimestampManager,
