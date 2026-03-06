@@ -377,6 +377,10 @@ class AdvMixin(WBAPIProtocol):
             return None
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
+        from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
+            filter_full_adv_stat_to_dates,
+            requested_dates_are_contiguous,
+        )
         from app.modules.full_stat_adv_updater.fullstats_v3_legacy import (
             fetch_fullstats_v3,
         )
@@ -387,7 +391,11 @@ class AdvMixin(WBAPIProtocol):
         stats = await fetch_fullstats_v3(
             self.session, headers, adv_ids, begin_date, end_date
         )
-        return stats if stats else None
+        if not stats:
+            return None
+        if not requested_dates_are_contiguous(dates):
+            stats = filter_full_adv_stat_to_dates(stats, dates)
+        return stats
 
     async def upcast_target_placement(
         self, adv_id: int, /, search: bool, recommendations: bool
