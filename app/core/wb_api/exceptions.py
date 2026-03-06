@@ -35,6 +35,9 @@ class TokensFromDifferentShopsError(BaseException):
         super().__init__(f"{m}")
 
 
+NO_FREE_TOKENS_MESSAGE = "Нет свободных токенов"
+
+
 class ApiForbiddenError(Exception):
     def __init__(
         self, text: str, wb_user_cabinet: typing.Optional["WBUserCabinet"] = None

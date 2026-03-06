@@ -214,10 +214,10 @@ class AdvertApi(ABC_WB_API):
         if not adverts:
             return []
         for advert in adverts:
-            if advert["type"] == 8:
-                for advert in advert["advert_list"]:
-                    advertId = advert["advertId"]
-                    advertIds.append(advertId)
+            # Type 8 = auto (unified), type 9 = search (manual). Both needed for ComplexAdv
+            if advert.get("type") in (8, 9):
+                for advert_item in advert["advert_list"]:
+                    advertIds.append(advert_item["advertId"])
 
         return advertIds
     #

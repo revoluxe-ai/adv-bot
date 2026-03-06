@@ -49,7 +49,9 @@ class WhiteListRemoveExecutor(BaseExecutor):
         # Получение keywords и фильтрация white_keywords
         keywords: list[CalculatedKeyword] = await ctx.complex_adv.get_keywords()
         white_keywords: list[CalculatedKeyword] = [
-            kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
+            kw for kw in keywords if kw.hard_status == 2
+                                     and not kw.best_keyword_status
+                                     and kw.views > 0
         ]
 
         if not white_keywords:
@@ -78,7 +80,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
                     )
 
                 # Массовое удаление из белого списка
-                keyword_ids = [kw.keyword_setting_original_id for kw in keywords_below_rec]
+                keyword_ids = [kw.keyword_setting_original_id  for kw in keywords_below_rec]
                 stmt = (
                     update(KeywordSetting)
                     .where(KeywordSetting.id.in_(keyword_ids))

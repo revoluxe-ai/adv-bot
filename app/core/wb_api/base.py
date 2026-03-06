@@ -8,7 +8,7 @@ from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from .exceptions import ApiForbiddenError
+from .exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
 
 if typing.TYPE_CHECKING:
     from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
@@ -113,5 +113,5 @@ class BaseAPI:
                 )
                 raise e
             raise ApiForbiddenError(
-                "Нет свободных токенов", wb_user_cabinet=self.access.wb_user_cabinet
+                NO_FREE_TOKENS_MESSAGE, wb_user_cabinet=self.access.wb_user_cabinet
             )

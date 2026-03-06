@@ -56,6 +56,11 @@ class WhiteListAddExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         current_pay_for_order = ctx.fact.pay_for_order
+        if current_pay_for_order is None:
+            logger.warning(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: нет данных по себестоимости заказа, пропускаем"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
 
         if current_pay_for_order >= threshold:
@@ -68,6 +73,8 @@ class WhiteListAddExecutor(BaseExecutor):
         # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
+            if keyword.views == 0:
+                return False
             if keyword.hard_status != 1:
                 return False
             if keyword.status == KeywordStatus.GOOD:

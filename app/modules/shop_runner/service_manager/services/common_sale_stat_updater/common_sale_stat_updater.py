@@ -24,13 +24,13 @@ class CommonSaleStatUpdater:
         self._wb_manager_hub = wb_manager_hub
         self._clickhouse_manager = clickhouse_manager
 
-    async def update_last_week_stats(self, complex_advs: list[ComplexAdv]) -> None:
+    async def update_last_week_stats(self, complex_advs: list[ComplexAdv]) -> set[int]:
         if not complex_advs:
-            return None
+            return set()
 
         nmids: list[int] = sorted({adv.main_nmid for adv in complex_advs})
         if not nmids:
-            return None
+            return set()
 
         MSK = ZoneInfo("Europe/Moscow")
         today = datetime.now(MSK).date()
@@ -53,7 +53,8 @@ class CommonSaleStatUpdater:
             all_rows.extend(rows)
 
         await self._clickhouse_manager.insert(all_rows)
-        return None
+        updated_nmids: set[int] = {row.nmid for row in all_rows}
+        return updated_nmids
 
 
 def _chunked(items: list[int], size: int) -> list[list[int]]:

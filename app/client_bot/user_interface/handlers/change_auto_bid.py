@@ -93,7 +93,7 @@ async def open_change_auto_bid(
         complex_adv = ComplexAdv(adv_setting, None)
         shop_id = adv_setting.wb_cabinet.shop_id
 
-        async with await DIManager.create(AppContainer) as container:
+        async with await DIManager.create(AppContainer) as container: # type: ignore
             factory = (
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
@@ -206,7 +206,7 @@ async def set_auto_bid(message: types.Message, state: FSMContext):
     nm_bid_pairs = {nmid: new_cpm for nmid in nmids}
 
     try:
-        async with await DIManager.create(AppContainer) as container:
+        async with await DIManager.create(AppContainer) as container: # type: ignore
             factory = (
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )

@@ -9,6 +9,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+# Фиксированная дата для нулевой статистики (ключи без данных в CH)
+_ZERO_STAT_TIMESTAMP = datetime.min
+
 
 class KeywordStat(BaseModel):
     """Статистика по ключу из ClickHouse: показы, клики, spend, conv_views_to_orders, cpm.
@@ -44,3 +47,24 @@ class KeywordStat(BaseModel):
             return self.clicks / self.views
         else:
             return 0.0
+
+
+def make_zero_keyword_stat(text: str) -> KeywordStat:
+    """Фабрика нулевой статистики для ключа без данных в ClickHouse (новые фразы в БС/релевантные)."""
+    return KeywordStat.model_construct(
+        text=text,
+        position=0.0,
+        timestamp=_ZERO_STAT_TIMESTAMP,
+        views=0,
+        clicks=0,
+        add_to_cart=0,
+        orders=0,
+        spend=0.0,
+        cpm=0.0,
+        base_cart_to_order_conv=0.0,
+        expected_orders_from_cart=0.0,
+        expected_orders=0.0,
+        conv_views_to_orders=0.0,
+        total_views=0,
+        total_orders=0,
+    )

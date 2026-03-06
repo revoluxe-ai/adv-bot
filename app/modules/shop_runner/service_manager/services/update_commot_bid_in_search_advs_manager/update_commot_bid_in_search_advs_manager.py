@@ -51,6 +51,8 @@ class UpdateCommotBidInSearchAdvsManager:
     def _get_new_bid(adv: WBAdvDTO, current_nmid: int) -> int | None:
         result_target_pay_for_order = adv.result_target_pay_for_order
         fact_pay_for_order = adv.fact_pay_for_order
+        if fact_pay_for_order is None:
+            return None
         current_common_bids = adv.current_common_bids_in_search_adv
         current_bid: int = current_common_bids[current_nmid]
         bid_step: int = adv.bid_step
