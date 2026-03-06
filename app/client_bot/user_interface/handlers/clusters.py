@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
-from ..views import callbacks, messages
+from ..views import callbacks
 from ..views.messages.main_adv_setting_menu import AdvSettingMenu
 
 sm = get_async_session_maker
