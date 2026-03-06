@@ -151,6 +151,10 @@ class AdvertApi(ABC_WB_API):
     ) -> list[FullAdvStat] | None:
         if not dates:
             return None
+        from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
+            filter_full_adv_stat_to_dates,
+            requested_dates_are_contiguous,
+        )
         from app.modules.full_stat_adv_updater.fullstats_v3_legacy import (
             fetch_fullstats_v3,
         )
@@ -161,7 +165,11 @@ class AdvertApi(ABC_WB_API):
         stats = await fetch_fullstats_v3(
             self.session, headers, adv_ids, begin_date, end_date
         )
-        return stats if stats else None
+        if not stats:
+            return None
+        if not requested_dates_are_contiguous(dates):
+            stats = filter_full_adv_stat_to_dates(stats, dates)
+        return stats
 
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
