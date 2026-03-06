@@ -161,6 +161,12 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
 
+
+class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
+    action: str
+    adv_original_id: int
+
+
 class ManageCampaignActivity(CallbackData, prefix="campaign_activity"):
     action: str
     adv_setting_original_id: int
@@ -398,6 +404,11 @@ class ChangeCommonBidInSearchAdvStatus(
 ):
     adv_id: int
     new_status: bool
+
+
+class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
 
 
 class IndividualKeywordsTargetPlaceToggle(

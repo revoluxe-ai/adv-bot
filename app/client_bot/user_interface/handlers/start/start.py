@@ -79,7 +79,7 @@ async def callback_start_registration(
         if callback.message is None:
             return
         chat_id = callback.message.chat.id
-        if user is None or not user.passed_gate:
+        if (user is None or not user.passed_gate) and settings.invite_gate:
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
@@ -110,7 +110,7 @@ async def show_shops_list(
         )
         result = await session.execute(stmt)
         user: User | None = result.unique().scalar()
-        if user is None or not user.passed_gate:
+        if user is None or (settings.invite_gate and not user.passed_gate):
             pass
         else:
             wb_user_cabinets = user.wb_user_cabinets
@@ -122,7 +122,7 @@ async def show_shops_list(
                 bot, chat_id, wb_user_cabinets, shop_ids_with_active_tokens
             )()
             return
-    if user is None or not user.passed_gate:
+    if (user is None or not user.passed_gate) and settings.invite_gate:
         _ = await bot.send_message(
             chat_id,
             get_gate_message_text(),
@@ -154,8 +154,8 @@ async def shops_list_paginator(
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User | None = result.unique().scalar()
-        if user is None or not user.passed_gate:
+        user: User = result.unique().scalar()
+        if not user.passed_gate and settings.invite_gate:
             _ = await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
@@ -406,8 +406,6 @@ async def process_cabinet_api(
             wb_cabinet: WBCabinet = WBCabinet()
             wb_cabinet.shop_id = shop_id
             wb_cabinet.active = True
-            wb_cabinet.balance = 0
-            wb_cabinet.bonus = 0
             wb_cabinet.default_max_cpm = settings.DEFAULT_MAX_CPM
             session.add(wb_cabinet)
             await session.flush()  # получаем wb_cabinet.id

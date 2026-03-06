@@ -3,11 +3,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -37,7 +37,7 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
         else:
             chat_id = message.message.chat.id
 
-        if not user.passed_gate:
+        if settings.invite_gate and not user.passed_gate:
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
