@@ -42,7 +42,8 @@ async def test_stats_freshness_guard_returns_fresh(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_missing_timestamp_is_emergency(monkeypatch) -> None:
+async def test_stats_freshness_guard_missing_timestamp_not_emergency(monkeypatch) -> None:
+    """Missing timestamp = not yet collected (e.g. new campaign). Must not trigger emergency."""
     common_manager = SimpleNamespace(get=AsyncMock(return_value=None))
     cluster_manager = SimpleNamespace(get=AsyncMock(return_value=datetime.now(timezone.utc)))
     guard = StatsFreshnessGuard(
@@ -63,7 +64,34 @@ async def test_stats_freshness_guard_missing_timestamp_is_emergency(monkeypatch)
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is False
-    assert state.is_stale_over_6h is True
+    assert state.is_stale_over_6h is False
+    assert "not yet collected" in (state.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_stats_freshness_guard_all_timestamps_missing_not_emergency(monkeypatch) -> None:
+    """New campaign with no stats in Redis yet must not be classified as emergency-stale."""
+    common_manager = SimpleNamespace(get=AsyncMock(return_value=None))
+    cluster_manager = SimpleNamespace(get=AsyncMock(return_value=None))
+    guard = StatsFreshnessGuard(
+        common_stat_timestamp_manager=common_manager,
+        cluster_stat_timestamp_manager=cluster_manager,
+    )  # type: ignore[arg-type]
+
+    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
+        get_one=AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
+    )
+
+    adv = SimpleNamespace(adv_id=101)
+    state = await guard.evaluate(adv)  # type: ignore[arg-type]
+
+    assert state.is_fresh is False
+    assert state.is_stale_over_6h is False
+    assert state.reason is not None and "not yet collected" in state.reason
 
 
 @pytest.mark.asyncio

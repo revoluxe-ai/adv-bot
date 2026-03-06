@@ -56,10 +56,12 @@ class StatsFreshnessGuard:
         }
         for source, age in source_ages.items():
             if age is None:
+                # Missing timestamp = stats not yet collected (e.g. new campaign).
+                # Do NOT treat as emergency-stale: that would trigger demotion + min bids.
                 return StatsFreshnessState(
                     is_fresh=False,
-                    is_stale_over_6h=True,
-                    reason=f"{source} missing for adv_id={adv_id}",
+                    is_stale_over_6h=False,
+                    reason=f"{source} not yet collected for adv_id={adv_id}",
                 )
             if age > self._EMERGENCY_STALE_PERIOD:
                 return StatsFreshnessState(
