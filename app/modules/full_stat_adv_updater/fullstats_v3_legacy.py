@@ -7,6 +7,8 @@ import logging
 from datetime import date
 from typing import Any
 
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+
 from app.core.mp.wb.api.adapter.promotion_client.fullstats.chunked import (
     FULLSTATS_V3_RATE_LIMIT_INTERVAL_SEC,
     run_chunked_single_range,
@@ -15,7 +17,6 @@ from app.core.mp.wb.api.excs import TooManyRequests
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     FullStatsItem,
 )
-from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,33 @@ async def fetch_fullstats_v3(
     return await fetch_fullstats_with_windowing(
         adv_ids, begin_date, end_date, single_range_fetcher
     )
+
+
+async def get_adv_full_state_for_dates(
+    session: Any,
+    headers: dict[str, str],
+    adv_ids: list[int],
+    dates: list[date],
+) -> list[FullAdvStat] | None:
+    """
+    Fetch fullstats for given adv_ids and dates; filter to exact dates if non-contiguous.
+    Single place for the glue logic used by common_slaves WB API and core wb_api mixins.
+    """
+    if not dates:
+        return None
+    from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
+        filter_full_adv_stat_to_dates,
+        requested_dates_are_contiguous,
+    )
+
+    begin_date = min(dates)
+    end_date = max(dates)
+    stats = await fetch_fullstats_v3(session, headers, adv_ids, begin_date, end_date)
+    if not stats:
+        return None
+    if not requested_dates_are_contiguous(dates):
+        stats = filter_full_adv_stat_to_dates(stats, dates)
+    return stats
 
 
 def _parse_429_retry_seconds(response: Any) -> int:
