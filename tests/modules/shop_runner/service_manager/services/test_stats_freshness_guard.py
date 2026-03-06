@@ -2,39 +2,41 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
-
 import pytest
 
 from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
     StatsFreshnessGuard,
 )
 
+MODULE = "app.modules.shop_runner.service_manager.services.stats_freshness_guard"
+
 
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_returns_fresh(monkeypatch) -> None:
-    common_manager = SimpleNamespace(get=AsyncMock())
-    cluster_manager = SimpleNamespace(get=AsyncMock())
-    guard = StatsFreshnessGuard(
-        common_stat_timestamp_manager=common_manager,
-        cluster_stat_timestamp_manager=cluster_manager,
-    )  # type: ignore[arg-type]
-
     now = datetime.now(timezone.utc)
     keyword_dt = now - timedelta(minutes=5)
     common_dt = now - timedelta(minutes=3)
     cluster_dt = now - timedelta(minutes=2)
-    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
-        get_one=AsyncMock(return_value=keyword_dt)
-    )
-    common_manager.get = AsyncMock(return_value=common_dt)
-    cluster_manager.get = AsyncMock(return_value=cluster_dt)
+
+    async def get_full(*_args: object, **_kwargs: object) -> datetime | None:
+        return keyword_dt
+
+    async def get_common(*_args: object, **_kwargs: object) -> datetime | None:
+        return common_dt
+
+    async def get_cluster(*_args: object, **_kwargs: object) -> datetime | None:
+        return cluster_dt
+
+    monkeypatch.setattr(f"{MODULE}.get_last_full_stat_update_from_db", get_full)
+    monkeypatch.setattr(f"{MODULE}.get_last_common_stat_update_from_db", get_common)
+    monkeypatch.setattr(f"{MODULE}.get_last_cluster_stat_update_from_db", get_cluster)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        f"{MODULE}.settings",
         SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
     )
 
-    adv = SimpleNamespace(adv_id=101)
+    guard = StatsFreshnessGuard()
+    adv = SimpleNamespace(adv_id=101, nmids=[1])
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is True
@@ -44,23 +46,27 @@ async def test_stats_freshness_guard_returns_fresh(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_missing_timestamp_not_emergency(monkeypatch) -> None:
     """Missing timestamp = not yet collected (e.g. new campaign). Must not trigger emergency."""
-    common_manager = SimpleNamespace(get=AsyncMock(return_value=None))
-    cluster_manager = SimpleNamespace(get=AsyncMock(return_value=datetime.now(timezone.utc)))
-    guard = StatsFreshnessGuard(
-        common_stat_timestamp_manager=common_manager,
-        cluster_stat_timestamp_manager=cluster_manager,
-    )  # type: ignore[arg-type]
-
     now = datetime.now(timezone.utc)
-    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
-        get_one=AsyncMock(return_value=now)
-    )
+
+    async def get_full(*_args: object, **_kwargs: object) -> datetime | None:
+        return now
+
+    async def get_common(*_args: object, **_kwargs: object) -> datetime | None:
+        return None
+
+    async def get_cluster(*_args: object, **_kwargs: object) -> datetime | None:
+        return now
+
+    monkeypatch.setattr(f"{MODULE}.get_last_full_stat_update_from_db", get_full)
+    monkeypatch.setattr(f"{MODULE}.get_last_common_stat_update_from_db", get_common)
+    monkeypatch.setattr(f"{MODULE}.get_last_cluster_stat_update_from_db", get_cluster)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        f"{MODULE}.settings",
         SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
     )
 
-    adv = SimpleNamespace(adv_id=101)
+    guard = StatsFreshnessGuard()
+    adv = SimpleNamespace(adv_id=101, nmids=[1])
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is False
@@ -70,23 +76,21 @@ async def test_stats_freshness_guard_missing_timestamp_not_emergency(monkeypatch
 
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_all_timestamps_missing_not_emergency(monkeypatch) -> None:
-    """New campaign with no stats in Redis yet must not be classified as emergency-stale."""
-    common_manager = SimpleNamespace(get=AsyncMock(return_value=None))
-    cluster_manager = SimpleNamespace(get=AsyncMock(return_value=None))
-    guard = StatsFreshnessGuard(
-        common_stat_timestamp_manager=common_manager,
-        cluster_stat_timestamp_manager=cluster_manager,
-    )  # type: ignore[arg-type]
+    """New campaign with no stats in DB yet must not be classified as emergency-stale."""
 
-    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
-        get_one=AsyncMock(return_value=None)
-    )
+    async def get_none(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(f"{MODULE}.get_last_full_stat_update_from_db", get_none)
+    monkeypatch.setattr(f"{MODULE}.get_last_common_stat_update_from_db", get_none)
+    monkeypatch.setattr(f"{MODULE}.get_last_cluster_stat_update_from_db", get_none)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        f"{MODULE}.settings",
         SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
     )
 
-    adv = SimpleNamespace(adv_id=101)
+    guard = StatsFreshnessGuard()
+    adv = SimpleNamespace(adv_id=101, nmids=[])
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is False
@@ -96,29 +100,30 @@ async def test_stats_freshness_guard_all_timestamps_missing_not_emergency(monkey
 
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_stale_but_not_emergency(monkeypatch) -> None:
-    common_manager = SimpleNamespace(get=AsyncMock())
-    cluster_manager = SimpleNamespace(get=AsyncMock())
-    guard = StatsFreshnessGuard(
-        common_stat_timestamp_manager=common_manager,
-        cluster_stat_timestamp_manager=cluster_manager,
-    )  # type: ignore[arg-type]
-
     now = datetime.now(timezone.utc)
-    # stale for regular guard (2h > 1h), but not emergency (2h < 6h)
     keyword_dt = now - timedelta(hours=2)
     common_dt = now - timedelta(minutes=10)
     cluster_dt = now - timedelta(minutes=9)
-    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
-        get_one=AsyncMock(return_value=keyword_dt)
-    )
-    common_manager.get = AsyncMock(return_value=common_dt)
-    cluster_manager.get = AsyncMock(return_value=cluster_dt)
+
+    async def get_full(*_args: object, **_kwargs: object) -> datetime | None:
+        return keyword_dt
+
+    async def get_common(*_args: object, **_kwargs: object) -> datetime | None:
+        return common_dt
+
+    async def get_cluster(*_args: object, **_kwargs: object) -> datetime | None:
+        return cluster_dt
+
+    monkeypatch.setattr(f"{MODULE}.get_last_full_stat_update_from_db", get_full)
+    monkeypatch.setattr(f"{MODULE}.get_last_common_stat_update_from_db", get_common)
+    monkeypatch.setattr(f"{MODULE}.get_last_cluster_stat_update_from_db", get_cluster)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        f"{MODULE}.settings",
         SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
     )
 
-    adv = SimpleNamespace(adv_id=101)
+    guard = StatsFreshnessGuard()
+    adv = SimpleNamespace(adv_id=101, nmids=[1])
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is False
@@ -127,28 +132,30 @@ async def test_stats_freshness_guard_stale_but_not_emergency(monkeypatch) -> Non
 
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_emergency_when_older_than_6h(monkeypatch) -> None:
-    common_manager = SimpleNamespace(get=AsyncMock())
-    cluster_manager = SimpleNamespace(get=AsyncMock())
-    guard = StatsFreshnessGuard(
-        common_stat_timestamp_manager=common_manager,
-        cluster_stat_timestamp_manager=cluster_manager,
-    )  # type: ignore[arg-type]
-
     now = datetime.now(timezone.utc)
     keyword_dt = now - timedelta(hours=7)
     common_dt = now - timedelta(minutes=10)
     cluster_dt = now - timedelta(minutes=10)
-    guard._keyword_stat_update_state = SimpleNamespace(  # type: ignore[assignment]
-        get_one=AsyncMock(return_value=keyword_dt)
-    )
-    common_manager.get = AsyncMock(return_value=common_dt)
-    cluster_manager.get = AsyncMock(return_value=cluster_dt)
+
+    async def get_full(*_args: object, **_kwargs: object) -> datetime | None:
+        return keyword_dt
+
+    async def get_common(*_args: object, **_kwargs: object) -> datetime | None:
+        return common_dt
+
+    async def get_cluster(*_args: object, **_kwargs: object) -> datetime | None:
+        return cluster_dt
+
+    monkeypatch.setattr(f"{MODULE}.get_last_full_stat_update_from_db", get_full)
+    monkeypatch.setattr(f"{MODULE}.get_last_common_stat_update_from_db", get_common)
+    monkeypatch.setattr(f"{MODULE}.get_last_cluster_stat_update_from_db", get_cluster)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.stats_freshness_guard.settings",
+        f"{MODULE}.settings",
         SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600),
     )
 
-    adv = SimpleNamespace(adv_id=101)
+    guard = StatsFreshnessGuard()
+    adv = SimpleNamespace(adv_id=101, nmids=[1])
     state = await guard.evaluate(adv)  # type: ignore[arg-type]
 
     assert state.is_fresh is False
