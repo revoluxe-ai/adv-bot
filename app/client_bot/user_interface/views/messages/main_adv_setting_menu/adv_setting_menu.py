@@ -303,18 +303,18 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if self._emergency_mode_active:
             text += (
                 "🚨 АВ.РЕЖИМ\n"
-                "СТАТА > 6 ЧАСОВ\n"
-                "РАСХОДЫ ОГРАНИЧЕНЫ\n"
+                "СТАТА > 6ч\n"
+                "РАСХ ОГРАН\n"
             )
             if self._emergency_mode_reason:
-                text += f"Причина: {self._emergency_mode_reason}\n"
+                text += f"{self._emergency_mode_reason}\n"
             text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
             text += "Авто-акт. РК: выкл\n"
         else:
-            text += "Авто-акт. РК: включено\n"
+            text += "Авто-акт. РК: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
             if use_common:
                 limit = self.adv.common_budget_daily_limit or 0
@@ -325,8 +325,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     spend_rounded = int(round(spend))
                     remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Общий бюджет: потрачено {spend_rounded} р., "
-                        f"осталось {remaining} р. (лимит {limit} р./сут)\n"
+                        f"Общий бюд: потрач. {spend_rounded} р., "
+                        f"ост. {remaining} р. (лим {limit} р./с)\n"
                     )
             else:
                 auto_limit = self.adv.auto_budget_daily_limit or 0
@@ -337,14 +337,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     spend_auto_rounded = int(round(spend_auto))
                     remaining_auto = max(0, auto_limit - spend_auto_rounded)
                     text += (
-                        f"Авто: потрачено {spend_auto_rounded} р., "
+                        f"Авто: потр. {spend_auto_rounded} р., "
                         f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
                     )
                 if self.adv.search_adv_id:
                     search_limit = self.adv.search_auto_budget_daily_limit or 0
                     spend_search = self._spend_search_today or 0
                     if self._spend_search_today is None:
-                        text += "Аук: потр: нет данных\n"
+                        text += "Аук: потр: н/д\n"
                     else:
                         spend_search_rounded = int(round(spend_search))
                         remaining_search = max(0, search_limit - spend_search_rounded)
@@ -372,13 +372,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
+                text += f"План. себес. зак.: {target_str} (факт. рек.сис.: {avg_str})\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. системы (полки) не раскр. "
-                    f"Рек. макс.заказа >= {int(suggested)} р.\n"
+                    "⚠️ Рек. сис. (полки) не раскр. "
+                    f"Рек. макс.зак. >= {int(suggested)} р.\n"
                 )
 
         management_enabled = bool(
@@ -388,9 +388,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         def _status_suffix(reason: CampaignActivityReason | None) -> str:
             if not management_enabled:
-                return " (управление отключено)"
+                return " (упр. отключено)"
             if reason is None:
-                return " (Нет данных)"
+                return " (н/д)"
             label = reason_code_to_display_text(str(reason.reason_code.value))
             dt = reason.updated_at
             if dt.tzinfo is None:
@@ -405,12 +405,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             suffix_auction = _status_suffix(self._reason_search)
 
-        id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подключено"
-        id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подключено"
+        id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подкл"
+        id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подк"
         text += (
             f"📢 Камп: {self.adv.name}\n"
             f"🆔 ID Авто: {id_auto}\n"
-            f"🆔 ID Аукциона: {id_auction}\n"
+            f"🆔 ID Аук: {id_auction}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
             f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
@@ -428,7 +428,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             else "—"
         )
         text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
-        text += f"{mark_conv}Мин. зак. на 1000 показов: {val_1000views}\n"
+        text += f"{mark_conv}Мин. зак. на 1000 п: {val_1000views}\n"
 
         text += "Посл.обнов:\n"
 
@@ -443,11 +443,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f" {self._update_informer.add_to_white_list_str}\n"
             f"удал. ключа из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"повыш. цел. позиции:"
+            f"повыш. цел. поз:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"пониж. целевой позиции:"
+            f"пониж. целевой поз:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"доб верхнего ключа в БС:"
+            f"доб верх кл в БС:"
             f" {self._update_informer.update_top_key_str}\n"
         )
 
@@ -458,7 +458,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 adv_stat.days, key=attrgetter("date")
             )
             stat_text = "Стат по дням:\n"
-            stat_text += "Дата | Зак | Себес заказа\n"
+            stat_text += "Дата | Зак | Себес зак\n"
             stat_text += "--------------------------------\n"
 
             def reverse_date(date_: date_type) -> str:
@@ -528,5 +528,5 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             else:
                 dt_utc = dt.astimezone(timezone.utc)
             if now - dt_utc > timedelta(hours=6):
-                return True, f"{source_name}: нет обновлений > 6 часов"
+                return True, f"{source_name}: нет обн > 6 часов"
         return False, None
