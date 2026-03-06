@@ -107,7 +107,8 @@ class CoroutinesManager:
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
         if wb_manager_hub is None:
-            wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+            wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()  # fallback for tests
+        self._wb_manager_hub = wb_manager_hub
         self._wb_shop_data_manager = WBShopDataManager(
             wb_cabinet,
             tasks_manager=tasks_manager,
@@ -267,7 +268,7 @@ class CoroutinesManager:
             CommonSaleStatUpdater,
             CommonSaleStatUpdaterContainer,
         )
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
 
@@ -466,7 +467,7 @@ class CoroutinesManager:
             KeywordStampManager,
         )
 
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         keyword_stamp_manager_container = KeywordStampManagerContainer(
             _wb_api_manager_hub=wb_manager_hub
         )
@@ -505,7 +506,7 @@ class CoroutinesManager:
             KeywordStampManager,
         )
 
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         keyword_stamp_manager_container = KeywordStampManagerContainer(
             _wb_api_manager_hub=wb_manager_hub
         )
@@ -541,7 +542,7 @@ class CoroutinesManager:
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
         minus_phrase_manager = container.minus_phrase_manager()
 
@@ -608,7 +609,7 @@ class CoroutinesManager:
         )
         if not candidates:
             return None
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         handlers: list[Callable[[], Awaitable[AutoBudgetEnsureResult | None]]] = []
         task_specs: list[tuple[AdvSetting, AdvType, int | None]] = []
 
@@ -682,7 +683,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
@@ -696,7 +697,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(24 * 60 * 60, 60)
     async def update_clusters_adv_stats_history(self) -> None:
         """Обновление статистики кластеров за прошлые дни."""
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
@@ -708,7 +709,7 @@ class CoroutinesManager:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
@@ -781,13 +782,13 @@ class CoroutinesManager:
                     .where(KeywordSetting.id.in_(demote_ids))
                     .values(hard_status=1)
                 )
-                await session.execute(stmt_demote)
+                _ = await session.execute(stmt_demote)
             stmt_promote = (
                 update(KeywordSetting)
                 .where(KeywordSetting.id == top_keyword_id)
                 .values(hard_status=2)
             )
-            await session.execute(stmt_promote)
+            _ = await session.execute(stmt_promote)
             await session.commit()
 
         await self._set_min_search_bid_for_keyword(complex_adv, top_keyword.text)
@@ -805,7 +806,7 @@ class CoroutinesManager:
         search_adv_id = complex_adv.auction_adv_id
         if search_adv_id is None:
             return None
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         min_bids = await wb_manager_hub.wb_manager.get_min_bids(
             [complex_adv], cache_possible=True
         )
@@ -897,7 +898,7 @@ class CoroutinesManager:
         if not advs:
             return None
 
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         service = AutoAdvActiveControlService(
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
@@ -916,7 +917,7 @@ class CoroutinesManager:
         if not advs:
             return None
 
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         service = AutoResetBidService(
             wb_manager_hub=wb_manager_hub,
             tasks_manager=self._tasks_manager,
@@ -932,7 +933,7 @@ class CoroutinesManager:
 
         # TODO: Ускорить работу, как вариант - переделать на генераторы
         from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
-        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = self._wb_manager_hub
         manager = UpdateCommotBidInSearchAdvsManager(
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,

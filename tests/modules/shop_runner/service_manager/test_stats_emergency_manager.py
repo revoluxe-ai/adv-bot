@@ -125,9 +125,10 @@ async def test_set_min_search_bid_for_keyword_uses_min_bids(fake_redis) -> None:
         wb_modifier=SimpleNamespace(set_cluster_bids_for_adv=AsyncMock()),
     )
 
+    manager._wb_manager_hub = wb_manager_hub
     with patch(
         "app.modules.shop_runner.service_manager.manager.WBManagerHubFactory.get_wb_manager_from_context",
-        return_value=wb_manager_hub,
+        side_effect=RuntimeError("should not be called"),
     ):
         await manager._set_min_search_bid_for_keyword(complex_adv, "top_phrase")  # type: ignore[arg-type]
 
