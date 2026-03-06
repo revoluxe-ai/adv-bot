@@ -55,20 +55,23 @@ async def error_handler_for_telegram_bad_request_exception(
         getattr(exc, "message", None),
         exc_info=True,
     )
-    await state.set_state()
-    message = error_event.update.message
-    if message is None:
-        assert error_event.update.callback_query
-        assert error_event.update.callback_query.message
-        assert error_event.update.callback_query.message.chat
-        chat_id = int(error_event.update.callback_query.message.chat.id)
-    else:
-        chat_id = message.chat.id
-    await bot.send_message(
-        chat_id=chat_id,
-        text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
-        f"проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}",
-    )
+    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
+    if "caption is too long" in error_text:
+        message = error_event.update.message
+        if message is None:
+            assert error_event.update.callback_query
+            assert error_event.update.callback_query.message
+            assert error_event.update.callback_query.message.chat
+            chat_id = int(error_event.update.callback_query.message.chat.id)
+        else:
+            chat_id = message.chat.id
+        await bot.send_message(
+            chat_id=chat_id,
+            text="Ошибка отправки сообщения, мы уже в курсе, скоро исправим. "
+            f"Можете обратиться в поддержку за более подробной информацией -> {const.SUPPORT_LINK}",
+        )
+        return
+    raise error_event.exception
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
