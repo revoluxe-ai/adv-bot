@@ -64,3 +64,15 @@ pytestmark = pytest.mark.integration
 def test_detect_campaign_state(plan, fact, expected_state):
     state = detect_campaign_state(plan, fact)
     assert state == expected_state
+
+
+def test_detect_campaign_state_returns_none_when_fact_pay_for_order_is_none():
+    """When fact has no pay_for_order data, state is undefined (None)."""
+    plan = PlanData(orders=10, target_pay_for_order=200, max_pay_for_order=400)
+    fact = FactData(
+        predict_orders=15.0,
+        pay_for_order=None,
+        original_orders=15,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) is None

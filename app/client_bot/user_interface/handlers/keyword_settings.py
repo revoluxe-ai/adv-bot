@@ -421,7 +421,10 @@ async def setting_keywords_by_adv(
     chat_id = message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug("Обработка собщения")
-    await state.set_state()
+    # Не сбрасываем FSM state намеренно: пользователь остаётся в waiting_for_filter_keywords
+    # и может сразу ввести новый набор ключевых слов для фильтрации без повторного входа в сценарий.
+    # Сброс state (как в setting_keywords_filter_by_query, ~стр. 783) здесь не нужен — там
+    # одноразовый ввод числа, здесь — многократное уточнение фильтра по ключевым словам.
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,

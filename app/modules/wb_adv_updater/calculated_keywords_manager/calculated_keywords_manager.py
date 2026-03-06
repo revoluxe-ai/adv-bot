@@ -15,7 +15,7 @@ from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from .dto.keyword_hard_status import KeywordHardStatus
 from .dto.states import KeywordStatus, KeywordStatusReason
 from .enum import KeywordRatingMode
-from .keyword_stat import KeywordStat
+from .keyword_stat import KeywordStat, make_zero_keyword_stat
 from app.core.clickhouse_manager import BaseClickHouseManager
 from app.core.clikhouse_client_manager import  get_clickhouse_client
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
@@ -271,17 +271,17 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         for keyword_hard_status in keyword_hard_statuses:
             keyword_setting = keyword_hard_status.keyword_setting
             stat = text_to_stat.get(keyword_setting.text)
-
-            if stat:
-                keyword_setting_dto = keyword_setting_to_keyword_setting_dto(keyword_setting)
-                calculated_keyword = PreCalculatedKeyword(
-                    keyword_setting=keyword_setting_dto,
-                    cluster_stat=stat,
-                    adv_id=complex_adv.adv_id,
-                    rating_mode=rating_mode,
-                    bidder_status=keyword_hard_status.bidder_keyword_status,
-                )
-                keywords.append(calculated_keyword)
+            if not stat:
+                stat = make_zero_keyword_stat(keyword_setting.text)
+            keyword_setting_dto = keyword_setting_to_keyword_setting_dto(keyword_setting)
+            calculated_keyword = PreCalculatedKeyword(
+                keyword_setting=keyword_setting_dto,
+                cluster_stat=stat,
+                adv_id=complex_adv.adv_id,
+                rating_mode=rating_mode,
+                bidder_status=keyword_hard_status.bidder_keyword_status,
+            )
+            keywords.append(calculated_keyword)
         return keywords
 
     async def _get_all_keyword_setting(self, complex_adv: 'ComplexAdv') -> list[KeywordHardStatus]:
@@ -328,6 +328,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
+        pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
 
         white_list = [kw for kw in pre_keywords if kw.hard_status in [2]]
         if not white_list:
@@ -358,9 +359,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 calculated_keyword_list.append(calculated_keyword)
             return calculated_keyword_list
 
-        white_list.sort(key=lambda kw: kw.rating)
-        best_keyword = max(pre_keywords, key=attrgetter("rating"))
-        worst_keyword = white_list[0]
+        best_keyword = max(pre_keywords, key=lambda kw: kw.rating or 0)
+        worst_keyword = min(white_list, key=lambda kw: kw.rating or 0)
         rating_of_worst_keyword = worst_keyword.rating
         for pre_kw in pre_keywords:
             best_keyword_status = True if pre_kw == best_keyword else False
@@ -374,6 +374,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=reason,
                     best_keyword_status=best_keyword_status,
                 )
+            elif pre_kw.rating is None:
+                state = KeywordState(
+                    status=KeywordStatus.BAD,
+                    reason=KeywordStatusReason.RATING_IS_NONE,
+                    best_keyword_status=best_keyword_status,
+                )
 
             elif complex_adv.auto_add_only_relevant_phrase and not pre_kw.relevant:
                 state = KeywordState(
@@ -381,7 +387,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     reason=KeywordStatusReason.NOT_RELEVANT_PHRASE,
                     best_keyword_status=best_keyword_status,
                 )
-
             elif hard_status == 3:
                 status = KeywordStatus.BAD
                 reason = KeywordStatusReason.TURN_OFF
@@ -408,7 +413,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     best_keyword_status=best_keyword_status
                 )
             elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
-                    pre_kw.rating >= rating_of_worst_keyword:
+                    rating_of_worst_keyword is not None and pre_kw.rating >= rating_of_worst_keyword:
                 if above_rec is False:
                     status = KeywordStatus.BAD
                     reason = KeywordStatusReason.BELOW_REC_CONVERSION

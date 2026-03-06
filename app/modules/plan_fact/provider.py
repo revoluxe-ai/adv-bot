@@ -53,16 +53,17 @@ class PlanFactProvider:
     @staticmethod
     def _get_fact_data_from_stat(common_stat_data: CommonAdvsStatData) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None
-        assert common_stat_data.mean_price_for_order is not None
         assert common_stat_data.all_orders_for_last_days is not None
+
+        pay_for_order: float | None = None
+        if common_stat_data.mean_price_for_order is not None:
+            pay_for_order = round(common_stat_data.mean_price_for_order, 2)
 
         return FactData(
             predict_orders=round(
                 common_stat_data.mean_orders_for_last_days, 2
             ),
-            pay_for_order=round(
-                common_stat_data.mean_price_for_order, 2
-            ),
+            pay_for_order=pay_for_order,
             original_orders=common_stat_data.all_orders_for_last_days,
             fact_method=common_stat_data.sales_predict_method,
         )

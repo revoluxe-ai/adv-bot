@@ -91,7 +91,7 @@ class WBAdvDTO:
 
 
     @property
-    def fact_pay_for_order(self) -> float:
+    def fact_pay_for_order(self) -> float | None:
         return self._fact.pay_for_order
 
 

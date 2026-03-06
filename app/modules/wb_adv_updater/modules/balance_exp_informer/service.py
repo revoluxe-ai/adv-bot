@@ -14,7 +14,12 @@ from app.client_bot.notification_sender import (
     get_notification_sender,
 )
 from app.modules.balance_manager.balance_service import get_cabinet_balance
-from app.modules.billing.event_manager.event_manager import BillingEventManager
+from app.modules.billing.event_manager.dto.event_type import EventType
+from app.modules.billing.event_manager.event_manager import (
+    BillingEventManager,
+)
+from app.modules.billing.billing import GRACE_MAX_NEGATIVE_DAYS
+from app.modules.billing.event_manager.models import BillingEvent
 from app.modules.billing.pricer.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -235,8 +240,16 @@ class BalanceReminderService:
                     continue
 
                 balance, bonus = await get_cabinet_balance(wb_cabinet_id)
-                total_balance = balance + bonus
-                days_left = total_balance / avg_daily_spend
+                total_balance = float(balance) + float(bonus)
+                # Align with billing: "days until block" uses grace = 7× daily spend.
+                # When balance >= 0: days until zero = balance / daily.
+                # When balance < 0: room = balance + 7× daily, days_left = room // daily (same as billing).
+                if total_balance >= 0:
+                    days_left = total_balance / avg_daily_spend
+                else:
+                    max_allowed_negative = avg_daily_spend * GRACE_MAX_NEGATIVE_DAYS
+                    room = total_balance + max_allowed_negative
+                    days_left = room / avg_daily_spend
                 days_left = max(0, int(days_left))
                 level = pick_level(days_left)
                 if level is None:
@@ -411,8 +424,7 @@ class BalanceReminderService:
         _ = await session.execute(stmt)
 
     async def send_negative_balance_reminders(self) -> None:
-        """Отправить ежедневные напоминания о минусовом балансе (7-дневная грация)."""
-        today = billing_today()
+        """Отправить ежедневные напоминания о минусовом балансе (грация по балансу: 7× дневной расход)."""
         async with self._session_factory() as session:
             stmt = (
                 select(
@@ -458,9 +470,33 @@ class BalanceReminderService:
                 if balance + bonus >= 0:
                     continue
                 sample = cab_rows[0]
-                neg_at = sample.balance_went_negative_at
-                neg_date = neg_at.date() if neg_at else today
-                days_left = max(0, 7 - (today - neg_date).days)
+                shop_id = getattr(sample, "shop_id", None) if sample else None
+                price_for_shop_for_day: float = 0.0
+                if shop_id:
+                    try:
+                        price_for_shop_for_day = await self._pricer.get_price_for_day_for_shop(
+                            session, shop_id
+                        )
+                    except Exception as exc:
+                        self._logger.debug(
+                            "Negative reminder: get_price_for_day_for_shop(%s) failed: %s",
+                            shop_id,
+                            exc,
+                        )
+                # Align with billing: deactivation is balance-based (grace = 7× daily spend).
+                # Same formula as billing._process_cabinet: room = balance + max_allowed_negative.
+                max_allowed_negative = (
+                    price_for_shop_for_day * GRACE_MAX_NEGATIVE_DAYS
+                    if price_for_shop_for_day > 0
+                    else 0.0
+                )
+                total_balance = float(balance) + float(bonus)
+                room = total_balance + max_allowed_negative
+                days_left = (
+                    max(0, int(room // price_for_shop_for_day))
+                    if price_for_shop_for_day > 0
+                    else 0
+                )
                 shop_name = (sample.shop_name or "").strip() or f"Кабинет {wb_cabinet_id}"
                 for row in cab_rows:
                     if row.chat_id is None:
@@ -468,7 +504,27 @@ class BalanceReminderService:
                     user_bundles[int(row.user_id)].append(
                         (shop_name, wb_cabinet_id, days_left)
                     )
+            # Дедупликация: не слать повторно, если уже отправляли за последние 24 ч (рестарт/несколько инстансов)
+            now_utc = datetime.now(timezone.utc)
+            since = now_utc - timedelta(hours=24)
+            dedup_stmt = select(BillingEvent.user_id).where(
+                BillingEvent.event_type == EventType.NEGATIVE_BALANCE_REMINDER_SENT.value,
+                BillingEvent.source == "negative_balance_informer",
+                BillingEvent.created_at >= since,
+                BillingEvent.user_id.is_not(None),
+            ).distinct()
+            dedup_result = await session.execute(dedup_stmt)
+            already_sent_user_ids: set[int] = {int(r[0]) for r in dedup_result.all()}
+            if already_sent_user_ids:
+                self._logger.info(
+                    "Negative balance reminders: skipping %s users (already sent in last 24h)",
+                    len(already_sent_user_ids),
+                )
+            sent_count = 0
+            failed_count = 0
             for user_id, raw_items in user_bundles.items():
+                if user_id in already_sent_user_ids:
+                    continue
                 seen_cabs: set[int] = set()
                 items: list[tuple[str, int, int]] = []
                 for sn, cid, dl in raw_items:
@@ -493,8 +549,27 @@ class BalanceReminderService:
                         disable_web_page_preview=True,
                     )
                     if not success:
-                        raise RuntimeError("Notification sender could not deliver")
+                        failed_count += 1
+                        self._logger.warning(
+                            "Negative balance reminder: send_message returned False for user_id=%s chat_id=%s (user may have blocked the bot or chat unavailable)",
+                            user_id,
+                            int(chat_id),
+                        )
+                        try:
+                            await self._event_manager.emit_negative_balance_reminder_failed(
+                                user_id=user_id,
+                                user_telegram_id=int(chat_id),
+                                shop_id=None,
+                                error="Notification sender could not deliver",
+                                session=session,
+                            )
+                        except Exception as exc:
+                            self._logger.debug(
+                                "Failed to emit negative_balance_reminder_failed: %s", exc
+                            )
+                        continue
                 except Exception as e:
+                    failed_count += 1
                     self._logger.error(
                         "Negative balance reminder send failed for user %s: %s",
                         user_id,
@@ -514,6 +589,7 @@ class BalanceReminderService:
                             "Failed to emit negative_balance_reminder_failed", exc_info=exc
                         )
                     continue
+                sent_count += 1
                 for shop_name, wb_cabinet_id, days_left in items:
                     shop_id = next(
                         (r.shop_id for r in rows if r.wb_cabinet_id == wb_cabinet_id),
@@ -533,4 +609,10 @@ class BalanceReminderService:
                         self._logger.exception(
                             "Failed to emit negative_balance_reminder_sent", exc_info=exc
                         )
+            if sent_count or failed_count:
+                self._logger.info(
+                    "Negative balance reminders: sent to %s users, %s failed",
+                    sent_count,
+                    failed_count,
+                )
             await session.commit()
