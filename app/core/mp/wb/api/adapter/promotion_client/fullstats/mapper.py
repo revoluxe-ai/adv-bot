@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     BoosterStats,
@@ -39,9 +39,11 @@ def _days_to_day_stats(days_raw: Any) -> list[DayStats]:
     if not days_raw:
         return []
     result: list[DayStats] = []
-    for d in days_raw if isinstance(days_raw, list) else []:
-        if not isinstance(d, dict):
-            continue
+    raw_list = cast(list[Any], days_raw if isinstance(days_raw, list) else [])
+    items: list[dict[str, Any]] = [
+        x for x in raw_list if isinstance(x, dict)
+    ]
+    for d in items:
         try:
             date_val = _parse_date(d.get("date", ""))
             result.append(
@@ -69,9 +71,11 @@ def _booster_stats_from_item(booster_stats: Any) -> list[BoosterStats] | None:
     if booster_stats is None or not isinstance(booster_stats, list):
         return None
     result: list[BoosterStats] = []
-    for b in booster_stats:
-        if not isinstance(b, dict):
-            continue
+    raw_list = cast(list[Any], booster_stats)
+    items: list[dict[str, Any]] = [
+        x for x in raw_list if isinstance(x, dict)
+    ]
+    for b in items:
         try:
             result.append(
                 BoosterStats(
@@ -92,7 +96,7 @@ def full_stats_item_to_full_adv_stat(
 ) -> FullAdvStat:
     """Map one FullStatsItem (v3 API) to FullAdvStat (app model)."""
     dates: list[str] = []
-    d = begin_date
+    d: date = begin_date
     while d <= end_date:
         dates.append(d.isoformat())
         d += timedelta(days=1)
