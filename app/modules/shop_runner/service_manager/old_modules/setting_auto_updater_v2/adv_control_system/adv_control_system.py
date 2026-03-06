@@ -87,15 +87,18 @@ class AdvControlSystem:
 
         force_obj = ForceContext(value=force)
 
+        fact_pay_str = (
+            f"{fact.pay_for_order:.1f}" if fact.pay_for_order is not None else "Не определена"
+        )
         logger.debug(
-            "[adv_id=%s] Состояние: %s, plan_orders=%s, fact_orders=%.1f, target_pay=%s, max_pay=%s, fact_pay=%.1f",
+            "[adv_id=%s] Состояние: %s, plan_orders=%s, fact_orders=%.1f, target_pay=%s, max_pay=%s, fact_pay=%s",
             adv.adv_id,
             state.name,
             plan.orders,
             fact.predict_orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
-            fact.pay_for_order,
+            fact_pay_str,
         )
 
         # 6. Создаём контекст и запускаем сценарий
