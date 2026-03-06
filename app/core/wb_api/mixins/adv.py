@@ -17,6 +17,7 @@ from ..data_classes.advs import adv_fabric
 from ..data_classes.advs.auction_adv import AuctionAdv
 from ..exceptions import BadRequestError, MinAdvBidWBApiError
 from ..http_request import requests, try_except_decorator
+from ..v2_adverts_to_legacy import v2_advert_item_to_legacy
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,8 @@ class AdvMixin(WBAPIProtocol):
 
         for advert in adverts:
             advert_type = advert.get("type")
-            # TODO: Была проблема в том, что некоторые РК идут с типом 8, надо разобраться, а то не понятно опять что и как обновлять, сейчкс все работает
-            if isinstance(advert_type, int) and advert_type in [9, 8]:
+            # Type 8 = auto (unified), type 9 = search (manual). Both needed for ComplexAdv (auto_adv_id + search_adv_id)
+            if isinstance(advert_type, int) and advert_type in (8, 9):
                 advert_list: list[dict[str, Any]] = advert.get("advert_list", [])
                 for advert_item in advert_list:
                     advertId = advert_item["advertId"]
@@ -83,16 +84,25 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list[int]) -> list[Adv]:
-        advs = []
-        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        if not adv_ids:
+            return []
+        url = "https://advert-api.wildberries.ru/api/advert/v2/adverts"
+        ids_param = ",".join(str(i) for i in adv_ids)
 
         response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
+            self.session,
+            "GET",
+            f"{url}?ids={ids_param}",
+            headers=self.headers.standart,
         )
         answer = json.loads(response_text)
-        for advert in answer:
-            adv: Adv = adv_fabric.get_adv_data_class(advert)
-            advs.append(adv)
+        adverts_list = answer.get("adverts", [])
+        advs: list[Adv] = []
+        for item in adverts_list:
+            legacy = v2_advert_item_to_legacy(item)
+            adv = adv_fabric.get_adv_data_class(legacy)
+            if adv is not None:
+                advs.append(adv)
         return advs
 
     @try_except_decorator(1, 1)
@@ -102,6 +112,8 @@ class AdvMixin(WBAPIProtocol):
         all_advs = []
         part = 50
         for i in range(0, len(adv_ids), part):
+            if i > 0:
+                await asyncio.sleep(0.2)
             part_of_advs = adv_ids[i : i + part]
             advs = await self._get_advs(part_of_advs)
             if advs:
@@ -286,6 +298,8 @@ class AdvMixin(WBAPIProtocol):
         if not adverts:
             return []
         for advert_data in adverts:
+            if advert_data.get("type") not in (8, 9):
+                continue
             for advert in advert_data["advert_list"]:
                 advertId = advert["advertId"]
                 advertIds.append(advertId)

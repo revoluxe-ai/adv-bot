@@ -329,7 +329,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
 
-        white_list = [kw for kw in pre_keywords if kw.hard_status in [2] and kw.rating is not None]
+        white_list = [kw for kw in pre_keywords if kw.hard_status in [2]]
         if not white_list:
             best_keyword = max(pre_keywords, key=attrgetter("rating"))
             for pre_kw in pre_keywords:
@@ -408,7 +408,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     best_keyword_status=best_keyword_status
                 )
             elif complex_adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING and \
-                    pre_kw.rating is not None and pre_kw.rating >= rating_of_worst_keyword:
+                    pre_kw.rating >= rating_of_worst_keyword:
                 if above_rec is False:
                     status = KeywordStatus.BAD
                     reason = KeywordStatusReason.BELOW_REC_CONVERSION
