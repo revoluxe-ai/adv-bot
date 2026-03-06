@@ -48,6 +48,13 @@ async def network_error_handler(
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
+    exc = error_event.exception
+    logger.warning(
+        "TelegramBadRequest: %s (message=%s)",
+        exc,
+        getattr(exc, "message", None),
+        exc_info=True,
+    )
     await state.set_state()
     message = error_event.update.message
     if message is None:

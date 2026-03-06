@@ -1,6 +1,7 @@
 from .cabinet_adverts_list import CabinetAdvertsListAdapter
 from .campaigns_management.adapter import CampaignsManagementAdapter
 from .campaigns_info_v2.adapter import CampaignsInfoV2Adapter
+from .fullstats import FullstatsAdapter
 from .minus_phrases.adapter import MinusPhrasesAdapter
 from .normquery_stats.adapter import NormqueryStatsAdapter
 from .normquery_bids.adapter import NormqueryBidsAdapter
@@ -25,6 +26,7 @@ class PromotionClient:
         cabinet_adverts_list_adapter: CabinetAdvertsListAdapter,
         common_bids_adapter: CommonBidsAdapter,
         product_cards_adapter: ProductCardsAdapter,
+        fullstats_adapter: FullstatsAdapter,
     ) -> None:
         self.__minus_phrases_adapter = minus_phrases_adapter
         self.__normquery_stats_adapter = normquery_stats_adapter
@@ -36,6 +38,7 @@ class PromotionClient:
         self.__cabinet_adverts_list_adapter = cabinet_adverts_list_adapter
         self.__common_bids_adapter = common_bids_adapter
         self.__product_cards_adapter = product_cards_adapter
+        self.__fullstats_adapter = fullstats_adapter
 
     @property
     def minus_phrases_adapter(self) -> MinusPhrasesAdapter:
@@ -76,3 +79,7 @@ class PromotionClient:
     @property
     def product_cards_adapter(self) -> ProductCardsAdapter:
         return self.__product_cards_adapter
+
+    @property
+    def fullstats_adapter(self) -> FullstatsAdapter:
+        return self.__fullstats_adapter

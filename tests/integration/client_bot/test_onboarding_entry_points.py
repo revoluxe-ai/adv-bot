@@ -149,7 +149,10 @@ async def test_start_registration_new_user_creates_user_and_shows_gate(
         "app.client_bot.user_interface.handlers.start_registration_func.sm"
     ) as mock_sm, patch(
         "app.client_bot.user_interface.handlers.start_registration_func.MainMenu"
-    ) as mock_main_menu:
+    ) as mock_main_menu, patch(
+        "app.client_bot.user_interface.handlers.start_registration_func.settings"
+    ) as mock_settings:
+        mock_settings.invite_gate = True
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=async_session)
         mock_cm.__aexit__ = AsyncMock(return_value=None)

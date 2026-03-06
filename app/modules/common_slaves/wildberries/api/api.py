@@ -149,55 +149,31 @@ class AdvertApi(ABC_WB_API):
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
-        dates = [date.isoformat() for date in dates]
-        url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
-        query_data = []
-        for adv_id in adv_ids:
-            query_data.append({"id": adv_id, "dates": dates})
-
-        response_text = await requests(
-            self.session,
-            "POST",
-            url,
-            json_data=query_data,
-            headers=self.headers.standart,
-        )
-        answer = json.loads(response_text)
-        full_stats = []
-        if not answer:
+        if not dates:
             return None
-        for data in answer:
-            try:
-                full_stat = FullAdvStat(**data)
-            except Exception as e:
-                logger.error(
-                    "Ошибка валидации данных по статистике рекламы", exc_info=True
-                )
-                raise e
-            full_stats.append(full_stat)
-        return full_stats
+        from app.modules.full_stat_adv_updater.fullstats_v3_legacy import (
+            get_adv_full_state_for_dates,
+        )
+
+        return await get_adv_full_state_for_dates(
+            self.session, self.headers.standart, list(adv_ids), dates
+        )
 
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
+        if not adv_ids:
+            return []
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
-        full_stats = []
-        part_len = 100
-        adv_ids = list(adv_ids)
-        for i in range(0, len(adv_ids), part_len):
-            part_of_adv_ids = adv_ids[i : i + part_len]
-            part_stats = await self._get_adv_full_state(part_of_adv_ids, dates)
-            if part_stats:
-                full_stats.extend(part_stats)
-        return full_stats
+        # Chunking by 50 is done inside _get_adv_full_state → fetch_fullstats_v3 → _fetch_single_range
+        return (await self._get_adv_full_state(list(adv_ids), dates)) or []
 
     async def get_full_adv_stat_for_date(
         self, adv_ids: list[int], date: datetime.date
     ) -> list[FullAdvStat]:
-        full_stats = await self.get_adv_full_state(adv_ids, [date])
-        return full_stats
+        return (await self.get_adv_full_state(adv_ids, [date])) or []
 
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
