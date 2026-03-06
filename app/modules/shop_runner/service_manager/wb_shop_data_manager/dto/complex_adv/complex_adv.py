@@ -36,7 +36,7 @@ class ComplexAdv:
     def __init__(
         self,
         adv_setting: AdvSetting,
-        search_adv: AdvSetting,
+        search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
         get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
@@ -108,6 +108,8 @@ class ComplexAdv:
 
     @property
     def  search_cpm(self) -> int | None:
+        if self._search_adv is None:
+            return None
         return self._search_adv.cpm
 
     @property

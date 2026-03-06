@@ -252,11 +252,11 @@ class CoroutinesManager:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
         # в фильтре только проверку активности аукциона
         advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs = [adv for adv in advs if adv.bot_active]
         control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
         handlers: list[Callable[[], Awaitable[Any]]] = []
@@ -458,8 +458,8 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         handlers: list[Callable[[], Awaitable[Any]]] = [
-            lambda complex_adv=adv: minus_phrase_manager.update_minus_phrases(
-                complex_adv
+            lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
+                complex_adv_
             )
             for adv in complex_advs
         ]
@@ -604,7 +604,7 @@ class CoroutinesManager:
 
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
-    @while_coroutine_decorator(60 * 15, 60)
+    @while_coroutine_decorator(60 * 5, 60)
     async def update_cluster_bids(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
@@ -767,7 +767,6 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         if not complex_advs:
             return None
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         if not complex_advs:
             return None
 
@@ -799,6 +798,7 @@ class CoroutinesManager:
     async def white_list_tail_trimmer(self):
         from .services.white_list_trimmer import WhiteListTrimmer
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
         complex_advs = [
             adv
@@ -832,6 +832,7 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         if not complex_advs:
             return None
+        complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs: list[ComplexAdv] = [adv for adv in complex_advs if adv.individual_keywords_target_place_mode]
         wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
 
@@ -861,6 +862,7 @@ class CoroutinesManager:
             return None
 
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
         if not complex_advs:
             return None
