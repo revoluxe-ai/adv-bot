@@ -291,7 +291,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
-        wb_api = self._wb_api
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         all_adv_ids: set[int] = set()
         for adv in advs:
