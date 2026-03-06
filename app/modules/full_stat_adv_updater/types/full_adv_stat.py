@@ -84,6 +84,21 @@ class SmallFullAdvStat:
     sum_price: float
 
 
+def compute_aggregate_ctr_cpc_cr(
+    views: int, clicks: int, sum_: float, orders: int
+) -> tuple[float, float, float]:
+    """
+    Compute CTR (%), CPC, and CR (%) from aggregated counts.
+
+    Single source of truth for re-aggregation formulas used when merging
+    or filtering FullAdvStat (e.g. window merge, date filter).
+    """
+    ctr = (clicks / views * 100.0) if views else 0.0
+    cpc = (sum_ / clicks) if clicks else 0.0
+    cr = (orders / clicks * 100.0) if clicks else 0.0
+    return ctr, cpc, cr
+
+
 class FullAdvStat(BaseModel):
     dates: list[str] = Field(
         ..., description="Даты, за которые необходимо выдать информацию"

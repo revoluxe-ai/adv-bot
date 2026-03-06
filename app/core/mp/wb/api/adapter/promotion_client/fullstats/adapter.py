@@ -20,7 +20,11 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     Response,
 )
-from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats, FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import (
+    DayStats,
+    FullAdvStat,
+    compute_aggregate_ctr_cpc_cr,
+)
 
 from .chunked import run_chunked_single_range
 from .mapper import full_stats_item_to_full_adv_stat
@@ -147,9 +151,7 @@ def _merge_full_adv_stat(a: FullAdvStat, b: FullAdvStat) -> FullAdvStat:
     shks = a.shks + b.shks
     sum_price = a.sum_price + b.sum_price
 
-    ctr = (clicks / views * 100.0) if views else 0.0
-    cpc = (sum_ / clicks) if clicks else 0.0
-    cr = (orders / clicks * 100.0) if clicks else 0.0
+    ctr, cpc, cr = compute_aggregate_ctr_cpc_cr(views, clicks, sum_, orders)
 
     booster_stats = (a.boosterStats or []) + (b.boosterStats or [])
     booster_stats = booster_stats if booster_stats else None
