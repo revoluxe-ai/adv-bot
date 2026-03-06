@@ -30,7 +30,7 @@ def _parse_date(value: Any) -> datetime:
     raise TypeError(f"Unexpected date type: {type(value)}")
 
 
-def _days_to_day_stats(days_raw: Any, date_range: list[str]) -> list[DayStats]:
+def _days_to_day_stats(days_raw: Any) -> list[DayStats]:
     """Convert API days (list of dicts) to list[DayStats]."""
     if not days_raw:
         return []
@@ -94,10 +94,7 @@ def full_stats_item_to_full_adv_stat(
         d += timedelta(days=1)
 
     days_raw = item.days
-    day_stats = _days_to_day_stats(
-        days_raw if isinstance(days_raw, list) else [],
-        dates,
-    )
+    day_stats = _days_to_day_stats(days_raw if isinstance(days_raw, list) else [])
     booster_stats = _booster_stats_from_item(item.booster_stats)
 
     return FullAdvStat(
