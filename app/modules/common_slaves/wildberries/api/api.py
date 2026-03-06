@@ -9,6 +9,7 @@ from aiohttp import ClientSession
 from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
+from app.core.wb_api.v2_adverts_to_legacy import v2_advert_item_to_legacy
 from app.core.wb_api.mixins.content import ContentMixin
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 
@@ -279,8 +280,11 @@ class AdvertApi(ABC_WB_API):
         adverts: list = answer["adverts"]
         if not adverts:
             return []
-        for advert in adverts:
-            for advert in advert["advert_list"]:
+        for advert_group in adverts:
+            # Type 8 = auto (unified), type 9 = search (manual). Both needed for ComplexAdv
+            if advert_group.get("type") not in (8, 9):
+                continue
+            for advert in advert_group["advert_list"]:
                 advertId = advert["advertId"]
                 advertIds.append(advertId)
 
@@ -288,25 +292,35 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
-        advs = []
-        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        if not adv_ids:
+            return []
+        url = "https://advert-api.wildberries.ru/api/advert/v2/adverts"
+        ids_param = ",".join(str(i) for i in adv_ids)
 
         response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
+            self.session,
+            "GET",
+            f"{url}?ids={ids_param}",
+            headers=self.headers.standart,
         )
         answer = json.loads(response_text)
-        for advert in answer:
-            adv: Adv | None = adv_fabric.get_adv_data_class(advert)
-            if adv:
+        adverts_list = answer.get("adverts", [])
+        advs: list[Adv] = []
+        for item in adverts_list:
+            legacy = v2_advert_item_to_legacy(item)
+            adv = adv_fabric.get_adv_data_class(legacy)
+            if adv is not None:
                 advs.append(adv)
         return advs
 
     async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
         if not adv_ids:
-            adv_ids: list[int] = await self.get_advertIds()
-        all_advs = []
+            adv_ids = await self.get_advertIds()
+        all_advs: list[Adv] = []
         part = 50
         for i in range(0, len(adv_ids), part):
+            if i > 0:
+                await asyncio.sleep(0.2)
             part_of_advs = adv_ids[i : i + part]
             advs = await self._get_advs(part_of_advs)
             all_advs.extend(advs)
