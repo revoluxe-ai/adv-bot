@@ -167,23 +167,17 @@ class AdvertApi(ABC_WB_API):
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
+        if not adv_ids:
+            return []
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
-        full_stats: list[FullAdvStat] = []
-        part_len = 50  # v3 API limit
-        adv_ids = list(adv_ids)
-        for i in range(0, len(adv_ids), part_len):
-            part_of_adv_ids = adv_ids[i : i + part_len]
-            part_stats = await self._get_adv_full_state(part_of_adv_ids, dates)
-            if part_stats:
-                full_stats.extend(part_stats)
-        return full_stats
+        # Chunking by 50 is done inside _get_adv_full_state → fetch_fullstats_v3 → _fetch_single_range
+        return (await self._get_adv_full_state(list(adv_ids), dates)) or []
 
     async def get_full_adv_stat_for_date(
         self, adv_ids: list[int], date: datetime.date
     ) -> list[FullAdvStat]:
-        full_stats = await self.get_adv_full_state(adv_ids, [date])
-        return full_stats
+        return (await self.get_adv_full_state(adv_ids, [date])) or []
 
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:

@@ -366,18 +366,8 @@ class AdvMixin(WBAPIProtocol):
     ) -> list[FullAdvStat]:
         if not adv_ids:
             return []
-
-        all_stats = []
-        batch_size = 50
-
-        # API разрешает не более 50 объявлений за один запрос, поэтому разбиваем список на чанки по 50
-        for i in range(0, len(adv_ids), batch_size):
-            chunk = adv_ids[i : i + batch_size]
-            stats_chunk = await self._get_adv_full_state(chunk, dates)
-            if stats_chunk:
-                all_stats.extend(stats_chunk)
-
-        return all_stats
+        # Chunking by 50 is done inside _get_adv_full_state → fetch_fullstats_v3 → _fetch_single_range
+        return (await self._get_adv_full_state(adv_ids, dates)) or []
 
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
