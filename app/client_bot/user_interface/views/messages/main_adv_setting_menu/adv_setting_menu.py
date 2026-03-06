@@ -304,7 +304,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             text += (
                 "🚨🚨🚨 АВАРИЙНЫЙ РЕЖИМ 🚨🚨🚨\n"
                 "СТАТА НЕ СВЕЖАЯ > 6 ЧАСОВ\n"
-                "АВТОМАТИКА ОГРАНИЧЕНА ДО ВОССТАНОВЛЕНИЯ СТАТЫ\n"
+                "РАСХОДЫ ОГРАНИЧЕНЫ ДО ВОССТАНОВЛЕНИЯ СТАТЫ\n"
             )
             if self._emergency_mode_reason:
                 text += f"Причина: {self._emergency_mode_reason}\n"
