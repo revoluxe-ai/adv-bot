@@ -73,6 +73,8 @@ class WhiteListAddExecutor(BaseExecutor):
         # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
+            if keyword.views == 0:
+                return False
             if keyword.hard_status != 1:
                 return False
             if keyword.status == KeywordStatus.GOOD:
