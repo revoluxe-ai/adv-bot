@@ -20,6 +20,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
@@ -97,6 +98,20 @@ class PromotionManager:
         return await method.get_current_bids(
             self._client.normquery_bids_adapter,
             complex_advs,
+        )
+
+    async def get_full_adv_stat(
+        self,
+        adv_ids: list[int],
+        dates: list[datetime.date],
+    ) -> list[FullAdvStat]:
+        """Полная статистика кампаний за указанные даты (GET /adv/v3/fullstats)."""
+        if not dates:
+            return []
+        begin_date = min(dates)
+        end_date = max(dates)
+        return await self._client.fullstats_adapter.get_full_adv_stat(
+            adv_ids, begin_date, end_date
         )
 
     async def get_min_bids_for_complex_adv(

@@ -5,6 +5,7 @@ from .normquery_stats.adapter import NormqueryStatsAdapter
 from .normquery_bids import NormqueryBidsAdapter
 from .finance.adapter import FinanceAdapter, BalanceTypeNotSupportedError
 from .promotion_client import PromotionClient
+from .fullstats import FullstatsAdapter
 from .min_bids.adapter import MinBidsAdapter
 from .campaigns_info_v2 import CampaignsInfoV2Adapter
 from .common_bids.adapter import CommonBidsAdapter
@@ -18,6 +19,7 @@ __all__ = [
     "NormqueryStatsAdapter",
     "NormqueryBidsAdapter",
     "PromotionClient",
+    "FullstatsAdapter",
     "MinBidsAdapter",
     "FinanceAdapter",
     "BalanceTypeNotSupportedError",
