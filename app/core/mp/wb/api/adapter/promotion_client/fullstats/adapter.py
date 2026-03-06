@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
@@ -121,7 +121,8 @@ class FullstatsAdapter(BaseSectionAdapter):
         parsed = response.parsed
         if parsed is None or not isinstance(parsed, list):
             return []
-        return [x for x in parsed if isinstance(x, FullStatsItem)]
+        parsed_list: list[Any] = cast(list[Any], parsed)
+        return [x for x in parsed_list if isinstance(x, FullStatsItem)]
 
 
 def _merge_full_adv_stat(a: FullAdvStat, b: FullAdvStat) -> FullAdvStat:
