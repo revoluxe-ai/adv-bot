@@ -16,7 +16,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import load_only
 
@@ -93,19 +93,33 @@ def _is_connectable_candidate(item: dict) -> bool:
 async def _get_adv_statuses_from_db(
     wb_cabinet_id: int, adv_ids: list[int]
 ) -> dict[int, str]:
-    """Вернуть словарь adv_id -> active_status для указанных adv_ids."""
+    """Вернуть словарь campaign_id -> active_status для указанных id (auto=adv_id, аукцион=_search_adv_id)."""
     if not adv_ids:
         return {}
     async with sm(read_only=True) as session:
         stmt = (
-            select(AdvSetting.adv_id, AdvSetting.active_status)
+            select(
+                AdvSetting.adv_id,
+                AdvSetting._search_adv_id,
+                AdvSetting.active_status,
+            )
             .where(
                 AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                AdvSetting.adv_id.in_(adv_ids),
+                or_(
+                    AdvSetting.adv_id.in_(adv_ids),
+                    AdvSetting._search_adv_id.in_(adv_ids),
+                ),
             )
         )
         result = await session.execute(stmt)
-        return {row[0]: row[1] for row in result.all() if row[1] is not None}
+        out: dict[int, str] = {}
+        for adv_id, search_adv_id, status in result.all():
+            if status is not None:
+                if adv_id is not None and adv_id in adv_ids:
+                    out[adv_id] = status
+                if search_adv_id is not None and search_adv_id in adv_ids:
+                    out[search_adv_id] = status
+        return out
 
 
 async def _sync_adv_status_from_wb(
@@ -137,8 +151,11 @@ async def _sync_adv_status_from_wb(
                     stmt = (
                         update(AdvSetting)
                         .where(
-                            AdvSetting.adv_id == adv_id,
                             AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                            or_(
+                                AdvSetting.adv_id == adv_id,
+                                AdvSetting._search_adv_id == adv_id,
+                            ),
                         )
                         .values(active_status=db_status)
                     )
