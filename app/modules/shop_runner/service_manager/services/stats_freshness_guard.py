@@ -30,20 +30,40 @@ class StatsFreshnessGuard:
     ) -> None:
         self._ch_reader = ch_freshness_reader
 
-    async def evaluate(self, complex_adv: ComplexAdv) -> StatsFreshnessState:
-        now = datetime.now(timezone.utc)
-        fresh_period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
-        adv_id_repr = complex_adv.original_adv_setting_id
+    async def evaluate_batch(self, complex_adv: ComplexAdv) -> StatsFreshnessState:
+        """Like evaluate() but fetches all three timestamps in one semaphore+session.
+        Use from UI (e.g. AdvSettingMenu) to reduce CH contention."""
+        common_updated_at, full_adv_updated_at, cluster_updated_at = (
+            await self._ch_reader.get_all_updated_ats(complex_adv)
+        )
+        return self._state_from_timestamps(
+            complex_adv, common_updated_at, full_adv_updated_at, cluster_updated_at
+        )
 
+    async def evaluate(self, complex_adv: ComplexAdv) -> StatsFreshnessState:
         common_updated_at = await self._ch_reader.get_common_updated_at(complex_adv)
         full_adv_updated_at = await self._ch_reader.get_full_adv_updated_at(complex_adv)
         cluster_updated_at = await self._ch_reader.get_cluster_updated_at(complex_adv)
+        return self._state_from_timestamps(
+            complex_adv, common_updated_at, full_adv_updated_at, cluster_updated_at
+        )
+
+    def _state_from_timestamps(
+        self,
+        complex_adv: ComplexAdv,
+        common_updated_at: datetime | None,
+        full_adv_updated_at: datetime | None,
+        cluster_updated_at: datetime | None,
+    ) -> StatsFreshnessState:
+        now = datetime.now(timezone.utc)
+        fresh_period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
+        adv_id_repr = complex_adv.original_adv_setting_id
 
         common_age = self._calc_age(now, common_updated_at)
         full_adv_age = self._calc_age(now, full_adv_updated_at)
         cluster_age = self._calc_age(now, cluster_updated_at)
 
-        source_ages = {
+        source_ages: dict[str, timedelta | None] = {
             "common_stat_update": common_age,
             "full_adv_stat_update": full_adv_age,
             "cluster_stat_update": cluster_age,
