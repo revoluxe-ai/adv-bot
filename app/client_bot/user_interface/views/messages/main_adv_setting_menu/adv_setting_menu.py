@@ -115,6 +115,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._spend_search_today: float | None = None
         self._emergency_mode_active: bool = False
         self._emergency_mode_reason: str | None = None
+        self._stats_fresh: bool = True
+        self._stats_stale_reason: str | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -198,10 +200,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_update_cluster_stat: datetime | None = (
             await self._redis_cluster_stat_timestamp_manager.get(self.adv.id)
         )
-        # Детект аварии по ClickHouse (как в guard), а не по Redis
-        self._emergency_mode_active, self._emergency_mode_reason = (
-            await self._resolve_emergency_mode_from_ch()
-        )
+        # Детект аварии и свежести статы по ClickHouse (как в guard), а не по Redis
+        (
+            self._emergency_mode_active,
+            self._emergency_mode_reason,
+            self._stats_fresh,
+            self._stats_stale_reason,
+        ) = await self._resolve_emergency_mode_from_ch()
         if last_update_common_stat:
             self.last_update_common_stat_str = last_update_common_stat.strftime(
                 "%d.%m.%Y %H:%M:%S"
@@ -315,6 +320,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
             if self._emergency_mode_reason:
                 text += f"{self._emergency_mode_reason}\n"
+            text += "\n"
+        elif not self._stats_fresh:
+            text += "Стата не свежая, автоматика приостановлена\n"
+            if self._stats_stale_reason:
+                text += f"{self._stats_stale_reason}\n"
             text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
@@ -513,8 +523,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
         return last_full_stat_update
 
-    async def _resolve_emergency_mode_from_ch(self) -> tuple[bool, str | None]:
-        """Детект аварии по данным ClickHouse (как StatsFreshnessGuard), не по Redis."""
+    async def _resolve_emergency_mode_from_ch(
+        self,
+    ) -> tuple[bool, str | None, bool, str | None]:
+        """Детект аварии и свежести статы по данным ClickHouse (как StatsFreshnessGuard), не по Redis.
+        Returns: (emergency_active, emergency_reason, stats_fresh, stats_stale_reason)."""
         search_adv: AdvSetting | None = None
         if getattr(self.adv, "search_adv_id", None):
             async with sm() as session:
@@ -524,9 +537,26 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 search_adv = result.scalar_one_or_none()
         complex_adv = ComplexAdv(self.adv, search_adv)
         state = await StatsFreshnessManager().evaluate(complex_adv)
-        if not state.is_stale_over_6h:
-            return False, None
-        return True, self._guard_reason_to_display(state.reason)
+        if state.is_stale_over_6h:
+            return True, self._guard_reason_to_display(state.reason), False, None
+        if not state.is_fresh and state.reason:
+            return False, None, False, self._stale_reason_to_display(state.reason)
+        return False, None, state.is_fresh, None
+
+    @staticmethod
+    def _stale_reason_to_display(reason: str) -> str:
+        """Маппинг reason от guard (не авария) в текст: какая стата не свежая."""
+        if "full_adv_stat_update" in reason:
+            name = "Рекламная стата"
+        elif "common_stat_update" in reason:
+            name = "Общая стата"
+        elif "cluster_stat_update" in reason:
+            name = "Кластерная стата"
+        else:
+            name = "Стата"
+        if "not yet collected" in reason:
+            return f"{name} ещё не собрана"
+        return f"{name} не свежая"
 
     @staticmethod
     def _guard_reason_to_display(reason: str | None) -> str:
