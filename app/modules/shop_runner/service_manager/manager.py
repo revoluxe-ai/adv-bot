@@ -78,6 +78,7 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from .services.clickhouse_freshness_reader import ClickHouseStatsFreshnessReader
 from .services.stats_freshness_guard import StatsFreshnessGuard, StatsFreshnessState
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
@@ -132,8 +133,7 @@ class CoroutinesManager:
             redis_client=redis_client_wrapper
         )
         self._stats_freshness_guard = StatsFreshnessGuard(
-            common_stat_timestamp_manager=self._redis_common_stat_timestamp_manager,
-            cluster_stat_timestamp_manager=self._redis_cluster_stat_timestamp_manager,
+            ch_freshness_reader=ClickHouseStatsFreshnessReader()
         )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
@@ -687,11 +687,9 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
-
-        updated_adv_ids = await updater.update_today_stats(complex_advs)
-        for adv_id in updated_adv_ids:
-            await self._redis_cluster_stat_timestamp_manager.set(adv_id)
+        updated_origonal_adv_ids = await updater.update_today_stats(complex_advs)
+        for adv_orig_id in updated_origonal_adv_ids:
+            await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
