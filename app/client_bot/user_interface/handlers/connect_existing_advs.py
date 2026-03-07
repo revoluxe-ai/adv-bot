@@ -500,9 +500,11 @@ async def connect_existing_advs_nmid(
                     reply_markup=kb,
                 )
                 return
-            # После синхронизации пара всё ещё есть (не done) — показываем прежнее сообщение
-            await state.set_state(
-                ConnectExistingAdvsStates.waiting_confirm_continue_invalid
+            # После синхронизации пара всё ещё есть (не done) — показываем сообщение
+            # Если поисковая РК уже есть в БД — не предлагаем «Создать поисковую РК», иначе создастся дубликат и перезапишется _search_adv_id.
+            search_already_in_db = (
+                existing_auction_id_from_db is not None
+                or existing_pair_after_sync[1] is not None
             )
             statuses = await _get_adv_statuses_from_db(
                 wb_cabinet_id, adv_ids_to_sync
@@ -522,36 +524,63 @@ async def connect_existing_advs_nmid(
                 lines.append(
                     f"• Поисковая РК: {existing_auction_id_from_db}, статус: {st_auction}; авто-РК: не указана"
                 )
-            lines.extend(
-                [
-                    "",
-                    "В списке кампаний по артикулу от WB эта кампания не пришла (так бывает: API не всегда отдаёт все кампании в выборке). Статус выше только что обновлён с WB — если там «пауза» или «запущена», кампания на WB есть.",
-                    "",
-                    "Что можно сделать:",
-                    "• «Создать поисковую РК» — бот создаст поисковую кампанию и привяжет к этой авто.",
-                    "• «Отмена» — ничего не создаём.",
-                ]
+            lines.append("")
+            lines.append(
+                "В списке кампаний по артикулу от WB эта кампания не пришла (так бывает: API не всегда отдаёт все кампании в выборке). Статус выше только что обновлён с WB — если там «пауза» или «запущена», кампания на WB есть."
             )
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
+            if search_already_in_db:
+                lines.append("")
+                lines.append(
+                    "Поисковая РК уже привязана к артикулу в боте. Дополнительно создавать её не нужно — вернитесь в меню магазина."
+                )
+                wb_user_cabinet_original_id = data_for_branch.get("wb_user_cabinet_original_id")
+                if isinstance(wb_user_cabinet_original_id, int):
+                    kb = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text="В меню магазина",
+                                    callback_data=callbacks.ConnectExistingAdvsBackToShop(
+                                        wb_user_cabinet_original_id=wb_user_cabinet_original_id
+                                    ).pack(),
+                                )
+                            ],
+                        ],
+                    )
+                else:
+                    kb = InlineKeyboardMarkup(inline_keyboard=[])
+            else:
+                lines.extend(
                     [
-                        InlineKeyboardButton(
-                            text="Создать поисковую РК",
-                            callback_data=callbacks.ConnectExistingContinueDespiteInvalid(
-                                action="confirm"
-                            ).pack(),
-                        )
+                        "",
+                        "Что можно сделать:",
+                        "• «Создать поисковую РК» — бот создаст поисковую кампанию и привяжет к этой авто.",
+                        "• «Отмена» — ничего не создаём.",
+                    ]
+                )
+                await state.set_state(
+                    ConnectExistingAdvsStates.waiting_confirm_continue_invalid
+                )
+                kb = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="Создать поисковую РК",
+                                callback_data=callbacks.ConnectExistingContinueDespiteInvalid(
+                                    action="confirm"
+                                ).pack(),
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                text="Отмена",
+                                callback_data=callbacks.ConnectExistingContinueDespiteInvalid(
+                                    action="cancel"
+                                ).pack(),
+                            )
+                        ],
                     ],
-                    [
-                        InlineKeyboardButton(
-                            text="Отмена",
-                            callback_data=callbacks.ConnectExistingContinueDespiteInvalid(
-                                action="cancel"
-                            ).pack(),
-                        )
-                    ],
-                ],
-            )
+                )
             await bot.send_message(
                 message.chat.id,
                 "\n".join(lines),
