@@ -1,5 +1,8 @@
 import asyncio
+import json
 import logging
+import time as _time_mod
+from pathlib import Path
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
@@ -219,9 +222,11 @@ class WBShopDataManager:
         )
         complex_advs: list[ComplexAdv] = []
         for adv in adv_settings:
-            search_adv = search_adv_idv.get(adv.search_adv_id)
-            if not search_adv:
-                continue
+            search_adv = (
+                search_adv_idv.get(adv.search_adv_id)
+                if adv.search_adv_id is not None
+                else None
+            )
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
                 adv_setting=adv,
@@ -232,6 +237,36 @@ class WBShopDataManager:
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
+        # #region agent log
+        try:
+            _log_path = Path(__file__).resolve().parents[5] / "debug-e97681.log"
+            with open(_log_path, "a", encoding="utf-8") as _f:
+                _ = _f.write(
+                    json.dumps(
+                        {
+                            "sessionId": "e97681",
+                            "hypothesisId": "get_complex_advs",
+                            "location": "wb_shop_data_manager.get_complex_advs",
+                            "message": "get_complex_advs result",
+                            "data": {
+                                "shop_id": self.shop_id,
+                                "count": len(complex_advs),
+                                "adv_setting_original_ids": [
+                                    a.adv_setting_original_id for a in complex_advs
+                                ],
+                                "has_search_adv": [
+                                    a.search_adv is not None for a in complex_advs
+                                ],
+                            },
+                            "timestamp": int(_time_mod.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
         return complex_advs
 
     @staticmethod
