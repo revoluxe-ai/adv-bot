@@ -4,8 +4,6 @@ from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
-from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
-from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.predict_keywords_target_place.di import PredictKeywordsTargetPlaceContainer
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -418,10 +416,8 @@ class UpdateClusterBidsManager:
         advs: list[ComplexAdv],
         auction_min_bids_by_nmid: dict[int, int],
     ) -> dict[int, (dict[int, dict[str, dict[int, int]]] | None)]:
-        predict_keywords_target_manager_container = PredictKeywordsTargetPlaceContainer()
-        predict_target_place_manager: PredictKeywordsTargetPlace = (
-            predict_keywords_target_manager_container.predict_keywords_target_place_manager()
-        )
+        container = PredictKeywordsTargetPlaceContainer()
+        bids_for_positions_manager = container.bids_for_positions_manager()
         adv_result: dict[int, (dict[int, dict[str, dict[int, int]]] | None)] = {}
         for adv in advs:
             search_adv_id = adv.auction_adv_id
@@ -430,15 +426,16 @@ class UpdateClusterBidsManager:
             if adv.individual_keywords_target_place_mode is False:
                 adv_result[search_adv_id] = None
                 continue
-            nmid_result = {}
+            nmid_result: dict[int, dict[str, dict[int, int]]] = {}
             for nmid in adv.nmids:
-                bid_positions_result:  dict[str, list[BidPosition]] = \
-                    await predict_target_place_manager.get_bids_for_positions(nmid=nmid,
-                                                                               min_bid=auction_min_bids_by_nmid[nmid])
-                dict_result: dict[str, dict[int, int]] = {}
-                for keyword_text, bid_positions in bid_positions_result.items():
-                    bid_positions_dict = {pos.position: pos.bid for pos in bid_positions}
-                    dict_result[keyword_text] = bid_positions_dict
+                min_bid = auction_min_bids_by_nmid[nmid]
+                bid_positions_result = await bids_for_positions_manager.get_bid_positions_normalized(
+                    nmid=nmid, min_bid=min_bid, positions_size=300
+                )
+                dict_result: dict[str, dict[int, int]] = {
+                    keyword_text: {pos.position: pos.bid for pos in row_list}
+                    for keyword_text, row_list in bid_positions_result.items()
+                }
                 nmid_result[nmid] = dict_result
             adv_result[search_adv_id] = nmid_result
 
