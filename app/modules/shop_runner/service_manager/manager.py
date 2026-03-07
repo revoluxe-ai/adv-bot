@@ -1,5 +1,8 @@
 import functools
+import json
 import logging
+import time
+from pathlib import Path
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import datetime
@@ -78,8 +81,8 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
-from .services.clickhouse_freshness_reader import ClickHouseStatsFreshnessReader
-from .services.stats_freshness_guard import StatsFreshnessGuard, StatsFreshnessState
+from .services.stats_freshness_guard import StatsFreshnessState
+from .services.stats_freshness_manager import StatsFreshnessManager
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -132,9 +135,6 @@ class CoroutinesManager:
         self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
             redis_client=redis_client_wrapper
         )
-        self._stats_freshness_guard = StatsFreshnessGuard(
-            ch_freshness_reader=ClickHouseStatsFreshnessReader()
-        )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
         )
@@ -164,6 +164,34 @@ class CoroutinesManager:
     ) -> tuple[list[ComplexAdv], list[ComplexAdv]]:
         if not advs:
             return [], []
+        # #region agent log
+        try:
+            _log_path = Path(__file__).resolve().parents[4] / "debug-e97681.log"
+            with open(_log_path, "a", encoding="utf-8") as _f:
+                _ = _f.write(
+                    json.dumps(
+                        {
+                            "sessionId": "e97681",
+                            "hypothesisId": "split_entry",
+                            "location": "manager._split_advs_by_stats_freshness",
+                            "message": "split_advs entry",
+                            "data": {
+                                "shop_id": self.shop_id,
+                                "operation_name": operation_name,
+                                "count": len(advs),
+                                "adv_setting_original_ids": [
+                                    a.adv_setting_original_id for a in advs
+                                ],
+                            },
+                            "timestamp": int(time.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
         handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StatsFreshnessState]]]] = [
             lambda adv_=adv: self._evaluate_adv_freshness(adv_) for adv in advs
         ]
@@ -186,11 +214,39 @@ class CoroutinesManager:
                 )
                 continue
             _, state = result
+            # #region agent log
+            try:
+                _log_path = Path(__file__).resolve().parents[4] / "debug-e97681.log"
+                with open(_log_path, "a", encoding="utf-8") as _f:
+                    _ = _f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "e97681",
+                                "hypothesisId": "split_result",
+                                "location": "manager._split_advs_by_stats_freshness",
+                                "message": "per-adv freshness result",
+                                "data": {
+                                    "shop_id": self.shop_id,
+                                    "operation_name": operation_name,
+                                    "adv_setting_original_id": adv.adv_setting_original_id,
+                                    "is_fresh": state.is_fresh,
+                                    "is_stale_over_6h": state.is_stale_over_6h,
+                                    "reason": state.reason,
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # #endregion
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
-            if state.is_fresh:
+            if not state.is_stale_over_6h:
                 fresh.append(adv)
-            else:
+            elif not state.is_fresh:
                 logger.debug(
                     "Automation skipped by stale stats: shop_id=%s adv_id=%s op=%s reason=%s",
                     self.shop_id,
@@ -203,7 +259,7 @@ class CoroutinesManager:
     async def _evaluate_adv_freshness(
         self, adv: ComplexAdv
     ) -> tuple[ComplexAdv, StatsFreshnessState]:
-        state = await self._stats_freshness_guard.evaluate(adv)
+        state = await StatsFreshnessManager().evaluate(adv)
         return adv, state
 
     @while_coroutine_decorator(1, 60)
@@ -720,15 +776,13 @@ class CoroutinesManager:
             adv
             for adv in advs
             if adv.bidder_active
-               and adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
         ]
-        advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs, _ = await self._split_advs_by_stats_freshness(
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="update_cluster_bids"
         )
-        if not advs:
+        if not advs_filtred:
             return None
-        await update_clusters_bid_manager.update_cluster_bids(advs)
+        await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
         return None
 
     @while_coroutine_decorator(60 * 5, 60)

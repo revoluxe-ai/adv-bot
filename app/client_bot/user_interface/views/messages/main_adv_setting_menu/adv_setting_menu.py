@@ -52,11 +52,8 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_manager import (
     RedisClusterStatTimestampManager,
 )
-from app.modules.shop_runner.service_manager.services.clickhouse_freshness_reader import (
-    ClickHouseStatsFreshnessReader,
-)
-from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
-    StatsFreshnessGuard,
+from app.modules.shop_runner.service_manager.services.stats_freshness_manager import (
+    StatsFreshnessManager,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -526,9 +523,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 )
                 search_adv = result.scalar_one_or_none()
         complex_adv = ComplexAdv(self.adv, search_adv)
-        reader = ClickHouseStatsFreshnessReader()
-        guard = StatsFreshnessGuard(reader)
-        state = await guard.evaluate_batch(complex_adv)
+        state = await StatsFreshnessManager().evaluate(complex_adv)
         if not state.is_stale_over_6h:
             return False, None
         return True, self._guard_reason_to_display(state.reason)
