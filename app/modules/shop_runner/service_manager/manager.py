@@ -314,6 +314,7 @@ class CoroutinesManager:
     async def update_advs_data_from_wb_to_pg(self) -> None:
         from app.modules.wb_adv_updater import data_manager
         await data_manager.update_advs_data_from_wb_to_pg(self._wb_api)
+        return None
 
 
     @while_coroutine_decorator(60 * 15)

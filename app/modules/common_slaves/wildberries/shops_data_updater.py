@@ -3,6 +3,7 @@ import logging
 import typing
 
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -84,14 +85,40 @@ class ShopDataUpdater:
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
 
     async def update_advs_data(self) -> list[Adv]:
-        # TODO: Тут пользователь нашел баг: не обновлялись search advs
+        # adv_ids берём из БД по кампаниям с bot_active; обновляем и авто-, и поисковые РК
         wb_api: WBApi = self.wb_api
         advert_api = wb_api
-        adv_ids: list[int] = await advert_api.get_advertIds()
+
+        adv_ids: list[int] = []
+        async with sm(read_only=True) as session:
+            stmt = (
+                select(models.AdvSetting)
+                .where(
+                    models.AdvSetting.wb_cabinet_id == self.wb_cabinet.id,
+                    models.AdvSetting.bot_active.is_(True),
+                )
+                .options(
+                    load_only(
+                        models.AdvSetting.name,
+                        models.AdvSetting.adv_id,
+                        models.AdvSetting._search_adv_id,
+                    )
+                )
+            )
+            result = await session.execute(stmt)
+            adv_settings = result.unique().scalars().all()
+        for adv_setting in adv_settings:
+            if adv_setting.adv_id is not None:
+                adv_ids.append(adv_setting.adv_id)
+            search_id = adv_setting.search_adv_id
+            if search_id is not None:
+                adv_ids.append(search_id)
+        adv_ids = list(dict.fromkeys(adv_ids))  # порядок сохраняем, дубли убираем
+
         if not adv_ids:
             return []
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
-        advs: list[Adv] = await advert_api.get_advs()
+        advs: list[Adv] = await advert_api.get_advs(adv_ids)
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         logger.debug("Обновление в базе advs завершено")
         return advs
