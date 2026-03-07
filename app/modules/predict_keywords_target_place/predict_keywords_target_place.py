@@ -13,6 +13,15 @@ from .clickhouse_manager.dto.bid_position import BidPosition
 
 logger = logging.getLogger(__name__)
 
+# Контракт get_keywords_target_position:
+# - В результат попадают только ключи, по которым есть данные по конверсиям (get_conv_cart_to_views).
+# - Ключи с нормализованными ставками (rows), но без conv (нет в clusters_adv_deltas_5m), в словарь
+#   не включаются — без conv нельзя посчитать MIN_CPO (pay_for_cart) или MAX_CONV.
+# - Вызывающий код (KeywordTargetPlaceUpdater._set_new_target_places) ожидает отсутствие ключа для
+#   таких случаев и подставляет GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE + логирует. Менять логику не
+#   обязательно: текущее поведение согласовано. При желании можно вернуть дефолт из этого модуля,
+#   чтобы убрать лог, или ввести fallback «позиция с min(bid)» — это уже изменение продукта.
+
 
 class PredictKeywordsTargetPlace:
     def __init__(
@@ -51,7 +60,9 @@ class PredictKeywordsTargetPlace:
         rows: dict[str, list[BidPositionRow]],
         convs: dict[str, list[ConvCartToViewsOnPosition]],
     ) -> dict[str, list[BidPosition]]:
-        """Map BidPositionRow + convs to dict[keyword, list[BidPosition]] with conv filled."""
+        """Map BidPositionRow + convs to dict[keyword, list[BidPosition]] with conv filled.
+        Ключи без conv (convs.get(key) пусто) намеренно не попадают в result — см. контракт вверху модуля.
+        """
         result: dict[str, list[BidPosition]] = {}
         for key, row_list in rows.items():
             positions = [
@@ -65,7 +76,7 @@ class PredictKeywordsTargetPlace:
             ]
             convs_for_keyword = convs.get(key)
             if not convs_for_keyword:
-                continue
+                continue  # Ключ без данных по конверсиям — не включаем; вызывающий код даст дефолт
             result[key] = self._fill_positions_convs(positions, convs_for_keyword)
         return result
 
@@ -103,6 +114,10 @@ class PredictKeywordsTargetPlace:
         positions: list[BidPosition],
         convs: list[ConvCartToViewsOnPosition],
     ) -> list[BidPosition]:
+        """Заполняет conv_carts_to_views у позиций и возвращает только те, для которых есть conv.
+        При текущем SQL get_conv_cart_to_views по каждому ключу приходят все позиции 1..positions_size,
+        поэтому отсечение по position обычно не срабатывает; при разреженных conv часть позиций отбрасывается.
+        """
         assert (
             len(
                 set(pos.keyword for pos in positions)

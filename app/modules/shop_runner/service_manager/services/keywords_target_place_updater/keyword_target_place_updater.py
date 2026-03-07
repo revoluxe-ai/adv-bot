@@ -33,6 +33,9 @@ class KeywordTargetPlaceUpdater:
                 text = keyword.text
                 target_place = target_places.get(text.lower())
                 if target_place is None:
+                    # Ожидаемо для ключей без данных по конверсиям в PredictKeywordsTargetPlace (нет в
+                    # clusters_adv_deltas_5m). Контракт: такой ключ не попадает в target_places, здесь
+                    # подставляем дефолт. Не баг — см. комментарии в predict_keywords_target_place.py
                     # TODO: Продумать уведомление об ошибке (срочно настроить сбор логов)
                     logger.error("No target place found for %s , adv_id: %s Set Default place = 2" ,
                                  text, adv.adv_id)
