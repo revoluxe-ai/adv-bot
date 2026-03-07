@@ -197,8 +197,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_update_common_stat: datetime | None = (
             await self._redis_common_stat_timestamp_manager.get(adv_id)
         )
+        # Ключ в Redis — AdvSetting.id (как в manager.update_clusters_adv_stats_today)
         last_update_cluster_stat: datetime | None = (
-            await self._redis_cluster_stat_timestamp_manager.get(adv_id)
+            await self._redis_cluster_stat_timestamp_manager.get(self.adv.id)
         )
         # Детект аварии по ClickHouse (как в guard), а не по Redis
         self._emergency_mode_active, self._emergency_mode_reason = (
