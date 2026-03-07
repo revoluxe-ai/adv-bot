@@ -206,6 +206,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self.last_update_common_stat_str = "Нет данных"
 
+        if last_update_cluster_stat:
+            self.last_update_cluster_stat_str = last_update_cluster_stat.strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
+        else:
+            self.last_update_cluster_stat_str = "Нет данных"
+
         self.keywords_status_last_update_auto_adv = (
             await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
         )
@@ -432,6 +439,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text += (
             f"воронки: {self.last_update_common_stat_str}\n"
             f"рек.стат.: {self.full_stat_update_time}\n"
+            f"класт: {self.last_update_cluster_stat_str}\n"
             f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
             f"ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
