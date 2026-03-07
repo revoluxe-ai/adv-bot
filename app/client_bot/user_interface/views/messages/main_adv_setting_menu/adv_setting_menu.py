@@ -30,7 +30,10 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
-from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
+from app.modules.wb_update_state_manager import (
+    AdvActiveKeywordUpdateStateManager,
+    KeywordStatUpdateState,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
     RedisClusterBidsTimestampManager,
@@ -48,6 +51,15 @@ from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_ma
 )
 from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_manager import (
     RedisClusterStatTimestampManager,
+)
+from app.modules.shop_runner.service_manager.services.clickhouse_freshness_reader import (
+    ClickHouseStatsFreshnessReader,
+)
+from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
+    StatsFreshnessGuard,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
@@ -185,19 +197,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_update_common_stat: datetime | None = (
             await self._redis_common_stat_timestamp_manager.get(adv_id)
         )
-        last_update_keyword_stat: datetime | None = (
-            await self._get_last_update_keyword_stat(adv_id)
-        )
         last_update_cluster_stat: datetime | None = (
             await self._redis_cluster_stat_timestamp_manager.get(adv_id)
         )
-        (
-            self._emergency_mode_active,
-            self._emergency_mode_reason,
-        ) = self._resolve_emergency_mode_status(
-            keyword_stat_updated_at=last_update_keyword_stat,
-            common_stat_updated_at=last_update_common_stat,
-            cluster_stat_updated_at=last_update_cluster_stat,
+        # Детект аварии по ClickHouse (как в guard), а не по Redis
+        self._emergency_mode_active, self._emergency_mode_reason = (
+            await self._resolve_emergency_mode_from_ch()
         )
         if last_update_common_stat:
             self.last_update_common_stat_str = last_update_common_stat.strftime(
@@ -510,28 +515,38 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
         return last_full_stat_update
 
+    async def _resolve_emergency_mode_from_ch(self) -> tuple[bool, str | None]:
+        """Детект аварии по данным ClickHouse (как StatsFreshnessGuard), не по Redis."""
+        search_adv: AdvSetting | None = None
+        if getattr(self.adv, "search_adv_id", None):
+            async with sm() as session:
+                result = await session.execute(
+                    select(AdvSetting).where(AdvSetting.adv_id == self.adv.search_adv_id)
+                )
+                search_adv = result.scalar_one_or_none()
+        complex_adv = ComplexAdv(self.adv, search_adv)
+        reader = ClickHouseStatsFreshnessReader()
+        guard = StatsFreshnessGuard(reader)
+        state = await guard.evaluate(complex_adv)
+        if not state.is_stale_over_6h:
+            return False, None
+        return True, self._guard_reason_to_display(state.reason)
+
     @staticmethod
-    def _resolve_emergency_mode_status(
-        *,
-        keyword_stat_updated_at: datetime | None,
-        common_stat_updated_at: datetime | None,
-        cluster_stat_updated_at: datetime | None,
-    ) -> tuple[bool, str | None]:
-        now = datetime.now(timezone.utc)
-        source_dt_map = {
-            "рекламная стата": keyword_stat_updated_at,
-            "общая стата": common_stat_updated_at,
-            "кластерная стата": cluster_stat_updated_at,
-        }
-        for source_name, dt in source_dt_map.items():
-            if dt is None:
-                # Align with StatsFreshnessGuard.evaluate: missing timestamp = stats not yet
-                # collected (e.g. new campaign). Do NOT treat as emergency.
-                return False, None
-            if dt.tzinfo is None:
-                dt_utc = dt.replace(tzinfo=timezone.utc)
-            else:
-                dt_utc = dt.astimezone(timezone.utc)
-            if now - dt_utc > timedelta(hours=6):
-                return True, f"{source_name}: нет обн > 6 часов"
-        return False, None
+    def _guard_reason_to_display(reason: str | None) -> str:
+        """Маппинг reason от guard в текст для пользователя."""
+        if not reason:
+            return "стата: нет обн > 6 часов"
+        if "full_adv_stat_update" in reason:
+            name = "рекламная стата"
+        elif "common_stat_update" in reason:
+            name = "общая стата"
+        elif "cluster_stat_update" in reason:
+            name = "кластерная стата"
+        else:
+            name = "стата"
+        if "stale over 6h" in reason:
+            return f"{name}: нет обн > 6 часов"
+        if "not yet collected" in reason:
+            return f"{name}: нет данных"
+        return f"{name}: нет обн > 6 часов"

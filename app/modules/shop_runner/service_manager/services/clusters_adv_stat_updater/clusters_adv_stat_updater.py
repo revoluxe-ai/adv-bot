@@ -37,7 +37,7 @@ class ClustersAdvStatUpdater:
 
         today = date.today()
         stats = await self._get_stats_for_day(complex_advs, today)
-        adv_ids_to_ids = {}
+        adv_ids_to_ids: dict[int, int] = {}
         for adv in complex_advs:
             if adv_id := adv.adv_id:
                 adv_ids_to_ids[adv_id] = adv.original_adv_setting_id
@@ -48,9 +48,9 @@ class ClustersAdvStatUpdater:
             await ch.update_clusters_adv_stats(stats)
             logger.info("Обновлена статистика за сегодня: %d записей", len(stats))
             await self._create_keyword_setting(complex_advs, stats)
-            success_adv_original_ids = set()
+            success_adv_original_ids: set[int] = set()
             for stat in stats:
-                original_adv_id = adv_ids_to_ids[stat.adv_id]
+                original_adv_id: int = adv_ids_to_ids[stat.adv_id]
                 success_adv_original_ids.add(original_adv_id)
             return success_adv_original_ids
         return set()
