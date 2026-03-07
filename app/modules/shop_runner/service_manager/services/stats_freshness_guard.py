@@ -40,10 +40,10 @@ class StatsFreshnessGuard:
     async def evaluate(self, complex_adv: ComplexAdv) -> StatsFreshnessState:
         now = datetime.now(timezone.utc)
         fresh_period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
-        adv_id = complex_adv.adv_id
-        keyword_updated_at = await self._keyword_stat_update_state.get_one(adv_id)
-        common_updated_at = await self._common_stat_timestamp_manager.get(adv_id)
-        cluster_updated_at = await self._cluster_stat_timestamp_manager.get(adv_id)
+        adv_ids = complex_adv.all_adv_ids
+        keyword_updated_at = await self._keyword_stat_update_state.get_one(adv_ids)
+        common_updated_at = await self._common_stat_timestamp_manager.get(adv_ids)
+        cluster_updated_at = await self._cluster_stat_timestamp_manager.get(adv_ids)
 
         keyword_age = self._calc_age(now, keyword_updated_at)
         common_age = self._calc_age(now, common_updated_at)
