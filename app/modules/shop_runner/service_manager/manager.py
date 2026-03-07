@@ -78,6 +78,7 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from .services.clickhouse_freshness_reader import ClickHouseStatsFreshnessReader
 from .services.stats_freshness_guard import StatsFreshnessGuard, StatsFreshnessState
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
@@ -131,7 +132,9 @@ class CoroutinesManager:
         self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
             redis_client=redis_client_wrapper
         )
-        self._stats_freshness_guard = StatsFreshnessGuard()
+        self._stats_freshness_guard = StatsFreshnessGuard(
+            ch_freshness_reader=ClickHouseStatsFreshnessReader()
+        )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
         )
