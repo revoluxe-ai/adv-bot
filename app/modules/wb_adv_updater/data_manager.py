@@ -843,3 +843,4 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
 async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
     shop_data_updater = ShopDataUpdater(wb_api)
     await shop_data_updater.update_advs_data()
+    return None
