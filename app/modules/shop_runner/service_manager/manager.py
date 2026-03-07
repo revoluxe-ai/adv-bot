@@ -688,8 +688,6 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
-
         updated_adv_ids = await updater.update_today_stats(complex_advs)
         for adv_id in updated_adv_ids:
             await self._redis_cluster_stat_timestamp_manager.set(adv_id)
