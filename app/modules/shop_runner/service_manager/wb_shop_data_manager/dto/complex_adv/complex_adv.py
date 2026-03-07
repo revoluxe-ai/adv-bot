@@ -192,7 +192,8 @@ class ComplexAdv:
     @property
     def all_adv_ids(self) -> set[int]:
         adv_ids: set[int] = set()
-        adv_ids.add(self._adv_setting.adv_id)
+        if self._adv_setting.adv_id:
+           adv_ids.add(self._adv_setting.adv_id)
         if self._search_adv:
             adv_ids.add(self._search_adv.adv_id)
         return adv_ids
