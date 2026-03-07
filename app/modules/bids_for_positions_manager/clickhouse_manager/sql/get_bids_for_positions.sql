@@ -12,6 +12,7 @@ SELECT
 FROM default_db.bid_decision_log
 WHERE nmid = v_nmid
   AND final_bid > 0
+  AND decision_time >= ts_from
 GROUP BY
     norm_query,
     pos_bin
