@@ -185,9 +185,9 @@ class CoroutinesManager:
             _, state = result
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
-            if not state.is_stale_over_6h:
+            elif state.is_fresh:
                 fresh.append(adv)
-            elif not state.is_fresh:
+            else:
                 logger.debug(
                     "Automation skipped by stale stats: shop_id=%s adv_id=%s op=%s reason=%s",
                     self.shop_id,
