@@ -41,16 +41,6 @@ def mock_request_limit_manager():
 
 
 @pytest.fixture
-def complex_adv():
-    """Мок ComplexAdv без БД (корневой complex_adv тянет Docker)."""
-    mock_adv = MagicMock()
-    mock_adv.nmids = [456]
-    mock_adv.auto_adv_id = 123
-    mock_adv.search_adv = None
-    return mock_adv
-
-
-@pytest.fixture
 def normquery_stats_adapter(
     mock_auth_client_handler, mock_request_limit_manager
 ):
@@ -64,10 +54,13 @@ def normquery_stats_adapter(
 
 @pytest.mark.asyncio
 async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
-                                          mock_auth_client_handler,
-                                          complex_adv):
+                                          mock_auth_client_handler):
     today = datetime.date.today()
-    command = dto_to_command([complex_adv], today, today)
+    mock_adv = MagicMock()
+    mock_adv.nmids = [456]
+    mock_adv.auto_adv_id = 123
+    mock_adv.search_adv = None
+    command = dto_to_command([mock_adv], today, today)
     expected_body = command_to_bodies(command)[0]
     #
     # stat_mock = V0GetNormQueryStatsItemStat(
