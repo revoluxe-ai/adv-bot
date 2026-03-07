@@ -18,19 +18,19 @@ class ClickHouseManager(BaseClickHouseManager):
                 query,
                 parameters={"nmid": nmid, "positions_size": positions_size},
             )
-        column_names = result.column_names
-        results: dict[str, list[ConvCartToViewsOnPosition]] = defaultdict(list)
-        rows = list(result.result_rows)
-        for row in rows:
-            row_dict = dict(zip(column_names, row))
-            keyword = row_dict["text"]
-            conv = row_dict["p_key_pos"]
-            position = row_dict["pos.pos_bin"]
-            results[keyword].append(
-                ConvCartToViewsOnPosition(
-                    keyword=keyword,
-                    position=position,
-                    conv_cart_to_views=conv,
+            column_names = result.column_names
+            results: dict[str, list[ConvCartToViewsOnPosition]] = defaultdict(list)
+            rows = list(result.result_rows)
+            for row in rows:
+                row_dict = dict(zip(column_names, row))
+                keyword = row_dict["text"]
+                conv = row_dict["p_key_pos"]
+                position = row_dict["pos.pos_bin"]
+                results[keyword].append(
+                    ConvCartToViewsOnPosition(
+                        keyword=keyword,
+                        position=position,
+                        conv_cart_to_views=conv,
+                    )
                 )
-            )
         return results
