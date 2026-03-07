@@ -53,6 +53,7 @@ class WBShop:
         try:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._alive_worker_run())
+                tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg())
                 tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg())
                 tg.create_task(coroutines_manager.update_common_sale_stat())
                 tg.create_task(coroutines_manager.update_full_adv_stat())
