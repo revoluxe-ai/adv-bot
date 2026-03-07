@@ -20,21 +20,21 @@ class BidsForPositionsClickHouseManager(BaseClickHouseManager):
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result = await client.query(query, parameters={"nmid": nmid})
-        column_names = result.column_names
-        results: dict[str, list[BidPositionRow]] = defaultdict(list)
-        rows = list(result.result_rows)
-        for row in rows:
-            row_dict = dict(zip(column_names, row))
-            keyword = row_dict["norm_query"]
-            position = row_dict["pos_bin"]
-            timestamp = row_dict["last_decision_time"]
-            bid = row_dict["bid_cpm"]
-            results[keyword].append(
-                BidPositionRow(
-                    keyword=keyword,
-                    position=position,
-                    bid=bid,
-                    timestamp=timestamp,
-                )
-            )
+                column_names = result.column_names
+                results: dict[str, list[BidPositionRow]] = defaultdict(list)
+                rows = list(result.result_rows)
+                for row in rows:
+                    row_dict = dict(zip(column_names, row))
+                    keyword = row_dict["norm_query"]
+                    position = row_dict["pos_bin"]
+                    timestamp = row_dict["last_decision_time"]
+                    bid = row_dict["bid_cpm"]
+                    results[keyword].append(
+                        BidPositionRow(
+                            keyword=keyword,
+                            position=position,
+                            bid=bid,
+                            timestamp=timestamp,
+                        )
+                    )
         return results
