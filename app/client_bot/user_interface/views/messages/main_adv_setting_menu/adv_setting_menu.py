@@ -528,7 +528,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         complex_adv = ComplexAdv(self.adv, search_adv)
         reader = ClickHouseStatsFreshnessReader()
         guard = StatsFreshnessGuard(reader)
-        state = await guard.evaluate(complex_adv)
+        state = await guard.evaluate_batch(complex_adv)
         if not state.is_stale_over_6h:
             return False, None
         return True, self._guard_reason_to_display(state.reason)
@@ -546,8 +546,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             name = "кластерная стата"
         else:
             name = "стата"
+        # Call site only passes reason when is_stale_over_6h is True; guard sets that
+        # only for "stale over 6h", never for "not yet collected".
         if "stale over 6h" in reason:
             return f"{name}: нет обн > 6 часов"
-        if "not yet collected" in reason:
-            return f"{name}: нет данных"
         return f"{name}: нет обн > 6 часов"
