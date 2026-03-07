@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy.orm import joinedload
 
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     UNSET,
@@ -26,10 +26,22 @@ from app.shared.domains.wb.enums import (
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.shared.domains.wb.utils.balance_source import (
+    balance_snapshot_from_response,
     select_balance_source_from_response,
 )
 from app.settings import settings
+
+from app.modules.auto_budget_manager.redis_auto_budget_last_success_manager import (
+    RedisAutoBudgetLastSuccessManager,
+)
+from app.modules.auto_budget_manager.redis_auto_budget_topup_failed_manager import (
+    RedisAutoBudgetTopupFailedManager,
+)
+from app.modules.auto_budget_manager.redis_shop_balance_snapshot_manager import (
+    RedisShopBalanceSnapshotManager,
+)
 
 import typing
 
@@ -87,6 +99,9 @@ class AutoBudgetService:
         redis_client: RedisClient
     ) -> None:
         self._redis = redis_client
+        self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
+        self._topup_failed_manager = RedisAutoBudgetTopupFailedManager(redis_client)
+        self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._lock_ttl = settings.AUTO_BUDGET_LOCK_TTL_SEC
         self._topup_amount = settings.AUTO_BUDGET_TOPUP_AMOUNT
         self._min_balance = settings.AUTO_BUDGET_MIN_BALANCE
@@ -136,7 +151,12 @@ class AutoBudgetService:
     ) -> AutoBudgetEnsureResult:
 
         async with sm(read_only=True) as session:
-            adv_setting = await session.get(AdvSetting, adv_setting_id)
+            result = await session.execute(
+                select(AdvSetting)
+                .options(joinedload(AdvSetting.wb_cabinet))
+                .where(AdvSetting.id == adv_setting_id)
+            )
+            adv_setting = result.unique().scalar_one_or_none()
         if adv_setting is None:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.ADV_NOT_READY,
@@ -259,8 +279,38 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
                 reason="Balance response is None",
             )
-        _, balance_type_source = select_balance_source_from_response(
-            balance_response)
+        snapshot = balance_snapshot_from_response(balance_response)
+        shop_id = (
+            adv_setting.wb_cabinet.shop_id
+            if adv_setting.wb_cabinet
+            else None
+        )
+        if shop_id is not None:
+            await self._balance_snapshot_manager.set(
+                shop_id,
+                snapshot.balance,
+                snapshot.net,
+                snapshot.bonus,
+            )
+        try:
+            _, balance_type_source = select_balance_source_from_response(
+                balance_response
+            )
+        except NotEnoughBalanceOnShopError:
+            await self._topup_failed_manager.set(adv_setting.id)
+            logger.warning(
+                "Not enough balance on shop for auto budget top-up, adv_setting_id=%s, campaign_type=%s",
+                adv_setting_id,
+                campaign_type,
+            )
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.TOPUP_FAILED,
+                campaign_type=campaign_type,
+                adv_id=config.adv_id,
+                spend_today=spend_today,
+                available_limit=limit - spend_today,
+                reason="Not enough balance on shop",
+            )
         async with sm(read_only=False) as session:
             topup_log = await self._create_topup_entry(
                 session=session,
@@ -340,6 +390,7 @@ class AutoBudgetService:
             if verification_total is not None
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
+        await self._last_success_manager.set(adv_setting.id)
 
         return AutoBudgetEnsureResult(
             status=result_status,
@@ -527,7 +578,7 @@ class AutoBudgetService:
 
     async def _release_lock(self, key: str) -> None:
         try:
-            await self._redis.delete(key)
+            _ = await self._redis.delete(key)
         except Exception as exc: # noqa
             logger.exception('Failed to acquire auto budget lock: %s', exc)
 
@@ -598,7 +649,12 @@ class AutoBudgetService:
         wb_manager_hub: "WBManagerHub",
     ) -> AutoBudgetEnsureResult:
         async with sm(read_only=True) as session:
-            adv_setting = await session.get(AdvSetting, adv_setting_id)
+            result = await session.execute(
+                select(AdvSetting)
+                .options(joinedload(AdvSetting.wb_cabinet))
+                .where(AdvSetting.id == adv_setting_id)
+            )
+            adv_setting = result.unique().scalar_one_or_none()
         if adv_setting is None:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.ADV_NOT_READY,
@@ -746,9 +802,37 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
                 reason="Balance response is None",
             )
-        _, balance_type_source = select_balance_source_from_response(
-            balance_response
+        snapshot = balance_snapshot_from_response(balance_response)
+        shop_id = (
+            adv_setting.wb_cabinet.shop_id
+            if adv_setting.wb_cabinet
+            else None
         )
+        if shop_id is not None:
+            await self._balance_snapshot_manager.set(
+                shop_id,
+                snapshot.balance,
+                snapshot.net,
+                snapshot.bonus,
+            )
+        try:
+            _, balance_type_source = select_balance_source_from_response(
+                balance_response
+            )
+        except NotEnoughBalanceOnShopError:
+            await self._topup_failed_manager.set(adv_setting.id)
+            logger.warning(
+                "Not enough balance on shop for common budget top-up, adv_setting_id=%s",
+                adv_setting_id,
+            )
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.TOPUP_FAILED,
+                campaign_type=target_campaign_type,
+                adv_id=target_adv_id,
+                spend_today=spend_today,
+                available_limit=limit - spend_today,
+                reason="Not enough balance on shop",
+            )
         async with sm(read_only=False) as session:
             topup_log = await self._create_topup_entry(
                 session=session,
@@ -824,6 +908,7 @@ class AutoBudgetService:
             if verification_total is not None
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
+        await self._last_success_manager.set(adv_setting.id)
         return AutoBudgetEnsureResult(
             status=result_status,
             campaign_type=target_campaign_type,

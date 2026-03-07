@@ -27,6 +27,16 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
+    WBCabinet,
+)
+from app.modules.auto_budget_manager.redis_auto_budget_last_success_manager import (
+    RedisAutoBudgetLastSuccessManager,
+)
+from app.modules.auto_budget_manager.redis_auto_budget_topup_failed_manager import (
+    RedisAutoBudgetTopupFailedManager,
+)
+from app.modules.auto_budget_manager.redis_shop_balance_snapshot_manager import (
+    RedisShopBalanceSnapshotManager,
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
@@ -107,8 +117,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_campaign_activity_reason_manager = (
             RedisCampaignActivityReasonManager(redis_client)
         )
+        self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
+        self._topup_failed_manager = RedisAutoBudgetTopupFailedManager(redis_client)
+        self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._reason_auto = None
         self._reason_search = None
+        self._shop_balance_snapshot: dict | None = None
+        self._topup_failed: dict | None = None
+        self._last_topup_success: dict | None = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
         self._spend_auto_today: float | None = None
@@ -279,6 +295,25 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._reason_search = None
 
+        shop_id: str | None = None
+        if self.adv.wb_cabinet_id is not None:
+            async with sm(read_only=True) as session:
+                result = await session.execute(
+                    select(WBCabinet.shop_id).where(
+                        WBCabinet.id == self.adv.wb_cabinet_id
+                    )
+                )
+                row = result.one_or_none()
+                shop_id = row[0] if row else None
+        if shop_id is not None:
+            self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
+                shop_id
+            )
+        else:
+            self._shop_balance_snapshot = None
+        self._topup_failed = await self._topup_failed_manager.get(self.adv.id)
+        self._last_topup_success = await self._last_success_manager.get(self.adv.id)
+
         if getattr(self.adv, "auto_budget_watchdog_enabled", False):
             now_msk = datetime.now(MSK_TZ)
             start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
@@ -330,6 +365,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
             text += "Авто-акт. РК: выкл\n"
+            text += "Автопополнение бюджета: не включено\n"
         else:
             text += "Авто-акт. РК: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
@@ -372,6 +408,55 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 else:
                     if self._spend_auto_today is not None:
                         text += "\n"
+
+        # Предупреждение о неудачном пополнении (из Redis) — показываем всегда при наличии записи
+        if self._topup_failed:
+            failed_at = self._topup_failed.get("failed_at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    failed_at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                failed_at_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                failed_at_str = failed_at or "—"
+            text += (
+                "⚠ Не удалось пополнить бюджет: недостаточно средств "
+                f"на балансе магазина ({failed_at_str})\n"
+            )
+
+        # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
+        if self._shop_balance_snapshot:
+            bal = self._shop_balance_snapshot.get("balance", 0)
+            net = self._shop_balance_snapshot.get("net", 0)
+            bonus = self._shop_balance_snapshot.get("bonus", 0)
+            updated_at = self._shop_balance_snapshot.get("updated_at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    updated_at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                updated_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                updated_str = updated_at or "—"
+            text += (
+                f"Баланс магазина: осн. {bal} р., нетто {net} р., "
+                f"бонус {bonus} р. (обновлено {updated_str})\n"
+            )
+        else:
+            text += "Баланс магазина: нет данных\n"
+
+        # Последнее успешное пополнение
+        if self._last_topup_success and self._last_topup_success.get("at"):
+            at = self._last_topup_success.get("at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                success_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                success_str = at or "—"
+            text += f"Последнее успешное пополнение: {success_str}\n"
+        else:
+            text += "Последнее успешное пополнение: нет данных\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
