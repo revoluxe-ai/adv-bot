@@ -78,8 +78,8 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
-from .services.clickhouse_freshness_reader import ClickHouseStatsFreshnessReader
-from .services.stats_freshness_guard import StatsFreshnessGuard, StatsFreshnessState
+from .services.stats_freshness_guard import StatsFreshnessState
+from .services.stats_freshness_manager import StatsFreshnessManager
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -131,9 +131,6 @@ class CoroutinesManager:
         )
         self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
             redis_client=redis_client_wrapper
-        )
-        self._stats_freshness_guard = StatsFreshnessGuard(
-            ch_freshness_reader=ClickHouseStatsFreshnessReader()
         )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
@@ -188,7 +185,7 @@ class CoroutinesManager:
             _, state = result
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
-            if state.is_fresh:
+            elif state.is_fresh:
                 fresh.append(adv)
             else:
                 logger.debug(
@@ -203,7 +200,7 @@ class CoroutinesManager:
     async def _evaluate_adv_freshness(
         self, adv: ComplexAdv
     ) -> tuple[ComplexAdv, StatsFreshnessState]:
-        state = await self._stats_freshness_guard.evaluate(adv)
+        state = await StatsFreshnessManager().evaluate(adv)
         return adv, state
 
     @while_coroutine_decorator(1, 60)
@@ -719,15 +716,13 @@ class CoroutinesManager:
             adv
             for adv in advs
             if adv.bidder_active
-               and adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
         ]
-        advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs, _ = await self._split_advs_by_stats_freshness(
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="update_cluster_bids"
         )
-        if not advs:
+        if not advs_filtred:
             return None
-        await update_clusters_bid_manager.update_cluster_bids(advs)
+        await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
