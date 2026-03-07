@@ -548,6 +548,4 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             name = "стата"
         # Call site only passes reason when is_stale_over_6h is True; guard sets that
         # only for "stale over 6h", never for "not yet collected".
-        if "stale over 6h" in reason:
-            return f"{name}: нет обн > 6 часов"
         return f"{name}: нет обн > 6 часов"
