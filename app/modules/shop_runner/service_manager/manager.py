@@ -1,8 +1,5 @@
 import functools
-import json
 import logging
-import time
-from pathlib import Path
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import datetime
@@ -164,34 +161,6 @@ class CoroutinesManager:
     ) -> tuple[list[ComplexAdv], list[ComplexAdv]]:
         if not advs:
             return [], []
-        # #region agent log
-        try:
-            _log_path = Path(__file__).resolve().parents[4] / "debug-e97681.log"
-            with open(_log_path, "a", encoding="utf-8") as _f:
-                _ = _f.write(
-                    json.dumps(
-                        {
-                            "sessionId": "e97681",
-                            "hypothesisId": "split_entry",
-                            "location": "manager._split_advs_by_stats_freshness",
-                            "message": "split_advs entry",
-                            "data": {
-                                "shop_id": self.shop_id,
-                                "operation_name": operation_name,
-                                "count": len(advs),
-                                "adv_setting_original_ids": [
-                                    a.adv_setting_original_id for a in advs
-                                ],
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
-        # #endregion
         handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StatsFreshnessState]]]] = [
             lambda adv_=adv: self._evaluate_adv_freshness(adv_) for adv in advs
         ]
@@ -214,34 +183,6 @@ class CoroutinesManager:
                 )
                 continue
             _, state = result
-            # #region agent log
-            try:
-                _log_path = Path(__file__).resolve().parents[4] / "debug-e97681.log"
-                with open(_log_path, "a", encoding="utf-8") as _f:
-                    _ = _f.write(
-                        json.dumps(
-                            {
-                                "sessionId": "e97681",
-                                "hypothesisId": "split_result",
-                                "location": "manager._split_advs_by_stats_freshness",
-                                "message": "per-adv freshness result",
-                                "data": {
-                                    "shop_id": self.shop_id,
-                                    "operation_name": operation_name,
-                                    "adv_setting_original_id": adv.adv_setting_original_id,
-                                    "is_fresh": state.is_fresh,
-                                    "is_stale_over_6h": state.is_stale_over_6h,
-                                    "reason": state.reason,
-                                },
-                                "timestamp": int(time.time() * 1000),
-                            },
-                            ensure_ascii=False,
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
             if not state.is_stale_over_6h:
