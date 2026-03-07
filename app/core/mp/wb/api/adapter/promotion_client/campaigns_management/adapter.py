@@ -8,12 +8,16 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.a
     get_adv_v0_pause,
     get_adv_v0_start,
     get_adv_v0_stop,
-    patch_adv_v0_bids,
     post_adv_v0_rename,
 )
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
-    PatchAdvV0BidsBody,
     PostAdvV0RenameBody,
+)
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.api.upravlenie_kampanijami.patch_api_advert_v1_bids import (
+    asyncio_detailed as patch_api_advert_v1_bids_async,
+)
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    PatchApiAdvertV1BidsBody,
 )
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 
@@ -37,10 +41,10 @@ class CampaignsManagementAdapter(BaseSectionAdapter):
         await with_raise_errors(get_adv_v0_stop.asyncio_detailed, client, id=adv_id)
 
     @retry_decorator(period=1, limit=2)
-    async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
+    async def patch_adv_v1_bids(self, body: PatchApiAdvertV1BidsBody) -> None:
         client = await self.auth_client_handler.get_proxy_client(self)
         await with_raise_errors(
-            patch_adv_v0_bids.asyncio_detailed,
+            patch_api_advert_v1_bids_async,
             client,
             body=body,
         )

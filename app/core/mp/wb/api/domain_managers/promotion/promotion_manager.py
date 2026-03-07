@@ -31,10 +31,10 @@ from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
 )
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
-    PatchAdvV0BidsBody,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     GetAdvV1SupplierSubjectsResponse200Type0Item,
+    PatchApiAdvertV1BidsBody,
     PostAdvV2SupplierNmsResponse200Item,
 )
 
@@ -152,8 +152,8 @@ class PromotionManager:
 
         await method(self._client.normquery_bids_adapter, bids)
 
-    async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
-        await self._client.campaigns_management_adapter.patch_adv_bids(body)
+    async def patch_adv_v1_bids(self, body: PatchApiAdvertV1BidsBody) -> None:
+        await self._client.campaigns_management_adapter.patch_adv_v1_bids(body)
 
     async def set_common_bids(self, command: SetCommonBidsCommand) -> None:
         await self._client.common_bids_adapter.patch_common_bids(command)

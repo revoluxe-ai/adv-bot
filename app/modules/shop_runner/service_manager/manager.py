@@ -197,8 +197,9 @@ class CoroutinesManager:
                 )
         return fresh, stale_over_6h
 
-    async def _evaluate_adv_freshness(
-        self, adv: ComplexAdv
+
+    @staticmethod
+    async def _evaluate_adv_freshness( adv: ComplexAdv
     ) -> tuple[ComplexAdv, StatsFreshnessState]:
         state = await StatsFreshnessManager().evaluate(adv)
         return adv, state
@@ -904,11 +905,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(60 * 60 * 4, 60)
     async def auto_reset_bid_for_auto_adv(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        advs, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="auto_reset_bid_for_auto_adv"
-        )
-        if not advs:
-            return None
+        advs = [adv for adv in advs if adv.bot_active]
 
         wb_manager_hub = self._wb_manager_hub
         service = AutoResetBidService(
