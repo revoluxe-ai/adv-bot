@@ -131,10 +131,7 @@ class CoroutinesManager:
         self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
             redis_client=redis_client_wrapper
         )
-        self._stats_freshness_guard = StatsFreshnessGuard(
-            common_stat_timestamp_manager=self._redis_common_stat_timestamp_manager,
-            cluster_stat_timestamp_manager=self._redis_cluster_stat_timestamp_manager,
-        )
+        self._stats_freshness_guard = StatsFreshnessGuard()
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client_wrapper
         )
@@ -688,9 +685,9 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-        updated_adv_ids = await updater.update_today_stats(complex_advs)
-        for adv_id in updated_adv_ids:
-            await self._redis_cluster_stat_timestamp_manager.set(adv_id)
+        updated_origonal_adv_ids = await updater.update_today_stats(complex_advs)
+        for adv_orig_id in updated_origonal_adv_ids:
+            await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
