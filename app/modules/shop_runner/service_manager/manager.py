@@ -887,12 +887,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        advs, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="auto_adv_active_control"
-        )
-        if not advs:
-            return None
-
+        advs = [adv for adv in advs if adv.bot_active]
         wb_manager_hub = self._wb_manager_hub
         service = AutoAdvActiveControlService(
             wb_modifier=wb_manager_hub.wb_modifier,
