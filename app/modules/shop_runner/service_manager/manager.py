@@ -681,8 +681,8 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-        updated_origonal_adv_ids = await updater.update_today_stats(complex_advs)
-        for adv_orig_id in updated_origonal_adv_ids:
+        updated_original_adv_ids = await updater.update_today_stats(complex_advs)
+        for adv_orig_id in updated_original_adv_ids:
             await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
         return None
 
