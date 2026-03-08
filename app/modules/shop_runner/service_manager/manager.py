@@ -727,6 +727,7 @@ class CoroutinesManager:
         """Emergency mode: stale stats over 6 hours => keep one top key and min bid."""
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
         if not complex_advs:
             return None
         _, stale_over_6h = await self._split_advs_by_stats_freshness(
