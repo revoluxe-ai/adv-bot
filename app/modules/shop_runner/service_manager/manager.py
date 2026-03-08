@@ -371,11 +371,6 @@ class CoroutinesManager:
         advs_with_whitelist = [
             adv for adv in advs if adv.auto_update_white_list
         ]
-        advs_with_whitelist, _ = await self._split_advs_by_stats_freshness(
-            advs_with_whitelist, operation_name="update_top_key_in_advs"
-        )
-        if not advs_with_whitelist:
-            return None
 
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs_with_whitelist:
