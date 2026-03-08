@@ -22,7 +22,7 @@ REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     AutoReasonCode.REC_SYSTEM_MODE_OFF.value: "Режим раскр вык",
     AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюд и себес в норме, зап",
     # Auction
-    AuctionReasonCode.COMMON_OK.value: "Об бюдт в норме, зап",
+    AuctionReasonCode.COMMON_OK.value: "Об бюд в норме, зап",
     AuctionReasonCode.SEARCH_SPEND_EXCEEDED.value: "Лимит Аук исч",
     AuctionReasonCode.SEARCH_LIMIT_OK.value: "Лим Аук в норме, запущ",
     AuctionReasonCode.SEARCH_LIMIT_0.value: "Лим Аук не зад",
