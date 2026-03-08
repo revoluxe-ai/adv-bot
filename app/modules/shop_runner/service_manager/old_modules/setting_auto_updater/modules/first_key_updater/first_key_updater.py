@@ -46,7 +46,7 @@ class FirstKeyUpdater:
             clear_keywords, key=lambda kw: kw.rating or 0, reverse=True
         )
         top_key = clear_keywords[0]
-        if top_key.hard_status == 2:
+        if top_key.hard_status in [2, 4]:
             return None
         # TODO: Сделать кнопку добавления не только релевантных фраз
         if self._adv.auto_add_only_relevant_phrase:
