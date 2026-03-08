@@ -349,15 +349,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = ""
         if self._emergency_mode_active:
             text += (
-                "🚨 АВ.РЕЖИМ\n"
-                "СТАТА > 6ч\n"
+                "🚨 АВ.РЕЖ\n"
+                "СТ > 6ч\n"
                 "РАСХ ОГРАН\n"
             )
             if self._emergency_mode_reason:
                 text += f"{self._emergency_mode_reason}\n"
             text += "\n"
         elif not self._stats_fresh:
-            text += "Стата не свежая, автоматика приостановлена\n"
+            text += "Ст не све, авт приост\n"
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
             text += "\n"
@@ -365,7 +365,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
             text += "Авто-акт. РК: выкл\n"
-            text += "Автопополнение бюджета: не включено\n"
+            text += "Автопоп бюд: не вкл\n"
         else:
             text += "Авто-акт. РК: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
@@ -373,19 +373,19 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 limit = self.adv.common_budget_daily_limit or 0
                 spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
                 if self._spend_auto_today is None or self._spend_search_today is None:
-                    text += "Общий бюджет: потрачено: нет данных\n"
+                    text += "Об бюд: потр: н/д\n"
                 else:
                     spend_rounded = int(round(spend))
                     remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Общий бюд: потрач. {spend_rounded} р., "
+                        f"Об. бюд: потр {spend_rounded} р., "
                         f"ост. {remaining} р. (лим {limit} р./с)\n"
                     )
             else:
                 auto_limit = self.adv.auto_budget_daily_limit or 0
                 spend_auto = self._spend_auto_today or 0
                 if self._spend_auto_today is None:
-                    text += "Авто: потр: нет данных\n"
+                    text += "Авто: потр: н/д\n"
                 else:
                     spend_auto_rounded = int(round(spend_auto))
                     remaining_auto = max(0, auto_limit - spend_auto_rounded)
@@ -420,7 +420,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             except (ValueError, TypeError):
                 failed_at_str = failed_at or "—"
             text += (
-                "⚠ Не удалось пополнить бюджет: недостаточно средств "
+                "⚠ Не удалось поп бюд: недост средств "
                 f"на балансе магазина ({failed_at_str})\n"
             )
 
@@ -438,11 +438,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             except (ValueError, TypeError):
                 updated_str = updated_at or "—"
             text += (
-                f"Баланс магазина: осн. {bal} р., нетто {net} р., "
-                f"бонус {bonus} р. (обновлено {updated_str})\n"
+                f"Бал маг: осн. {bal} р., нетто {net} р., "
+                f"бонус {bonus} р. (обн {updated_str})\n"
             )
         else:
-            text += "Баланс магазина: нет данных\n"
+            text += "Бал маг: нет данных\n"
 
         # Последнее успешное пополнение
         if self._last_topup_success and self._last_topup_success.get("at"):
@@ -454,9 +454,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 success_str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
                 success_str = at or "—"
-            text += f"Последнее успешное пополнение: {success_str}\n"
+            text += f"Посл усп поп: {success_str}\n"
         else:
-            text += "Последнее успешное пополнение: нет данных\n"
+            text += "Посл усп поп: н/д\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
@@ -479,8 +479,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. сис. (полки) не раскр. "
-                    f"Рек. макс.зак. >= {int(suggested)} р.\n"
+                    "⚠️ Рек. сис. не раскр. "
+                    f"Макс.зак. >= {int(suggested)} р.\n"
                 )
 
         management_enabled = bool(
@@ -503,7 +503,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         suffix_auto = _status_suffix(self._reason_auto)
         if not self.adv.search_adv_id:
-            suffix_auction = " (не подключен)"
+            suffix_auction = " (не подк)"
         else:
             suffix_auction = _status_suffix(self._reason_search)
 
@@ -530,17 +530,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             else "—"
         )
         text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
-        text += f"{mark_conv}Мин. зак. на 1000 п: {val_1000views}\n"
+        text += f"{mark_conv}Мин. зак. на 1000п: {val_1000views}\n"
 
         text += "Посл.обнов:\n"
 
         text += (
-            f"воронки: {self.last_update_common_stat_str}\n"
+            f"ворон: {self.last_update_common_stat_str}\n"
             f"рек.стат.: {self.full_stat_update_time}\n"
             f"класт: {self.last_update_cluster_stat_str}\n"
             f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
+            f"став в класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
             f"общей ставки аук: {self.last_common_bid_update_str}\n"
             f"добав ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
