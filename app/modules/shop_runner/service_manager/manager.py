@@ -257,7 +257,7 @@ class CoroutinesManager:
         keywords = await complex_adv.get_keywords()
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(60 * 15)
+    @while_coroutine_decorator(60 * 5)
     async def update_common_sale_stat(self) -> None:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
