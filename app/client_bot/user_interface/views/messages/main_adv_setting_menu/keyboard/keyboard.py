@@ -67,7 +67,7 @@ def get_adv_setting_keyboard(
     )
 
     button = InlineKeyboardButton(
-        text="Анализ Изменения Ранжирования",
+        text="Анализ Динамики Ранжирования",
         callback_data=callbacks.RaiseCardAnalyze(
             adv_setting_original_id=adv_setting.id,
             action="menu",
@@ -130,7 +130,7 @@ def get_adv_setting_keyboard(
         InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
     )
 
-    
+
 
     activity_callback = callbacks.ManageCampaignActivity(
         action="menu", adv_setting_original_id=adv_setting.id
