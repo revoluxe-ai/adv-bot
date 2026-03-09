@@ -342,7 +342,7 @@ class StrategyMenuMessage(TextWithKeyboard):
         current_strategy = self._adv_setting.strategy or Strategy.MIN_CPO
         mode_label = "Автоматический" if auto_update_strategy else "Ручной"
         if current_strategy == Strategy.MIN_CPO:
-            strategy_label = "MIN_CPO (минимальная себестоимость заказа)"
+            strategy_label = "MIN_CPO (мин себестоимость заказа)"
         else:
             strategy_label = "MAX_CONV (максимум конверсии)"
 
