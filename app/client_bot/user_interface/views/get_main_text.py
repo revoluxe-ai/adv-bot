@@ -1,3 +1,4 @@
+from app.client_bot import const
 
 
 def get_main_text(user_telegram_id: int) -> str:
@@ -24,6 +25,9 @@ def get_main_text(user_telegram_id: int) -> str:
 
 ⛔️ Если реклама “не крутится”
 Чаще это связано с настройками, бюджетом или лимитами, а не с “поломкой” ✅
+
+Поддержка и помощь -> {const.SUPPORT_LINK}
+
 """
 
     return text
