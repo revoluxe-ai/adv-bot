@@ -362,8 +362,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
         best_keyword = max(pre_keywords, key=lambda kw: kw.rating or 0)
         white_list_without_non_views = [kw for kw in white_list if kw.cluster_stat.views > 0]
-        worst_keyword = min(white_list_without_non_views, key=lambda kw: kw.rating)
-        rating_of_worst_keyword = worst_keyword.rating
+        if not white_list_without_non_views:
+            rating_of_worst_keyword = None
+        else:
+            worst_keyword = min(white_list_without_non_views, key=lambda kw: kw.rating)
+            rating_of_worst_keyword = worst_keyword.rating
         for pre_kw in pre_keywords:
             best_keyword_status = True if pre_kw == best_keyword else False
             hard_status = pre_kw.hard_status
@@ -400,6 +403,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     status=status,
                     reason=reason,
                     best_keyword_status=best_keyword_status
+                )
+            elif  rating_of_worst_keyword is None:
+                status = KeywordStatus.BAD
+                reason = KeywordStatusReason.NOT_FOUND_WHITE_LIST_KEYWORD_WITH_RATING
+                state  = KeywordState(
+                    status=status,
+                    reason=reason,
+                    best_keyword_status=best_keyword_status,
                 )
             elif hard_status == 0:
                 status = KeywordStatus.BAD
