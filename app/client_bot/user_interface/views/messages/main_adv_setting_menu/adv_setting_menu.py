@@ -429,11 +429,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             updated_at: str = str(self._shop_balance_snapshot.get("updated_at", ""))
             try:
                 dt = datetime.fromisoformat(
-                    updated_at.replace("Z", "+00:00")
+                    str(updated_at).replace("Z", "+00:00")
                 ).astimezone(MSK_TZ)
                 updated_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
-                updated_str = updated_at or "—"
+                updated_str = str(updated_at) if updated_at else "—"
             text += (
                 f"Бал: осн {bal}, нет {net}, бон {bonus} (обн {updated_str})\n"
             )
