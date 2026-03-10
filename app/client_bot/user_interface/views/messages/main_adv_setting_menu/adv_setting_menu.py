@@ -141,20 +141,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             return "—"
         # Коды WB: 4=ready_for_start, 9=started, 11=pause, 7=done, 8=refused
         code_to_ru = {
-            "4": "готова к старту",
-            "9": "запущена",
-            "11": "пауза",
-            "7": "завершена",
-            "8": "отклонена",
+            "4": "гот к ст",
+            "9": "зап",
+            "11": "п",
+            "7": "зав",
+            "8": "отк",
         }
         if status in code_to_ru:
             return code_to_ru[status]
         text_to_ru = {
-            "ready_for_start": "готова к старту",
-            "started": "запущена",
-            "pause": "пауза",
-            "done": "завершена",
-            "refused": "отклонена",
+            "ready_for_start": "гот к ст",
+            "started": "зап",
+            "pause": "п",
+            "done": "зав",
+            "refused": "отк",
         }
         return text_to_ru.get(status, status)
 
@@ -162,7 +162,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:
         if not search_adv_id:
-            return "не подключен"
+            return "не под"
         stmt = select(AdvSetting.active_status).where(
             AdvSetting.adv_id == search_adv_id
         )
@@ -170,7 +170,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             result = await session.execute(stmt)
             status = result.scalar_one_or_none()
             if not status:
-                status = "РК не найдена"
+                status = "РК не най"
             return status
 
     async def __call__(self) -> Message:
@@ -180,7 +180,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
              status_auction = self._format_status_for_display(status_auction)
              self._status_auction = status_auction
         else:
-            self._status_auction = "Не установлен"
+            self._status_auction = "Не уст"
         keywords = await utils.get_keywords_for_keyboard(self.adv)
         self._min_orders_per_1000_rub = phrases_processor.get_min_orders_per_1000_rub(keywords)
         self._min_conv_views_to_orders = phrases_processor.get_min_conv_views_to_orders(keywords)
@@ -192,7 +192,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
         if not full_stat_update_time:
-            full_stat_update_time_str = "Нет данных"
+            full_stat_update_time_str = "Н/д"
         else:
             full_stat_update_time_str = full_stat_update_time.strftime(
                 "%d.%m.%Y %H:%M:%S"
@@ -228,30 +228,30 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 "%d.%m.%Y %H:%M:%S"
             )
         else:
-            self.last_update_common_stat_str = "Нет данных"
+            self.last_update_common_stat_str = "Н/д"
 
         if last_update_cluster_stat:
             self.last_update_cluster_stat_str = last_update_cluster_stat.strftime(
                 "%d.%m.%Y %H:%M:%S"
             )
         else:
-            self.last_update_cluster_stat_str = "Нет данных"
+            self.last_update_cluster_stat_str = "Н/д"
 
         self.keywords_status_last_update_auto_adv = (
             await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
         )
 
         if not self.keywords_status_last_update_auto_adv:
-            self.keywords_status_last_update_auto_adv = "Нет данных"
+            self.keywords_status_last_update_auto_adv = "Н/д"
 
         if search_adv_id := self.adv.search_adv_id:
             self.keywords_status_last_update_search_adv = (
                 await self._get_last_keywords_status_update_timestamp(search_adv_id)
             )
             if self.keywords_status_last_update_search_adv is None:
-                self.keywords_status_last_update_search_adv = "Нет данных"
+                self.keywords_status_last_update_search_adv = "Н/д"
         else:
-            self.keywords_status_last_update_search_adv = "Аукцион не подключен к РК"
+            self.keywords_status_last_update_search_adv = "Аук не подк к РК"
 
         adv_stat: FullAdvStat | None = (
             await data_manager.get_full_adv_stat_for_adv_id_from_redis(
@@ -270,7 +270,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 "%H:%M:%S %d.%m.%Y"
             )
         else:
-            self.last_common_bid_update_str = "Нет данных"
+            self.last_common_bid_update_str = "Н/д"
 
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
@@ -647,15 +647,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     def _guard_reason_to_display(reason: str | None) -> str:
         """Маппинг reason от guard в текст для пользователя."""
         if not reason:
-            return "стата: нет обн > 6 часов"
+            return "ст нет обн > 6 часов"
         if "full_adv_stat_update" in reason:
-            name = "рекламная стата"
+            name = "рек ст"
         elif "common_stat_update" in reason:
-            name = "общая стата"
+            name = "общ ст"
         elif "cluster_stat_update" in reason:
-            name = "кластерная стата"
+            name = "клас ст"
         else:
             name = "стата"
         # Call site only passes reason when is_stale_over_6h is True; guard sets that
         # only for "stale over 6h", never for "not yet collected".
-        return f"{name}: нет обн > 6 часов"
+        return f"{name}: нет обн>6ч"
