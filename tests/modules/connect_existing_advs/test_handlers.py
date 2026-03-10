@@ -456,9 +456,9 @@ async def test_connect_existing_advs_nmid_success_auction_only() -> None:
         )
 
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.confirm_type1)
-    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then auction message
-    assert "AuctionCampaign" in bot.send_message.call_args[0][1]
-    assert "42" in bot.send_message.call_args[0][1]
+    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then auction choice menu
+    assert "Как подключить поисковую" in bot.send_message.call_args[0][1]
+    assert "аукцион" in bot.send_message.call_args[0][1]
 
 
 @pytest.mark.unit
@@ -631,15 +631,16 @@ async def test_connect_existing_confirm_type1_adv_id_zero() -> None:
         callback, callback_data, bot, state
     )
 
-    bot.send_message.assert_called_once()
-    assert "Создание аукционной РК будет доступно" in bot.send_message.call_args[0][1]
-    state.set_state.assert_not_called()
+    assert bot.send_message.call_count == 2  # message + auction choice menu
+    assert "Создание аукционной РК будет доступно" in bot.send_message.call_args_list[0][0][1]
+    assert "Как подключить поисковую" in bot.send_message.call_args_list[1][0][1]
+    state.set_state.assert_called_with(ConnectExistingAdvsStates.confirm_type1)
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_confirm_type1_adv_id_set() -> None:
-    """confirm_type1: adv_id=123 -> state confirm_type2, message with auto candidate."""
+    """confirm_type1: adv_id=123 -> state confirm_type2, show auto choice menu."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -662,8 +663,7 @@ async def test_connect_existing_confirm_type1_adv_id_set() -> None:
     state.update_data.assert_called_once_with(chosen_auction_adv_id=123)
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.confirm_type2)
     bot.send_message.assert_called_once()
-    assert "AutoCamp" in bot.send_message.call_args[0][1]
-    assert "456" in bot.send_message.call_args[0][1]
+    assert "Как подключить авто-кампанию" in bot.send_message.call_args[0][1]
 
 
 @pytest.mark.unit
