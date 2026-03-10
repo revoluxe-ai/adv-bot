@@ -15,6 +15,7 @@ from app.core.mp.wb.api.generated.products.v1.content_products_client.models imp
     PostContentV2GetCardsListBodySettingsFilter,
     PostContentV2GetCardsListBodySettingsSort,
     PostContentV2GetCardsListResponse200,
+    PostContentV2GetCardsListResponse200CardsItem,
 )
 from app.core.mp.wb.api.generated.products.v1.content_products_client.types import UNSET
 
@@ -131,10 +132,14 @@ class ProductsManager:
             response = await self.get_cards_list(body=body)
             if response is None:
                 break
-            cards = response.cards
-            if cards is UNSET:
-                cards = []
-            for card in cards:
+            cards_raw = response.cards
+            if cards_raw is UNSET:
+                cards_list: list[PostContentV2GetCardsListResponse200CardsItem] = []
+            else:
+                cards_list = cast(
+                    list[PostContentV2GetCardsListResponse200CardsItem], cards_raw
+                )
+            for card in cards_list:
                 raw_nm_id = card.nm_id
                 if raw_nm_id is not UNSET and int(cast(int, raw_nm_id)) == nmid:
                     title = (
@@ -143,7 +148,7 @@ class ProductsManager:
                         else str(nmid)
                     )
                     return ProductCardInfo(name=str(title), nmid=nmid)
-            if len(cards) < limit:
+            if len(cards_list) < limit:
                 break
             updated_at = UNSET
             next_nm_id = UNSET
@@ -155,8 +160,8 @@ class ProductsManager:
                 if total is not UNSET and int(cast(int, total)) < limit:
                     break
             if updated_at is UNSET or next_nm_id is UNSET:
-                if cards:
-                    last = cards[-1]
+                if cards_list:
+                    last = cards_list[-1]
                     last_updated = getattr(last, "updated_at", UNSET)
                     last_nm = getattr(last, "nm_id", UNSET)
                     if last_updated is not UNSET and last_nm is not UNSET:
