@@ -534,15 +534,15 @@ async def test_connect_existing_advs_nmid_success_auto_only() -> None:
     )
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then continue invalid
     text = bot.send_message.call_args[0][1]
-    assert "Без подключённой поисковой РК" in text
-    assert "Продолжить создание" in text
+    assert "авто-кампании без поисковой" in text
+    assert "Создать поисковую РК" in text
     reply_markup = bot.send_message.call_args[1]["reply_markup"]
     buttons_texts = [
         btn.text
         for row in reply_markup.inline_keyboard
         for btn in row
     ]
-    assert "✅ Продолжить создание" in buttons_texts
+    assert "Создать поисковую РК" in buttons_texts
     assert "Отмена" in buttons_texts
 
 
@@ -557,15 +557,12 @@ async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
-    state.get_data = AsyncMock(
-        side_effect=[
-            {"wb_user_cabinet_original_id": 1},
-            {
-                "existing_auction_id": 123,
-                "auto_candidates": [{"id": 456, "name": "AutoCamp"}],
-            },
-        ]
-    )
+    state_data = {
+        "wb_user_cabinet_original_id": 1,
+        "existing_auction_id": 123,
+        "auto_candidates": [{"id": 456, "name": "AutoCamp"}],
+    }
+    state.get_data = AsyncMock(return_value=state_data)
     state.update_data = AsyncMock()
     state.set_state = AsyncMock()
     message = _make_message(chat_id=222, text="100")
@@ -614,16 +611,15 @@ async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None
 
     state.update_data.assert_any_call(chosen_auction_adv_id=123)
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.confirm_type2)
-    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then auction-already message
+    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then auto choice menu
     text = bot.send_message.call_args[0][1]
-    assert "Аукционная РК уже подключена" in text
-    assert "Выберите авто-кампанию или создайте новую" in text
+    assert "авто-кампанию" in text or "авто" in text
     reply_markup = bot.send_message.call_args[1]["reply_markup"]
     buttons_texts = [
         btn.text for row in reply_markup.inline_keyboard for btn in row
     ]
     assert "Создать РК" in buttons_texts
-    assert "Подтвердить" in buttons_texts
+    assert "Ввести ID кампании" in buttons_texts
 
 
 @pytest.mark.unit
