@@ -110,6 +110,76 @@ class ProductsManager:
         title = str(card.title) if card.title is not UNSET else str(nmid)
         return ProductCardInfo(name=str(title), nmid=nm_id)
 
+    async def get_card_by_nmid_via_full_list(self, nmid: int) -> ProductCardInfo:
+        """
+        Найти одну карточку по nmID без фильтра textSearch: пагинация по всем
+        карточкам поставщика до первого совпадения. Может занять длительное время.
+        При отсутствии карточки выбрасывает CardNotFoundInWB.
+        """
+        limit = 100
+        filter_ = PostContentV2GetCardsListBodySettingsFilter(with_photo=-1)
+        cursor = PostContentV2GetCardsListBodySettingsCursor(limit=limit)
+        sort = PostContentV2GetCardsListBodySettingsSort(ascending=True)
+        settings = PostContentV2GetCardsListBodySettings(
+            filter_=filter_,
+            cursor=cursor,
+            sort=sort,
+        )
+        body = PostContentV2GetCardsListBody(settings=settings)
+
+        while True:
+            response = await self.get_cards_list(body=body)
+            if response is None:
+                break
+            cards = response.cards
+            if cards is UNSET:
+                cards = []
+            for card in cards:
+                raw_nm_id = card.nm_id
+                if raw_nm_id is not UNSET and int(cast(int, raw_nm_id)) == nmid:
+                    title = (
+                        str(card.title)
+                        if card.title is not UNSET
+                        else str(nmid)
+                    )
+                    return ProductCardInfo(name=str(title), nmid=nmid)
+            if len(cards) < limit:
+                break
+            updated_at = UNSET
+            next_nm_id = UNSET
+            resp_cursor = response.cursor
+            if resp_cursor is not UNSET:
+                updated_at = getattr(resp_cursor, "updated_at", UNSET)
+                next_nm_id = getattr(resp_cursor, "nm_id", UNSET)
+                total = getattr(resp_cursor, "total", UNSET)
+                if total is not UNSET and int(cast(int, total)) < limit:
+                    break
+            if updated_at is UNSET or next_nm_id is UNSET:
+                if cards:
+                    last = cards[-1]
+                    last_updated = getattr(last, "updated_at", UNSET)
+                    last_nm = getattr(last, "nm_id", UNSET)
+                    if last_updated is not UNSET and last_nm is not UNSET:
+                        updated_at = last_updated
+                        next_nm_id = int(cast(int, last_nm))
+                if updated_at is UNSET or next_nm_id is UNSET:
+                    break
+            cursor = PostContentV2GetCardsListBodySettingsCursor(
+                limit=limit,
+                updated_at=updated_at if updated_at is not UNSET else UNSET,
+                nm_id=next_nm_id if next_nm_id is not UNSET else UNSET,
+            )
+            settings = PostContentV2GetCardsListBodySettings(
+                filter_=filter_,
+                cursor=cursor,
+                sort=sort,
+            )
+            body = PostContentV2GetCardsListBody(settings=settings)
+
+        raise CardNotFoundInWB(
+            f"Карточка с артикулом {nmid} не найдена на Wildberries"
+        )
+
     async def get_card_by_nmid_for_db(
         self, nmid: int
     ) -> tuple["ProductCardInfo", "CardFromWB"] | None:

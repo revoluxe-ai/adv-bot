@@ -115,6 +115,18 @@ class ConnectExistingConfirmType2(CallbackData, prefix="ce_confirm_t2"):
     adv_id: int = 0  # 0 = нажата «Создать РК»
 
 
+class ConnectExistingChooseAuction(CallbackData, prefix="ce_choose_auc"):
+    """Выбор способа выбора аукционной РК: ввести ID, список, создать, назад."""
+
+    action: str  # enter_id | choose_list | create | back
+
+
+class ConnectExistingChooseAuto(CallbackData, prefix="ce_choose_auto"):
+    """Выбор способа выбора авто-РК: ввести ID, список, создать, назад."""
+
+    action: str  # enter_id | choose_list | create | back
+
+
 class ConnectExistingCreateBoth(CallbackData, prefix="ce_create_both"):
     """Подтверждение создания обеих кампаний (аукцион + авто) через create_complex_advs."""
 
@@ -131,6 +143,12 @@ class ConnectExistingAdvsBackToShop(CallbackData, prefix="ce_back_shop"):
     """Вернуться в меню магазина из сценария «подключить существующие» (уже есть РК или отмена)."""
 
     wb_user_cabinet_original_id: int
+
+
+class ConnectExistingCardNotFound(CallbackData, prefix="ce_card_not_found"):
+    """Действие при «артикул по фильтру не найден»: поиск по полному списку или выход."""
+
+    action: str  # retry_full_list
 
 
 class ShowShopsList(CallbackData, prefix="shops_list"):
