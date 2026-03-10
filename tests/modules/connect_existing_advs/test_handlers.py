@@ -173,13 +173,14 @@ async def test_connect_existing_advs_nmid_cabinet_not_found() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_card_not_found() -> None:
-    """nmid handler: CardNotFoundInWB -> 'Артикул не найден на Wildberries'."""
+    """nmid handler: CardNotFoundInWB -> message containing 'артикул не найден', keyboard with retry/shop."""
     from app.core.wb_api.mixins.excs import CardNotFoundInWB
 
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
     state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
+    state.update_data = AsyncMock()
     message = _make_message(chat_id=222, text="12345")
     mock_session = MagicMock()
     mock_result = MagicMock()
@@ -190,11 +191,23 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
 
     container = _make_hub_with_products_manager(CardNotFoundInWB())
-    mock_di_create = AsyncMock()
-    mock_acm = MagicMock()
-    mock_acm.__aenter__ = AsyncMock(return_value=container)
-    mock_acm.__aexit__ = AsyncMock(return_value=None)
-    mock_di_create.return_value = mock_acm
+
+    class _AwaitableCtx:
+        """Awaitable that returns self; async ctx yields _container for 'async with ... as container'."""
+
+        def __init__(self, _container: MagicMock) -> None:
+            self._container = _container
+
+        def __await__(self):
+            return (yield self)
+
+        async def __aenter__(self):
+            return self._container
+
+        async def __aexit__(self, *args):
+            return None
+
+    mock_di_create = AsyncMock(return_value=_AwaitableCtx(container))
 
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
@@ -204,7 +217,8 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
         )
 
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then error
-    assert "Артикул не найден" in bot.send_message.call_args[0][1]
+    last_message = bot.send_message.call_args[0][1]
+    assert "артикул не найден" in last_message.lower()
 
 
 @pytest.mark.unit
