@@ -55,7 +55,7 @@ class UpdateCommotBidInSearchAdvsManager:
             return None
         current_common_bids = adv.current_common_bids_in_search_adv
         current_bid: int = current_common_bids[current_nmid]
-        bid_step: int = adv.bid_step
+        bid_step: int = 1
         if not current_bid:
             return None
         if fact_pay_for_order > result_target_pay_for_order:
