@@ -59,7 +59,8 @@ class UpdateCommotBidInSearchAdvsManager:
         if not current_bid:
             return None
         if fact_pay_for_order > result_target_pay_for_order:
-            new_bid = current_bid - bid_step
+            min_bid = adv.search_adv_min_bids[current_nmid]
+            new_bid = min_bid
         elif fact_pay_for_order < result_target_pay_for_order:
             new_bid = current_bid + bid_step
         else:
