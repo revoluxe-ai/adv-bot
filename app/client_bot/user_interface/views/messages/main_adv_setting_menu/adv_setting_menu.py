@@ -301,9 +301,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     WBCabinet.id == self.adv.wb_cabinet_id
                 )
             )
-            shop_id = result.result_one()
-
-
+            shop_id = result.scalar_one()
         self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
             shop_id
         )
