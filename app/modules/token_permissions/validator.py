@@ -149,7 +149,16 @@ class TokenPermissionsValidator:
             async with session.get(url, headers=headers, timeout=timeout) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    return data.get("Status") == "OK"
+                    if data.get("Status") == "OK":
+                        return True
+                    # HTTP 200 but Status != "OK": API format change or service issue
+                    # This is NOT a permission denial, so fall back to JWT
+                    logger.warning(
+                        "API probe for %s returned 200 but Status=%s (not OK), treating as transient",
+                        right_name,
+                        data.get("Status"),
+                    )
+                    return None
                 # HTTP 403 = permission denied (token lacks this permission)
                 if resp.status == 403:
                     return False

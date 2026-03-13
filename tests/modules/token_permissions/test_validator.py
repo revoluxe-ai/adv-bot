@@ -133,6 +133,39 @@ class TestTokenPermissionsValidator:
         assert result.permissions["Продвижение"].is_available
 
     @pytest.mark.asyncio
+    async def test_valid_token_api_format_change_fallback_to_jwt(self):
+        """Test validation when API returns 200 but Status != "OK" (API format change).
+        
+        This scenario represents an API format change or service issue (not permission denial).
+        The token should remain valid and fall back to JWT claims for validation.
+        """
+        validator = TokenPermissionsValidator()
+
+        # Create a custom mock that simulates API returning 200 with Status != "OK"
+        async def mock_probe_with_wrong_status(right_name, api_key, temp_session=None):
+            # Simulate the actual _probe_api logic for 200 with wrong Status
+            if right_name in ["Контент", "Аналитика", "Продвижение"]:
+                return None  # API format issue, should return None
+            return True
+
+        with patch.object(validator, "_probe_api", side_effect=mock_probe_with_wrong_status):
+            result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
+
+        assert result.is_valid_jwt
+        assert not result.is_read_only
+        assert not result.is_expired
+
+        # Token SHOULD be usable - API format changes don't invalidate JWT claims
+        assert result.can_be_used
+        assert result.error_message is None
+        assert len(result.missing_required) == 0
+
+        # Permissions should be available based on JWT claims (fallback)
+        assert result.permissions["Контент"].is_available
+        assert result.permissions["Аналитика"].is_available
+        assert result.permissions["Продвижение"].is_available
+
+    @pytest.mark.asyncio
     async def test_invalid_token(self):
         """Test validation with invalid JWT token."""
         validator = TokenPermissionsValidator()
@@ -296,7 +329,11 @@ class TestTokenPermissionsValidator:
 
     @pytest.mark.asyncio
     async def test_probe_api_failure_wrong_status(self):
-        """Test _probe_api method with 200 but wrong Status field."""
+        """Test _probe_api method with 200 but wrong Status field.
+        
+        HTTP 200 with Status != "OK" is treated as a transient/service issue,
+        not a permission denial. This allows fallback to JWT validation.
+        """
         # Mock aiohttp session with wrong Status
         mock_response = MagicMock()
         mock_response.status = 200
@@ -312,7 +349,8 @@ class TestTokenPermissionsValidator:
         validator = TokenPermissionsValidator()
         result = await validator._probe_api("Контент", "test_token", mock_session)
 
-        assert result is False
+        # Should return None (transient error), not False (permission denied)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_probe_api_exception(self):

@@ -50,6 +50,7 @@ tests/modules/token_permissions/test_validator.py .... 21 passed in 0.40s
 | Scenario | API Probe Result | Token With JWT Claims | Outcome |
 |----------|------------------|----------------------|---------|
 | API returns 200 + Status:OK | `True` | Yes | ✅ Accepted |
+| API returns 200 + Status:ERROR | `None` | Yes | ✅ Accepted (API format issue, fallback to JWT) |
 | API returns 403 | `False` | Yes | ❌ Rejected (missing permission) |
 | Network timeout | `None` | Yes | ✅ Accepted (fallback to JWT) |
 | DNS failure | `None` | Yes | ✅ Accepted (fallback to JWT) |
