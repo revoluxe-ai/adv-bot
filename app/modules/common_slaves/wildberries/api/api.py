@@ -9,6 +9,7 @@ from aiohttp import ClientSession
 from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
+from app.core.wb_api.v2_adverts_to_legacy import v2_advert_item_to_legacy
 from app.core.wb_api.mixins.content import ContentMixin
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 
@@ -148,55 +149,31 @@ class AdvertApi(ABC_WB_API):
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
-        dates = [date.isoformat() for date in dates]
-        url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
-        query_data = []
-        for adv_id in adv_ids:
-            query_data.append({"id": adv_id, "dates": dates})
-
-        response_text = await requests(
-            self.session,
-            "POST",
-            url,
-            json_data=query_data,
-            headers=self.headers.standart,
-        )
-        answer = json.loads(response_text)
-        full_stats = []
-        if not answer:
+        if not dates:
             return None
-        for data in answer:
-            try:
-                full_stat = FullAdvStat(**data)
-            except Exception as e:
-                logger.error(
-                    "Ошибка валидации данных по статистике рекламы", exc_info=True
-                )
-                raise e
-            full_stats.append(full_stat)
-        return full_stats
+        from app.modules.full_stat_adv_updater.fullstats_v3_legacy import (
+            get_adv_full_state_for_dates,
+        )
+
+        return await get_adv_full_state_for_dates(
+            self.session, self.headers.standart, list(adv_ids), dates
+        )
 
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
     ) -> list[FullAdvStat] | None:
+        if not adv_ids:
+            return []
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
-        full_stats = []
-        part_len = 100
-        adv_ids = list(adv_ids)
-        for i in range(0, len(adv_ids), part_len):
-            part_of_adv_ids = adv_ids[i : i + part_len]
-            part_stats = await self._get_adv_full_state(part_of_adv_ids, dates)
-            if part_stats:
-                full_stats.extend(part_stats)
-        return full_stats
+        # Chunking by 50 is done inside _get_adv_full_state → fetch_fullstats_v3 → _fetch_single_range
+        return (await self._get_adv_full_state(list(adv_ids), dates)) or []
 
     async def get_full_adv_stat_for_date(
         self, adv_ids: list[int], date: datetime.date
     ) -> list[FullAdvStat]:
-        full_stats = await self.get_adv_full_state(adv_ids, [date])
-        return full_stats
+        return (await self.get_adv_full_state(adv_ids, [date])) or []
 
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
@@ -279,8 +256,11 @@ class AdvertApi(ABC_WB_API):
         adverts: list = answer["adverts"]
         if not adverts:
             return []
-        for advert in adverts:
-            for advert in advert["advert_list"]:
+        for advert_group in adverts:
+            # Type 8 = auto (unified), type 9 = search (manual). Both needed for ComplexAdv
+            if advert_group.get("type") not in (8, 9):
+                continue
+            for advert in advert_group["advert_list"]:
                 advertId = advert["advertId"]
                 advertIds.append(advertId)
 
@@ -288,25 +268,35 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
-        advs = []
-        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        if not adv_ids:
+            return []
+        url = "https://advert-api.wildberries.ru/api/advert/v2/adverts"
+        ids_param = ",".join(str(i) for i in adv_ids)
 
         response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
+            self.session,
+            "GET",
+            f"{url}?ids={ids_param}",
+            headers=self.headers.standart,
         )
         answer = json.loads(response_text)
-        for advert in answer:
-            adv: Adv | None = adv_fabric.get_adv_data_class(advert)
-            if adv:
+        adverts_list = answer.get("adverts", [])
+        advs: list[Adv] = []
+        for item in adverts_list:
+            legacy = v2_advert_item_to_legacy(item)
+            adv = adv_fabric.get_adv_data_class(legacy)
+            if adv is not None:
                 advs.append(adv)
         return advs
 
     async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
         if not adv_ids:
-            adv_ids: list[int] = await self.get_advertIds()
-        all_advs = []
+            adv_ids = await self.get_advertIds()
+        all_advs: list[Adv] = []
         part = 50
         for i in range(0, len(adv_ids), part):
+            if i > 0:
+                await asyncio.sleep(0.2)
             part_of_advs = adv_ids[i : i + part]
             advs = await self._get_advs(part_of_advs)
             all_advs.extend(advs)

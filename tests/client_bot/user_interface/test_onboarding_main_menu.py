@@ -20,8 +20,10 @@ def test_main_menu_text_contains_key_phrases() -> None:
     assert "Wildberries" in text
 
 
-def test_get_main_menu_keyboard_regular_user_three_buttons() -> None:
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> None:
     """For regular user: 3 buttons (Мои магазины, Мой баланс, Показать инвайт), no admin."""
+    mock_settings.invite_gate = True
     user_id = 999999  # Not in ADMINS
     kb = get_main_menu_keyboard(user_id)
     rows = kb.inline_keyboard
@@ -34,9 +36,11 @@ def test_get_main_menu_keyboard_regular_user_three_buttons() -> None:
     assert rows[2][0].callback_data == callbacks.InviteShow().pack()
 
 
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.const.ADMINS", [123])
-def test_get_main_menu_keyboard_admin_four_buttons() -> None:
+def test_get_main_menu_keyboard_admin_four_buttons(mock_settings) -> None:
     """For admin: 4 buttons, first is Панель администратора with AdminPanel(action='menu')."""
+    mock_settings.invite_gate = True
     user_id = 123
     kb = get_main_menu_keyboard(user_id)
     rows = kb.inline_keyboard

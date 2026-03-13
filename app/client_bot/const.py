@@ -33,10 +33,9 @@ MIN_CPM = 100
 
 ADMINS = [
     373435337,  # я
-    # 1603000351, #Леля
     707068503,  # Лена
-    # 1121102685,  # Владислав
-]
+    5401359037, # Рома
+    ]
 
 DEFAULT_BIDDER_STEP = 2
 
@@ -52,5 +51,5 @@ OFFERTA_URL = (
 
 PRICE_LINK = 'https://telegra.ph/Tarify-Servisa-Gorizont-Avtomatizaciya-vnutrennej-reklamy-WB-02-06'
 
-SUPPORT_LINK = "https://t.me/@skyline360_1"
-SUPPORT_USER_NAME = "skyline360_1"  # username для лички (без @)
+SUPPORT_LINK = "https://t.me/sky_manager_1"
+SUPPORT_USER_NAME = "sky_manager_1"  # username для лички (без @)

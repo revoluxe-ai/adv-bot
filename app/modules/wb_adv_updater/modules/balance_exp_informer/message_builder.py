@@ -92,3 +92,27 @@ def build_message(items_chunk: list[ReminderItem]) -> tuple[str, InlineKeyboardM
     lines.append("Нажмите «Пополнить» напротив нужного магазина.")
 
     return "\n".join(lines), buttons.as_markup()
+
+
+def build_negative_balance_reminder_message(
+    items: list[tuple[str, int, int]],
+) -> tuple[str, InlineKeyboardMarkup]:
+    """items: (shop_name, wb_cabinet_id, days_left) per shop."""
+    lines: list[str] = [
+        "🔴 Баланс в минусе",
+        "",
+        "Осталось дней до отключения кампаний: пополните баланс или деактивируйте кампании в настройках магазина.",
+        "",
+    ]
+    buttons = InlineKeyboardBuilder()
+    for shop_name, wb_cabinet_id, days_left in items:
+        lines.append(f"• {shop_name}: осталось {days_left} дн.")
+        buttons.row(
+            InlineKeyboardButton(
+                text=f"Пополнить • {shop_name}",
+                callback_data=AddBalance(wb_cabinet_original_id=wb_cabinet_id).pack(),
+            )
+        )
+    lines.append("")
+    lines.append("Нажмите «Пополнить» или отключите кампании в настройках магазина.")
+    return "\n".join(lines), buttons.as_markup()

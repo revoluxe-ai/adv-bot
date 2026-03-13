@@ -51,13 +51,16 @@ class UpdateCommotBidInSearchAdvsManager:
     def _get_new_bid(adv: WBAdvDTO, current_nmid: int) -> int | None:
         result_target_pay_for_order = adv.result_target_pay_for_order
         fact_pay_for_order = adv.fact_pay_for_order
+        if fact_pay_for_order is None:
+            return None
         current_common_bids = adv.current_common_bids_in_search_adv
         current_bid: int = current_common_bids[current_nmid]
-        bid_step: int = adv.bid_step
+        bid_step: int = 1
         if not current_bid:
             return None
         if fact_pay_for_order > result_target_pay_for_order:
-            new_bid = current_bid - bid_step
+            min_bid = adv.search_adv_min_bids[current_nmid]
+            new_bid = min_bid
         elif fact_pay_for_order < result_target_pay_for_order:
             new_bid = current_bid + bid_step
         else:
@@ -76,7 +79,7 @@ class UpdateCommotBidInSearchAdvsManager:
         keywords = adv.keywords
         if not keywords:
             return None
-        keywords.sort(key=lambda k: k.rating_by_orders, reverse=True)
+        keywords.sort(key=lambda k: k.rating or 0, reverse=True)
         top_key = keywords[0]
         cpm_of_top_key = top_key.cpm
         return cpm_of_top_key

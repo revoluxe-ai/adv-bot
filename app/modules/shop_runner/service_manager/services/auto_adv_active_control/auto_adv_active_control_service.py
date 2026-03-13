@@ -216,6 +216,26 @@ class AutoAdvActiveControlService:
             )
             return None
 
+        # Авто-кампанию ведём только при включённом режиме продвижения полок (rec_system_mode).
+        # rec_system_mode по умолчанию False — кампании без явного включения полок остаются на паузе
+        # по дизайну продукта: логика контроля активности и стратегий завязана на полки (сначала
+        # самые дешёвые места, затем конверсия). Это не баг, а намеренное ограничение.
+        # Ранний выход только из этого обработчика; аукцион (поиск) обрабатывается отдельно
+        # в _search_campaign_handler, который вызывается тем же ensure_campaigns_active.
+        if not adv.rec_system_promotion_mode_active:
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign (rec_system mode off) adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.REC_SYSTEM_MODE_OFF,
+            )
+            return None
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
             spend_auto = await self._get_spend_for_adv(

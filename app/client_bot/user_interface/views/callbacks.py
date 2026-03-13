@@ -161,6 +161,12 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     action: str
     adv_original_id: int
 
+
+class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
+    action: str
+    adv_original_id: int
+
+
 class ManageCampaignActivity(CallbackData, prefix="campaign_activity"):
     action: str
     adv_setting_original_id: int
@@ -204,6 +210,14 @@ class UserBalanceMenu(CallbackData, prefix="user_balance_menu"):
 
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
+
+
+class RaiseCardAnalyze(CallbackData, prefix="raise_card_analyze"):
+    """Анализ раскрутки карточки: меню, результат, по дням, бакеты, что делать дальше."""
+
+    adv_setting_original_id: int
+    action: str | None = "menu"  # menu | result | by_days | buckets | what_next
+    nmid: int | None = None
 
 
 class AddWhitePhrases(CallbackData, prefix="add_white_phrases"):
@@ -260,9 +274,17 @@ class ResetAddedClicks(CallbackData, prefix="reset_added_clicks"):
     adv_setting_original_id: int
 
 
+# TODO(legacy-remove): legacy callback связан с target_ctr_mode, оставить
+# до полного выпиливания старого интерфейса strategy_setting.
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int
+
+
+class StrategyMenu(CallbackData, prefix="strategy_menu"):
+    action: str
+    adv_setting_original_id: int
+    strategy: str | None = None
 
 
 class ResetWhiteList(CallbackData, prefix="reset_white_list"):
@@ -382,6 +404,11 @@ class ChangeCommonBidInSearchAdvStatus(
 ):
     adv_id: int
     new_status: bool
+
+
+class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
 
 
 class IndividualKeywordsTargetPlaceToggle(

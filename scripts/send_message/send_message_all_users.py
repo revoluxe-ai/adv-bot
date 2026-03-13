@@ -21,7 +21,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from scripts.get_users.filters.filters import get_users_by_telegram_id, get_test_users
 from scripts.send_message.utils.get_users_with_low_balance_and_near_last_payment import \
     get_users_with_low_balance_and_near_last_payment
-from scripts.send_message.utils.messages import message_8
+from scripts.send_message.utils.messages import message_11
 from scripts.users_communicate_module.main_user_generator import get_users_iterator, get_test_users_iterator
 from scripts.users_csv_exporter.dto import UserDTO
 
@@ -59,23 +59,31 @@ async def async_chain(
 
 redis_semaphore = asyncio.Semaphore(1)
 
+TEST_MODE = False
+DRY_RUN_MODE = False
+
+
+
 
 async def send_message(user: UserDTO, bot: Bot) -> bool:
     user_id = user.telegram_id
-    message = message_8.Message
+    message = message_11.Message
     hash_ = sha256(str(message).encode()).hexdigest()
 
     # фильтр Влада
     if user_id == 1121102685:
         return False
-
-    # проверка в Redis
-    if await redis_manager.check_message_send(hash_, user_id, bot.id):
-        return False
+    if not TEST_MODE or DRY_RUN_MODE:
+        if await redis_manager.check_message_send(hash_, user_id, bot.id):
+            return False
 
     try:
-        await message(bot, user)()
-        await redis_manager.set_message_send(hash_, user_id, bot.id)
+        if not DRY_RUN_MODE:
+            await message(bot, user)()
+        else:
+            print('Имитация отправки: ', user.telegram_id)
+        if not TEST_MODE or DRY_RUN_MODE:
+            await redis_manager.set_message_send(hash_, user_id, bot.id)
         return True
     except Exception as e:
         logger.error(e)
@@ -88,14 +96,15 @@ async def send_message(user: UserDTO, bot: Bot) -> bool:
 async def send_message_to_users():
     send_count = 0
     not_send_count = 0
-
-    users: AsyncIterator[UserDTO] = await get_users_iterator(
-        only_with_auto_campaign=False
-    )
-    bots = get_bots()
+    if not TEST_MODE:
+        users: AsyncIterator[UserDTO] = await get_users_iterator(
+            only_with_auto_campaign=False
+        )
+        bots = get_bots()
     #
-    # bots =  get_test_bots()
-    # users = get_test_users_iterator()
+    else:
+        bots =  get_test_bots()
+        users = get_test_users_iterator()
 
     try:
         async for user in users:
@@ -106,12 +115,10 @@ async def send_message_to_users():
                     send_flag = True
                 except Exception as e:
                     logger.error(e)
-
             if send_flag:
                 send_count += 1
             else:
                 not_send_count += 1
-
                 print("Отправлено сообщений:", send_count)
                 print("Не отправлено сообщений:", not_send_count)
         print(f'Всего отправлено: {send_count}')

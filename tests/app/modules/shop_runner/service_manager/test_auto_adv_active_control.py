@@ -30,10 +30,11 @@ class _FakeAdvSetting:
         active_status: str,
         adv_id: int | None = None,
         *,
+        adv_setting_id: int | None = None,
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
-        adv_setting_id: int | None = None,
+        rec_system_mode: bool = True,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -41,6 +42,7 @@ class _FakeAdvSetting:
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
+        self.rec_system_mode = rec_system_mode
 
 
 class _FakeSearchAdv:
@@ -66,6 +68,7 @@ class _FakeComplexAdv:
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
+        rec_system_mode: bool = True,
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -77,6 +80,7 @@ class _FakeComplexAdv:
             plan_for_sales_for_day=plan_for_sales_for_day,
             target_price_for_order=target_price_for_order,
             max_price_for_order=max_price_for_order,
+            rec_system_mode=rec_system_mode,
         )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
@@ -106,6 +110,10 @@ class _FakeComplexAdv:
     @property
     def common_budget_daily_limit(self) -> int | None:
         return self._common_budget_daily_limit
+
+    @property
+    def rec_system_promotion_mode_active(self) -> bool:
+        return self._adv_setting.rec_system_mode
 
 
 @pytest.mark.asyncio
@@ -217,6 +225,49 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv_to_pause)
     wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv_to_pause)
     assert run_tasks_call["tasks_manager"] is tasks_manager
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode_off():
+    """When rec_system (shelf promotion) mode is off, auto campaign is paused and not started."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=50,
+        search_status="pause",
+        auto_adv_id=10,
+        search_adv_id=11,
+        rec_system_mode=False,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        for handler in handlers:
+            await handler()
+        return []
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=MagicMock(spec=PlanFactReader),
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_awaited()
 
 
 @pytest.mark.asyncio

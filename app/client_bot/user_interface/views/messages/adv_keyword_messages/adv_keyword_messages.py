@@ -12,6 +12,9 @@ from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
+from app.client_bot.user_interface.views.messages.strategy_display import (
+    format_adv_strategy,
+)
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
 )
@@ -70,6 +73,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.image_mode = image_mode
         self._last_saved_bids: dict[int, int] = {}
         self._cpm_date_map = cpm_date_map
+        self.min_orders_per_1000_rub: float | None = None
 
     @inject
     async def __call__(
@@ -150,7 +154,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._fact_data: FactData = fact_data
 
         # Устанавливаем полученные данные
-        self.min_rating_by_orders = stat_data.min_rating_by_orders
+        self.min_orders_per_1000_rub: float | None = stat_data.min_orders_per_1000_rub
         self.auto_cpm = stat_data.auto_cpm
         self.auction_cpm = stat_data.auction_cpm
         self.total_spend = stat_data.total_spend
@@ -206,15 +210,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             str(self._adv_setting.name) + "\n"
             f"Авто: {self._adv_setting.active_status}\n"
             f"Аук.: {self._status_auction}\n"
+            f"Стратегия: {format_adv_strategy(self._adv_setting.strategy)}\n"
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аук.: {self._adv_setting.search_adv_id}\n"
             f"Cтат. за 2 дня:\n")
 
-        if self.min_rating_by_orders is not None:
-            t = f"Мин. рейтинг по зак.: {self.min_rating_by_orders * 100:.2f}%\n"
+        min_orders_per_1000_rub: float | None = self.min_orders_per_1000_rub
+
+        if min_orders_per_1000_rub is None:
+            t = 'Не достаточно данных для оценки заказов!!!\n'
         else:
-            t = '❗Ограничители не заданы!!!\n'
+            t = f"Мин. зак. на 1000₽: {min_orders_per_1000_rub:.2f}\n"
+
         text += t
         text +=(
             f"Стр.: {self._page}/{total_page + 1}\n"
@@ -271,10 +279,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         )
 
         fact_method_ru = self._fact_data.method_ru
+        pay_for_order: float | None = self._fact_data.pay_for_order
+        if pay_for_order is None:
+            pay_for_order_str = 'Нет данных по продажам'
+        else:
+            pay_for_order_str = f'{pay_for_order:.2f} р.'
         text += (
             f"\n Факт-продажи({fact_method_ru}):\n"
             f"Прог. зак. в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
-            f"Себес.: {round(self._fact_data.pay_for_order, 2)} р."
+            f"Себес.: {pay_for_order_str}"
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
         )
 

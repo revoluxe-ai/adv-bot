@@ -23,10 +23,12 @@ def create_mock_keyword(
     text: str,
     hard_status: int = 2,
     above_rec_conversion: bool | None = None,
-    conversion_without_cpm: float = 0.05,
+    conv_views_to_orders: float = 0.05,
     rating_by_orders: float = 10.0,
+    orders_per_1000_rub: float = 10.0,
     pay_for_order: float = 100.0,
     best_keyword_status: bool = False,
+    views: int = 1,
 ) -> CalculatedKeyword:
     """Создает мок CalculatedKeyword."""
     keyword = MagicMock(spec=CalculatedKeyword)
@@ -34,11 +36,14 @@ def create_mock_keyword(
     keyword.text = text
     keyword.hard_status = hard_status
     keyword.above_rec_conversion = above_rec_conversion
-    keyword.conversion_without_cpm = conversion_without_cpm
+    keyword.conv_views_to_orders = conv_views_to_orders
     keyword.rating_by_orders = rating_by_orders
-    keyword.pay_for_order_by_current_cpm = pay_for_order
+    keyword.orders_per_1000_rub = orders_per_1000_rub
+    keyword.pay_for_order = pay_for_order
+    keyword.rating = rating_by_orders  # для анти-слив (max по rating)
     keyword.best_keyword_status = best_keyword_status
     keyword.status = KeywordStatus.GOOD
+    keyword.views = views  # для фильтра white_keywords (kw.views > 0)
     return keyword
 
 
@@ -95,9 +100,9 @@ async def test_removes_keywords_with_below_rec_conversion():
     fact.predict_orders = 12.0
 
     keywords = [
-        create_mock_keyword(1, "keyword1", above_rec_conversion=False, conversion_without_cpm=0.01),
-        create_mock_keyword(2, "keyword2", above_rec_conversion=False, conversion_without_cpm=0.02),
-        create_mock_keyword(3, "keyword3", above_rec_conversion=True, conversion_without_cpm=0.05),
+        create_mock_keyword(1, "keyword1", above_rec_conversion=False, conv_views_to_orders=0.01),
+        create_mock_keyword(2, "keyword2", above_rec_conversion=False, conv_views_to_orders=0.02),
+        create_mock_keyword(3, "keyword3", above_rec_conversion=True, conv_views_to_orders=0.05),
     ]
 
     ctx = create_mock_context(

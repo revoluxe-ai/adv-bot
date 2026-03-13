@@ -3,6 +3,7 @@ from collections.abc import Callable, Awaitable
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
@@ -35,7 +36,7 @@ class ComplexAdv:
     def __init__(
         self,
         adv_setting: AdvSetting,
-        search_adv: AdvSetting,
+        search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
         get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
@@ -51,6 +52,20 @@ class ComplexAdv:
 
     def __repr__(self):
         return str(self._adv_setting.id)
+
+
+    @property
+    def strategy(self) -> Strategy:
+        if self._adv_setting.strategy is None:
+            return Strategy.MIN_CPO
+        return self._adv_setting.strategy
+
+    @property
+    def auto_update_strategy(self) -> bool:
+        auto_update_strategy = self._adv_setting.auto_update_strategy
+        if auto_update_strategy is None:
+            return True
+        return auto_update_strategy
 
 
     @property
@@ -93,6 +108,8 @@ class ComplexAdv:
 
     @property
     def  search_cpm(self) -> int | None:
+        if self._search_adv is None:
+            return None
         return self._search_adv.cpm
 
     @property
@@ -145,8 +162,6 @@ class ComplexAdv:
 
     @keyword_getting_mode.setter
     def keyword_getting_mode(self, value: KeywordGettingMode):
-        if not isinstance(value, KeywordGettingMode):
-            raise ValueError()
         self._keyword_getting_mode = value
 
     @property
@@ -177,7 +192,8 @@ class ComplexAdv:
     @property
     def all_adv_ids(self) -> set[int]:
         adv_ids: set[int] = set()
-        adv_ids.add(self._adv_setting.adv_id)
+        if self._adv_setting.adv_id:
+           adv_ids.add(self._adv_setting.adv_id)
         if self._search_adv:
             adv_ids.add(self._search_adv.adv_id)
         return adv_ids

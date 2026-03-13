@@ -463,6 +463,157 @@ async def test_connect_existing_advs_nmid_success_auction_only() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_connect_existing_advs_nmid_success_auto_only() -> None:
+    """nmid handler: only auto candidates -> waiting_confirm_continue_invalid, text and buttons."""
+    from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+        GetAdvertsAdvertsItem,
+    )
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+    message = _make_message(chat_id=222, text="100")
+    mock_session = MagicMock()
+    mock_result = MagicMock()
+    mock_result.one_or_none.return_value = (1, "shop_1")
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    mock_auto = MagicMock(spec=GetAdvertsAdvertsItem)
+    mock_auto.id = 55
+    mock_auto.settings.name = "AutoCampaign"
+    mock_auto.status.value = 9
+    result_only_auto = ConnectExistingCandidatesResult(
+        auction_candidates=[],
+        auto_candidates=[mock_auto],
+    )
+
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
+    with patch(f"{MODULE}.sm", mock_sm), patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
+        f"{MODULE}._get_existing_adv_pair_not_done",
+        AsyncMock(return_value=None),
+    ), patch(
+        f"{MODULE}.get_connect_existing_candidates",
+        AsyncMock(return_value=result_only_auto),
+    ):
+        await connect_existing_advs.connect_existing_advs_nmid(
+            message, bot, state
+        )
+
+    state.set_state.assert_called_once_with(
+        ConnectExistingAdvsStates.waiting_confirm_continue_invalid
+    )
+    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then continue invalid
+    text = bot.send_message.call_args[0][1]
+    assert "Без подключённой поисковой РК" in text
+    assert "Продолжить создание" in text
+    reply_markup = bot.send_message.call_args[1]["reply_markup"]
+    buttons_texts = [
+        btn.text
+        for row in reply_markup.inline_keyboard
+        for btn in row
+    ]
+    assert "✅ Продолжить создание" in buttons_texts
+    assert "Отмена" in buttons_texts
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None:
+    """nmid: existing_pair (None, 123) + both candidates -> confirm_type2, 'Аукционная РК уже подключена'."""
+    from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+        GetAdvertsAdvertsItem,
+    )
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        side_effect=[
+            {"wb_user_cabinet_original_id": 1},
+            {
+                "existing_auction_id": 123,
+                "auto_candidates": [{"id": 456, "name": "AutoCamp"}],
+            },
+        ]
+    )
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+    message = _make_message(chat_id=222, text="100")
+    mock_session = MagicMock()
+    mock_result = MagicMock()
+    mock_result.one_or_none.return_value = (1, "shop_1")
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    mock_auction = MagicMock(spec=GetAdvertsAdvertsItem)
+    mock_auction.id = 42
+    mock_auction.settings.name = "AuctionCamp"
+    mock_auction.status.value = 9
+    mock_auto = MagicMock(spec=GetAdvertsAdvertsItem)
+    mock_auto.id = 456
+    mock_auto.settings.name = "AutoCamp"
+    mock_auto.status.value = 9
+    result_both = ConnectExistingCandidatesResult(
+        auction_candidates=[mock_auction],
+        auto_candidates=[mock_auto],
+    )
+
+    container = _make_hub_with_products_manager(
+        ProductCardInfo(name="Card Name", nmid=100)
+    )
+    mock_di_create = AsyncMock()
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create.return_value = mock_acm
+
+    with patch(f"{MODULE}.sm", mock_sm), patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
+        f"{MODULE}._get_existing_adv_pair_not_done",
+        AsyncMock(return_value=(None, 123)),
+    ), patch(
+        f"{MODULE}.get_connect_existing_candidates",
+        AsyncMock(return_value=result_both),
+    ):
+        await connect_existing_advs.connect_existing_advs_nmid(
+            message, bot, state
+        )
+
+    state.update_data.assert_any_call(chosen_auction_adv_id=123)
+    state.set_state.assert_called_once_with(ConnectExistingAdvsStates.confirm_type2)
+    assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then auction-already message
+    text = bot.send_message.call_args[0][1]
+    assert "Аукционная РК уже подключена" in text
+    assert "Выберите авто-кампанию или создайте новую" in text
+    reply_markup = bot.send_message.call_args[1]["reply_markup"]
+    buttons_texts = [
+        btn.text for row in reply_markup.inline_keyboard for btn in row
+    ]
+    assert "Создать РК" in buttons_texts
+    assert "Подтвердить" in buttons_texts
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_connect_existing_confirm_type1_adv_id_zero() -> None:
     """confirm_type1: adv_id=0 -> message about next update, no confirm_type2."""
     bot = MagicMock()
@@ -611,8 +762,118 @@ async def test_connect_existing_confirm_type2_creates_adv_setting() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_connect_existing_confirm_type2_cabinet_not_found() -> None:
+    """confirm_type2: session.get(WBCabinet, wb_cabinet_id) is None -> 'Кабинет не найден.', no commit."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "nmid": 100,
+            "wb_cabinet_id": 1,
+            "shop_id": None,
+            "card_name": "Card",
+            "chosen_auction_adv_id": 10,
+            "auction_candidates": [],
+            "auto_candidates": [],
+        }
+    )
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingConfirmType2(adv_id=20), chat_id=333
+    )
+    callback_data = callbacks.ConnectExistingConfirmType2(adv_id=20)
+    mock_session = MagicMock()
+    mock_session.get = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock()
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(f"{MODULE}.sm", mock_sm):
+        await connect_existing_advs.connect_existing_confirm_type2(
+            callback, callback_data, bot, state
+        )
+
+    bot.send_message.assert_called_once_with(333, "Кабинет не найден.")
+    mock_session.commit.assert_not_called()
+    state.clear.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_confirm_type2_rename_exception_still_upserts() -> None:
+    """confirm_type2: rename_campaign raises -> message about rename, upsert and commit still run."""
+    from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    # Names differ from get_name_for_adv(100, "Card", ...) so need_rename is True
+    state.get_data = AsyncMock(
+        return_value={
+            "nmid": 100,
+            "wb_cabinet_id": 1,
+            "shop_id": "shop_1",
+            "card_name": "Card",
+            "chosen_auction_adv_id": 10,
+            "chosen_auto_adv_id": 20,
+            "auction_candidates": [{"id": 10, "name": "OldAuctionName"}],
+            "auto_candidates": [{"id": 20, "name": "OldAutoName"}],
+        }
+    )
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingConfirmType2(adv_id=20), chat_id=333
+    )
+    callback_data = callbacks.ConnectExistingConfirmType2(adv_id=20)
+    mock_wb_cabinet = MagicMock(spec=WBCabinet)
+    mock_wb_cabinet.id = 1
+    mock_session = MagicMock()
+    mock_session.get = AsyncMock(return_value=mock_wb_cabinet)
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_pm = MagicMock()
+    mock_pm.rename_campaign = AsyncMock(side_effect=Exception("rename failed"))
+    mock_hub = MagicMock()
+    mock_hub.wb_data_manager.promotion_manager = mock_pm
+    mock_factory = MagicMock()
+    mock_factory.get_wb_manager_hub.return_value = mock_hub
+    mock_container = MagicMock()
+    mock_container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = mock_factory
+    mock_acm = MagicMock()
+    mock_acm.__aenter__ = AsyncMock(return_value=mock_container)
+    mock_acm.__aexit__ = AsyncMock(return_value=None)
+    mock_di_create = AsyncMock(return_value=mock_acm)
+
+    with patch(f"{MODULE}.sm", mock_sm), patch(
+        f"{MODULE}.DIManager.create", mock_di_create
+    ), patch(
+        "app.modules.adv_creator.backend.main_manager.MainAdvManager._apply_default_settings_to_adv",
+        new_callable=AsyncMock,
+    ):
+        await connect_existing_advs.connect_existing_confirm_type2(
+            callback, callback_data, bot, state
+        )
+
+    rename_msg = next(
+        (c[0][1] for c in bot.send_message.call_args_list if "переименование" in c[0][1]),
+        None,
+    )
+    assert rename_msg is not None
+    assert "переименование на WB не удалось" in rename_msg
+    mock_session.execute.assert_called_once()
+    mock_session.commit.assert_called_once()
+    state.clear.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_connect_existing_create_both_cancel() -> None:
-    """create_both: action cancel -> state.clear, 'Отменено'."""
+    """create_both: action cancel (no cabinet in data) -> state.clear, 'Отменено'."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -629,6 +890,34 @@ async def test_connect_existing_create_both_cancel() -> None:
 
     state.clear.assert_called_once()
     bot.send_message.assert_called_once_with(333, "Отменено.")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_create_both_cancel_with_cabinet() -> None:
+    """create_both: cancel with wb_user_cabinet_original_id in data -> state.clear, ShopMenu, no 'Отменено'."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 7})
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingCreateBoth(action="cancel"), chat_id=333
+    )
+    callback_data = callbacks.ConnectExistingCreateBoth(action="cancel")
+    mock_shop_menu = MagicMock()
+    mock_shop_menu.return_value = AsyncMock()
+
+    with patch(f"{MODULE}.ShopMenu", mock_shop_menu):
+        await connect_existing_advs.connect_existing_create_both(
+            callback, callback_data, bot, state
+        )
+
+    state.clear.assert_called_once()
+    mock_shop_menu.assert_called_once_with(bot, 333, state, 7)
+    mock_shop_menu.return_value.assert_called_once()
+    send_calls = [c[0][1] for c in bot.send_message.call_args_list]
+    assert "Отменено" not in send_calls
 
 
 @pytest.mark.unit
@@ -725,6 +1014,62 @@ async def test_connect_existing_continue_despite_invalid_confirm_enqueue() -> No
     state.clear.assert_called_once()
     bot.send_message.assert_called_once()
     assert "добавлена в очередь" in bot.send_message.call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_continue_despite_invalid_cancel_with_cabinet() -> None:
+    """continue_despite_invalid: cancel with wb_user_cabinet_original_id -> state.clear, ShopMenu, no 'Отменено'."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 7})
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingContinueDespiteInvalid(action="cancel"),
+        chat_id=333,
+    )
+    callback_data = callbacks.ConnectExistingContinueDespiteInvalid(action="cancel")
+    mock_shop_menu = MagicMock()
+    mock_shop_menu.return_value = AsyncMock()
+
+    with patch(f"{MODULE}.ShopMenu", mock_shop_menu):
+        await connect_existing_advs.connect_existing_continue_despite_invalid(
+            callback, callback_data, bot, state
+        )
+
+    state.clear.assert_called_once()
+    mock_shop_menu.assert_called_once_with(bot, 333, state, 7)
+    mock_shop_menu.return_value.assert_called_once()
+    send_calls = [c[0][1] for c in bot.send_message.call_args_list]
+    assert "Отменено" not in send_calls
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_continue_despite_invalid_confirm_empty_auto_candidates() -> None:
+    """continue_despite_invalid: confirm with empty auto_candidates -> message, no enqueue."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={"nmid": 100, "shop_id": "shop_1", "auto_candidates": []}
+    )
+    state.clear = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingContinueDespiteInvalid(action="confirm"),
+        chat_id=333,
+    )
+    callback_data = callbacks.ConnectExistingContinueDespiteInvalid(action="confirm")
+
+    with patch("arq.create_pool", AsyncMock()) as mock_create_pool:
+        await connect_existing_advs.connect_existing_continue_despite_invalid(
+            callback, callback_data, bot, state
+        )
+
+    bot.send_message.assert_called_once_with(333, "Нет данных об авто-кампании.")
+    mock_create_pool.assert_not_called()
+    state.clear.assert_not_called()
 
 
 @pytest.mark.unit

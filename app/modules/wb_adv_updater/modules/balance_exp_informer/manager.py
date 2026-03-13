@@ -75,6 +75,7 @@ async def balance_expiration_informer_tick(
 
     try:
         await service.update()
+        await service.send_negative_balance_reminders()
     except Exception as exc:
         raise SenderTickError from exc
 

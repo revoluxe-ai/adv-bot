@@ -17,14 +17,27 @@ from app.client_bot import utils
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
+from app.client_bot.user_interface.views.messages.strategy_display import (
+    format_adv_strategy,
+)
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from . import keyboard
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
+    WBCabinet,
 )
-from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.auto_budget_manager.redis_auto_budget_last_success_manager import (
+    RedisAutoBudgetLastSuccessManager,
+)
+from app.modules.auto_budget_manager.redis_auto_budget_topup_failed_manager import (
+    RedisAutoBudgetTopupFailedManager,
+)
+from app.modules.auto_budget_manager.redis_shop_balance_snapshot_manager import (
+    RedisShopBalanceSnapshotManager,
+)
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats
 from app.modules.wb_adv_updater import data_manager, phrases_processor
 from app.modules.wb_update_state_manager import (
@@ -45,6 +58,15 @@ from app.modules.shop_runner.service_manager.services.redis_campaign_activity_re
 )
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
+)
+from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_manager import (
+    RedisClusterStatTimestampManager,
+)
+from app.modules.shop_runner.service_manager.services.stats_freshness_manager import (
+    StatsFreshnessManager,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
@@ -86,18 +108,31 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._redis_common_stat_timestamp_manager = RedisCommonStatTimestampManager(
             redis_client
         )
+        self._redis_cluster_stat_timestamp_manager = RedisClusterStatTimestampManager(
+            redis_client
+        )
         self._redis_common_bid_timestamp_manager = RedisCommonBidTimestampManager(
             redis_client
         )
         self._redis_campaign_activity_reason_manager = (
             RedisCampaignActivityReasonManager(redis_client)
         )
+        self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
+        self._topup_failed_manager = RedisAutoBudgetTopupFailedManager(redis_client)
+        self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._reason_auto = None
         self._reason_search = None
+        self._shop_balance_snapshot: dict | None = None
+        self._topup_failed: dict | None = None
+        self._last_topup_success: dict | None = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
+        self._emergency_mode_active: bool = False
+        self._emergency_mode_reason: str | None = None
+        self._stats_fresh: bool = True
+        self._stats_stale_reason: str | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -106,20 +141,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             return "—"
         # Коды WB: 4=ready_for_start, 9=started, 11=pause, 7=done, 8=refused
         code_to_ru = {
-            "4": "готова к старту",
-            "9": "запущена",
-            "11": "пауза",
-            "7": "завершена",
-            "8": "отклонена",
+            "4": "гот к ст",
+            "9": "зап",
+            "11": "п",
+            "7": "зав",
+            "8": "отк",
         }
         if status in code_to_ru:
             return code_to_ru[status]
         text_to_ru = {
-            "ready_for_start": "готова к старту",
-            "started": "запущена",
-            "pause": "пауза",
-            "done": "завершена",
-            "refused": "отклонена",
+            "ready_for_start": "гот к ст",
+            "started": "зап",
+            "pause": "п",
+            "done": "зав",
+            "refused": "отк",
         }
         return text_to_ru.get(status, status)
 
@@ -127,7 +162,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:
         if not search_adv_id:
-            return "не подключен"
+            return "не под"
         stmt = select(AdvSetting.active_status).where(
             AdvSetting.adv_id == search_adv_id
         )
@@ -135,7 +170,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             result = await session.execute(stmt)
             status = result.scalar_one_or_none()
             if not status:
-                status = "РК не найдена"
+                status = "РК не най"
             return status
 
     async def __call__(self) -> Message:
@@ -145,10 +180,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
              status_auction = self._format_status_for_display(status_auction)
              self._status_auction = status_auction
         else:
-            self._status_auction = "Не установлен"
-        self._hard_min_ctr = self.adv.hard_min_ctr
+            self._status_auction = "Не уст"
         keywords = await utils.get_keywords_for_keyboard(self.adv)
-        self._min_rating_by_orders: float | None = phrases_processor.get_min_rating_by_orders(keywords)
+        self._min_orders_per_1000_rub = phrases_processor.get_min_orders_per_1000_rub(keywords)
+        self._min_conv_views_to_orders = phrases_processor.get_min_conv_views_to_orders(keywords)
+        self._strategy = self.adv.strategy or Strategy.MIN_CPO
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -156,7 +192,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
         if not full_stat_update_time:
-            full_stat_update_time_str = "Нет данных"
+            full_stat_update_time_str = "Н/д"
         else:
             full_stat_update_time_str = full_stat_update_time.strftime(
                 "%d.%m.%Y %H:%M:%S"
@@ -172,31 +208,50 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # last_update_keyword_stat: datetime | None = (
         #     await self._get_last_update_keyword_stat(self.adv.adv_id)
         # ) TODO: Разобраться что за данные, почему не используются
+        adv_id = self.adv.adv_id
         last_update_common_stat: datetime | None = (
-            await self._redis_common_stat_timestamp_manager.get(self.adv.adv_id)
+            await self._redis_common_stat_timestamp_manager.get(adv_id)
         )
+        # Ключ в Redis — AdvSetting.id (как в manager.update_clusters_adv_stats_today)
+        last_update_cluster_stat: datetime | None = (
+            await self._redis_cluster_stat_timestamp_manager.get(self.adv.id)
+        )
+        # Детект аварии и свежести статы по ClickHouse (как в guard), а не по Redis
+        (
+            self._emergency_mode_active,
+            self._emergency_mode_reason,
+            self._stats_fresh,
+            self._stats_stale_reason,
+        ) = await self._resolve_emergency_mode_from_ch()
         if last_update_common_stat:
             self.last_update_common_stat_str = last_update_common_stat.strftime(
                 "%d.%m.%Y %H:%M:%S"
             )
         else:
-            self.last_update_common_stat_str = "Нет данных"
+            self.last_update_common_stat_str = "Н/д"
+
+        if last_update_cluster_stat:
+            self.last_update_cluster_stat_str = last_update_cluster_stat.strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
+        else:
+            self.last_update_cluster_stat_str = "Н/д"
 
         self.keywords_status_last_update_auto_adv = (
             await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
         )
 
         if not self.keywords_status_last_update_auto_adv:
-            self.keywords_status_last_update_auto_adv = "Нет данных"
+            self.keywords_status_last_update_auto_adv = "Н/д"
 
         if search_adv_id := self.adv.search_adv_id:
             self.keywords_status_last_update_search_adv = (
                 await self._get_last_keywords_status_update_timestamp(search_adv_id)
             )
             if self.keywords_status_last_update_search_adv is None:
-                self.keywords_status_last_update_search_adv = "Нет данных"
+                self.keywords_status_last_update_search_adv = "Н/д"
         else:
-            self.keywords_status_last_update_search_adv = "Аукцион не подключен к РК"
+            self.keywords_status_last_update_search_adv = "Аук не подк к РК"
 
         adv_stat: FullAdvStat | None = (
             await data_manager.get_full_adv_stat_for_adv_id_from_redis(
@@ -215,7 +270,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 "%H:%M:%S %d.%m.%Y"
             )
         else:
-            self.last_common_bid_update_str = "Нет данных"
+            self.last_common_bid_update_str = "Н/д"
 
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
@@ -239,6 +294,25 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
         else:
             self._reason_search = None
+
+        shop_id: str | None = None
+        if self.adv.wb_cabinet_id is not None:
+            async with sm(read_only=True) as session:
+                result = await session.execute(
+                    select(WBCabinet.shop_id).where(
+                        WBCabinet.id == self.adv.wb_cabinet_id
+                    )
+                )
+                row = result.one_or_none()
+                shop_id = row[0] if row else None
+        if shop_id is not None:
+            self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
+                shop_id
+            )
+        else:
+            self._shop_balance_snapshot = None
+        self._topup_failed = await self._topup_failed_manager.get(self.adv.id)
+        self._last_topup_success = await self._last_success_manager.get(self.adv.id)
 
         if getattr(self.adv, "auto_budget_watchdog_enabled", False):
             now_msk = datetime.now(MSK_TZ)
@@ -271,50 +345,59 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def text(self) -> str:
         # Determine predict CTR mode display text
-        predict_ctr_mode = self.adv.predict_ctr_mode or PredictCTRMode.V1
-        if predict_ctr_mode == PredictCTRMode.V1:
-            predict_ctr_mode_text = "v1 (по ID кампании)"
-        else:
-            # TODO: Добавить отображение фото в ключах
-            predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
+        if self._emergency_mode_active:
+            text += (
+                "🚨 АВ.РЕЖ\n"
+                "СТ > 6ч\n"
+                "РАСХ ОГРАН\n"
+            )
+            if self._emergency_mode_reason:
+                text += f"{self._emergency_mode_reason}\n"
+            text += "\n"
+        elif not self._stats_fresh:
+            text += "Ст не све, авт приост\n"
+            if self._stats_stale_reason:
+                text += f"{self._stats_stale_reason}\n"
+            text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
             text += "Авто-акт. РК: выкл\n"
+            text += "Автопоп бюд: не вкл\n"
         else:
-            text += "Авто-акт. РК: включено\n"
+            text += "Авто-акт. РК: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
             if use_common:
                 limit = self.adv.common_budget_daily_limit or 0
                 spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
                 if self._spend_auto_today is None or self._spend_search_today is None:
-                    text += "Общий бюджет: потрачено: нет данных\n"
+                    text += "Об бюд: потр: н/д\n"
                 else:
                     spend_rounded = int(round(spend))
                     remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Общий бюджет: потрачено {spend_rounded} р., "
-                        f"осталось {remaining} р. (лимит {limit} р./сут)\n"
+                        f"Об. бюд: потр {spend_rounded} р., "
+                        f"ост. {remaining} р. (лим {limit} р./с)\n"
                     )
             else:
                 auto_limit = self.adv.auto_budget_daily_limit or 0
                 spend_auto = self._spend_auto_today or 0
                 if self._spend_auto_today is None:
-                    text += "Авто: потр: нет данных\n"
+                    text += "Авто: потр: н/д\n"
                 else:
                     spend_auto_rounded = int(round(spend_auto))
                     remaining_auto = max(0, auto_limit - spend_auto_rounded)
                     text += (
-                        f"Авто: потрачено {spend_auto_rounded} р., "
+                        f"Авто: потр. {spend_auto_rounded} р., "
                         f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
                     )
                 if self.adv.search_adv_id:
                     search_limit = self.adv.search_auto_budget_daily_limit or 0
                     spend_search = self._spend_search_today or 0
                     if self._spend_search_today is None:
-                        text += "Аук: потр: нет данных\n"
+                        text += "Аук: потр: н/д\n"
                     else:
                         spend_search_rounded = int(round(spend_search))
                         remaining_search = max(0, search_limit - spend_search_rounded)
@@ -325,6 +408,55 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 else:
                     if self._spend_auto_today is not None:
                         text += "\n"
+
+        # Предупреждение о неудачном пополнении (из Redis) — показываем всегда при наличии записи
+        if self._topup_failed:
+            failed_at = self._topup_failed.get("failed_at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    failed_at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                failed_at_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                failed_at_str = failed_at or "—"
+            text += (
+                "⚠ Не удалось поп бюд: недост средств "
+                f"на балансе магазина ({failed_at_str})\n"
+            )
+
+        # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
+        if self._shop_balance_snapshot:
+            bal = self._shop_balance_snapshot.get("balance", 0)
+            net = self._shop_balance_snapshot.get("net", 0)
+            bonus = self._shop_balance_snapshot.get("bonus", 0)
+            updated_at = self._shop_balance_snapshot.get("updated_at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    updated_at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                updated_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                updated_str = updated_at or "—"
+            text += (
+                f"Бал маг: осн. {bal} р., нетто {net} р., "
+                f"бонус {bonus} р. (обн {updated_str})\n"
+            )
+        else:
+            text += "Бал маг: нет данных\n"
+
+        # Последнее успешное пополнение
+        if self._last_topup_success and self._last_topup_success.get("at"):
+            at = self._last_topup_success.get("at", "")
+            try:
+                dt = datetime.fromisoformat(
+                    at.replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                success_str = dt.strftime("%d.%m.%Y %H:%M")
+            except (ValueError, TypeError):
+                success_str = at or "—"
+            text += f"Посл усп поп: {success_str}\n"
+        else:
+            text += "Посл усп поп: н/д\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
@@ -342,13 +474,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"План. себес. заказа: {target_str} (факт. рек.сис.: {avg_str})\n"
+                text += f"План. себес. зак.: {target_str} (факт. рек.сис.: {avg_str})\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. системы (полки) не раскр. "
-                    f"Рек. макс.заказа >= {int(suggested)} р.\n"
+                    "⚠️ Рек. сис. не раскр. "
+                    f"Макс.зак. >= {int(suggested)} р.\n"
                 )
 
         management_enabled = bool(
@@ -358,10 +490,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         def _status_suffix(reason: CampaignActivityReason | None) -> str:
             if not management_enabled:
-                return " (управление отключено)"
+                return " (упр. отключено)"
             if reason is None:
-                return " (Нет данных)"
-            label = reason_code_to_display_text(reason.reason_code.value)
+                return " (н/д)"
+            label = reason_code_to_display_text(str(reason.reason_code.value))
             dt = reason.updated_at
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
@@ -371,43 +503,54 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         suffix_auto = _status_suffix(self._reason_auto)
         if not self.adv.search_adv_id:
-            suffix_auction = " (не подключен)"
+            suffix_auction = " (не подк)"
         else:
             suffix_auction = _status_suffix(self._reason_search)
 
+        id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подкл"
+        id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подк"
         text += (
             f"📢 Камп: {self.adv.name}\n"
-            f"🆔 ID камп: {self.adv.adv_id}\n"
+            f"🆔 ID Авто: {id_auto}\n"
+            f"🆔 ID Аук: {id_auction}\n"
             f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
+            f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
         )
-            # TODO: Попала ошибка в код, пытался сделать .2f строке
-        if self._min_rating_by_orders is not None:
-            text += f"🎯 Мин. Рейтинг по зак.: {round(self._min_rating_by_orders * 1000, 2)}\n"
-        elif self._hard_min_ctr is not None:
-            text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
-        else:
-            text += "Огран не заданы!\n"
+        mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "
+        mark_conv = "▶ " if self._strategy == Strategy.MAX_CONV else "  "
+        val_1000rub = (
+            round(self._min_orders_per_1000_rub, 2)
+            if self._min_orders_per_1000_rub is not None
+            else "—"
+        )
+        val_1000views = (
+            round(self._min_conv_views_to_orders * 1000, 2)
+            if self._min_conv_views_to_orders is not None
+            else "—"
+        )
+        text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
+        text += f"{mark_conv}Мин. зак. на 1000п: {val_1000views}\n"
 
-        text += f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
         text += "Посл.обнов:\n"
 
         text += (
-            f"воронки: {self.last_update_common_stat_str}\n"
+            f"ворон: {self.last_update_common_stat_str}\n"
             f"рек.стат.: {self.full_stat_update_time}\n"
+            f"класт: {self.last_update_cluster_stat_str}\n"
             f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
             f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"ставок в кластерах: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
+            f"став в класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
             f"общей ставки аук: {self.last_common_bid_update_str}\n"
             f"добав ключа в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
             f"удал. ключа из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"повыш. цел. позиции:"
+            f"повыш. цел. поз:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"пониж. целевой позиции:"
+            f"пониж. целевой поз:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"доб верхнего ключа в БС:"
+            f"доб верх кл в БС:"
             f" {self._update_informer.update_top_key_str}\n"
         )
 
@@ -418,7 +561,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 adv_stat.days, key=attrgetter("date")
             )
             stat_text = "Стат по дням:\n"
-            stat_text += "Дата | Зак | Себес заказа\n"
+            stat_text += "Дата | Зак | Себес зак\n"
             stat_text += "--------------------------------\n"
 
             def reverse_date(date_: date_type) -> str:
@@ -464,3 +607,55 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     async def _get_last_full_stat_update(adv_id: int) -> datetime | None:
         last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
         return last_full_stat_update
+
+    async def _resolve_emergency_mode_from_ch(
+        self,
+    ) -> tuple[bool, str | None, bool, str | None]:
+        """Детект аварии и свежести статы по данным ClickHouse (как StatsFreshnessGuard), не по Redis.
+        Returns: (emergency_active, emergency_reason, stats_fresh, stats_stale_reason)."""
+        search_adv: AdvSetting | None = None
+        if getattr(self.adv, "search_adv_id", None):
+            async with sm() as session:
+                result = await session.execute(
+                    select(AdvSetting).where(AdvSetting.adv_id == self.adv.search_adv_id)
+                )
+                search_adv = result.scalar_one_or_none()
+        complex_adv = ComplexAdv(self.adv, search_adv)
+        state = await StatsFreshnessManager().evaluate(complex_adv)
+        if state.is_stale_over_6h:
+            return True, self._guard_reason_to_display(state.reason), False, None
+        if not state.is_fresh and state.reason:
+            return False, None, False, self._stale_reason_to_display(state.reason)
+        return False, None, state.is_fresh, None
+
+    @staticmethod
+    def _stale_reason_to_display(reason: str) -> str:
+        """Маппинг reason от guard (не авария) в текст: какая стата не свежая."""
+        if "full_adv_stat_update" in reason:
+            name = "Рекламная стата"
+        elif "common_stat_update" in reason:
+            name = "Общая стата"
+        elif "cluster_stat_update" in reason:
+            name = "Кластерная стата"
+        else:
+            name = "Стата"
+        if "not yet collected" in reason:
+            return f"{name} ещё не собрана"
+        return f"{name} не свежая"
+
+    @staticmethod
+    def _guard_reason_to_display(reason: str | None) -> str:
+        """Маппинг reason от guard в текст для пользователя."""
+        if not reason:
+            return "ст нет обн > 6 часов"
+        if "full_adv_stat_update" in reason:
+            name = "рек ст"
+        elif "common_stat_update" in reason:
+            name = "общ ст"
+        elif "cluster_stat_update" in reason:
+            name = "клас ст"
+        else:
+            name = "стата"
+        # Call site only passes reason when is_stale_over_6h is True; guard sets that
+        # only for "stale over 6h", never for "not yet collected".
+        return f"{name}: нет обн>6ч"

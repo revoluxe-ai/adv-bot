@@ -7,13 +7,12 @@ from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
-    PredictCTRModeToggle,
     SalesPredictMethodToggle,
     AutoUpdaterVersionToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeCommonBidInSearchAdvStatus,
+    SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
-    TargetPositionModeToggle,
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -21,12 +20,10 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums import (
     OrdersSourceForAutoMode,
-    TargetPositionMode,
 )
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import (
     BidderCoroutineType,
-    PredictCTRMode,
 )
 
 from app.modules.white_list_mode_settings.telegram.main_callback import (
@@ -59,6 +56,7 @@ def get_adv_setting_keyboard(
     _ = builder.row(sales_plan_button.get(adv_setting))
 
 
+
     _ = builder.row(
         InlineKeyboardButton(
             text="➡ Контроль ключевых слов по кампании",
@@ -67,6 +65,15 @@ def get_adv_setting_keyboard(
             ).pack(),
         )
     )
+
+    button = InlineKeyboardButton(
+        text="Анализ Динамики Ранжирования",
+        callback_data=callbacks.RaiseCardAnalyze(
+            adv_setting_original_id=adv_setting.id,
+            action="menu",
+        ).pack(),
+    )
+    _ = builder.row(button)
 
     """Рекомендательные системы (настройка)"""
     from .buttoms import rec_system_button
@@ -87,27 +94,6 @@ def get_adv_setting_keyboard(
             callback_data=indiv_place_callback,
         )
     )
-
-    current_target_pos_mode = getattr(
-        adv_setting, "target_position_mode", None
-    ) or TargetPositionMode.MIN_CPA
-    if current_target_pos_mode == TargetPositionMode.MIN_CPA:
-        target_pos_text = "Перек. на Цель. Поз. По Макс. Конв"
-        new_target_pos_mode = TargetPositionMode.MAX_CART_TO_VIEWS_CONV.value
-    else:
-        target_pos_text = "Перек. на Цель. Поз. По Мин. CPA"
-        new_target_pos_mode = TargetPositionMode.MIN_CPA.value
-    target_pos_callback = TargetPositionModeToggle(
-        new_mode=new_target_pos_mode,
-        adv_setting_original_id=adv_setting.id,
-    ).pack()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text=target_pos_text,
-            callback_data=target_pos_callback,
-        )
-    )
-
     white_list_button = InlineKeyboardButton(
         text="Режимы Управления Белым Списком",
         callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
@@ -144,6 +130,8 @@ def get_adv_setting_keyboard(
         InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
     )
 
+
+
     activity_callback = callbacks.ManageCampaignActivity(
         action="menu", adv_setting_original_id=adv_setting.id
     ).pack()
@@ -159,6 +147,15 @@ def get_adv_setting_keyboard(
         InlineKeyboardButton(
             text="⏰ Ограничения показов по времени",
             callback_data=TS(a="open", adv=adv_setting.id).pack(),
+        )
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Стратегия РК",
+            callback_data=callbacks.StrategyMenu(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+            ).pack(),
         )
     )
 
@@ -311,20 +308,6 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    # Добавляем кнопку переключения режима прогноза CTR
-    if adv_setting.predict_ctr_mode == PredictCTRMode.V1:
-        text = "Переключить на режим прогноза CTR v2 (по артикулам)"
-        new_mode = PredictCTRMode.V2
-    else:
-        text = "Переключить на режим прогноза CTR v1 (по ID кампании)"
-        new_mode = PredictCTRMode.V1
-
-    callback = PredictCTRModeToggle(
-        new_mode=new_mode, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
-
     # Кнопка переключения версии АвтоАпдейтера
     if adv_setting.automatic_version == 1:
         text = "Переключить на АвтоАпдейтер V2"
@@ -338,7 +321,6 @@ def get_adv_setting_keyboard(
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
-
 
 
     button = InlineKeyboardButton(
@@ -393,23 +375,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-    button = InlineKeyboardButton(
-        text="Задать/Изменить максимальную стоимость клика",
-        callback_data=callbacks.ChangeMaxCPC(
-            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
-
-    button = InlineKeyboardButton(
-        text="Изменить мин. кол-во просмотров для ИИ-прогноза CTR",
-        callback_data=callbacks.ChangeMinViewsForPredictCTR(
-            adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
 
     if adv_setting.reset_place is not None and adv_setting.reset_place:
         button = InlineKeyboardButton(
@@ -428,21 +393,6 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(button)
 
-    if adv_setting.clusters_mode is not None and not adv_setting.clusters_mode:
-        button = InlineKeyboardButton(
-            text="Включить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="on", adv_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Отключить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="off", adv_original_id=adv_setting.id
-            ).pack(),
-        )
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
@@ -451,6 +401,28 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+
+    button = InlineKeyboardButton(
+        text="Изменить ставку в Авто",
+        callback_data=callbacks.ChangeAutoBid(
+            action="open", adv_original_id=adv_setting.id
+        ).pack(),
+    )
+    _ = builder.row(button)
+
+
+    if adv_setting.search_adv_id:
+        set_common_bid_callback = SetCommonBidManual(
+            adv_setting_original_id=adv_setting.id,
+            wb_user_cabinet_original_id=wb_user_cabinet.id,
+        ).pack()
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Установить общую ставку (аукцион)",
+                callback_data=set_common_bid_callback,
+            )
+        )
+
 
     button = InlineKeyboardButton(
         text="Обновить минус-слова",
@@ -467,6 +439,15 @@ def get_adv_setting_keyboard(
             adv_setting_original_id=adv_setting.id
         ).pack(),
     )
+    _ = builder.row(button)
+
+    button = InlineKeyboardButton(
+        text="Задать/Изменить максимальную стоимость клика",
+        callback_data=callbacks.ChangeMaxCPC(
+            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
+        ).pack(),
+    )
+
     _ = builder.row(button)
 
     if not in_favorites:

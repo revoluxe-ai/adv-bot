@@ -1,8 +1,11 @@
 import datetime
+import logging
 from http import HTTPStatus
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
@@ -53,6 +56,12 @@ def _parse_response(
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.json()
+        if _response_200 is None or not isinstance(_response_200, list):
+            logger.warning(
+                "adv/v3/fullstats returned 200 with non-array body (None or %s), treating as empty list",
+                type(_response_200).__name__,
+            )
+            _response_200 = []
         for componentsschemas_response_full_stats_item_data in _response_200:
             componentsschemas_response_full_stats_item = FullStatsItem.from_dict(
                 componentsschemas_response_full_stats_item_data

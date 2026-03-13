@@ -46,7 +46,10 @@ async def test_start_registration_new_user_creates_user_and_shows_gate() -> None
         return_value=mock_user,
     ) as mock_create_user, patch(
         "app.client_bot.user_interface.handlers.start_registration_func.MainMenu"
-    ) as mock_main_menu:
+    ) as mock_main_menu, patch(
+        "app.client_bot.user_interface.handlers.start_registration_func.settings"
+    ) as mock_settings:
+        mock_settings.invite_gate = True
         mock_sm.return_value = session_cm
 
         await start_registration(message, bot, state)

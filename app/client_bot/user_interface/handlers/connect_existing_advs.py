@@ -1,4 +1,8 @@
-"""Подключение существующих рекламных кампаний WB к артикулу (NM-id)."""
+"""Подключение существующих рекламных кампаний WB к артикулу (NM-id).
+
+Описание функционала и направление миграции -> app/client_bot/user_interface/handlers/CONNECT_EXISTING_SPEC.md
+
+"""
 
 import logging
 
@@ -65,12 +69,25 @@ async def _get_existing_adv_pair_not_done(
 router = Router()
 
 
+def _wb_status_code_to_text(status_code: int) -> str:
+    """Код статуса WB (4, 9, 11, 7, 8) → текст для active_status."""
+    return {4: "ready_for_start", 9: "started", 11: "pause", 7: "done", 8: "refused"}.get(
+        status_code, "unknown"
+    )
+
+
 def _serialize_candidates(
     result: ConnectExistingCandidatesResult,
 ) -> tuple[list[dict], list[dict]]:
-    """Serialize candidates for FSM state (id, name)."""
-    auction = [{"id": c.id, "name": c.settings.name} for c in result.auction_candidates]
-    auto = [{"id": c.id, "name": c.settings.name} for c in result.auto_candidates]
+    """Serialize candidates for FSM state (id, name, status)."""
+    auction = [
+        {"id": c.id, "name": c.settings.name, "status": c.status.value}
+        for c in result.auction_candidates
+    ]
+    auto = [
+        {"id": c.id, "name": c.settings.name, "status": c.status.value}
+        for c in result.auto_candidates
+    ]
     return auction, auto
 
 
@@ -630,6 +647,11 @@ async def connect_existing_confirm_type2(
         if wb_cabinet is None:
             await bot.send_message(callback.message.chat.id, "Кабинет не найден.")
             return
+        auto_status_text = "started"
+        for c in auto_candidates:
+            if c.get("id") == chosen_auto and "status" in c:
+                auto_status_text = _wb_status_code_to_text(int(c["status"]))
+                break
         adv_data = {
             "adv_id": chosen_auto,
             "_search_adv_id": chosen_auction,
@@ -644,7 +666,7 @@ async def connect_existing_confirm_type2(
             "auto_adv_target_status": False,
             "auto_update_white_list": False,
             "auto_update_target_place": False,
-            "active_status": "9",
+            "active_status": auto_status_text,  # из кандидата; при синке wb_db_manager перезапишет из API
             "type": 8,
             "nmids": [nmid],
             "hard_min_ctr": 0.1,

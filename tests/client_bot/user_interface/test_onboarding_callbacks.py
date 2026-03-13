@@ -5,6 +5,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingAdvsBackToShop,
     ConnectExistingConfirmType1,
     ConnectExistingConfirmType2,
+    ConnectExistingContinueDespiteInvalid,
     ConnectExistingCreateBoth,
     ShowShopsList,
     ShopsListPaginator,
@@ -89,6 +90,19 @@ def test_connect_existing_create_both_pack_unpack() -> None:
 
     packed_cancel = ConnectExistingCreateBoth(action="cancel").pack()
     unpacked_cancel = ConnectExistingCreateBoth.unpack(packed_cancel)
+    assert unpacked_cancel is not None
+    assert unpacked_cancel.action == "cancel"
+
+
+def test_connect_existing_continue_despite_invalid_pack_unpack() -> None:
+    """ConnectExistingContinueDespiteInvalid pack/unpack with action confirm/cancel."""
+    packed_confirm = ConnectExistingContinueDespiteInvalid(action="confirm").pack()
+    unpacked_confirm = ConnectExistingContinueDespiteInvalid.unpack(packed_confirm)
+    assert unpacked_confirm is not None
+    assert unpacked_confirm.action == "confirm"
+
+    packed_cancel = ConnectExistingContinueDespiteInvalid(action="cancel").pack()
+    unpacked_cancel = ConnectExistingContinueDespiteInvalid.unpack(packed_cancel)
     assert unpacked_cancel is not None
     assert unpacked_cancel.action == "cancel"
 

@@ -119,7 +119,8 @@ async def test_gate_middleware_not_passed_sends_gate_screen() -> None:
     with patch(
         "app.client_bot.middlewars.gate._sm",
         session_cm,
-    ):
+    ), patch("app.client_bot.middlewars.gate.settings") as mock_settings:
+        mock_settings.invite_gate = True
         mw = GateMiddleware()
         await mw(handler, event, data)
 
@@ -195,14 +196,14 @@ async def test_gate_middleware_new_user_creation_and_gate_screen() -> None:
     telegram_id = 1011
     username = "new_test_user"
     chat_id = 1011
-    
+
     event = MagicMock(spec=Message)
     event.from_user = MagicMock(id=telegram_id, is_bot=False, username=username)
     event.chat = MagicMock(spec=Chat, id=chat_id)
     event.successful_payment = None
-    
+
     bot_mock = AsyncMock()
-    
+
     session_mock, session_cm = make_session_context(user=None)
 
     data = {"bot": bot_mock}
@@ -210,7 +211,8 @@ async def test_gate_middleware_new_user_creation_and_gate_screen() -> None:
     with patch(
         "app.client_bot.middlewars.gate._sm",
         session_cm,
-    ):
+    ), patch("app.client_bot.middlewars.gate.settings") as mock_settings:
+        mock_settings.invite_gate = True
         result = await middleware(handler, event, data)
         assert result is None
         

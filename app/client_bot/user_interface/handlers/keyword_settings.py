@@ -253,7 +253,7 @@ async def setting_keywords_white_list(
         and keyword.status == KeywordStatus.BAD
         and keyword.reason != "max_position"
     ]
-    keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
+    keywords.sort(key=lambda x: x.rating or 0, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
@@ -314,7 +314,7 @@ async def setting_keywords_white_list(
         adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
-    keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
+    keywords.sort(key=lambda x: x.rating or 0, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
@@ -421,7 +421,10 @@ async def setting_keywords_by_adv(
     chat_id = message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug("Обработка собщения")
-    await state.set_state()
+    # Не сбрасываем FSM state намеренно: пользователь остаётся в waiting_for_filter_keywords
+    # и может сразу ввести новый набор ключевых слов для фильтрации без повторного входа в сценарий.
+    # Сброс state (как в setting_keywords_filter_by_query, ~стр. 783) здесь не нужен — там
+    # одноразовый ввод числа, здесь — многократное уточнение фильтра по ключевым словам.
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,

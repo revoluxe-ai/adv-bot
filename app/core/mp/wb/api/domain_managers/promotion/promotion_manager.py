@@ -20,16 +20,21 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
+from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
+    filter_full_adv_stat_to_dates,
+    requested_dates_are_contiguous,
+)
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
 )
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     GetAdvV1BalanceResponse200,
-    PatchAdvV0BidsBody,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     GetAdvV1SupplierSubjectsResponse200Type0Item,
+    PatchApiAdvertV1BidsBody,
     PostAdvV2SupplierNmsResponse200Item,
 )
 
@@ -99,6 +104,23 @@ class PromotionManager:
             complex_advs,
         )
 
+    async def get_full_adv_stat(
+        self,
+        adv_ids: list[int],
+        dates: list[datetime.date],
+    ) -> list[FullAdvStat]:
+        """Полная статистика кампаний за указанные даты (GET /adv/v3/fullstats)."""
+        if not dates:
+            return []
+        begin_date = min(dates)
+        end_date = max(dates)
+        stats = await self._client.fullstats_adapter.get_full_adv_stat(
+            adv_ids, begin_date, end_date
+        )
+        if not requested_dates_are_contiguous(dates):
+            stats = filter_full_adv_stat_to_dates(stats, dates)
+        return stats
+
     async def get_min_bids_for_complex_adv(
         self,
         complex_advs: list[ComplexAdv],
@@ -130,8 +152,8 @@ class PromotionManager:
 
         await method(self._client.normquery_bids_adapter, bids)
 
-    async def patch_adv_bids(self, body: PatchAdvV0BidsBody) -> None:
-        await self._client.campaigns_management_adapter.patch_adv_bids(body)
+    async def patch_adv_v1_bids(self, body: PatchApiAdvertV1BidsBody) -> None:
+        await self._client.campaigns_management_adapter.patch_adv_v1_bids(body)
 
     async def set_common_bids(self, command: SetCommonBidsCommand) -> None:
         await self._client.common_bids_adapter.patch_common_bids(command)

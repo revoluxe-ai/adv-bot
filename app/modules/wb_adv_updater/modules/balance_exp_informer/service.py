@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
 from typing import Any, AsyncIterator, Iterable
 
-from sqlalchemy import or_, select, update, Result
+from sqlalchemy import exists, or_, select, update, Result
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,7 @@ from app.modules.wb_adv_updater.modules.balance_exp_informer.levels import (
 )
 from app.modules.wb_adv_updater.modules.balance_exp_informer.message_builder import (
     build_message,
+    build_negative_balance_reminder_message,
     chunk,
     sort_items,
 )
@@ -408,3 +409,128 @@ class BalanceReminderService:
             )
         )
         _ = await session.execute(stmt)
+
+    async def send_negative_balance_reminders(self) -> None:
+        """Отправить ежедневные напоминания о минусовом балансе (7-дневная грация)."""
+        today = billing_today()
+        async with self._session_factory() as session:
+            stmt = (
+                select(
+                    User.id.label("user_id"),
+                    User.user_telegram_id.label("chat_id"),
+                    WBCabinet.id.label("wb_cabinet_id"),
+                    WBCabinet.shop_id.label("shop_id"),
+                    WBUserCabinet.name.label("shop_name"),
+                    WBCabinet.balance_went_negative_at,
+                )
+                .select_from(WBUserCabinet)
+                .join(User, User.id == WBUserCabinet.user_id)
+                .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
+                .where(
+                    WBCabinet.balance_went_negative_at.isnot(None),
+                    User.user_telegram_id.is_not(None),
+                    exists(
+                        select(1).where(
+                            AdvSetting.wb_cabinet_id == WBCabinet.id,
+                            AdvSetting.bot_active.is_(True),
+                        )
+                    ),
+                )
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+            if not rows:
+                return
+            by_cabinet: dict[int, list[Any]] = defaultdict(list)
+            for row in rows:
+                by_cabinet[int(row.wb_cabinet_id)].append(row)
+            user_bundles: dict[int, list[tuple[str, int, int]]] = defaultdict(list)
+            for wb_cabinet_id, cab_rows in by_cabinet.items():
+                try:
+                    balance, bonus = await get_cabinet_balance(wb_cabinet_id)
+                except Exception as exc:
+                    self._logger.warning(
+                        "Negative reminder: get_cabinet_balance(%s) failed: %s",
+                        wb_cabinet_id,
+                        exc,
+                    )
+                    continue
+                if balance + bonus >= 0:
+                    continue
+                sample = cab_rows[0]
+                neg_at = sample.balance_went_negative_at
+                neg_date = neg_at.date() if neg_at else today
+                days_left = max(0, 7 - (today - neg_date).days)
+                shop_name = (sample.shop_name or "").strip() or f"Кабинет {wb_cabinet_id}"
+                for row in cab_rows:
+                    if row.chat_id is None:
+                        continue
+                    user_bundles[int(row.user_id)].append(
+                        (shop_name, wb_cabinet_id, days_left)
+                    )
+            for user_id, raw_items in user_bundles.items():
+                seen_cabs: set[int] = set()
+                items: list[tuple[str, int, int]] = []
+                for sn, cid, dl in raw_items:
+                    if cid in seen_cabs:
+                        continue
+                    seen_cabs.add(cid)
+                    items.append((sn, cid, dl))
+                if not items:
+                    continue
+                chat_id = next(
+                    (r.chat_id for r in rows if r.user_id == user_id),
+                    None,
+                )
+                if chat_id is None:
+                    continue
+                text, keyboard = build_negative_balance_reminder_message(items)
+                try:
+                    success = await self._notification_sender.send_message(
+                        int(chat_id),
+                        text,
+                        reply_markup=keyboard,
+                        disable_web_page_preview=True,
+                    )
+                    if not success:
+                        raise RuntimeError("Notification sender could not deliver")
+                except Exception as e:
+                    self._logger.error(
+                        "Negative balance reminder send failed for user %s: %s",
+                        user_id,
+                        e,
+                        exc_info=True,
+                    )
+                    try:
+                        await self._event_manager.emit_negative_balance_reminder_failed(
+                            user_id=user_id,
+                            user_telegram_id=int(chat_id),
+                            shop_id=None,
+                            error=str(e),
+                            session=session,
+                        )
+                    except Exception as exc:
+                        self._logger.exception(
+                            "Failed to emit negative_balance_reminder_failed", exc_info=exc
+                        )
+                    continue
+                for shop_name, wb_cabinet_id, days_left in items:
+                    shop_id = next(
+                        (r.shop_id for r in rows if r.wb_cabinet_id == wb_cabinet_id),
+                        "",
+                    )
+                    try:
+                        await self._event_manager.emit_negative_balance_reminder_sent(
+                            user_id=user_id,
+                            user_telegram_id=int(chat_id),
+                            wb_cabinet_id=wb_cabinet_id,
+                            shop_id=str(shop_id) if shop_id else "",
+                            days_left=days_left,
+                            shop_name=shop_name,
+                            session=session,
+                        )
+                    except Exception as exc:
+                        self._logger.exception(
+                            "Failed to emit negative_balance_reminder_sent", exc_info=exc
+                        )
+            await session.commit()

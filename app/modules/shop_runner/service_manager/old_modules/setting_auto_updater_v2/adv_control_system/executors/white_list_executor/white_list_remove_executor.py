@@ -49,7 +49,9 @@ class WhiteListRemoveExecutor(BaseExecutor):
         # Получение keywords и фильтрация white_keywords
         keywords: list[CalculatedKeyword] = await ctx.complex_adv.get_keywords()
         white_keywords: list[CalculatedKeyword] = [
-            kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
+            kw for kw in keywords if kw.hard_status == 2
+                                     and not kw.best_keyword_status
+                                     and kw.views > 0
         ]
 
         if not white_keywords:
@@ -74,11 +76,11 @@ class WhiteListRemoveExecutor(BaseExecutor):
                         "(conversion=%.6f < rec_conversion, above_rec_conversion=False)",
                         adv_id,
                         kw.text,
-                        kw.conversion_without_cpm,
+                        kw.conv_views_to_orders,
                     )
 
                 # Массовое удаление из белого списка
-                keyword_ids = [kw.keyword_setting_original_id for kw in keywords_below_rec]
+                keyword_ids = [kw.keyword_setting_original_id  for kw in keywords_below_rec]
                 stmt = (
                     update(KeywordSetting)
                     .where(KeywordSetting.id.in_(keyword_ids))
@@ -116,9 +118,9 @@ class WhiteListRemoveExecutor(BaseExecutor):
 
             # Логирование для каждого удаляемого ключа
             for kw in keywords_to_remove:
-                if kw.rating_by_orders <= 0:
+                if kw.orders_per_1000_rub <= 0:
                     logger.info(
-                        "[adv_id=%s] WhiteListRemove: удаляем '%s' (rating_by_orders=0, нет заказов)",
+                        "[adv_id=%s] WhiteListRemove: удаляем '%s' (orders_per_1000_rub=0, нет заказов)",
                         adv_id,
                         kw.text,
                     )
@@ -127,7 +129,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
                         "[adv_id=%s] WhiteListRemove: удаляем '%s' (pay_for_order=%.2f > target=%.2f)",
                         adv_id,
                         kw.text,
-                        kw.pay_for_order_by_current_cpm,
+                        kw.pay_for_order,
                         target_pay_for_order,
                     )
         else:
@@ -188,15 +190,15 @@ class WhiteListRemoveExecutor(BaseExecutor):
         keywords_to_remove: list[CalculatedKeyword] = []
 
         for kw in white_keywords:
-            # Ключи без заказов (rating_by_orders <= 0) удаляем в первую очередь
-            if kw.rating_by_orders <= 0:
+            # Ключи без заказов (orders_per_1000_rub <= 0) удаляем в первую очередь
+            if kw.orders_per_1000_rub <= 0:
                 keywords_to_remove.append(kw)
                 continue
 
             # Для ключей с заказами проверяем pay_for_order
 
-            pay_for_order = kw.pay_for_order_by_current_cpm
-            if pay_for_order > target_pay_for_order:
+            pay_for_order = kw.pay_for_order
+            if pay_for_order is None or pay_for_order > target_pay_for_order:
                 keywords_to_remove.append(kw)
 
 
@@ -234,8 +236,8 @@ class WhiteListRemoveExecutor(BaseExecutor):
         if not white_keywords:
             return []
 
-        # Находим лучший ключ по rating_by_orders
-        best_keyword = max(white_keywords, key=lambda kw: kw.rating_by_orders or 0)
+        # Находим лучший ключ по рейтингу (стратегия: конверсия или заказы на 1000₽)
+        best_keyword = max(white_keywords, key=lambda kw: kw.rating or 0)
 
         # Удаляем все кроме лучшего
         keywords_to_remove = [kw for kw in white_keywords if kw != best_keyword]

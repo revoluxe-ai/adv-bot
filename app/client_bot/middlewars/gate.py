@@ -10,6 +10,7 @@ from sqlalchemy.orm import load_only
 from app.client_bot.const import ADMINS
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
+from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -55,6 +56,8 @@ class GateMiddleware(BaseMiddleware):
                 )
 
         passed_gate = user.passed_gate
+        if not settings.invite_gate:
+            passed_gate = True
         if passed_gate:
             return await handler(event, data)
 

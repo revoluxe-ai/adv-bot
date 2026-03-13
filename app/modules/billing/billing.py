@@ -2,21 +2,26 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.client_bot.notification_sender import get_notification_sender
+from app.modules.billing.event_manager.event_manager import BillingEventManager
+
 from app.modules.billing.di import BillingContainer
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    WBUserCabinet,
     WBBalancePayment,
     WBBonusPayment,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.utils.db.models import User
 from .models import AdvPayment
 from .redis_lock import RedisLock
 from .redis_manager import RedisManager
@@ -55,6 +60,118 @@ async def _load_cabinet_with_relations(
     )
     result = await session.execute(stmt)
     return result.unique().scalar_one_or_none()
+
+
+GRACE_MAX_NEGATIVE_DAYS = 7  # множитель к дневному расходу: в минус можно не более 7× price_for_day
+
+GRACE_EXCEEDED_MESSAGE = (
+    "Кампании отключены: превышен допустимый минус по балансу (лимит 7 дней расхода). "
+    "Пополните баланс, чтобы снова включить управление рекламой."
+)
+
+
+def _days_until_block_message(days_left: int) -> str:
+    """Склонение: 1 день / 2-4 дня / 5-20 дней / 21 день / ..."""
+    if days_left % 10 == 1 and days_left % 100 != 11:
+        return "день"
+    if days_left % 10 in (2, 3, 4) and days_left % 100 not in (12, 13, 14):
+        return "дня"
+    return "дней"
+
+
+async def _notify_days_until_block(cabinet_id: int, days_left: int) -> None:
+    """Отправить пользователям кабинета: ежедневное списание выполнено, осталось N дней до полной блокировки."""
+    word = _days_until_block_message(days_left)
+    text = (
+        f"Ежедневное списание выполнено. До полной блокировки осталось {days_left} {word}."
+    )
+    sender = get_notification_sender()
+    async with sm() as session:
+        stmt = (
+            select(User.id, User.user_telegram_id)
+            .select_from(WBUserCabinet)
+            .join(User, User.id == WBUserCabinet.user_id)
+            .where(
+                WBUserCabinet.wb_cabinet_id == cabinet_id,
+                User.user_telegram_id.is_not(None),
+            )
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+    for _user_id, chat_id in rows:
+        if chat_id is None:
+            continue
+        try:
+            await sender.send_message(int(chat_id), text)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Days until block notification failed for cabinet %s chat %s: %s",
+                cabinet_id,
+                chat_id,
+                exc,
+            )
+
+
+async def _notify_grace_exceeded(cabinet_id: int) -> None:
+    """Отправить уведомление пользователям кабинета об отключении из-за превышения лимита минуса."""
+    event_manager = BillingEventManager()
+    sender = get_notification_sender()
+    async with sm() as session:
+        stmt = (
+            select(User.id, User.user_telegram_id)
+            .select_from(WBUserCabinet)
+            .join(User, User.id == WBUserCabinet.user_id)
+            .where(
+                WBUserCabinet.wb_cabinet_id == cabinet_id,
+                User.user_telegram_id.is_not(None),
+            )
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+    for user_id, chat_id in rows:
+        if chat_id is None:
+            continue
+        try:
+            success = await sender.send_message(int(chat_id), GRACE_EXCEEDED_MESSAGE)
+            if success:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_sent(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id),
+                        wb_cabinet_id=cabinet_id,
+                        session=session,
+                    )
+                    await session.commit()
+            else:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_failed(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id),
+                        wb_cabinet_id=cabinet_id,
+                        error="send_message returned False",
+                        session=session,
+                    )
+                    await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "Grace exceeded notification failed for cabinet %s user %s: %s",
+                cabinet_id,
+                user_id,
+                exc,
+                exc_info=True,
+            )
+            try:
+                async with sm() as session:
+                    await event_manager.emit_balance_grace_exceeded_failed(
+                        user_id=user_id,
+                        user_telegram_id=int(chat_id) if chat_id else None,
+                        wb_cabinet_id=cabinet_id,
+                        error=str(exc),
+                        session=session,
+                    )
+                    await session.commit()
+            except Exception as emit_exc:
+                logger.warning("Emit grace_exceeded_failed failed: %s", emit_exc)
 
 
 async def _safe_commit(
@@ -127,10 +244,13 @@ async def __process_single_cabinet(
 
     # # Быстрая проверка идемпотентности по Redis
     if skip_by_redis:
-        if await redis_manager.get_billing_process_for_day(cabinet_id, current_dt):
+        redis_flagged = await redis_manager.get_billing_process_for_day(cabinet_id, current_dt)
+        if redis_flagged:
             result["reason"] = "redis_flag_skip"
             return result
 
+    grace_exceeded_cabinet_id: int | None = None
+    days_until_block_notify: tuple[int, int] | None = None  # (cabinet_id, days_left)
     try:
         wb_cabinet = await _load_cabinet_with_relations(session, cabinet_id)
         if wb_cabinet is None:
@@ -221,6 +341,8 @@ async def __process_single_cabinet(
         calculated_bonus = float(wb_cabinet.calculated_bonus or 0)  # type: ignore[truthy-function]
         calculated_balance = float(wb_cabinet.calculated_balance or 0)  # type: ignore[truthy-function]
         payment_successful = False
+        # Не сбрасываем balance_went_negative_at до оплаты: иначе минимальное
+        # пополнение (total >= 0, но < price) обнулит счётчик грации.
 
         def add_bonus(amt: float) -> None:
             session.add(
@@ -261,14 +383,44 @@ async def __process_single_cabinet(
                 add_balance(remaining)
             payment_successful = True
         else:
-            # Недостаточно средств — деактивируем кампании
-            for campaign in wb_cabinet.adv_settings:
-                if campaign.bot_active:
-                    campaign.bot_active = False
-                    campaign.auto_update_white_list = False
-                    campaign.auto_update_target_place = False
+            # Недостаточно средств: лимит минуса = 7× дневной расход; при превышении — деактивация
+            max_allowed_negative = price_for_shop_for_day * GRACE_MAX_NEGATIVE_DAYS
+            balance_after_charge = (
+                calculated_bonus + calculated_balance - price_for_shop_for_day
+            )
+            now_utc = current_dt if current_dt.tzinfo else current_dt.replace(tzinfo=timezone.utc)
+
+            if balance_after_charge < -max_allowed_negative:
+                # Превышен лимит минуса — деактивируем кампании, не списываем, не сбрасываем neg_at
+                grace_exceeded_cabinet_id = cabinet_id
+                for campaign in wb_cabinet.adv_settings:
+                    if campaign.bot_active:
+                        campaign.bot_active = False
+                        campaign.auto_update_white_list = False
+                        campaign.auto_update_target_place = False
+            else:
+                # В пределах лимита: списание в минус
+                if getattr(wb_cabinet, "balance_went_negative_at", None) is None:
+                    wb_cabinet.balance_went_negative_at = now_utc  # type: ignore[attr-defined]
+                use_b = min(calculated_bonus, price_for_shop_for_day)
+                use_bal = min(max(0, calculated_balance), price_for_shop_for_day - use_b)
+                shortfall = price_for_shop_for_day - use_b - use_bal
+                if use_b > 0:
+                    add_bonus(use_b)
+                total_balance_debit = use_bal + shortfall
+                if total_balance_debit > 0:
+                    add_balance(total_balance_debit)
+                payment_successful = True
+                # Уведомление «осталось N дней до полной блокировки»
+                room = balance_after_charge + max_allowed_negative
+                days_left = max(0, int(room // price_for_shop_for_day))
+                days_until_block_notify = (cabinet_id, days_left)
 
         if payment_successful:
+            # После успешного списания баланс >= 0 — сбрасываем грацию минуса
+            total_after = calculated_bonus + calculated_balance - price_for_shop_for_day
+            if total_after >= 0:
+                wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
             price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns)
             for campaign in cabinet_campaigns:
                 exists_payment = await session.scalar(
@@ -291,6 +443,28 @@ async def __process_single_cabinet(
         # Фиксация БД (укороченный helper)
         if not await _safe_commit(session, result, cabinet_id):
             return result
+
+        if grace_exceeded_cabinet_id is not None:
+            try:
+                await _notify_grace_exceeded(grace_exceeded_cabinet_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Cabinet %s: notify_grace_exceeded failed: %s",
+                    grace_exceeded_cabinet_id,
+                    exc,
+                )
+
+        if days_until_block_notify is not None:
+            try:
+                await _notify_days_until_block(
+                    days_until_block_notify[0], days_until_block_notify[1]
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Cabinet %s: notify_days_until_block failed: %s",
+                    days_until_block_notify[0],
+                    exc,
+                )
 
         # Отметка времени последнего успешного списания (best-effort, по shop_id)
         if payment_successful:

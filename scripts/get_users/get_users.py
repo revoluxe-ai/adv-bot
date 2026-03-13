@@ -50,6 +50,7 @@ async def _fetch_user_batch(
     last_id: int | None,
     telegram_ids_filter: list[int] | None,
     only_with_auto_campaign: bool = False,
+balance_more_than_0: bool = None,
 ) -> list[User]:
     stmt = (
         select(User)
@@ -72,10 +73,10 @@ async def _fetch_user_batch(
             .where(
                 WBUserCabinet.user_id == User.id,
                 AdvSetting.bot_active.is_(True),
-                AdvSetting.automatic_version.in_([1, 2]),
                 or_(
                     AdvSetting.auto_update_white_list.is_(True),
                     AdvSetting.auto_update_target_place.is_(True),
+                    AdvSetting.individual_keywords_target_place_mode.is_(True)
                 ),
             )
         )
@@ -99,6 +100,7 @@ async def get_users(
     batch_size: int,
     telegram_ids_filter: list[int] | None = None,
     only_with_auto_campaign: bool = False,
+balance_more_than_0: bool = None
 ) -> AsyncGenerator[UserDTO, None]:
     """
     Pull users in batches via short-lived sessions so no cursor stays open too long.
@@ -109,7 +111,7 @@ async def get_users(
 
     while True:
         batch = await _fetch_user_batch(
-            batch_size, last_id, telegram_ids_filter, only_with_auto_campaign
+            batch_size, last_id, telegram_ids_filter, only_with_auto_campaign, balance_more_than_0
         )
         if not batch:
             break
@@ -122,7 +124,13 @@ async def get_users(
             print(
                 f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [{user_count}] Cursor row: user id={user.id}, username={user.username}"
             )
-            yield user_dto
+            if balance_more_than_0:
+                for cab  in user_dto.cabinets:
+                    if cab.balance_plus_bonus > 0:
+                        yield user_dto
+                        break
+            else:
+                yield user_dto
 
 
 

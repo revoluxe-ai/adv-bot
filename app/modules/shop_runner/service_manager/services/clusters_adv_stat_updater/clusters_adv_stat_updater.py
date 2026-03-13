@@ -26,21 +26,34 @@ class ClustersAdvStatUpdater:
     def __init__(self, wb_manager_hub: "WBManagerHub"):
         self._wb_manager_hub = wb_manager_hub
 
-    async def update_today_stats(self, complex_advs: list[ComplexAdv]) -> None:
+    async def update_today_stats(self, complex_advs: list[ComplexAdv]) -> set[int]:
         """
         Обновляет статистику кластеров за сегодня (без проверки наличия данных).
-        
+
         Предназначен для частого вызова в отдельной корутине.
         """
         if not complex_advs:
-            return
-        
+            return set()
+
         today = date.today()
         stats = await self._get_stats_for_day(complex_advs, today)
+        adv_ids_to_ids: dict[int, int] = {}
+        for adv in complex_advs:
+            if adv_id := adv.adv_id:
+                adv_ids_to_ids[adv_id] = adv.original_adv_setting_id
+            if adv_id := adv.search_adv_id:
+                adv_ids_to_ids[adv_id] = adv.original_adv_setting_id
+
         if stats:
             await ch.update_clusters_adv_stats(stats)
             logger.info("Обновлена статистика за сегодня: %d записей", len(stats))
             await self._create_keyword_setting(complex_advs, stats)
+            success_adv_original_ids: set[int] = set()
+            for stat in stats:
+                original_adv_id: int = adv_ids_to_ids[stat.adv_id]
+                success_adv_original_ids.add(original_adv_id)
+            return success_adv_original_ids
+        return set()
 
 
     async def update_past_days_stats(
@@ -48,16 +61,16 @@ class ClustersAdvStatUpdater:
     ) -> None:
         """
         Обновляет статистику кластеров за прошлые дни.
-        
+
         Проверяет наличие данных в ClickHouse и загружает только недостающие.
         Предназначен для редкого вызова в отдельной корутине.
         """
         if not complex_advs:
             return
-        
+
         # Получить словарь недостающих дат для прошлых дней
         missing_dates_map = await self._get_missing_dates_map(complex_advs, for_last_days)
-        
+
         if not missing_dates_map:
             logger.info("Все данные за прошлые дни уже есть в ClickHouse")
             return
@@ -80,34 +93,34 @@ class ClustersAdvStatUpdater:
     ) -> dict[date, list[ComplexAdv]]:
         """
         Возвращает словарь {дата: список ComplexAdv без статистики за эту дату}.
-        
+
         Проверяет наличие данных в ClickHouse по комбинации (adv_id, nmid, date).
         """
         if not complex_advs:
             return {}
-        
+
         today = date.today()
         yesterday = today - timedelta(days=1)
         start_date = today - timedelta(days=for_last_days)
-        
+
         # Собираем пары (adv_id, nmid) из complex_advs
         adv_nmid_pairs: list[tuple[int, int]] = [
             (adv.adv_id, adv.main_nmid) for adv in complex_advs
         ]
-        
+
         # Создаем маппинг (adv_id, nmid) -> ComplexAdv для быстрого поиска
         adv_by_pair: dict[tuple[int, int], ComplexAdv] = {
             (adv.adv_id, adv.main_nmid): adv for adv in complex_advs
         }
-        
+
         # Получаем существующие комбинации из ClickHouse
         existing = await ch.get_existing_adv_nmid_dates(
             adv_nmid_pairs, start_date, yesterday
         )
-        
+
         # Формируем словарь недостающих дат
         missing_map: dict[date, list[ComplexAdv]] = defaultdict(list)
-        
+
         # Для каждой даты в диапазоне проверяем какие adv отсутствуют
         current_date = yesterday
         while current_date >= start_date:
@@ -116,7 +129,7 @@ class ClustersAdvStatUpdater:
                 if (adv_id, nmid, current_date) not in existing:
                     missing_map[current_date].append(adv)
             current_date -= timedelta(days=1)
-        
+
         # Преобразуем defaultdict в обычный dict
         return dict(missing_map)
 

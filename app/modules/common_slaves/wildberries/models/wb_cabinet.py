@@ -46,7 +46,7 @@ class WBCabinet(BaseTable):
         Float, default=0, server_default=text("0"), nullable=False
     )
     bonus: Mapped[float] = mapped_column(
-        Float, default=0, server_default=text("0"), nullable=False
+        Float, default=1000, server_default=text("1000"), nullable=False
     )
     white_list_update_active: Mapped[bool | None] = mapped_column(
         Boolean, default=False, nullable=True
@@ -61,6 +61,9 @@ class WBCabinet(BaseTable):
                                                  nullable=False,
                                                  default=settings.DEFAULT_MAX_CPM,
                                                  server_default=text(str(settings.DEFAULT_MAX_CPM)))
+    balance_went_negative_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),

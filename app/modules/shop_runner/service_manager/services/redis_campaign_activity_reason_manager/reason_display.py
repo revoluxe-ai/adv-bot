@@ -9,23 +9,24 @@ from app.modules.shop_runner.service_manager.services.redis_campaign_activity_re
 
 REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     # Common
-    AutoReasonCode.COMMON_LIMIT_0.value: "Общий лимит не задан",
-    AutoReasonCode.COMMON_SPEND_EXCEEDED.value: "Общий лимит исчерпан",
-    AuctionReasonCode.COMMON_LIMIT_0.value: "Общий лимит не задан",
-    AuctionReasonCode.COMMON_SPEND_EXCEEDED.value: "Общий лимит исчерпан",
+    AutoReasonCode.COMMON_LIMIT_0.value: "Об лим не задан",
+    AutoReasonCode.COMMON_SPEND_EXCEEDED.value: "Об лим исч",
+    AuctionReasonCode.COMMON_LIMIT_0.value: "Об лим не зад",
+    AuctionReasonCode.COMMON_SPEND_EXCEEDED.value: "Об лим исч",
     # Auto
-    AutoReasonCode.AUTO_LIMIT_0.value: "Лимит Авто не задан",
-    AutoReasonCode.AUTO_SPEND_EXCEEDED.value: "Лимит Авто исчерпан",
-    AutoReasonCode.COST_DATA_INSUFFICIENT.value: "Недостаточно данных по себестоимости",
-    AutoReasonCode.COST_RULE_FAILED.value: "Правило по себестоимости не выполнено",
-    AutoReasonCode.TIME_SCHEDULE.value: "Вне расписания показов",
-    AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюджет и себестоимость в норме, запущена",
+    AutoReasonCode.AUTO_LIMIT_0.value: "Лим Авто не зад",
+    AutoReasonCode.AUTO_SPEND_EXCEEDED.value: "Лим Авто исч",
+    AutoReasonCode.COST_DATA_INSUFFICIENT.value: "Н/д по себес",
+    AutoReasonCode.COST_RULE_FAILED.value: "Прав по себес не вып",
+    AutoReasonCode.TIME_SCHEDULE.value: "Вне расп пок",
+    AutoReasonCode.REC_SYSTEM_MODE_OFF.value: "Режим раскр вык",
+    AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюд и себес в норме, зап",
     # Auction
-    AuctionReasonCode.COMMON_OK.value: "Общий бюджет в норме, запущена",
-    AuctionReasonCode.SEARCH_SPEND_EXCEEDED.value: "Лимит Аукциона исчерпан",
-    AuctionReasonCode.SEARCH_LIMIT_OK.value: "Лимит Аукциона в норме, запущена",
-    AuctionReasonCode.SEARCH_LIMIT_0.value: "Лимит Аукциона не задан",
-    AuctionReasonCode.TIME_SCHEDULE.value: "Вне расписания показов",
+    AuctionReasonCode.COMMON_OK.value: "Об бюд в норме, зап",
+    AuctionReasonCode.SEARCH_SPEND_EXCEEDED.value: "Лимит Аук исч",
+    AuctionReasonCode.SEARCH_LIMIT_OK.value: "Лим Аук в норме, запущ",
+    AuctionReasonCode.SEARCH_LIMIT_0.value: "Лим Аук не зад",
+    AuctionReasonCode.TIME_SCHEDULE.value: "Вне рас пок",
 }
 
 

@@ -27,6 +27,7 @@ class DummyCalculatedKeyword:
         position: float,
         rating_by_orders: float,
         total_orders: int,
+        orders_per_1000_rub: float | None = None,
     ) -> None:
         self.text = text
         self.clicks = clicks
@@ -40,6 +41,9 @@ class DummyCalculatedKeyword:
         self.status = status
         self.position = position
         self.rating_by_orders = rating_by_orders
+        self.orders_per_1000_rub = (
+            orders_per_1000_rub if orders_per_1000_rub is not None else rating_by_orders * 10
+        )
         self.total_orders = total_orders
 
 

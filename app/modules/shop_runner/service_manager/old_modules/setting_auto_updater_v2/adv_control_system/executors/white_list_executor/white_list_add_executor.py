@@ -56,6 +56,11 @@ class WhiteListAddExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         current_pay_for_order = ctx.fact.pay_for_order
+        if current_pay_for_order is None:
+            logger.warning(
+                f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: нет данных по себестоимости заказа, пропускаем"
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         threshold = self.PAY_PER_ORDER_THRESHOLD * target_cost
 
         if current_pay_for_order >= threshold:
@@ -68,6 +73,8 @@ class WhiteListAddExecutor(BaseExecutor):
         # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
+            if keyword.views == 0:
+                return False
             if keyword.hard_status != 1:
                 return False
             if keyword.status == KeywordStatus.GOOD:
@@ -90,7 +97,7 @@ class WhiteListAddExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Сортируем по рейтингу и берём лучший
-        candidates.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
+        candidates.sort(key=lambda kw: kw.rating or 0, reverse=True)
         best_keyword = candidates[0]
 
         # Добавляем в белый список
@@ -104,7 +111,7 @@ class WhiteListAddExecutor(BaseExecutor):
 
         logger.info(
             f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: добавлен ключ '{best_keyword.text}' "
-            f"(rating={best_keyword.rating_by_orders:.4f})"
+            f"(rating={(best_keyword.rating or 0):.4f})"
         )
 
         # Efficiency = 1 ключ добавлен (на первом этапе всегда 1 действие)

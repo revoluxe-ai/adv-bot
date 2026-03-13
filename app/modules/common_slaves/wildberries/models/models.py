@@ -31,6 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
 from .bidder_mode import BidderMode
+from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
 from app.settings import settings
@@ -415,6 +416,9 @@ class AdvSetting(BaseTable):
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
     nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
+    black_phrases: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default=text("'[]'")
+    )
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",
@@ -424,7 +428,7 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
-    hard_min_ctr: Mapped[float | None] = mapped_column(
+    hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется
         Float,
         nullable=True,
         default=settings.DEFAULT_MIN_CTR,
@@ -613,23 +617,31 @@ class AdvSetting(BaseTable):
                                                            default=WhiteListMode.ABOVE_MIN_RATING,
                                                            server_default=WhiteListMode.ABOVE_MIN_RATING.name,)
 
-    individual_keywords_target_place_mode: Mapped[bool] = mapped_column(
+    individual_keywords_target_place_mode: Mapped[bool | None] = mapped_column(
         Boolean,
         nullable=True,
         default=False,
         server_default=text("false")
     )
-    min_target_position: Mapped[int] = mapped_column(
+    min_target_position: Mapped[int | None] = mapped_column(
         Integer,
         nullable=False,
         default=300,
         server_default=text('300'),
     )
 
-    target_position_mode: Mapped[TargetPositionMode] = mapped_column(SAEnum(TargetPositionMode),
+    target_position_mode: Mapped[TargetPositionMode  | None] = mapped_column(SAEnum(TargetPositionMode),
                                                                      nullable=True,
                                                                      default=TargetPositionMode.MIN_CPA,
                                                                      server_default=TargetPositionMode.MIN_CPA.name)
+
+    strategy: Mapped[Strategy | None] = mapped_column(SAEnum(Strategy),
+                                               nullable=True,
+                                               default=Strategy.MIN_CPO,
+                                               server_default=Strategy.MIN_CPO.name)
+    auto_update_strategy: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True, default=True, server_default=text("true")
+    )
 
     __table_args__ = (
         # Составной индекс для основного запроса

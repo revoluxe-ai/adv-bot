@@ -15,6 +15,7 @@ from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import Norm
 from typing import TYPE_CHECKING
 
 from app.core.mp.wb.dto.adv_info import AdvInfoDTO, AdvInfoNmSetting
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.shared.domains.wb.dto.current_common_bids_for_adv import CurrentCommonBidsForAdv
 
@@ -115,6 +116,13 @@ class WBDataManager:
 
         return await self._promotion_manager.get_min_bids_for_complex_adv(advs)
 
+    async def get_full_adv_stat(
+        self,
+        adv_ids: list[int],
+        dates: list[datetime.date],
+    ) -> list[FullAdvStat]:
+        """Полная статистика кампаний за указанные даты (v3 fullstats)."""
+        return await self._promotion_manager.get_full_adv_stat(adv_ids, dates)
 
     async def get_advs_info(
         self, advs: list["ComplexAdv"], *, get_auto: bool = True

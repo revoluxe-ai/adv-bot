@@ -70,11 +70,12 @@ async def get_test_users_iterator() -> AsyncGenerator[UserDTO, None]:
 
 
 async def get_users_iterator(
-    only_with_auto_campaign: bool = False,
+    only_with_auto_campaign: bool = True,
 ) -> AsyncIterator[UserDTO]:
     get_users_generator = get_users(
         batch_size=batch_size,
         telegram_ids_filter=None,
-        only_with_auto_campaign=only_with_auto_campaign,
+        only_with_auto_campaign=True,
+        balance_more_than_0=True
     )
     return get_users_generator

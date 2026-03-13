@@ -39,6 +39,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBBalancePayment,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
@@ -327,6 +328,43 @@ class CampaignActivityChangeLimit(Text):
         )
 
 
+class StrategyMenuMessage(TextWithKeyboard):
+    def __init__(self, bot: Bot, chat_id: int, adv_setting: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv_setting = adv_setting
+
+    @property
+    def text(self) -> str:
+        # None means auto-enabled (same as True); only False is manual
+        auto_update_strategy = (
+            getattr(self._adv_setting, "auto_update_strategy", True) is not False
+        )
+        current_strategy = self._adv_setting.strategy or Strategy.MIN_CPO
+        mode_label = "Автоматический" if auto_update_strategy else "Ручной"
+        if current_strategy == Strategy.MIN_CPO:
+            strategy_label = "MIN_CPO (мин себестоимость заказа)"
+        else:
+            strategy_label = "MAX_CONV (максимум конверсии)"
+
+        return (
+            f"Стратегия кампании «{self._adv_setting.name}»\n"
+            f"Текущий режим: {mode_label}\n"
+            f"Текущая стратегия: {strategy_label}\n\n"
+            "Как это работает:\n"
+            "• MIN_CPO — приоритет минимальной себестоимости заказа.\n"
+            "• MAX_CONV — приоритет максимальной конверсии/объема заказов.\n"
+            "• В авто-режиме бот сам переключает стратегию по факту выполнения плана,\n"
+            "  целевой себестоимости и состоянию кампании.\n"
+            "• В ручном режиме стратегия фиксируется вручную и не переключается автоматически.\n\n"
+            "Рекомендуется держать авто-режим включенным и переходить в ручной только для\n"
+            "временных гипотез/тестов."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_strategy_menu_keyboard(self._adv_setting)
+
+
 class CabinetNameExists(Text):
     @property
     def text(self) -> str:
@@ -531,9 +569,14 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"💰 *Расход:* {self.spend:.2f} ₽\n"
         )
 
-
-        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders * 1000, 2)}\n"
-        text += f'Себестоимость заказа: {round(self._calculated_keyword.pay_for_order_by_current_cpm, 2)}\n'
+        text += f'Заказов на 1000 показов: {round(self._calculated_keyword.conv_views_to_orders * 1000, 2)}\n'
+        text += f"Заказов на 1000₽: {round(self._calculated_keyword.orders_per_1000_rub, 2)}\n"
+        pay_for_order = self._calculated_keyword.pay_for_order
+        if pay_for_order is not None:
+            pay_for_order_str = f"{pay_for_order:.2f}"
+        else:
+            pay_for_order_str = 'Не определен (нет заказов)'
+        text += f'Себес. заказа: {pay_for_order_str}\n'
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
