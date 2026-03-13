@@ -1,7 +1,12 @@
 """Data Transfer Objects for token permissions validation."""
 
+from __future__ import annotations
 from dataclasses import dataclass
 import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .validator import TokenPermissionsValidator
 
 
 @dataclass
@@ -34,7 +39,9 @@ class ValidationResult:
     @property
     def missing_required(self) -> set[str]:
         """Get set of missing required permissions."""
-        required = {"Контент", "Статистика", "Аналитика", "Продвижение"}
+        from .validator import TokenPermissionsValidator
+        
+        required = TokenPermissionsValidator.REQUIRED_RIGHTS
         available = {name for name, perm in self.permissions.items() if perm.is_available}
         return required - available
 
