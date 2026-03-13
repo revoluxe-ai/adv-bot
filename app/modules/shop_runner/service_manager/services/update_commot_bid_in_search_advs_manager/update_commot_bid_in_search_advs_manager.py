@@ -32,7 +32,10 @@ class UpdateCommotBidInSearchAdvsManager:
         if count_auto_keywords > 0:
             direct = 'reset'
         else:
-            if adv.fact_pay_for_order >= adv.plan.target_pay_for_order:
+            fact_pay_for_order: float | None = adv.fact_pay_for_order
+            if fact_pay_for_order is None:
+                direct = 'reset'
+            elif adv.fact_pay_for_order >= adv.plan.target_pay_for_order:
                 direct = 'reset'
             else:
                 direct = 'up'
