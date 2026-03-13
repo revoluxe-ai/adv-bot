@@ -110,5 +110,5 @@ class UpdateCommotBidInSearchAdvsManager:
         from app.modules.keywords_manager.keywords_manager import KeywordsManager
         keywords_manager = KeywordsManager()
         candidates: list[CalculatedKeyword] = await keywords_manager.get_candidates_to_white_list(adv.complex_adv)
-        auto_keywords = sum(candidates)
+        auto_keywords = len(candidates)
         return auto_keywords
