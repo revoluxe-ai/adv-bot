@@ -1,3 +1,5 @@
+from typing import Literal
+
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
     SetCommonBidsCommandItem,
@@ -24,11 +26,18 @@ class UpdateCommotBidInSearchAdvsManager:
         self._redis_common_bid_value_manager = redis_common_bid_value_manager
 
     async def update_common_bid_in_search_adv(self, adv: WBAdvDTO) -> None:
+        count_auto_keywords: int = self._count_auto_keywords(adv)
+        direct: Literal['reset', 'up']
+        if count_auto_keywords > 0:
+            direct = 'reset'
+        else:
+            direct = 'up'
+
         nmids: list[int] = adv.nmids
         nmid_to_new_bid: dict[int, int | None] = {}
 
         for nmid in nmids:
-            new_bid = self._get_new_bid(adv, current_nmid=nmid)
+            new_bid = self._get_new_bid(adv, current_nmid=nmid, direct=direct)
             nmid_to_new_bid[nmid] = new_bid
 
         command_items = self._build_command_items(adv, nmid_to_new_bid)
@@ -48,25 +57,19 @@ class UpdateCommotBidInSearchAdvsManager:
 
 
     @staticmethod
-    def _get_new_bid(adv: WBAdvDTO, current_nmid: int) -> int | None:
-        result_target_pay_for_order = adv.result_target_pay_for_order
-        fact_pay_for_order = adv.fact_pay_for_order
-        if fact_pay_for_order is None:
-            return None
+    def _get_new_bid(adv: WBAdvDTO, current_nmid: int, direct: Literal['reset', 'up']) -> int | None:
         current_common_bids = adv.current_common_bids_in_search_adv
         current_bid: int = current_common_bids[current_nmid]
-        bid_step: int = 1
         if not current_bid:
             return None
-        if fact_pay_for_order > result_target_pay_for_order:
+        if direct == 'up':
+            bid_step: int = 1
+            new_bid = current_bid + bid_step
+        elif direct == 'reset':
             min_bid = adv.search_adv_min_bids[current_nmid]
             new_bid = min_bid
-        elif fact_pay_for_order < result_target_pay_for_order:
-            new_bid = current_bid + bid_step
         else:
-            new_bid = fact_pay_for_order
-        if new_bid < adv.search_adv_min_bids[current_nmid]:
-            new_bid = adv.search_adv_min_bids[current_nmid]
+            raise ValueError(f"Invalid direct: {direct}")
         max_bid = adv.max_user_cpm_bid
         if new_bid > max_bid:
             new_bid = max_bid
@@ -98,3 +101,8 @@ class UpdateCommotBidInSearchAdvsManager:
             for nmid, new_bid in nmid_to_new_bid.items()
             if new_bid is not None
         ]
+    @staticmethod
+    def _count_auto_keywords(adv: WBAdvDTO) -> int:
+        keywords = adv.keywords
+        auto_keywords = sum([kw for kw in keywords if kw.hard_status == 1])
+        return auto_keywords
