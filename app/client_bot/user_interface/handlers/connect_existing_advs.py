@@ -72,7 +72,7 @@ router = Router()
 def _wb_status_code_to_text(status_code: int) -> str:
     """Код статуса WB (4, 9, 11, 7, 8) → текст для active_status."""
     return {4: "ready_for_start", 9: "started", 11: "pause", 7: "done", 8: "refused"}.get(
-        status_code, "started"
+        status_code, "unknown"
     )
 
 
