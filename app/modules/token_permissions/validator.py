@@ -85,34 +85,49 @@ class TokenPermissionsValidator:
             api_probe_success=None,
         )
 
-        for right_name in ["Контент", "Аналитика", "Продвижение"]:
-            has_claim = right_name in jwt_categories
-            api_success = None
+        # Create temporary session if needed (reused across all probes)
+        temp_session = None
+        if mode == "claims_plus_api" and self._session is None:
+            temp_session = ClientSession()
 
-            if mode == "claims_plus_api" and has_claim:
-                api_success = await self._probe_api(right_name, api_key)
+        try:
+            for right_name in ["Контент", "Аналитика", "Продвижение"]:
+                has_claim = right_name in jwt_categories
+                api_success = None
 
-            permissions[right_name] = PermissionStatus(
-                name=right_name,
-                has_jwt_claim=has_claim,
-                api_probe_success=api_success,
+                if mode == "claims_plus_api" and has_claim:
+                    api_success = await self._probe_api(right_name, api_key, temp_session)
+
+                permissions[right_name] = PermissionStatus(
+                    name=right_name,
+                    has_jwt_claim=has_claim,
+                    api_probe_success=api_success,
+                )
+
+            return ValidationResult(
+                is_valid_jwt=True,
+                shop_id=shop_id,
+                is_read_only=is_read_only,
+                is_expired=is_expired,
+                expires=expires,
+                permissions=permissions,
             )
+        finally:
+            if temp_session is not None:
+                await temp_session.close()
 
-        return ValidationResult(
-            is_valid_jwt=True,
-            shop_id=shop_id,
-            is_read_only=is_read_only,
-            is_expired=is_expired,
-            expires=expires,
-            permissions=permissions,
-        )
-
-    async def _probe_api(self, right_name: str, api_key: str) -> bool:
+    async def _probe_api(
+        self,
+        right_name: str,
+        api_key: str,
+        temp_session: ClientSession | None = None,
+    ) -> bool:
         """Probe API endpoint to verify permission.
 
         Args:
             right_name: Name of the right to probe
             api_key: WB API token
+            temp_session: Optional temporary session provided by caller
 
         Returns:
             True if API probe successful, False otherwise
@@ -121,11 +136,10 @@ class TokenPermissionsValidator:
         if not url:
             return True
 
-        session = self._session
-        close_after = False
+        # Use provided temp_session, fallback to instance session
+        session = temp_session or self._session
         if session is None:
-            session = ClientSession()
-            close_after = True
+            raise ValueError("No session available for API probe")
 
         try:
             headers = {"Authorization": api_key}
@@ -138,6 +152,3 @@ class TokenPermissionsValidator:
         except Exception as e:
             logger.warning("API probe failed for %s: %s", right_name, e)
             return False
-        finally:
-            if close_after:
-                await session.close()

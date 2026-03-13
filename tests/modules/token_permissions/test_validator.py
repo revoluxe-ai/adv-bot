@@ -192,8 +192,6 @@ class TestTokenPermissionsValidator:
     @pytest.mark.asyncio
     async def test_probe_api_success(self):
         """Test _probe_api method with successful response."""
-        validator = TokenPermissionsValidator()
-
         # Mock aiohttp session
         mock_response = MagicMock()
         mock_response.status = 200
@@ -205,18 +203,15 @@ class TestTokenPermissionsValidator:
 
         mock_session = MagicMock()
         mock_session.get = MagicMock(return_value=mock_get_cm)
-        mock_session.close = AsyncMock()
 
-        with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session):
-            result = await validator._probe_api("Контент", "test_token")
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
 
         assert result is True
 
     @pytest.mark.asyncio
     async def test_probe_api_failure_non_200(self):
         """Test _probe_api method with non-200 status."""
-        validator = TokenPermissionsValidator()
-
         # Mock aiohttp session with 403 status
         mock_response = MagicMock()
         mock_response.status = 403
@@ -227,18 +222,15 @@ class TestTokenPermissionsValidator:
 
         mock_session = MagicMock()
         mock_session.get = MagicMock(return_value=mock_get_cm)
-        mock_session.close = AsyncMock()
 
-        with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session):
-            result = await validator._probe_api("Контент", "test_token")
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
 
         assert result is False
 
     @pytest.mark.asyncio
     async def test_probe_api_failure_wrong_status(self):
         """Test _probe_api method with 200 but wrong Status field."""
-        validator = TokenPermissionsValidator()
-
         # Mock aiohttp session with wrong Status
         mock_response = MagicMock()
         mock_response.status = 200
@@ -250,25 +242,21 @@ class TestTokenPermissionsValidator:
 
         mock_session = MagicMock()
         mock_session.get = MagicMock(return_value=mock_get_cm)
-        mock_session.close = AsyncMock()
 
-        with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session):
-            result = await validator._probe_api("Контент", "test_token")
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
 
         assert result is False
 
     @pytest.mark.asyncio
     async def test_probe_api_exception(self):
         """Test _probe_api method with exception."""
-        validator = TokenPermissionsValidator()
-
         # Mock aiohttp session to raise exception
         mock_session = MagicMock()
         mock_session.get.side_effect = Exception("Network error")
-        mock_session.close = AsyncMock()
 
-        with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session):
-            result = await validator._probe_api("Контент", "test_token")
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
 
         assert result is False
 
@@ -283,6 +271,38 @@ class TestTokenPermissionsValidator:
             result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
 
         assert result.can_be_used
+
+    @pytest.mark.asyncio
+    async def test_session_reuse_across_multiple_probes(self):
+        """Test that a single temporary session is reused across multiple API probes."""
+        validator = TokenPermissionsValidator()
+
+        # Mock ClientSession creation
+        mock_session = MagicMock()
+        mock_session.close = AsyncMock()
+
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"Status": "OK"})
+
+        mock_get_cm = MagicMock()
+        mock_get_cm.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_get_cm.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session.get = MagicMock(return_value=mock_get_cm)
+
+        with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session) as mock_session_class:
+            result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
+
+        # Verify session was created only once despite 3 API probes
+        assert mock_session_class.call_count == 1
+        # Verify session was closed exactly once
+        assert mock_session.close.call_count == 1
+        # Verify all three probes succeeded
+        assert result.permissions["Контент"].api_probe_success is True
+        assert result.permissions["Аналитика"].api_probe_success is True
+        assert result.permissions["Продвижение"].api_probe_success is True
 
     def test_permission_status_is_available_with_api_probe(self):
         """Test PermissionStatus.is_available with API probe result."""
