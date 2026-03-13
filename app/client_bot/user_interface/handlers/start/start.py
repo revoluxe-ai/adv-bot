@@ -498,7 +498,7 @@ async def add_app_token(
 
 @router.message(StateFilter(states.AddNewToken.token))
 async def process_add_new_token(
-    message: Message, bot: aiogram.Bot, state: FSMContext
+    message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
 ) -> None:
     """
     Обработчик добавления нов��го токена для существующего магазина.
@@ -540,7 +540,7 @@ async def process_add_new_token(
         return None
 
     # Validate token using centralized validator
-    validator = TokenPermissionsValidator()  # Will create its own session
+    validator = TokenPermissionsValidator(http_session=client_session)
     validation_result = await validator.validate(text, mode="claims_plus_api")
 
     if not validation_result.is_valid_jwt:
