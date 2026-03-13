@@ -743,6 +743,7 @@ async def _connect_existing_after_card_resolved(
                     )
                 else:
                     kb = InlineKeyboardMarkup(inline_keyboard=[])
+                await state.clear()
             else:
                 lines.extend(
                     [
