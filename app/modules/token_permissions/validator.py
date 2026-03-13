@@ -28,7 +28,6 @@ class TokenPermissionsValidator:
             http_session: Optional aiohttp session. If None, temporary session will be created.
         """
         self._session = http_session
-        self._own_session = False
 
     async def validate(
         self,
