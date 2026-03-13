@@ -1,39 +1,24 @@
 from typing import AsyncIterator
 
 from scripts.get_users.get_users import get_users
-
-from app.modules.balance_manager.balance_service import get_cabinet_balance
-from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.utils.db.models import User
+from scripts.users_csv_exporter.dto import UserDTO
 
 
 async def iter_users_with_zero_or_negative_balance_without_active_advs(
-    batch_size,
-) -> AsyncIterator[User]:
+    batch_size: int,
+) -> AsyncIterator[UserDTO]:
     """
-    Yield `User` records whose telegram ID is set and for whom all tracked
-    cabinets have a non-positive sum of `balance + bonus` and no active advs.
+    Yield `UserDTO` records whose telegram ID is set and for whom at least one
+    cabinet has a non-positive balance+bonus and no active advs.
     """
 
     async for user in get_users(batch_size=batch_size):
-        if not user.user_telegram_id: # type: ignore
+        if not user.telegram_id:
             continue
 
-        for link in user.wb_user_cabinets: # type: ignore
-            cabinet = link.wb_cabinet
-            if not cabinet:
+        for cabinet in user.cabinets:
+            if cabinet.has_active_campaign:
                 continue
-
-            active_adv_exists = any(
-                getattr(ad, "bot_active", False)
-                for ad in cabinet.adv_settings
-                if isinstance(ad, AdvSetting)
-            )
-            if active_adv_exists:
-                continue
-
-            balance, bonus = await get_cabinet_balance(cabinet.id)
-            total = balance + bonus
-            if total <= 0:
+            if cabinet.balance_plus_bonus <= 0:
                 yield user
                 break
