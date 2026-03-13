@@ -121,7 +121,7 @@ class TokenPermissionsValidator:
         right_name: str,
         api_key: str,
         temp_session: ClientSession | None = None,
-    ) -> bool:
+    ) -> bool | None:
         """Probe API endpoint to verify permission.
 
         Args:
@@ -130,7 +130,9 @@ class TokenPermissionsValidator:
             temp_session: Optional temporary session provided by caller
 
         Returns:
-            True if API probe successful, False otherwise
+            True if API probe successful (permission verified)
+            False if permission denied (HTTP 403)
+            None if network/transient error (timeout, DNS, connection error, etc.)
         """
         url = self.PROBE_ENDPOINTS.get(right_name)
         if not url:
@@ -148,7 +150,22 @@ class TokenPermissionsValidator:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("Status") == "OK"
-                return False
+                # HTTP 403 = permission denied (token lacks this permission)
+                if resp.status == 403:
+                    return False
+                # Other HTTP errors (4xx, 5xx) = service issue, can't verify
+                logger.warning(
+                    "API probe for %s returned status %s (not 403), treating as transient",
+                    right_name,
+                    resp.status,
+                )
+                return None
         except Exception as e:
-            logger.warning("API probe failed for %s: %s", right_name, e)
-            return False
+            # Network errors (timeout, DNS failure, connection refused, etc.)
+            # These are transient and don't mean the token lacks permissions
+            logger.warning(
+                "API probe failed for %s with network/transient error: %s",
+                right_name,
+                e,
+            )
+            return None

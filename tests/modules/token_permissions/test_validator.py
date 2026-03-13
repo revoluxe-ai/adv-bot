@@ -81,10 +81,10 @@ class TestTokenPermissionsValidator:
 
     @pytest.mark.asyncio
     async def test_valid_token_claims_plus_api_mode_failure(self):
-        """Test validation with claims_plus_api mode when API probes fail."""
+        """Test validation when API probes fail with 403 (permission denied)."""
         validator = TokenPermissionsValidator()
 
-        # Mock failed API responses
+        # Mock failed API responses (403 = permission denied)
         with patch.object(validator, "_probe_api", new=AsyncMock(return_value=False)):
             result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
 
@@ -92,7 +92,7 @@ class TestTokenPermissionsValidator:
         assert not result.is_read_only
         assert not result.is_expired
 
-        # Token should NOT be usable because API probes failed
+        # Token should NOT be usable because API probes returned False (403)
         assert not result.can_be_used
         assert result.error_message is not None
         assert len(result.missing_required) > 0
@@ -104,6 +104,33 @@ class TestTokenPermissionsValidator:
         assert not result.permissions["Контент"].is_available
         assert not result.permissions["Аналитика"].is_available
         assert not result.permissions["Продвижение"].is_available
+
+    @pytest.mark.asyncio
+    async def test_valid_token_network_errors_fallback_to_jwt(self):
+        """Test validation when API probes have network errors (should fall back to JWT claims)."""
+        validator = TokenPermissionsValidator()
+
+        # Mock network errors (returns None)
+        with patch.object(validator, "_probe_api", new=AsyncMock(return_value=None)):
+            result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
+
+        assert result.is_valid_jwt
+        assert not result.is_read_only
+        assert not result.is_expired
+
+        # Token SHOULD be usable - network errors don't invalidate JWT claims
+        assert result.can_be_used
+        assert result.error_message is None
+        assert len(result.missing_required) == 0
+
+        # Check that API probes returned None (network error)
+        assert result.permissions["Контент"].api_probe_success is None
+        assert result.permissions["Аналитика"].api_probe_success is None
+        assert result.permissions["Продвижение"].api_probe_success is None
+        # But permissions are still available based on JWT claims
+        assert result.permissions["Контент"].is_available
+        assert result.permissions["Аналитика"].is_available
+        assert result.permissions["Продвижение"].is_available
 
     @pytest.mark.asyncio
     async def test_invalid_token(self):
@@ -211,7 +238,7 @@ class TestTokenPermissionsValidator:
 
     @pytest.mark.asyncio
     async def test_probe_api_failure_non_200(self):
-        """Test _probe_api method with non-200 status."""
+        """Test _probe_api method with 403 status (permission denied)."""
         # Mock aiohttp session with 403 status
         mock_response = MagicMock()
         mock_response.status = 403
@@ -226,7 +253,46 @@ class TestTokenPermissionsValidator:
         validator = TokenPermissionsValidator()
         result = await validator._probe_api("Контент", "test_token", mock_session)
 
+        # 403 = permission denied, definitive False
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_probe_api_500_error(self):
+        """Test _probe_api with 500 status (server error, transient)."""
+        mock_response = MagicMock()
+        mock_response.status = 500
+
+        mock_get_cm = MagicMock()
+        mock_get_cm.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_get_cm.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_get_cm)
+
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
+
+        # 5xx = service issue, can't verify → None
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_probe_api_404_error(self):
+        """Test _probe_api with 404 status (not found, transient issue)."""
+        mock_response = MagicMock()
+        mock_response.status = 404
+
+        mock_get_cm = MagicMock()
+        mock_get_cm.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_get_cm.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_get_cm)
+
+        validator = TokenPermissionsValidator()
+        result = await validator._probe_api("Контент", "test_token", mock_session)
+
+        # 404 (not 403) = service issue, can't verify → None
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_probe_api_failure_wrong_status(self):
@@ -250,7 +316,7 @@ class TestTokenPermissionsValidator:
 
     @pytest.mark.asyncio
     async def test_probe_api_exception(self):
-        """Test _probe_api method with exception."""
+        """Test _probe_api method with exception (network error)."""
         # Mock aiohttp session to raise exception
         mock_session = MagicMock()
         mock_session.get.side_effect = Exception("Network error")
@@ -258,7 +324,8 @@ class TestTokenPermissionsValidator:
         validator = TokenPermissionsValidator()
         result = await validator._probe_api("Контент", "test_token", mock_session)
 
-        assert result is False
+        # Network errors should return None (can't verify, not a definitive failure)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_validator_with_provided_session(self):
@@ -310,12 +377,22 @@ class TestTokenPermissionsValidator:
         perm = PermissionStatus(name="Контент", has_jwt_claim=True, api_probe_success=True)
         assert perm.is_available
 
-        # JWT claim but API probe failed
+        # JWT claim but API probe failed (403 = permission denied)
         perm = PermissionStatus(name="Контент", has_jwt_claim=True, api_probe_success=False)
         assert not perm.is_available
 
-        # No JWT claim
+        # No JWT claim, even if API probe succeeded (shouldn't happen in practice)
         perm = PermissionStatus(name="Контент", has_jwt_claim=False, api_probe_success=True)
+        assert not perm.is_available
+
+    def test_permission_status_is_available_with_network_error(self):
+        """Test PermissionStatus.is_available when API probe has network error (None)."""
+        # JWT claim + network error (None) → fall back to JWT, available
+        perm = PermissionStatus(name="Контент", has_jwt_claim=True, api_probe_success=None)
+        assert perm.is_available
+
+        # No JWT claim + network error → still unavailable
+        perm = PermissionStatus(name="Контент", has_jwt_claim=False, api_probe_success=None)
         assert not perm.is_available
 
     def test_permission_status_is_available_without_api_probe(self):

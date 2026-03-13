@@ -19,9 +19,18 @@ class PermissionStatus:
 
     @property
     def is_available(self) -> bool:
-        """Check if permission is available."""
+        """Check if permission is available.
+        
+        Logic:
+        - If no API probe was performed (api_probe_success is None), rely on JWT claim.
+        - If API probe succeeded (True), permission is confirmed available.
+        - If API probe failed with 403 (False), permission is definitely unavailable.
+        - For network/transient errors, _probe_api returns None, so we fall back to JWT claim.
+        """
         if self.api_probe_success is None:
+            # No probe performed, or probe had network error → trust JWT claim
             return self.has_jwt_claim
+        # Probe was performed and returned definitive result (True or False)
         return self.has_jwt_claim and self.api_probe_success
 
 
