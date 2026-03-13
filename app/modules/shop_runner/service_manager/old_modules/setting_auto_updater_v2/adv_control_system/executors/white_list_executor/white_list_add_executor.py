@@ -13,8 +13,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.shared.domains.wb.utils.cost_resolver import (
     resolve_target_cost_from_context,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 from .redis_cache import LastAutoAddPhraseToWhiteListV2
 
