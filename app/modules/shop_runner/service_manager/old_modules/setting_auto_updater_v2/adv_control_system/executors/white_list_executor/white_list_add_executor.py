@@ -72,7 +72,7 @@ class WhiteListAddExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         from app.modules.keywords_manager.keywords_manager import KeywordsManager
         keywords_manager = KeywordsManager()
-        candidates = keywords_manager.get_candidates_to_white_list(ctx.complex_adv)
+        candidates = await keywords_manager.get_candidates_to_white_list(ctx.complex_adv)
         if not candidates:
             logger.debug(
                 f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: нет кандидатов для добавления"
