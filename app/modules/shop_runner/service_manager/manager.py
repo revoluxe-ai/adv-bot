@@ -933,10 +933,9 @@ class CoroutinesManager:
 
         if not advs:
             return None
-
         handlers: list[Callable[..., Any]] = []
         for adv in advs:
-            handler = lambda adv_=adv: manager.update_common_bid_in_search_adv(adv_)
+            handler = lambda adv_=adv:manager.update_common_bid_in_search_adv(adv_)
             handlers.append(handler)
 
         results = await run_tasks(
