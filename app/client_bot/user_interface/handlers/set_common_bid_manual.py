@@ -1,5 +1,6 @@
 """Ручная установка общей ставки в поисковой (аукционной) кампании."""
 
+import asyncio
 import logging
 from typing import Any
 
@@ -37,6 +38,30 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 MAX_BID_RUB = 3000
+
+
+async def _reload_adv_setting_menu(
+    bot: Bot,
+    chat_id: int,
+    wb_user_cabinet_original_id: int,
+    adv_setting_original_id: int,
+) -> None:
+    """Перезагрузить меню настроек кампании."""
+    async with sm() as session:
+        wb_user_cabinet_result = await session.execute(
+            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+        wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
+        
+        adv_result = await session.execute(
+            select(AdvSetting)
+            .options(joinedload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv_setting_original_id)
+        )
+        adv_setting_reload = adv_result.scalar_one_or_none()
+
+    if wb_user_cabinet and adv_setting_reload:
+        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting_reload)()
 
 
 def _build_complex_adv(main_adv: AdvSetting, search_adv: AdvSetting, shop_id: str) -> ComplexAdv:
@@ -145,9 +170,24 @@ async def set_common_bid_manual_apply(
 ) -> None:
     chat_id = message.chat.id
     data: dict[str, Any] = await state.get_data()
-    adv_setting_original_id: int = data["adv_setting_original_id"]
-    wb_user_cabinet_original_id: int = data["wb_user_cabinet_original_id"]
-    min_bid: int = data["min_bid_search"]
+    
+    adv_setting_original_id = data.get("adv_setting_original_id")
+    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
+    min_bid = data.get("min_bid_search")
+    
+    if adv_setting_original_id is None or wb_user_cabinet_original_id is None or min_bid is None:
+        await state.set_state(None)
+        await message.answer(
+            f"Произошла ошибка: не найдены сохраненные данные. Начните заново.\n\n"
+            f"Если проблема будет повторяться, обратитесь в поддержку -> {const.SUPPORT_LINK}"
+        )
+        
+        await asyncio.sleep(1)
+        
+        if wb_user_cabinet_original_id and adv_setting_original_id:
+            await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
+        
+        return
 
     text = message.text or ""
     if not text.strip().isdigit():
@@ -245,17 +285,4 @@ async def set_common_bid_manual_apply(
     await state.set_state(None)
     await message.answer(f"Общая ставка изменена на {bid_value} р.")
 
-    async with sm() as session:
-        wb_user_cabinet_result = await session.execute(
-            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        )
-        wb_user_cabinet: WBUserCabinet | None = wb_user_cabinet_result.scalar_one_or_none()
-        adv_result = await session.execute(
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
-        )
-        adv_setting_reload: AdvSetting | None = adv_result.scalar_one_or_none()
-
-    if wb_user_cabinet and adv_setting_reload:
-        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting_reload)()
+    await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
