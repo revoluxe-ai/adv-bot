@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 
@@ -41,7 +42,8 @@ class RedisAutoBudgetLastSuccessManager:
             data = json.loads(raw)
             if not isinstance(data, dict):
                 return None
-            at = data.get("at", "")
+            data = cast(dict[str, Any], data)
+            at: str = str(data.get("at", ""))
             return {"at": at} if at else None
         except (json.JSONDecodeError, TypeError, ValueError):
             return None

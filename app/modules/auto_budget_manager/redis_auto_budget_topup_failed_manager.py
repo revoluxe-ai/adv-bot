@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 
@@ -53,8 +54,9 @@ class RedisAutoBudgetTopupFailedManager:
             data = json.loads(raw)
             if not isinstance(data, dict):
                 return None
-            failed_at = data.get("failed_at", "")
-            reason = data.get("reason", REASON_NOT_ENOUGH_BALANCE)
-            return {"failed_at": failed_at, "reason": str(reason)}
+            data = cast(dict[str, Any], data)
+            failed_at: str = str(data.get("failed_at", ""))
+            reason: str = str(data.get("reason", REASON_NOT_ENOUGH_BALANCE))
+            return {"failed_at": failed_at, "reason": reason}
         except (json.JSONDecodeError, TypeError, ValueError):
             return None

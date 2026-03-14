@@ -3,20 +3,13 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Sequence, Awaitable, Any
-
-from sqlalchemy import select
-
-from app.modules.common_slaves.wildberries.models import KeywordSetting
-from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
+from typing import TYPE_CHECKING, Awaitable, Any
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
     from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from .click_house_clusters_stat_manager import click_house_clusters_stat_manager as ch
-from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +67,16 @@ class ClustersAdvStatUpdater:
         if not missing_dates_map:
             logger.info("Все данные за прошлые дни уже есть в ClickHouse")
             return
-
         # Собрать статистику за все недостающие даты
         all_stats_generator: AsyncGenerator[list[NormqueryStatsDTO], Any] \
             = self.__get_all_stats_generator(missing_dates_map)
-
+        from app.modules.keywords_manager.keywords_manager import KeywordsManager
+        keywords_manager = KeywordsManager()
         # Записать все данные одним батчем
         async for all_stats in all_stats_generator:
+            # TODO: Объединить обе задачи и тут, и в подневной записи, запараллелить
             await ch.update_clusters_adv_stats(all_stats)
+            await keywords_manager.create_new_keyword_settings_for_complex_advs(complex_advs, all_stats)
             logger.debug(
                 "Записано %d записей статистики за %d дней",
                 len(all_stats),
@@ -179,46 +174,16 @@ class ClustersAdvStatUpdater:
                return False
         else:
             return True
-
-    async def _create_keyword_setting(self, complex_advs: list[ComplexAdv],
+    @staticmethod
+    async def _create_keyword_setting(complex_advs: list[ComplexAdv],
                                       stats: list["NormqueryStatsDTO"]) -> None:
-
+        from app.modules.keywords_manager.keywords_manager import KeywordsManager
         # TODO: Сюда прошла ошибка в рантайм
-        adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
-        for stat in stats:
-            adv_id = stat.adv_id
-            complex_adv = adv_id_to_complex_adv[adv_id]
-            original_adv_id = complex_adv.original_adv_setting_id
-            texts: list[str] = [st.norm_query for st in stat.stats]
-            exists_keywords_text: Sequence[str] = await self.__get_exists_keyword_settings_text(original_adv_id, texts)
-            new_texts: set[str] = set(texts) - set(exists_keywords_text)
-            relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
-            template_data = await relevant_phrase_manager.get_relevant_template_data()
-            not_rel_templator = NotRelevantTemplate(template_data)
-            async with sm(read_only=False) as session:
-                for text in new_texts:
-                    if not not_rel_templator.is_relevant(text):
-                        hard_status = 0
-                    else:
-                        hard_status = 1
-                    new_keyword_setting = KeywordSetting(
-                        text=text,
-                        hard_status=hard_status,
-                        adv_setting_id=complex_adv.original_adv_setting_id
-                    )
-                    session.add(new_keyword_setting)
-                await session.commit()
+        keywords_manager = KeywordsManager()
+        await keywords_manager.create_new_keyword_settings_for_complex_advs(complex_advs, stats)
         return None
 
-    @staticmethod
-    async def __get_exists_keyword_settings_text(original_adv_id: int, texts: list[str]) -> Sequence[str]:
-        # TODO: Тут ошибка в рантайм попала
-        stmt = select(KeywordSetting.text).where(KeywordSetting.text.in_(texts),
-                                                 KeywordSetting.adv_setting_id == original_adv_id)
-        async with sm(read_only=True) as session:
-            results = await session.execute(stmt)
-            texts_exists: Sequence[str] = results.scalars().all()
-        return texts_exists
+
 
     async def __get_all_stats_generator(self, missing_dates_map: dict[date, list[ComplexAdv]]):
         for day, advs_for_day in missing_dates_map.items():

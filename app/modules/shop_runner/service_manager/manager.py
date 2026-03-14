@@ -693,7 +693,6 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
-
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
     @while_coroutine_decorator(60 * 5, 60)
@@ -933,10 +932,9 @@ class CoroutinesManager:
 
         if not advs:
             return None
-
         handlers: list[Callable[..., Any]] = []
         for adv in advs:
-            handler = lambda adv_=adv: manager.update_common_bid_in_search_adv(adv_)
+            handler = lambda adv_=adv:manager.update_common_bid_in_search_adv(adv_)
             handlers.append(handler)
 
         results = await run_tasks(
