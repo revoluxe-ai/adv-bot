@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 
@@ -55,14 +56,15 @@ class RedisShopBalanceSnapshotManager:
             data = json.loads(raw)
             if not isinstance(data, dict):
                 return None
-            balance = data.get("balance", 0)
-            net = data.get("net", 0)
-            bonus = data.get("bonus", 0)
-            updated_at = data.get("updated_at", "")
+            data = cast(dict[str, Any], data)
+            balance_raw: Any = data.get("balance", 0)
+            net_raw: Any = data.get("net", 0)
+            bonus_raw: Any = data.get("bonus", 0)
+            updated_at: str = str(data.get("updated_at", ""))
             return {
-                "balance": int(balance) if balance is not None else 0,
-                "net": int(net) if net is not None else 0,
-                "bonus": int(bonus) if bonus is not None else 0,
+                "balance": int(balance_raw) if balance_raw is not None else 0,
+                "net": int(net_raw) if net_raw is not None else 0,
+                "bonus": int(bonus_raw) if bonus_raw is not None else 0,
                 "updated_at": updated_at,
             }
         except (json.JSONDecodeError, TypeError, ValueError):

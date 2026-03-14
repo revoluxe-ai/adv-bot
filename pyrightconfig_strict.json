@@ -40,7 +40,8 @@
     "app/modules/shop_runner/service_manager/services/increment_fact_data_manager",
     "app/modules/shop_runner/service_manager/services/white_list_trimmer.py",
     "app/common_coroutine/coroutines/target_keyword_place_priors_updater",
-    "app/client_bot/user_interface/views/messages/main_adv_setting_menu"
+    "app/client_bot/user_interface/views/messages/main_adv_setting_menu",
+    "app/modules/keywords_manager"
   ],
 
   "exclude": [

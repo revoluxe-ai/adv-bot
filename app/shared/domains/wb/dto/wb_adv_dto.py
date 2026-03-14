@@ -24,6 +24,10 @@ class WBAdvDTO:
     _current_common_bids_in_search_adv: dict[int, int] = field(alias='current_common_bids_in_search_adv') # артикул ->  ставка
 
     @property
+    def plan(self)-> PlanData:
+        return self._plan
+
+    @property
     def target_position_mode(self) -> TargetPositionMode:
         return self._complex_adv.target_position_mode
 
