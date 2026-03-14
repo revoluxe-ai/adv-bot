@@ -35,7 +35,7 @@ class UpdateCommotBidInSearchAdvsManager:
             fact_pay_for_order: float | None = adv.fact_pay_for_order
             if fact_pay_for_order is None:
                 direct = 'reset'
-            elif fact_pay_for_order >= adv.plan.target_pay_for_order:
+            elif fact_pay_for_order >= adv.result_target_pay_for_order:
                 direct = 'reset'
             else:
                 direct = 'up'
