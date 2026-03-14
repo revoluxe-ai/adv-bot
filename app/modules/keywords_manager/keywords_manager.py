@@ -1,5 +1,7 @@
 from typing import Sequence
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.modules.common_slaves.wildberries.models import KeywordSetting
@@ -40,33 +42,46 @@ class KeywordsManager:
     async def create_new_keyword_settings_for_complex_advs(self,
                                                            complex_advs: list[ComplexAdv],
                                                            stats: list["NormqueryStatsDTO"]):
+        adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
         async with sm(read_only=False) as session:
-            adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
             for stat in stats:
-                adv_id = stat.adv_id
-                complex_adv = adv_id_to_complex_adv[adv_id]
-                original_adv_id = complex_adv.original_adv_setting_id
+                complex_adv = adv_id_to_complex_adv[stat.adv_id]
                 texts: list[str] = [st.norm_query for st in stat.stats]
-                exists_keywords_text: Sequence[str] = \
-                    await self.__get_exists_keyword_settings_text(original_adv_id,
-                                                                   texts)
-                new_texts: set[str] = set(texts) - set(exists_keywords_text)
-                relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
-                template_data = await relevant_phrase_manager.get_relevant_template_data()
-                not_rel_templator = NotRelevantTemplate(template_data)
-                for text in new_texts:
-                    if not not_rel_templator.is_relevant(text):
-                        hard_status = 0
-                    else:
-                        hard_status = 1
-                    new_keyword_setting = KeywordSetting(
-                        text=text,
-                        hard_status=hard_status,
-                        adv_setting_id=complex_adv.original_adv_setting_id
-                    )
-                    session.add(new_keyword_setting)
+                await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
             await session.commit()
 
+    async def create_new_keyword_settings(self, complex_adv: ComplexAdv, stats: list[KeywordStat]):
+        texts: list[str] = [stat.text for stat in stats]
+        async with sm(read_only=False) as session:
+            await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
+            await session.commit()
+
+    async def _add_new_keyword_settings_to_session(
+        self,
+        session: AsyncSession,
+        complex_adv: ComplexAdv,
+        texts: list[str],
+    ) -> None:
+        """Единая логика: существующие ключевые слова, new_texts, релевантность, добавление KeywordSetting в session."""
+        if not texts:
+            return
+        original_adv_id = complex_adv.original_adv_setting_id
+        exists_keywords_text: Sequence[str] = await self.__get_exists_keyword_settings_text(
+            original_adv_id, texts
+        )
+        new_texts: set[str] = set(texts) - set(exists_keywords_text)
+        relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
+        template_data = await relevant_phrase_manager.get_relevant_template_data()
+        not_rel_templator = NotRelevantTemplate(template_data)
+        for text in new_texts:
+            hard_status = 0 if not not_rel_templator.is_relevant(text) else 1
+            session.add(
+                KeywordSetting(
+                    text=text,
+                    hard_status=hard_status,
+                    adv_setting_id=original_adv_id,
+                )
+            )
 
     @staticmethod
     async def __get_exists_keyword_settings_text(original_adv_id: int, texts: list[str]) -> Sequence[str]:
@@ -77,31 +92,3 @@ class KeywordsManager:
             results = await session.execute(stmt)
             texts_exists: Sequence[str] = results.scalars().all()
         return texts_exists
-
-    async def create_new_keyword_settings(self, complex_adv: ComplexAdv, stats: list[KeywordStat]):
-        async with sm(read_only=False) as session:
-            original_adv_id = complex_adv.original_adv_setting_id
-            texts: list[str] = [stat.text for stat in stats]
-            exists_keywords_text: Sequence[str] = await self.__get_exists_keyword_settings_text(
-                original_adv_id,
-                texts
-            )
-            new_texts: set[str] = set(texts) - set(exists_keywords_text)
-
-            relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
-            template_data = await relevant_phrase_manager.get_relevant_template_data()
-            not_rel_templator = NotRelevantTemplate(template_data)
-
-            for text in new_texts:
-                if not not_rel_templator.is_relevant(text):
-                    hard_status = 0
-                else:
-                    hard_status = 1
-                new_keyword_setting = KeywordSetting(
-                    text=text,
-                    hard_status=hard_status,
-                    adv_setting_id=complex_adv.original_adv_setting_id
-                )
-                session.add(new_keyword_setting)
-
-            await session.commit()
