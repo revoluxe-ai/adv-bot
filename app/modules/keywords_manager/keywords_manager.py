@@ -67,7 +67,7 @@ class KeywordsManager:
             return
         original_adv_id = complex_adv.original_adv_setting_id
         exists_keywords_text: Sequence[str] = await self.__get_exists_keyword_settings_text(
-            original_adv_id, texts
+            session, original_adv_id, texts
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
         relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
@@ -84,11 +84,17 @@ class KeywordsManager:
             )
 
     @staticmethod
-    async def __get_exists_keyword_settings_text(original_adv_id: int, texts: list[str]) -> Sequence[str]:
-        # TODO: Тут ошибка в рантайм попала
-        stmt = select(KeywordSetting.text).where(KeywordSetting.text.in_(texts),
-                                                 KeywordSetting.adv_setting_id == original_adv_id)
-        async with sm(read_only=True) as session:
-            results = await session.execute(stmt)
-            texts_exists: Sequence[str] = results.scalars().all()
-        return texts_exists
+    async def __get_exists_keyword_settings_text(
+        session: AsyncSession,
+        original_adv_id: int,
+        texts: list[str],
+    ) -> Sequence[str]:
+        """Run in the same session so uncommitted adds in the same transaction are visible (avoids duplicate inserts when multiple stats map to the same adv_setting_id)."""
+        if not texts:
+            return ()
+        stmt = select(KeywordSetting.text).where(
+            KeywordSetting.text.in_(texts),
+            KeywordSetting.adv_setting_id == original_adv_id,
+        )
+        results = await session.execute(stmt)
+        return results.scalars().all()
