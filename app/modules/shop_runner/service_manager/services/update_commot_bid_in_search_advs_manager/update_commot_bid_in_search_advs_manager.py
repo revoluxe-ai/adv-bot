@@ -9,6 +9,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
     RedisCommonBidValueManager,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.shared.domains.wb.enums import AdvType
 
@@ -26,12 +27,18 @@ class UpdateCommotBidInSearchAdvsManager:
         self._redis_common_bid_value_manager = redis_common_bid_value_manager
 
     async def update_common_bid_in_search_adv(self, adv: WBAdvDTO) -> None:
-        count_auto_keywords: int = self._count_auto_keywords(adv)
+        count_auto_keywords: int = await self._count_auto_keywords(adv)
         direct: Literal['reset', 'up']
         if count_auto_keywords > 0:
             direct = 'reset'
         else:
-            direct = 'up'
+            fact_pay_for_order: float | None = adv.fact_pay_for_order
+            if fact_pay_for_order is None:
+                direct = 'reset'
+            elif fact_pay_for_order >= adv.plan.target_pay_for_order:
+                direct = 'reset'
+            else:
+                direct = 'up'
 
         nmids: list[int] = adv.nmids
         nmid_to_new_bid: dict[int, int | None] = {}
@@ -102,7 +109,9 @@ class UpdateCommotBidInSearchAdvsManager:
             if new_bid is not None
         ]
     @staticmethod
-    def _count_auto_keywords(adv: WBAdvDTO) -> int:
-        keywords = adv.keywords
-        auto_keywords = sum([kw for kw in keywords if kw.hard_status == 1])
+    async def _count_auto_keywords(adv: WBAdvDTO) -> int:
+        from app.modules.keywords_manager.keywords_manager import KeywordsManager
+        keywords_manager = KeywordsManager()
+        candidates: list[CalculatedKeyword] = await keywords_manager.get_candidates_to_white_list(adv.complex_adv)
+        auto_keywords = len(candidates)
         return auto_keywords

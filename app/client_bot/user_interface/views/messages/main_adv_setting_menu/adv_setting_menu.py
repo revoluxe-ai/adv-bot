@@ -122,9 +122,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._reason_auto = None
         self._reason_search = None
-        self._shop_balance_snapshot: dict | None = None
-        self._topup_failed: dict | None = None
-        self._last_topup_success: dict | None = None
+        self._shop_balance_snapshot: dict[str, int | str] | None = None
+        self._topup_failed: dict[str, str] | None = None
+        self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
         self._spend_auto_today: float | None = None
@@ -296,7 +296,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             self._reason_search = None
 
         shop_id: str | None = None
-        if self.adv.wb_cabinet_id is not None:
+        if self.adv.wb_cabinet_id is not None:  # type: ignore[comparison-overlap]
             async with sm(read_only=True) as session:
                 result = await session.execute(
                     select(WBCabinet.shop_id).where(
@@ -411,12 +411,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         # Предупреждение о неудачном пополнении (из Redis) — показываем всегда при наличии записи
         if self._topup_failed:
-            failed_at = self._topup_failed.get("failed_at", "")
+            failed_at: str = self._topup_failed.get("failed_at", "")
             try:
                 dt = datetime.fromisoformat(
                     failed_at.replace("Z", "+00:00")
                 ).astimezone(MSK_TZ)
-                failed_at_str = dt.strftime("%d.%m.%Y %H:%M")
+                failed_at_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
                 failed_at_str = failed_at or "—"
             text += (
@@ -426,15 +426,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
         if self._shop_balance_snapshot:
-            bal = self._shop_balance_snapshot.get("balance", 0)
-            net = self._shop_balance_snapshot.get("net", 0)
-            bonus = self._shop_balance_snapshot.get("bonus", 0)
-            updated_at = self._shop_balance_snapshot.get("updated_at", "")
+            bal: int = int(self._shop_balance_snapshot.get("balance", 0))
+            net: int = int(self._shop_balance_snapshot.get("net", 0))
+            bonus: int = int(self._shop_balance_snapshot.get("bonus", 0))
+            updated_at: str = str(self._shop_balance_snapshot.get("updated_at", ""))
             try:
                 dt = datetime.fromisoformat(
                     updated_at.replace("Z", "+00:00")
                 ).astimezone(MSK_TZ)
-                updated_str = dt.strftime("%d.%m.%Y %H:%M")
+                updated_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
                 updated_str = updated_at or "—"
             text += (
@@ -445,15 +445,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             text += "Бал маг: нет данных\n"
 
         # Последнее успешное пополнение
-        if self._last_topup_success and self._last_topup_success.get("at"):
-            at = self._last_topup_success.get("at", "")
+        at_val: str = (self._last_topup_success or {}).get("at", "")
+        if self._last_topup_success and at_val:
             try:
                 dt = datetime.fromisoformat(
-                    at.replace("Z", "+00:00")
+                    at_val.replace("Z", "+00:00")
                 ).astimezone(MSK_TZ)
-                success_str = dt.strftime("%d.%m.%Y %H:%M")
+                success_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
-                success_str = at or "—"
+                success_str = at_val or "—"
             text += f"Посл усп поп: {success_str}\n"
         else:
             text += "Посл усп поп: н/д\n"

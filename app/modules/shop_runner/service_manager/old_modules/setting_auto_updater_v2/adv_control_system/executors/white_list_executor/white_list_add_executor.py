@@ -13,8 +13,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.shared.domains.wb.utils.cost_resolver import (
     resolve_target_cost_from_context,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 from .redis_cache import LastAutoAddPhraseToWhiteListV2
 
@@ -70,26 +68,9 @@ class WhiteListAddExecutor(BaseExecutor):
                 f"целевая={target_cost:.2f}, {current_pay_for_order / target_cost * 100:.1f}%)"
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-        # TODO: Централизовать отбор кандидатов в БС
-        # Фильтруем кандидатов для белого списка
-        def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
-            if keyword.views == 0:
-                return False
-            if keyword.hard_status != 1:
-                return False
-            if keyword.status == KeywordStatus.GOOD:
-                 return False
-            if ctx.complex_adv.auto_add_only_relevant_phrase and not keyword.relevant:
-                 return False
-            if (ctx.complex_adv.rec_system_promotion_mode_active
-                and keyword.above_rec_conversion is False
-                and ctx.complex_adv.auto_adv_active_status):
-                    return False
-            return True
-
-        keywords = await ctx.complex_adv.get_keywords()
-        candidates = list(filter(candidate_filter, keywords))
-
+        from app.modules.keywords_manager.keywords_manager import KeywordsManager
+        keywords_manager = KeywordsManager()
+        candidates = await keywords_manager.get_candidates_to_white_list(ctx.complex_adv)
         if not candidates:
             logger.debug(
                 f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: нет кандидатов для добавления"
