@@ -35,7 +35,8 @@ class UpdateCommotBidInSearchAdvsManager:
             fact_pay_for_order: float | None = adv.fact_pay_for_order
             if fact_pay_for_order is None:
                 direct = 'reset'
-            elif fact_pay_for_order >= adv.result_target_pay_for_order:
+            # TODO: Вынести этот коэффициент в общий настраиваемый grace-период
+            elif fact_pay_for_order >= adv.result_target_pay_for_order * 0.9:
                 direct = 'reset'
             else:
                 direct = 'up'
