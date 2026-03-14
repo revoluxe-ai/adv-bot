@@ -66,10 +66,12 @@ class UpdateCommotBidInSearchAdvsManager:
             bid_step: int = 1
             new_bid = current_bid + bid_step
         elif direct == 'reset':
-            min_bid = adv.search_adv_min_bids[current_nmid]
-            new_bid = min_bid
+            new_bid = adv.search_adv_min_bids[current_nmid]
         else:
             raise ValueError(f"Invalid direct: {direct}")
+        min_bid = adv.search_adv_min_bids[current_nmid]
+        if new_bid < min_bid:
+            new_bid = min_bid
         max_bid = adv.max_user_cpm_bid
         if new_bid > max_bid:
             new_bid = max_bid
