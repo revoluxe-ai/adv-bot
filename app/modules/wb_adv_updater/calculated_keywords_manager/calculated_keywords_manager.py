@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from collections.abc import Awaitable, Callable
@@ -76,16 +75,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             -> list[CalculatedKeyword]:
         # TODO: Сделать на будущее более глобальные объекты для списков, в котором будут передаваться не только данные, но и метаданные
         # TODO: тут получаем только для одного артикула, возможно, что нал
-        results = await asyncio.gather(
-            self._get_all_keyword_setting(complex_adv),
-            self._get_all_stats(complex_adv, min_days, min_views),
-        )
-        keyword_hard_statuses: list[KeywordHardStatus] = list(results[0])
-        stats_with_bid_log: _StatsWithBidLog = results[1]
+        stats_with_bid_log = await self._get_all_stats(complex_adv, min_days, min_views)
+        from app.modules.keywords_manager.keywords_manager import KeywordsManager
+        keyword_manager = KeywordsManager()
         stats = stats_with_bid_log.stats
+        await keyword_manager.create_new_keyword_settings(complex_adv, stats)
+        keyword_hard_statuses = await self._get_all_keyword_setting(complex_adv)
         bid_log_map = stats_with_bid_log.bid_log_map
         set_bid_map = stats_with_bid_log.set_bid_map
-
         pre_calculated_keywords = self.__create_pre_calculated_keywords(keyword_hard_statuses,
                                                                         stats,
                                                                         complex_adv)
@@ -127,7 +124,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     adv_for_ts, # pyright:ignore # noqa
                     redis_client
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa
                 set_bid_map = {}
 
         return _StatsWithBidLog(
@@ -286,6 +283,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
     async def _get_all_keyword_setting(self, complex_adv: 'ComplexAdv') -> list[KeywordHardStatus]:
         adv_setting_original_id = complex_adv.original_adv_setting_id
+
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
         async with sm(read_only=True) as session:
             result = await session.execute(stmt)
