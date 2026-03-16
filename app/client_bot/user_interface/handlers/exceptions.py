@@ -55,6 +55,9 @@ async def error_handler_for_telegram_bad_request_exception(
         getattr(exc, "message", None),
         exc_info=True,
     )
+    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
+    if "caption is too long" in error_text:
+        raise error_event.exception
     await state.set_state()
     message = error_event.update.message
     if message is None:
@@ -64,9 +67,6 @@ async def error_handler_for_telegram_bad_request_exception(
         chat_id = int(error_event.update.callback_query.message.chat.id)
     else:
         chat_id = message.chat.id
-    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
-    if "caption is too long" in error_text:
-        raise error_event.exception
     await bot.send_message(
         chat_id=chat_id,
         text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
