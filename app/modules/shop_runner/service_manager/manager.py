@@ -921,6 +921,7 @@ class CoroutinesManager:
         resolver = CurrentCommonBidsResolver(
             redis_common_bid_value_manager=self._redis_common_bid_value_manager,
             wb_data_manager=wb_manager_hub.wb_data_manager,
+            wb_shop_data_manager=self._wb_shop_data_manager,
         )
         manager = UpdateCommotBidInSearchAdvsManager(
             wb_modifier=wb_manager_hub.wb_modifier,

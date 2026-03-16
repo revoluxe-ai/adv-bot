@@ -35,6 +35,7 @@ from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
 
 if typing.TYPE_CHECKING:
+    from app.modules.cpm_sources_resolver.dto import CurrentBidDTO
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 
@@ -81,9 +82,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         current_bids = await CpmSourcesResolver().get_current_bids(
             complex_adv, texts, stats_cpm_by_text={s.text: s.cpm for s in stats}
         )
-        current_bids_dict = {dto.text: dto.bid for dto in current_bids}
+        current_bids_by_text = {dto.text: dto for dto in current_bids}
         pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
-            pre_calculated_keywords, current_bids_dict
+            pre_calculated_keywords, current_bids_by_text
         )
         calculated_keyword_list = await self.__get_calculated_keywords(complex_adv, pre_calculated_keywords)
         await self._set_calculated_keywords_in_redis_cache(complex_adv, calculated_keyword_list)
@@ -99,21 +100,54 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
     @staticmethod
     def __enrich_pre_calculated_with_cpm_sources(
         pre_keywords: list[PreCalculatedKeyword],
-        current_bids: dict[str, int],
+        current_bids_by_text: dict[str, CurrentBidDTO],
     ) -> list[PreCalculatedKeyword]:
-        """Подставляет CPM из current_bids (резолвер) или cluster_stat.cpm в KeywordCpmSources."""
+        """Подставляет CPM из резолвера в нужное поле KeywordCpmSources по source (set_bid → bid_log → stats)."""
         enriched: list[PreCalculatedKeyword] = []
         for pre_kw in pre_keywords:
             text = pre_kw.keyword_setting.text
-            cpm_from_stats = float(current_bids[text]) if text in current_bids else pre_kw.cluster_stat.cpm
-            sources = KeywordCpmSources(
-                cpm_set_bid=None,
-                cpm_set_bid_date=None,
-                cpm_from_bid_log=None,
-                cpm_from_bid_log_date=None,
-                cpm_from_stats=cpm_from_stats,
-                cpm_from_stats_date=None,
-            )
+            dto = current_bids_by_text.get(text)
+            if dto is not None:
+                bid_val = float(dto.bid)
+                ts = dto.timestamp
+                if dto.source == "set_bid":
+                    sources = KeywordCpmSources(
+                        cpm_set_bid=dto.bid,
+                        cpm_set_bid_date=ts,
+                        cpm_from_bid_log=None,
+                        cpm_from_bid_log_date=None,
+                        cpm_from_stats=None,
+                        cpm_from_stats_date=None,
+                    )
+                elif dto.source == "bid_log":
+                    sources = KeywordCpmSources(
+                        cpm_set_bid=None,
+                        cpm_set_bid_date=None,
+                        cpm_from_bid_log=bid_val,
+                        cpm_from_bid_log_date=ts,
+                        cpm_from_stats=None,
+                        cpm_from_stats_date=None,
+                    )
+                else:
+                    # "api" or "stats"
+                    sources = KeywordCpmSources(
+                        cpm_set_bid=None,
+                        cpm_set_bid_date=None,
+                        cpm_from_bid_log=None,
+                        cpm_from_bid_log_date=None,
+                        cpm_from_stats=bid_val,
+                        cpm_from_stats_date=None,
+                    )
+            else:
+                cpm_from_stats = pre_kw.cluster_stat.cpm
+                sources = KeywordCpmSources(
+                    cpm_set_bid=None,
+                    cpm_set_bid_date=None,
+                    cpm_from_bid_log=None,
+                    cpm_from_bid_log_date=None,
+                    cpm_from_stats=cpm_from_stats,
+                    cpm_from_stats_date=None,
+                )
             enriched.append(
                 PreCalculatedKeyword(
                     adv_id=pre_kw.adv_id,

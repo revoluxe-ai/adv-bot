@@ -21,9 +21,11 @@ class CurrentCommonBidsResolver:
         self,
         redis_common_bid_value_manager: RedisCommonBidValueManager,
         wb_data_manager: WBDataManager,
+        wb_shop_data_manager: WBShopDataManager,
     ) -> None:
         self._redis = redis_common_bid_value_manager
         self._wb_data_manager = wb_data_manager
+        self._wb_shop_data_manager = wb_shop_data_manager
 
     async def get_merged_bids(
         self, complex_advs: list[ComplexAdv]
@@ -37,7 +39,7 @@ class CurrentCommonBidsResolver:
         api_bids_raw = await self._wb_data_manager.get_current_bids_for_advs(
             complex_advs
         )
-        api_aggregated = WBShopDataManager._aggregate_bids(api_bids_raw) # pyright: ignore # noqa
+        api_aggregated = self._wb_shop_data_manager.aggregate_bids(api_bids_raw)
         result: dict[int, dict[int, int]] = {}
         for adv in complex_advs:
             search_adv_id = adv.search_adv_id

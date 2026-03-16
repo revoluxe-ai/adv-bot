@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, cast
 
-from .dto import CurrentBidDTO
+from .dto import CurrentBidDTO, CpmBidSource
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
@@ -82,22 +82,29 @@ class CpmSourcesResolver:
         for text in texts:
             val: float | None = None
             ts: datetime | None = None
+            source: CpmBidSource = "stats"
             if text in set_bid_map:
                 val = set_bid_map[text][0]
                 raw_ts = set_bid_map[text][1]
                 ts = raw_ts if isinstance(raw_ts, datetime) else None
+                source = "set_bid"
             elif text in api_bids:
                 val = float(api_bids[text])
                 ts = None
+                source = "api"
             elif text in bid_log_map:
                 val = bid_log_map[text][0]
                 raw_ts = bid_log_map[text][1]
                 ts = raw_ts if isinstance(raw_ts, datetime) else None
+                source = "bid_log"
             elif text in stats:
                 val = stats[text]
                 ts = None
+                source = "stats"
             if val is not None:
                 result.append(
-                    CurrentBidDTO(text=text, bid=int(round(val)), timestamp=ts)
+                    CurrentBidDTO(
+                        text=text, bid=int(round(val)), timestamp=ts, source=source
+                    )
                 )
         return result
