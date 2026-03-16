@@ -913,8 +913,16 @@ class CoroutinesManager:
             return None
 
         # TODO: Ускорить работу, как вариант - переделать на генераторы
-        from .services.update_commot_bid_in_search_advs_manager import  UpdateCommotBidInSearchAdvsManager
+        from .services.update_commot_bid_in_search_advs_manager import (
+            CurrentCommonBidsResolver,
+            UpdateCommotBidInSearchAdvsManager,
+        )
         wb_manager_hub = self._wb_manager_hub
+        resolver = CurrentCommonBidsResolver(
+            redis_common_bid_value_manager=self._redis_common_bid_value_manager,
+            wb_data_manager=wb_manager_hub.wb_data_manager,
+            wb_shop_data_manager=self._wb_shop_data_manager,
+        )
         manager = UpdateCommotBidInSearchAdvsManager(
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
@@ -928,7 +936,10 @@ class CoroutinesManager:
         complex_advs, _ = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_common_bid_in_search_adv"
         )
-        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+        search_adv_bids = await resolver.get_merged_bids(complex_advs)
+        advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
+            complex_advs, search_adv_bids_override=search_adv_bids
+        )
 
         if not advs:
             return None
