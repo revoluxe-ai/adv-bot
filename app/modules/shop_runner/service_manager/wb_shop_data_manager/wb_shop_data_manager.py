@@ -268,6 +268,11 @@ class WBShopDataManager:
         )
         return self._aggregate_bids(bids)
 
+
+    def aggregate_bids(self, bids: list[NormqueryBidDTO] | None,) -> dict[int, dict[int, int]]:
+        return self._aggregate_bids(bids)
+
+
     @staticmethod
     def _aggregate_bids(
         bids: list[NormqueryBidDTO] | None,

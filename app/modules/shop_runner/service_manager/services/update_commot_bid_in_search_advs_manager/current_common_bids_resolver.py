@@ -37,7 +37,7 @@ class CurrentCommonBidsResolver:
         api_bids_raw = await self._wb_data_manager.get_current_bids_for_advs(
             complex_advs
         )
-        api_aggregated = WBShopDataManager._aggregate_bids(api_bids_raw)
+        api_aggregated = WBShopDataManager._aggregate_bids(api_bids_raw) # pyright: ignore # noqa
         result: dict[int, dict[int, int]] = {}
         for adv in complex_advs:
             search_adv_id = adv.search_adv_id
