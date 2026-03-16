@@ -81,8 +81,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         current_bids = await CpmSourcesResolver().get_current_bids(
             complex_adv, texts, stats_cpm_by_text={s.text: s.cpm for s in stats}
         )
+        current_bids_dict = {dto.text: dto.bid for dto in current_bids}
         pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
-            pre_calculated_keywords, current_bids
+            pre_calculated_keywords, current_bids_dict
         )
         calculated_keyword_list = await self.__get_calculated_keywords(complex_adv, pre_calculated_keywords)
         await self._set_calculated_keywords_in_redis_cache(complex_adv, calculated_keyword_list)
