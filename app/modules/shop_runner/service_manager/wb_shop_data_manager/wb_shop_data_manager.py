@@ -45,7 +45,7 @@ class WBAdvDataParts:
     plan: PlanData
     fact: FactData
     keywords: list[CalculatedKeyword]
-    current_common_bids_in_search_adv: dict[int, int]
+    current_common_bids_in_search_adv: dict[int, int] | None
 
 
 class WBShopDataManager:
@@ -130,9 +130,6 @@ class WBShopDataManager:
         for complex_adv in complex_advs:
             search_adv_id = complex_adv.search_adv_id
             current_search_bids = search_adv_bids.get(search_adv_id)
-            if current_search_bids is None:
-                logger.error('не получены текущие ставки для ComplexAdv.adv_id: " %s', complex_adv.adv_id)
-                continue
             complex_advs_with_bids.append(complex_adv)
             handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
             handlers.append(handler)
@@ -189,7 +186,7 @@ class WBShopDataManager:
     async def _collect_adv_data_parts(
         self,
         complex_adv: ComplexAdv,
-        search_adv_bids: dict[int, dict[int, int]],
+        search_adv_bids: dict[int, dict[int, int] | None],
     ) -> WBAdvDataParts:
         plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
         keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
@@ -203,7 +200,7 @@ class WBShopDataManager:
             plan=plan,
             fact=fact,
             keywords=keywords,
-            current_common_bids_in_search_adv=search_adv_bids # noqa
+            current_common_bids_in_search_adv=search_adv_bids
         )
 
     @single_run()
