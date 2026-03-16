@@ -59,15 +59,19 @@ class UpdateCommotBidInSearchAdvsManager:
             for item in command_items
             if item.new_bid is not None
         }
-        if adv.adv_id and bid_values:
-            await self._redis_common_bid_value_manager.set_bids(adv.adv_id, bid_values)
+        search_adv_id = adv.complex_adv.search_adv_id
+        if search_adv_id is not None and bid_values:
+            await self._redis_common_bid_value_manager.set_bids(search_adv_id, bid_values)
         return None
 
 
     @staticmethod
     def _get_new_bid(adv: WBAdvDTO, current_nmid: int, direct: Literal['reset', 'up']) -> int | None:
         current_common_bids = adv.current_common_bids_in_search_adv
-        current_bid: int = current_common_bids[current_nmid]
+        if current_common_bids is not None and current_nmid in current_common_bids:
+            current_bid = current_common_bids[current_nmid]
+        else:
+            current_bid = adv.search_adv_min_bids[current_nmid]
         if not current_bid:
             return None
         if direct == 'up':
