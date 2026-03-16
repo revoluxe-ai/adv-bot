@@ -1,4 +1,4 @@
-"""Resolve current CPM bids from cascade: Redis set_bid → bid_decision_log → stats. Returns dict[str, int]."""
+"""Resolve current CPM bids from cascade: Redis set_bid → WB API → bid_decision_log → stats. Returns dict[str, int]."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class _AdvForTimestamp:
 
 
 class CpmSourcesResolver:
-    """Resolves current bid (CPM) per norm_query from cache and ClickHouse sources."""
+    """Resolves current bid (CPM) per norm_query from cache, WB API, and ClickHouse sources."""
 
     async def get_current_bids(
         self,
@@ -29,11 +29,28 @@ class CpmSourcesResolver:
         stats_cpm_by_text: dict[str, float] | None = None,
     ) -> dict[str, int]:
         """
-        Resolve current bid per text from cascade: set_bid (Redis) → bid_log (bid_decision_log) → stats.
+        Resolve current bid per text from cascade: set_bid (Redis) → WB API → bid_log (bid_decision_log) → stats.
         Returns only keys for which a value was resolved; caller may fall back to cluster_stat.cpm for the rest.
         """
         if not texts:
             return {}
+        api_bids: dict[str, int] = {}
+        try:
+            from app.core.di.wb_manager_hub import WBManagerHubFactory
+
+            hub = WBManagerHubFactory.get_wb_manager_from_context()
+            wb_data_manager = hub.wb_data_manager
+            bids = await wb_data_manager.get_current_bids_for_advs([complex_adv])
+            if bids:
+                for dto in bids:
+                    q = dto.norm_query
+                    b = dto.bid
+                    if q not in api_bids:
+                        api_bids[q] = b
+                    else:
+                        api_bids[q] = max(api_bids[q], b)
+        except Exception:  # noqa: BLE001
+            api_bids = {}
         search_adv_id = getattr(complex_adv, "search_adv_id", None)
         nmids = complex_adv.nmids
         set_bid_map: dict[str, tuple[float, object]] = {}
@@ -63,6 +80,8 @@ class CpmSourcesResolver:
             val = None
             if text in set_bid_map:
                 val = set_bid_map[text][0]
+            elif text in api_bids:
+                val = float(api_bids[text])
             elif text in bid_log_map:
                 val = bid_log_map[text][0]
             elif text in stats:
