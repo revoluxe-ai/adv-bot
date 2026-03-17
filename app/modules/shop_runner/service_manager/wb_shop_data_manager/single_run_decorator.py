@@ -11,8 +11,22 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 logger = logging.getLogger(__name__)
 
 
+def _to_hashable(val: Any) -> Any:
+    """Convert a value to a hashable form for cache key; dicts become sorted tuples."""
+    if isinstance(val, dict):
+        return tuple(sorted((_to_hashable(k), _to_hashable(v)) for k, v in val.items()))
+    if isinstance(val, (list, tuple)):
+        return tuple(_to_hashable(x) for x in val)
+    try:
+        hash(val)
+        return val
+    except TypeError:
+        raise TypeError(f"Unhashable type in single_run cache key: {type(val)}") from None
+
+
 def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> str:
-    return f"{func_name}:{args}:{frozenset(kwargs.items())}"
+    key_items = [(k, _to_hashable(v)) for k, v in kwargs.items()]
+    return f"{func_name}:{args}:{frozenset(key_items)}"
 
 
 def single_run() -> (

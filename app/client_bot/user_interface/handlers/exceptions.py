@@ -55,6 +55,9 @@ async def error_handler_for_telegram_bad_request_exception(
         getattr(exc, "message", None),
         exc_info=True,
     )
+    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
+    if "caption is too long" in error_text:
+        raise error_event.exception
     await state.set_state()
     message = error_event.update.message
     if message is None:

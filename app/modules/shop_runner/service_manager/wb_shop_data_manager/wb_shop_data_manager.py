@@ -45,7 +45,7 @@ class WBAdvDataParts:
     plan: PlanData
     fact: FactData
     keywords: list[CalculatedKeyword]
-    current_common_bids_in_search_adv: dict[int, int]
+    current_common_bids_in_search_adv: dict[int, int] | None
 
 
 class WBShopDataManager:
@@ -103,7 +103,11 @@ class WBShopDataManager:
         return adv_dict
 
     @single_run()
-    async def get_wb_advs_dto(self, complex_advs: list[ComplexAdv] ) -> list[WBAdvDTO]:
+    async def get_wb_advs_dto(
+        self,
+        complex_advs: list[ComplexAdv],
+        search_adv_bids_override: dict[int, dict[int, int]] | None = None,
+    ) -> list[WBAdvDTO]:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs_with_search_adv: list[ComplexAdv] = []
         for complex_adv in complex_advs:
@@ -117,10 +121,14 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
-        min_bids, search_adv_bids = await asyncio.gather(
-            self._get_min_bids(complex_advs, cache_possible=True),
-            self._get_search_adv_common_bids(complex_advs),
-        )
+        if search_adv_bids_override is not None:
+            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            search_adv_bids = search_adv_bids_override
+        else:
+            min_bids, search_adv_bids = await asyncio.gather(
+                self._get_min_bids(complex_advs, cache_possible=True),
+                self._get_search_adv_common_bids(complex_advs),
+            )
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
 
@@ -129,12 +137,15 @@ class WBShopDataManager:
         complex_advs_with_bids: list[ComplexAdv] = []
         for complex_adv in complex_advs:
             search_adv_id = complex_adv.search_adv_id
-            current_search_bids = search_adv_bids.get(search_adv_id)
-            if current_search_bids is None:
-                logger.error('не получены текущие ставки для ComplexAdv.adv_id: " %s', complex_adv.adv_id)
-                continue
+            current_search_bids = (
+                search_adv_bids.get(search_adv_id)
+                if search_adv_id is not None
+                else None
+            )
             complex_advs_with_bids.append(complex_adv)
-            handler = partial(self._collect_adv_data_parts, complex_adv, current_search_bids)
+            handler = partial(
+                self._collect_adv_data_parts, complex_adv, current_search_bids
+            )
             handlers.append(handler)
 
         max_workers = max(1, min(len(handlers), 16))
@@ -189,7 +200,7 @@ class WBShopDataManager:
     async def _collect_adv_data_parts(
         self,
         complex_adv: ComplexAdv,
-        search_adv_bids: dict[int, dict[int, int]],
+        current_search_bids: dict[int, int] | None,
     ) -> WBAdvDataParts:
         plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
         keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
@@ -203,7 +214,7 @@ class WBShopDataManager:
             plan=plan,
             fact=fact,
             keywords=keywords,
-            current_common_bids_in_search_adv=search_adv_bids # noqa
+            current_common_bids_in_search_adv=current_search_bids,
         )
 
     @single_run()
@@ -256,6 +267,11 @@ class WBShopDataManager:
             complex_advs
         )
         return self._aggregate_bids(bids)
+
+
+    def aggregate_bids(self, bids: list[NormqueryBidDTO] | None,) -> dict[int, dict[int, int]]:
+        return self._aggregate_bids(bids)
+
 
     @staticmethod
     def _aggregate_bids(

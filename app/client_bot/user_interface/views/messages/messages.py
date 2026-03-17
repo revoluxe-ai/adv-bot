@@ -603,6 +603,7 @@ class KeywordSettingMessage(TextWithKeyboard):
             kw.cpm_set_bid,
             kw.cpm_set_bid_date,
         )
+        text += _cpm_line("CPM из API", kw.cpm_from_api, None)
         text += _cpm_line("Расчетная CPM", kw.cpm_from_bid_log, kw.cpm_from_bid_log_date)
         text += _cpm_line("CPM из исходной статистики", kw.cpm_from_stats, kw.cpm_from_stats_date)
         return text

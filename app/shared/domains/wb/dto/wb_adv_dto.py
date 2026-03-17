@@ -21,7 +21,9 @@ class WBAdvDTO:
     _fact: FactData = field(alias='fact')
     keywords: list[CalculatedKeyword]
     _min_bids: AdvMinNmidsBids = field(alias='min_bids')
-    _current_common_bids_in_search_adv: dict[int, int] = field(alias='current_common_bids_in_search_adv') # артикул ->  ставка
+    _current_common_bids_in_search_adv: dict[int, int] | None = field(
+        alias='current_common_bids_in_search_adv', default=None
+    )  # артикул -> ставка
 
     @property
     def plan(self)-> PlanData:
@@ -100,7 +102,7 @@ class WBAdvDTO:
 
 
     @property
-    def current_common_bids_in_search_adv(self) -> dict[int, int]:
+    def current_common_bids_in_search_adv(self) -> dict[int, int] | None:
         return self._current_common_bids_in_search_adv
 
 
