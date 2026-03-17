@@ -120,6 +120,8 @@ class CoroutinesManager:
         self._wb_api = wb_api
         self._access = wb_api.access
         self.shop_id = wb_api.shop_id
+        if not self.shop_id:
+            raise ValueError("CoroutinesManager requires non-empty shop_id")
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
         )
