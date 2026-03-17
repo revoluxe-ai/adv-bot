@@ -295,22 +295,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._reason_search = None
 
-        shop_id: str | None = None
-        if self.adv.wb_cabinet_id is not None:  # type: ignore[comparison-overlap]
-            async with sm(read_only=True) as session:
-                result = await session.execute(
-                    select(WBCabinet.shop_id).where(
-                        WBCabinet.id == self.adv.wb_cabinet_id
-                    )
+        async with sm(read_only=True) as session:
+            result = await session.execute(
+                select(WBCabinet.shop_id).where(
+                    WBCabinet.id == self.adv.wb_cabinet_id
                 )
-                row = result.one_or_none()
-                shop_id = row[0] if row else None
-        if shop_id is not None:
-            self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
-                shop_id
             )
-        else:
-            self._shop_balance_snapshot = None
+            shop_id = result.scalar_one()
+        self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
+            shop_id
+        )
         self._topup_failed = await self._topup_failed_manager.get(self.adv.id)
         self._last_topup_success = await self._last_success_manager.get(self.adv.id)
 

@@ -27,7 +27,7 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.user_interface.views.callbacks import Action
-from app.core.wb_api.exceptions import ApiForbiddenError, NotValidTokenError
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import (
     models as wb_models,
     super_cabinet_manager,
@@ -43,6 +43,7 @@ from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabine
 from app.modules.token_monitoring.services import get_shop_ids_with_complete_token_status
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.token_permissions import TokenPermissionsValidator
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -269,45 +270,54 @@ async def process_cabinet_api(
         )
         return None
 
-    wb_token = wb_models.WBToken(
-        api_key=text,
-    )
-    if wb_token.read_only:
+    # Validate token using centralized validator
+    validator = TokenPermissionsValidator(http_session=client_session)
+    validation_result = await validator.validate(text, mode="claims_plus_api")
+
+    if not validation_result.is_valid_jwt:
+        logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
+        _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        return None
+
+    if validation_result.is_read_only:
         logger.info("Token is read-only for user %s", user_telegram_id)
         _= await bot.send_message(
             chat_id,
             "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
         )
-        await state.set_state(
-            states.CabinetRegistration.api
-        )  # Возвращаем пользователя в состояние ввода токена
+        await state.set_state(states.CabinetRegistration.api)
         return None
-    try:
-        shop_id = wb_token.get_shop_id_from_token()
-    except NotValidTokenError:
-        logger.info("Invalid token (NotValidTokenError) for user %s", user_telegram_id)
-        _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
-        # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
-        logger.info(
-            "Sent invalid token message to user %s, keeping state", user_telegram_id
+
+    if validation_result.is_expired:
+        logger.info("Token is expired for user %s", user_telegram_id)
+        _= await bot.send_message(
+            chat_id,
+            "Токен истёк. Пожалуйста, создайте новый токен в личном кабинете Wildberries.",
         )
+        await state.set_state(states.CabinetRegistration.api)
         return None
-    except Exception as e:
-        # Catch all unexpected exceptions from token parsing to avoid silent failures
-        logger.warning(
-            "Unexpected error while validating token for user %s in AddNewToken flow: %s",
+
+    if not validation_result.can_be_used:
+        missing_str = ", ".join(sorted(validation_result.missing_required))
+        logger.info(
+            "Token missing required permissions for user %s: %s",
             user_telegram_id,
-            e,
-            exc_info=True,
+            missing_str,
         )
         _= await bot.send_message(
             chat_id,
-            "Токен не валиден или произошла ошибка при его обработке. Попробуйте ввести токен еще раз.",
+            f"Токен не имеет необходимых прав: {missing_str}.\n\n"
+            "Создайте токен с правами: Контент, Статистика, Аналитика, Продвижение.",
         )
-        # Не сбрасываем state — пользователь остаётся в состоянии ввода
-        logger.info(
-            "Sent error message to user %s after token parse exception, returning",
-            user_telegram_id,
+        await state.set_state(states.CabinetRegistration.api)
+        return None
+
+    shop_id = validation_result.shop_id
+    if not shop_id:
+        logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
+        _= await bot.send_message(
+            chat_id,
+            "Не удалось получить идентификатор магазина из токена. Попробуйте еще раз.",
         )
         return None
     async with sm() as session:
@@ -319,6 +329,8 @@ async def process_cabinet_api(
         result: Result[tuple[int]] = await session.execute(stmt_for_select_user_id)
         user_id: int = result.scalar() # type: ignore
 
+    # Create WBToken object for database storage
+    wb_token = wb_models.WBToken(api_key=text)
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
@@ -486,7 +498,7 @@ async def add_app_token(
 
 @router.message(StateFilter(states.AddNewToken.token))
 async def process_add_new_token(
-    message: Message, bot: aiogram.Bot, state: FSMContext
+    message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
 ) -> None:
     """
     Обработчик добавления нов��го токена для существующего магазина.
@@ -515,6 +527,7 @@ async def process_add_new_token(
             "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
         return None
+
     # Получение данных из состояния
     data_state = await state.get_data()
     wb_user_cabinet_original_id = data_state.get("wb_user_cabinet_original_id")
@@ -526,42 +539,54 @@ async def process_add_new_token(
         await state.clear()
         return None
 
-    # Создание и валидация токена
-    wb_token = wb_models.WBToken(api_key=text)
+    # Validate token using centralized validator
+    validator = TokenPermissionsValidator(http_session=client_session)
+    validation_result = await validator.validate(text, mode="claims_plus_api")
 
-    if wb_token.read_only:
+    if not validation_result.is_valid_jwt:
+        logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
+        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        return None
+
+    if validation_result.is_read_only:
         logger.info("Token is read-only for user %s", user_telegram_id)
         await bot.send_message(
             chat_id,
             "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
         )
-        await state.set_state(
-            states.AddNewToken.token
-        )  # Возвращаем пользователя в состояние ввода токена
+        await state.set_state(states.AddNewToken.token)
         return None
 
-    try:
-        shop_id = wb_token.get_shop_id_from_token()
-    except NotValidTokenError:
-        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
-        # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
+    if validation_result.is_expired:
+        logger.info("Token is expired for user %s", user_telegram_id)
+        await bot.send_message(
+            chat_id,
+            "Токен истёк. Пожалуйста, создайте новый токен в личном кабинете Wildberries.",
+        )
+        await state.set_state(states.AddNewToken.token)
         return None
-    except Exception as e:
-        # Catch all unexpected exceptions from token parsing to avoid silent failures
-        logger.warning(
-            "Unexpected error while validating token for user %s in AddNewToken flow: %s",
+
+    if not validation_result.can_be_used:
+        missing_str = ", ".join(sorted(validation_result.missing_required))
+        logger.info(
+            "Token missing required permissions for user %s: %s",
             user_telegram_id,
-            e,
-            exc_info=True,
+            missing_str,
         )
         await bot.send_message(
             chat_id,
-            "Токен не валиден или при его проверке произошла ошибка. Попробуйте ещё раз или свяжитесь с поддержкой.",
+            f"Токен не имеет необходимых прав: {missing_str}.\n\n"
+            "Создайте токен с правами: Контент, Статистика, Аналитика, Продвижение.",
         )
-        # Не сбрасываем state — пользователь остаётся в состоянии ввода
-        logger.info(
-            "Sent error message to user %s after token parse exception, returning",
-            user_telegram_id,
+        await state.set_state(states.AddNewToken.token)
+        return None
+
+    shop_id = validation_result.shop_id
+    if not shop_id:
+        logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
+        await bot.send_message(
+            chat_id,
+            "Не удалось получить идентификатор магазина из токена. Попробуйте еще раз.",
         )
         return None
     # Получение user_id из БД
@@ -595,7 +620,8 @@ async def process_add_new_token(
         )
         return None
 
-    # Установка атрибутов токена
+    # Create WBToken object for database storage
+    wb_token = wb_models.WBToken(api_key=text)
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
 
