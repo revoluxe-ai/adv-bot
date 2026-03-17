@@ -598,11 +598,6 @@ class CoroutinesManager:
                 )
             )
         ]
-        candidates, _ = await self._split_advs_by_stats_freshness(
-            candidates, operation_name="auto_budget_watchdog"
-        )
-        if not candidates:
-            return None
         wb_manager_hub = self._wb_manager_hub
         handlers: list[Callable[[], Awaitable[AutoBudgetEnsureResult | None]]] = []
         task_specs: list[tuple[AdvSetting, AdvType, int | None]] = []
