@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
@@ -27,78 +27,35 @@ class StrategySelection:
 
 class AdvStrategySelector:
     @staticmethod
-    async def _is_target_cost_exceeded(
-        complex_adv: ComplexAdv,
+    def _is_target_cost_exceeded(
         *,
-        plan_fact_reader: PlanFactReader,
+        plan: Any | None,
+        summary: Any | None,
     ) -> bool:
         """True if plan/fact data exist and fact_pay_for_order > target_cost."""
-        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
-        if plan is None:
+        if plan is None or summary is None:
             return False
-        summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
-        if summary is None:
-            return False
-        if summary.fact_predict_orders is None or summary.fact_pay_for_order is None:
+        fact_orders = summary.fact_predict_orders
+        fact_pay_for_order = summary.fact_pay_for_order
+        if fact_orders is None or fact_pay_for_order is None:
             return False
         target_cost = resolve_target_cost(
             plan.orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
-            summary.fact_predict_orders,
+            fact_orders,
         )
         if target_cost is None:
             return False
-        return summary.fact_pay_for_order > target_cost
-
-    async def select_target_strategy(
-        self,
-        complex_adv: ComplexAdv,
-        *,
-        plan_fact_reader: PlanFactReader,
-    ) -> StrategySelection | None:
-        if await self._is_target_cost_exceeded(
-            complex_adv, plan_fact_reader=plan_fact_reader
-        ):
-            return StrategySelection(
-                strategy=Strategy.MIN_CPO,
-                reason="cost_above_target",
-            )
-        if not complex_adv.rec_system_promotion_mode_active:
-            return await self._select_by_plan_and_cost(
-                complex_adv=complex_adv,
-                plan_fact_reader=plan_fact_reader,
-            )
-
-        if not complex_adv.auto_adv_active_status:
-            return await self._select_by_plan_and_cost(
-                complex_adv=complex_adv,
-                plan_fact_reader=plan_fact_reader,
-            )
-
-        keywords = await complex_adv.get_keywords()
-        if self._all_shelf_keywords_activated(keywords):
-            return StrategySelection(
-                strategy=Strategy.MAX_CONV,
-                reason="all_shelf_keywords_activated",
-            )
-        return StrategySelection(
-            strategy=Strategy.MIN_CPO,
-            reason="not_all_shelf_keywords_activated",
-        )
+        return fact_pay_for_order > target_cost
 
     @staticmethod
-    async def _select_by_plan_and_cost(
+    def _select_by_plan_and_cost(
         *,
-        complex_adv: ComplexAdv,
-        plan_fact_reader: PlanFactReader,
+        plan: Any | None,
+        summary: Any | None,
     ) -> StrategySelection | None:
-        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
-        if plan is None:
-            return None
-
-        summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
-        if summary is None:
+        if plan is None or summary is None:
             return None
 
         fact_orders = summary.fact_predict_orders
@@ -130,6 +87,45 @@ class AdvStrategySelector:
         return StrategySelection(
             strategy=Strategy.MAX_CONV,
             reason="cost_below_or_equal_target",
+        )
+
+    async def select_target_strategy(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        plan_fact_reader: PlanFactReader,
+    ) -> StrategySelection | None:
+        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
+        summary = None
+        if plan is not None:
+            summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
+
+        if self._is_target_cost_exceeded(plan=plan, summary=summary):
+            return StrategySelection(
+                strategy=Strategy.MIN_CPO,
+                reason="cost_above_target",
+            )
+        if not complex_adv.rec_system_promotion_mode_active:
+            return self._select_by_plan_and_cost(
+                plan=plan,
+                summary=summary,
+            )
+
+        if not complex_adv.auto_adv_active_status:
+            return self._select_by_plan_and_cost(
+                plan=plan,
+                summary=summary,
+            )
+
+        keywords = await complex_adv.get_keywords()
+        if self._all_shelf_keywords_activated(keywords):
+            return StrategySelection(
+                strategy=Strategy.MAX_CONV,
+                reason="all_shelf_keywords_activated",
+            )
+        return StrategySelection(
+            strategy=Strategy.MIN_CPO,
+            reason="not_all_shelf_keywords_activated",
         )
 
     @staticmethod

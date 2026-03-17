@@ -106,6 +106,30 @@ async def test_select_target_strategy_base_rule_cost_branches() -> None:
 
 
 @pytest.mark.asyncio
+async def test_select_target_strategy_plan_and_cost_path_reads_plan_fact_once() -> None:
+    selector = AdvStrategySelector()
+    reader = _plan_fact_reader(fact_orders=4.0, fact_pay_for_order=160.0)
+    complex_adv = _make_complex_adv(
+        rec_system_promotion_mode_active=False,
+        auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        fact_orders=4.0,
+        fact_pay_for_order=160.0,
+    )
+
+    result = await selector.select_target_strategy(
+        complex_adv,
+        plan_fact_reader=reader,
+    )
+
+    assert result is not None
+    assert result.strategy == Strategy.MAX_CONV
+    reader.get_latest_plan_fact.assert_awaited_once_with(complex_adv.adv_id)
+
+
+@pytest.mark.asyncio
 async def test_select_target_strategy_rec_mode_inactive_auto_falls_back_to_base_logic() -> None:
     selector = AdvStrategySelector()
     complex_adv = _make_complex_adv(
