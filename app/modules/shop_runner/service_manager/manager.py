@@ -107,6 +107,8 @@ class CoroutinesManager:
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
+        if not wb_api.shop_id:
+            raise ValueError("CoroutinesManager requires non-empty shop_id")
         if wb_manager_hub is None:
             wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()  # fallback for tests
         self._wb_manager_hub = wb_manager_hub
