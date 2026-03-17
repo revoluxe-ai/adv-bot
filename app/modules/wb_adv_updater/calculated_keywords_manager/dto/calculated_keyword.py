@@ -61,6 +61,10 @@ class CalculatedKeyword(BaseModel):
         return self.cpm_sources.cpm_set_bid_date if self.cpm_sources else None
 
     @property
+    def cpm_from_api(self) -> int | None:
+        return self.cpm_sources.cpm_from_api if self.cpm_sources else None
+
+    @property
     def cpm_from_bid_log(self) -> float | None:
         return self.cpm_sources.cpm_from_bid_log if self.cpm_sources else None
 
