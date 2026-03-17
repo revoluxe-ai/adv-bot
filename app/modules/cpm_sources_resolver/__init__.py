@@ -1,6 +1,6 @@
-"""CPM sources resolver: resolve current bids from Redis → WB API → bid_log → stats. Exposes DTO and resolver."""
+"""CPM sources resolver: Redis → WB API → bid_log. Exposes AllCpmSourcesPerText and CpmSourcesResolver.get_all_sources."""
 
-from .dto import AllCpmSourcesPerText, CurrentBidDTO
+from .dto import AllCpmSourcesPerText
 from .resolver import CpmSourcesResolver
 
-__all__ = ("AllCpmSourcesPerText", "CurrentBidDTO", "CpmSourcesResolver")
+__all__ = ("AllCpmSourcesPerText", "CpmSourcesResolver")

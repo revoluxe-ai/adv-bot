@@ -1,4 +1,4 @@
-"""Resolve current CPM bids from cascade: Redis set_bid → WB API → bid_decision_log → stats. Returns list[CurrentBidDTO]."""
+"""Resolve CPM sources from cascade: Redis set_bid → WB API → bid_decision_log. Exposes get_all_sources for UI."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime
 from typing import TYPE_CHECKING, cast
 
-from .dto import AllCpmSourcesPerText, CurrentBidDTO, CpmBidSource
+from .dto import AllCpmSourcesPerText
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
@@ -81,56 +81,7 @@ async def _fetch_set_bid_and_bid_log_maps(
 
 
 class CpmSourcesResolver:
-    """Resolves current bid (CPM) per norm_query from cache, WB API, and ClickHouse sources."""
-
-    @staticmethod
-    async def get_current_bids(
-        complex_adv: ComplexAdv,
-        texts: list[str],
-        stats_cpm_by_text: dict[str, float] | None = None,
-    ) -> list[CurrentBidDTO]:
-        """
-        Resolve current bid per text from cascade: set_bid (Redis) → WB API → bid_log (bid_decision_log) → stats.
-        Returns list of DTOs (text, bid, timestamp); timestamp is set from set_bid_map or bid_log_map when available.
-        API request is wrapped in asyncio.wait_for(..., timeout=1.0); on timeout/error fallback to empty api_bids.
-        """
-        if not texts:
-            return []
-        set_bid_map, bid_log_map = await _fetch_set_bid_and_bid_log_maps(
-            complex_adv, texts
-        )
-        api_bids = await _fetch_api_bids(complex_adv)
-        stats = stats_cpm_by_text or {}
-        result: list[CurrentBidDTO] = []
-        for text in texts:
-            val: float | None = None
-            ts: datetime | None = None
-            source: CpmBidSource = "stats"
-            if text in set_bid_map:
-                val = set_bid_map[text][0]
-                raw_ts = set_bid_map[text][1]
-                ts = raw_ts if isinstance(raw_ts, datetime) else None
-                source = "set_bid"
-            elif text in api_bids:
-                val = float(api_bids[text])
-                ts = None
-                source = "api"
-            elif text in bid_log_map:
-                val = bid_log_map[text][0]
-                raw_ts = bid_log_map[text][1]
-                ts = raw_ts if isinstance(raw_ts, datetime) else None
-                source = "bid_log"
-            elif text in stats:
-                val = stats[text]
-                ts = None
-                source = "stats"
-            if val is not None:
-                result.append(
-                    CurrentBidDTO(
-                        text=text, bid=int(round(val)), timestamp=ts, source=source
-                    )
-                )
-        return result
+    """Resolves CPM sources per norm_query from cache, WB API, and ClickHouse for UI (get_all_sources)."""
 
     @staticmethod
     async def get_all_sources(
@@ -142,10 +93,10 @@ class CpmSourcesResolver:
         """
         if not texts:
             return {}
-        set_bid_map, bid_log_map = await _fetch_set_bid_and_bid_log_maps(
-            complex_adv, texts
+        (set_bid_map, bid_log_map), api_bids = await asyncio.gather(
+            _fetch_set_bid_and_bid_log_maps(complex_adv, texts),
+            _fetch_api_bids(complex_adv),
         )
-        api_bids = await _fetch_api_bids(complex_adv)
         result: dict[str, AllCpmSourcesPerText] = {}
         for text in texts:
             cpm_set_bid: int | None = None
