@@ -26,11 +26,14 @@ def _get_shop_id_for_log(args: tuple[Any, ...]) -> str:
     if not args:
         return "missing_shop_id(no_self)"
     obj = args[0]
-    if getattr(obj, "shop_id", None) not in (None, ""):
-        return str(getattr(obj, "shop_id"))
+    shop_id = getattr(obj, "shop_id", None)
+    if shop_id not in (None, ""):
+        return str(shop_id)
     wb_api = getattr(obj, "_wb_api", None)
-    if wb_api is not None and getattr(wb_api, "shop_id", None) not in (None, ""):
-        return str(getattr(wb_api, "shop_id"))
+    if wb_api is not None:
+        wb_shop_id = getattr(wb_api, "shop_id", None)
+        if wb_shop_id not in (None, ""):
+            return str(wb_shop_id)
     return f"missing_shop_id(type={type(obj).__name__})"
 
 
