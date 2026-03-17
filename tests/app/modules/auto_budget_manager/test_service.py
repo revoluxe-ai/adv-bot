@@ -202,10 +202,16 @@ def test_balance_source_from_response_raises_when_insufficient() -> None:
 
 
 class _FakeExecutionResult:
-    def __init__(self, value: float = 0.0) -> None:
+    def __init__(self, value: float | SimpleNamespace = 0.0) -> None:
         self._value = value
 
+    def unique(self) -> _FakeExecutionResult:
+        return self
+
     def scalar(self) -> float:
+        return self._value  # type: ignore[return-value]
+
+    def scalar_one_or_none(self) -> float | SimpleNamespace | None:
         return self._value
 
 
@@ -213,6 +219,7 @@ class _FakeAdvSettingSession:
     def __init__(self, adv_setting, execute_values: list[float] | None = None):
         self._adv_setting = adv_setting
         self._execute_values = execute_values or []
+        self._execute_call_count = 0
 
     async def __aenter__(self):
         return self
@@ -224,6 +231,10 @@ class _FakeAdvSettingSession:
         return self._adv_setting
 
     async def execute(self, _stmt):
+        self._execute_call_count += 1
+        # First execute is select(AdvSetting) -> must return adv_setting for unique().scalar_one_or_none()
+        if self._execute_call_count == 1:
+            return _FakeExecutionResult(self._adv_setting)
         value = self._execute_values.pop(0) if self._execute_values else 0.0
         return _FakeExecutionResult(value)
 
