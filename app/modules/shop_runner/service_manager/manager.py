@@ -107,6 +107,8 @@ class CoroutinesManager:
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
+        if not wb_api.shop_id:
+            raise ValueError("CoroutinesManager requires non-empty shop_id")
         if wb_manager_hub is None:
             wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()  # fallback for tests
         self._wb_manager_hub = wb_manager_hub
@@ -120,8 +122,6 @@ class CoroutinesManager:
         self._wb_api = wb_api
         self._access = wb_api.access
         self.shop_id = wb_api.shop_id
-        if not self.shop_id:
-            raise ValueError("CoroutinesManager requires non-empty shop_id")
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
         )
