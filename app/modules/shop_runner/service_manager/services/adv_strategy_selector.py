@@ -26,12 +26,44 @@ class StrategySelection:
 
 
 class AdvStrategySelector:
+    @staticmethod
+    async def _is_target_cost_exceeded(
+        complex_adv: ComplexAdv,
+        *,
+        plan_fact_reader: PlanFactReader,
+    ) -> bool:
+        """True if plan/fact data exist and fact_pay_for_order > target_cost."""
+        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
+        if plan is None:
+            return False
+        summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
+        if summary is None:
+            return False
+        if summary.fact_predict_orders is None or summary.fact_pay_for_order is None:
+            return False
+        target_cost = resolve_target_cost(
+            plan.orders,
+            plan.target_pay_for_order,
+            plan.max_pay_for_order,
+            summary.fact_predict_orders,
+        )
+        if target_cost is None:
+            return False
+        return summary.fact_pay_for_order > target_cost
+
     async def select_target_strategy(
         self,
         complex_adv: ComplexAdv,
         *,
         plan_fact_reader: PlanFactReader,
     ) -> StrategySelection | None:
+        if await self._is_target_cost_exceeded(
+            complex_adv, plan_fact_reader=plan_fact_reader
+        ):
+            return StrategySelection(
+                strategy=Strategy.MIN_CPO,
+                reason="cost_above_target",
+            )
         if not complex_adv.rec_system_promotion_mode_active:
             return await self._select_by_plan_and_cost(
                 complex_adv=complex_adv,
