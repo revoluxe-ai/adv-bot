@@ -296,7 +296,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += "\n"
 
         text += (
-            f"\nCPM Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
+            f"\nCPM Авто: {int(self.auto_cpm/100) if self.auto_cpm else 'Не получена'} р. "
         )
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         if self._adv_setting.bidder_coroutine_type == BidderCoroutineType.OLD_UPDATE_CPM_BIDDER:
