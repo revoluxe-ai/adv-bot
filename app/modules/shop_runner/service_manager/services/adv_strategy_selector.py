@@ -27,29 +27,6 @@ class StrategySelection:
 
 class AdvStrategySelector:
     @staticmethod
-    def _is_target_cost_exceeded(
-        *,
-        plan: Any | None,
-        summary: Any | None,
-    ) -> bool:
-        """True if plan/fact data exist and fact_pay_for_order > target_cost."""
-        if plan is None or summary is None:
-            return False
-        fact_orders = summary.fact_predict_orders
-        fact_pay_for_order = summary.fact_pay_for_order
-        if fact_orders is None or fact_pay_for_order is None:
-            return False
-        target_cost = resolve_target_cost(
-            plan.orders,
-            plan.target_pay_for_order,
-            plan.max_pay_for_order,
-            fact_orders,
-        )
-        if target_cost is None:
-            return False
-        return fact_pay_for_order > target_cost
-
-    @staticmethod
     def _select_by_plan_and_cost(
         *,
         plan: Any | None,
@@ -100,22 +77,20 @@ class AdvStrategySelector:
         if plan is not None:
             summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
 
-        if self._is_target_cost_exceeded(plan=plan, summary=summary):
-            return StrategySelection(
-                strategy=Strategy.MIN_CPO,
-                reason="cost_above_target",
-            )
+        plan_and_cost_selection = self._select_by_plan_and_cost(
+            plan=plan,
+            summary=summary,
+        )
+        if (
+            plan_and_cost_selection is not None
+            and plan_and_cost_selection.reason == "cost_above_target"
+        ):
+            return plan_and_cost_selection
         if not complex_adv.rec_system_promotion_mode_active:
-            return self._select_by_plan_and_cost(
-                plan=plan,
-                summary=summary,
-            )
+            return plan_and_cost_selection
 
         if not complex_adv.auto_adv_active_status:
-            return self._select_by_plan_and_cost(
-                plan=plan,
-                summary=summary,
-            )
+            return plan_and_cost_selection
 
         keywords = await complex_adv.get_keywords()
         if self._all_shelf_keywords_activated(keywords):
