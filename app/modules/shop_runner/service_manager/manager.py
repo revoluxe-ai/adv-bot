@@ -107,6 +107,8 @@ class CoroutinesManager:
     ):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
+        if not wb_api.shop_id:
+            raise ValueError("CoroutinesManager requires non-empty shop_id")
         if wb_manager_hub is None:
             wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()  # fallback for tests
         self._wb_manager_hub = wb_manager_hub
@@ -1068,12 +1070,6 @@ class CoroutinesManager:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
         complex_advs = [adv for adv in complex_advs if adv.auto_update_strategy]
-        complex_advs, _ = await self._split_advs_by_stats_freshness(
-            complex_advs, operation_name="change_adv_strategy"
-        )
-        if not complex_advs:
-            return None
-
         handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StrategySelection | None]]]] = []
         for adv in complex_advs:
             handlers.append(

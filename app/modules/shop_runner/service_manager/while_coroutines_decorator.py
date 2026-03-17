@@ -21,6 +21,22 @@ T_Result = TypeVar("T_Result")
 F_Spec = ParamSpec("F_Spec")
 
 
+def _get_shop_id_for_log(args: tuple[Any, ...]) -> str:
+    """Extract shop_id from first argument (expected: CoroutinesManager instance)."""
+    if not args:
+        return "missing_shop_id(no_self)"
+    obj = args[0]
+    shop_id = getattr(obj, "shop_id", None)
+    if shop_id not in (None, ""):
+        return str(shop_id)
+    wb_api = getattr(obj, "_wb_api", None)
+    if wb_api is not None:
+        wb_shop_id = getattr(wb_api, "shop_id", None)
+        if wb_shop_id not in (None, ""):
+            return str(wb_shop_id)
+    return f"missing_shop_id(type={type(obj).__name__})"
+
+
 def while_coroutine_decorator(
     pause_on_success: int, pause_on_error: int = 5
 ) -> Callable[
@@ -55,7 +71,14 @@ def while_coroutine_decorator(
                     )
                     await asyncio.sleep(pause_on_error)
                 except Exception as exc:
-                    logger.error(f"Ошибка: {exc}", exc_info=True)
+                    shop_id = _get_shop_id_for_log(args)
+                    logger.error(
+                        "Ошибка (shop_id=%s, coroutine=%s): %s",
+                        shop_id,
+                        func.__name__,
+                        exc,
+                        exc_info=True,
+                    )
                     await asyncio.sleep(pause_on_error)
 
         return wrapper

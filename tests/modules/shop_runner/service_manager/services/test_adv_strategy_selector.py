@@ -106,6 +106,30 @@ async def test_select_target_strategy_base_rule_cost_branches() -> None:
 
 
 @pytest.mark.asyncio
+async def test_select_target_strategy_plan_and_cost_path_reads_plan_fact_once() -> None:
+    selector = AdvStrategySelector()
+    reader = _plan_fact_reader(fact_orders=4.0, fact_pay_for_order=160.0)
+    complex_adv = _make_complex_adv(
+        rec_system_promotion_mode_active=False,
+        auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        fact_orders=4.0,
+        fact_pay_for_order=160.0,
+    )
+
+    result = await selector.select_target_strategy(
+        complex_adv,
+        plan_fact_reader=reader,
+    )
+
+    assert result is not None
+    assert result.strategy == Strategy.MAX_CONV
+    reader.get_latest_plan_fact.assert_awaited_once_with(complex_adv.adv_id)
+
+
+@pytest.mark.asyncio
 async def test_select_target_strategy_rec_mode_inactive_auto_falls_back_to_base_logic() -> None:
     selector = AdvStrategySelector()
     complex_adv = _make_complex_adv(
@@ -153,7 +177,8 @@ async def test_select_target_strategy_rec_mode_active_auto_not_all_shelf_keyword
 
 
 @pytest.mark.asyncio
-async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_enabled_with_exclusions() -> None:
+async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_cost_exceeded_returns_min_cpo() -> None:
+    """When cost is above target, MIN_CPO is returned even if all shelf keywords are enabled."""
     selector = AdvStrategySelector()
     keywords = [
         SimpleNamespace(
@@ -183,6 +208,9 @@ async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_en
     complex_adv = _make_complex_adv(
         rec_system_promotion_mode_active=True,
         auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
         keywords=keywords,
     )
 
@@ -192,4 +220,55 @@ async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_en
     )
 
     assert result is not None
+    assert result.strategy == Strategy.MIN_CPO
+    assert result.reason == "cost_above_target"
+
+
+def _all_shelf_keywords_with_exclusions() -> list[SimpleNamespace]:
+    return [
+        SimpleNamespace(
+            above_rec_conversion=True,
+            hard_status=1,
+            status=KeywordStatus.GOOD,
+        ),
+        SimpleNamespace(
+            above_rec_conversion=True,
+            hard_status=0,
+            status=KeywordStatus.BAD,
+        ),
+        SimpleNamespace(
+            above_rec_conversion=True,
+            hard_status=3,
+            status=KeywordStatus.BAD,
+        ),
+        SimpleNamespace(
+            above_rec_conversion=False,
+            hard_status=1,
+            status=KeywordStatus.BAD,
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_cost_ok_returns_max_conv() -> None:
+    """When all shelf keywords are enabled and cost is not exceeded, MAX_CONV is returned."""
+    selector = AdvStrategySelector()
+    complex_adv = _make_complex_adv(
+        rec_system_promotion_mode_active=True,
+        auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        fact_orders=1.0,
+        fact_pay_for_order=150.0,
+        keywords=_all_shelf_keywords_with_exclusions(),
+    )
+
+    result = await selector.select_target_strategy(
+        complex_adv,
+        plan_fact_reader=_plan_fact_reader(fact_orders=1.0, fact_pay_for_order=150.0),
+    )
+
+    assert result is not None
     assert result.strategy == Strategy.MAX_CONV
+    assert result.reason == "all_shelf_keywords_activated"

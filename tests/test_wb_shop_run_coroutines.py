@@ -20,15 +20,16 @@ async def _completed_coro() -> None:
 
 
 def _build_coroutines_manager_mock() -> MagicMock:
-    # Order matches WBShop.run() create_task list (no update_advs_data_from_wb_to_pg)
+    # Order matches WBShop.run() create_task list
     methods = [
+        "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
         "update_common_sale_stat",
         "update_full_adv_stat",
-        "adv_settings_auto_update",
-        "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
+        "adv_settings_auto_update",
+        "update_minus_phrases_in_advs",
         "update_cluster_bids",
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
@@ -100,6 +101,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         await wb_shop.run()
 
     for method in (
+        "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
         "update_common_sale_stat",
         "update_full_adv_stat",
@@ -155,9 +157,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    # 1 _alive_worker_run + 19 coroutines from WBShop.run() TaskGroup
-    assert len(recorded_group.created) == 20
+    # 1 _alive_worker_run + 20 coroutines from WBShop.run() TaskGroup
+    assert len(recorded_group.created) == 21
     for method in (
+        "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
         "update_common_sale_stat",
         "update_full_adv_stat",
