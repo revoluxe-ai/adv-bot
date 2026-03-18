@@ -56,22 +56,27 @@ class MinusPhraseManager:
             return None
 
         minus_phrases_to_send = list(bad_keywords_for_this_adv)[:1000]
+        target_set = set(minus_phrases_to_send)
+
 
         tasks: list[Awaitable[None]] = []
         for nmid in nmids:
-            task = self._wb_api.wb_modifier.set_minus_phrases_for_adv(
-            adv_id=adv_id,
-            nmid=nmid,
-            phrases=minus_phrases_to_send,
-            update_redis_timestamp_manager=self._update_redis_timestamp_manager
+            current_minus_keywords = await self._wb_api.wb_modifier.get_minus_phrases_for_adv(adv_id, nmid)
+            if set(current_minus_keywords) != target_set:
+                task = self._wb_api.wb_modifier.set_minus_phrases_for_adv(
+                    adv_id=adv_id,
+                    nmid=nmid,
+                    phrases=minus_phrases_to_send,
+                    update_redis_timestamp_manager=self._update_redis_timestamp_manager,
+                )
+                tasks.append(task)
+
+        results: list[None | BaseException] = await asyncio.gather(
+            *tasks, return_exceptions=True
         )
-            tasks.append(task)
-
-        results: list[None | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
-
         for result in results:
             if isinstance(result, Exception):
-                logger.error('Ошибка обновления РК: %s', result, exc_info=True)
+                logger.error("Ошибка обновления РК: %s", result, exc_info=True)
 
         return None
 

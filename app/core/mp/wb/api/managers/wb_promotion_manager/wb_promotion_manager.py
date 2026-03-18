@@ -54,6 +54,12 @@ class WBModifier:
         await update_redis_timestamp_manager.set_one(adv_id=adv_id)
         return None
 
+    async def get_minus_phrases_for_adv(self, adv_id: int, nmid: int) -> list[str]:
+        """Получить текущий список минус-фраз для пары кампания + номенклатура."""
+        return await self._promotion_manager.get_minus_phrases(
+            advert_id=adv_id, nm_id=nmid
+        )
+
     async def set_cluster_bids_for_adv(self, bids: "UpdateBidsCommand") -> None:
         """Устанавливает ставки по кластерам для РК.
 
