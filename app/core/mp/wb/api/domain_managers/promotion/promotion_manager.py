@@ -77,6 +77,14 @@ class PromotionManager:
             command,
         )
 
+    async def get_minus_phrases(self, advert_id: int, nm_id: int) -> list[str]:
+        """Получить список минус-фраз для пары кампания + номенклатура (POST /adv/v0/normquery/get-minus)."""
+        from .methods.get_minus_phrases import method
+
+        return await method.get_minus_phrases(
+            self._client.minus_phrases_adapter, advert_id, nm_id
+        )
+
     async def get_normquery_stats(
         self,
         complex_advs: list[ComplexAdv],

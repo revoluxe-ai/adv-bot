@@ -534,7 +534,7 @@ class CoroutinesManager:
 
         return None
 
-    @while_coroutine_decorator(60 * 15, 60)
+    @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
