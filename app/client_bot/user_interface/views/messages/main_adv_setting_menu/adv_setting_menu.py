@@ -349,20 +349,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # Determine predict CTR mode display text
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
+        text += "Freshness (CH): "
         if self._emergency_mode_active:
             text += (
-                "🚨 АВ.РЕЖ\n"
-                "СТ > 6ч\n"
-                "РАСХ ОГРАН\n"
+                "🚨 АВ.РЕЖ, СТ > 6ч, РАСХ ОГРАН\n"
             )
             if self._emergency_mode_reason:
                 text += f"{self._emergency_mode_reason}\n"
-            text += "\n"
-        elif not self._stats_fresh:
+        elif self._stats_fresh:
+            text += f"{self._fresh_reason_to_display()}\n"
+        else:
             text += "Ст не све, авт приост\n"
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
-            text += "\n"
+        text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
@@ -650,9 +650,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         state = await StatsFreshnessManager().evaluate(complex_adv)
         if state.is_stale_over_6h:
             return True, self._guard_reason_to_display(state.reason), False, None
-        if not state.is_fresh and state.reason:
-            return False, None, False, self._stale_reason_to_display(state.reason)
-        return False, None, state.is_fresh, None
+        if not state.is_fresh:
+            if state.reason:
+                return False, None, False, self._stale_reason_to_display(state.reason)
+            return False, None, False, self._stale_reason_fallback_to_display()
+        return False, None, True, self._fresh_reason_to_display()
 
     @staticmethod
     def _stale_reason_to_display(reason: str) -> str:
@@ -711,3 +713,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 "Ошибка получения today traffic clicks для adv_id=%s", self.adv.adv_id
             )
             return None
+
+    @staticmethod
+    def _fresh_reason_to_display() -> str:
+        return "стата свежая"
+
+    @staticmethod
+    def _stale_reason_fallback_to_display() -> str:
+        return "стата не свежая"
