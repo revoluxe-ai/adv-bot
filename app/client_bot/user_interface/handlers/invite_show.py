@@ -16,8 +16,9 @@ from app.utils.db.session_maker import get_async_session_maker
 router = Router()
 _sm = get_async_session_maker
 
-INVITE_TTL_DAYS = 7
-INVITE_COOLDOWN_DAYS = 3
+# Срок действия выданного инвайта (не дольше 24 часов с момента выдачи).
+INVITE_TTL = timedelta(hours=24)
+INVITE_COOLDOWN_DAYS = 0
 CODE_ALPHABET = string.ascii_uppercase + string.digits
 CODE_PART_LEN = 4
 CODE_PARTS = 2
@@ -100,7 +101,7 @@ async def invite_show_handler(
         # Выдаём новый инвайт
         for _ in range(10):
             code = _generate_invite_code()
-            expires_at = now_utc + timedelta(days=INVITE_TTL_DAYS)
+            expires_at = now_utc + INVITE_TTL
             try:
                 invite = Invite(
                     code=code,

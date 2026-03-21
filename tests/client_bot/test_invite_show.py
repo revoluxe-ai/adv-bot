@@ -99,18 +99,19 @@ async def test_invite_show_active_not_expired_returns_same_code():
         assert "SAME-CODE" in text
 
 
-async def test_invite_show_cooldown_not_passed_returns_available_after():
-    """Кулдаун не прошёл → новый не выдаётся, сообщение «доступен после …»."""
+async def test_invite_show_cooldown_zero_allows_new_invite_without_wait_message():
+    """При нулевом кулдауне после недавней выдачи можно сразу получить новый инвайт."""
     user = _make_user(
         id=1,
         telegram_id=3002,
         last_invite_issued_at=datetime.datetime.now(UTC).replace(tzinfo=None)
-        - timedelta(days=1),
+        - timedelta(hours=1),
     )
 
     session = AsyncMock()
     session.execute = AsyncMock()
     session.commit = AsyncMock()
+    session.add = MagicMock()
 
     call_count = [0]
 
@@ -119,6 +120,8 @@ async def test_invite_show_cooldown_not_passed_returns_available_after():
         res = MagicMock()
         if call_count[0] == 1:
             res.scalar_one_or_none.return_value = user
+        elif call_count[0] == 2:
+            res.scalar_one_or_none.return_value = None
         else:
             res.scalar_one_or_none.return_value = None
         return res
@@ -153,4 +156,5 @@ async def test_invite_show_cooldown_not_passed_returns_available_after():
             if len(callback.bot.send_message.call_args[0]) > 1
             else "",
         )
-        assert "доступен после" in text
+        assert "Ваш инвайт:" in text
+        assert "доступен после" not in text

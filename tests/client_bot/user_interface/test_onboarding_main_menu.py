@@ -14,7 +14,7 @@ from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 
 def test_main_menu_text_contains_key_phrases() -> None:
     """MainMenu.text returns text from get_main_text, contains key phrases."""
-    menu = MainMenu(bot=None, chat_id=12345)  # type: ignore[arg-type]
+    menu = MainMenu(bot=None, chat_id=12345, full_client_ui=True)  # type: ignore[arg-type]
     text = menu.text
     assert "Экономическое управление" in text
     assert "Wildberries" in text
@@ -22,10 +22,11 @@ def test_main_menu_text_contains_key_phrases() -> None:
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> None:
-    """For regular user: 3 buttons (Мои магазины, Мой баланс, Показать инвайт), no admin."""
+    """Обычный пользователь: Мои магазины, Мой баланс, Показать инвайт."""
+    mock_settings.presentation_only = False
     mock_settings.invite_gate = True
     user_id = 999999  # Not in ADMINS
-    kb = get_main_menu_keyboard(user_id)
+    kb = get_main_menu_keyboard(user_id, full_client_ui=True)
     rows = kb.inline_keyboard
     assert len(rows) == 3
     assert rows[0][0].text == "Мои магазины"
@@ -37,12 +38,24 @@ def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> Non
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-@patch("app.client_bot.user_interface.handlers.shop_choice_message.const.ADMINS", [123])
+def test_get_main_menu_keyboard_invite_visible_when_invite_gate_off(mock_settings) -> None:
+    """INVITE_GATE=false не скрывает кнопку «Показать инвайт» на полном меню."""
+    mock_settings.presentation_only = False
+    mock_settings.invite_gate = False
+    kb = get_main_menu_keyboard(999999, full_client_ui=True)
+    rows = kb.inline_keyboard
+    assert len(rows) == 3
+    assert rows[2][0].text == "Показать инвайт"
+
+
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+@patch("app.client_bot.admin_access.ADMINS", [123])
 def test_get_main_menu_keyboard_admin_four_buttons(mock_settings) -> None:
-    """For admin: 4 buttons, first is Панель администратора with AdminPanel(action='menu')."""
+    """Админ: Панель, Мои магазины, Мой баланс, Показать инвайт."""
+    mock_settings.presentation_only = False
     mock_settings.invite_gate = True
     user_id = 123
-    kb = get_main_menu_keyboard(user_id)
+    kb = get_main_menu_keyboard(user_id, full_client_ui=True)
     rows = kb.inline_keyboard
     assert len(rows) == 4
     assert rows[0][0].text == "Панель администратора"
@@ -57,7 +70,7 @@ async def test_main_menu_calls_bot_send_message() -> None:
     """MainMenu(bot, chat_id)() calls bot.send_message with text, reply_markup, parse_mode=HTML."""
     bot = AsyncMock()
     chat_id = 12345
-    menu = MainMenu(bot, chat_id)
+    menu = MainMenu(bot, chat_id, full_client_ui=True)
     await menu()
     bot.send_message.assert_awaited_once()
     call_kw = bot.send_message.call_args[1]

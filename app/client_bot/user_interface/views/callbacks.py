@@ -146,9 +146,15 @@ class ShopsListPaginator(CallbackData, prefix="shops_list_pg"):
 
 
 class Gate(CallbackData, prefix="gate"):
-    """Коллбеки экрана гейта: invite_enter, pay_entry_amount, offer_open, restore_request."""
+    """Коллбеки экрана гейта: invite_enter, offer_open, restore_request."""
 
     action: str
+
+
+class RequestPresentation(CallbackData, prefix="presentation"):
+    """Запрос презентации: после ввода валидного инвайта — уведомление саппорту."""
+
+    action: str = "request"
 
 
 class InviteShow(CallbackData, prefix="invite"):

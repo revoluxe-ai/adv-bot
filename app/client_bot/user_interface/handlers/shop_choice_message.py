@@ -3,6 +3,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
@@ -21,28 +22,47 @@ SHOPS_PER_PAGE = 20
 
 
 class MainMenu(TextWithKeyboard):
-    """Главная страница после Start: «Мои магазины», инвайт, баланс, админка."""
+    """Главная страница после Start: минимальный UI только для новых без гейта при presentation_only."""
 
     parse_mode = ParseMode.HTML
 
-    def __init__(self, bot: Bot, chat_id: int):
+    def __init__(self, bot: Bot, chat_id: int, *, full_client_ui: bool = False):
         super().__init__(bot, chat_id)
         self.user_telegram_id = chat_id
+        self._full_client_ui = full_client_ui
 
     @property
     def text(self) -> str:
-        return get_main_text(self.user_telegram_id)
+        return get_main_text(self.user_telegram_id, full_client_ui=self._full_client_ui)
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
-        return get_main_menu_keyboard(self.user_telegram_id)
+        return get_main_menu_keyboard(
+            self.user_telegram_id, full_client_ui=self._full_client_ui
+        )
 
 
-def get_main_menu_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура главной страницы: Мои магазины, Показать инвайт, Мой баланс, админка."""
+def get_main_menu_keyboard(
+    user_telegram_id: int, *, full_client_ui: bool = False
+) -> InlineKeyboardMarkup:
+    """Клавиатура главной: минимальный режим только если presentation_only и не full_client_ui."""
     keyboard_buttons = []
 
-    if user_telegram_id in const.ADMINS:
+    if settings.presentation_only and not full_client_ui:
+        if is_bot_admin(user_telegram_id):
+            admin_button = InlineKeyboardButton(
+                text="Панель администратора",
+                callback_data=AdminPanel(action="menu").pack(),
+            )
+            keyboard_buttons.append([admin_button])
+        presentation_button = InlineKeyboardButton(
+            text="Запросить презентацию",
+            callback_data=callbacks.RequestPresentation(action="request").pack(),
+        )
+        keyboard_buttons.append([presentation_button])
+        return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+    if is_bot_admin(user_telegram_id):
         admin_button = InlineKeyboardButton(
             text="Панель администратора",
             callback_data=AdminPanel(action="menu").pack(),
@@ -60,13 +80,13 @@ def get_main_menu_keyboard(user_telegram_id: int) -> InlineKeyboardMarkup:
         callback_data=callbacks.UserBalanceMenu().pack(),
     )
     keyboard_buttons.append([user_balance_button])
-    if settings.invite_gate:
-        invite_show_button = InlineKeyboardButton(
-            text="Показать инвайт",
-            callback_data=callbacks.InviteShow().pack(),
-        )
-        keyboard_buttons.append([invite_show_button])
-
+    # Полное меню видят только прошедшие гейт / админы — инвайт для приглашений показываем
+    # всегда; INVITE_GATE в middleware относится к входу, не к этой кнопке.
+    invite_show_button = InlineKeyboardButton(
+        text="Показать инвайт",
+        callback_data=callbacks.InviteShow().pack(),
+    )
+    keyboard_buttons.append([invite_show_button])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
@@ -162,6 +182,18 @@ def get_shops_list_keyboard(
         )
     if paginator_row:
         keyboard_buttons.append(paginator_row)
+
+    balance_row = InlineKeyboardButton(
+        text="Мой баланс",
+        callback_data=callbacks.UserBalanceMenu().pack(),
+    )
+    keyboard_buttons.append([balance_row])
+    # Список магазинов доступен после гейта — кнопка инвайта всегда, без INVITE_GATE.
+    invite_show_button = InlineKeyboardButton(
+        text="Показать инвайт",
+        callback_data=callbacks.InviteShow().pack(),
+    )
+    keyboard_buttons.append([invite_show_button])
 
     back_button = InlineKeyboardButton(
         text="Назад",

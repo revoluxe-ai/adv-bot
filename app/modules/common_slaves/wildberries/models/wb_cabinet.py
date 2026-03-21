@@ -46,7 +46,7 @@ class WBCabinet(BaseTable):
         Float, default=0, server_default=text("0"), nullable=False
     )
     bonus: Mapped[float] = mapped_column(
-        Float, default=1000, server_default=text("1000"), nullable=False
+        Float, default=0, server_default=text("0"), nullable=False
     )
     white_list_update_active: Mapped[bool | None] = mapped_column(
         Boolean, default=False, nullable=True

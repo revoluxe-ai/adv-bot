@@ -4,18 +4,16 @@ from urllib.parse import quote
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.client_bot.const import GATE_ENTRY_AMOUNT, OFFERTA_URL, SUPPORT_USER_NAME
+from app.client_bot.const import OFFERTA_URL, SUPPORT_USER_NAME
 from app.client_bot.user_interface.views.callbacks import Gate
 
 
-def get_gate_message_text(entry_amount: int = GATE_ENTRY_AMOUNT) -> str:
+def get_gate_message_text() -> str:
     """Формирует полный текст экрана гейта: заголовок, тело, подвал."""
     header = "🔒 Доступ закрыт"
     body = (
-        f"Чтобы пользоваться сервисом, нужен инвайт или входной платёж {entry_amount} ₽.\n\n"
-        f"{entry_amount} ₽ зачисляются на ваш баланс пользователя. "
-        "Далее вы можете использовать эти средства для пополнения подключенных кабинетов в сервисе.\n\n"
-        "Возврат входного платежа не предусмотрен (см. оферту)."
+        "Чтобы пользоваться сервисом, нужен инвайт-код.\n\n"
+        "Нажмите «Ввести инвайт» и отправьте код одним сообщением."
     )
     footer = (
         "Если вы уже работали с сервисом и считаете, что доступ должен быть — "
@@ -24,7 +22,7 @@ def get_gate_message_text(entry_amount: int = GATE_ENTRY_AMOUNT) -> str:
     return f"{header}\n\n{body}\n\n{footer}"
 
 
-def get_gate_keyboard(entry_amount: int = GATE_ENTRY_AMOUNT) -> InlineKeyboardMarkup:
+def get_gate_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура экрана гейта: по одной кнопке на строке."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -32,12 +30,6 @@ def get_gate_keyboard(entry_amount: int = GATE_ENTRY_AMOUNT) -> InlineKeyboardMa
                 InlineKeyboardButton(
                     text="Ввести инвайт",
                     callback_data=Gate(action="invite_enter").pack(),
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"Входной платёж {entry_amount} ₽",
-                    callback_data=Gate(action="pay_entry_amount").pack(),
                 )
             ],
             [

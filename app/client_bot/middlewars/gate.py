@@ -7,7 +7,8 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
-from app.client_bot.const import ADMINS
+
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.settings import settings
@@ -16,9 +17,24 @@ from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 
+PRESENTATION_ONLY_BLOCKED_TEXT = (
+    "Доступ к функциям бота закрыт. Откройте меню через /start — запись на презентацию."
+)
+
+
+def _is_start_command(message: Message) -> bool:
+    raw = getattr(message, "text", None)
+    if not isinstance(raw, str):
+        return False
+    first = raw.strip().split(maxsplit=1)[0]
+    return first == "/start" or first.startswith("/start@")
+
 
 class GateMiddleware(BaseMiddleware):
-    """Пропускает только callback'и gate:* (инвайт, оплата) и successful_payment; /start не пропускаем — показываем гейт."""
+    """В режиме presentation_only: админы и passed_gate — полный доступ; иначе whitelist заявки.
+
+    Иначе — passed_gate и whitelist gate:* / оплата / GateInvite (классический гейт).
+    """
 
     async def __call__(
         self,
@@ -27,13 +43,12 @@ class GateMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         event = cast(Message | CallbackQuery, event)
-        telegram_id = (
-            event.from_user.id if event.from_user else None
-        )
+        telegram_id = event.from_user.id if event.from_user else None
         if telegram_id is None:
             return await handler(event, data)
 
-        if telegram_id in ADMINS:
+        admin_ok = is_bot_admin(telegram_id)
+        if admin_ok:
             return await handler(event, data)
 
         async with _sm(read_only=False) as session:
@@ -55,6 +70,44 @@ class GateMiddleware(BaseMiddleware):
                     adv_updater_user_chat_id=chat_id,
                 )
 
+        if settings.presentation_only:
+            passed_gate_effective = user.passed_gate
+            if passed_gate_effective:
+                return await handler(event, data)
+
+            if isinstance(event, Message):
+                if _is_start_command(event):
+                    return await handler(event, data)
+                state = data.get("state")
+                if state is not None:
+                    current = await state.get_state()
+                    if current is not None and str(current).startswith(
+                        "PresentationRequest:"
+                    ):
+                        return await handler(event, data)
+            if (
+                isinstance(event, CallbackQuery)
+                and event.data
+                and event.data.startswith("presentation:")
+            ):
+                return await handler(event, data)
+
+            if isinstance(event, Message):
+                chat_id = event.chat.id
+            else:
+                chat_id = (
+                    event.message.chat.id
+                    if event.message and event.message.chat
+                    else None
+                )
+            if chat_id is None:
+                return await handler(event, data)
+            bot = data.get("bot")
+            if bot is None:
+                return await handler(event, data)
+            await bot.send_message(chat_id, PRESENTATION_ONLY_BLOCKED_TEXT)
+            return None
+
         passed_gate = user.passed_gate
         if not settings.invite_gate:
             passed_gate = True
@@ -62,16 +115,13 @@ class GateMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         # Whitelist для пользователя без passed_gate (все остальное → экран гейта):
-        # 1) CallbackQuery с data "gate:*" — кнопки экрана гейта:
-        #    gate:invite_enter (Ввести инвайт), gate:pay_entry_amount (Входной платёж / пополнение баланса пользователя),
-        #    gate:offer_open (Оферта), gate:restore_request (Восстановить — сейчас url, не callback).
-        # 2) Message с successful_payment — после оплаты инвойса (в т.ч. входного платежа).
-        # 3) Message в FSM GateInvite:* — ввод инвайт-кода одним сообщением.
-        # PreCheckoutQuery не идёт через этот middleware (висит на message/callback_query), обрабатывается отдельно.
+        # 1) CallbackQuery с data "gate:*"
+        # 2) Message с successful_payment
+        # 3) Message в FSM GateInvite:* — ввод инвайт-кода
         if isinstance(event, CallbackQuery):
             if event.data and event.data.startswith("gate:"):
                 return await handler(event, data)
-        elif isinstance(event, Message):
+        if isinstance(event, Message):
             if getattr(event, "successful_payment", None) is not None:
                 return await handler(event, data)
             state = data.get("state")
