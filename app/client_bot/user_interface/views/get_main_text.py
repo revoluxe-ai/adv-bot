@@ -8,7 +8,6 @@ def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str
             f"Ваш Telegram ID: <code>{user_telegram_id}</code>\n\n"
             "Сервис сейчас доступен по записи на презентацию.\n"
             "Нажмите «Запросить презентацию» и отправьте инвайт-код одним сообщением.\n\n"
-            f"Поддержка: {const.SUPPORT_LINK}"
         )
 
     text = f"""
