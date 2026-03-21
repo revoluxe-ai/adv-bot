@@ -38,6 +38,11 @@ async def test_start_registration_new_user_creates_user_and_shows_gate() -> None
     mock_user = MagicMock()
     mock_user.passed_gate = False
 
+    mock_settings = MagicMock()
+    mock_settings.invite_gate = True
+    mock_settings.presentation_only = False
+    mock_settings.extra_admin_telegram_ids = frozenset()
+
     with patch(
         "app.client_bot.user_interface.handlers.start_registration_func.sm"
     ) as mock_sm, patch(
@@ -47,9 +52,13 @@ async def test_start_registration_new_user_creates_user_and_shows_gate() -> None
     ) as mock_create_user, patch(
         "app.client_bot.user_interface.handlers.start_registration_func.MainMenu"
     ) as mock_main_menu, patch(
-        "app.client_bot.user_interface.handlers.start_registration_func.settings"
-    ) as mock_settings:
-        mock_settings.invite_gate = True
+        "app.client_bot.user_interface.handlers.start_registration_func.settings",
+        mock_settings,
+    ), patch(
+        # use_minimal_presentation_ui читает settings из admin_access
+        "app.client_bot.admin_access.settings",
+        mock_settings,
+    ):
         mock_sm.return_value = session_cm
 
         await start_registration(message, bot, state)

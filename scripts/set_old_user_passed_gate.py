@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 try:
     from set_path import add_project_root_to_path
@@ -107,7 +107,7 @@ async def _run(dry_run: bool, batch_size: int) -> None:
 
             user.passed_gate = True
             user.passed_gate_reason = PassedGateReason.OLD_USER
-            user.passed_gate_at = datetime.now(timezone.utc)
+            user.passed_gate_at = datetime.now(UTC).replace(tzinfo=None)
             updated_count += 1
 
             if batch_size > 0 and updated_count % batch_size == 0 and not dry_run:

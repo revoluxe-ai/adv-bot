@@ -15,7 +15,7 @@ from app.client_bot.user_interface.views.callbacks import (
     CommonBudgetModeToggle,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
-from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
+from app.modules.cabinet_bonus_manager.callbacks import AdminBonus, AdminPanel
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -989,6 +989,12 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="👤 Пополнение пользователей",
                     callback_data=AdminUserBalance(action="menu").pack(),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✅ Открыть гейт по Telegram ID",
+                    callback_data=AdminPanel(action="grant_gate").pack(),
                 )
             ],
             [

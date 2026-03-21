@@ -267,10 +267,10 @@ async def turn_adv_on(
             wb_cabinet.id
         )
         sum_balance = balance + bonus
-        if sum_balance < 0:
+        if sum_balance <= 0:
             await bot.send_message(
                 callback.message.chat.id,
-                "Баланс в минусе. Новые РК активировать нельзя. Пополните баланс или деактивируйте кампании в настройках магазина.",
+                "Недостаточно средств на балансе кабинета для запуска. Пополните баланс.",
             )
             await ShopMenu(
                 bot, callback.message.chat.id, state, wb_user_cabinet_original_id

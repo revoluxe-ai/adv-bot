@@ -14,6 +14,8 @@ from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.exc import IntegrityError
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
+from app.client_bot.utils import create_user
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.shop_choice_message import (
@@ -76,18 +78,35 @@ async def callback_start_registration(
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User | None = result.unique().scalar()
+        user: User | None = result.unique().scalar_one_or_none()
         if callback.message is None:
             return
         chat_id = callback.message.chat.id
-        if (user is None or not user.passed_gate) and settings.invite_gate:
+        if user is None:
+            user = await create_user(
+                session,
+                user_id,
+                username=callback.from_user.username if callback.from_user else None,
+                adv_updater_user_chat_id=chat_id,
+            )
+
+        minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
+        if minimal:
+            await MainMenu(bot, chat_id, full_client_ui=False)()
+            return
+
+        if (
+            settings.invite_gate
+            and not user.passed_gate
+            and not is_bot_admin(user_id)
+        ):
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
                 reply_markup=get_gate_keyboard(),
             )
             return
-        await MainMenu(bot, chat_id)()
+        await MainMenu(bot, chat_id, full_client_ui=True)()
     return
 
 

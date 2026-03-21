@@ -89,15 +89,57 @@ class Settings:
 
     @property
     def invite_gate(self) -> bool:
+        """По умолчанию True: гейт по инвайту включён, если в .env не задано иначе.
+
+        Явно выключить: INVITE_GATE=false
+        """
         value = os.environ.get("INVITE_GATE")
-        if value is None:
-            return False
-        value = value.lower()
+        if value is None or not str(value).strip():
+            return True
+        value = str(value).strip().lower()
         if value == "false":
             return False
         elif value == "true":
             return True
         raise Exception("Не верное значение в INVITE_GATE")
+
+    @property
+    def presentation_only(self) -> bool:
+        """Режим «только презентация»: минимальный UX, инвайт для заявки, без полного доступа к боту.
+
+        По умолчанию True, если переменная не задана или пустая.
+        Полный клиентский бот: PRESENTATION_ONLY_MODE=false
+        """
+        value = os.environ.get("PRESENTATION_ONLY_MODE")
+        if value is None or not str(value).strip():
+            return True
+        value = str(value).strip().lower()
+        if value == "false":
+            return False
+        elif value == "true":
+            return True
+        raise Exception("Не верное значение в PRESENTATION_ONLY_MODE")
+
+    @property
+    def presentation_notify_telegram_id(self) -> int | None:
+        """Telegram ID для уведомлений о заявке на презентацию (иначе const.MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID)."""
+        raw = os.environ.get("PRESENTATION_NOTIFY_TELEGRAM_ID")
+        if raw is None or not str(raw).strip():
+            return None
+        return int(str(raw).strip())
+
+    @property
+    def extra_admin_telegram_ids(self) -> list[int]:
+        """Дополнительные Telegram ID админов (переменная EXTRA_ADMIN_TELEGRAM_IDS, через запятую)."""
+        raw = os.environ.get("EXTRA_ADMIN_TELEGRAM_IDS", "")
+        if not raw.strip():
+            return []
+        out: list[int] = []
+        for part in raw.split(","):
+            part = part.strip()
+            if part.isdigit():
+                out.append(int(part))
+        return out
 
     @property
     def version(self) -> str | None:

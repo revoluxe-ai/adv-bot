@@ -9,13 +9,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.client_bot.const import GATE_ENTRY_AMOUNT
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.balance_manager.handlers import successful_payment_handler
 from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
-from app.utils.db.passed_gate_reason import PassedGateReason
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
@@ -248,10 +246,12 @@ async def test_successful_payment_handler_user_not_found_integration(
 
 
 @pytest.mark.asyncio
-async def test_successful_payment_gate_entry_sets_passed_gate(
+async def test_successful_payment_gate_entry_does_not_open_gate(
     async_session: AsyncSession,
 ):
-    """При payload target=user и gate_entry=True и сумме GATE_ENTRY_AMOUNT выставляется passed_gate."""
+    """Входной платёж через gate_entry больше не открывает passed_gate."""
+    from app.client_bot.const import GATE_ENTRY_AMOUNT
+
     user = await _create_test_user(
         async_session, user_telegram_id=77777, passed_gate=False
     )
@@ -286,7 +286,6 @@ async def test_successful_payment_gate_entry_sets_passed_gate(
         async def _balance_updated_coro() -> None:
             pass
 
-        # BalanceUpdated(bot, ...)() — возвращает callable, при вызове даёт coroutine
         mock_messages.BalanceUpdated.return_value = lambda: _balance_updated_coro()
         mock_shop_choice.return_value = AsyncMock()
 
@@ -299,8 +298,5 @@ async def test_successful_payment_gate_entry_sets_passed_gate(
         )
 
     await async_session.refresh(user)
-    assert user.passed_gate is True
-    assert user.passed_gate_reason == PassedGateReason.BALANCE_TOP_UP
-    assert user.passed_gate_at is not None
-    mock_message.answer.assert_any_call("Оплата получена. Доступ открыт.")
+    assert user.passed_gate is False
 
