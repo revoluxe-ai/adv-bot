@@ -26,7 +26,10 @@ def _is_start_command(message: Message) -> bool:
     raw = getattr(message, "text", None)
     if not isinstance(raw, str):
         return False
-    first = raw.strip().split(maxsplit=1)[0]
+    stripped = raw.strip()
+    if not stripped:
+        return False
+    first = stripped.split(maxsplit=1)[0]
     return first == "/start" or first.startswith("/start@")
 
 
