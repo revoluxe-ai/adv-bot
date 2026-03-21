@@ -8,6 +8,9 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, update
 
+from app.client_bot.user_interface.handlers.presentation_invite import (
+    normalize_invite_code,
+)
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.callbacks import Gate
@@ -19,11 +22,6 @@ from app.utils.db.session_maker import get_async_session_maker
 
 router = Router()
 _sm = get_async_session_maker
-
-
-def _normalize_invite_code(raw: str) -> str:
-    """Trim, upper, keep dashes."""
-    return raw.strip().upper()
 
 
 @router.callback_query(Gate.filter(F.action == "invite_enter"))
@@ -47,7 +45,7 @@ async def gate_invite_process_code(
     """Приём инвайт-кода: атомарная активация или ошибка + gate."""
     if not message.text or not message.from_user:
         return
-    code = _normalize_invite_code(message.text)
+    code = normalize_invite_code(message.text)
     if not code:
         _ = await bot.send_message(
             message.chat.id,
