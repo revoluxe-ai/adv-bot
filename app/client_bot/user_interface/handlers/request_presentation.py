@@ -66,7 +66,6 @@ async def request_presentation_process_invite(
         user_db_id = user.id
 
     ok, err = await redeem_invite_for_presentation(
-        telegram_id=telegram_id,
         user_db_id=user_db_id,
         code=code,
     )
