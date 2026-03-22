@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Generator, Protocol, Sequence, TypeVar, cast
 from typing_extensions import ParamSpec
 
@@ -18,8 +19,15 @@ from app.core.clikhouse_client_manager import  get_clickhouse_client
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
     RedisKeywordBidderStatusManager,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid_cooldown import (
+    apply_above_target_min_bid_cooldown,
+    max_search_min_bid_for_complex_nmids,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
+from app.modules.wb_adv_updater.calculated_keywords_manager.redis_above_target_min_bid_cooldown_manager import (
+    RedisAboveTargetMinBidCooldownManager,
+)
 from ...calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
 from ...common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import  get_async_session_maker as sm
@@ -35,7 +43,11 @@ from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
 
 if typing.TYPE_CHECKING:
+    from app.core.di.wb_manager_hub.wb_manager_hub import WBManagerHub
     from app.modules.cpm_sources_resolver.dto import AllCpmSourcesPerText
+    from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
+        WBManager,
+    )
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 
@@ -86,7 +98,36 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
             pre_calculated_keywords, all_sources_by_text
         )
-        calculated_keyword_list = await self.__get_calculated_keywords(complex_adv, pre_calculated_keywords)
+        now = datetime.now(UTC)
+        min_bid_for_adv = max_search_min_bid_for_complex_nmids(
+            list(complex_adv.nmids), complex_adv.min_nmids_bids
+        )
+        if min_bid_for_adv is None:
+            min_bid_for_adv = await self._fetch_min_search_bid_aggregate(complex_adv)
+
+        cooldown_map: dict[str, datetime | None] | None = None
+        cooldown_updates: dict[str, datetime | None] | None = None
+        cooldown_redis_mgr: RedisAboveTargetMinBidCooldownManager | None = None
+        if min_bid_for_adv is not None:
+            cooldown_updates = {}
+            hub_kw = await self._get_wb_manager_hub(complex_adv)
+            cooldown_redis_mgr = RedisAboveTargetMinBidCooldownManager(
+                hub_kw.redis_client_wrapper
+            )
+            pre_texts = [p.keyword_setting.text for p in pre_calculated_keywords]
+            cooldown_map = await cooldown_redis_mgr.get_many(complex_adv.adv_id, pre_texts)
+
+        calculated_keyword_list = await self.__get_calculated_keywords(
+            complex_adv,
+            pre_calculated_keywords,
+            min_bid_for_adv=min_bid_for_adv,
+            cooldown_map=cooldown_map,
+            cooldown_updates=cooldown_updates,
+            now=now,
+        )
+        if cooldown_redis_mgr is not None and cooldown_updates:
+            await cooldown_redis_mgr.apply_updates(complex_adv.adv_id, cooldown_updates)
+
         await self._set_calculated_keywords_in_redis_cache(complex_adv, calculated_keyword_list)
 
         return calculated_keyword_list
@@ -261,8 +302,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return keyword_hard_statuses
 
     @staticmethod
-    async def __get_calculated_keywords(complex_adv: 'ComplexAdv',
-                                        pre_keywords: list[PreCalculatedKeyword]) -> list[CalculatedKeyword]:
+    async def __get_calculated_keywords(
+        complex_adv: "ComplexAdv",
+        pre_keywords: list[PreCalculatedKeyword],
+        *,
+        min_bid_for_adv: int | None = None,
+        cooldown_map: dict[str, datetime | None] | None = None,
+        cooldown_updates: dict[str, datetime | None] | None = None,
+        now: datetime | None = None,
+    ) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
         from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
@@ -288,6 +336,18 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
 
+        def _apply_above_target_cooldown(
+            pre_kw_: PreCalculatedKeyword, state_: KeywordState
+        ) -> KeywordState:
+            return apply_above_target_min_bid_cooldown(
+                pre_kw=pre_kw_,
+                base_state=state_,
+                min_bid_for_adv=min_bid_for_adv,
+                cooldown_map=cooldown_map,
+                cooldown_updates=cooldown_updates,
+                now=now,
+            )
+
         white_list = [kw for kw in pre_keywords
                                         if kw.hard_status in [2]]
         if not white_list:
@@ -305,6 +365,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                         reason=KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS,
                         best_keyword_status=False,
                     )
+                state = _apply_above_target_cooldown(pre_kw, state)
                 calculated_keyword = CalculatedKeyword(
                     adv_id=pre_kw.adv_id,
                     keyword_setting=pre_kw.keyword_setting,
@@ -401,6 +462,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     best_keyword_status=best_keyword_status,
                 )
 
+            state = _apply_above_target_cooldown(pre_kw, state)
             calculated_keyword_list.append(
                 CalculatedKeyword(
                     adv_id=pre_kw.adv_id,
@@ -415,32 +477,32 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
         return calculated_keyword_list
 
+    async def _fetch_min_search_bid_aggregate(self, complex_adv: "ComplexAdv") -> int | None:
+        from .above_target_min_bid_cooldown import max_search_min_bid_for_complex_nmids
+
+        nmids = list(complex_adv.nmids)
+        if not nmids:
+            return None
+        hub = await self._get_wb_manager_hub(complex_adv)
+        wb_manager = hub.wb_manager
+        if isinstance(wb_manager, providers.Provider):
+            wb_manager = cast("WBManager", wb_manager())
+        min_bids = await wb_manager.get_min_bids([complex_adv], cache_possible=True)
+        return max_search_min_bid_for_complex_nmids(nmids, min_bids)
 
     @staticmethod
-    async def _set_calculated_keywords_in_redis_cache(complex_adv: 'ComplexAdv',
-                                                      calculated_keyword_list: list[CalculatedKeyword]) -> None:
-        redis_cache_manager = RedisCalculatedKeywordsCacheManager()
-        await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
-
-    @staticmethod
-    async def _get_bidder_keyword_statuses(
-        complex_adv: 'ComplexAdv',
-        texts: list[str],
-    ) -> dict[str, BidderKeywordStatus]:
+    async def _get_wb_manager_hub(complex_adv: "ComplexAdv") -> "WBManagerHub":
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 
-        # КОСТЫЛЬ: Пробуем получить из контекста, если не получается - создаем на лету
         try:
-            wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+            return WBManagerHubFactory.get_wb_manager_from_context()
         except RuntimeError:
-            # Если контекст не установлен (например, в боте), создаем на лету
             from app.core.di.client_di.wb_manager_hub_container import WBManagerHubContainer
             from app.core.mp.wb.api.httpx_client_handler import HttpxClientHandler
             from app.core.redis_manager_v2.redis_client import RedisClient
             from app.configs import AppConfig
             from redis.asyncio import Redis
 
-            # Создаем Redis клиент напрямую (костыль)
             config = AppConfig.create()
             redis_config = config.infrastructure.redis
             raw_redis_client = Redis(
@@ -453,13 +515,25 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             redis_client_wrapper = RedisClient(redis_client=raw_redis_client)
             httpx_client_handler = HttpxClientHandler()
 
-            # Создаем контейнер и получаем hub
             wb_manager_hub_container = WBManagerHubContainer(
                 _shop_id=complex_adv.shop_id,
                 _httpx_client_handler=httpx_client_handler,
                 _redis_wrapper=redis_client_wrapper,
             )
-            wb_manager_hub = wb_manager_hub_container.wb_manager_hub()
+            return wb_manager_hub_container.wb_manager_hub()
+
+    @staticmethod
+    async def _set_calculated_keywords_in_redis_cache(complex_adv: 'ComplexAdv',
+                                                      calculated_keyword_list: list[CalculatedKeyword]) -> None:
+        redis_cache_manager = RedisCalculatedKeywordsCacheManager()
+        await redis_cache_manager.set_calculated_keywords(calculated_keyword_list, complex_adv.adv_id)
+
+    @staticmethod
+    async def _get_bidder_keyword_statuses(
+        complex_adv: 'ComplexAdv',
+        texts: list[str],
+    ) -> dict[str, BidderKeywordStatus]:
+        wb_manager_hub = await CalculatedKeywordsManager._get_wb_manager_hub(complex_adv)
 
         redis_manager_instance: RedisKeywordBidderStatusManager = (
             wb_manager_hub.redis_keyword_bidder_status_manager

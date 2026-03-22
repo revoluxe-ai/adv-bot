@@ -93,6 +93,10 @@ class CalculatedKeyword(BaseModel):
         return self.state.reason
 
     @property
+    def cooldown_display_tag(self) -> str | None:
+        return self.state.cooldown_display_tag
+
+    @property
     def best_keyword_status(self) -> bool:
         return self.state.best_keyword_status
 
