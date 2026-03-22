@@ -1,5 +1,6 @@
 from collections.abc import Callable, Awaitable
 
+from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.common_slaves.wildberries.models.enums import TargetPositionMode
@@ -40,6 +41,7 @@ class ComplexAdv:
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
         get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
+        min_nmids_bids: AdvMinNmidsBids | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
@@ -49,10 +51,18 @@ class ComplexAdv:
         self._calculated_keywords: list["CalculatedKeyword"] | None = None
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
+        self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
 
     def __repr__(self):
         return str(self._adv_setting.id)
 
+    @property
+    def min_nmids_bids(self) -> AdvMinNmidsBids | None:
+        """Мин. CPM auto/search по nmid; батч из get_complex_advs — один общий объект на все РК."""
+        return self._min_nmids_bids
+
+    def attach_min_nmids_bids(self, bids: AdvMinNmidsBids) -> None:
+        self._min_nmids_bids = bids
 
     @property
     def strategy(self) -> Strategy:

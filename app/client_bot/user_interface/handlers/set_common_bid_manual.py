@@ -132,7 +132,9 @@ async def set_common_bid_manual_start(
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            min_bids = await hub.wb_data_manager.get_min_bids([complex_adv])
+            min_bids = await hub.wb_manager.get_min_bids(
+                [complex_adv], cache_possible=True
+            )
     except Exception as e:
         logger.exception("get_min_bids failed for adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
