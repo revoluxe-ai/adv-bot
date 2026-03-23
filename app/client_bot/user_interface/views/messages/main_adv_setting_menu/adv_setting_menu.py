@@ -209,7 +209,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         nmids = self.adv.nmids
         images = await data_manager.get_main_photos(nmids[:1])
-        image = images[0]
+        image = images[0] if images else "https://placehold.co/600x800/png?text=WB"
         self.image = image
 
         # last_update_keyword_stat: datetime | None = (

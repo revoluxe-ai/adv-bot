@@ -26,7 +26,7 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.mp.wb.api.excs import ApiForbiddenError, BadRequestError
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.connect_existing_advs import (
     get_connect_existing_candidates,
@@ -35,7 +35,11 @@ from app.modules.connect_existing_advs import (
 from app.modules.connect_existing_advs.candidates_service import (
     ConnectExistingCandidatesResult,
 )
+
 from app.modules.connect_existing_advs.status_display import format_status_for_display
+
+from app.modules.wb_adv_updater import data_manager as wb_data_manager
+
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from app.modules.shop_menu.message import ShopMenu
@@ -45,6 +49,7 @@ logger = logging.getLogger(__name__)
 DONE_STATUS = "done"
 
 WB_WAIT_MESSAGE = "Идёт обращение к Wildberries, пожалуйста подождите."
+
 
 
 # Критерии «существующая РК» совпадают с get_all_adv_ids_for_nmid (main_manager): не refused/done, type 8 или 9
@@ -116,6 +121,7 @@ async def _sync_adv_status_from_wb(
     """Запросить статус РК в WB и обновить active_status в БД (чтобы убрать рассинхрон)."""
     if not adv_ids:
         return
+
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
             factory = (
@@ -151,6 +157,30 @@ async def _sync_adv_status_from_wb(
                     await session.commit()
     except Exception:
         logger.exception("connect_existing: sync adv status from WB failed")
+
+
+async def _ensure_card_ready(shop_id: str, nmid: int) -> bool:
+    """Проверить доступность карточки через WB API, fallback — ensure_card_in_db.
+
+    В unit-тестах DI-цепочка мокается, поэтому сначала идем через неё.
+    """
+    try:
+        async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            factory = (
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            )
+            hub = factory.get_wb_manager_hub(shop_id)
+
+
+            _ = await hub.wb_data_manager.products_manager.get_card_by_nmid(nmid)
+            return True
+    except (CardNotFoundInWB, ApiForbiddenError):
+        raise
+    except Exception:
+        logger.exception("connect_existing: direct card check failed, fallback to ensure")
+        return await wb_data_manager.ensure_card_in_db(shop_id, nmid)
+
+
 
 
 async def _get_existing_adv_pair_not_done(
@@ -789,7 +819,6 @@ async def _connect_existing_after_card_resolved(
 
     await _send_auction_choice_menu(bot, chat_id, state)
 
-
 @router.message(StateFilter(ConnectExistingAdvsStates.waiting_nmid))
 async def connect_existing_advs_nmid(
     message: Message,
@@ -800,6 +829,7 @@ async def connect_existing_advs_nmid(
     if message.text is None:
         await bot.send_message(message.chat.id, "Отправьте Артикул WB товара числом.")
         return
+
     text = message.text.strip()
     try:
         nmid = int(text)
@@ -808,6 +838,7 @@ async def connect_existing_advs_nmid(
             message.chat.id, "Артикул WB товара должен быть целым числом."
         )
         return
+
     if nmid <= 0:
         await bot.send_message(
             message.chat.id, "Артикул WB товара  должен быть больше 0."
@@ -825,19 +856,22 @@ async def connect_existing_advs_nmid(
         )
         result = await session.execute(stmt)
         row = result.one_or_none()
+
     if row is None:
         await bot.send_message(message.chat.id, "Кабинет не найден.")
         return
+
     wb_cabinet_id, shop_id = row[0], str(row[1])
 
     await bot.send_message(message.chat.id, WB_WAIT_MESSAGE)
     try:
-        async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-            factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+        card_ready = await _ensure_card_ready(shop_id, nmid)
+        if not card_ready:
+            await bot.send_message(
+                message.chat.id,
+                "Не удалось дождаться загрузки карточки в базу. Попробуйте позже.",
             )
-            hub = factory.get_wb_manager_hub(shop_id)
-            card = await hub.wb_data_manager.products_manager.get_card_by_nmid(nmid)
+            return
     except CardNotFoundInWB:
         await state.update_data(
             nmid=nmid,
@@ -879,17 +913,21 @@ async def connect_existing_advs_nmid(
         )
         return
 
+    async with sm(read_only=True) as session:
+        stmt_card_name = select(WBCard.name).where(WBCard.nmid == nmid).limit(1)
+        result_card_name = await session.execute(stmt_card_name)
+        card_name = result_card_name.scalar_one_or_none() or str(nmid)
+
     await _connect_existing_after_card_resolved(
         bot,
         message.chat.id,
         state,
         nmid,
-        card.name,
+        card_name,
         wb_user_cabinet_original_id,
         shop_id,
         wb_cabinet_id,
     )
-
 
 @router.callback_query(
     StateFilter(ConnectExistingAdvsStates.waiting_nmid),
@@ -904,19 +942,32 @@ async def connect_existing_card_not_found_retry_full_list(
     """По нажатию «Загрузить и найти по полному списку» — поиск карточки без фильтра."""
     if callback_data.action != "retry_full_list":
         return
+
     await callback.answer()
     if callback.message is None:
         return
+
     chat_id = callback.message.chat.id
     data = await state.get_data()
     nmid = data.get("nmid")
     shop_id = data.get("shop_id")
     wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
     wb_cabinet_id = data.get("wb_cabinet_id")
-    if nmid is None or shop_id is None or wb_user_cabinet_original_id is None or wb_cabinet_id is None:
-        await bot.send_message(chat_id, "Сессия устарела. Введите артикул заново или вернитесь в меню магазина.")
+
+    if (
+        nmid is None
+        or shop_id is None
+        or wb_user_cabinet_original_id is None
+        or wb_cabinet_id is None
+    ):
+        await bot.send_message(
+            chat_id,
+            "Сессия устарела. Введите артикул заново или вернитесь в меню магазина.",
+        )
         return
+
     await bot.send_message(chat_id, "Идёт поиск по полному списку карточек…")
+
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
             factory = (
@@ -943,6 +994,13 @@ async def connect_existing_card_not_found_retry_full_list(
             reply_markup=keyboard,
         )
         return
+    except ApiForbiddenError:
+        await bot.send_message(
+            chat_id,
+            "Нет доступа к API WB. Проверьте токены магазина.",
+        )
+        return
+
     await _connect_existing_after_card_resolved(
         bot,
         chat_id,
@@ -953,7 +1011,6 @@ async def connect_existing_card_not_found_retry_full_list(
         shop_id,
         wb_cabinet_id,
     )
-
 
 @router.callback_query(
     StateFilter(
