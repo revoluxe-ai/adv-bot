@@ -17,6 +17,9 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.excs import (
+    ClusterBidsUpdateError,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -121,14 +124,26 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
+        reuse_min_bids = self._reuse_shared_min_bids_from_complex_advs(complex_advs)
+
         if search_adv_bids_override is not None:
-            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            if reuse_min_bids is not None:
+                min_bids = reuse_min_bids
+            else:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
             search_adv_bids = search_adv_bids_override
         else:
-            min_bids, search_adv_bids = await asyncio.gather(
-                self._get_min_bids(complex_advs, cache_possible=True),
-                self._get_search_adv_common_bids(complex_advs),
-            )
+            if reuse_min_bids is not None:
+                min_bids = reuse_min_bids
+                search_adv_bids = await self._get_search_adv_common_bids(complex_advs)
+            else:
+                # mypy 1.19: INTERNAL ERROR на `a, b = await gather(...)`; индексация обходит.
+                _gathered = await asyncio.gather(
+                    self._get_min_bids(complex_advs, cache_possible=True),
+                    self._get_search_adv_common_bids(complex_advs),
+                )
+                min_bids = _gathered[0]
+                search_adv_bids = _gathered[1]
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
 
@@ -173,6 +188,19 @@ class WBShopDataManager:
             for parts in successful_parts
         ]
 
+
+    @staticmethod
+    def _reuse_shared_min_bids_from_complex_advs(
+        complex_advs: list[ComplexAdv],
+    ) -> AdvMinNmidsBids | None:
+        if not complex_advs:
+            return None
+        first_bids = complex_advs[0].min_nmids_bids
+        if first_bids is None:
+            return None
+        if not all(a.min_nmids_bids is first_bids for a in complex_advs):
+            return None
+        return first_bids
 
     @staticmethod
     async def _collect_plan_data(complex_adv: ComplexAdv) -> PlanData:
@@ -245,6 +273,20 @@ class WBShopDataManager:
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
+        if complex_advs:
+            try:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            except ClusterBidsUpdateError as exc:
+                logger.warning(
+                    "get_min_bids failed in get_complex_advs for shop_id=%s; "
+                    "returning ComplexAdv without min_nmids_bids (%s)",
+                    self.shop_id,
+                    exc,
+                )
+            else:
+                if min_bids is not None:
+                    for adv in complex_advs:
+                        adv.attach_min_nmids_bids(min_bids)
         return complex_advs
 
     @staticmethod

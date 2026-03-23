@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 from .plan_fact_controller.plan_fact_reader import PlanFactReader
@@ -105,13 +105,13 @@ class AdvStrategySelector:
 
     @staticmethod
     def _all_shelf_keywords_activated(keywords: list[CalculatedKeyword]) -> bool:
-        # "Полочные" ключи: выше конверсии доп.показов.
-        # Ключи, которые не могут быть включены вручную (hard_status 0/3), исключаем.
-        candidates = [
+        # Полочные (above rec conversion, hard_status 1), ещё BAD и не в cooldown МС.
+        # Пока такие есть — не все «активированы» → MIN_CPO; пусто → MAX_CONV.
+        pending_shelf = [
             keyword
             for keyword in keywords
-            if keyword.above_rec_conversion is True and keyword.hard_status not in {0, 3}
+            if keyword.above_rec_conversion is True and keyword.hard_status == 1
+               and keyword.status == KeywordStatus.BAD
+               and keyword.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
         ]
-        # При пустом candidates all() даёт True намеренно: включать нечего, дальше двигать
-        # товар можно только за счёт повышения конверсии → выбираем MAX_CONV.
-        return all(keyword.status == KeywordStatus.GOOD for keyword in candidates)
+        return not pending_shelf

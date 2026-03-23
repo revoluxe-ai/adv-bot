@@ -112,7 +112,7 @@ async def test_set_common_bid_manual_start_success() -> None:
             container = MagicMock()
             factory = MagicMock()
             hub = MagicMock()
-            hub.wb_data_manager.get_min_bids = AsyncMock(return_value=min_bids_mock)
+            hub.wb_manager.get_min_bids = AsyncMock(return_value=min_bids_mock)
 
             factory.get_wb_manager_hub.return_value = hub
             container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory

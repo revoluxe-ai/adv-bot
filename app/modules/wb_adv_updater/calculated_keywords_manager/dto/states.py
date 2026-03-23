@@ -19,6 +19,8 @@ class KeywordStatusReason(StrEnum):
     BEST_KEYWORD = auto()
     NOT_RELEVANT_PHRASE = auto()
     NOT_FOUND_WHITE_LIST_KEYWORD_WITH_RATING = auto()
+    # Выше цели при мин. ставке (метка «МС» в UI)
+    ABOVE_TARGET_AT_MIN_BID = "МС"
 
 class KeywordStatus(StrEnum):
     GOOD = "good"
