@@ -7,6 +7,7 @@ from app.modules.keywords_manager.keywords_manager import KeywordsManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 if typing.TYPE_CHECKING:
@@ -32,10 +33,15 @@ class FirstKeyUpdater:
         self,
         complex_adv: "ComplexAdv",
     ) -> None:
-        candidates = await KeywordsManager.get_candidates_to_white_list(complex_adv)
-        if not candidates:
+
+        keywords = await complex_adv.get_keywords()
+        auto_and_white_list_keywords_without_cooldown_by_min_bid = \
+        [kw for kw in keywords if kw.hard_status in (1, 2)
+         and kw.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID]
+
+        if not auto_and_white_list_keywords_without_cooldown_by_min_bid:
             return None
-        best = candidates[0]
+        best = auto_and_white_list_keywords_without_cooldown_by_min_bid[0]
         if best.hard_status == 2:
             return None
 
