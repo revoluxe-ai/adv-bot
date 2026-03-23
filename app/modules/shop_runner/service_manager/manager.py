@@ -534,7 +534,7 @@ class CoroutinesManager:
 
         return None
 
-    @while_coroutine_decorator(60 * 15, 60)
+    @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
@@ -544,9 +544,6 @@ class CoroutinesManager:
 
         complex_advs = await self._wb_shop_data_manager.get_complex_advs()
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        complex_advs, _ = await self._split_advs_by_stats_freshness(
-            complex_advs, operation_name="update_minus_phrases_in_advs"
-        )
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
                 complex_adv_

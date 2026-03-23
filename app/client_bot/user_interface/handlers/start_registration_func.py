@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
+from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
@@ -37,12 +38,17 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
         else:
             chat_id = message.message.chat.id
 
-        if settings.invite_gate and not user.passed_gate:
+        minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
+        if minimal:
+            await MainMenu(bot, chat_id, full_client_ui=False)()
+            return
+
+        if settings.invite_gate and not user.passed_gate and not is_bot_admin(user_id):
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
                 reply_markup=get_gate_keyboard(),
             )
             return
-        await MainMenu(bot, chat_id)()
+        await MainMenu(bot, chat_id, full_client_ui=True)()
     return

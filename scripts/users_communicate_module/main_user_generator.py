@@ -75,7 +75,7 @@ async def get_users_iterator(
     get_users_generator = get_users(
         batch_size=batch_size,
         telegram_ids_filter=None,
-        only_with_auto_campaign=True,
-        balance_more_than_0=True
+        only_with_auto_campaign=False,
+        balance_more_than_0=False
     )
     return get_users_generator

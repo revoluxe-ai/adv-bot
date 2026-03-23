@@ -9,3 +9,4 @@ class PassedGateReason(StrEnum):
     BALANCE_TOP_UP = "BALANCE_TOP_UP"  # пополнение баланса
     INVITE_CODE_ENTRY = "INVITE_CODE_ENTRY"  # введение инвайт-кода
     OLD_USER = "OLD_USER"  # пользователь до миграции
+    ADMIN_MANUAL = "ADMIN_MANUAL"  # вручную админом из панели

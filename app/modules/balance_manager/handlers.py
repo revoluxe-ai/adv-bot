@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-from datetime import UTC, date
+from datetime import date
 import json
 import logging
 from uuid import uuid4
@@ -17,7 +17,6 @@ from sqlalchemy.orm import joinedload
 from app.client_bot import const
 from app.client_bot.const import (
     EMAIL_FOR_PAYMENT_RECEIPT,
-    GATE_ENTRY_AMOUNT,
     OFFERTA_URL,
 )
 from app.client_bot.user_interface import states
@@ -39,7 +38,6 @@ from app.modules.shop_menu.message import ShopMenu
 from app.payments.db.models import Payment
 from app.settings import settings
 from app.utils.db.models import User
-from app.utils.db.passed_gate_reason import PassedGateReason
 from app.utils.db.session_maker import get_async_session_maker
 from . import messages
 from ..billing.event_manager.event_manager import BillingEventManager
@@ -763,7 +761,7 @@ async def successful_payment_handler(
                 exc_info=exc,
             )
         bonus_percent = 0.0
-        if date.today() <= date(2025, 12, 31):
+        if date.today() <= date(2025, 12, 31) and not settings.presentation_only:
             bonus_percent = settings.BALANCE_TOPUP_BONUS_PERCENT
         try:
             (
@@ -797,18 +795,6 @@ async def successful_payment_handler(
                 "Failed to emit balance_topup_applied (user); continuing",
                 exc_info=exc,
             )
-        if parsed_payload.get("gate_entry") is True and cost == float(GATE_ENTRY_AMOUNT):
-            async with sm() as session:
-                stmt = select(User).where(User.user_telegram_id == message.chat.id)
-                result = await session.execute(stmt)
-                gate_user = result.scalar_one()
-                gate_user.passed_gate = True
-                gate_user.passed_gate_reason = PassedGateReason.BALANCE_TOP_UP
-                now_utc = datetime.datetime.now(UTC).replace(tzinfo=None)
-                gate_user.passed_gate_at = now_utc
-                session.add(gate_user)
-                await session.commit()
-            await message.answer("Оплата получена. Доступ открыт.")
         await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()
         shop_ids = [uc.wb_cabinet.shop_id for uc in user.wb_user_cabinets]
         shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
@@ -871,7 +857,7 @@ async def successful_payment_handler(
         )
 
     bonus_percent = 0.0
-    if date.today() <= date(2025, 12, 31):
+    if date.today() <= date(2025, 12, 31) and not settings.presentation_only:
         bonus_percent = settings.BALANCE_TOPUP_BONUS_PERCENT
 
     (

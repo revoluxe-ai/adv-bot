@@ -26,6 +26,8 @@ import logging
 from collections.abc import Callable, Iterable, Awaitable
 from datetime import datetime, time, timedelta, timezone
 
+from app.modules import balance_manager
+
 from app.client_bot.user_interface.handlers.time_settings.logic import (
     allowed_now_from_db_state,
 )
@@ -185,6 +187,14 @@ class AutoAdvActiveControlService:
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
 
+    @staticmethod
+    async def _cabinet_has_positive_balance(adv: ComplexAdv) -> bool:
+        wb_cabinet_id = adv.adv_setting.wb_cabinet_id
+        balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
+            wb_cabinet_id
+        )
+        return (balance + bonus) > 0
+
     async def _auto_campaign_handler(
         self,
         adv: ComplexAdv,
@@ -213,6 +223,21 @@ class AutoAdvActiveControlService:
                 auto_adv_id,
                 CampaignActivityCommand.PAUSE,
                 AutoReasonCode.TIME_SCHEDULE,
+            )
+            return None
+
+        if not await self._cabinet_has_positive_balance(adv):
+            if auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auto campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.INSUFFICIENT_BALANCE,
             )
             return None
 
@@ -426,6 +451,21 @@ class AutoAdvActiveControlService:
                 adv_id,
                 CampaignActivityCommand.PAUSE,
                 AuctionReasonCode.TIME_SCHEDULE,
+            )
+            return None
+
+        if not await self._cabinet_has_positive_balance(adv):
+            if search_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto budget watcher: pausing auction campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",
+                    adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auction_campaign(adv)
+            await self._set_search_reason(
+                adv_id,
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.INSUFFICIENT_BALANCE,
             )
             return None
 

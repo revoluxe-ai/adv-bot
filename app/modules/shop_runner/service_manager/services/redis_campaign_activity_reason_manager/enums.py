@@ -28,6 +28,7 @@ class AutoReasonCode(StrEnum):
     TIME_SCHEDULE = "time_schedule"
     REC_SYSTEM_MODE_OFF = "rec_system_mode_off"
     BUDGET_OK_COST_OK = "budget_ok_cost_ok"
+    INSUFFICIENT_BALANCE = "insufficient_balance_auto"
 
 
 class AuctionReasonCode(StrEnum):
@@ -40,6 +41,7 @@ class AuctionReasonCode(StrEnum):
     SEARCH_LIMIT_OK = "search_limit_ok"
     SEARCH_LIMIT_0 = "search_limit_0"
     TIME_SCHEDULE = "time_schedule"
+    INSUFFICIENT_BALANCE = "insufficient_balance_auction"
 
 
 CampaignReasonCode = AutoReasonCode | AuctionReasonCode

@@ -53,3 +53,7 @@ PRICE_LINK = 'https://telegra.ph/Tarify-Servisa-Gorizont-Avtomatizaciya-vnutrenn
 
 SUPPORT_LINK = "https://t.me/sky_manager_1"
 SUPPORT_USER_NAME = "sky_manager_1"  # username для лички (без @)
+
+# Получатель уведомлений о заявке на презентацию (главный менеджер @sky_manager_1).
+# Переопределение: PRESENTATION_NOTIFY_TELEGRAM_ID в окружении.
+MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID = 373435337
