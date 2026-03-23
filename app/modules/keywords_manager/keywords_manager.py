@@ -37,8 +37,11 @@ class KeywordsManager:
                 return False
             return True
 
-        keywords = await complex_adv.get_keywords()
-        keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
+        keywords = sorted(
+            await complex_adv.get_keywords(),
+            key=lambda kw: kw.rating or 0,
+            reverse=True,
+        )
         candidates = list(filter(candidate_filter, keywords))
         return candidates
 
