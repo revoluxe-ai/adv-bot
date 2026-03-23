@@ -30,8 +30,14 @@ class FirstKeyUpdater:
         complex_adv: "ComplexAdv",
     ) -> None:
         keywords = await complex_adv.get_keywords()
-        clear_keywords = [kw for kw in keywords if kw.hard_status not in (0, 3) # не НРФ и не Откл
-                          and kw.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID]
+        # Пул 1/2/4 (без НРФ 0 и откл. 3) и без причины «МС». По рейтингу лидер
+        # может быть белым списком (2) или always-on (4) — тогда не трогаем БД.
+        clear_keywords = [
+            kw
+            for kw in keywords
+            if kw.hard_status not in (0, 3)
+            and kw.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+        ]
         if not clear_keywords:
             return None
         clear_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
