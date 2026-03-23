@@ -1257,13 +1257,13 @@ def _pre_kw_above_target_at_min(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_first_disable(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     """Нет last_disabled: условие выполнено -> BAD МС, в updates время и показы."""
-    pre_kw = _pre_kw_above_target_at_min(text="k1")
+    pre_kw = _pre_kw_above_target_at_min(text="k1", hard_status=HardStatus.WHITELIST)
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={},
@@ -1278,13 +1278,13 @@ async def test_above_target_min_bid_first_disable(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_within_24h_no_redis_touch(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     last = fixed_now - timedelta(hours=12)
-    pre_kw = _pre_kw_above_target_at_min(text="k2")
+    pre_kw = _pre_kw_above_target_at_min(text="k2", hard_status=HardStatus.WHITELIST)
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={"k2": last},
@@ -1330,13 +1330,13 @@ async def test_above_target_min_bid_retest_tag(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_after_25h_new_cycle(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     last = fixed_now - timedelta(hours=26)
-    pre_kw = _pre_kw_above_target_at_min(text="k3")
+    pre_kw = _pre_kw_above_target_at_min(text="k3", hard_status=HardStatus.WHITELIST)
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={"k3": last},
@@ -1349,14 +1349,16 @@ async def test_above_target_min_bid_after_25h_new_cycle(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_clear_when_condition_false(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     last = fixed_now - timedelta(hours=5)
     # место хуже цели: pos 25 > target 20 -> не «выше цели»
-    pre_kw = _pre_kw_above_target_at_min(text="k4", position=25.0, target_place=20)
+    pre_kw = _pre_kw_above_target_at_min(
+        text="k4", position=25.0, target_place=20, hard_status=HardStatus.WHITELIST
+    )
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={"k4": last},
@@ -1364,6 +1366,45 @@ async def test_above_target_min_bid_clear_when_condition_false(
         now=fixed_now,
     )
     assert updates.get("k4") is None
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_not_applied_when_base_not_good(
+    complex_adv_with_hard_min_ctr, fixed_now
+) -> None:
+    """Без белого списка ключ BAD — правило МС не проверяем, даже если метрики «как у МС»."""
+    pre_kw = _pre_kw_above_target_at_min(text="inactive_ms")
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_with_hard_min_ctr,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.LESS_THEN_RATING_BY_ORDERS
+    assert updates == {}
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_clears_redis_when_base_not_good(
+    complex_adv_with_hard_min_ctr, fixed_now
+) -> None:
+    """Был cooldown в Redis, базовое состояние стало BAD — удаляем ключ из Redis."""
+    last = fixed_now - timedelta(hours=5)
+    pre_kw = _pre_kw_above_target_at_min(text="was_active_now_bad")
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_with_hard_min_ctr,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={"was_active_now_bad": last},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    assert updates.get("was_active_now_bad") is None
 
 
 @pytest.mark.asyncio
@@ -1404,14 +1445,16 @@ async def test_above_target_min_bid_skipped_zero_cpm(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_retest_window_no_extra_views(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     """25–26 ч, но показы не выросли — BAD МС, без метки Т."""
     last = fixed_now - timedelta(hours=25, minutes=30)
-    pre_kw = _pre_kw_above_target_at_min(text="k_no_extra")
+    pre_kw = _pre_kw_above_target_at_min(
+        text="k_no_extra", hard_status=HardStatus.WHITELIST
+    )
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={"k_no_extra": AboveTargetCooldownEntry(last, 1000)},
@@ -1423,14 +1466,16 @@ async def test_above_target_min_bid_retest_window_no_extra_views(
 
 @pytest.mark.asyncio
 async def test_above_target_min_bid_views_drop_updates_baseline(
-    complex_adv_with_hard_min_ctr, fixed_now
+    complex_adv_mock_whitelist, fixed_now
 ) -> None:
     """Показы упали (сброс суток в CH) — в Redis пишем актуальное v, таймер не сбрасываем."""
     last = fixed_now - timedelta(hours=12)
-    pre_kw = _pre_kw_above_target_at_min(text="k_drop", position=5.0, views=400)
+    pre_kw = _pre_kw_above_target_at_min(
+        text="k_drop", position=5.0, views=400, hard_status=HardStatus.WHITELIST
+    )
     updates: dict[str, AboveTargetCooldownEntry | None] = {}
     await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-        complex_adv_with_hard_min_ctr,
+        complex_adv_mock_whitelist,
         [pre_kw],
         min_bid_for_adv=100,
         cooldown_map={"k_drop": AboveTargetCooldownEntry(last, 1000)},

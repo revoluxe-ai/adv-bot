@@ -96,6 +96,13 @@ def apply_above_target_min_bid_cooldown(
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)
 
+    # Только ключи, которые по базовой логике сейчас GOOD (активны); остальные не трогаем и не проверяем МС.
+    if base_state.status != KeywordStatus.GOOD:
+        entry_inactive = _normalize_entry(cooldown_map.get(text))
+        if entry_inactive is not None:
+            cooldown_updates[text] = None
+        return base_state.model_copy(update={"cooldown_display_tag": None})
+
     condition = is_above_target_at_min_bid(pre_kw, min_bid_for_adv)
     v_cur = pre_kw.cluster_stat.views
 
