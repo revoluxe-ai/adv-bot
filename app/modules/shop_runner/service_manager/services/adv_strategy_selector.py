@@ -105,15 +105,13 @@ class AdvStrategySelector:
 
     @staticmethod
     def _all_shelf_keywords_activated(keywords: list[CalculatedKeyword]) -> bool:
-        # "Полочные" ключи: выше конверсии доп.показов.
-        # Ключи, которые не могут быть включены вручную, исключаем.
-        candidates = [
+        # Полочные (above rec conversion, hard_status 1), ещё BAD и не в cooldown МС.
+        # Пока такие есть — не все «активированы» → MIN_CPO; пусто → MAX_CONV.
+        pending_shelf = [
             keyword
             for keyword in keywords
             if keyword.above_rec_conversion is True and keyword.hard_status == 1
                and keyword.status == KeywordStatus.BAD
                and keyword.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
         ]
-        # При пустом candidates all() даёт True намеренно: включать нечего, дальше двигать
-        # товар можно только за счёт повышения конверсии → выбираем MAX_CONV.
-        return all(keyword.status == KeywordStatus.GOOD for keyword in candidates)
+        return not pending_shelf
