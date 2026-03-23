@@ -1,19 +1,16 @@
-from collections.abc import Awaitable
 import typing
-
-
 
 from sqlalchemy import update
 
-
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.keywords_manager.keywords_manager import KeywordsManager
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 if typing.TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
-
 
 from .exc import FirstKeyUpdaterError
 
@@ -26,45 +23,26 @@ class FirstKeyUpdater:
         self,
         complex_adv: "ComplexAdv",
     ) -> None:
-        keywords = await complex_adv.get_keywords()
-
         try:
-            await self._top_key_auto_update(keywords)
+            await self._top_key_auto_update(complex_adv)
         except Exception as exc:
             raise FirstKeyUpdaterError from exc
 
     async def _top_key_auto_update(
         self,
-        keywords: list[CalculatedKeyword],
+        complex_adv: "ComplexAdv",
     ) -> None:
-        if not keywords:
+        candidates = await KeywordsManager.get_candidates_to_white_list(complex_adv)
+        if not candidates:
             return None
-        clear_keywords = [kw for kw in keywords if kw.hard_status in (1, 2, 4)]
-        if not clear_keywords:
-            return None
-        clear_keywords = sorted(
-            clear_keywords, key=lambda kw: kw.rating or 0, reverse=True
-        )
-        top_key = clear_keywords[0]
-        if top_key.hard_status in [2, 4]:
-            return None
-        # TODO: Сделать кнопку добавления не только релевантных фраз
-        if self._adv.auto_add_only_relevant_phrase:
-            relevant_phrases = [kw for kw in clear_keywords if kw.relevant]
-        else:
-            relevant_phrases = clear_keywords
-        if not relevant_phrases:
-            return None
-        top_relevant_phrase = relevant_phrases[0]
-        if top_relevant_phrase.hard_status == 2:
+        best = candidates[0]
+        if best.hard_status == 2:
             return None
 
         async with sm(read_only=False) as session:
             stmt = (
                 update(KeywordSetting)
-                .where(
-                    KeywordSetting.id == top_relevant_phrase.keyword_setting_original_id
-                )
+                .where(KeywordSetting.id == best.keyword_setting_original_id)
                 .values(hard_status=2)
             )
             await session.execute(stmt)
