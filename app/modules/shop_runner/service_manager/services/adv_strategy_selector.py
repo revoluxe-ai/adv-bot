@@ -26,6 +26,42 @@ class StrategySelection:
 
 
 class AdvStrategySelector:
+    async def select_target_strategy(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        plan_fact_reader: PlanFactReader,
+    ) -> StrategySelection | None:
+        if not complex_adv.rec_system_promotion_mode_active:
+            return await self._select_by_plan_and_cost(
+                complex_adv=complex_adv,
+                plan_fact_reader=plan_fact_reader,
+            )
+
+        if not complex_adv.auto_adv_active_status:
+            return await self._select_by_plan_and_cost(
+                complex_adv=complex_adv,
+                plan_fact_reader=plan_fact_reader,
+            )
+
+        plan_selection = await self._select_by_plan_and_cost(
+            complex_adv=complex_adv,
+            plan_fact_reader=plan_fact_reader,
+        )
+        if plan_selection is not None and plan_selection.strategy == Strategy.MIN_CPO:
+            return plan_selection
+
+        keywords = await complex_adv.get_keywords()
+        if self._all_shelf_keywords_activated(keywords):
+            return StrategySelection(
+                strategy=Strategy.MAX_CONV,
+                reason="all_shelf_keywords_activated",
+            )
+        return StrategySelection(
+            strategy=Strategy.MIN_CPO,
+            reason="not_all_shelf_keywords_activated",
+        )
+
     @staticmethod
     def _select_by_plan_and_cost(
         *,

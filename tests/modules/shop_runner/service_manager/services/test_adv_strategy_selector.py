@@ -214,9 +214,10 @@ async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_co
         keywords=keywords,
     )
 
+    # План не выполнен и себестоимость в норме → из плана MAX_CONV, затем полочная ветка → MAX_CONV
     result = await selector.select_target_strategy(
         complex_adv,
-        plan_fact_reader=_plan_fact_reader(fact_orders=1.0, fact_pay_for_order=500.0),
+        plan_fact_reader=_plan_fact_reader(fact_orders=4.0, fact_pay_for_order=160.0),
     )
 
     assert result is not None
@@ -272,3 +273,61 @@ async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_co
     assert result is not None
     assert result.strategy == Strategy.MAX_CONV
     assert result.reason == "all_shelf_keywords_activated"
+
+
+@pytest.mark.asyncio
+async def test_select_target_strategy_rec_mode_active_plan_fulfilled_all_shelf_good_returns_min_cpo() -> None:
+    selector = AdvStrategySelector()
+    keywords = [
+        SimpleNamespace(
+            above_rec_conversion=True,
+            hard_status=1,
+            status=KeywordStatus.GOOD,
+        ),
+    ]
+    complex_adv = _make_complex_adv(
+        rec_system_promotion_mode_active=True,
+        auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        keywords=keywords,
+    )
+
+    result = await selector.select_target_strategy(
+        complex_adv,
+        plan_fact_reader=_plan_fact_reader(fact_orders=12.0, fact_pay_for_order=50.0),
+    )
+
+    assert result is not None
+    assert result.strategy == Strategy.MIN_CPO
+    assert result.reason == "orders_reached_plan"
+
+
+@pytest.mark.asyncio
+async def test_select_target_strategy_rec_mode_active_cost_above_target_all_shelf_good_returns_min_cpo() -> None:
+    selector = AdvStrategySelector()
+    keywords = [
+        SimpleNamespace(
+            above_rec_conversion=True,
+            hard_status=1,
+            status=KeywordStatus.GOOD,
+        ),
+    ]
+    complex_adv = _make_complex_adv(
+        rec_system_promotion_mode_active=True,
+        auto_adv_active_status=True,
+        plan_orders=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        keywords=keywords,
+    )
+
+    result = await selector.select_target_strategy(
+        complex_adv,
+        plan_fact_reader=_plan_fact_reader(fact_orders=1.0, fact_pay_for_order=500.0),
+    )
+
+    assert result is not None
+    assert result.strategy == Strategy.MIN_CPO
+    assert result.reason == "cost_above_target"
