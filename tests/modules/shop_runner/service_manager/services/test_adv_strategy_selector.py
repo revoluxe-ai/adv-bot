@@ -214,10 +214,10 @@ async def test_select_target_strategy_rec_mode_active_auto_all_shelf_keywords_co
         keywords=keywords,
     )
 
-    # План не выполнен и себестоимость в норме → из плана MAX_CONV, затем полочная ветка → MAX_CONV
+    # План не выполнен, фактическая себестоимость выше целевой → MIN_CPO (cost_above_target), полочная ветка не меняет
     result = await selector.select_target_strategy(
         complex_adv,
-        plan_fact_reader=_plan_fact_reader(fact_orders=4.0, fact_pay_for_order=160.0),
+        plan_fact_reader=_plan_fact_reader(fact_orders=1.0, fact_pay_for_order=500.0),
     )
 
     assert result is not None

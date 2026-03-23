@@ -26,42 +26,6 @@ class StrategySelection:
 
 
 class AdvStrategySelector:
-    async def select_target_strategy(
-        self,
-        complex_adv: ComplexAdv,
-        *,
-        plan_fact_reader: PlanFactReader,
-    ) -> StrategySelection | None:
-        if not complex_adv.rec_system_promotion_mode_active:
-            return await self._select_by_plan_and_cost(
-                complex_adv=complex_adv,
-                plan_fact_reader=plan_fact_reader,
-            )
-
-        if not complex_adv.auto_adv_active_status:
-            return await self._select_by_plan_and_cost(
-                complex_adv=complex_adv,
-                plan_fact_reader=plan_fact_reader,
-            )
-
-        plan_selection = await self._select_by_plan_and_cost(
-            complex_adv=complex_adv,
-            plan_fact_reader=plan_fact_reader,
-        )
-        if plan_selection is not None and plan_selection.strategy == Strategy.MIN_CPO:
-            return plan_selection
-
-        keywords = await complex_adv.get_keywords()
-        if self._all_shelf_keywords_activated(keywords):
-            return StrategySelection(
-                strategy=Strategy.MAX_CONV,
-                reason="all_shelf_keywords_activated",
-            )
-        return StrategySelection(
-            strategy=Strategy.MIN_CPO,
-            reason="not_all_shelf_keywords_activated",
-        )
-
     @staticmethod
     def _select_by_plan_and_cost(
         *,
@@ -113,20 +77,19 @@ class AdvStrategySelector:
         if plan is not None:
             summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)
 
-        plan_and_cost_selection = self._select_by_plan_and_cost(
+        plan_selection = self._select_by_plan_and_cost(
             plan=plan,
             summary=summary,
         )
-        if (
-            plan_and_cost_selection is not None
-            and plan_and_cost_selection.reason == "cost_above_target"
-        ):
-            return plan_and_cost_selection
+
         if not complex_adv.rec_system_promotion_mode_active:
-            return plan_and_cost_selection
+            return plan_selection
 
         if not complex_adv.auto_adv_active_status:
-            return plan_and_cost_selection
+            return plan_selection
+
+        if plan_selection is not None and plan_selection.strategy == Strategy.MIN_CPO:
+            return plan_selection
 
         keywords = await complex_adv.get_keywords()
         if self._all_shelf_keywords_activated(keywords):
