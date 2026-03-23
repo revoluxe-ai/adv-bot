@@ -10,9 +10,11 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
     AboveTargetCooldownEntry,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid_cooldown import (
+    ABOVE_TARGET_MIN_BID_COOLDOWN_REDIS_TTL_SECONDS,
+)
 
 _KEY_PREFIX = "kw_cooldown:above_target_min"
-_TTL_SECONDS = 25 * 60 * 60
 
 
 def _key(adv_id: int, normalized_text: str) -> str:
@@ -100,6 +102,8 @@ class RedisAboveTargetMinBidCooldownManager:
         for text, entry in updates.items():
             k = _key(adv_id, text)
             if entry is None:
-                await self._redis.delete(k)
+                _ = await self._redis.delete(k)
             else:
-                await self._redis.set(k, _serialize(entry), ex=_TTL_SECONDS)
+                _ = await self._redis.set(
+                    k, _serialize(entry), ex=ABOVE_TARGET_MIN_BID_COOLDOWN_REDIS_TTL_SECONDS
+                )

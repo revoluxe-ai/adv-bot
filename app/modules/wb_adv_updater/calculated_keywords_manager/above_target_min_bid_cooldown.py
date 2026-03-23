@@ -24,6 +24,12 @@ _FREEZE_H = timedelta(hours=24)
 _WAIT_AFTER_FREEZE_H = timedelta(hours=1)  # после 24 ч — ещё 1 ч до окна перетеста (всего 25 ч)
 _RETEST_WINDOW_H = timedelta(hours=1)  # 25–26 ч: перетест при росте показов
 
+# Redis TTL ≥ полного цикла, иначе ключ исчезает до конца окна 25–26 ч и цикл сбрасывается.
+_ABOVE_TARGET_FULL_CYCLE = _FREEZE_H + _WAIT_AFTER_FREEZE_H + _RETEST_WINDOW_H
+ABOVE_TARGET_MIN_BID_COOLDOWN_REDIS_TTL_SECONDS = int(
+    _ABOVE_TARGET_FULL_CYCLE.total_seconds()
+) + 3600  # +1 ч запас к границе следующего цикла
+
 COOLDOWN_RETEST_DISPLAY_TAG = "Т"
 
 
