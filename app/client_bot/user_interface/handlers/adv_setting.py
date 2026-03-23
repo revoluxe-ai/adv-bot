@@ -27,6 +27,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -221,6 +222,26 @@ async def adv_handler(
     if not wb_user_cabinet:
         await bot.send_message(
             chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
+
+    nmids = adv.nmids or []
+    nmid = nmids[0] if nmids else None
+    if nmid is None:
+        _ = await bot.send_message(
+            chat_id,
+            "Не удалось открыть РК: у кампании отсутствует артикул. "
+            f"Обратитесь в поддержку -> {const.SUPPORT_LINK}",
+        )
+        return
+    shop_id = str(wb_user_cabinet.wb_cabinet.shop_id)
+    ui_card_result = await wb_data_manager.ensure_card_with_image_for_ui(shop_id, nmid)
+    if not ui_card_result.ok:
+        _ = await bot.send_message(
+            chat_id,
+            "Не удалось загрузить данные карточки для отображения РК. "
+            "Переход в меню остановлен до восстановления данных. "
+            f"Обратитесь в поддержку -> {const.SUPPORT_LINK}",
         )
         return
 

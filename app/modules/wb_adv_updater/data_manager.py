@@ -4,6 +4,7 @@ import json
 import logging
 import pstats
 import time
+from dataclasses import dataclass
 from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
@@ -53,6 +54,12 @@ _ensure_card_locks: dict[tuple[str, int], asyncio.Lock] = {}
 _ensure_card_locks_guard = asyncio.Lock()
 
 
+@dataclass(slots=True)
+class CardImageEnsureResult:
+    ok: bool
+    reason: str | None = None
+
+
 async def _card_exists_in_db(nmid: int) -> bool:
     async with _sm(read_only=True) as session:
         stmt = select(WBCard.nmid).where(WBCard.nmid == nmid).limit(1)
@@ -87,6 +94,20 @@ async def _cleanup_ensure_lock(key: tuple[str, int], lock: asyncio.Lock) -> None
         current_lock = _ensure_card_locks.get(key)
         if current_lock is lock and not lock.locked():
             _ = _ensure_card_locks.pop(key, None)
+
+
+async def _card_has_photo_in_db(nmid: int) -> bool:
+    async with _sm(read_only=True) as session:
+        stmt = select(WBCard).where(WBCard.nmid == nmid).limit(1)
+        result = await session.execute(stmt)
+        wb_card = result.scalar_one_or_none()
+        if wb_card is None:
+            return False
+        try:
+            photos = wb_card.photos
+        except Exception:
+            return False
+        return bool(photos)
 
 
 async def ensure_card_in_db(shop_id: str, nmid: int, *, timeout_sec: int = 60) -> bool:
@@ -145,6 +166,37 @@ async def ensure_card_in_db(shop_id: str, nmid: int, *, timeout_sec: int = 60) -
             return False
     finally:
         await _cleanup_ensure_lock(key, lock)
+
+
+async def ensure_card_with_image_for_ui(
+    shop_id: str,
+    nmid: int,
+    *,
+    timeout_sec: int = 60,
+) -> CardImageEnsureResult:
+    """Проверить, что карточка и фото готовы для UI меню РК."""
+    if nmid <= 0:
+        return CardImageEnsureResult(ok=False, reason="invalid_nmid")
+
+    if await _card_exists_in_db(nmid) and await _card_has_photo_in_db(nmid):
+        return CardImageEnsureResult(ok=True)
+
+    try:
+        card_ready = await ensure_card_in_db(shop_id, nmid, timeout_sec=timeout_sec)
+    except Exception as exc:
+        logger.warning(
+            "ensure_card_with_image_for_ui failed for shop_id=%s nmid=%s: %s",
+            shop_id,
+            nmid,
+            exc,
+        )
+        return CardImageEnsureResult(ok=False, reason="ensure_card_failed")
+
+    if not card_ready:
+        return CardImageEnsureResult(ok=False, reason="card_not_loaded")
+    if not await _card_has_photo_in_db(nmid):
+        return CardImageEnsureResult(ok=False, reason="photo_missing")
+    return CardImageEnsureResult(ok=True)
 
 
 async def get_keyword_statistic_clickhouse(
