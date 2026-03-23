@@ -1,61 +1,105 @@
-"""Redis: время последнего отключения ключа по правилу «выше цели при мин. ставке»."""
+"""Redis-хранилище cooldown «выше цели при мин. ставке» (JSON: время + показы)."""
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import cast
 
-from app.core.redis_manager_v2.base_protocol import BaseRedisManagerProtocol
-from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
+from app.core.redis_manager_v2.redis_client import RedisClient
+from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
+    AboveTargetCooldownEntry,
+)
 
-if TYPE_CHECKING:
-    pass
-
-# 25 ч — покрывает цикл 24 ч BAD + 1 ч перетест; автоочистка при сбоях
+_KEY_PREFIX = "kw_cooldown:above_target_min"
 _TTL_SECONDS = 25 * 60 * 60
 
 
-def normalize_cooldown_keyword_text(text: str) -> str:
-    return text.strip().casefold()
+def _key(adv_id: int, normalized_text: str) -> str:
+    return f"{_KEY_PREFIX}:{adv_id}:{normalized_text}"
 
 
-class RedisAboveTargetMinBidCooldownManager(BaseRedisManager, BaseRedisManagerProtocol):
-    """Ключ: kw_cooldown:above_target_min:{adv_id}:{normalized_text} → Unix timestamp (float str)."""
+def _serialize(entry: AboveTargetCooldownEntry) -> str:
+    return json.dumps(
+        {
+            "t": entry.last_disabled_at.timestamp(),
+            "v": entry.views_at_freeze,
+        },
+        separators=(",", ":"),
+    )
 
-    prefix = "kw_cooldown:above_target_min"
-    default_ttl = _TTL_SECONDS
 
-    def _get_key(self, adv_id: int, normalized_text: str) -> str:
-        return f"{self.prefix}:{adv_id}:{normalized_text}"
+def _parse_payload(raw: str) -> AboveTargetCooldownEntry | None:
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        parsed: object = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        data = cast(dict[str, object], parsed)
+        t_raw = data.get("t")
+        v_raw = data.get("v", 0)
+        if isinstance(t_raw, (int, float)):
+            t = float(t_raw)
+            v = _coerce_views_int(v_raw)
+            return AboveTargetCooldownEntry(datetime.fromtimestamp(t, tz=UTC), v)
+    try:
+        ts = float(raw)
+        return AboveTargetCooldownEntry(datetime.fromtimestamp(ts, tz=UTC), 0)
+    except (TypeError, ValueError, OSError):
+        return None
 
-    async def get_many(self, adv_id: int, texts: list[str]) -> dict[str, datetime | None]:
-        """По исходным text (как в БД) → last_disabled_at или None."""
-        result: dict[str, datetime | None] = {}
-        for text in texts:
-            norm = normalize_cooldown_keyword_text(text)
-            raw = await self._client.get(self._get_key(adv_id, norm))
-            if not raw:
-                result[text] = None
+
+def _coerce_views_int(v_raw: object) -> int:
+    if isinstance(v_raw, bool):
+        return 0
+    if isinstance(v_raw, int):
+        return v_raw
+    if isinstance(v_raw, float):
+        return int(v_raw)
+    if isinstance(v_raw, str):
+        try:
+            return int(v_raw)
+        except ValueError:
+            return 0
+    return 0
+
+
+class RedisAboveTargetMinBidCooldownManager:
+    """Хранит last_disabled_at + views_at_freeze по ключу adv_id + normalized_text."""
+
+    def __init__(self, redis: RedisClient) -> None:
+        self._redis = redis
+
+    async def get_many(
+        self,
+        adv_id: int,
+        normalized_texts: list[str],
+    ) -> dict[str, AboveTargetCooldownEntry | None]:
+        if not normalized_texts:
+            return {}
+        keys = [_key(adv_id, t) for t in normalized_texts]
+        values = await self._redis.mget(keys)
+        out: dict[str, AboveTargetCooldownEntry | None] = {}
+        for text, raw in zip(normalized_texts, values, strict=True):
+            if raw is None:
+                out[text] = None
                 continue
-            try:
-                ts = float(raw)
-                result[text] = datetime.fromtimestamp(ts, tz=UTC)
-            except (TypeError, ValueError):
-                result[text] = None
-        return result
+            out[text] = _parse_payload(raw)
+        return out
 
     async def apply_updates(
-        self, adv_id: int, updates: dict[str, datetime | None]
+        self,
+        adv_id: int,
+        updates: dict[str, AboveTargetCooldownEntry | None],
     ) -> None:
-        """None в updates — удалить ключ; datetime — записать с TTL."""
         if not updates:
             return
-        ttl = self._resolve_ttl()
-        for text, at in updates.items():
-            norm = normalize_cooldown_keyword_text(text)
-            key = self._get_key(adv_id, norm)
-            if at is None:
-                await self._client.delete(key)
+        for text, entry in updates.items():
+            k = _key(adv_id, text)
+            if entry is None:
+                await self._redis.delete(k)
             else:
-                ts = at.timestamp()
-                await self._client.set(key, str(ts), ex=ttl)
+                await self._redis.set(k, _serialize(entry), ex=_TTL_SECONDS)

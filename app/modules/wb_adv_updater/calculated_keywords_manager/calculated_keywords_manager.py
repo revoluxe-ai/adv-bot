@@ -19,6 +19,12 @@ from app.core.clikhouse_client_manager import  get_clickhouse_client
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
     RedisKeywordBidderStatusManager,
 )
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
+    WBManager,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
+    AboveTargetCooldownEntry,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid_cooldown import (
     apply_above_target_min_bid_cooldown,
     max_search_min_bid_for_complex_nmids,
@@ -45,9 +51,6 @@ from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 if typing.TYPE_CHECKING:
     from app.core.di.wb_manager_hub.wb_manager_hub import WBManagerHub
     from app.modules.cpm_sources_resolver.dto import AllCpmSourcesPerText
-    from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
-        WBManager,
-    )
     from ...shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 
@@ -105,8 +108,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         if min_bid_for_adv is None:
             min_bid_for_adv = await self._fetch_min_search_bid_aggregate(complex_adv)
 
-        cooldown_map: dict[str, datetime | None] | None = None
-        cooldown_updates: dict[str, datetime | None] | None = None
+        cooldown_map: dict[str, AboveTargetCooldownEntry | None] | None = None
+        cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None = None
         cooldown_redis_mgr: RedisAboveTargetMinBidCooldownManager | None = None
         if min_bid_for_adv is not None:
             cooldown_updates = {}
@@ -307,8 +310,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         pre_keywords: list[PreCalculatedKeyword],
         *,
         min_bid_for_adv: int | None = None,
-        cooldown_map: dict[str, datetime | None] | None = None,
-        cooldown_updates: dict[str, datetime | None] | None = None,
+        cooldown_map: dict[str, AboveTargetCooldownEntry | None] | None = None,
+        cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None = None,
         now: datetime | None = None,
     ) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
@@ -478,15 +481,15 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return calculated_keyword_list
 
     async def _fetch_min_search_bid_aggregate(self, complex_adv: "ComplexAdv") -> int | None:
-        from .above_target_min_bid_cooldown import max_search_min_bid_for_complex_nmids
-
         nmids = list(complex_adv.nmids)
         if not nmids:
             return None
         hub = await self._get_wb_manager_hub(complex_adv)
-        wb_manager = hub.wb_manager
-        if isinstance(wb_manager, providers.Provider):
-            wb_manager = cast("WBManager", wb_manager())
+        wb_manager_raw = hub.wb_manager
+        if isinstance(wb_manager_raw, providers.Provider):
+            wb_manager = cast(WBManager, wb_manager_raw())
+        else:
+            wb_manager = wb_manager_raw
         min_bids = await wb_manager.get_min_bids([complex_adv], cache_possible=True)
         return max_search_min_bid_for_complex_nmids(nmids, min_bids)
 
