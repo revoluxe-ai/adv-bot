@@ -17,6 +17,9 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.excs import (
+    ClusterBidsUpdateError,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -271,10 +274,19 @@ class WBShopDataManager:
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
         if complex_advs:
-            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
-            if min_bids is not None:
-                for adv in complex_advs:
-                    adv.attach_min_nmids_bids(min_bids)
+            try:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            except ClusterBidsUpdateError as exc:
+                logger.warning(
+                    "get_min_bids failed in get_complex_advs for shop_id=%s; "
+                    "returning ComplexAdv without min_nmids_bids (%s)",
+                    self.shop_id,
+                    exc,
+                )
+            else:
+                if min_bids is not None:
+                    for adv in complex_advs:
+                        adv.attach_min_nmids_bids(min_bids)
         return complex_advs
 
     @staticmethod
