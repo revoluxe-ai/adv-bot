@@ -3,10 +3,6 @@ import typing
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-from app.modules.keywords_manager.keywords_manager import KeywordsManager
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
-    CalculatedKeyword,
-)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -40,17 +36,13 @@ class FirstKeyUpdater:
             return None
         clear_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
 
-        top_key = clear_keywords[0]
-        if top_key.hard_status in (2, 4):
-            return None
-
-        best = clear_keywords[0]
-        if best.hard_status != 1:
+        top = clear_keywords[0]
+        if top.hard_status != 1:
             return None
         async with sm(read_only=False) as session:
             stmt = (
                 update(KeywordSetting)
-                .where(KeywordSetting.id == best.keyword_setting_original_id)
+                .where(KeywordSetting.id == top.keyword_setting_original_id)
                 .values(hard_status=2)
             )
             _ = await session.execute(stmt)

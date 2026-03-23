@@ -1,4 +1,4 @@
-"""Тесты FirstKeyUpdater: ворота 1/2/4 и кандидаты через KeywordsManager."""
+"""Тесты FirstKeyUpdater: ворота по hard_status и причине «МС»."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -41,6 +41,7 @@ def _calc_kw(
     views: int = 10,
     relevant: bool = True,
     above_rec: bool | None = True,
+    reason: KeywordStatusReason = KeywordStatusReason.BIDDER_BAD_STATUS,
 ) -> CalculatedKeyword:
     stat = make_zero_keyword_stat(text).model_copy(update={"views": views})
     return CalculatedKeyword(
@@ -54,7 +55,7 @@ def _calc_kw(
         cluster_stat=stat,
         state=KeywordState(
             status=status,
-            reason=KeywordStatusReason.BIDDER_BAD_STATUS,
+            reason=reason,
             best_keyword_status=False,
         ),
         rating=rating,
@@ -71,7 +72,7 @@ def adv_setting() -> AdvSetting:
 
 
 @pytest.mark.asyncio
-async def test_gate_top_white_skips_without_fetching_candidates(adv_setting: AdvSetting) -> None:
+async def test_gate_top_white_skips_without_db(adv_setting: AdvSetting) -> None:
     keywords = [
         _calc_kw(ks_id=1, text="a", hard_status=2, rating=100.0, status=KeywordStatus.BAD),
         _calc_kw(ks_id=2, text="b", hard_status=1, rating=50.0, status=KeywordStatus.BAD),
@@ -79,13 +80,19 @@ async def test_gate_top_white_skips_without_fetching_candidates(adv_setting: Adv
     complex_adv = MagicMock()
     complex_adv.get_keywords = AsyncMock(return_value=keywords)
 
-    with patch(f"{MODULE}.KeywordsManager.get_candidates_to_white_list", new_callable=AsyncMock) as get_cand:
+    session_mock = MagicMock()
+    session_mock.execute = AsyncMock()
+    maker_mock = MagicMock()
+    maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
+    maker_mock.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(f"{MODULE}.sm", return_value=maker_mock):
         await FirstKeyUpdater(adv_setting).top_key_auto_update(complex_adv)
-        get_cand.assert_not_called()
+    session_mock.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_gate_top_fixed_skips_without_fetching_candidates(adv_setting: AdvSetting) -> None:
+async def test_gate_top_fixed_skips_without_db(adv_setting: AdvSetting) -> None:
     keywords = [
         _calc_kw(ks_id=1, text="a", hard_status=4, rating=100.0, status=KeywordStatus.BAD),
         _calc_kw(ks_id=2, text="b", hard_status=1, rating=50.0, status=KeywordStatus.BAD),
@@ -93,15 +100,28 @@ async def test_gate_top_fixed_skips_without_fetching_candidates(adv_setting: Adv
     complex_adv = MagicMock()
     complex_adv.get_keywords = AsyncMock(return_value=keywords)
 
-    with patch(f"{MODULE}.KeywordsManager.get_candidates_to_white_list", new_callable=AsyncMock) as get_cand:
+    session_mock = MagicMock()
+    session_mock.execute = AsyncMock()
+    maker_mock = MagicMock()
+    maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
+    maker_mock.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(f"{MODULE}.sm", return_value=maker_mock):
         await FirstKeyUpdater(adv_setting).top_key_auto_update(complex_adv)
-        get_cand.assert_not_called()
+    session_mock.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_no_candidates_no_db_session(adv_setting: AdvSetting) -> None:
+async def test_empty_clear_keywords_no_db_session(adv_setting: AdvSetting) -> None:
     keywords = [
-        _calc_kw(ks_id=1, text="a", hard_status=1, rating=10.0, status=KeywordStatus.BAD),
+        _calc_kw(
+            ks_id=1,
+            text="a",
+            hard_status=1,
+            rating=10.0,
+            status=KeywordStatus.BAD,
+            reason=KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID,
+        ),
     ]
     complex_adv = MagicMock()
     complex_adv.get_keywords = AsyncMock(return_value=keywords)
@@ -113,24 +133,16 @@ async def test_no_candidates_no_db_session(adv_setting: AdvSetting) -> None:
     maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
     maker_mock.__aexit__ = AsyncMock(return_value=None)
 
-    with (
-        patch(
-            f"{MODULE}.KeywordsManager.get_candidates_to_white_list",
-            new_callable=AsyncMock,
-            return_value=[],
-        ),
-        patch(f"{MODULE}.sm", return_value=maker_mock),
-    ):
+    with patch(f"{MODULE}.sm", return_value=maker_mock):
         await FirstKeyUpdater(adv_setting).top_key_auto_update(complex_adv)
     session_mock.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_promotes_best_candidate(adv_setting: AdvSetting) -> None:
+async def test_promotes_top_candidate(adv_setting: AdvSetting) -> None:
     keywords = [
         _calc_kw(ks_id=1, text="a", hard_status=1, rating=10.0, status=KeywordStatus.BAD),
     ]
-    best = _calc_kw(ks_id=99, text="best", hard_status=1, rating=5.0, status=KeywordStatus.BAD)
     complex_adv = MagicMock()
     complex_adv.get_keywords = AsyncMock(return_value=keywords)
 
@@ -145,11 +157,6 @@ async def test_promotes_best_candidate(adv_setting: AdvSetting) -> None:
     ts_instance.set_timestamp = AsyncMock()
 
     with (
-        patch(
-            f"{MODULE}.KeywordsManager.get_candidates_to_white_list",
-            new_callable=AsyncMock,
-            return_value=[best],
-        ),
         patch(f"{MODULE}.sm", return_value=maker_mock),
         patch(
             "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater"
