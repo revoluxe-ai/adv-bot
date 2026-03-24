@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.api.campaign_parameters import (
     post_adv_v0_normquery_set_minus,
@@ -58,4 +59,5 @@ class MinusPhrasesAdapter(BaseSectionAdapter):
         item = parsed.items[0]
         if item.norm_queries is UNSET:
             return []
-        return list(item.norm_queries)
+        norm_queries = cast(list[str], item.norm_queries)
+        return list(norm_queries)
