@@ -432,13 +432,11 @@ async def get_keywords_views_by_days(
         GROUP BY date
         ORDER BY date
     """
-
     try:
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 res = await client.query(query)
                 rows = res.result_rows
-
                 result: dict[dt.date, int] = {}
                 current_date = dt.date.fromisoformat(start_date_str)
                 end_date_obj = dt.date.fromisoformat(end_date_str)
@@ -452,12 +450,59 @@ async def get_keywords_views_by_days(
                         views = int(row[1]) if row[1] is not None else 0
                         result[date_val] = views
                 return result
-
     except Exception:
         logger.error(
             "Ошибка получения показов по ключам по дням из ClickHouse",
             exc_info=True,
         )
+        return {}
+
+
+async def get_keywords_clicks_by_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+) -> dict[date, int]:
+    """Возвращает клики по ключевым словам по дням за период."""
+    import datetime as dt
+
+    if not adv_ids:
+        return {}
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+
+    query = f"""
+        WITH aggregated AS (
+            SELECT
+                date,
+                argMaxMerge(clicks_state) AS clicks
+            FROM default_db.mv_clusters_daily_agg
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            date,
+            COALESCE(SUM(clicks), 0) AS total_clicks
+        FROM aggregated
+        GROUP BY date
+        ORDER BY date
+    """
+    try:
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                rows = res.result_rows
+                result: dict[dt.date, int] = {}
+                for row in rows:
+                    if row and len(row) >= 2 and row[0] is not None:
+                        result[row[0]] = int(row[1] or 0)
+                return result
+    except Exception:
+        logger.error("Ошибка получения кликов по ключам по дням", exc_info=True)
         return {}
 
 
@@ -576,3 +621,11 @@ async def get_keywords_clicks_and_views(
             exc_info=True,
         )
         return 0, 0
+
+
+async def get_auto_total_clicks_today(adv_id: int) -> int:
+    """Возвращает суммарные клики авто-РК за сегодня."""
+    end_date = datetime.now()
+    start_date = end_date
+    stats = await get_stats_by_last_days([adv_id], start_date, end_date)
+    return int(stats.clicks or 0)

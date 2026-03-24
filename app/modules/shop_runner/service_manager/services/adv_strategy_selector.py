@@ -91,6 +91,16 @@ class AdvStrategySelector:
         if plan_selection is not None and plan_selection.strategy == Strategy.MIN_CPO:
             return plan_selection
 
+        traffic_clicks = complex_adv.traffic_clicks_dto
+        if (
+            traffic_clicks is not None
+            and traffic_clicks.organic_clicks > traffic_clicks.shelf_clicks
+        ):
+            return StrategySelection(
+                strategy=Strategy.MIN_CPO,
+                reason="organic_clicks_above_shelf_clicks",
+            )
+
         keywords = await complex_adv.get_keywords()
         if self._all_shelf_keywords_activated(keywords):
             return StrategySelection(

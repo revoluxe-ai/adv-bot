@@ -1,3 +1,3 @@
-from .complex_adv import ComplexAdv
+from .complex_adv import ComplexAdv, TrafficClicksDTO
 
-__all__ = ['ComplexAdv']
+__all__ = ["ComplexAdv", "TrafficClicksDTO"]

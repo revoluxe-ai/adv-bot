@@ -20,6 +20,7 @@ def _make_complex_adv(
     fact_orders: float = 5.0,
     fact_pay_for_order: float = 150.0,
     keywords: list[SimpleNamespace] | None = None,
+    traffic_clicks_dto: SimpleNamespace | None = None,
 ) -> SimpleNamespace:
     adv_setting = SimpleNamespace(
         plan_for_sales_for_day=plan_orders,
@@ -33,6 +34,7 @@ def _make_complex_adv(
         rec_system_promotion_mode_active=rec_system_promotion_mode_active,
         auto_adv_active_status=auto_adv_active_status,
         get_keywords=AsyncMock(return_value=keywords_result),
+        traffic_clicks_dto=traffic_clicks_dto,
     )
 
 
