@@ -96,12 +96,14 @@ class UpdateClusterBidsManager:
         )
 
     async def update_cluster_bids(self, advs: list[ComplexAdv]) -> None:
-         calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
-         calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(calculate_data)
-         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
-         await self._apply_command(new_bids_command)
-         for adv in advs: # TODO: Тут накостылил, чтобы быстрее в прод выложить
-             await self._redis_cluster_bids_timestamp_manager.set(adv)
+        calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
+        calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
+            calculate_data
+        )
+        new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
+        await self._apply_command(new_bids_command)
+        for adv in advs:  # TODO: Тут накостылил, чтобы быстрее в прод выложить
+            await self._redis_cluster_bids_timestamp_manager.set(adv)
 
     async def _get_bidder_update_data(
         self,
@@ -283,11 +285,20 @@ class UpdateClusterBidsManager:
         texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
 
         keywords: list[CalculatedKeyword] = await adv.get_keywords()
-        keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
-        keywords = [kw for kw in keywords if kw.text in texts_in_this_adv]
+        keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
+        matched_in_ch = [
+            kw
+            for kw in keywords_good
+            if kw.cluster_stat.text in texts_in_this_adv or kw.text in texts_in_this_adv
+        ]
+        # Если единственные GOOD не попали в snapshots clusters_adv_stats (срез может отличаться
+        # от mv_clusters_*), всё равно участвуют в торгах по norm_query из cluster_stat.
+        keywords = matched_in_ch if matched_in_ch else keywords_good
         map_datas: set[AdvIdItemCalculateData] = set()
         for nmid in adv.nmids:
             for kw in keywords:
+                cluster_for_wb = kw.cluster_stat.text or kw.text
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
                 if adv.individual_keywords_target_place_mode and (keyword_target_place := kw.target_place):
@@ -297,7 +308,7 @@ class UpdateClusterBidsManager:
                 map_data = AdvIdItemCalculateData(
                     adv_id=search_adv_id,
                     nmid=nmid,
-                    cluster=kw.text,
+                    cluster=cluster_for_wb,
                     current_position=kw.position,
                     max_cpm=adv.max_user_cpm,
                     target_position=target_position,
