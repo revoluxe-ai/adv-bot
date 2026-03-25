@@ -52,6 +52,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             kw for kw in keywords if kw.hard_status == 2
                                      and not kw.best_keyword_status
                                      and kw.views > 0
+                                     and kw.reason.ABOVE_TARGET_AT_MIN_BID
         ]
 
         if not white_keywords:
