@@ -20,6 +20,9 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.excs import (
     ClusterBidsUpdateError,
 )
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    TrafficClicksManager,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
@@ -64,6 +67,7 @@ class WBShopDataManager:
         self._tasks_manager: TasksManager | None = tasks_manager
         self._wb_api_data_manager = wb_api_data_manager
         self._wb_manager = wb_manager
+        self._traffic_clicks_manager = TrafficClicksManager()
 
     @single_run()
     async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
@@ -270,6 +274,25 @@ class WBShopDataManager:
                 search_adv=search_adv,
             )
             complex_advs.append(complex_adv)
+        handlers: list[Callable[[], Awaitable[None]]] = [
+            lambda adv_=adv: self._traffic_clicks_manager.enrich(adv_)
+            for adv in complex_advs
+        ]
+        if handlers:
+            results = await run_tasks(
+                handlers,
+                max_workers=max(1, min(len(handlers), 16)),
+                tasks_manager=self._tasks_manager,
+                return_exceptions=True,
+            )
+            for adv, result in zip(complex_advs, results):
+                if isinstance(result, BaseException):
+                    logger.exception(
+                        "Ошибка enrich traffic_clicks_dto, adv_id=%s shop_id=%s",
+                        adv.adv_id,
+                        adv.shop_id,
+                        exc_info=result,
+                    )
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)

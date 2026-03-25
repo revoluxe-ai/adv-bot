@@ -67,6 +67,10 @@ from app.modules.shop_runner.service_manager.services.stats_freshness_manager im
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+    TrafficClicksDTO,
+)
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    TrafficClicksManager,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
@@ -133,6 +137,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._emergency_mode_reason: str | None = None
         self._stats_fresh: bool = True
         self._stats_stale_reason: str | None = None
+        self._traffic_clicks_dto: TrafficClicksDTO | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -260,6 +265,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
 
         self.adv_stat: FullAdvStat | None = adv_stat
+        self._traffic_clicks_dto = await self._get_today_traffic_clicks_dto()
 
         adv_id = self.adv.adv_id
         last_common_bid_update = (
@@ -476,6 +482,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     "⚠️ Рек. сис. не раскр. "
                     f"Макс.зак. >= {int(suggested)} р.\n"
                 )
+            if self._traffic_clicks_dto is not None:
+                text += (
+                    "Клики (сегодня): "
+                    f"орг {self._traffic_clicks_dto.organic_clicks}, "
+                    f"полки {self._traffic_clicks_dto.shelf_clicks}, "
+                )
 
         management_enabled = bool(
             self.adv.bot_active
@@ -653,3 +665,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # Call site only passes reason when is_stale_over_6h is True; guard sets that
         # only for "stale over 6h", never for "not yet collected".
         return f"{name}: нет обн>6ч"
+
+    async def _get_today_traffic_clicks_dto(self) -> TrafficClicksDTO | None:
+        if not self.adv.rec_system_mode:
+            return None
+        try:
+            complex_adv = ComplexAdv(
+                adv_setting=self.adv,
+                search_adv=None,
+            )
+            manager = TrafficClicksManager()
+            await manager.enrich(complex_adv)
+            return complex_adv.traffic_clicks_dto
+        except Exception:
+            logger.exception(
+                "Ошибка получения today traffic clicks для adv_id=%s", self.adv.adv_id
+            )
+            return None

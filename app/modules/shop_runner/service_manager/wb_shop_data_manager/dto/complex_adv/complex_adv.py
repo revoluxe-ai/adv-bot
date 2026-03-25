@@ -1,4 +1,5 @@
 from collections.abc import Callable, Awaitable
+from dataclasses import dataclass
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -18,6 +19,14 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 if typing.TYPE_CHECKING:
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+
+
+@dataclass(frozen=True, slots=True)
+class TrafficClicksDTO:
+    organic_clicks: int
+    shelf_clicks: int
+    keyword_clicks: int
+
 
 class _CPMs:
     def __init__(self, adv_setting: AdvSetting, search_adv: AdvSetting | None):
@@ -52,6 +61,7 @@ class ComplexAdv:
         self._target_pay_for_order: float | None = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
+        self._traffic_clicks_dto: TrafficClicksDTO | None = None
 
     def __repr__(self):
         return str(self._adv_setting.id)
@@ -224,6 +234,26 @@ class ComplexAdv:
     @property
     def rec_system_promotion_mode_active(self) -> bool:
         return self._adv_setting.rec_system_mode
+
+    @property
+    def traffic_clicks_dto(self) -> "TrafficClicksDTO | None":
+        if not self.rec_system_promotion_mode_active:
+            return None
+        return self._traffic_clicks_dto
+
+    @traffic_clicks_dto.setter
+    def traffic_clicks_dto(self, value: "TrafficClicksDTO | None") -> None:
+        if not self.rec_system_promotion_mode_active:
+            self._traffic_clicks_dto = None
+            return
+        self._traffic_clicks_dto = value
+
+    @property
+    def is_shelf_activation_allowed(self) -> bool:
+        dto = self.traffic_clicks_dto
+        if dto is None:
+            return False
+        return dto.shelf_clicks > dto.organic_clicks
 
     async def get_mean_auto_ctr(self) -> float | None:
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (

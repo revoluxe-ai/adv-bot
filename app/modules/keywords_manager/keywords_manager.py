@@ -33,7 +33,8 @@ class KeywordsManager:
                 return False
             if (complex_adv.rec_system_promotion_mode_active
                     and keyword.above_rec_conversion is False
-                    and complex_adv.auto_adv_active_status):
+                    and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed):
                 return False
             return True
 

@@ -39,7 +39,6 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_value_manager import (
     RedisCommonBidValueManager,
 )
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.redis_common_stat_timestamp_manager import (
     RedisCommonStatTimestampManager,
 )
@@ -63,6 +62,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
     run_tasks,
 )
+from ..wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
