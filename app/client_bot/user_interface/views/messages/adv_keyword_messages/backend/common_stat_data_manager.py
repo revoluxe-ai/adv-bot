@@ -151,7 +151,7 @@ class CommonStatDataManager:
                 shelf_clicks = max(0, auto_clicks - auto_keyword_clicks)
                 organic_clicks = max(0, common_stat.open_card - auto_clicks)
                 text_row += (
-                    f" Кл(орг/пол/кл): {organic_clicks}/{shelf_clicks}"
+                    f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
                 )
 
             text_row += "\n"
