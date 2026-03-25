@@ -20,8 +20,16 @@ class TrafficClicksManager:
         auto_total_clicks = await full_wb_adv_stat.get_auto_total_clicks_today(
             complex_adv.adv_id
         )
+        # Суммарные клики всех РК комплекса (авто + поиск, если есть).
+        all_campaign_clicks_today = (
+            await full_wb_adv_stat.get_stats_by_last_days(
+                list(complex_adv.all_adv_ids),
+                start_date=datetime.now(),
+                end_date=datetime.now(),
+            )
+        ).clicks or 0
         # Клики именно по ключевым запросам в этой же авто-кампании за сегодня.
-        keyword_search_clicks, _keyword_search_views = (
+        auto_keyword_clicks, _auto_keyword_views = (
             await full_wb_adv_stat.get_keywords_clicks_and_views(
             [complex_adv.adv_id],
             start_date=datetime.now(),
@@ -34,16 +42,15 @@ class TrafficClicksManager:
         )
 
         # Полки/рекомендации = авто-клики минус клики по ключам.
-        shelf_clicks = max(0, auto_total_clicks - keyword_search_clicks)
-        # Органика по согласованной формуле:
-        # воронка - авто-клики - клики по ключам.
+        shelf_clicks = max(0, auto_total_clicks - auto_keyword_clicks)
+        # Органика: клики из воронки минус суммарные клики всех РК.
         organic_clicks = max(
             0,
-            funnel_clicks - auto_total_clicks - keyword_search_clicks,
+            funnel_clicks - int(all_campaign_clicks_today),
         )
         complex_adv.traffic_clicks_dto = TrafficClicksDTO(
             organic_clicks=organic_clicks,
             shelf_clicks=shelf_clicks,
-            keyword_clicks=keyword_search_clicks,
+            keyword_clicks=auto_keyword_clicks,
         )
 

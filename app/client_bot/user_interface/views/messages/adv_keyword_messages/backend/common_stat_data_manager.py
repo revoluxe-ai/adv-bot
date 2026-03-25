@@ -147,11 +147,11 @@ class CommonStatDataManager:
                 text_row += f" Доп.пок.: {extra_views}"
             if adv.rec_system_mode:
                 auto_clicks = auto_clicks_by_day.get(date, 0)
-                keyword_clicks = keywords_clicks_by_day.get(date, 0)
-                shelf_clicks = max(0, auto_clicks - keyword_clicks)
-                organic_clicks = max(0, common_stat.open_card - auto_clicks - keyword_clicks)
+                auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
+                shelf_clicks = max(0, auto_clicks - auto_keyword_clicks)
+                organic_clicks = max(0, common_stat.open_card - auto_clicks)
                 text_row += (
-                    f" Кл(орг/пол/кл): {organic_clicks}/{shelf_clicks}/{keyword_clicks}"
+                    f" Кл(орг/пол/кл): {organic_clicks}/{shelf_clicks}"
                 )
 
             text_row += "\n"
