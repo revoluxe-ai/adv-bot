@@ -671,9 +671,18 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if not self.adv.rec_system_mode:
             return None
         try:
+            search_adv: AdvSetting | None = None
+            if self.adv.search_adv_id:
+                async with sm(read_only=True) as session:
+                    result = await session.execute(
+                        select(AdvSetting).where(
+                            AdvSetting.adv_id == self.adv.search_adv_id
+                        )
+                    )
+                    search_adv = result.scalar_one_or_none()
             complex_adv = ComplexAdv(
                 adv_setting=self.adv,
-                search_adv=None,
+                search_adv=search_adv,
             )
             manager = TrafficClicksManager()
             await manager.enrich(complex_adv)
