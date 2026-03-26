@@ -42,7 +42,16 @@ class FirstKeyUpdater:
             return None
         clear_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
 
-        top = clear_keywords[0]
+        # Respect user setting: when enabled, auto-promote only relevant phrases.
+        candidates = (
+            [kw for kw in clear_keywords if kw.relevant]
+            if self._adv.auto_add_only_relevant_phrase
+            else clear_keywords
+        )
+        if not candidates:
+            return None
+
+        top = candidates[0]
         if top.hard_status != 1:
             return None
         async with sm(read_only=False) as session:
