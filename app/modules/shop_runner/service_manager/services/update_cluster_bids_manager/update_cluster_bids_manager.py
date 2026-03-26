@@ -102,20 +102,9 @@ class UpdateClusterBidsManager:
         )
         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
         await self._apply_command(new_bids_command)
-        # Timestamp is used by UI "Установленная ставка CPM" and is read by search_adv_id.
-        # So we must persist it under search_adv_id, not under ComplexAdv.adv_id (auto campaign id).
-        class _AdvForTimestamp:
-            def __init__(self, adv_id: int) -> None:
-                self._adv_id = adv_id
-
-            @property
-            def adv_id(self) -> int:
-                return self._adv_id
-
+        # Timestamp key: search_adv_id when present (same as RedisClusterBidsTimestampManager._get_key).
         for adv in advs:  # TODO: Тут накостылил, чтобы быстрее в прод выложить
-            search_adv_id = getattr(adv, "search_adv_id", None)
-            adv_id_for_ts = int(search_adv_id) if search_adv_id is not None else int(adv.adv_id)
-            await self._redis_cluster_bids_timestamp_manager.set(_AdvForTimestamp(adv_id_for_ts))
+            await self._redis_cluster_bids_timestamp_manager.set(adv)
 
     async def _get_bidder_update_data(
         self,
