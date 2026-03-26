@@ -55,6 +55,7 @@ from .services.increment_fact_data_manager.increment_fact_data_manager import (
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
+from .wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -821,12 +822,14 @@ class CoroutinesManager:
         """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
         from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
 
-        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        if not advs:
+        pre_advs: list[PreComplexAdv] = (
+            await self._wb_shop_data_manager.get_pre_complex_advs()
+        )
+        if not pre_advs:
             return None
 
         manager = PlanFactManager()
-        await manager.process_and_save(advs)
+        await manager.process_and_save_pre_complex_advs(pre_advs)
         return None
     def _log_auto_budget_result(
         self,

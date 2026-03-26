@@ -3,12 +3,16 @@ from typing import Optional
 
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
     PlanData,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.dto.plan_fact_stat_dto import PlanFactStatDTO
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
+    PreComplexAdv,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +42,20 @@ class PlanFactController:
         )
         return dto
 
+
+    @staticmethod
+    async def _resolve_fact_for_pre_adv(pre_adv: PreComplexAdv) -> FactData:
+        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
+
+        complex_adv = ComplexAdv(
+            shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
+            adv_setting=pre_adv.auto_adv,
+            search_adv=pre_adv.search_adv,
+        )
+        keywords = await get_good_bad_phrases(complex_adv)
+        provider = PlanFactProvider(pre_adv.auto_adv)
+        stat = await provider.get_stat_data(keywords)
+        return await provider.get_fact_data(stat)
 
     @staticmethod
     async def process_adv(
@@ -71,6 +89,19 @@ class PlanFactController:
             version=version,
         )
         return dto
+
+    @staticmethod
+    async def process_pre_adv(
+        pre_adv: PreComplexAdv, version: float
+    ) -> PlanFactStatDTO | None:
+        fact = await PlanFactController._resolve_fact_for_pre_adv(pre_adv)
+        return PlanFactStatDTO.create(
+            adv_id=pre_adv.adv_id,
+            shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
+            plan=pre_adv.plan_data,
+            fact=fact,
+            version=version,
+        )
 
 
 
