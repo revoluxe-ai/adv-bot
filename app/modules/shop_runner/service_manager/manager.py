@@ -407,7 +407,6 @@ class CoroutinesManager:
                     exc_info=True,
                 )
                 raise result
-
         return None
 
     @while_coroutine_decorator(15, 60)
