@@ -150,7 +150,8 @@ async def get_today_funnel_clicks(nmids: list[int]) -> int:
             result = await client.query(query, parameters=params)
     if not result.result_rows:
         return 0
-    return int(result.result_rows[0][0] or 0)
+    return int(result.result_rows[0][0])
+
 
 
 class WBCommonStatManager:
