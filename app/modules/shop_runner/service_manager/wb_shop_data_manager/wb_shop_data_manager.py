@@ -288,6 +288,32 @@ class WBShopDataManager:
 
     @single_run()
     async def get_complex_advs(self) -> list["ComplexAdv"]:
+        # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
+        # оба помечены `@single_run()`.
+        #
+        # Наш `single_run` реализован не через re-entrant lock, а через per-key "single-flight"
+        # на `asyncio.Event` (см. `single_run_decorator.py`). Это означает:
+        # - параллельные вызовы ОДНОГО и того же метода с одинаковыми args/kwargs будут ждать
+        #   один общий event и получать общий результат;
+        # - при этом повторный вход В ТОТ ЖЕ метод с теми же args/kwargs до завершения первого
+        #   вызова приводит к self-deadlock (второй вход будет ждать event, который выставит
+        #   только первый вход, но первый вход уже ждёт второго по цепочке вызовов).
+        #
+        # Текущее вложение `get_complex_advs()` -> `get_pre_complex_advs()` само по себе НЕ
+        # обязано дедлочиться, т.к. ключ в `single_run` включает имя функции, и это разные key.
+        # Однако это место становится "точкой риска" для будущих рефакторингов:
+        # достаточно случайно получить цикл вида
+        # `get_complex_advs()` -> ... -> `get_pre_complex_advs()` -> ... -> `get_complex_advs()`
+        # (или запуск фоновой задачи, которая внутри снова вызовет `get_complex_advs()`), и мы
+        # получим вечное ожидание.
+        #
+        # Что нужно сделать позже (выбрать один вариант):
+        # - добавить в `single_run` явную защиту от re-entrance в рамках одной asyncio.Task
+        #   (например, task-local стек ключей через `contextvars`): либо разрешать re-entrance
+        #   (re-entrant single-flight), либо падать с понятной ошибкой вместо "вечного await";
+        # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
+        #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
+        # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
         pre_complex_advs = await self.get_pre_complex_advs()
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
