@@ -76,6 +76,8 @@ def apply_above_target_min_bid_cooldown(
     pre_kw: PreCalculatedKeyword,
     base_state: KeywordState,
     min_bid_for_adv: int | None,
+    keyword_pay_for_order: float | None,
+    resolved_target_cost: float | None,
     cooldown_map: Mapping[str, datetime | AboveTargetCooldownEntry | None] | None,
     cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None,
     now: datetime | None,
@@ -113,6 +115,15 @@ def apply_above_target_min_bid_cooldown(
         entry = AboveTargetCooldownEntry(entry.last_disabled_at, v_cur)
 
     if not condition:
+        if entry is not None:
+            cooldown_updates[text] = None
+        return base_state.model_copy(update={"cooldown_display_tag": None})
+
+    if (
+        keyword_pay_for_order is not None
+        and resolved_target_cost is not None
+        and keyword_pay_for_order <= resolved_target_cost
+    ):
         if entry is not None:
             cooldown_updates[text] = None
         return base_state.model_copy(update={"cooldown_display_tag": None})

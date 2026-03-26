@@ -29,6 +29,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid
     apply_above_target_min_bid_cooldown,
     max_search_min_bid_for_complex_nmids,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
+    calc_pay_for_order,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
 from app.modules.wb_adv_updater.calculated_keywords_manager.redis_above_target_min_bid_cooldown_manager import (
@@ -320,6 +323,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
         pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
+        resolved_target_cost = (
+            float(complex_adv.target_pay_for_order)
+            if isinstance(complex_adv.target_pay_for_order, int | float)
+            else None
+        )
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
@@ -342,10 +350,13 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         def _apply_above_target_cooldown(
             pre_kw_: PreCalculatedKeyword, state_: KeywordState
         ) -> KeywordState:
+            keyword_pay_for_order = calc_pay_for_order(pre_kw_.orders_per_1000_rub)
             return apply_above_target_min_bid_cooldown(
                 pre_kw=pre_kw_,
                 base_state=state_,
                 min_bid_for_adv=min_bid_for_adv,
+                keyword_pay_for_order=keyword_pay_for_order,
+                resolved_target_cost=resolved_target_cost,
                 cooldown_map=cooldown_map,
                 cooldown_updates=cooldown_updates,
                 now=now,
