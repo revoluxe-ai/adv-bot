@@ -23,12 +23,18 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
 )
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
+    PreComplexAdv,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
@@ -60,7 +66,7 @@ class WBShopDataManager:
         wb_cabinet: WBCabinet,
         tasks_manager: TasksManager,
         wb_api_data_manager : WBDataManager,
-        wb_manager: WBManager,
+        wb_manager: WBManager | None,
     ):
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
@@ -252,7 +258,7 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_complex_advs(self) -> list["ComplexAdv"]:
+    async def get_pre_complex_advs(self) -> list[PreComplexAdv]:
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
         )
@@ -262,18 +268,35 @@ class WBShopDataManager:
         search_adv_idv: dict[int, AdvSetting] = (
             await self.__get_adv_id_to_search_adv_map(search_adv_ids)
         )
-        complex_advs: list[ComplexAdv] = []
-        for adv in adv_settings:
-            search_adv = (
-                search_adv_idv.get(adv.search_adv_id)
-                if adv.search_adv_id is not None
-                else None
+        plan_fact_reader = PlanFactReader()
+        summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+            [adv.adv_id for adv in adv_settings]
+        )
+        return [
+            PreComplexAdv(
+                auto_adv=adv,
+                plan_data=PlanFactProvider.get_plan_data(adv),
+                plan_fact_summary=summaries_by_adv_id.get(adv.adv_id),
+                search_adv=(
+                    search_adv_idv.get(adv.search_adv_id)
+                    if adv.search_adv_id is not None
+                    else None
+                ),
             )
+            for adv in adv_settings
+        ]
+
+    @single_run()
+    async def get_complex_advs(self) -> list["ComplexAdv"]:
+        pre_complex_advs = await self.get_pre_complex_advs()
+        complex_advs: list[ComplexAdv] = []
+        for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
-                adv_setting=adv,
+                adv_setting=pre_adv.auto_adv,
                 get_keywords_func=self.__get_calculated_keywords,
-                search_adv=search_adv,
+                search_adv=pre_adv.search_adv,
+                target_pay_for_order=pre_adv.resolved_target_pay_for_order,
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [
@@ -356,7 +379,7 @@ class WBShopDataManager:
         return aggregated
 
     async def _get_min_bids(
-        self, complex_advs: list[ComplexAdv], cache_possible
+        self, complex_advs: list[ComplexAdv], cache_possible: bool
     ) -> AdvMinNmidsBids | None:
         if self._wb_manager is not None:
             return await self._wb_manager.get_min_bids(complex_advs, cache_possible)
