@@ -108,8 +108,7 @@ class PlanFactReader:
         if not adv_ids:
             return {}
         normalized_adv_ids = sorted({int(adv_id) for adv_id in adv_ids})
-        adv_ids_sql = ", ".join(str(adv_id) for adv_id in normalized_adv_ids)
-        query = f"""
+        query = """
         SELECT
             adv_id,
             argMax(plan_orders, timestamp) AS plan_orders,
@@ -118,11 +117,14 @@ class PlanFactReader:
             argMax(fact_predict_orders, timestamp) AS fact_predict_orders,
             argMax(fact_pay_for_order, timestamp) AS fact_pay_for_order
         FROM default_db.plan_fact_stats
-        WHERE adv_id IN ({adv_ids_sql})
+        WHERE adv_id IN %(adv_ids)s
         GROUP BY adv_id
         """
         async with get_clickhouse_client() as client:
-            result = await client.query(query)
+            result = await client.query(
+                query,
+                parameters={"adv_ids": normalized_adv_ids},
+            )
         summaries: dict[int, PlanFactSummary] = {}
         for row in result.result_rows:
             summary = self._row_to_summary(row)

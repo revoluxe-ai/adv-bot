@@ -29,6 +29,11 @@ async def test_get_latest_plan_facts_returns_mapping() -> None:
     ):
         result = await reader.get_latest_plan_facts([111, 222])
 
+    mock_client.query.assert_awaited_once()
+    call_args = mock_client.query.call_args
+    assert call_args.kwargs["parameters"] == {"adv_ids": [111, 222]}
+    assert "IN %(adv_ids)s" in call_args.args[0]
+
     assert set(result.keys()) == {111, 222}
     assert result[111].plan_orders == 100
     assert result[111].fact_predict_orders == 95.5
