@@ -88,7 +88,9 @@ class WBShopDataManager:
         stmt = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
-            .filter(WBCabinet.shop_id == shop_id, AdvSetting.active_status != 'done')
+            .filter(WBCabinet.shop_id == shop_id,
+                    AdvSetting.active_status != 'done',
+                    AdvSetting.bot_active.is_(True),)
         )
         async with sm() as session:
             result = await session.execute(stmt)
