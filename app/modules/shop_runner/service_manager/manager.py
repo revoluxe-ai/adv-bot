@@ -752,7 +752,16 @@ class CoroutinesManager:
     async def _apply_stats_stale_emergency(self, complex_adv: ComplexAdv) -> None:
         keywords = await complex_adv.get_keywords()
         candidates = [kw for kw in keywords if kw.hard_status in (1, 2)]
+        if complex_adv.auto_add_only_relevant_phrase:
+            candidates = [kw for kw in candidates if kw.relevant]
         if not candidates:
+            if complex_adv.auto_add_only_relevant_phrase:
+                logger.warning(
+                    "Emergency stale-stats handling skipped (no relevant candidates): "
+                    "shop_id=%s adv_id=%s",
+                    self.shop_id,
+                    complex_adv.adv_id,
+                )
             return None
         top_keyword = max(candidates, key=lambda kw: kw.rating or 0)
         top_keyword_id = top_keyword.keyword_setting_original_id
