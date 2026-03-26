@@ -45,9 +45,7 @@ from app.modules.wb_update_state_manager import (
     KeywordStatUpdateState,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
-    RedisClusterBidsTimestampManager,
-)
+from app.modules.cluster_bids_redis import RedisClusterBidsTimestampManager
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
     RedisCommonBidTimestampManager,
 )
