@@ -43,15 +43,11 @@ class PlanFactManager:
             lambda adv_=adv: self._controller.process_adv(adv_, version) for adv in advs
         ]
 
-        try:
-            results: list[PlanFactStatDTO | None] = await run_tasks(
-                handlers,
-                max_workers=max(1, min(len(handlers), 16)),
-                return_exceptions=False,
-            )
-        except Exception as exc:
-            logger.error("PlanFactManager failed to process advs: %s", exc)
-            raise
+        results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(
+            handlers,
+            max_workers=max(1, min(len(handlers), 16)),
+            return_exceptions=True,
+        )
 
         # Собираем успешные результаты
         plan_fact_stats: list[PlanFactStatDTO] = []
@@ -85,15 +81,11 @@ class PlanFactManager:
             for pre_adv in pre_advs
         ]
 
-        try:
-            results: list[PlanFactStatDTO | None] = await run_tasks(
-                handlers,
-                max_workers=max(1, min(len(handlers), 16)),
-                return_exceptions=False,
-            )
-        except Exception as exc:
-            logger.error("PlanFactManager failed to process pre advs: %s", exc)
-            raise
+        results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(
+            handlers,
+            max_workers=max(1, min(len(handlers), 16)),
+            return_exceptions=True,
+        )
 
         plan_fact_stats: list[PlanFactStatDTO] = []
         for i, result in enumerate(results):
