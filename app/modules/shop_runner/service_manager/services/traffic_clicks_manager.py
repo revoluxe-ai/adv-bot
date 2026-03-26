@@ -10,6 +10,21 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
 
 
+def compute_shelf_clicks(auto_total_clicks: int, auto_keyword_clicks: int) -> int:
+    """Return shelf/recommendation clicks from auto campaign clicks."""
+    return max(0, auto_total_clicks - auto_keyword_clicks)
+
+
+def compute_organic_clicks(funnel_clicks: int, all_campaign_clicks: int) -> int:
+    """
+    Return organic clicks.
+
+    Organic clicks are card opens from funnel minus clicks from all campaigns
+    in the complex campaign (auto + search).
+    """
+    return max(0, funnel_clicks - all_campaign_clicks)
+
+
 class TrafficClicksManager:
     async def enrich(self, complex_adv: ComplexAdv) -> None:
         if not complex_adv.rec_system_promotion_mode_active:
@@ -42,11 +57,11 @@ class TrafficClicksManager:
         )
 
         # Полки/рекомендации = авто-клики минус клики по ключам.
-        shelf_clicks = max(0, auto_total_clicks - auto_keyword_clicks)
+        shelf_clicks = compute_shelf_clicks(auto_total_clicks, auto_keyword_clicks)
         # Органика: клики из воронки минус суммарные клики всех РК.
-        organic_clicks = max(
-            0,
-            funnel_clicks - int(all_campaign_clicks_today),
+        organic_clicks = compute_organic_clicks(
+            funnel_clicks,
+            int(all_campaign_clicks_today),
         )
         complex_adv.traffic_clicks_dto = TrafficClicksDTO(
             organic_clicks=organic_clicks,

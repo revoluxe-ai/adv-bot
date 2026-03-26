@@ -4,6 +4,10 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    compute_organic_clicks,
+    compute_shelf_clicks,
+)
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
@@ -148,8 +152,12 @@ class CommonStatDataManager:
             if adv.rec_system_mode:
                 auto_clicks = auto_clicks_by_day.get(date, 0)
                 auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
-                shelf_clicks = max(0, auto_clicks - auto_keyword_clicks)
-                organic_clicks = max(0, common_stat.open_card - auto_clicks)
+                shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
+                # В organic исключаем клики всех РК комплекса за день (auto + search).
+                organic_clicks = compute_organic_clicks(
+                    common_stat.open_card,
+                    stat.clicks,
+                )
                 text_row += (
                     f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
                 )

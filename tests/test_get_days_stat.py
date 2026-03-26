@@ -66,3 +66,45 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
         assert isinstance(text, str)
         assert len(text) > 0
         print("\n", text)
+
+
+@pytest.mark.asyncio
+async def test_days_stat_uses_all_campaign_clicks_for_organic() -> None:
+    test_date = (datetime.datetime.now() - datetime.timedelta(days=1)).date()
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.rec_system_mode = True
+    adv_setting_mock.plan_for_sales_for_day = None
+    adv_setting_mock.target_price_for_order = None
+    adv_setting_mock.max_price_for_order = None
+
+    concatenated_adv_stat_result = [
+        SmallFullAdvStatPerDay(
+            date=test_date,
+            views=100,
+            clicks=10,  # all campaign clicks (auto + search)
+            spend=100.0,
+            added_to_cart=2,
+            orders=1,
+            sum_price=0.0,
+        )
+    ]
+    common_card_stat = CommonCardStat(
+        nmid=1,
+        open_card=100,
+        add_to_cart=5,
+        orders=3,
+        orders_sum=0,
+        buy_outs=0,
+    )
+    common_card_stat.date = test_date
+
+    text = await manager._get_days_static_text(
+        adv_setting_mock,
+        concatenated_adv_stat_result,
+        [common_card_stat],
+        auto_views_by_day={test_date: 90},
+        keywords_views_by_day={test_date: 80},
+        auto_clicks_by_day={test_date: 4},
+        keywords_clicks_by_day={test_date: 1},
+    )
+    assert "Кл(орг/пол): 90/3" in text
