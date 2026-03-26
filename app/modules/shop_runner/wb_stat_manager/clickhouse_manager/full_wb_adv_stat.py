@@ -56,9 +56,9 @@ def concatenate_stats(
 
     concatenate_stats = []
 
-    for date in all_dates:
-        auto_stat = data_to_auto.get(date)
-        auction_stat = data_to_auction.get(date)
+    for day in all_dates:
+        auto_stat = data_to_auto.get(day)
+        auction_stat = data_to_auction.get(day)
         if auto_stat and auction_stat:
             # Объединяем статистику по дням
             auto_stat.views += auction_stat.views
@@ -497,6 +497,11 @@ async def get_keywords_clicks_by_days(
                 res = await client.query(query)
                 rows = res.result_rows
                 result: dict[dt.date, int] = {}
+                current_date = dt.date.fromisoformat(start_date_str)
+                end_date_obj = dt.date.fromisoformat(end_date_str)
+                while current_date <= end_date_obj:
+                    result[current_date] = 0
+                    current_date += dt.timedelta(days=1)
                 for row in rows:
                     if row and len(row) >= 2 and row[0] is not None:
                         result[row[0]] = int(row[1] or 0)
