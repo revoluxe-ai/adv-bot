@@ -487,6 +487,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     "Клики (сегодня): "
                     f"орг {self._traffic_clicks_dto.organic_clicks}, "
                     f"полки {self._traffic_clicks_dto.shelf_clicks}, "
+                    f"ключи {self._traffic_clicks_dto.keyword_clicks}\n"
                 )
 
         management_enabled = bool(
