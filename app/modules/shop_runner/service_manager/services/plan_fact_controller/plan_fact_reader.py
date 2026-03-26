@@ -30,8 +30,23 @@ class PlanFactReader:
     def _as_int(value: object) -> int:
         if isinstance(value, bool):
             return int(value)
-        if isinstance(value, int | float | str):
+        if isinstance(value, int):
             return int(value)
+        if isinstance(value, float):
+            if not value.is_integer():
+                raise TypeError(
+                    f"Expected integer-like float value, got {value!r}"
+                )
+            return int(value)
+        if isinstance(value, str):
+            raw = value.strip()
+            if raw.startswith(("+", "-")):
+                sign, digits = raw[0], raw[1:]
+                if digits.isdigit():
+                    return int(f"{sign}{digits}")
+            elif raw.isdigit():
+                return int(raw)
+            raise TypeError(f"Expected integer-like string value, got {value!r}")
         raise TypeError(f"Expected int-convertible value, got {type(value)!r}")
 
     @staticmethod
