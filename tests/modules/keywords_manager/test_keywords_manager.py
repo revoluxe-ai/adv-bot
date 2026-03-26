@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.modules.keywords_manager.keywords_manager import KeywordsManager
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+    KeywordStatusReason,
+)
 
 
 def _kw(
@@ -14,6 +17,8 @@ def _kw(
     status: KeywordStatus = KeywordStatus.BAD,
     relevant: bool = True,
     above_rec_conversion: bool | None = None,
+    reason: KeywordStatusReason | None = None,
+    rating: int | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         views=views,
@@ -21,6 +26,8 @@ def _kw(
         status=status,
         relevant=relevant,
         above_rec_conversion=above_rec_conversion,
+        reason=reason,
+        rating=rating,
     )
 
 
