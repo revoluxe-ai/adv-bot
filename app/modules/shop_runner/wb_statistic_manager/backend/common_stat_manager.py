@@ -124,11 +124,13 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
     return stats
 
 
-async def get_today_funnel_clicks(nmids: list[int]) -> int:
+async def get_today_funnel_clicks(
+    nmids: list[int], *, at: datetime | None = None
+) -> int:
     """Возвращает сумму карточных переходов (open_card) за сегодня по nmids."""
     if not nmids:
         return 0
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = (at or datetime.now()).strftime("%Y-%m-%d")
     query = """
     SELECT COALESCE(SUM(latest_open_card), 0) AS funnel_clicks
     FROM (

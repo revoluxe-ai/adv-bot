@@ -628,9 +628,11 @@ async def get_keywords_clicks_and_views(
         return 0, 0
 
 
-async def get_auto_total_clicks_today(adv_id: int) -> int:
+async def get_auto_total_clicks_today(
+    adv_id: int, *, at: datetime | None = None
+) -> int:
     """Возвращает суммарные клики авто-РК за сегодня."""
-    end_date = datetime.now()
+    end_date = at or datetime.now()
     start_date = end_date
     stats = await get_stats_by_last_days([adv_id], start_date, end_date)
     return int(stats.clicks or 0)

@@ -31,29 +31,32 @@ class TrafficClicksManager:
             complex_adv.traffic_clicks_dto = None
             return
 
+        # Один момент времени для всех запросов — иначе около полуночи даты могут разъехаться.
+        now = datetime.now()
+
         # Все клики авто-кампании за сегодня (ключи + полки/рекомендации).
         auto_total_clicks = await full_wb_adv_stat.get_auto_total_clicks_today(
-            complex_adv.adv_id
+            complex_adv.adv_id, at=now
         )
         # Суммарные клики всех РК комплекса (авто + поиск, если есть).
         all_campaign_clicks_today = (
             await full_wb_adv_stat.get_stats_by_last_days(
                 list(complex_adv.all_adv_ids),
-                start_date=datetime.now(),
-                end_date=datetime.now(),
+                start_date=now,
+                end_date=now,
             )
         ).clicks or 0
         # Клики именно по ключевым запросам в этой же авто-кампании за сегодня.
         auto_keyword_clicks, _auto_keyword_views = (
             await full_wb_adv_stat.get_keywords_clicks_and_views(
-            [complex_adv.adv_id],
-            start_date=datetime.now(),
-            end_date=datetime.now(),
-        )
+                [complex_adv.adv_id],
+                start_date=now,
+                end_date=now,
+            )
         )
         # Карточные переходы из товарной воронки за сегодня.
         funnel_clicks = await common_stat_manager.get_today_funnel_clicks(
-            complex_adv.nmids
+            complex_adv.nmids, at=now
         )
 
         # Полки/рекомендации = авто-клики минус клики по ключам.
