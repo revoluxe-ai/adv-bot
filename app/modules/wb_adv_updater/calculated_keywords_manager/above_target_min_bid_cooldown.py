@@ -107,7 +107,6 @@ def apply_above_target_min_bid_cooldown(
 
     condition = is_above_target_at_min_bid(pre_kw, min_bid_for_adv)
     v_cur = pre_kw.cluster_stat.views
-
     entry = _normalize_entry(cooldown_map.get(text))
 
     if entry is not None and v_cur < entry.views_at_freeze:
