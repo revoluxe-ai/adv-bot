@@ -22,14 +22,17 @@ class PreComplexAdv:
     @property
     def resolved_target_pay_for_order(self) -> float | None:
         plan = self.plan_data
-        summary = self.plan_fact_summary
-        if plan is None or summary is None:
+        if plan is None:
             return None
+        summary = self.plan_fact_summary
+        fact_predict_orders = (
+            summary.fact_predict_orders if summary is not None else None
+        )
         return resolve_target_cost(
             plan.orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
-            summary.fact_predict_orders,
+            fact_predict_orders,
         )
 
     @property
