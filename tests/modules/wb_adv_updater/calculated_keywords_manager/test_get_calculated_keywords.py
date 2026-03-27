@@ -1277,6 +1277,82 @@ async def test_above_target_min_bid_first_disable(
 
 
 @pytest.mark.asyncio
+async def test_above_target_min_bid_keeps_active_when_pay_below_or_equal_target(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """МС-условие true, но себестоимость ключа <= target: ключ остается активным, cooldown очищаем."""
+    complex_adv_mock_whitelist.target_pay_for_order = 2.0
+    pre_kw = _pre_kw_above_target_at_min(text="k_allow", hard_status=HardStatus.WHITELIST)
+    last = fixed_now - timedelta(hours=3)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={"k_allow": AboveTargetCooldownEntry(last, 1000)},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    assert result[0].status == KeywordStatus.GOOD
+    assert result[0].reason == KeywordStatusReason.WHITE_LIST
+    assert updates.get("k_allow") is None
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_stays_bad_when_pay_above_target(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """МС-условие true и pay_for_order выше target: текущая BAD/МС логика сохраняется."""
+    complex_adv_mock_whitelist.target_pay_for_order = 1.0
+    pre_kw = _pre_kw_above_target_at_min(text="k_deny", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+    assert updates.get("k_deny") == AboveTargetCooldownEntry(fixed_now, 1000)
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_fallback_when_pay_for_order_unavailable(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """Если pay_for_order не вычисляется, gate не срабатывает и остается BAD/МС."""
+    complex_adv_mock_whitelist.target_pay_for_order = 100.0
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=12345,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="k_no_pay",
+        keyword_setting__target_place=20,
+        cluster_stat__norm_query="k_no_pay",
+        cluster_stat__position=5.0,
+        cluster_stat__cpm=100.0,
+        cluster_stat__views=1000,
+        cluster_stat__clicks=100,
+        cluster_stat__conv_views_to_orders=0.0,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+    assert updates.get("k_no_pay") == AboveTargetCooldownEntry(fixed_now, 1000)
+
+
+@pytest.mark.asyncio
 async def test_above_target_min_bid_within_24h_no_redis_touch(
     complex_adv_mock_whitelist, fixed_now
 ) -> None:
