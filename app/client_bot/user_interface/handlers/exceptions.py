@@ -57,7 +57,41 @@ async def error_handler_for_telegram_bad_request_exception(
     )
     error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
     if "caption is too long" in error_text:
-        raise error_event.exception
+        await state.set_state()
+        message = error_event.update.message
+        if message is None:
+            assert error_event.update.callback_query
+            assert error_event.update.callback_query.message
+            assert error_event.update.callback_query.message.chat
+            chat_id = int(error_event.update.callback_query.message.chat.id)
+            user_name = error_event.update.callback_query.from_user.username
+            callback_data = getattr(error_event.update.callback_query, "data", None)
+        else:
+            chat_id = message.chat.id
+            user_name = message.from_user.username
+            callback_data = None
+
+        admin_text = (
+            "TelegramBadRequest: caption is too long\n"
+            f"chat_id={chat_id}\n"
+            f"user={user_name}\n"
+            f"callback_data={callback_data}\n"
+            f"exc={exc}"
+        )
+        for i in range(0, len(admin_text), const.MAX_MESSAGE_LENGTH):
+            await bot.send_message(
+                admin_telegram_id,
+                admin_text[i : i + const.MAX_MESSAGE_LENGTH],
+            )
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "Сообщение получилось слишком длинным и было автоматически сокращено. "
+                "Если проблема повторяется, обратитесь в поддержку -> "
+                f"{const.SUPPORT_LINK}"
+            ),
+        )
+        return
     await state.set_state()
     message = error_event.update.message
     if message is None:

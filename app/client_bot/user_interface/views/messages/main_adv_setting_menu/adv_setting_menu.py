@@ -85,6 +85,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+SAFE_CAPTION_LIMIT = 900
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -364,46 +365,43 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
-            text += "Авто-акт. РК: выкл\n"
-            text += "Автопоп бюд: не вкл\n"
+            text += "Авто-акт: выкл\n"
+            text += "Автопоп: выкл\n"
         else:
-            text += "Авто-акт. РК: вкл\n"
+            text += "Авто-акт: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
             if use_common:
                 limit = self.adv.common_budget_daily_limit or 0
                 spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
                 if self._spend_auto_today is None or self._spend_search_today is None:
-                    text += "Об бюд: потр: н/д\n"
+                    text += "Об.бюд потр: н/д\n"
                 else:
                     spend_rounded = int(round(spend))
                     remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Об. бюд: потр {spend_rounded} р., "
-                        f"ост. {remaining} р. (лим {limit} р./с)\n"
+                        f"Об.бюд: {spend_rounded}/{limit} р., ост {remaining}\n"
                     )
             else:
                 auto_limit = self.adv.auto_budget_daily_limit or 0
                 spend_auto = self._spend_auto_today or 0
                 if self._spend_auto_today is None:
-                    text += "Авто: потр: н/д\n"
+                    text += "Авто потр: н/д\n"
                 else:
                     spend_auto_rounded = int(round(spend_auto))
                     remaining_auto = max(0, auto_limit - spend_auto_rounded)
                     text += (
-                        f"Авто: потр. {spend_auto_rounded} р., "
-                        f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
+                        f"Авто: {spend_auto_rounded}/{auto_limit} р., ост {remaining_auto}\n"
                     )
                 if self.adv.search_adv_id:
                     search_limit = self.adv.search_auto_budget_daily_limit or 0
                     spend_search = self._spend_search_today or 0
                     if self._spend_search_today is None:
-                        text += "Аук: потр: н/д\n"
+                        text += "Аук потр: н/д\n"
                     else:
                         spend_search_rounded = int(round(spend_search))
                         remaining_search = max(0, search_limit - spend_search_rounded)
                         text += (
-                            f"Аук: потр {spend_search_rounded} р., "
-                            f"ост {remaining_search} р. (лим {search_limit} р/с)\n"
+                            f"Аук: {spend_search_rounded}/{search_limit} р., ост {remaining_search}\n"
                         )
                 else:
                     if self._spend_auto_today is not None:
@@ -420,8 +418,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             except (ValueError, TypeError):
                 failed_at_str = failed_at or "—"
             text += (
-                "⚠ Не удалось поп бюд: недост средств "
-                f"на балансе магазина ({failed_at_str})\n"
+                f"⚠ Поп.бюд не удался ({failed_at_str})\n"
             )
 
         # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
@@ -438,11 +435,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             except (ValueError, TypeError):
                 updated_str = updated_at or "—"
             text += (
-                f"Бал маг: осн. {bal} р., нетто {net} р., "
-                f"бонус {bonus} р. (обн {updated_str})\n"
+                f"Бал: осн {bal}, нет {net}, бон {bonus} (обн {updated_str})\n"
             )
         else:
-            text += "Бал маг: нет данных\n"
+            text += "Бал: н/д\n"
 
         # Последнее успешное пополнение
         at_val: str = (self._last_topup_success or {}).get("at", "")
@@ -454,9 +450,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 success_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
                 success_str = at_val or "—"
-            text += f"Посл усп поп: {success_str}\n"
+            text += f"Поп посл: {success_str}\n"
         else:
-            text += "Посл усп поп: н/д\n"
+            text += "Поп посл: н/д\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
@@ -474,17 +470,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"План. себес. зак.: {target_str} (факт. рек.сис.: {avg_str})\n"
+                text += f"Себес зак: план {target_str}, факт {avg_str}\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. сис. не раскр. "
-                    f"Макс.зак. >= {int(suggested)} р.\n"
+                    f"⚠ Рек.сис не раскр, макс.зак >= {int(suggested)} р.\n"
                 )
             if self._traffic_clicks_dto is not None:
                 text += (
-                    "Клики (сегодня): "
+                    "Клики сегодн: "
                     f"орг {self._traffic_clicks_dto.organic_clicks}, "
                     f"полки {self._traffic_clicks_dto.shelf_clicks}, "
                     f"ключи {self._traffic_clicks_dto.keyword_clicks}\n"
@@ -517,12 +512,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подкл"
         id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подк"
         text += (
-            f"📢 Камп: {self.adv.name}\n"
-            f"🆔 ID Авто: {id_auto}\n"
-            f"🆔 ID Аук: {id_auction}\n"
-            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
-            f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
-            f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
+            f"📢 {self.adv.name}\n"
+            f"ID А:{id_auto} У:{id_auction}\n"
+            f"Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
+            f"Аук: {self._status_auction}{suffix_auction}\n"
+            f"🎯 {format_adv_strategy(self.adv.strategy)}\n"
         )
         mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "
         mark_conv = "▶ " if self._strategy == Strategy.MAX_CONV else "  "
@@ -536,28 +530,28 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._min_conv_views_to_orders is not None
             else "—"
         )
-        text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
-        text += f"{mark_conv}Мин. зак. на 1000п: {val_1000views}\n"
+        text += f"{mark_cpo}Мин зак/1000р: {val_1000rub}\n"
+        text += f"{mark_conv}Мин зак/1000п: {val_1000views}\n"
 
-        text += "Посл.обнов:\n"
+        text += "Обновл:\n"
 
         text += (
             f"ворон: {self.last_update_common_stat_str}\n"
-            f"рек.стат.: {self.full_stat_update_time}\n"
+            f"рекст: {self.full_stat_update_time}\n"
             f"класт: {self.last_update_cluster_stat_str}\n"
-            f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
-            f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"став в класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
-            f"общей ставки аук: {self.last_common_bid_update_str}\n"
-            f"добав ключа в БС:"
+            f"минус авто: {self.keywords_status_last_update_auto_adv}\n"
+            f"минус аук: {self.keywords_status_last_update_search_adv}\n"
+            f"став класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Н/д'}\n"
+            f"общ.став аук: {self.last_common_bid_update_str}\n"
+            f"добавл в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
-            f"удал. ключа из БС:"
+            f"удал из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"повыш. цел. поз:"
+            f"цел.поз +:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"пониж. целевой поз:"
+            f"цел.поз -:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"доб верх кл в БС:"
+            f"топ в БС:"
             f" {self._update_informer.update_top_key_str}\n"
         )
 
@@ -567,14 +561,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             days_stat: list[DayStats] = sorted(
                 adv_stat.days, key=attrgetter("date")
             )
-            stat_text = "Стат по дням:\n"
-            stat_text += "Дата | Зак | Себес зак\n"
-            stat_text += "--------------------------------\n"
+            stat_text = "Стат дн:\n"
+            stat_text += "Дата | Зак | Себес\n"
 
             def reverse_date(date_: date_type) -> str:
                 return date_.strftime("%d-%m-%Y")
 
-            for day_stat in days_stat[-5:]:
+            for day_stat in days_stat[-3:]:
                 date_str = reverse_date(day_stat.date)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
                 spend = day_stat.sum
                 orders = day_stat.orders
@@ -586,7 +579,15 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
             text += stat_text
 
-        return text
+        return self._shrink_for_caption(text)
+
+    @staticmethod
+    def _shrink_for_caption(text: str) -> str:
+        if len(text) <= SAFE_CAPTION_LIMIT:
+            return text
+        tail = "\n…[сокращено]"
+        max_len = max(0, SAFE_CAPTION_LIMIT - len(tail))
+        return text[:max_len] + tail
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:

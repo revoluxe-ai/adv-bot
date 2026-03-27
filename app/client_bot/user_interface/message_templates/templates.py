@@ -3,10 +3,11 @@ import logging
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar, Any
+from typing import TypeVar, Any, cast
 
 import aiogram
 from aiogram import types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
 
 from app import file_handler
@@ -15,6 +16,7 @@ from app.client_bot.message_manager import LastMessage as ActualLastMessage
 from .base import Base
 
 logger = logging.getLogger(__name__)
+MAX_TELEGRAM_CAPTION_LEN = 1024
 
 
 T = TypeVar("T", bound=Message)
@@ -169,14 +171,56 @@ class TextWithKeyboardAndImage(Base):
 
     @manage_file_id
     async def __call__(self) -> Message:
-        # TODO: Поймали ошибку в рантайме
         logger.debug("Вызов метода send_photo")
-        message = await self.bot.send_photo(
-            chat_id=self.chat_id,
-            photo=self.image,
-            caption=self.text,
-            reply_markup=self.keyboard,
-            parse_mode=getattr(self, "parse_mode", None),
-        )
+        full_caption = self.text
+        caption, overflow = self._split_caption(full_caption)
+        photo = cast(types.InputFile | str, self.image)
+        try:
+            message = await self.bot.send_photo(
+                chat_id=self.chat_id,
+                photo=photo,
+                caption=caption,
+                reply_markup=self.keyboard,
+                parse_mode=getattr(self, "parse_mode", None),
+            )
+        except TelegramBadRequest as exc:
+            error_text = (getattr(exc, "message", None) or str(exc)).lower()
+            if "caption is too long" not in error_text:
+                raise
+            logger.warning(
+                "Caption overflow in send_photo for chat_id=%s; applying fallback",
+                self.chat_id,
+            )
+            caption, overflow = self._split_caption(
+                full_caption,
+                limit=MAX_TELEGRAM_CAPTION_LEN - 64,
+            )
+            message = await self.bot.send_photo(
+                chat_id=self.chat_id,
+                photo=photo,
+                caption=caption,
+                reply_markup=self.keyboard,
+                parse_mode=getattr(self, "parse_mode", None),
+            )
+        if overflow:
+            _ = await self.bot.send_message(
+                chat_id=self.chat_id,
+                text=f"Продолжение:\n{overflow}",
+                parse_mode=getattr(self, "parse_mode", None),
+                disable_web_page_preview=True,
+            )
         logger.debug("Отправка сообщения завершена")
         return message
+
+    @staticmethod
+    def _split_caption(
+        caption: str,
+        limit: int = MAX_TELEGRAM_CAPTION_LEN,
+    ) -> tuple[str, str]:
+        if len(caption) <= limit:
+            return caption, ""
+        if limit <= 16:
+            return caption[:limit], caption[limit:]
+        head = caption[: limit - 5] + "\n..."
+        tail = caption[limit - 5 :]
+        return head, tail
