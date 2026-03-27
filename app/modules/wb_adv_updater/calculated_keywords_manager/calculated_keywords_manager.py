@@ -32,9 +32,6 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_pay_for_order,
 )
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
-)
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
@@ -327,13 +324,14 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
         pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
-        summary = await PlanFactReader().get_latest_plan_fact(complex_adv.adv_id)
-        resolved_target_cost = resolve_target_cost(
-            complex_adv.adv_setting.plan_for_sales_for_day,
-            complex_adv.adv_setting.target_price_for_order,
-            complex_adv.adv_setting.max_price_for_order,
-            summary.fact_predict_orders if summary is not None else None,
-        )
+        resolved_target_cost = complex_adv.target_pay_for_order
+        if resolved_target_cost is None:
+            resolved_target_cost = resolve_target_cost(
+                complex_adv.adv_setting.plan_for_sales_for_day,
+                complex_adv.adv_setting.target_price_for_order,
+                complex_adv.adv_setting.max_price_for_order,
+                None,
+            )
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом

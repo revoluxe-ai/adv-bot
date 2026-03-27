@@ -16,6 +16,7 @@ import typing
 
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 if typing.TYPE_CHECKING:
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -58,7 +59,14 @@ class ComplexAdv:
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list["CalculatedKeyword"] | None = None
-        self._target_pay_for_order: float | None = target_pay_for_order
+        if target_pay_for_order is None:
+            target_pay_for_order = resolve_target_cost(
+                adv_setting.plan_for_sales_for_day,
+                adv_setting.target_price_for_order,
+                adv_setting.max_price_for_order,
+                None,
+            )
+        self._target_pay_for_order = target_pay_for_order
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
