@@ -57,7 +57,7 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
             fact_predict_orders=120.0,
             fact_pay_for_order=450.0,
         ),
-        # Для второй РК summary отсутствует -> target должен быть None.
+        # Для второй РК summary нет: факт как 0 заказов → план не выполнен → max_pay_for_order.
     }
 
     with (
@@ -75,4 +75,4 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     assert len(complex_advs) == 2
     by_adv_id = {adv.adv_id: adv for adv in complex_advs}
     assert by_adv_id[111].target_pay_for_order == 500.0
-    assert by_adv_id[222].target_pay_for_order is None
+    assert by_adv_id[222].target_pay_for_order == 900.0
