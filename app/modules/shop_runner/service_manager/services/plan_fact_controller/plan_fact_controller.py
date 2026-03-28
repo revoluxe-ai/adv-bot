@@ -51,6 +51,7 @@ class PlanFactController:
             shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
             adv_setting=pre_adv.auto_adv,
             search_adv=pre_adv.search_adv,
+            target_pay_for_order=pre_adv.resolved_target_pay_for_order,
         )
         keywords = await get_good_bad_phrases(complex_adv)
         provider = PlanFactProvider(pre_adv.auto_adv)
