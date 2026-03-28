@@ -82,26 +82,18 @@ class WhiteListTrimmer:
         start_index = max(white_indices_after_trim) + 1 if white_indices_after_trim else 0
 
         replacement_ids: list[int] = []
-        skipped_not_auto = 0
-        skipped_not_relevant = 0
-        skipped_removed = 0
-        skipped_rec_filter = 0
         # TODO: Централизовать по всему проекту отбор кандидатов в белый список!
         for kw in keywords[start_index:]:
             if kw.hard_status != 1:
-                skipped_not_auto += 1
                 continue
             if complex_adv.auto_add_only_relevant_phrase and not kw.relevant:
-                skipped_not_relevant += 1
                 continue
             kw_id = kw.keyword_setting_original_id
             if kw_id in removed_ids:
-                skipped_removed += 1
                 continue
             if (complex_adv.rec_system_promotion_mode_active
                     and kw.above_rec_conversion is False
                     and complex_adv.auto_adv_active_status):
-                skipped_rec_filter += 1
                 continue
             replacement_ids.append(kw_id)
             if len(replacement_ids) >= removed_count:
