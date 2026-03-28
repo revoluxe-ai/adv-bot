@@ -349,7 +349,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # Determine predict CTR mode display text
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = ""
-        text += "Freshness (CH): "
         if self._emergency_mode_active:
             text += (
                 "🚨 АВ.РЕЖ, СТ > 6ч, РАСХ ОГРАН\n"
