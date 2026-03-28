@@ -1,6 +1,7 @@
 """Unit tests for NotRelevantTemplate (quoted exact + regex rules)."""
 
 import logging
+import time
 
 import pytest
 
@@ -73,10 +74,27 @@ def test_invalid_regex_skipped_warning(caplog: pytest.LogCaptureFixture) -> None
     t = NotRelevantTemplate([r"(?P<unclosed", "valid"])
     assert t.is_relevant("valid") is False
     assert t.is_relevant("other") is True
-    assert any("невалидного regex" in r.message for r in caplog.records)
+    assert any("шаблоне НРФ" in r.message for r in caplog.records)
 
 
 def test_single_quotes_exact() -> None:
     t = NotRelevantTemplate(["'foo'"])
     assert t.is_relevant("foo") is False
     assert t.is_relevant("Foo") is False
+
+
+def test_redos_prone_pattern_completes_quickly() -> None:
+    """RE2 must not exhibit exponential backtracking like Python re on (a+)+b."""
+    t = NotRelevantTemplate([r"(a+)+b"])
+    start = time.perf_counter()
+    assert t.is_relevant("a" * 50 + "c") is True
+    assert time.perf_counter() - start < 0.5
+
+
+def test_oversized_pattern_skipped(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING)
+    long_pat = "x" * 600
+    t = NotRelevantTemplate([long_pat, "z"])
+    assert t.is_relevant("x" * 600) is True
+    assert t.is_relevant("az") is False
+    assert any("слишком длинного" in r.message for r in caplog.records)
