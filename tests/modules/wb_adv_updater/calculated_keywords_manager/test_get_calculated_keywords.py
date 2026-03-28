@@ -4,13 +4,20 @@
 1. Без белого списка: все ключевые слова -> BAD (LESS_THEN_RATING_BY_ORDERS), best_keyword_status=False
 2. С белым списком: фильтрация по rating_by_orders и hard_status (при white_list_mode=ABOVE_MIN_RATING)
 
-Это unit-тесты, не требующие базы данных.
+Это unit-тесты, не требующие базы данных. PlanFactReader.get_latest_plan_fact по умолчанию
+мокируется (autouse) как отсутствие строки в ClickHouse; отдельные тесты проверяют путь с фактом и логирование ошибок.
 """
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock
+
+import app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager as ckm_module
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactSummary,
+)
 
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
@@ -40,6 +47,16 @@ from tests.factories.keyword_pipeline import (
 # ============================================================================
 # Fixtures
 # ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _stub_plan_fact_reader_no_clickhouse(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid real ClickHouse in unit tests; return no row (None)."""
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(return_value=None),
+    )
 
 
 @pytest.fixture
@@ -1253,6 +1270,115 @@ def _pre_kw_above_target_at_min(
         cluster_stat__conv_views_to_orders=0.05,
         bidder_keyword_status=BidderKeywordStatus.GOOD,
     )
+
+
+# ============================================================================
+# PlanFactReader (ClickHouse) → resolve_target_cost для порога МС
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_plan_fact_reader_fact_orders_tightens_min_bid_cooldown_gate(
+    complex_adv_mock_whitelist,
+    fixed_now,
+) -> None:
+    """Факт заказов из CH сужает resolved_target_cost относительно пути без факта (как пустая выборка)."""
+    adv_id = 999
+    complex_adv_mock_whitelist.adv_id = adv_id
+    complex_adv_mock_whitelist.target_pay_for_order = 200.0
+    complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
+        plan_for_sales_for_day=10,
+        target_price_for_order=50,
+        max_price_for_order=200,
+    )
+    # CPM ≤ min_bid (100) нужен для условия МС; conv подобран так, чтобы CPO ≈ 75 ₽.
+    _conv_for_pay_75 = 100_000 / 75_000_000
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=adv_id,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="ch_gate",
+        keyword_setting__target_place=20,
+        cluster_stat__norm_query="ch_gate",
+        cluster_stat__position=5.0,
+        cluster_stat__cpm=100.0,
+        cluster_stat__views=1000,
+        cluster_stat__clicks=100,
+        cluster_stat__conv_views_to_orders=_conv_for_pay_75,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    summary = PlanFactSummary(
+        adv_id=adv_id,
+        plan_orders=10,
+        plan_target_pay_for_order=50,
+        plan_max_pay_for_order=200,
+        fact_predict_orders=15.0,
+        fact_pay_for_order=None,
+    )
+    updates_ch: dict[str, AboveTargetCooldownEntry | None] = {}
+    patch_path = (
+        "app.modules.wb_adv_updater.calculated_keywords_manager."
+        "calculated_keywords_manager.PlanFactReader.get_latest_plan_fact"
+    )
+    with patch(patch_path, new=AsyncMock(return_value=summary)):
+        result_ch = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+            complex_adv_mock_whitelist,
+            [pre_kw],
+            min_bid_for_adv=100,
+            cooldown_map={},
+            cooldown_updates=updates_ch,
+            now=fixed_now,
+        )
+    assert result_ch[0].status == KeywordStatus.BAD
+    assert result_ch[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+
+    # Без строки в CH: fact=None → 0 заказов относительно плана → max 200; 75 <= 200 → порог МС не режет.
+    updates_stub: dict[str, AboveTargetCooldownEntry | None] = {}
+    result_stub = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates_stub,
+        now=fixed_now,
+    )
+    assert result_stub[0].status == KeywordStatus.GOOD
+    assert result_stub[0].reason == KeywordStatusReason.WHITE_LIST
+
+
+@pytest.mark.asyncio
+async def test_plan_fact_reader_failure_is_logged(
+    complex_adv_mock_whitelist,
+    fixed_now,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import logging
+
+    complex_adv_mock_whitelist.adv_id = 4242
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(side_effect=RuntimeError("clickhouse unavailable")),
+    )
+    with caplog.at_level(
+        logging.ERROR,
+        logger="app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager",
+    ):
+        _ = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+            complex_adv_mock_whitelist,
+            [
+                _pre_kw_above_target_at_min(
+                    text="log_kw", hard_status=HardStatus.WHITELIST
+                )
+            ],
+            min_bid_for_adv=100,
+            cooldown_map={},
+            cooldown_updates=updates,
+            now=fixed_now,
+        )
+    assert "PlanFactReader.get_latest_plan_fact failed" in caplog.text
+    assert "4242" in caplog.text
 
 
 @pytest.mark.asyncio

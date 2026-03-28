@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-import sys
+import logging
 from numbers import Real
 from typing import Generator, Protocol, Sequence, TypeVar, cast
 from typing_extensions import ParamSpec
@@ -48,6 +48,8 @@ from ...common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import  get_async_session_maker as sm
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from operator import  attrgetter
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -356,17 +358,21 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         )
 
         _resolved_ch: float | None = None
-        if "pytest" not in sys.modules:
-            try:
-                _summary = await PlanFactReader().get_latest_plan_fact(
-                    complex_adv.adv_id
-                )
-                _ch_fact = _summary.fact_predict_orders if _summary is not None else None
-                _resolved_ch = resolve_target_cost(
-                    _plan_o, _plan_t, _plan_m, _ch_fact
-                )
-            except Exception:
-                _resolved_ch = None
+        try:
+            _summary = await PlanFactReader().get_latest_plan_fact(
+                complex_adv.adv_id
+            )
+            _ch_fact = _summary.fact_predict_orders if _summary is not None else None
+            _resolved_ch = resolve_target_cost(
+                _plan_o, _plan_t, _plan_m, _ch_fact
+            )
+        except Exception:
+            logger.exception(
+                "PlanFactReader.get_latest_plan_fact failed for adv_id=%r; "
+                "falling back to target_pay_for_order / plan without CH fact",
+                getattr(complex_adv, "adv_id", None),
+            )
+            _resolved_ch = None
 
         if _resolved_ch is not None:
             resolved_target_cost: float | None = _resolved_ch
