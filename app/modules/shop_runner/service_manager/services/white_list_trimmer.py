@@ -93,7 +93,8 @@ class WhiteListTrimmer:
                 continue
             if (complex_adv.rec_system_promotion_mode_active
                     and kw.above_rec_conversion is False
-                    and complex_adv.auto_adv_active_status):
+                    and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed):
                 continue
             replacement_ids.append(kw_id)
             if len(replacement_ids) >= removed_count:
@@ -117,6 +118,7 @@ class WhiteListTrimmer:
                     complex_adv.rec_system_promotion_mode_active
                     and kw.above_rec_conversion is False
                     and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed
                 ):
                     continue
                 replacement_ids.append(kw_id)
