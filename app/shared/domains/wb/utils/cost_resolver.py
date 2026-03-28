@@ -40,6 +40,11 @@ def resolve_target_cost_from_context(ctx: PipelineContext) -> float | None:
         return None
 
 
+def _is_real_number(value: object) -> bool:
+    """True для int/float, не bool (bool — подкласс int)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def resolve_target_cost(
     plan_orders: int | None,
     plan_target_pay_for_order: int | float | None,
@@ -62,16 +67,24 @@ def resolve_target_cost(
     Returns:
         Целевая себестоимость заказа или None если данные невалидны.
     """
-    if (
-        plan_orders is None
-        or plan_target_pay_for_order is None
-        or plan_max_pay_for_order is None
+    if not (
+        _is_real_number(plan_orders)
+        and _is_real_number(plan_target_pay_for_order)
+        and _is_real_number(plan_max_pay_for_order)
     ):
         return None
-    fact_orders = fact_predict_orders if fact_predict_orders is not None else 0.0
-    if fact_orders >= plan_orders:
-        return float(plan_target_pay_for_order)
-    return float(plan_max_pay_for_order)
+    plan_o = float(plan_orders)
+    plan_t = float(plan_target_pay_for_order)
+    plan_m = float(plan_max_pay_for_order)
+    if fact_predict_orders is None:
+        fact_orders = 0.0
+    elif not _is_real_number(fact_predict_orders):
+        return None
+    else:
+        fact_orders = float(fact_predict_orders)
+    if fact_orders >= plan_o:
+        return plan_t
+    return plan_m
 
 
 def resolve_target_cost_from_summary(summary: PlanFactSummary | None) -> float | None:
