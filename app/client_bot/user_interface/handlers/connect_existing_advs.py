@@ -35,6 +35,7 @@ from app.modules.connect_existing_advs import (
 from app.modules.connect_existing_advs.candidates_service import (
     ConnectExistingCandidatesResult,
 )
+from app.modules.connect_existing_advs.status_display import format_status_for_display
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from app.modules.shop_menu.message import ShopMenu
@@ -58,27 +59,6 @@ _WB_STATUS_TO_DB: dict[int, str] = {
     9: "started",
     11: "pause",
 }
-
-# Статус (код WB int или строка active_status) → текст для пользователя
-_STATUS_DISPLAY_RU: dict[int | str, str] = {
-    4: "готова к старту",
-    7: "завершена",
-    8: "отклонена",
-    9: "запущена",
-    11: "пауза",
-    "ready_for_start": "готова к старту",
-    "done": "завершена",
-    "refused": "отклонена",
-    "started": "запущена",
-    "pause": "пауза",
-}
-
-
-def _format_status_for_display(status: int | str | None) -> str:
-    """Числовой код WB (4,7,8,9,11) или строка active_status → строка для отображения."""
-    if status is None:
-        return "—"
-    return _STATUS_DISPLAY_RU.get(status, str(status))
 
 
 def _wb_status_code_to_text(code: int) -> str:
@@ -201,12 +181,6 @@ async def _get_existing_adv_pair_not_done(
 
 
 router = Router()
-
-def _wb_status_code_to_text(status_code: int) -> str:
-    """Код статуса WB (4, 9, 11, 7, 8) → текст для active_status."""
-    return {4: "ready_for_start", 9: "started", 11: "pause", 7: "done", 8: "refused"}.get(
-        status_code, "unknown"
-    )
 
 
 def _auction_choice_menu_keyboard(
@@ -484,7 +458,7 @@ def _serialize_candidates(
             "id": c.id,
             "name": c.settings.name,
             "status": status_val,
-            "status_text": _format_status_for_display(status_val),
+            "status_text": format_status_for_display(status_val),
         }
     auction = [_item_dict(c) for c in result.auction_candidates]
     auto = [_item_dict(c) for c in result.auto_candidates]
@@ -623,7 +597,7 @@ async def _connect_existing_after_card_resolved(
             "",
         ]
         for a in auto_list:
-            status_txt = a.get("status_text") or _format_status_for_display(a.get("status"))
+            status_txt = a.get("status_text") or format_status_for_display(a.get("status"))
             lines.append(f"• Авто-РК: {a['id']}, статус: {status_txt}, поисковая: не указана")
         lines.extend(
             [
@@ -708,13 +682,13 @@ async def _connect_existing_after_card_resolved(
                 "",
             ]
             if existing_auto_id_from_db is not None:
-                st_auto = _format_status_for_display(statuses.get(existing_auto_id_from_db))
-                st_auction = _format_status_for_display(statuses.get(existing_auction_id_from_db)) if existing_auction_id_from_db else "—"
+                st_auto = format_status_for_display(statuses.get(existing_auto_id_from_db))
+                st_auction = format_status_for_display(statuses.get(existing_auction_id_from_db)) if existing_auction_id_from_db else "—"
                 lines.append(
                     f"• Авто-РК: {existing_auto_id_from_db}, статус: {st_auto}; поисковая РК: {existing_auction_id_from_db if existing_auction_id_from_db else 'не указана'}, статус: {st_auction}"
                 )
             if existing_auction_id_from_db is not None and existing_auto_id_from_db is None:
-                st_auction = _format_status_for_display(statuses.get(existing_auction_id_from_db))
+                st_auction = format_status_for_display(statuses.get(existing_auction_id_from_db))
                 lines.append(
                     f"• Поисковая РК: {existing_auction_id_from_db}, статус: {st_auction}; авто-РК: не указана"
                 )

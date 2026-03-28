@@ -16,6 +16,7 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 from app.modules.connect_existing_advs.candidates_service import (
     filter_and_classify_campaigns_by_nmid,
 )
+from app.modules.connect_existing_advs.status_display import format_status_for_display
 
 logger = logging.getLogger(__name__)
 
@@ -27,21 +28,6 @@ _CONNECTABLE_EXCLUDE_STATUSES = {
     GetAdvertsAdvertsItemStatus.VALUE_8,  # refused
 }
 
-_STATUS_DISPLAY_RU: dict[int | str, str] = {
-    4: "готова к старту",
-    7: "завершена",
-    8: "отклонена",
-    9: "запущена",
-    11: "пауза",
-}
-
-
-def _format_status_for_display(status: int | str | None) -> str:
-    if status is None:
-        return "—"
-    return _STATUS_DISPLAY_RU.get(status, str(status))
-
-
 def _serialize_candidate_item(item: GetAdvertsAdvertsItem) -> dict[str, Any]:
     """Serialize one campaign to FSM-style dict (id, name, status, status_text)."""
     status_val = getattr(item.status, "value", item.status) if hasattr(item.status, "value") else item.status
@@ -50,7 +36,7 @@ def _serialize_candidate_item(item: GetAdvertsAdvertsItem) -> dict[str, Any]:
         "id": item.id,
         "name": name,
         "status": status_val,
-        "status_text": _format_status_for_display(status_val),
+        "status_text": format_status_for_display(status_val),
     }
 
 
