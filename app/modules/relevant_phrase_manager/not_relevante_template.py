@@ -1,16 +1,23 @@
 import logging
-import re
+from typing import Any
+
+import re2
 
 logger = logging.getLogger(__name__)
 
-_RE_FLAGS = re.IGNORECASE
+# RE2 guarantees linear-time matching (no catastrophic backtracking). User patterns are
+# compiled with case-insensitive semantics equivalent to re.IGNORECASE for literals.
+_RE2_OPTS = re2.Options()
+_RE2_OPTS.case_sensitive = False
+
+_MAX_PATTERN_LEN = 512
 
 
 class NotRelevantTemplate:
     def __init__(self, row_template: list[str]):
         self._row_template = row_template
         self._exact: list[str] = []
-        self._patterns: list[re.Pattern[str]] = []
+        self._patterns: list[Any] = []
         self._parse_rows()
 
     def _parse_rows(self) -> None:
@@ -23,11 +30,20 @@ class NotRelevantTemplate:
                 if inner:
                     self._exact.append(inner)
                 continue
-            try:
-                self._patterns.append(re.compile(row, _RE_FLAGS))
-            except re.error:
+            if len(row) > _MAX_PATTERN_LEN:
                 logger.warning(
-                    "Пропуск невалидного regex в шаблоне НРФ: %r",
+                    "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
+                    len(row),
+                    row[:80],
+                )
+                continue
+            try:
+                self._patterns.append(
+                    re2.compile(row, _RE2_OPTS)  # pyright: ignore[reportUnknownMemberType]
+                )
+            except re2.error:  # pyright: ignore[reportUnknownMemberType]
+                logger.warning(
+                    "Пропуск невалидного или неподдерживаемого regex в шаблоне НРФ: %r",
                     row,
                 )
 
