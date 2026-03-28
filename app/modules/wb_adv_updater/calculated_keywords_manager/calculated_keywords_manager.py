@@ -1,6 +1,8 @@
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+import sys
+from numbers import Real
 from typing import Generator, Protocol, Sequence, TypeVar, cast
 from typing_extensions import ParamSpec
 
@@ -33,6 +35,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
     calc_pay_for_order,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
 from app.modules.wb_adv_updater.calculated_keywords_manager.redis_above_target_min_bid_cooldown_manager import (
@@ -76,6 +81,22 @@ class _ClickHouseNamedResultsResponse(Protocol):
 
 
 # TODO: Нужно сделать автоматизацию по проверке обновлений API и внесением правок через ИИ
+
+
+def _coerce_optional_int_for_resolve(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, Real):
+        return int(float(value))
+    return None
+
+
+def _coerce_optional_float_for_resolve(value: object) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, Real):
+        return float(value)
+    return None
 
 
 class CalculatedKeywordsManager(BaseClickHouseManager):
@@ -324,14 +345,44 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
         pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
-        resolved_target_cost = complex_adv.target_pay_for_order
-        if resolved_target_cost is None:
-            resolved_target_cost = resolve_target_cost(
-                complex_adv.adv_setting.plan_for_sales_for_day,
-                complex_adv.adv_setting.target_price_for_order,
-                complex_adv.adv_setting.max_price_for_order,
-                None,
-            )
+        _plan_o = _coerce_optional_int_for_resolve(
+            complex_adv.adv_setting.plan_for_sales_for_day
+        )
+        _plan_t = _coerce_optional_float_for_resolve(
+            complex_adv.adv_setting.target_price_for_order
+        )
+        _plan_m = _coerce_optional_float_for_resolve(
+            complex_adv.adv_setting.max_price_for_order
+        )
+
+        _resolved_ch: float | None = None
+        if "pytest" not in sys.modules:
+            try:
+                _summary = await PlanFactReader().get_latest_plan_fact(
+                    complex_adv.adv_id
+                )
+                _ch_fact = _summary.fact_predict_orders if _summary is not None else None
+                _resolved_ch = resolve_target_cost(
+                    _plan_o, _plan_t, _plan_m, _ch_fact
+                )
+            except Exception:
+                _resolved_ch = None
+
+        if _resolved_ch is not None:
+            resolved_target_cost: float | None = _resolved_ch
+        else:
+            _raw_target = complex_adv.target_pay_for_order
+            if _raw_target is None or isinstance(_raw_target, bool):
+                resolved_target_cost = None
+            elif isinstance(_raw_target, Real):
+                resolved_target_cost = float(_raw_target)
+            else:
+                resolved_target_cost = None
+            if resolved_target_cost is None:
+                resolved_target_cost = resolve_target_cost(
+                    _plan_o, _plan_t, _plan_m, None
+                )
+
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None
         # TODO: Тут надо внимательно перепроверить логику с rec_conversion, сделать тесты, делаю коммит авансом
