@@ -71,6 +71,7 @@ class CPMSetting(StatesGroup):
 
 class AddBlackPhrasesTemplates(StatesGroup):
     waiting_for_black_phrases = State()
+    waiting_for_black_phrases_test = State()
 
 
 class AddRelevantPhrases(StatesGroup):

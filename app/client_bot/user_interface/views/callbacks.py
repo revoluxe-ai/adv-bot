@@ -253,6 +253,14 @@ class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
     adv_setting_id: int
 
 
+class TestBlackPhrasesTemplates(CallbackData, prefix="test_black_phrases"):
+    adv_setting_id: int
+
+
+class ExitBlackPhrasesTest(CallbackData, prefix="exit_black_phrases_test"):
+    adv_setting_id: int
+
+
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
 
