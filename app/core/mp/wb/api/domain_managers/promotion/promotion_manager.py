@@ -33,6 +33,7 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
     GetAdvV1BalanceResponse200,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    GetAdvertsAdvertsItem,
     GetAdvV1SupplierSubjectsResponse200Type0Item,
     PatchApiAdvertV1BidsBody,
     PostAdvV2SupplierNmsResponse200Item,
@@ -213,6 +214,10 @@ class PromotionManager:
             adv_id=advert_id,
         )
 
+    async def get_adverts_v2_by_ids(self, adv_ids: list[int]) -> list[GetAdvertsAdvertsItem]:
+        """Сырые элементы GET /api/advert/v2/adverts по числовым id (не путать с get_campaigns_info)."""
+        return await self._client.campaigns_info_v2_adapter.get_campaigns_info(adv_ids)
+
     async def get_campaign_status(self, adv_id: int) -> int | None:
         """Статус кампании на WB (например 7=завершена) или None, если не найдена.
 
@@ -221,9 +226,7 @@ class PromotionManager:
         Пустой ответ возможен: кампания удалена; или WB по своему правилу не возвращает
         часть кампаний (например, завершённые) при запросе по ids — зависит от API WB.
         """
-        campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
-            [adv_id]
-        )
+        campaigns = await self.get_adverts_v2_by_ids([adv_id])
         if not campaigns:
             return None
         return int(campaigns[0].status)

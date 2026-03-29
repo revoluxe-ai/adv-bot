@@ -59,9 +59,9 @@ async def validate_campaign_id_for_connect(
             )
             hub = factory.get_wb_manager_hub(shop_id)
             pm = hub.wb_data_manager.promotion_manager
-            campaigns = await pm.get_campaigns_info([adv_id])
+            campaigns = await pm.get_adverts_v2_by_ids([adv_id])
     except Exception as e:
-        logger.warning("validate_campaign_id get_campaigns_info failed: %s", e)
+        logger.warning("validate_campaign_id get_adverts_v2_by_ids failed: %s", e)
         return False, "Не удалось проверить кампанию в WB. Попробуйте позже.", None
 
     if not campaigns:
