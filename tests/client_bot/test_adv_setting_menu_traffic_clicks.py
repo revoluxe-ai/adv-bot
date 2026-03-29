@@ -25,7 +25,15 @@ async def test_get_today_traffic_clicks_dto_returns_values_when_rec_mode_enabled
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     menu = AdvSettingMenu.__new__(AdvSettingMenu)
-    menu.adv = SimpleNamespace(rec_system_mode=True, adv_id=123, nmids=[1, 2])
+    menu.adv = SimpleNamespace(
+        rec_system_mode=True,
+        adv_id=123,
+        nmids=[1, 2],
+        search_adv_id=None,
+        plan_for_sales_for_day=1,
+        target_price_for_order=100,
+        max_price_for_order=200,
+    )
 
     from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
         TrafficClicksManager,
