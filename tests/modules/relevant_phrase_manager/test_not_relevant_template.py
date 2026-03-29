@@ -35,15 +35,19 @@ def test_quoted_does_not_substring_match() -> None:
     assert t.is_relevant("foobar") is True
 
 
-def test_quoted_heuristic_leading_quote_only() -> None:
+def test_unmatched_leading_quote_is_regex_not_exact() -> None:
+    """Opening ``"`` without closing ``"`` is RE2, not exact ``partial``."""
     t = NotRelevantTemplate(['"partial'])
-    assert t.is_relevant("partial") is False
+    assert t.is_relevant("partial") is True
+    assert t.is_relevant('"partial') is False
     assert t.is_relevant("partialx") is True
 
 
-def test_quoted_heuristic_trailing_quote_only() -> None:
+def test_unmatched_trailing_quote_is_regex_not_exact() -> None:
+    """Trailing ``"`` without leading pair is RE2, not exact ``partial``."""
     t = NotRelevantTemplate(['partial"'])
-    assert t.is_relevant("partial") is False
+    assert t.is_relevant("partial") is True
+    assert t.is_relevant('partial"') is False
 
 
 def test_regex_substring_case_insensitive() -> None:

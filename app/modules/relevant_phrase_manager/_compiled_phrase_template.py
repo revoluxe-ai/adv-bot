@@ -99,9 +99,13 @@ class CompiledPhraseTemplate:
 
     @staticmethod
     def _is_quoted(text: str) -> bool:
-        return (text.startswith('"') or text.endswith('"')) or (
-            text.startswith("'") or text.endswith("'")
-        )
+        """True only when wrapped in a matching pair of ``"`` or ``'`` (same delimiter both ends)."""
+        if len(text) < 2:
+            return False
+        opening = text[0]
+        if opening not in "\"'":
+            return False
+        return text[-1] == opening
 
     def _matches_any(self, phrase: str) -> bool:
         phrase_cf = phrase.casefold()
