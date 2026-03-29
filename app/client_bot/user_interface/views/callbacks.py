@@ -435,3 +435,9 @@ class ChangeShopDefaultMaxCPM(CallbackData, prefix="change_shop_default_max_cpm"
 
 class ApplyDefaultsForShop(CallbackData, prefix="apply_shop_defaults"):
     wb_user_cabinet_original_id: int
+
+
+class ToggleCabinetActive(CallbackData, prefix="toggle_cabinet_active"):
+    """Переключить WBCabinet.active из меню магазина."""
+
+    wb_user_cabinet_original_id: int
