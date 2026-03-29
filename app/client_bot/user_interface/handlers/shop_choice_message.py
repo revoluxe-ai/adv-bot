@@ -13,7 +13,7 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.settings import settings
 
 SHOPS_LIST_PAGE_TITLE = (
-    "Нажмите 'Добавить магазин' для начала использования"
+    "Нажмите 'Добавить магазин' для начала использования\n"
     "Мои магазины: \n"
     "\n"
     "Префикс кнопки: [Каб][Ток] имя\n"
