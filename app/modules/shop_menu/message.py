@@ -459,7 +459,7 @@ class ShopMenu(TextWithKeyboard):
         )
         builder.row(button)
 
-        if bool(wb_cabinet.active):
+        if wb_cabinet.active is True:
             toggle_label = "Деактивировать магазин"
         else:
             toggle_label = "Активировать магазин"
