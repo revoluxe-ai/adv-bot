@@ -19,6 +19,17 @@ _SERVICE_MODULE = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _mock_positive_cabinet_balance() -> object:
+    """Тесты не ходят в БД за балансом кабинета; иначе _cabinet_has_positive_balance даёт False."""
+    with patch.object(
+        AutoAdvActiveControlService,
+        "_cabinet_has_positive_balance",
+        new=AsyncMock(return_value=True),
+    ):
+        yield
+
+
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
     return {aid: None for aid in adv_ids}
@@ -31,6 +42,7 @@ class _FakeAdvSetting:
         adv_id: int | None = None,
         *,
         adv_setting_id: int | None = None,
+        wb_cabinet_id: int = 1,
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
@@ -38,6 +50,7 @@ class _FakeAdvSetting:
     ):
         self.active_status = active_status
         self.adv_id = adv_id
+        self.wb_cabinet_id = wb_cabinet_id
         self.id = adv_setting_id if adv_setting_id is not None else (adv_id if adv_id is not None else 0)
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order

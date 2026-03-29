@@ -96,9 +96,10 @@ async def test_relevant_phrase_templates_start(
     )
     assert callback.from_user
     prompt = (
+        "✅ РЕЛЕВАНТНЫЕ ШАБЛОНЫ\n\n"
         "Отправьте список фраз для проверки — по одной строке. "
-        "Бот отметит, подходит ли каждая под текущие сохранённые шаблоны "
-        "релевантных фраз."
+        "Бот отметит каждую как подходящую под сохранённые шаблоны "
+        "релевантных фраз или нет."
     )
     await bot.send_message(
         chat_id=callback.from_user.id,
@@ -152,14 +153,14 @@ async def waiting_for_relevant_phrase_templates_test(
     lines_out: list[str] = []
     for line in _templates_from_message(text):
         matches = templator.matches(line)
-        mark = "подходит под шаблон" if matches else "не подходит"
+        mark = "подходит" if matches else "не подходит"
         sym = "✓" if matches else "✗"
         lines_out.append(f"{sym} {mark}: {line}")
 
     if not lines_out:
         return None
 
-    header = "Результат по текущим шаблонам релевантных фраз:\n"
+    header = "✅ РЕЛЕВАНТНЫЕ ШАБЛОНЫ\n\nРезультат по текущим шаблонам:\n"
     body = "\n".join(lines_out)
     full = header + body
     assert message.from_user

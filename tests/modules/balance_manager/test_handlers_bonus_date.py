@@ -35,6 +35,7 @@ async def test_bonus_awarded_before_end_of_2025():
         # Мокируем настройки
         with patch("app.modules.balance_manager.handlers.settings") as mock_settings:
             mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 200.0
+            mock_settings.presentation_only = False
 
             # Мокируем сообщение и состояние
             mock_message = MagicMock()
@@ -122,6 +123,7 @@ async def test_bonus_not_awarded_after_end_of_2025():
         # Мокируем настройки
         with patch("app.modules.balance_manager.handlers.settings") as mock_settings:
             mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 200.0
+            mock_settings.presentation_only = False
 
             # Мокируем сообщение и состояние
             mock_message = MagicMock()
@@ -207,6 +209,7 @@ async def test_bonus_awarded_on_last_day_of_2025():
 
         with patch("app.modules.balance_manager.handlers.settings") as mock_settings:
             mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 200.0
+            mock_settings.presentation_only = False
 
             mock_message = MagicMock()
             mock_message.chat.id = 12345

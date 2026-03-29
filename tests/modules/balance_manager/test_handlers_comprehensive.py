@@ -326,6 +326,7 @@ async def test_bonus_date_boundary_cases():
 
             with patch("app.modules.balance_manager.handlers.settings") as mock_settings:
                 mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 200.0
+                mock_settings.presentation_only = False
 
                 mock_message = MagicMock()
                 mock_message.chat.id = 12345
