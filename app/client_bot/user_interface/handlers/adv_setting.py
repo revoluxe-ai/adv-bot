@@ -214,10 +214,13 @@ async def adv_handler(
         return
 
     async with sm() as session:
-        wb_user_cabinet = await session.execute(
-            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        stmt = (
+            select(WBUserCabinet)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .options(selectinload(WBUserCabinet.wb_cabinet))
         )
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet_result = await session.execute(stmt)
+        wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
 
     if not wb_user_cabinet:
         await bot.send_message(
