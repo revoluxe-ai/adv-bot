@@ -80,6 +80,7 @@ async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None
         adv_id=777,
         auto_add_only_relevant_phrase=False,
         get_keywords=AsyncMock(return_value=keywords),
+        auto_add_only_relevant_phrase=False,
     )
 
     class _FakeSession:

@@ -184,10 +184,10 @@ async def adv_handler(
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
-        adv = await session.execute(
+        adv_result: Result[tuple[AdvSetting]] = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv: AdvSetting | None = adv_result.scalar_one_or_none()
 
     if not adv:
         await bot.send_message(

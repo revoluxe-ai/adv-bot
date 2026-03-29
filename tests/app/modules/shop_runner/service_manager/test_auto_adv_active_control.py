@@ -25,10 +25,8 @@ def _positive_cabinet_balance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Избегаем реального balance_manager: положительный баланс кабинета."""
     monkeypatch.setattr(
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
-        AsyncMock(return_value=(100.0, 0.0)),
+        AsyncMock(return_value=(1000.0, 0.0)),
     )
-
-
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
     return {aid: None for aid in adv_ids}
@@ -46,6 +44,7 @@ class _FakeAdvSetting:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
+        wb_cabinet_id: int = 1,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -55,6 +54,7 @@ class _FakeAdvSetting:
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
+        self.wb_cabinet_id = wb_cabinet_id
 
 
 class _FakeSearchAdv:

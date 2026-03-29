@@ -516,6 +516,9 @@ def adv_setting_mock():
     adv_setting_mock.nmids = [222811118]
     adv_setting_mock.search_adv_id = None
     adv_setting_mock.active_status = "started"
+    adv_setting_mock.plan_for_sales_for_day = None
+    adv_setting_mock.target_price_for_order = None
+    adv_setting_mock.max_price_for_order = None
     return adv_setting_mock
 
 
