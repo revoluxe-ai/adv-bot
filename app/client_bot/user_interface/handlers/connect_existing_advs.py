@@ -62,8 +62,8 @@ _WB_STATUS_TO_DB: dict[int, str] = {
 
 
 def _wb_status_code_to_text(code: int) -> str:
-    """Код статуса WB API (4,7,8,9,11) → строка active_status для БД."""
-    return _WB_STATUS_TO_DB.get(code, "started")
+    """Код статуса WB API → active_status; неизвестные коды → ``unknown`` (как раньше, не ``started``)."""
+    return _WB_STATUS_TO_DB.get(code, "unknown")
 
 
 # Статусы, при которых кампанию не предлагаем для подключения (завершена/отклонена)
