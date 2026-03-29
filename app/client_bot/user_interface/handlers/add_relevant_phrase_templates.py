@@ -12,6 +12,12 @@ from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.relevant_phrase_manager.relevant_phrase_template import (
     RelevantPhraseTemplate,
 )
+from app.modules.wb_adv_updater.data_manager import (
+    reset_relevant_phrases_templates as dm_reset_relevant_phrases_templates,
+)
+from app.modules.wb_adv_updater.data_manager import (
+    update_relevant_phrases_templates as dm_update_relevant_phrases_templates,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
@@ -68,13 +74,7 @@ async def waiting_for_relevant_phrase_templates(
     keywords = _templates_from_message(text)
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
-    async with sm(read_only=True) as session:
-        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
-    if adv is None:
-        return None
-
-    rel_manager = RelevantPhraseManager(adv)
-    await rel_manager.update_relevant_phrases_templates(keywords)
+    await dm_update_relevant_phrases_templates(adv_setting_id, keywords)
     assert message.from_user
     await messages.WaitingForRelevantPhraseTemplates(bot, message.from_user.id)(
         adv_setting_id
@@ -192,8 +192,7 @@ async def reset_relevant_phrase_templates(
     if adv is None:
         await callback.answer("Кампания не найдена.", show_alert=True)
         return
-    manager = RelevantPhraseManager(adv)
-    await manager.update_relevant_phrases_templates([])
+    await dm_reset_relevant_phrases_templates(adv_setting_original_id)
     assert callback.from_user
     await messages.WaitingForRelevantPhraseTemplates(bot, callback.from_user.id)(
         callback_data.adv_setting_id
