@@ -1,90 +1,14 @@
-import logging
-from typing import Any
-
-import re2
-
-logger = logging.getLogger(__name__)
-
-# RE2 guarantees linear-time matching (no catastrophic backtracking). User patterns are
-# compiled with case-insensitive semantics equivalent to re.IGNORECASE for literals.
-_RE2_OPTS = re2.Options()
-_RE2_OPTS.case_sensitive = False
-
-_MAX_PATTERN_LEN = 512
+from ._compiled_phrase_template import CompiledPhraseTemplate
 
 
-class NotRelevantTemplate:
-    def __init__(self, row_template: list[str]):
-        self._row_template = row_template
-        self._exact: list[str] = []
-        self._substring_excludes: list[str] = []
-        self._any_groups: list[list[str]] = []
-        self._patterns: list[Any] = []
-        self._parse_rows()
+class NotRelevantTemplate(CompiledPhraseTemplate):
+    """НРФ (чёрный список): тот же синтаксис строк, что у релевантных шаблонов, но инвертированная проверка."""
 
-    def _parse_rows(self) -> None:
-        for raw in self._row_template:
-            row = raw.strip()
-            if not row:
-                continue
-            row_cf = row.casefold()
-            if row_cf.startswith("any:"):
-                if len(row) > _MAX_PATTERN_LEN:
-                    logger.warning(
-                        "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
-                        len(row),
-                        row[:80],
-                    )
-                    continue
-                content = row.split(":", 1)[1].strip()
-                group = [item.strip() for item in content.split(",") if item.strip()]
-                if group:
-                    self._any_groups.append(group)
-                continue
-            if row_cf.startswith("not:"):
-                rest = row.split(":", 1)[1].strip()
-                if not rest:
-                    continue
-                if self._is_quoted(rest):
-                    inner = rest.strip("\"'")
-                    if inner:
-                        self._exact.append(inner)
-                    continue
-                if len(rest) > _MAX_PATTERN_LEN:
-                    logger.warning(
-                        "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
-                        len(rest),
-                        rest[:80],
-                    )
-                    continue
-                self._substring_excludes.append(rest)
-                continue
-            if self._is_quoted(row):
-                inner = row.strip("\"'")
-                if inner:
-                    self._exact.append(inner)
-                continue
-            if len(row) > _MAX_PATTERN_LEN:
-                logger.warning(
-                    "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
-                    len(row),
-                    row[:80],
-                )
-                continue
-            try:
-                self._patterns.append(
-                    re2.compile(row, _RE2_OPTS)  # pyright: ignore[reportUnknownMemberType]
-                )
-            except re2.error:  # pyright: ignore[reportUnknownMemberType]
-                logger.warning(
-                    "Пропуск невалидного или неподдерживаемого regex в шаблоне НРФ: %r",
-                    row,
-                )
-
-    @staticmethod
-    def _is_quoted(text: str) -> bool:
-        return (text.startswith('"') or text.endswith('"')) or (
-            text.startswith("'") or text.endswith("'")
+    def __init__(self, row_template: list[str]) -> None:
+        super().__init__(
+            row_template=row_template,
+            log_context="НРФ",
+            not_unquoted_as_exclude=True,
         )
 
     def is_relevant(self, phrase: str) -> bool:

@@ -14,11 +14,19 @@ _MAX_PATTERN_LEN = 512
 class CompiledPhraseTemplate:
     """Common parser/compiler for quoted exact matches, legacy any:/not:, and RE2."""
 
-    def __init__(self, row_template: list[str], log_context: str):
+    def __init__(
+        self,
+        row_template: list[str],
+        log_context: str,
+        *,
+        not_unquoted_as_exclude: bool = False,
+    ) -> None:
         self._row_template = row_template
         self._log_context = log_context
+        self._not_unquoted_as_exclude = not_unquoted_as_exclude
         self._exact: list[str] = []
         self._substring_includes: list[str] = []
+        self._substring_excludes: list[str] = []
         self._any_groups: list[list[str]] = []
         self._patterns: list[Any] = []
         self._parse_rows()
@@ -60,7 +68,10 @@ class CompiledPhraseTemplate:
                         rest[:80],
                     )
                     continue
-                self._substring_includes.append(rest)
+                if self._not_unquoted_as_exclude:
+                    self._substring_excludes.append(rest)
+                else:
+                    self._substring_includes.append(rest)
                 continue
             if self._is_quoted(row):
                 inner = row.strip("\"'")
