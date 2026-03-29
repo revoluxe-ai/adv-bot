@@ -347,14 +347,10 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     ]
     try:
         async with sm(read_only=False) as session:
-            # Обработка данных порциями
+            flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
             for keyword in keyword_settings:
                 text = keyword.text
-                hard_status, relevant = (
-                    RelevantPhraseManager.initial_flags_for_new_keyword(
-                        text, adv_setting
-                    )
-                )
+                hard_status, relevant = flags_for(text)
                 keyword.hard_status = hard_status
                 keyword.relevant = relevant
                 session.add(keyword)

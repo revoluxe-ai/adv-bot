@@ -77,10 +77,9 @@ class KeywordsManager:
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
         adv_setting = complex_adv.adv_setting
+        flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
         for text in new_texts:
-            hard_status, relevant = RelevantPhraseManager.initial_flags_for_new_keyword(
-                text, adv_setting
-            )
+            hard_status, relevant = flags_for(text)
             session.add(
                 KeywordSetting(
                     text=text,

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from sqlalchemy import select, update
 
@@ -22,11 +22,13 @@ class RelevantPhraseManager:
         return [x for x in raw if isinstance(x, str)]
 
     @staticmethod
-    def initial_flags_for_new_keyword(text: str, adv: AdvSetting) -> tuple[int, bool]:
-        """Стартовые hard_status и relevant для нового KeywordSetting.
+    def build_initial_flags_evaluator(
+        adv: AdvSetting,
+    ) -> Callable[[str], tuple[int, bool]]:
+        """Скомпилировать шаблоны один раз; вызывать возвращаемую функцию на каждую фразу.
 
-        При auto_add_only_relevant_phrase=True применяются только шаблоны relevant_phrases.
-        Иначе — только black_phrases (как раньше).
+        В циклах по ключам используйте это вместо повторных вызовов
+        initial_flags_for_new_keyword (иначе re2.compile на каждое правило × N ключей).
         """
         only_rel = bool(getattr(adv, "auto_add_only_relevant_phrase", False))
         if only_rel:
@@ -34,13 +36,30 @@ class RelevantPhraseManager:
                 getattr(adv, "relevant_phrases", None)
             )
             rel_t = RelevantPhraseTemplate(rel_rows)
-            return (1, rel_t.matches(text))
+
+            def _flags_only_relevant(text: str) -> tuple[int, bool]:
+                return (1, rel_t.matches(text))
+
+            return _flags_only_relevant
         black_rows = RelevantPhraseManager._safe_str_list(
             getattr(adv, "black_phrases", None)
         )
         not_rel = NotRelevantTemplate(black_rows)
-        hard = 0 if not not_rel.is_relevant(text) else 1
-        return (hard, False)
+
+        def _flags_black(text: str) -> tuple[int, bool]:
+            hard = 0 if not not_rel.is_relevant(text) else 1
+            return (hard, False)
+
+        return _flags_black
+
+    @staticmethod
+    def initial_flags_for_new_keyword(text: str, adv: AdvSetting) -> tuple[int, bool]:
+        """Стартовые hard_status и relevant для нового KeywordSetting.
+
+        При auto_add_only_relevant_phrase=True применяются только шаблоны relevant_phrases.
+        Иначе — только black_phrases (как раньше).
+        """
+        return RelevantPhraseManager.build_initial_flags_evaluator(adv)(text)
 
     async def update_black_phrases(self, keywords: list[str]) -> None:
         adv_setting_id = self._adv.id
