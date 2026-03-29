@@ -39,7 +39,7 @@ class TokenNotificationTracker(BaseTable):
     notification_type: Mapped[str] = mapped_column(String, nullable=False)
 
     # Token expiration date (nullable for deactivation notifications)
-    token_expiry_date: Mapped[datetime.datetime] = mapped_column(
+    token_expiry_date: Mapped[datetime.datetime | None] = mapped_column(
         DateTime, nullable=True
     )
 
@@ -49,7 +49,7 @@ class TokenNotificationTracker(BaseTable):
     )
 
     # When the token issue was resolved (nullable until resolved)
-    resolved_at: Mapped[datetime.datetime] = mapped_column(
+    resolved_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime, nullable=True, index=True
     )
 
