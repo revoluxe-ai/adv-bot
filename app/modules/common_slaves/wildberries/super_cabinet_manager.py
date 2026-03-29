@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
+from app.modules.token_monitoring.models import NotificationType
+from app.modules.token_monitoring.services.cabinet_status_service import (
+    deactivate_cabinet_atomic_with_user_trackers,
+)
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
 from . import exceptions
@@ -27,7 +31,7 @@ async def get_shop_ids_with_active_tokens(
         return set()
     stmt = (
         select(WBToken.shop_id)
-        .where(WBToken.shop_id.in_(shop_ids), WBToken.active == True)
+        .where(WBToken.shop_id.in_(shop_ids), WBToken.active.is_(True))
         .distinct()
     )
     result = await session.execute(stmt)
@@ -66,6 +70,7 @@ async def get_access_for_wb_cabinet(
     else:
         wb_cabinet_id = wb_cabinet_id_or_shop_id
 
+    shop_id_for_deactivate: str | None = None
     async with sm() as session:
         wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
 
@@ -89,16 +94,21 @@ async def get_access_for_wb_cabinet(
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
-            if wb_cabinet.active is not False:
-                wb_cabinet.active = False
-                await session.commit()
-            raise ApiForbiddenError(
-                f"Нет валидных токенов для кабинета с shop_id {shop_id}"
+            shop_id_for_deactivate = shop_id
+        else:
+            access = WBCabinetAccess(
+                tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
             )
-        access = WBCabinetAccess(
-            tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
+            return access
+
+    if shop_id_for_deactivate is not None:
+        await deactivate_cabinet_atomic_with_user_trackers(
+            shop_id_for_deactivate,
+            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
         )
-        return access
+        raise ApiForbiddenError(
+            f"Нет валидных токенов для кабинета с shop_id {shop_id_for_deactivate}"
+        )
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:

@@ -37,6 +37,11 @@ class NotificationManager:
         NotificationType.TOKEN_DEACTIVATED.value: (
             "Токен истек или деактивирован, сделайте срочно новый и добавьте в магазин {shop_name}"
         ),
+        NotificationType.CABINET_DEACTIVATED.value: (
+            "Магазин {shop_name} деактивирован в боте. "
+            "Чтобы снова запустить автообработку, откройте меню магазина и нажмите «Активировать магазин» "
+            "или обновите токен."
+        ),
         NotificationType.TOKEN_EXPIRING_14_DAYS.value: (
             "Токен для магазина {shop_name} истекает через 2 недели ({expiry_date}). "
             "Подготовьте новый токен заранее"
@@ -73,6 +78,21 @@ class NotificationManager:
             self._notification_sender = NotificationSender([token])
         else:
             self._notification_sender = get_notification_sender()
+
+    def format_shop_notification_message(
+        self,
+        notification_type: str,
+        shop_name: str,
+        expiry_date: datetime.datetime | None = None,
+    ) -> str:
+        """Public wrapper for template formatting (used by cabinet status flow)."""
+        return self._format_message(notification_type, shop_name, expiry_date)
+
+    @staticmethod
+    def naive_utc_now() -> datetime.datetime:
+        """Current UTC time as naive datetime for TIMESTAMP WITHOUT TIME ZONE columns."""
+        now = datetime.datetime.now(datetime.UTC)
+        return now.astimezone(datetime.UTC).replace(tzinfo=None)
 
     @staticmethod
     def _to_naive_utc(dt: datetime.datetime | None) -> datetime.datetime | None:

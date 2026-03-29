@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import aiogram
 from aiogram import Router, types
@@ -49,6 +49,10 @@ from app.modules.token_permissions import TokenPermissionsValidator
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from app.modules.token_monitoring.services.cabinet_status_service import (
+    activate_cabinet,
+    deactivate_cabinet_atomic_with_user_trackers,
+)
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
 )
@@ -768,6 +772,7 @@ async def process_add_new_token(
             NotificationType.TOKEN_EXPIRING_3_DAYS.value,
             NotificationType.TOKEN_EXPIRING_1_DAY.value,
             NotificationType.TOKEN_DEACTIVATED.value,
+            NotificationType.CABINET_DEACTIVATED.value,
         ]
 
         for notif_type in notification_types:
@@ -802,6 +807,55 @@ async def process_add_new_token(
     await state.clear()
 
     # Переход в меню магазина
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
+    return None
+
+
+@router.callback_query(callbacks.ToggleCabinetActive.filter())
+async def toggle_cabinet_active_handler(
+    callback: CallbackQuery,
+    callback_data: callbacks.ToggleCabinetActive,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None or callback.from_user is None:
+        return None
+    chat_id = int(callback.message.chat.id)
+    user_telegram_id = callback.from_user.id
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+
+    async with sm(read_only=True) as session:
+        stmt = (
+            select(WBUserCabinet)
+            .join(WBUserCabinet.user)
+            .options(joinedload(WBUserCabinet.wb_cabinet))
+            .where(
+                WBUserCabinet.id == wb_user_cabinet_original_id,
+                User.user_telegram_id == user_telegram_id,
+            )
+        )
+        result = await session.execute(stmt)
+        wb_user_cabinet = result.unique().scalar_one_or_none()
+
+    if wb_user_cabinet is None:
+        await bot.send_message(chat_id, "Магазин не найден или нет доступа.")
+        return None
+
+    shop_id = str(wb_user_cabinet.wb_cabinet.shop_id)
+    if wb_user_cabinet.wb_cabinet.active is True:
+        deactivated = await deactivate_cabinet_atomic_with_user_trackers(
+            shop_id,
+            notification_type=NotificationType.CABINET_DEACTIVATED.value,
+        )
+        if not deactivated:
+            await bot.send_message(chat_id, "Не удалось деактивировать магазин.")
+            return None
+    else:
+        activated = await activate_cabinet(shop_id)
+        if not activated:
+            await bot.send_message(chat_id, "Не удалось активировать магазин.")
+            return None
+
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return None
 

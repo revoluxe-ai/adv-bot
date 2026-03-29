@@ -20,6 +20,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeShopDefaultMaxCPM,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
+    ToggleCabinetActive,
 )
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
@@ -418,10 +419,13 @@ class ShopMenu(TextWithKeyboard):
             text += "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n"
 
         # Shop information
+        cabinet_active = self._wb_cabinet.active is True
+        cabinet_status_human = "Активен" if cabinet_active else "Не активен"
         text += (
             "\n===================================\n"
             f"🏬 <b>Магазин</b>: {self._wb_user_cabinet.name}\n"
             f"🆔 <b>Shop ID</b>: {self._wb_cabinet.shop_id}\n"
+            f"📶 <b>Статус магазина в боте</b>: {cabinet_status_human}\n"
         )
 
         text += """
@@ -449,6 +453,18 @@ class ShopMenu(TextWithKeyboard):
         button = InlineKeyboardButton(
             text="➕ Добавить токен/Обновить токены",
             callback_data=AddNewToken(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
+
+        if bool(wb_cabinet.active):
+            toggle_label = "Деактивировать магазин"
+        else:
+            toggle_label = "Активировать магазин"
+        button = InlineKeyboardButton(
+            text=toggle_label,
+            callback_data=ToggleCabinetActive(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )
