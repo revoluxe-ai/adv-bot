@@ -12,6 +12,10 @@ from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.modules.token_monitoring.models import NotificationType
+from app.modules.token_monitoring.services.cabinet_status_service import (
+    deactivate_cabinet_atomic_with_user_trackers,
+)
 from app.modules.shop_runner.modules.wb_api import WBApi
 
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
@@ -67,13 +71,10 @@ async def _run_shop_task(
     wb_manager_hub_factory.set_wb_manager_hub(shop_id)
 
     async def _deactivate_cabinet() -> None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id)
-            result = await session.execute(stmt)
-            wb_cabinet = result.scalar()
-            if wb_cabinet is not None:
-                wb_cabinet.active = False
-                await session.commit()
+        await deactivate_cabinet_atomic_with_user_trackers(
+            shop_id,
+            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+        )
 
     try:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
@@ -156,8 +157,8 @@ async def _update_tasks(
             if task.done():
                 if exc := task.exception():
                     logger.exception(
-                        f"Не обработанная ошибка выполнения задачи магазина: %s",
-                        exc
+                        "Не обработанная ошибка выполнения задачи магазина: %s",
+                        exc,
                     )
                     raise exc
                 del active_tasks[shop_id]
