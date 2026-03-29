@@ -17,6 +17,7 @@ from .base import Base
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_CAPTION_LEN = 1024
+_CAPTION_OVERFLOW_SUFFIX = "\n..."
 
 
 T = TypeVar("T", bound=Message)
@@ -219,8 +220,13 @@ class TextWithKeyboardAndImage(Base):
     ) -> tuple[str, str]:
         if len(caption) <= limit:
             return caption, ""
-        if limit <= 16:
+        suffix = _CAPTION_OVERFLOW_SUFFIX
+        suffix_len = len(suffix)
+        if limit <= suffix_len + 12:
             return caption[:limit], caption[limit:]
-        head = caption[: limit - 5] + "\n..."
-        tail = caption[limit - 5 :]
+        # One split index: tail must start exactly where the caption text in head ends,
+        # so len(caption[:split_at] + suffix) <= limit and no gap/overlap with tail.
+        split_at = limit - suffix_len
+        head = caption[:split_at] + suffix
+        tail = caption[split_at:]
         return head, tail
