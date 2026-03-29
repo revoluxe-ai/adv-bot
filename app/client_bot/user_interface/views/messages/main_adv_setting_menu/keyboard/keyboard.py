@@ -324,12 +324,21 @@ def get_adv_setting_keyboard(
 
 
     button = InlineKeyboardButton(
-        text="Шаблоны не релевантных фраз",
+        text="⛔ Шаблоны не релевантных фраз",
         callback_data=callbacks.AddBlackPhrasesTemplates(
             adv_setting_id=adv_setting.id
         ).pack(),
     )
     _ = builder.row(button)
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="✅ Шаблоны релевантных фраз",
+            callback_data=callbacks.AddRelevantPhraseTemplates(
+                adv_setting_id=adv_setting.id
+            ).pack(),
+        )
+    )
 
     _ = builder.row(
         InlineKeyboardButton(

@@ -26,7 +26,6 @@ from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
-from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from ..wb_update_state_manager import KeywordStatUpdateState
 from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
@@ -346,18 +345,14 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
         KeywordSetting(text=keyword, adv_setting_id=adv_setting.id)
         for keyword in new_keywords
     ]
-    relevant_phrase_manager = RelevantPhraseManager(adv_setting)
-    template_data = await relevant_phrase_manager.get_relevant_template_data()
-
-    not_rel_templator = NotRelevantTemplate(template_data)
-
     try:
         async with sm(read_only=False) as session:
-            # Обработка данных порциями
+            flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
             for keyword in keyword_settings:
                 text = keyword.text
-                if not not_rel_templator.is_relevant(text):
-                    keyword.hard_status = 0
+                hard_status, relevant = flags_for(text)
+                keyword.hard_status = hard_status
+                keyword.relevant = relevant
                 session.add(keyword)
             await session.commit()
     except Exception as exc:

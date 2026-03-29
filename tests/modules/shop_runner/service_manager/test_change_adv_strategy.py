@@ -122,6 +122,9 @@ def test_complex_adv_auto_update_strategy_defaults_to_true_when_field_missing() 
     adv_setting = SimpleNamespace(
         strategy=Strategy.MIN_CPO,
         auto_update_strategy=None,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
     )
     complex_adv = ComplexAdv(
         adv_setting=adv_setting,

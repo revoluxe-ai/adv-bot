@@ -83,6 +83,7 @@ async def test_black_phrases_start(
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases_test)
     assert callback.from_user
     prompt = (
+        "⛔ ЧЁРНЫЙ СПИСОК\n\n"
         "Отправьте список фраз для проверки — по одной строке. "
         "Бот отметит каждую как релевантную или нерелевантную (НРФ) "
         "по текущим сохранённым шаблонам черного списка."
@@ -138,7 +139,7 @@ async def waiting_for_black_phrases_test(
     if not lines_out:
         return None
 
-    header = "Результат по текущим шаблонам:\n"
+    header = "⛔ ЧЁРНЫЙ СПИСОК\n\nРезультат по текущим шаблонам:\n"
     body = "\n".join(lines_out)
     full = header + body
     assert message.from_user

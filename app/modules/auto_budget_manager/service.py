@@ -692,6 +692,25 @@ class AutoBudgetService:
                 reason="Common budget limit is not configured",
             )
         now_msk = self._now_msk()
+        period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
+        last_auto = await self._get_last_full_stat_update(adv_id_auto)
+        last_search = await self._get_last_full_stat_update(adv_id_search)
+        if last_auto is None or last_search is None:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=0.0,
+                reason="Missing full adv stats for one or both campaigns",
+            )
+        if now_msk > last_auto + period or now_msk > last_search + period:
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=0.0,
+                reason="Last full adv stats too old",
+            )
         date_msk = now_msk.date()
         spend_auto = await self._calculate_spend_today(adv_id_auto, now_msk)
 

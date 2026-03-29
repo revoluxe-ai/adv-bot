@@ -579,6 +579,26 @@ async def reset_black_phrases(adv_setting_id: int) -> None:
     await manager.update_black_phrases([])
 
 
+async def update_relevant_phrases_templates(
+    adv_setting_id: int, keywords: list[str]
+) -> None:
+    async with _sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
+    manager = RelevantPhraseManager(adv)
+    await manager.update_relevant_phrases_templates(keywords)
+
+
+async def reset_relevant_phrases_templates(adv_setting_id: int) -> None:
+    async with _sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
+    manager = RelevantPhraseManager(adv)
+    await manager.update_relevant_phrases_templates([])
+
+
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
         for text in keywords:
