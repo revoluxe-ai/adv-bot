@@ -1,17 +1,7 @@
-import logging
-from typing import Any
-
-import re2
-
-logger = logging.getLogger(__name__)
-
-_RE2_OPTS = re2.Options()
-_RE2_OPTS.case_sensitive = False
-
-_MAX_PATTERN_LEN = 512
+from ._compiled_phrase_template import CompiledPhraseTemplate
 
 
-class RelevantPhraseTemplate:
+class RelevantPhraseTemplate(CompiledPhraseTemplate):
     """Шаблоны релевантных фраз: те же правила, что у NotRelevantTemplate (quoted + RE2).
 
     Фраза «подходит» под шаблон, если совпадает с точной строкой в кавычках
@@ -19,50 +9,7 @@ class RelevantPhraseTemplate:
     """
 
     def __init__(self, row_template: list[str]):
-        self._row_template = row_template
-        self._exact: list[str] = []
-        self._patterns: list[Any] = []
-        self._parse_rows()
-
-    def _parse_rows(self) -> None:
-        for raw in self._row_template:
-            row = raw.strip()
-            if not row:
-                continue
-            if self._is_quoted(row):
-                inner = row.strip("\"'")
-                if inner:
-                    self._exact.append(inner)
-                continue
-            if len(row) > _MAX_PATTERN_LEN:
-                logger.warning(
-                    "Пропуск слишком длинного шаблона релевантных фраз (%s симв.): %r…",
-                    len(row),
-                    row[:80],
-                )
-                continue
-            try:
-                self._patterns.append(
-                    re2.compile(row, _RE2_OPTS)  # pyright: ignore[reportUnknownMemberType]
-                )
-            except re2.error:  # pyright: ignore[reportUnknownMemberType]
-                logger.warning(
-                    "Пропуск невалидного или неподдерживаемого regex в шаблоне релевантных фраз: %r",
-                    row,
-                )
-
-    @staticmethod
-    def _is_quoted(text: str) -> bool:
-        return (text.startswith('"') or text.endswith('"')) or (
-            text.startswith("'") or text.endswith("'")
-        )
+        super().__init__(row_template=row_template, log_context="релевантных фраз")
 
     def matches(self, phrase: str) -> bool:
-        phrase_cf = phrase.casefold()
-        for exact in self._exact:
-            if phrase_cf == exact.casefold():
-                return True
-        for pattern in self._patterns:
-            if pattern.search(phrase):
-                return True
-        return False
+        return self._matches_any(phrase)
