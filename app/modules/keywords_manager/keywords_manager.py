@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
@@ -77,16 +76,17 @@ class KeywordsManager:
             session, original_adv_id, texts
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
-        relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
-        template_data = await relevant_phrase_manager.get_relevant_template_data()
-        not_rel_templator = NotRelevantTemplate(template_data)
+        adv_setting = complex_adv.adv_setting
         for text in new_texts:
-            hard_status = 0 if not not_rel_templator.is_relevant(text) else 1
+            hard_status, relevant = RelevantPhraseManager.initial_flags_for_new_keyword(
+                text, adv_setting
+            )
             session.add(
                 KeywordSetting(
                     text=text,
                     hard_status=hard_status,
                     adv_setting_id=original_adv_id,
+                    relevant=relevant,
                 )
             )
 

@@ -74,6 +74,11 @@ class AddBlackPhrasesTemplates(StatesGroup):
     waiting_for_black_phrases_test = State()
 
 
+class AddRelevantPhraseTemplatesGroup(StatesGroup):
+    waiting_for_relevant_phrase_templates = State()
+    waiting_for_relevant_phrase_templates_test = State()
+
+
 class AddRelevantPhrases(StatesGroup):
     waiting_for_relevant_phrases = State()
 
