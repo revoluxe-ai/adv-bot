@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
+from app.client_bot.telegram_message_split import split_telegram_plain_text
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -144,18 +145,14 @@ async def waiting_for_black_phrases_test(
     assert message.from_user
     chat_id = message.from_user.id
     markup = _exit_test_keyboard(adv_setting_id).as_markup()
-    limit = const.MAX_MESSAGE_LENGTH
-    if len(full) <= limit:
-        await bot.send_message(chat_id=chat_id, text=full, reply_markup=markup)
-    else:
-        for i in range(0, len(full), limit):
-            chunk = full[i : i + limit]
-            is_last = i + limit >= len(full)
-            await bot.send_message(
-                chat_id=chat_id,
-                text=chunk,
-                reply_markup=markup if is_last else None,
-            )
+    chunks = split_telegram_plain_text(full, const.MAX_MESSAGE_LENGTH)
+    for idx, chunk in enumerate(chunks):
+        is_last = idx == len(chunks) - 1
+        await bot.send_message(
+            chat_id=chat_id,
+            text=chunk,
+            reply_markup=markup if is_last else None,
+        )
     return None
 
 
