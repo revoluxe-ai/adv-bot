@@ -78,6 +78,11 @@ class AddRelevantPhrases(StatesGroup):
     waiting_for_relevant_phrases = State()
 
 
+class AddRelevantPhraseTemplatesGroup(StatesGroup):
+    waiting_for_relevant_phrase_templates = State()
+    waiting_for_relevant_phrase_templates_test = State()
+
+
 class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
 

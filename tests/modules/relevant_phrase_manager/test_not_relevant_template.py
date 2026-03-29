@@ -6,6 +6,9 @@ import time
 import pytest
 
 from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
+from app.modules.relevant_phrase_manager.relevant_phrase_template import (
+    RelevantPhraseTemplate,
+)
 
 
 def test_empty_template_all_relevant() -> None:
@@ -98,3 +101,52 @@ def test_oversized_pattern_skipped(caplog: pytest.LogCaptureFixture) -> None:
     assert t.is_relevant("x" * 600) is True
     assert t.is_relevant("az") is False
     assert any("слишком длинного" in r.message for r in caplog.records)
+
+
+def test_legacy_any_prefix_requires_token_per_group() -> None:
+    """any:a,b — фраза нерелевантна, если ни один токен группы не входит как подстрока."""
+    t = NotRelevantTemplate(["any:word1,word2"])
+    assert t.is_relevant("слово word1 здесь") is True
+    assert t.is_relevant("другое") is False
+    assert t.is_relevant("WORD2") is True
+
+
+def test_legacy_any_multiple_groups_and() -> None:
+    t = NotRelevantTemplate(["any:aa", "any:bb"])
+    assert t.is_relevant("aa x") is False
+    assert t.is_relevant("bb x") is False
+    assert t.is_relevant("aa bb") is True
+
+
+def test_legacy_not_prefix_substring_not_regex() -> None:
+    """not:cheap — литеральное вхождение, не regex (точка не «любой символ»)."""
+    t = NotRelevantTemplate(["not:cheap"])
+    assert t.is_relevant("buy cheap") is False
+    assert t.is_relevant("buy cheapy") is False
+    assert t.is_relevant("buy che p") is True
+
+
+def test_legacy_not_prefix_quoted_exact() -> None:
+    t = NotRelevantTemplate(['not:"foo bar"'])
+    assert t.is_relevant("foo bar") is False
+    assert t.is_relevant("foo bar x") is True
+
+
+def test_legacy_any_line_not_compiled_as_regex() -> None:
+    """Раньше any:… попадал в regex и не работал как задумано."""
+    t = NotRelevantTemplate(["any:x"])
+    assert t.is_relevant("prefix xsuffix") is True
+    assert t.is_relevant("no match") is False
+
+
+def test_relevant_template_legacy_not_substring_matches() -> None:
+    t = RelevantPhraseTemplate(["not:deal"])
+    assert t.matches("great deal") is True
+    assert t.matches("other") is False
+
+
+def test_relevant_template_legacy_any_or_within_row() -> None:
+    t = RelevantPhraseTemplate(["any:one,two"])
+    assert t.matches("the one") is True
+    assert t.matches("two") is True
+    assert t.matches("three") is False

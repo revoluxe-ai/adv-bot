@@ -419,6 +419,13 @@ class AdvSetting(BaseTable):
     black_phrases: Mapped[list[str]] = mapped_column(
         JSONB, default=list, nullable=False, server_default=text("'[]'")
     )
+    relevant_phrases: Mapped[list[str]] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+        server_default=text("'[]'"),
+        comment="Шаблоны релевантных фраз (quoted + RE2), как black_phrases",
+    )
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",

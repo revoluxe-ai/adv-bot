@@ -1,5 +1,6 @@
 """Интеграционные тесты для полного цикла план-факта"""
 
+from contextlib import ExitStack
 from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,6 +22,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
+    PreComplexAdv,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
@@ -69,6 +73,69 @@ def _create_manager(wb_api, redis_client_wrapper):
     )
 
 
+def _pre_adv_from_complex(complex_adv: ComplexAdv, plan_data: PlanData) -> PreComplexAdv:
+    """PreComplexAdv для update_plan_fact_stats (путь process_pre_adv)."""
+    return PreComplexAdv(
+        auto_adv=complex_adv.adv_setting,
+        plan_data=plan_data,
+        plan_fact_summary=None,
+        search_adv=complex_adv.search_adv,
+    )
+
+
+def _mock_pre_adv(adv_id: int, shop_id: str, plan: PlanData) -> PreComplexAdv:
+    auto = MagicMock()
+    auto.adv_id = adv_id
+    cab = MagicMock()
+    cab.shop_id = shop_id
+    auto.wb_cabinet = cab
+    return PreComplexAdv(
+        auto_adv=auto,
+        plan_data=plan,
+        plan_fact_summary=None,
+        search_adv=None,
+    )
+
+
+def _enter_pre_adv_mocks(
+    stack: ExitStack, manager: CoroutinesManager, pre_advs: list[PreComplexAdv]
+) -> None:
+    stack.enter_context(
+        patch.object(
+            manager._wb_shop_data_manager,
+            "get_pre_complex_advs",
+            new=AsyncMock(return_value=pre_advs),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "app.modules.wb_adv_updater.phrases_processor.get_good_bad_phrases",
+            new=AsyncMock(return_value=[]),
+        )
+    )
+
+
+async def _run_tasks_sequentially(
+    handlers,
+    *,
+    max_workers: int,
+    return_exceptions: bool = True,
+    tasks_manager=None,
+):
+    """Как run_tasks, но без пула — стабильный порядок вызовов моков get_fact_data."""
+    del max_workers, tasks_manager
+    results: list[object] = []
+    for h in handlers:
+        try:
+            results.append(await h())
+        except Exception as exc:
+            if return_exceptions:
+                results.append(exc)
+            else:
+                raise
+    return results
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_full_cycle_plan_fact_stats(
@@ -90,21 +157,16 @@ async def test_full_cycle_plan_fact_stats(
         fact_method=FactMethods.DIRECT_SALES,
     )
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[complex_adv]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-            return_value=plan,
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_fact_data",
-            return_value=fact,
-        ),
-    ):
+    pre_advs = [_pre_adv_from_complex(complex_adv, plan)]
+    with ExitStack() as stack:
+        _enter_pre_adv_mocks(stack, manager, pre_advs)
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_fact_data",
+                return_value=fact,
+            )
+        )
         # Используем __wrapped__ для обхода декоратора
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
     async with anti_ch_crash_semaphore:
@@ -128,7 +190,7 @@ async def test_full_cycle_plan_fact_stats(
 
     row = result.result_rows[0]
     assert row[0] == complex_adv.adv_id  # adv_id
-    assert row[1] == complex_adv.shop_id  # shop_id (используется shop_id из ComplexAdv, а не из manager)
+    assert row[1] == complex_adv.shop_id  # shop_id из wb_cabinet / ComplexAdv
     assert isinstance(row[2], date)  # date
     assert isinstance(row[3], datetime)  # timestamp
     assert row[4] == 100  # plan_orders
@@ -162,21 +224,16 @@ async def test_full_cycle_with_real_complex_adv(
         fact_method=FactMethods.BY_CARTS,
     )
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[complex_adv]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-            return_value=plan,
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_fact_data",
-            return_value=fact,
-        ),
-    ):
+    pre_advs = [_pre_adv_from_complex(complex_adv, plan)]
+    with ExitStack() as stack:
+        _enter_pre_adv_mocks(stack, manager, pre_advs)
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_fact_data",
+                return_value=fact,
+            )
+        )
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем, что данные записались с правильным adv_id из complex_adv
@@ -210,13 +267,6 @@ async def test_full_cycle_error_handling_for_some_advs(
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
 
-    # Создаем второй ComplexAdv
-    adv2 = MagicMock()
-    adv2.adv_id = 99999
-    adv2.shop_id = "test_shop_2"
-    adv2.adv_setting = MagicMock()
-    adv2.get_keywords = AsyncMock(return_value=[])
-
     plan1 = PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000)
     plan2 = PlanData(orders=50, target_pay_for_order=300, max_pay_for_order=800)
 
@@ -227,24 +277,37 @@ async def test_full_cycle_error_handling_for_some_advs(
         fact_method=FactMethods.DIRECT_SALES,
     )
 
-    with patch(
-        "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-        new=AsyncMock(return_value=[complex_adv, adv2]),
-    ), patch(
-        "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-        side_effect=[plan1, plan2],
-    ), patch.object(
-        PlanFactProvider,
-        "get_stat_data",
-        new=AsyncMock(
-            return_value=_make_minimal_common_advs_stat_data(MagicMock()),
-        ),
-    ), patch.object(
-        PlanFactProvider,
-        "get_fact_data",
-        new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
-    ), pytest.raises(Exception, match="Fact data error"):
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+    pre_advs = [
+        _pre_adv_from_complex(complex_adv, plan1),
+        _mock_pre_adv(99999, "test_shop_2", plan2),
+    ]
+
+    with ExitStack() as stack:
+        _enter_pre_adv_mocks(stack, manager, pre_advs)
+        stack.enter_context(
+            patch(
+                "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.run_tasks",
+                new=_run_tasks_sequentially,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_stat_data",
+                new=AsyncMock(
+                    return_value=_make_minimal_common_advs_stat_data(MagicMock()),
+                ),
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_fact_data",
+                new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
+            )
+        )
+        with pytest.raises(Exception, match="Fact data error"):
+            await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
 
 @pytest.mark.integration
@@ -258,19 +321,6 @@ async def test_full_cycle_multiple_advs_simultaneously(
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
-
-    # Создаем дополнительные кампании
-    adv2 = MagicMock()
-    adv2.adv_id = 11111
-    adv2.shop_id = "test_shop_2"
-    adv2.adv_setting = MagicMock()
-    adv2.get_keywords = AsyncMock(return_value=[])
-
-    adv3 = MagicMock()
-    adv3.adv_id = 22222
-    adv3.shop_id = "test_shop_3"
-    adv3.adv_setting = MagicMock()
-    adv3.get_keywords = AsyncMock(return_value=[])
 
     plans = [
         PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=1000),
@@ -299,28 +349,36 @@ async def test_full_cycle_multiple_advs_simultaneously(
         ),
     ]
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[complex_adv, adv2, adv3]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-            side_effect=plans,
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_stat_data",
-            new=AsyncMock(
-                return_value=_make_minimal_common_advs_stat_data(MagicMock()),
-            ),
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_fact_data",
-            new=AsyncMock(side_effect=facts),
-        ),
-    ):
+    pre_advs = [
+        _pre_adv_from_complex(complex_adv, plans[0]),
+        _mock_pre_adv(11111, "test_shop_2", plans[1]),
+        _mock_pre_adv(22222, "test_shop_3", plans[2]),
+    ]
+
+    with ExitStack() as stack:
+        _enter_pre_adv_mocks(stack, manager, pre_advs)
+        stack.enter_context(
+            patch(
+                "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.run_tasks",
+                new=_run_tasks_sequentially,
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_stat_data",
+                new=AsyncMock(
+                    return_value=_make_minimal_common_advs_stat_data(MagicMock()),
+                ),
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_fact_data",
+                new=AsyncMock(side_effect=facts),
+            )
+        )
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем, что все три кампании записались
@@ -372,21 +430,16 @@ async def test_full_cycle_data_correctness_in_clickhouse(
         fact_method=FactMethods.DIRECT_SALES,
     )
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[complex_adv]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_controller.PlanFactProvider.get_plan_data",
-            return_value=plan,
-        ),
-        patch.object(
-            PlanFactProvider,
-            "get_fact_data",
-            return_value=fact,
-        ),
-    ):
+    pre_advs = [_pre_adv_from_complex(complex_adv, plan)]
+    with ExitStack() as stack:
+        _enter_pre_adv_mocks(stack, manager, pre_advs)
+        stack.enter_context(
+            patch.object(
+                PlanFactProvider,
+                "get_fact_data",
+                return_value=fact,
+            )
+        )
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем все поля на корректность

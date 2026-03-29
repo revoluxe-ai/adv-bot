@@ -279,6 +279,22 @@ class ExitBlackPhrasesTest(CallbackData, prefix="exit_black_phrases_test"):
     adv_setting_id: int
 
 
+class AddRelevantPhraseTemplates(CallbackData, prefix="add_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class ResetRelevantPhraseTemplates(CallbackData, prefix="reset_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class TestRelevantPhraseTemplates(CallbackData, prefix="test_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class ExitRelevantPhraseTemplatesTest(CallbackData, prefix="exit_rel_phrase_test"):
+    adv_setting_id: int
+
+
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
 

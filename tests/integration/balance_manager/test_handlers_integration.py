@@ -75,6 +75,7 @@ async def test_successful_payment_handler_integration_bonus_before_2026(
 
         with patch("app.modules.balance_manager.handlers.settings") as mock_settings:
             mock_settings.BALANCE_TOPUP_BONUS_PERCENT = 200.0
+            mock_settings.presentation_only = False
 
             mock_message = MagicMock()
             mock_message.chat.id = user.user_telegram_id

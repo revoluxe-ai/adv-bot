@@ -89,7 +89,6 @@ class WhiteListAddExecutor(BaseExecutor):
             .values({"hard_status": 2})
         )
         await ctx.session.execute(stmt)
-        await ctx.session.commit()
         await redis_cache.set()
 
         logger.info(

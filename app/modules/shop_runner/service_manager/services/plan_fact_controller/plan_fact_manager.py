@@ -1,4 +1,3 @@
-import logging
 import time
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -18,8 +17,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_comple
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
 
-logger = logging.getLogger(__name__)
-
 TItem = TypeVar("TItem")
 
 class PlanFactManager:
@@ -34,7 +31,6 @@ class PlanFactManager:
         items: list[TItem],
         *,
         processor: Callable[[TItem, float], Awaitable[PlanFactStatDTO | None]],
-        get_adv_id: Callable[[TItem], int],
     ) -> None:
         if not items:
             return None
@@ -45,22 +41,15 @@ class PlanFactManager:
             lambda item_=item: processor(item_, version) for item in items
         ]
 
-        results: list[PlanFactStatDTO | None | BaseException] = await run_tasks(
+        results: list[PlanFactStatDTO | None] = await run_tasks(
             handlers,
             max_workers=max(1, min(len(handlers), 16)),
-            return_exceptions=True,
+            return_exceptions=False,
         )
 
-        plan_fact_stats: list[PlanFactStatDTO] = []
-        for i, result in enumerate(results):
-            if isinstance(result, BaseException):
-                logger.error(
-                    "Ошибка обработки план-факта для adv_id=%s: %s",
-                    get_adv_id(items[i]),
-                    result,
-                )
-            elif result is not None:
-                plan_fact_stats.append(result)
+        plan_fact_stats: list[PlanFactStatDTO] = [
+            r for r in results if r is not None
+        ]
 
         if plan_fact_stats:
             await self._clickhouse_manager.insert_plan_fact_stats(plan_fact_stats)
@@ -76,7 +65,6 @@ class PlanFactManager:
         return await self._process_and_save_items(
             advs,
             processor=self._controller.process_adv,
-            get_adv_id=lambda adv: adv.adv_id,
         )
 
     async def process_and_save_pre_complex_advs(
@@ -86,6 +74,5 @@ class PlanFactManager:
         return await self._process_and_save_items(
             pre_advs,
             processor=self._controller.process_pre_adv,
-            get_adv_id=lambda pre_adv: pre_adv.adv_id,
         )
 

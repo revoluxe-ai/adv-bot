@@ -1,7 +1,7 @@
 """Integration tests for entry points: gate, start_registration, shop_settings call MainMenu/ShopsListPage."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from aiogram.types import CallbackQuery, Chat, Message, User as TelegramUser
@@ -17,6 +17,7 @@ from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.gate import get_gate_message_text
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.settings.settings_master import Settings
 from app.utils.db.models import Invite, InviteStatus, User
 
 
@@ -118,7 +119,7 @@ async def test_gate_invite_success_calls_main_menu(
 
         await gate_invite_process_code(message, bot, state)
 
-        mock_main_menu.assert_called_once_with(bot, 88882)
+        mock_main_menu.assert_called_once_with(bot, 88882, full_client_ui=True)
         mock_main_menu.return_value.assert_awaited_once()
 
 
@@ -149,10 +150,11 @@ async def test_start_registration_new_user_creates_user_and_shows_gate(
         "app.client_bot.user_interface.handlers.start_registration_func.sm"
     ) as mock_sm, patch(
         "app.client_bot.user_interface.handlers.start_registration_func.MainMenu"
-    ) as mock_main_menu, patch(
-        "app.client_bot.user_interface.handlers.start_registration_func.settings"
-    ) as mock_settings:
-        mock_settings.invite_gate = True
+    ) as mock_main_menu, patch.object(
+        Settings, "invite_gate", PropertyMock(return_value=True)
+    ), patch.object(
+        Settings, "presentation_only", PropertyMock(return_value=False)
+    ):
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=async_session)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
@@ -216,7 +218,7 @@ async def test_start_registration_passed_gate_calls_main_menu(
 
             await start_registration(message, bot, state)
 
-            mock_main_menu.assert_called_once_with(bot, 88883)
+            mock_main_menu.assert_called_once_with(bot, 88883, full_client_ui=True)
             mock_main_menu.return_value.assert_awaited_once()
 
 

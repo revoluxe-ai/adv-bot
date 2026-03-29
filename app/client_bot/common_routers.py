@@ -44,6 +44,7 @@ from .user_interface.handlers.raise_card_analyze import (
 from .user_interface.handlers import (
     admin_panel,
     add_black_phrases,
+    add_relevant_phrase_templates,
     invite_show,
     add_white_phrases,
     adv_setting,
@@ -146,6 +147,7 @@ common_router.include_routers(campaign_activity.router)
 common_router.include_routers(time_settings.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
+common_router.include_routers(add_relevant_phrase_templates.router)
 common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defined]

@@ -631,12 +631,16 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
 
     await postgres_session.begin()
     seed = await create_complex_adv_seed(postgres_session)
+    await postgres_session.refresh(
+        seed.adv_setting, attribute_names=["wb_cabinet"]
+    )
+    cabinet_shop_id = seed.adv_setting.wb_cabinet.shop_id
 
     async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
         return seed.calculated_keywords
 
     complex_adv = ComplexAdv(
-        shop_id="559785095jljiuilhkh",
+        shop_id=cabinet_shop_id,
         get_keywords_func=get_keywords_func,
         adv_setting=seed.adv_setting,
         search_adv=seed.search_adv,

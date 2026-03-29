@@ -1,6 +1,6 @@
 """Integration tests for onboarding handlers: callback_start_registration, show_shops_list, shops_list_paginator."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from aiogram.types import CallbackQuery, Chat, Message, User as TelegramUser
@@ -22,6 +22,7 @@ from app.client_bot.user_interface.handlers.shop_choice_message import (
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.settings.settings_master import Settings
 from app.utils.db.models import User
 
 
@@ -117,8 +118,11 @@ async def test_callback_start_registration_not_passed_gate_shows_gate(
 
     callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 99993)
 
-    with patch("app.client_bot.user_interface.handlers.start.start.settings") as mock_settings:
-        mock_settings.invite_gate = True
+    with patch.object(
+        Settings, "invite_gate", PropertyMock(return_value=True)
+    ), patch.object(
+        Settings, "presentation_only", PropertyMock(return_value=False)
+    ):
         await callback_start_registration(callback, bot, state)
 
     bot.send_message.assert_awaited_once()

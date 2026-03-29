@@ -333,6 +333,15 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
+            text="Шаблоны релевантных фраз",
+            callback_data=callbacks.AddRelevantPhraseTemplates(
+                adv_setting_id=adv_setting.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
             text="Добавить фразы в продвижение (Белый список)",
             callback_data=callbacks.AddWhitePhrases(
                 adv_setting_id=adv_setting.id

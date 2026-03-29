@@ -1169,6 +1169,79 @@ class WaitingForBlackPhrases(TextWithKeyboard):
         return builder.as_markup()
 
 
+class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
+    """Экран редактирования шаблонов релевантных фраз (зеркало WaitingForBlackPhrases)."""
+
+    async def __call__(self, adv_setting_id: int) -> None:
+        self.adv_setting_id: int = adv_setting_id
+        async with sm() as session:
+            adv: AdvSetting | None = await session.get(
+                AdvSetting, self.adv_setting_id
+            )
+        if adv is None:
+            raise ValueError(
+                f"AdvSetting с id {self.adv_setting_id} не найден."
+            )
+        rel_manager = RelevantPhraseManager(adv)
+        self.relevant_phrases: list[str] | None = (
+            await rel_manager.get_relevant_phrases_template_data()
+        )
+        return await super().__call__()
+
+    @property
+    def text(self) -> str:
+        if self.relevant_phrases:
+            lines = "\n".join(self.relevant_phrases)
+            return (
+                f"Текущие шаблоны релевантных фраз:\n{lines}\n\n"
+                "Чтобы обновить, отправьте список ещё раз — он будет заменён."
+            )
+        return (
+            "Укажите через перенос строки шаблоны для автоматической пометки "
+            "фраз как релевантных.\n\n"
+            "Строка без кавычек — regex в синтаксисе RE2 (подмножество Python: "
+            "без обратных ссылок и lookaround; поиск без учета регистра). "
+            "Строка в кавычках \"...\" или '...' — точное совпадение фразы "
+            "без учета регистра.\n\n"
+            "Пример:\n"
+            "платье.*женск\n"
+            "летн|вечерн\n"
+            '"сарафан летний"\n\n'
+            "Кнопка «Протестировать» — проверить фразы по уже сохранённым правилам.\n\n"
+            "При включённом режиме «только релевантные фразы» эти шаблоны задают "
+            "релевантность новых ключей; шаблоны чёрного списка в этом режиме не "
+            "применяются."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(
+                text="Протестировать",
+                callback_data=callbacks.TestRelevantPhraseTemplates(
+                    adv_setting_id=self.adv_setting_id
+                ).pack(),
+            )
+        )
+        if self.relevant_phrases:
+            builder.row(
+                InlineKeyboardButton(
+                    text="Сбросить шаблоны релевантных фраз",
+                    callback_data=callbacks.ResetRelevantPhraseTemplates(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
+        builder.row(
+            InlineKeyboardButton(
+                text="Вернуться в настройки РК",
+                callback_data=callbacks.Adv(adv_original_id=self.adv_setting_id).pack(),
+            )
+        )
+        return builder.as_markup()
+
+
 class FilterByQuery(Text):
 
     @property

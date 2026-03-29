@@ -17,6 +17,8 @@ class NotRelevantTemplate:
     def __init__(self, row_template: list[str]):
         self._row_template = row_template
         self._exact: list[str] = []
+        self._substring_excludes: list[str] = []
+        self._any_groups: list[list[str]] = []
         self._patterns: list[Any] = []
         self._parse_rows()
 
@@ -24,6 +26,38 @@ class NotRelevantTemplate:
         for raw in self._row_template:
             row = raw.strip()
             if not row:
+                continue
+            row_cf = row.casefold()
+            if row_cf.startswith("any:"):
+                if len(row) > _MAX_PATTERN_LEN:
+                    logger.warning(
+                        "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
+                        len(row),
+                        row[:80],
+                    )
+                    continue
+                content = row.split(":", 1)[1].strip()
+                group = [item.strip() for item in content.split(",") if item.strip()]
+                if group:
+                    self._any_groups.append(group)
+                continue
+            if row_cf.startswith("not:"):
+                rest = row.split(":", 1)[1].strip()
+                if not rest:
+                    continue
+                if self._is_quoted(rest):
+                    inner = rest.strip("\"'")
+                    if inner:
+                        self._exact.append(inner)
+                    continue
+                if len(rest) > _MAX_PATTERN_LEN:
+                    logger.warning(
+                        "Пропуск слишком длинного шаблона НРФ (%s симв.): %r…",
+                        len(rest),
+                        rest[:80],
+                    )
+                    continue
+                self._substring_excludes.append(rest)
                 continue
             if self._is_quoted(row):
                 inner = row.strip("\"'")
@@ -58,7 +92,13 @@ class NotRelevantTemplate:
         for exact in self._exact:
             if phrase_cf == exact.casefold():
                 return False
+        for sub in self._substring_excludes:
+            if sub.casefold() in phrase_cf:
+                return False
         for pattern in self._patterns:
             if pattern.search(phrase):
+                return False
+        for group in self._any_groups:
+            if not any(token.casefold() in phrase_cf for token in group):
                 return False
         return True
