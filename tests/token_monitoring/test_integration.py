@@ -101,18 +101,19 @@ class TestTokenMonitoringIntegration:
         user_cabinet.name = "Test Shop"
         user_cabinet.user = user
 
-        # Mock _get_shop_users to return our test user
-        notification_manager._get_shop_users = AsyncMock(return_value=[user_cabinet])
-
         # Simulate token deactivation event
         shop_id = "test_shop_123"
 
-        # This would normally be triggered by the HTTP decorator
-        await notification_manager.notify_token_issue(
-            shop_id=shop_id,
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-            context={"method_name": "get_advs", "error": "All tokens failed"},
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[user_cabinet]),
+        ):
+            # This would normally be triggered by the HTTP decorator
+            await notification_manager.notify_token_issue(
+                shop_id=shop_id,
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+                context={"method_name": "get_advs", "error": "All tokens failed"},
+            )
 
         # Verify notification was sent
         mock_notification_sender.send_message.assert_awaited_once()
@@ -165,13 +166,16 @@ class TestTokenMonitoringIntegration:
             return_value=[expiring_token]
         )
         expiration_service._notification_already_sent = AsyncMock(return_value=False)
-        notification_manager._get_shop_users = AsyncMock(return_value=[user_cabinet])
 
         with patch(
-            "datetime.datetime", MagicMock(now=MagicMock(return_value=fixed_now))
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[user_cabinet]),
         ):
-            # Run expiration check
-            stats = await expiration_service.check_token_expiration()
+            with patch(
+                "datetime.datetime", MagicMock(now=MagicMock(return_value=fixed_now))
+            ):
+                # Run expiration check
+                stats = await expiration_service.check_token_expiration()
 
             # Verify results
             assert stats["total_tokens_checked"] == 1
@@ -405,13 +409,15 @@ class TestTokenMonitoringIntegration:
         user_cabinet.name = "Test Shop"
         user_cabinet.user = user
 
-        notification_manager._get_shop_users = AsyncMock(return_value=[user_cabinet])
-
-        # Should not raise exception despite bot error
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[user_cabinet]),
+        ):
+            # Should not raise exception despite bot error
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Bot was called but notification was not recorded due to error
         mock_notification_sender.send_message.assert_called_once()
@@ -440,16 +446,18 @@ class TestTokenMonitoringIntegration:
         user_cabinet.name = "Test Shop"
         user_cabinet.user = user
 
-        notification_manager._get_shop_users = AsyncMock(return_value=[user_cabinet])
-
         # Mock database constraint violation
         session.flush.side_effect = IntegrityError("duplicate key", "orig", "params")
 
-        # Should handle duplicate gracefully
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[user_cabinet]),
+        ):
+            # Should handle duplicate gracefully
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Message was sent but database rolled back
         mock_notification_sender.send_message.assert_called_once()
@@ -503,13 +511,16 @@ class TestTokenMonitoringIntegration:
             return_value=tokens
         )
         expiration_service._notification_already_sent = AsyncMock(return_value=False)
-        notification_manager._get_shop_users = AsyncMock(side_effect=user_cabinets)
 
         with patch(
-            "datetime.datetime", MagicMock(now=MagicMock(return_value=fixed_now))
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(side_effect=user_cabinets),
         ):
-            # Run expiration check
-            stats = await expiration_service.check_token_expiration()
+            with patch(
+                "datetime.datetime", MagicMock(now=MagicMock(return_value=fixed_now))
+            ):
+                # Run expiration check
+                stats = await expiration_service.check_token_expiration()
 
             # Verify all warning stages were processed
             assert stats["total_tokens_checked"] == 3
