@@ -55,11 +55,16 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     is_auto_campaign_active,
 )
+from app.shared.domains.wb.utils.balance_source import (
+    balance_snapshot_from_response,
+    cashback_summary_from_response,
+)
 from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+
 _time_settings_repo = TimeSettingsRepository()
 
 
@@ -113,16 +118,25 @@ class AutoAdvActiveControlService:
                 session, unique_adv_ids
             )
 
+        wb_wallet_ok_by_cabinet: dict[int, bool] = {}
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
-                lambda complex_adv=adv, ds=db_state: self._auto_campaign_handler(
-                    complex_adv, start_of_day, end_of_day, db_state=ds
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_ok_by_cabinet: self._auto_campaign_handler(
+                    complex_adv,
+                    start_of_day,
+                    end_of_day,
+                    db_state=ds,
+                    wb_wallet_ok_by_cabinet=cache,
                 )
             )
             handlers.append(
-                lambda complex_adv=adv, ds=db_state: self._search_campaign_handler(
-                    complex_adv, start_of_day, end_of_day, db_state=ds
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_ok_by_cabinet: self._search_campaign_handler(
+                    complex_adv,
+                    start_of_day,
+                    end_of_day,
+                    db_state=ds,
+                    wb_wallet_ok_by_cabinet=cache,
                 )
             )
 
@@ -187,13 +201,40 @@ class AutoAdvActiveControlService:
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
 
-    @staticmethod
-    async def _cabinet_has_positive_balance(adv: ComplexAdv) -> bool:
+    async def _cabinet_has_positive_balance(
+        self,
+        adv: ComplexAdv,
+        wb_wallet_ok_by_cabinet: dict[int, bool],
+    ) -> bool:
         wb_cabinet_id = adv.adv_setting.wb_cabinet_id
         balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
             wb_cabinet_id
         )
-        return (balance + bonus) > 0
+        total = float(balance) + float(bonus)
+        if total > 0:
+            return True
+
+        if wb_cabinet_id in wb_wallet_ok_by_cabinet:
+            return wb_wallet_ok_by_cabinet[wb_cabinet_id]
+
+        ok_wb = False
+        wb_wallet_sum = 0
+        wb_cashbacks_total = 0
+        try:
+            wb_resp = await self._wb_modifier.get_campaign_balance()
+            if wb_resp:
+                snap = balance_snapshot_from_response(wb_resp)
+                cashback = cashback_summary_from_response(wb_resp)
+                wb_cashbacks_total = cashback.total
+                wb_wallet_sum = (
+                    snap.balance + snap.net + snap.bonus + wb_cashbacks_total
+                )
+                ok_wb = wb_wallet_sum > 0
+        except Exception:
+            ok_wb = False
+
+        wb_wallet_ok_by_cabinet[wb_cabinet_id] = ok_wb
+        return ok_wb
 
     async def _auto_campaign_handler(
         self,
@@ -202,6 +243,7 @@ class AutoAdvActiveControlService:
         end_of_day: datetime,
         *,
         db_state: TimeSettingsDbState | None,
+        wb_wallet_ok_by_cabinet: dict[int, bool],
     ) -> None:
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
@@ -226,7 +268,7 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        if not await self._cabinet_has_positive_balance(adv):
+        if not await self._cabinet_has_positive_balance(adv, wb_wallet_ok_by_cabinet):
             if auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auto campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",
@@ -428,6 +470,7 @@ class AutoAdvActiveControlService:
         end_of_day: datetime,
         *,
         db_state: TimeSettingsDbState | None,
+        wb_wallet_ok_by_cabinet: dict[int, bool],
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
@@ -454,7 +497,7 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        if not await self._cabinet_has_positive_balance(adv):
+        if not await self._cabinet_has_positive_balance(adv, wb_wallet_ok_by_cabinet):
             if search_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auction campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",

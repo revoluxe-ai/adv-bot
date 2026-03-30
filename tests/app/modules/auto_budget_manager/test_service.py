@@ -554,7 +554,10 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_common_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -587,10 +590,16 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
         AsyncMock(return_value=(0.0, 0.0)),
     )
 
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=600, raw={}),
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
     result = await service._ensure_common_budget_locked(
         adv_setting_id=adv_setting.id,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
@@ -605,7 +614,10 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_common_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -633,10 +645,16 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
         AsyncMock(return_value=(0.0, 0.0)),
     )
 
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=600, raw={}),
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
     result = await service._ensure_common_budget_locked(
         adv_setting_id=adv_setting.id,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
@@ -697,7 +715,10 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -720,7 +741,7 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
 
     wb_modifier = SimpleNamespace(
         get_campaign_budget=AsyncMock(
-            return_value=SimpleNamespace(total=0, raw={"current": 0})
+            return_value=SimpleNamespace(total=2000, raw={"current": 2000})
         ),
         get_campaign_balance=AsyncMock(return_value={"balance": []}),
         top_up_budget=AsyncMock(return_value=SimpleNamespace(total=100, raw={"ok": True})),
