@@ -15,13 +15,29 @@ from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.const import OFFERTA_URL
-from app.client_bot.user_interface.views.gate import get_gate_keyboard
+from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.utils.db.models import Invite, InviteStatus, User
 from app.utils.db.passed_gate_reason import PassedGateReason
 from app.utils.db.session_maker import get_async_session_maker
 
 router = Router()
 _sm = get_async_session_maker
+
+
+async def _clear_invite_fsm_and_show_gate(
+    bot: Bot,
+    chat_id: int,
+    state: FSMContext,
+    error_line: str,
+) -> None:
+    """Сброс FSM и возврат к экрану гейта (текст + клавиатура) после ошибки ввода инвайта."""
+    await state.clear()
+    full_text = f"{error_line}\n\n{get_gate_message_text()}"
+    _ = await bot.send_message(
+        chat_id,
+        full_text,
+        reply_markup=get_gate_keyboard(),
+    )
 
 
 @router.callback_query(Gate.filter(F.action == "invite_enter"))
@@ -47,10 +63,11 @@ async def gate_invite_process_code(
         return
     code = normalize_invite_code(message.text)
     if not code:
-        _ = await bot.send_message(
+        await _clear_invite_fsm_and_show_gate(
+            bot,
             message.chat.id,
+            state,
             "Введите непустой инвайт-код.",
-            reply_markup=get_gate_keyboard(),
         )
         return
 
@@ -64,10 +81,11 @@ async def gate_invite_process_code(
         user_result = await session.execute(user_stmt)
         user = user_result.scalar_one_or_none()
         if not user:
-            _ = await bot.send_message(
+            await _clear_invite_fsm_and_show_gate(
+                bot,
                 chat_id,
+                state,
                 "Ошибка: пользователь не найден. Попробуйте /start.",
-                reply_markup=get_gate_keyboard(),
             )
             return
 
@@ -77,18 +95,20 @@ async def gate_invite_process_code(
         invite = invite_result.scalar_one_or_none()
 
         if invite is None:
-            _ = await bot.send_message(
+            await _clear_invite_fsm_and_show_gate(
+                bot,
                 chat_id,
+                state,
                 "Неверный инвайт-код.",
-                reply_markup=get_gate_keyboard(),
             )
             return
 
         if invite.status != InviteStatus.ACTIVE:
-            _ = await bot.send_message(
+            await _clear_invite_fsm_and_show_gate(
+                bot,
                 chat_id,
+                state,
                 "Этот инвайт уже использован или отозван.",
-                reply_markup=get_gate_keyboard(),
             )
             return
 
@@ -96,10 +116,11 @@ async def gate_invite_process_code(
             invite.status = InviteStatus.EXPIRED
             session.add(invite)
             await session.commit()
-            _ = await bot.send_message(
+            await _clear_invite_fsm_and_show_gate(
+                bot,
                 chat_id,
+                state,
                 "Срок действия инвайт-кода истёк.",
-                reply_markup=get_gate_keyboard(),
             )
             return
 
@@ -120,10 +141,11 @@ async def gate_invite_process_code(
         result = await session.execute(update_invite_stmt)
         rowcount = getattr(result, "rowcount", 0)
         if rowcount != 1:
-            _ = await bot.send_message(
+            await _clear_invite_fsm_and_show_gate(
+                bot,
                 chat_id,
+                state,
                 "Этот инвайт уже использован или истёк.",
-                reply_markup=get_gate_keyboard(),
             )
             return
 

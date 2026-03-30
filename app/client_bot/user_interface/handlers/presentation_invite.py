@@ -18,7 +18,6 @@ def normalize_invite_code(raw: str) -> str:
 
 async def redeem_invite_for_presentation(
     *,
-    telegram_id: int,
     user_db_id: int,
     code: str,
 ) -> tuple[bool, str]:

@@ -139,10 +139,12 @@ async def test_gate_invite_wrong_code_user_stays_blocked(
         await gate_invite_process_code(message, mock_bot, mock_state)
 
     assert user.passed_gate is False
+    mock_state.clear.assert_awaited_once()
     mock_bot.send_message.assert_called()
     call_args = mock_bot.send_message.call_args
     text = call_args.kwargs.get("text", call_args[0][1] if call_args[0] else "")
     assert "Неверный" in text
+    assert "Доступ закрыт" in text
 
 
 async def test_gate_invite_expired_becomes_expired_user_stays_blocked(
@@ -192,6 +194,12 @@ async def test_gate_invite_expired_becomes_expired_user_stays_blocked(
     assert user.passed_gate is False
     assert invite.status == InviteStatus.EXPIRED
     session.add.assert_called()
+    mock_state.clear.assert_awaited_once()
+    text = mock_bot.send_message.call_args.kwargs.get(
+        "text", mock_bot.send_message.call_args[0][1]
+    )
+    assert "истёк" in text or "истек" in text
+    assert "Доступ закрыт" in text
 
 
 async def test_gate_invite_already_used_does_not_open_access(
@@ -241,10 +249,12 @@ async def test_gate_invite_already_used_does_not_open_access(
         await gate_invite_process_code(message, mock_bot, mock_state)
 
     assert user.passed_gate is False
+    mock_state.clear.assert_awaited_once()
     mock_bot.send_message.assert_called()
     args, kwargs = mock_bot.send_message.call_args[0], mock_bot.send_message.call_args[1]
     text = kwargs.get("text", args[1] if len(args) > 1 else "")
     assert "использован" in text or "отозван" in text
+    assert "Доступ закрыт" in text
 
 
 @pytest.fixture

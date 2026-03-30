@@ -14,6 +14,7 @@ from app.client_bot.user_interface.handlers.presentation_invite import (
     normalize_invite_code,
     redeem_invite_for_presentation,
 )
+from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import PresentationRequest
 from app.client_bot.user_interface.views.callbacks import RequestPresentation
 from app.utils.db.models import User
@@ -66,12 +67,13 @@ async def request_presentation_process_invite(
         user_db_id = user.id
 
     ok, err = await redeem_invite_for_presentation(
-        telegram_id=telegram_id,
         user_db_id=user_db_id,
         code=code,
     )
     if not ok:
+        await state.clear()
         _ = await bot.send_message(chat_id, err)
+        await MainMenu(bot, chat_id, full_client_ui=False)()
         return
 
     await notify_presentation_request(
