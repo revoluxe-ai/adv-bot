@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Mapping
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -11,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
+from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
 from app.client_bot.user_interface.views.callbacks import (
@@ -34,6 +36,9 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.token_monitoring.services.token_info_service import (
     TokenInfoService,
     TokenStatusReport,
+)
+from app.modules.auto_budget_manager.redis_shop_balance_snapshot_manager import (
+    RedisShopBalanceSnapshotManager,
 )
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.utils.db.models import User
@@ -62,8 +67,11 @@ class ShopMenu(TextWithKeyboard):
         self._tariff_details: TariffDetails | None = None
         self._last_charge_at: datetime | None = None
         self._billing_redis_manager: BillingRedisManager | None = None
+        self._balance_snapshot_manager: RedisShopBalanceSnapshotManager | None = None
+        self._shop_balance_snapshot: dict[str, int | str | None] | None = None
         if isinstance(redis_client, RedisClient):
             self._billing_redis_manager = BillingRedisManager(redis_client=redis_client)
+            self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
 
         # Initialize token status attributes
         self._token_status: TokenStatusReport | None = None
@@ -139,6 +147,10 @@ class ShopMenu(TextWithKeyboard):
             # 4. Получаем данные баланса
             self._balance = self._wb_cabinet.calculated_balance
             self._bonus = self._wb_cabinet.calculated_bonus
+            if self._balance_snapshot_manager is not None:
+                self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
+                    self._wb_cabinet.shop_id
+                )
             # 6. Load token status
             await self.get_shop_token_status()
 
@@ -362,6 +374,9 @@ class ShopMenu(TextWithKeyboard):
             f"💰 <b>Баланс магазина</b>: {balance:.0f} рублей\n"
             f"🎁 <b>Бонусы</b>: {self._bonus:.0f} рублей\n"
         )
+        cashback_line = self._format_cashback_snapshot_line(self._shop_balance_snapshot)
+        if cashback_line:
+            text += f"{cashback_line}\n"
 
         # 🔑 TOKEN SECTION - All token information grouped together
         if self._token_status_loaded and self._token_status:
@@ -521,3 +536,18 @@ class ShopMenu(TextWithKeyboard):
         )
         builder.row(button)
         return builder.as_markup()
+
+    @staticmethod
+    def _format_cashback_snapshot_line(
+        snapshot: Mapping[str, int | str | None] | None,
+    ) -> str | None:
+        parsed = parse_cashback_snapshot(snapshot)
+        if parsed is None:
+            return None
+        exp_part = ""
+        if parsed.expiration_msk:
+            exp_part = f", сгорят {parsed.expiration_msk.strftime('%d.%m.%Y')}"
+        return (
+            f"🧾 <b>Cashback</b>: {parsed.total} руб"
+            f"{parsed.percent_part}{exp_part}"
+        )

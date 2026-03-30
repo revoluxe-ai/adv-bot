@@ -92,6 +92,7 @@ class TestTokenLoadingBugReproduction:
             chat_id=123456789,
             state=mock_state,
             wb_user_cabinet_original_id=1,
+            redis_client=None,
         )
 
         # Manually set token status (this is what existing tests did)
@@ -197,6 +198,7 @@ class TestTokenLoadingBugReproduction:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         # Check initial state
@@ -277,6 +279,7 @@ class TestTokenLoadingBugReproduction:
                         chat_id=123456789,
                         state=mock_state,
                         wb_user_cabinet_original_id=1,
+                        redis_client=None,
                     )
 
                     # Mock TokenInfoService to simulate successful token loading

@@ -84,6 +84,8 @@ class FinanceAdapter(BaseSectionAdapter):
         amount: int,
         balance_type: str,
         return_total: bool = True,
+        cashback_sum: int | None = None,
+        cashback_percent: int | None = None,
     ) -> ResponseWithReturn | None:
         """
         Top up campaign budget. Optionally request WB to return current total.
@@ -95,6 +97,10 @@ class FinanceAdapter(BaseSectionAdapter):
             type_=resolved_balance_type,
             return_=return_total,
         )
+        if cashback_sum is not None:
+            body.cashback_sum = cashback_sum
+        if cashback_percent is not None:
+            body.cashback_percent = cashback_percent
         client = await self.auth_client_handler.get_proxy_client(self)
         response = await with_raise_errors(
             post_adv_v1_budget_deposit.asyncio_detailed,

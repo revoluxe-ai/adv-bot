@@ -29,7 +29,8 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.shared.domains.wb.utils.balance_source import (
     balance_snapshot_from_response,
-    select_balance_source_from_response,
+    cashback_summary_from_response,
+    select_topup_balance_decision,
 )
 from app.settings import settings
 
@@ -280,6 +281,7 @@ class AutoBudgetService:
                 reason="Balance response is None",
             )
         snapshot = balance_snapshot_from_response(balance_response)
+        cashback_summary = cashback_summary_from_response(balance_response)
         shop_id = (
             adv_setting.wb_cabinet.shop_id
             if adv_setting.wb_cabinet
@@ -291,11 +293,16 @@ class AutoBudgetService:
                 snapshot.balance,
                 snapshot.net,
                 snapshot.bonus,
+                cashbacks_total=cashback_summary.total,
+                cashbacks_earliest_expiration=cashback_summary.earliest_expiration_date,
+                cashbacks_best_percent=cashback_summary.best_percent,
             )
         try:
-            _, balance_type_source = select_balance_source_from_response(
-                balance_response
+            balance_decision = select_topup_balance_decision(
+                balance_response,
+                topup_amount=planned_amount,
             )
+            balance_type_source = balance_decision.balance_name
         except NotEnoughBalanceOnShopError:
             await self._topup_failed_manager.set(adv_setting.id)
             logger.warning(
@@ -325,6 +332,16 @@ class AutoBudgetService:
                     "amount": planned_amount,
                     "balance_type": balance_type_source,
                     "campaign_type": campaign_type,
+                    "cashback_sum": (
+                        balance_decision.cashback.cashback_sum
+                        if balance_decision.cashback
+                        else None
+                    ),
+                    "cashback_percent": (
+                        balance_decision.cashback.cashback_percent
+                        if balance_decision.cashback
+                        else None
+                    ),
                 },
             )
 
@@ -334,6 +351,16 @@ class AutoBudgetService:
                 amount=planned_amount,
                 balance_type=balance_type_source,
                 return_total=True,
+                cashback_sum=(
+                    balance_decision.cashback.cashback_sum
+                    if balance_decision.cashback
+                    else None
+                ),
+                cashback_percent=(
+                    balance_decision.cashback.cashback_percent
+                    if balance_decision.cashback
+                    else None
+                ),
             )
         except Exception as exc:  # pragma: no cover - network errors
             logger.error(
@@ -800,6 +827,7 @@ class AutoBudgetService:
                 reason="Balance response is None",
             )
         snapshot = balance_snapshot_from_response(balance_response)
+        cashback_summary = cashback_summary_from_response(balance_response)
         shop_id = (
             adv_setting.wb_cabinet.shop_id
             if adv_setting.wb_cabinet
@@ -811,11 +839,16 @@ class AutoBudgetService:
                 snapshot.balance,
                 snapshot.net,
                 snapshot.bonus,
+                cashbacks_total=cashback_summary.total,
+                cashbacks_earliest_expiration=cashback_summary.earliest_expiration_date,
+                cashbacks_best_percent=cashback_summary.best_percent,
             )
         try:
-            _, balance_type_source = select_balance_source_from_response(
-                balance_response
+            balance_decision = select_topup_balance_decision(
+                balance_response,
+                topup_amount=planned_amount,
             )
+            balance_type_source = balance_decision.balance_name
         except NotEnoughBalanceOnShopError:
             await self._topup_failed_manager.set(adv_setting.id)
             logger.warning(
@@ -845,6 +878,16 @@ class AutoBudgetService:
                     "balance_type": balance_type_source,
                     "campaign_type": target_campaign_type,
                     "common_budget": True,
+                    "cashback_sum": (
+                        balance_decision.cashback.cashback_sum
+                        if balance_decision.cashback
+                        else None
+                    ),
+                    "cashback_percent": (
+                        balance_decision.cashback.cashback_percent
+                        if balance_decision.cashback
+                        else None
+                    ),
                 },
             )
         try:
@@ -853,6 +896,16 @@ class AutoBudgetService:
                 amount=planned_amount,
                 balance_type=balance_type_source,
                 return_total=True,
+                cashback_sum=(
+                    balance_decision.cashback.cashback_sum
+                    if balance_decision.cashback
+                    else None
+                ),
+                cashback_percent=(
+                    balance_decision.cashback.cashback_percent
+                    if balance_decision.cashback
+                    else None
+                ),
             )
         except Exception as exc:  # pragma: no cover
             logger.error(
