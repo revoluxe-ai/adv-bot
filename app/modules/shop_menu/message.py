@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
 from aiogram import Bot
@@ -12,6 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
+
+MSK_TZ = timezone(timedelta(hours=3))
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
 from app.client_bot.user_interface.views.callbacks import (
@@ -554,7 +556,7 @@ class ShopMenu(TextWithKeyboard):
         if raw_exp:
             try:
                 dt = datetime.fromisoformat(str(raw_exp).replace("Z", "+00:00"))
-                exp_part = f", сгорят {dt.strftime('%d.%m.%Y')}"
+                exp_part = f", сгорят {dt.astimezone(MSK_TZ).strftime('%d.%m.%Y')}"
             except (ValueError, TypeError):
                 exp_part = ""
         return f"🧾 <b>Cashback</b>: {total} руб{percent_part}{exp_part}"
