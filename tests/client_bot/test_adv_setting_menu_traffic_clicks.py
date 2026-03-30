@@ -54,3 +54,19 @@ async def test_get_today_traffic_clicks_dto_returns_values_when_rec_mode_enabled
     assert dto.keyword_clicks == 30
     assert dto.shelf_clicks == 70
     assert dto.organic_clicks == 70
+
+
+def test_adv_setting_cashback_compact_line_is_short_and_informative() -> None:
+    line = AdvSettingMenu._build_cashback_compact_line(  # type: ignore[attr-defined]
+        {
+            "cashbacks_total": 143497,
+            "cashbacks_best_percent": 50,
+            "cashbacks_earliest_expiration": "2026-04-03T21:00:00Z",
+        }
+    )
+
+    assert line is not None
+    assert line.startswith("КБ:")
+    assert "143497" in line
+    assert "50%" in line
+    assert len(line) < 40

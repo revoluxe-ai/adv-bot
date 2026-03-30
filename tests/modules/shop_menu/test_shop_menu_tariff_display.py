@@ -30,3 +30,17 @@ class TestShopMenuTariffDisplay:
         assert "10000.00" in text
         assert "Последнее списание" in text
 
+    def test_cashback_snapshot_line_is_compact(self):
+        line = ShopMenu._format_cashback_snapshot_line(  # type: ignore[attr-defined]
+            {
+                "cashbacks_total": 143497,
+                "cashbacks_best_percent": 50,
+                "cashbacks_earliest_expiration": "2026-04-03T21:00:00Z",
+            }
+        )
+
+        assert line is not None
+        assert "Cashback" in line
+        assert "143497" in line
+        assert "50%" in line
+

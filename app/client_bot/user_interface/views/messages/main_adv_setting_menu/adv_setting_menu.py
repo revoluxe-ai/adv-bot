@@ -4,7 +4,7 @@ import logging
 from datetime import date as date_type
 from datetime import datetime, time, timedelta, timezone
 from operator import attrgetter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 from aiogram import Bot
 from aiogram.types import (
     Message,
@@ -127,7 +127,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._reason_auto = None
         self._reason_search = None
-        self._shop_balance_snapshot: dict[str, int | str] | None = None
+        self._shop_balance_snapshot: dict[str, int | str | None] | None = None
         self._topup_failed: dict[str, str] | None = None
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
@@ -423,9 +423,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
         if self._shop_balance_snapshot:
-            bal: int = int(self._shop_balance_snapshot.get("balance", 0))
-            net: int = int(self._shop_balance_snapshot.get("net", 0))
-            bonus: int = int(self._shop_balance_snapshot.get("bonus", 0))
+            bal: int = int(self._shop_balance_snapshot.get("balance", 0) or 0)
+            net: int = int(self._shop_balance_snapshot.get("net", 0) or 0)
+            bonus: int = int(self._shop_balance_snapshot.get("bonus", 0) or 0)
             updated_at: str = str(self._shop_balance_snapshot.get("updated_at", ""))
             try:
                 dt = datetime.fromisoformat(
@@ -437,6 +437,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             text += (
                 f"Бал: осн {bal}, нет {net}, бон {bonus} (обн {updated_str})\n"
             )
+            cashback_line = self._build_cashback_compact_line(
+                self._shop_balance_snapshot
+            )
+            if cashback_line:
+                text += cashback_line
         else:
             text += "Бал: н/д\n"
 
@@ -588,6 +593,29 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         tail = "\n…[сокращено]"
         max_len = max(0, SAFE_CAPTION_LIMIT - len(tail))
         return text[:max_len] + tail
+
+    @staticmethod
+    def _build_cashback_compact_line(
+        snapshot: Mapping[str, int | str | None],
+    ) -> str | None:
+        cashbacks_total = int(snapshot.get("cashbacks_total", 0) or 0)
+        if cashbacks_total <= 0:
+            return None
+        raw_exp = snapshot.get("cashbacks_earliest_expiration")
+        raw_percent = snapshot.get("cashbacks_best_percent")
+        percent_part = ""
+        if raw_percent is not None:
+            percent_part = f", до {int(raw_percent)}%"
+        exp_part = ""
+        if raw_exp:
+            try:
+                dt = datetime.fromisoformat(
+                    str(raw_exp).replace("Z", "+00:00")
+                ).astimezone(MSK_TZ)
+                exp_part = f", гор {dt.strftime('%d.%m')}"
+            except (ValueError, TypeError):
+                exp_part = ""
+        return f"КБ: {cashbacks_total}{percent_part}{exp_part}\n"
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:

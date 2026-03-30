@@ -179,12 +179,16 @@ class PromotionManager:
         amount: int,
         balance_type: str,
         return_total: bool = True,
+        cashback_sum: int | None = None,
+        cashback_percent: int | None = None,
     ) -> BudgetTopUpResult:
         response = await self._client.finance_adapter.top_up_budget(
             adv_id=adv_id,
             amount=amount,
             balance_type=balance_type,
             return_total=return_total,
+            cashback_sum=cashback_sum,
+            cashback_percent=cashback_percent,
         )
         raw: dict[str, Any] = response.to_dict() if response else {}
         total = raw.get("total")

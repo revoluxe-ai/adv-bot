@@ -18,8 +18,11 @@ from app.shared.domains.wb.enums import (
 )
 from app.shared.domains.wb.utils.balance_source import (
     BalanceSnapshot,
+    cashback_summary_from_response,
+    pick_cashback_for_topup,
     select_balance_source,
     select_balance_source_from_response,
+    select_topup_balance_decision,
 )
 
 
@@ -45,6 +48,7 @@ class _FakeBalanceResponse:
     balance: int
     net: int
     bonus: int
+    cashbacks: list[dict] | None = None
 
 
 def _build_settings(**overrides):
@@ -201,6 +205,82 @@ def test_balance_source_from_response_raises_when_insufficient() -> None:
         select_balance_source_from_response(response)
 
 
+def test_pick_cashback_for_topup_prefers_earliest_expiration() -> None:
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=5000,
+        bonus=0,
+        cashbacks=[
+            {
+                "sum": 99999,
+                "percent": 50,
+                "expiration_date": "2026-05-03T21:00:00Z",
+            },
+            {
+                "sum": 1000,
+                "percent": 40,
+                "expiration_date": "2026-04-03T21:00:00Z",
+            },
+        ],
+    )
+
+    cashback = pick_cashback_for_topup(response, topup_amount=1000)
+
+    assert cashback is not None
+    assert cashback.cashback_percent == 40
+    assert cashback.cashback_sum == 400
+    assert cashback.expiration_date == "2026-04-03T21:00:00Z"
+
+
+def test_select_topup_balance_decision_prefers_non_bonus_when_cashback_present() -> None:
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=3000,
+        bonus=1200,
+        cashbacks=[
+            {
+                "sum": 2000,
+                "percent": 50,
+                "expiration_date": "2026-04-03T21:00:00Z",
+            }
+        ],
+    )
+
+    decision = select_topup_balance_decision(response, topup_amount=1000)
+
+    assert decision.balance_name == "net"
+    assert decision.balance_type == 1
+    assert decision.cashback is not None
+    assert decision.cashback.cashback_sum == 500
+    assert decision.cashback.cashback_percent == 50
+
+
+def test_cashback_summary_collects_total_best_percent_and_earliest_date() -> None:
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=0,
+        bonus=0,
+        cashbacks=[
+            {
+                "sum": 1000,
+                "percent": 30,
+                "expiration_date": "2026-04-10T21:00:00Z",
+            },
+            {
+                "sum": 2000,
+                "percent": 50,
+                "expiration_date": "2026-04-03T21:00:00Z",
+            },
+        ],
+    )
+
+    summary = cashback_summary_from_response(response)
+
+    assert summary.total == 3000
+    assert summary.best_percent == 50
+    assert summary.earliest_expiration_date == "2026-04-03T21:00:00Z"
+
+
 class _FakeExecutionResult:
     def __init__(self, value: float | SimpleNamespace = 0.0) -> None:
         self._value = value
@@ -301,8 +381,11 @@ async def test_ensure_budget_limits_by_successful_topups(monkeypatch) -> None:
         top_up_budget=AsyncMock(return_value=SimpleNamespace(total=600, raw={"ok": True})),
     )
     monkeypatch.setattr(
-        "app.modules.auto_budget_manager.service.select_balance_source_from_response",
-        lambda response: (None, "balance_type"),
+        "app.modules.auto_budget_manager.service.select_topup_balance_decision",
+        lambda response, *, topup_amount: SimpleNamespace(
+            balance_name="balance_type",
+            cashback=None,
+        ),
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
     wb_manager_hub = _build_wb_manager_hub()
@@ -349,8 +432,11 @@ async def test_ensure_budget_limits_by_doubled_all_attempts(monkeypatch) -> None
     )
     wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     monkeypatch.setattr(
-        "app.modules.auto_budget_manager.service.select_balance_source_from_response",
-        lambda response: (None, "balance_type"),
+        "app.modules.auto_budget_manager.service.select_topup_balance_decision",
+        lambda response, *, topup_amount: SimpleNamespace(
+            balance_name="balance_type",
+            cashback=None,
+        ),
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
     wb_manager_hub = _build_wb_manager_hub()
@@ -641,8 +727,11 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
     )
     wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     monkeypatch.setattr(
-        "app.modules.auto_budget_manager.service.select_balance_source_from_response",
-        lambda response: (None, "balance_type"),
+        "app.modules.auto_budget_manager.service.select_topup_balance_decision",
+        lambda response, *, topup_amount: SimpleNamespace(
+            balance_name="balance_type",
+            cashback=None,
+        ),
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
     monkeypatch.setattr(
