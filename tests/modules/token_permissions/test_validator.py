@@ -13,8 +13,15 @@ from app.modules.token_permissions import (
 pytestmark = pytest.mark.unit
 
 
-# Valid token with all required permissions (from test_token_validation.py)
+# Valid PERSONAL token with all required permissions
 VALID_TOKEN = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpZCI6InRlc3QiLCJzIjoxMDIsInNpZCI6InRlc3Rfc2hvcCIsImV4cCI6MjAxMTgzMDMyMCwiYWNjIjozLCJmb3IiOiJzZWxmIiwidCI6ZmFsc2V9."
+    "9_r9EMOX3TtN26rgezFbtP60BRrYgybaPPv7Hi4dIMc"
+)
+
+# Valid BASE token (non-personal)
+NON_PERSONAL_TOKEN = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpZCI6IjkwODNmNDU2LWJiZGEtNDczOS1hMGYxLTMwMzRiZDhjMDczNCIsInMiOjEwMiwic2lkIjoiOTRhM2YwY2QtOGFjMS00Mjk2LTliNmUtYmE4NmNiNTQ2NGNiIiwiZXhwIjoyMDExODMwMzIwLCJhY2MiOjEsInQiOmZhbHNlfQ."
     "QeUqgoxsjJEWrJpdsFxLOsqa15EBfGkNZwf690qlUko"
@@ -180,6 +187,17 @@ class TestTokenPermissionsValidator:
         assert result.is_expired is False
 
     @pytest.mark.asyncio
+    async def test_non_personal_token(self):
+        """Test validation with non-personal token."""
+        validator = TokenPermissionsValidator()
+        result = await validator.validate(NON_PERSONAL_TOKEN, mode="claims_only")
+
+        assert result.is_valid_jwt
+        assert not result.is_personal
+        assert not result.can_be_used
+        assert result.error_message == "Токен не персональный"
+
+    @pytest.mark.asyncio
     async def test_read_only_token(self):
         """Test validation with read-only token."""
         validator = TokenPermissionsValidator()
@@ -189,6 +207,7 @@ class TestTokenPermissionsValidator:
             mock_token = MagicMock()
             mock_token.check_valid.return_value = True
             mock_token.get_shop_id_from_token.return_value = "test_shop_id"
+            mock_token.is_personal = True
             mock_token.read_only = True
             mock_token.is_expired = False
             mock_token.expires = None
@@ -212,6 +231,7 @@ class TestTokenPermissionsValidator:
             mock_token = MagicMock()
             mock_token.check_valid.return_value = True
             mock_token.get_shop_id_from_token.return_value = "test_shop_id"
+            mock_token.is_personal = True
             mock_token.read_only = False
             mock_token.is_expired = True
             mock_token.expires = None
@@ -235,6 +255,7 @@ class TestTokenPermissionsValidator:
             mock_token = MagicMock()
             mock_token.check_valid.return_value = True
             mock_token.get_shop_id_from_token.return_value = "test_shop_id"
+            mock_token.is_personal = True
             mock_token.read_only = False
             mock_token.is_expired = False
             mock_token.expires = None
@@ -455,6 +476,7 @@ class TestTokenPermissionsValidator:
         result = ValidationResult(
             is_valid_jwt=True,
             shop_id="test_shop",
+            is_personal=True,
             is_read_only=False,
             is_expired=False,
             expires=None,
@@ -477,6 +499,7 @@ class TestTokenPermissionsValidator:
         result = ValidationResult(
             is_valid_jwt=True,
             shop_id="test_shop",
+            is_personal=True,
             is_read_only=False,
             is_expired=False,
             expires=None,

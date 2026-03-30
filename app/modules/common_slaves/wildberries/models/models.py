@@ -68,6 +68,14 @@ class BidderCoroutineType(str, Enum):
     UPDATE_CLUSTER_BIDS = "UPDATE_CLUSTER_BIDS"
 
 
+class WBTokenType(str, Enum):
+    BASE = "base"
+    TEST = "test"
+    PERSONAL = "personal"
+    SERVICE = "service"
+    UNKNOWN = "unknown"
+
+
 _sm = get_async_session_maker
 
 
@@ -277,6 +285,30 @@ class WBToken(BaseTable):
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
             )
+
+    def detect_wb_token_type(self) -> WBTokenType:
+        payload = self.__payload
+        acc = payload.get("acc")
+        for_field = payload.get("for")
+        t = payload.get("t")
+
+        if acc == 1 and for_field is None and t is False:
+            return WBTokenType.BASE
+        if acc == 2 and for_field is None and t is True:
+            return WBTokenType.TEST
+        if acc == 3 and for_field == "self" and t is False:
+            return WBTokenType.PERSONAL
+        if acc == 4 and isinstance(for_field, str) and for_field.startswith("asid:"):
+            return WBTokenType.SERVICE
+        return WBTokenType.UNKNOWN
+
+    @property
+    def token_type(self) -> WBTokenType:
+        return self.detect_wb_token_type()
+
+    @property
+    def is_personal(self) -> bool:
+        return self.token_type == WBTokenType.PERSONAL
 
 
 class AdvKeyword(BaseTable):
