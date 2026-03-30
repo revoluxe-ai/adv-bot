@@ -116,6 +116,18 @@ class AutoBudgetService:
             0.0, float(settings.AUTO_BUDGET_VERIFICATION_DELAY_SEC)
         )
 
+    def _stale_stats_wb_total_threshold(self) -> int:
+        """WB campaign total above which we keep the stale full-stats gate.
+
+        When stats are stale, we only proceed (using possibly stale spend counters)
+        if the live WB budget snapshot is below this threshold or missing. If
+        ``AUTO_BUDGET_MIN_BALANCE`` is zero, use the top-up step so the gate is not
+        disabled entirely.
+        """
+        if self._min_balance > 0:
+            return self._min_balance
+        return max(1, self._topup_amount)
+
     async def ensure_budget(
         self,
         adv_setting_id: int,
@@ -186,19 +198,35 @@ class AutoBudgetService:
                 spend_today=0.0,
                 reason="Auto-budget limit is not configured",
             )
-        last_full_adv_stat_update: datetime.datetime | None =  await self._get_last_full_stat_update(config.adv_id)
+        last_full_adv_stat_update: datetime.datetime | None = (
+            await self._get_last_full_stat_update(config.adv_id)
+        )
         now_msk = self._now_msk()
-
-        if (last_full_adv_stat_update
-                and now_msk > last_full_adv_stat_update
-                + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)):
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
-                campaign_type=campaign_type,
-                adv_id=config.adv_id,
-                spend_today=0.0,
-                reason="Last Update Full Adv Stats too old",
+        stats_too_old = bool(
+            last_full_adv_stat_update
+            and now_msk
+            > last_full_adv_stat_update
+            + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
+        )
+        cached_budget_info = None
+        if stats_too_old:
+            cached_budget_info = await wb_manager_hub.wb_modifier.get_campaign_budget(
+                config.adv_id
             )
+            pre_total = cached_budget_info.total
+            threshold = self._stale_stats_wb_total_threshold()
+            need_topup_despite_stale_stats = (
+                pre_total is None or pre_total < threshold
+            )
+            if not need_topup_despite_stale_stats:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                    campaign_type=campaign_type,
+                    adv_id=config.adv_id,
+                    spend_today=0.0,
+                    budget_total_before=pre_total,
+                    reason="Last Update Full Adv Stats too old",
+                )
 
         date_msk = now_msk.date()
         spend_today = await self._calculate_spend_today(config.adv_id, now_msk)
@@ -238,8 +266,10 @@ class AutoBudgetService:
                 reason="Daily spend limit exceeded",
             )
 
-        budget_info = await wb_manager_hub.wb_modifier.get_campaign_budget(
-            config.adv_id
+        budget_info = (
+            cached_budget_info
+            if cached_budget_info is not None
+            else await wb_manager_hub.wb_modifier.get_campaign_budget(config.adv_id)
         )
         current_budget = budget_info.total
         if (
@@ -661,9 +691,10 @@ class AutoBudgetService:
                 reason="Auto-budget common lock is busy",
             )
         try:
-            return await self._ensure_common_budget_locked(
+            result = await self._ensure_common_budget_locked(
                 adv_setting_id, wb_manager_hub
             )
+            return result
         except Exception:  # noqa
             logger.exception("Failed to ensure common budget")
             return None
@@ -730,14 +761,31 @@ class AutoBudgetService:
                 spend_today=0.0,
                 reason="Missing full adv stats for one or both campaigns",
             )
-        if now_msk > last_auto + period or now_msk > last_search + period:
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
-                campaign_type=AdvType.AUTO,
-                adv_id=adv_id_auto,
-                spend_today=0.0,
-                reason="Last full adv stats too old",
+        stats_stale_common = now_msk > last_auto + period or now_msk > last_search + period
+        cached_info_auto = None
+        cached_info_search = None
+        if stats_stale_common:
+            cached_info_auto = await wb_manager_hub.wb_modifier.get_campaign_budget(
+                adv_id_auto
             )
+            cached_info_search = await wb_manager_hub.wb_modifier.get_campaign_budget(
+                adv_id_search
+            )
+            ba_pre = cached_info_auto.total or 0
+            bs_pre = cached_info_search.total or 0
+            threshold = self._stale_stats_wb_total_threshold()
+            both_comfortable_on_wb = (
+                ba_pre >= threshold and bs_pre >= threshold
+            )
+            if both_comfortable_on_wb:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                    campaign_type=AdvType.AUTO,
+                    adv_id=adv_id_auto,
+                    spend_today=0.0,
+                    budget_total_before=int(ba_pre + bs_pre),
+                    reason="Last full adv stats too old",
+                )
         date_msk = now_msk.date()
         spend_auto = await self._calculate_spend_today(adv_id_auto, now_msk)
 
@@ -776,9 +824,17 @@ class AutoBudgetService:
                 reason="Daily spend limit exceeded",
             )
 
-        info_auto = await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_auto)
+        info_auto = (
+            cached_info_auto
+            if cached_info_auto is not None
+            else await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_auto)
+        )
         budget_auto = info_auto.total
-        info_search = await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_search)
+        info_search = (
+            cached_info_search
+            if cached_info_search is not None
+            else await wb_manager_hub.wb_modifier.get_campaign_budget(adv_id_search)
+        )
         budget_search = info_search.total
         b_auto = budget_auto or 0
         b_search = budget_search or 0

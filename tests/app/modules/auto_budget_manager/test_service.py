@@ -554,7 +554,10 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_common_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -587,10 +590,16 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
         AsyncMock(return_value=(0.0, 0.0)),
     )
 
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=600, raw={}),
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
     result = await service._ensure_common_budget_locked(
         adv_setting_id=adv_setting.id,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
@@ -605,7 +614,10 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_common_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -633,10 +645,16 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
         AsyncMock(return_value=(0.0, 0.0)),
     )
 
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=600, raw={}),
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
     result = await service._ensure_common_budget_locked(
         adv_setting_id=adv_setting.id,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
@@ -697,7 +715,10 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
     period = 600
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(UPDATE_FULL_ADV_STAT_PERIOD=period),
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=500,
+        ),
     )
     adv_setting = _build_adv_setting()
     _patch_adv_setting(monkeypatch, adv_setting)
@@ -720,7 +741,7 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
 
     wb_modifier = SimpleNamespace(
         get_campaign_budget=AsyncMock(
-            return_value=SimpleNamespace(total=0, raw={"current": 0})
+            return_value=SimpleNamespace(total=2000, raw={"current": 2000})
         ),
         get_campaign_balance=AsyncMock(return_value={"balance": []}),
         top_up_budget=AsyncMock(return_value=SimpleNamespace(total=100, raw={"ok": True})),
@@ -747,4 +768,151 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
     assert result.reason == "Last Update Full Adv Stats too old"
     assert result.spend_today == 0.0
+
+
+def test_stale_stats_wb_total_threshold(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(
+            AUTO_BUDGET_MIN_BALANCE=0,
+            AUTO_BUDGET_TOPUP_AMOUNT=777,
+        ),
+    )
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    assert service._stale_stats_wb_total_threshold() == 777
+
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(
+            AUTO_BUDGET_MIN_BALANCE=0,
+            AUTO_BUDGET_TOPUP_AMOUNT=0,
+        ),
+    )
+    service_zero_topup = AutoBudgetService(redis_client=_FakeRedis())
+    assert service_zero_topup._stale_stats_wb_total_threshold() == 1
+
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(AUTO_BUDGET_MIN_BALANCE=300),
+    )
+    service_min = AutoBudgetService(redis_client=_FakeRedis())
+    assert service_min._stale_stats_wb_total_threshold() == 300
+
+
+@pytest.mark.asyncio
+async def test_ensure_budget_rejects_stale_when_min_balance_zero_but_wb_high(
+    monkeypatch,
+) -> None:
+    """With MIN_BALANCE=0, stale gate must still apply using top-up step as threshold."""
+    period = 600
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=0,
+            AUTO_BUDGET_TOPUP_AMOUNT=1000,
+        ),
+    )
+    adv_setting = _build_adv_setting()
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+    last_update = now - datetime.timedelta(seconds=period * 2)
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_get_last_full_stat_update",
+        AsyncMock(return_value=last_update),
+    )
+
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=2000, raw={"current": 2000})
+        ),
+        get_campaign_balance=AsyncMock(return_value={"balance": []}),
+        top_up_budget=AsyncMock(return_value=SimpleNamespace(total=100, raw={"ok": True})),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.select_topup_balance_decision",
+        lambda response, *, topup_amount: SimpleNamespace(
+            balance_name="balance_type",
+            cashback=None,
+        ),
+    )
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    result = await service._ensure_budget_locked(
+        adv_setting_id=adv_setting.id,
+        campaign_type=AdvType.AUTO,
+        wb_manager_hub=wb_manager_hub,
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
+    assert result.reason == "Last Update Full Adv Stats too old"
+
+
+@pytest.mark.asyncio
+async def test_ensure_common_budget_rejects_stale_when_min_zero_both_wb_high(
+    monkeypatch,
+) -> None:
+    period = 600
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(
+            UPDATE_FULL_ADV_STAT_PERIOD=period,
+            AUTO_BUDGET_MIN_BALANCE=0,
+            AUTO_BUDGET_TOPUP_AMOUNT=1000,
+        ),
+    )
+    adv_setting = _build_common_adv_setting()
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+    stale = now - datetime.timedelta(seconds=period * 2)
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_last_full_stat_update",
+        AsyncMock(return_value=stale),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums_common",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            return_value=SimpleNamespace(total=2000, raw={}),
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    result = await service._ensure_common_budget_locked(
+        adv_setting_id=adv_setting.id,
+        wb_manager_hub=wb_manager_hub,
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
+    assert result.reason == "Last full adv stats too old"
 

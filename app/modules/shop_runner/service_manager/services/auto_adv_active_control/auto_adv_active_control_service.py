@@ -22,8 +22,10 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Callable, Iterable, Awaitable
+from collections.abc import Awaitable, Callable, Iterable
+from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
 
 from app.modules import balance_manager
@@ -55,12 +57,40 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     is_auto_campaign_active,
 )
+from app.shared.domains.wb.utils.balance_source import (
+    balance_snapshot_from_response,
+    cashback_summary_from_response,
+)
 from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+
 _time_settings_repo = TimeSettingsRepository()
+
+
+@dataclass
+class WbWalletOkCache:
+    """Per-``ensure_campaigns_active`` run: cache WB wallet positivity per cabinet.
+
+    ``run_tasks`` runs handlers concurrently; without coordination, many coroutines
+    could miss the cache between the membership check and ``get_campaign_balance``
+    (there is an ``await`` in between). Per-cabinet locks plus double-checked
+    loading ensure at most one WB wallet fetch per cabinet per run.
+    """
+
+    ok_by_cabinet: dict[int, bool] = field(default_factory=dict)
+    _locks_by_cabinet: dict[int, asyncio.Lock] = field(default_factory=dict)
+    _locks_meta: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+    async def lock_for(self, wb_cabinet_id: int) -> asyncio.Lock:
+        async with self._locks_meta:
+            lock = self._locks_by_cabinet.get(wb_cabinet_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._locks_by_cabinet[wb_cabinet_id] = lock
+            return lock
 
 
 class AutoAdvActiveControlService:
@@ -113,16 +143,25 @@ class AutoAdvActiveControlService:
                 session, unique_adv_ids
             )
 
+        wb_wallet_cache = WbWalletOkCache()
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
-                lambda complex_adv=adv, ds=db_state: self._auto_campaign_handler(
-                    complex_adv, start_of_day, end_of_day, db_state=ds
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache: self._auto_campaign_handler(
+                    complex_adv,
+                    start_of_day,
+                    end_of_day,
+                    db_state=ds,
+                    wb_wallet_cache=cache,
                 )
             )
             handlers.append(
-                lambda complex_adv=adv, ds=db_state: self._search_campaign_handler(
-                    complex_adv, start_of_day, end_of_day, db_state=ds
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache: self._search_campaign_handler(
+                    complex_adv,
+                    start_of_day,
+                    end_of_day,
+                    db_state=ds,
+                    wb_wallet_cache=cache,
                 )
             )
 
@@ -187,13 +226,44 @@ class AutoAdvActiveControlService:
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
 
-    @staticmethod
-    async def _cabinet_has_positive_balance(adv: ComplexAdv) -> bool:
+    async def _cabinet_has_positive_balance(
+        self,
+        adv: ComplexAdv,
+        wb_wallet_cache: WbWalletOkCache,
+    ) -> bool:
         wb_cabinet_id = adv.adv_setting.wb_cabinet_id
         balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
             wb_cabinet_id
         )
-        return (balance + bonus) > 0
+        total = float(balance) + float(bonus)
+        if total > 0:
+            return True
+
+        cache = wb_wallet_cache.ok_by_cabinet
+        if wb_cabinet_id in cache:
+            return cache[wb_cabinet_id]
+
+        lock = await wb_wallet_cache.lock_for(wb_cabinet_id)
+        async with lock:
+            if wb_cabinet_id in cache:
+                return cache[wb_cabinet_id]
+
+            ok_wb = False
+            try:
+                wb_resp = await self._wb_modifier.get_campaign_balance()
+                if wb_resp:
+                    snap = balance_snapshot_from_response(wb_resp)
+                    cashback = cashback_summary_from_response(wb_resp)
+                    wb_cashbacks_total = cashback.total
+                    wb_wallet_sum = (
+                        snap.balance + snap.net + snap.bonus + wb_cashbacks_total
+                    )
+                    ok_wb = wb_wallet_sum > 0
+            except Exception:
+                ok_wb = False
+
+            cache[wb_cabinet_id] = ok_wb
+            return ok_wb
 
     async def _auto_campaign_handler(
         self,
@@ -202,6 +272,7 @@ class AutoAdvActiveControlService:
         end_of_day: datetime,
         *,
         db_state: TimeSettingsDbState | None,
+        wb_wallet_cache: WbWalletOkCache,
     ) -> None:
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
@@ -226,7 +297,7 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        if not await self._cabinet_has_positive_balance(adv):
+        if not await self._cabinet_has_positive_balance(adv, wb_wallet_cache):
             if auto_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auto campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",
@@ -428,6 +499,7 @@ class AutoAdvActiveControlService:
         end_of_day: datetime,
         *,
         db_state: TimeSettingsDbState | None,
+        wb_wallet_cache: WbWalletOkCache,
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
@@ -454,7 +526,7 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        if not await self._cabinet_has_positive_balance(adv):
+        if not await self._cabinet_has_positive_balance(adv, wb_wallet_cache):
             if search_status == WBAdvActiveStatus.STARTED:
                 logger.info(
                     "Auto budget watcher: pausing auction campaign (cabinet balance <= 0) adv_id=%s shop_id=%s",
