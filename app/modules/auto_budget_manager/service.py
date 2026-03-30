@@ -116,6 +116,18 @@ class AutoBudgetService:
             0.0, float(settings.AUTO_BUDGET_VERIFICATION_DELAY_SEC)
         )
 
+    def _stale_stats_wb_total_threshold(self) -> int:
+        """WB campaign total above which we keep the stale full-stats gate.
+
+        When stats are stale, we only proceed (using possibly stale spend counters)
+        if the live WB budget snapshot is below this threshold or missing. If
+        ``AUTO_BUDGET_MIN_BALANCE`` is zero, use the top-up step so the gate is not
+        disabled entirely.
+        """
+        if self._min_balance > 0:
+            return self._min_balance
+        return max(1, self._topup_amount)
+
     async def ensure_budget(
         self,
         adv_setting_id: int,
@@ -202,8 +214,9 @@ class AutoBudgetService:
                 config.adv_id
             )
             pre_total = cached_budget_info.total
-            need_topup_despite_stale_stats = self._min_balance <= 0 or (
-                pre_total is None or pre_total < self._min_balance
+            threshold = self._stale_stats_wb_total_threshold()
+            need_topup_despite_stale_stats = (
+                pre_total is None or pre_total < threshold
             )
             if not need_topup_despite_stale_stats:
                 return AutoBudgetEnsureResult(
@@ -760,12 +773,11 @@ class AutoBudgetService:
             )
             ba_pre = cached_info_auto.total or 0
             bs_pre = cached_info_search.total or 0
-            both_above_min = (
-                self._min_balance > 0
-                and ba_pre >= self._min_balance
-                and bs_pre >= self._min_balance
+            threshold = self._stale_stats_wb_total_threshold()
+            both_comfortable_on_wb = (
+                ba_pre >= threshold and bs_pre >= threshold
             )
-            if both_above_min:
+            if both_comfortable_on_wb:
                 return AutoBudgetEnsureResult(
                     status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
                     campaign_type=AdvType.AUTO,
