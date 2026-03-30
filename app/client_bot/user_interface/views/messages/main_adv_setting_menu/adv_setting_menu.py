@@ -14,6 +14,7 @@ from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
 from app.client_bot import utils
+from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
@@ -598,24 +599,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     def _build_cashback_compact_line(
         snapshot: Mapping[str, int | str | None],
     ) -> str | None:
-        cashbacks_total = int(snapshot.get("cashbacks_total", 0) or 0)
-        if cashbacks_total <= 0:
+        parsed = parse_cashback_snapshot(snapshot)
+        if parsed is None:
             return None
-        raw_exp = snapshot.get("cashbacks_earliest_expiration")
-        raw_percent = snapshot.get("cashbacks_best_percent")
-        percent_part = ""
-        if raw_percent is not None:
-            percent_part = f", до {int(raw_percent)}%"
         exp_part = ""
-        if raw_exp:
-            try:
-                dt = datetime.fromisoformat(
-                    str(raw_exp).replace("Z", "+00:00")
-                ).astimezone(MSK_TZ)
-                exp_part = f", гор {dt.strftime('%d.%m')}"
-            except (ValueError, TypeError):
-                exp_part = ""
-        return f"КБ: {cashbacks_total}{percent_part}{exp_part}\n"
+        if parsed.expiration_msk:
+            exp_part = f", гор {parsed.expiration_msk.strftime('%d.%m')}"
+        return f"КБ: {parsed.total}{parsed.percent_part}{exp_part}\n"
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Mapping
 
 from aiogram import Bot
@@ -12,8 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
-
-MSK_TZ = timezone(timedelta(hours=3))
+from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
 from app.client_bot.user_interface.views.callbacks import (
@@ -542,21 +541,13 @@ class ShopMenu(TextWithKeyboard):
     def _format_cashback_snapshot_line(
         snapshot: Mapping[str, int | str | None] | None,
     ) -> str | None:
-        if not snapshot:
+        parsed = parse_cashback_snapshot(snapshot)
+        if parsed is None:
             return None
-        total = int(snapshot.get("cashbacks_total", 0) or 0)
-        if total <= 0:
-            return None
-        raw_exp = snapshot.get("cashbacks_earliest_expiration")
-        raw_percent = snapshot.get("cashbacks_best_percent")
-        percent_part = ""
-        if raw_percent is not None:
-            percent_part = f", до {int(raw_percent)}%"
         exp_part = ""
-        if raw_exp:
-            try:
-                dt = datetime.fromisoformat(str(raw_exp).replace("Z", "+00:00"))
-                exp_part = f", сгорят {dt.astimezone(MSK_TZ).strftime('%d.%m.%Y')}"
-            except (ValueError, TypeError):
-                exp_part = ""
-        return f"🧾 <b>Cashback</b>: {total} руб{percent_part}{exp_part}"
+        if parsed.expiration_msk:
+            exp_part = f", сгорят {parsed.expiration_msk.strftime('%d.%m.%Y')}"
+        return (
+            f"🧾 <b>Cashback</b>: {parsed.total} руб"
+            f"{parsed.percent_part}{exp_part}"
+        )
