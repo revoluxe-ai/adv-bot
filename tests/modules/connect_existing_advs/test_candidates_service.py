@@ -313,3 +313,22 @@ def test_filter_by_nmid_includes_campaign_with_multiple_nm_ids() -> None:
     result = filter_and_classify_campaigns_by_nmid([item], target_nmid)
     assert len(result.auction_candidates) == 1
     assert result.auto_candidates == []
+
+
+@pytest.mark.unit
+def test_get_adverts_adverts_item_from_dict_null_nm_settings() -> None:
+    """WB may return nm_settings: null; from_dict must not raise (regression)."""
+    item = _make_item(
+        id=1,
+        bid_type="manual",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=True,
+        recommendations=False,
+        shelf=False,
+        nmid=100,
+        status=GetAdvertsAdvertsItemStatus.VALUE_9,
+    )
+    raw = item.to_dict()
+    raw["nm_settings"] = None
+    parsed = GetAdvertsAdvertsItem.from_dict(raw)
+    assert parsed.nm_settings == []

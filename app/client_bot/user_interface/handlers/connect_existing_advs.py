@@ -566,7 +566,7 @@ async def _connect_existing_after_card_resolved(
                 "Ошибка запроса к WB. Попробуйте позже или обратитесь в поддержку.",
             )
             return
-    except Exception as e:
+    except Exception:
         logger.exception("connect_existing get_candidates failed")
         await bot.send_message(
             chat_id,

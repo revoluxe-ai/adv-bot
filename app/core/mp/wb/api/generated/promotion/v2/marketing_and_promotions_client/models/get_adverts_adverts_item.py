@@ -88,7 +88,8 @@ class GetAdvertsAdvertsItem:
         id = d.pop("id")
 
         nm_settings = []
-        _nm_settings = d.pop("nm_settings")
+        # WB may return null for nm_settings; OpenAPI client expected a list (TypeError otherwise).
+        _nm_settings = d.pop("nm_settings", None) or []
         for nm_settings_item_data in _nm_settings:
             nm_settings_item = AdvertNMsSettings.from_dict(nm_settings_item_data)
 
