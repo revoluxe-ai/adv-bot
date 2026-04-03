@@ -6,6 +6,7 @@ from app.modules.connect_existing_advs.candidates_service import (
     filter_and_classify_campaigns_by_nmid,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    GetAdverts,
     GetAdvertsAdvertsItem,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models.get_adverts_adverts_item_status import (
@@ -332,3 +333,44 @@ def test_get_adverts_adverts_item_from_dict_null_nm_settings() -> None:
     raw["nm_settings"] = None
     parsed = GetAdvertsAdvertsItem.from_dict(raw)
     assert parsed.nm_settings == []
+
+
+@pytest.mark.unit
+def test_get_adverts_from_dict_null_adverts() -> None:
+    """WB may return adverts: null on GET /api/advert/v2/adverts."""
+    parsed = GetAdverts.from_dict({"adverts": None})
+    assert parsed.adverts == []
+
+
+@pytest.mark.unit
+def test_get_adverts_adverts_item_from_dict_null_settings_and_timestamps() -> None:
+    """Null settings/timestamps must not raise (dict(None) / missing nested)."""
+    item = _make_item(
+        id=1,
+        bid_type="manual",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=True,
+        recommendations=False,
+        shelf=False,
+        nmid=100,
+        status=GetAdvertsAdvertsItemStatus.VALUE_9,
+    )
+    raw = item.to_dict()
+    raw["settings"] = None
+    raw["timestamps"] = None
+    parsed = GetAdvertsAdvertsItem.from_dict(raw)
+    assert parsed.settings.payment_type == AdvertSettingsPaymentType.CPM
+    assert parsed.timestamps.created is not None
+
+
+@pytest.mark.unit
+def test_advert_settings_from_dict_null_placements() -> None:
+    from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models.advert_settings import (
+        AdvertSettings,
+    )
+
+    s = AdvertSettings.from_dict(
+        {"payment_type": "cpm", "name": "x", "placements": None}
+    )
+    assert s.placements.search is False
+    assert s.placements.recommendations is False

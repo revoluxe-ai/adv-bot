@@ -43,11 +43,15 @@ class AdvertSettingsPlacements:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        d = dict(src_dict)
-        search = d.pop("search")
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any] | None) -> T:
+        d = dict(src_dict or {})
+        search = d.pop("search", False)
+        if search is None:
+            search = False
 
-        recommendations = d.pop("recommendations")
+        recommendations = d.pop("recommendations", False)
+        if recommendations is None:
+            recommendations = False
 
         advert_settings_placements = cls(
             search=search,

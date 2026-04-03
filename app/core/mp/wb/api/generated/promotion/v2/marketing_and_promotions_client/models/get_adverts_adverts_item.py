@@ -16,6 +16,14 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound="GetAdvertsAdvertsItem")
 
+# WB may omit or null timestamps; Timestamps.from_dict requires ISO strings for non-optional fields.
+_DEFAULT_TIMESTAMPS_DICT: dict[str, Any] = {
+    "created": "1970-01-01T00:00:00+00:00",
+    "updated": "1970-01-01T00:00:00+00:00",
+    "started": None,
+    "deleted": "1970-01-01T00:00:00+00:00",
+}
+
 
 @_attrs_define
 class GetAdvertsAdvertsItem:
@@ -83,7 +91,7 @@ class GetAdvertsAdvertsItem:
         from ..models.timestamps import Timestamps
 
         d = dict(src_dict)
-        bid_type = d.pop("bid_type")
+        bid_type = d.pop("bid_type") or ""
 
         id = d.pop("id")
 
@@ -95,11 +103,12 @@ class GetAdvertsAdvertsItem:
 
             nm_settings.append(nm_settings_item)
 
-        settings = AdvertSettings.from_dict(d.pop("settings"))
+        settings = AdvertSettings.from_dict(d.pop("settings", None))
 
         status = GetAdvertsAdvertsItemStatus(d.pop("status"))
 
-        timestamps = Timestamps.from_dict(d.pop("timestamps"))
+        _ts = d.pop("timestamps", None)
+        timestamps = Timestamps.from_dict(_ts if _ts is not None else _DEFAULT_TIMESTAMPS_DICT)
 
         get_adverts_adverts_item = cls(
             bid_type=bid_type,

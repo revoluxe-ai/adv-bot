@@ -39,11 +39,15 @@ class AdvertBidsKopecks:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        d = dict(src_dict)
-        search = d.pop("search")
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any] | None) -> T:
+        d = dict(src_dict or {})
+        search = d.pop("search", 0)
+        if search is None:
+            search = 0
 
-        recommendations = d.pop("recommendations")
+        recommendations = d.pop("recommendations", 0)
+        if recommendations is None:
+            recommendations = 0
 
         advert_bids_kopecks = cls(
             search=search,

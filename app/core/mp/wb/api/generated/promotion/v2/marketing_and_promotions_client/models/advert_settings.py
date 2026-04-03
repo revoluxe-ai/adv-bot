@@ -52,15 +52,21 @@ class AdvertSettings:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any] | None) -> T:
         from ..models.advert_settings_placements import AdvertSettingsPlacements
 
-        d = dict(src_dict)
-        payment_type = AdvertSettingsPaymentType(d.pop("payment_type"))
+        d = dict(src_dict or {})
+        payment_type_raw = d.pop("payment_type", None)
+        payment_type = AdvertSettingsPaymentType(payment_type_raw or "cpm")
 
-        name = d.pop("name")
+        name = d.pop("name", None) or ""
 
-        placements = AdvertSettingsPlacements.from_dict(d.pop("placements"))
+        placements_raw = d.pop("placements", None)
+        placements = AdvertSettingsPlacements.from_dict(
+            placements_raw
+            if placements_raw is not None
+            else {"search": False, "recommendations": False}
+        )
 
         advert_settings = cls(
             payment_type=payment_type,
