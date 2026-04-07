@@ -339,6 +339,10 @@ class ResetWhiteList(CallbackData, prefix="reset_white_list"):
     adv_setting_original_id: int
 
 
+class ResetNonRelevantPhrases(CallbackData, prefix="reset_non_rel"):
+    adv_setting_original_id: int
+
+
 class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
     adv_setting_id: int
 
