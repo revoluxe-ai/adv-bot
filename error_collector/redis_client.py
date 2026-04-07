@@ -20,7 +20,7 @@ async def get_redis_client(host: str, port: int, password: str | None = None):
             port=port,
             password=password,
             db=0,
-            decode_responses=False,  # Важно для hgetall, чтобы получать bytes
+            decode_responses=True,
         )
         logger.info("Created Redis client: %s:%d", host, port)
     return _redis_client

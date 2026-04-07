@@ -451,6 +451,14 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
     button = InlineKeyboardButton(
+        text="Сбросить все нерелевантные фразы",
+        callback_data=callbacks.ResetNonRelevantPhrases(
+            adv_setting_original_id=adv_setting.id
+        ).pack(),
+    )
+    _ = builder.row(button)
+
+    button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
         callback_data=callbacks.ChangeMaxCPC(
             action="to_max_cpc_change_page", adv_original_id=adv_setting.id

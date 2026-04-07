@@ -1,0 +1,68 @@
+# Grafana в namespace logging: Loki datasource + sidecar для дашбордов (ConfigMap с label grafana_dashboard=1).
+# Замените плейсхолдеры через apply-grafana.ps1: __GRAFANA_FQDN__, __GRAFANA_ROOT_URL__, __INGRESS_ENABLED__.
+
+replicaCount: 1
+
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+grafana.ini:
+  server:
+    domain: "__GRAFANA_FQDN__"
+    root_url: "__GRAFANA_ROOT_URL__"
+  auth.anonymous:
+    enabled: false
+  users:
+    viewers_can_edit: false
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        uid: loki-logging
+        url: http://loki.logging.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 500
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folder: /tmp/dashboards
+  datasources:
+    enabled: false
+
+persistence:
+  enabled: true
+  type: pvc
+  size: 2Gi
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+ingress:
+  enabled: __INGRESS_ENABLED__
+  ingressClassName: nginx
+  annotations: {}
+  hosts:
+    - __GRAFANA_FQDN__
+  path: /
+  pathType: Prefix
+  tls: []
+
+service:
+  type: ClusterIP
+  port: 80
