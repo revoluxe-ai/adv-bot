@@ -9,16 +9,11 @@ if (-not $conf) {
     exit 1
 }
 
-if ($conf -match "kube\.errors") {
-    Write-Host "kube.errors config already present, skipping." -ForegroundColor Yellow
-    exit 0
-}
-
 $rewriteTagBlock = @"
 [FILTER]
     Name rewrite_tag
-    Match kube.*
-    Rule `$log (Traceback|Exception|ERROR|CRITICAL|FATAL) kube.errors true
+    Match kube.var.log.containers.*
+    Rule `$log (?i)(traceback|exception|error|critical|fatal) kube.errors true
     Emitter_Name error_emitter
     Emitter_Storage.type memory
 
@@ -36,16 +31,38 @@ $httpOutBlock = @"
     Retry_Limit False
 "@
 
-# Insert rewrite_tag right before the kubernetes filter so it can see the original `log` field.
-# Note: fluent-bit.conf inside ConfigMap is indented, so allow leading spaces.
-$pattern = '(?ms)^\s*\[FILTER\]\s*\r?\n\s*Name\s+kubernetes\b'
-if (-not ([regex]::IsMatch($conf, $pattern))) {
-    Write-Host "ERROR: Cannot find kubernetes filter block in fluent-bit.conf; aborting to avoid breaking config." -ForegroundColor Red
-    exit 1
+$lokiOutBlock = @"
+
+[OUTPUT]
+    Name loki
+    Match kube.var.log.containers.*
+    Host loki.logging.svc.cluster.local
+    Port 3100
+    Labels job=fluent-bit, namespace=`$kubernetes['namespace_name'], pod=`$kubernetes['pod_name'], container=`$kubernetes['container_name']
+    Line_Format json
+    Retry_Limit False
+"@
+
+# Normalize source matches to avoid recursive kubernetes filter warnings on kube.errors
+$newConf = $conf
+$newConf = $newConf -replace '(?m)^(\s*Match\s+)kube\.\*$', '${1}kube.var.log.containers.*'
+
+if ($newConf -notmatch "(?ms)^\s*\[FILTER\]\s*\r?\n\s*Name\s+rewrite_tag\b.*?kube\.errors") {
+    $pattern = '(?ms)^\s*\[FILTER\]\s*\r?\n\s*Name\s+kubernetes\b'
+    if (-not ([regex]::IsMatch($newConf, $pattern))) {
+        Write-Host "ERROR: Cannot find kubernetes filter block in fluent-bit.conf; aborting to avoid breaking config." -ForegroundColor Red
+        exit 1
+    }
+    $newConf = [regex]::Replace($newConf, $pattern, { param($m) $rewriteTagBlock + $m.Value }, 1)
 }
 
-$newConf = [regex]::Replace($conf, $pattern, { param($m) $rewriteTagBlock + $m.Value }, 1)
-$newConf = $newConf + $httpOutBlock
+if ($newConf -notmatch "(?ms)^\s*\[OUTPUT\]\s*\r?\n\s*Name\s+http\b.*?error-collector\.logging\.svc\.cluster\.local") {
+    $newConf = $newConf + $httpOutBlock
+}
+
+if ($newConf -notmatch "(?ms)^\s*\[OUTPUT\]\s*\r?\n\s*Name\s+loki\b") {
+    $newConf = $newConf + $lokiOutBlock
+}
 
 # Patch ConfigMap using --patch-file to avoid command-line length limits.
 $patchObj = @{ data = @{ "fluent-bit.conf" = $newConf } }
