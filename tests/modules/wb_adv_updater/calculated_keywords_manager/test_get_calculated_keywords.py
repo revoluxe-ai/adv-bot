@@ -51,6 +51,13 @@ def complex_adv_mock():
     mock.hard_min_ctr = None
     mock.rec_system_promotion_mode_active = False
     mock.auto_add_only_relevant_phrase = False
+    mock.target_pay_for_order = None
+    adv_setting = MagicMock()
+    adv_setting.plan_for_sales_for_day = 10
+    adv_setting.target_price_for_order = 50.0
+    # Низкий max при «план не выполнен», чтобы дефолтный CPO ключа (≈2) был выше target.
+    adv_setting.max_price_for_order = 1.0
+    mock.adv_setting = adv_setting
     return mock
 
 

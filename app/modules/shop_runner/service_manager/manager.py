@@ -337,7 +337,6 @@ class CoroutinesManager:
         # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
         # в фильтре только проверку активности аукциона
         advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs = [adv for adv in advs if adv.bot_active]
         advs, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )

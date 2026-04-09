@@ -27,6 +27,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -183,10 +184,10 @@ async def adv_handler(
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
-        adv = await session.execute(
+        adv_result: Result[tuple[AdvSetting]] = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv: AdvSetting | None = adv_result.scalar_one_or_none()
 
     if not adv:
         await bot.send_message(
@@ -213,14 +214,37 @@ async def adv_handler(
         return
 
     async with sm() as session:
-        wb_user_cabinet = await session.execute(
-            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        stmt = (
+            select(WBUserCabinet)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .options(selectinload(WBUserCabinet.wb_cabinet))
         )
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet_result = await session.execute(stmt)
+        wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
 
     if not wb_user_cabinet:
         await bot.send_message(
             chat_id, "Кабинет не найден, попробуйте еще раз"
+        )
+        return
+
+    nmids = adv.nmids or []
+    nmid = nmids[0] if nmids else None
+    if nmid is None:
+        _ = await bot.send_message(
+            chat_id,
+            "Не удалось открыть РК: у кампании отсутствует артикул. "
+            f"Обратитесь в поддержку -> {const.SUPPORT_LINK}",
+        )
+        return
+    shop_id = str(wb_user_cabinet.wb_cabinet.shop_id)
+    ui_card_result = await wb_data_manager.ensure_card_with_image_for_ui(shop_id, nmid)
+    if not ui_card_result.ok:
+        _ = await bot.send_message(
+            chat_id,
+            "Не удалось загрузить данные карточки для отображения РК. "
+            "Переход в меню остановлен до восстановления данных. "
+            f"Обратитесь в поддержку -> {const.SUPPORT_LINK}",
         )
         return
 
