@@ -6,6 +6,9 @@ __all__ = (
     "PassedGateReason",
     "InviteStatus",
     "Invite",
+    "PresentationSlot",
+    "PresentationBookingStatus",
+    "PresentationBooking",
 )
 
 import datetime
@@ -23,6 +26,7 @@ from sqlalchemy import (
     Integer,
     String,
     text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +40,11 @@ class InviteStatus(str, enum.Enum):
     USED = "USED"
     EXPIRED = "EXPIRED"
     REVOKED = "REVOKED"
+
+
+class PresentationBookingStatus(str, enum.Enum):
+    BOOKED = "booked"
+    CANCELLED = "cancelled"
 
 
 if typing.TYPE_CHECKING:
@@ -164,3 +173,72 @@ class Invite(BaseTable):
     used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (Index("ix_invites_code", "code", unique=True),)
+
+
+class PresentationSlot(BaseTable):
+    __tablename__ = "presentation_slot"
+
+    start_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    duration_minutes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("60"),
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("user.id"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+    __table_args__ = (
+        Index("ix_presentation_slot_start_at", "start_at"),
+        Index("ix_presentation_slot_is_active_start_at", "is_active", "start_at"),
+    )
+
+
+class PresentationBooking(BaseTable):
+    __tablename__ = "presentation_booking"
+
+    slot_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("presentation_slot.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("user.id"),
+        nullable=False,
+    )
+    status: Mapped[PresentationBookingStatus] = mapped_column(
+        SAEnum(
+            PresentationBookingStatus,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            name="presentationbookingstatus",
+        ),
+        nullable=False,
+        server_default=text("'booked'"),
+    )
+    comment: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("now()"),
+    )
+    cancelled_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("slot_id", name="uq_presentation_booking_slot_id"),
+        Index("ix_presentation_booking_user_id_status", "user_id", "status"),
+    )

@@ -1,5 +1,6 @@
 """Integration tests for onboarding handlers: callback_start_registration, show_shops_list, shops_list_paginator."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -23,7 +24,14 @@ from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.settings.settings_master import Settings
-from app.utils.db.models import User
+from app.utils.db.models import (
+    PresentationBooking,
+    PresentationBookingStatus,
+    PresentationSlot,
+    User,
+)
+
+from tests.integration.client_bot.conftest import MockSessionMaker
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
@@ -106,11 +114,11 @@ async def test_callback_start_registration_passed_gate_shows_main_menu(
     assert call_kw["reply_markup"] is not None
 
 
-async def test_callback_start_registration_not_passed_gate_shows_gate(
+async def test_callback_start_registration_not_passed_gate_shows_booking_entry(
     async_session,
     patch_start_and_token_services,
 ):
-    """User not passed_gate -> gate screen."""
+    """User not passed_gate -> minimal main menu with presentation booking button."""
     user = await _create_user_with_cabinets(async_session, 99993, passed_gate=False)
     bot = AsyncMock()
     state = MagicMock()
@@ -118,17 +126,61 @@ async def test_callback_start_registration_not_passed_gate_shows_gate(
 
     callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 99993)
 
-    with patch.object(
-        Settings, "invite_gate", PropertyMock(return_value=True)
-    ), patch.object(
+    with patch.object(Settings, "invite_gate", PropertyMock(return_value=True)), patch.object(
         Settings, "presentation_only", PropertyMock(return_value=False)
     ):
         await callback_start_registration(callback, bot, state)
 
     bot.send_message.assert_awaited_once()
-    call_args, call_kw = bot.send_message.call_args
-    text = call_kw.get("text", call_args[1] if len(call_args) > 1 else "")
-    assert get_gate_message_text() in text or "Доступ" in text
+    call_kw = bot.send_message.call_args[1]
+    rows = call_kw["reply_markup"].inline_keyboard
+    assert rows[0][0].text == "Записаться на презентацию"
+    assert rows[0][0].callback_data == callbacks.PresentationBooking(action="menu").pack()
+
+
+async def test_callback_start_registration_shows_active_booking_when_presentation_only(
+    async_session,
+    patch_start_and_token_services,
+) -> None:
+    """При presentation_only и активной брони /start показывает слот и кнопку подтверждения менеджеру."""
+    user = await _create_user_with_cabinets(async_session, 999101, passed_gate=False)
+    slot = PresentationSlot(
+        start_at=(datetime.now(UTC) + timedelta(days=2)).replace(tzinfo=None),
+        duration_minutes=40,
+        is_active=True,
+    )
+    async_session.add(slot)
+    await async_session.flush()
+    async_session.add(
+        PresentationBooking(
+            slot_id=slot.id,
+            user_id=user.id,
+            status=PresentationBookingStatus.BOOKED,
+        )
+    )
+    await async_session.commit()
+
+    bot = AsyncMock()
+    state = MagicMock()
+    state.clear = AsyncMock()
+    callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 999101)
+
+    booking_sm = MockSessionMaker(async_session)
+    with patch(
+        "app.client_bot.presentation_booking_service.sm",
+        booking_sm,
+    ), patch.object(Settings, "presentation_only", PropertyMock(return_value=True)):
+        await callback_start_registration(callback, bot, state)
+
+    bot.send_message.assert_awaited_once()
+    call_kw = bot.send_message.call_args[1]
+    assert "Вы записаны на презентацию" in call_kw["text"]
+    assert "МСК" in call_kw["text"]
+    rows = call_kw["reply_markup"].inline_keyboard
+    assert any(row[0].text == "Связаться с менеджером" for row in rows if row)
+    assert not any(
+        row[0].text == "Записаться на презентацию" for row in rows if row
+    )
 
 
 async def test_show_shops_list_passed_gate_with_shops_shows_shops_list_page(

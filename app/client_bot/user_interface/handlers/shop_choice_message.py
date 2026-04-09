@@ -7,10 +7,10 @@ from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.presentation_booking_service import presentation_manager_confirm_url
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
-from app.settings import settings
 
 SHOPS_LIST_PAGE_TITLE = ("Нажмите 'Добавить магазин' для начала использования"
                          "Мои магазины: \n"
@@ -26,40 +26,67 @@ class MainMenu(TextWithKeyboard):
 
     parse_mode = ParseMode.HTML
 
-    def __init__(self, bot: Bot, chat_id: int, *, full_client_ui: bool = False):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        *,
+        full_client_ui: bool = False,
+        booked_slot_human: str | None = None,
+    ):
         super().__init__(bot, chat_id)
         self.user_telegram_id = chat_id
         self._full_client_ui = full_client_ui
+        self._booked_slot_human = booked_slot_human
 
     @property
     def text(self) -> str:
-        return get_main_text(self.user_telegram_id, full_client_ui=self._full_client_ui)
+        return get_main_text(
+            self.user_telegram_id,
+            full_client_ui=self._full_client_ui,
+            booked_slot_human=self._booked_slot_human,
+        )
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return get_main_menu_keyboard(
-            self.user_telegram_id, full_client_ui=self._full_client_ui
+            self.user_telegram_id,
+            full_client_ui=self._full_client_ui,
+            booked_slot_human=self._booked_slot_human,
         )
 
 
 def get_main_menu_keyboard(
-    user_telegram_id: int, *, full_client_ui: bool = False
+    user_telegram_id: int,
+    *,
+    full_client_ui: bool = False,
+    booked_slot_human: str | None = None,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура главной: минимальный режим только если presentation_only и не full_client_ui."""
+    """Клавиатура главной: минимальный режим для пользователей без passed_gate."""
     keyboard_buttons = []
 
-    if settings.presentation_only and not full_client_ui:
+    if not full_client_ui:
         if is_bot_admin(user_telegram_id):
             admin_button = InlineKeyboardButton(
                 text="Панель администратора",
                 callback_data=AdminPanel(action="menu").pack(),
             )
             keyboard_buttons.append([admin_button])
-        presentation_button = InlineKeyboardButton(
-            text="Запросить презентацию",
-            callback_data=callbacks.RequestPresentation(action="request").pack(),
+        if booked_slot_human:
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="Связаться с менеджером",
+                        url=presentation_manager_confirm_url(booked_slot_human),
+                    )
+                ]
+            )
+            return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        booking_button = InlineKeyboardButton(
+            text="Записаться на презентацию",
+            callback_data=callbacks.PresentationBooking(action="menu").pack(),
         )
-        keyboard_buttons.append([presentation_button])
+        keyboard_buttons.append([booking_button])
         return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
     if is_bot_admin(user_telegram_id):

@@ -81,17 +81,13 @@ class GateMiddleware(BaseMiddleware):
             if isinstance(event, Message):
                 if _is_start_command(event):
                     return await handler(event, data)
-                state = data.get("state")
-                if state is not None:
-                    current = await state.get_state()
-                    if current is not None and str(current).startswith(
-                        "PresentationRequest:"
-                    ):
-                        return await handler(event, data)
             if (
                 isinstance(event, CallbackQuery)
                 and event.data
-                and event.data.startswith("presentation:")
+                and (
+                    event.data.startswith("presentation:")
+                    or event.data.startswith("presentation_booking:")
+                )
             ):
                 return await handler(event, data)
 
@@ -122,7 +118,10 @@ class GateMiddleware(BaseMiddleware):
         # 2) Message с successful_payment
         # 3) Message в FSM GateInvite:* — ввод инвайт-кода
         if isinstance(event, CallbackQuery):
-            if event.data and event.data.startswith("gate:"):
+            if event.data and (
+                event.data.startswith("gate:")
+                or event.data.startswith("presentation_booking:")
+            ):
                 return await handler(event, data)
         if isinstance(event, Message):
             if getattr(event, "successful_payment", None) is not None:

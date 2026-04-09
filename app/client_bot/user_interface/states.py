@@ -109,16 +109,16 @@ class GateInvite(StatesGroup):
     waiting_code = State()
 
 
-class PresentationRequest(StatesGroup):
-    """Ввод инвайт-кода для заявки на презентацию (одноразовый инвайт)."""
-
-    waiting_invite = State()
-
-
 class AdminGrantGate(StatesGroup):
     """Админ: открыть гейт пользователю по Telegram ID."""
 
     waiting_telegram_id = State()
+
+
+class AdminPresentationSlots(StatesGroup):
+    """Админ: создание слота презентации."""
+
+    waiting_for_slot_input = State()
 
 
 class ConnectExistingAdvsStates(StatesGroup):

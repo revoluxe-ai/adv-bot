@@ -2,12 +2,24 @@ from app.client_bot import const
 from app.settings import settings
 
 
-def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str:
+def get_main_text(
+    user_telegram_id: int,
+    *,
+    full_client_ui: bool = False,
+    booked_slot_human: str | None = None,
+) -> str:
     if settings.presentation_only and not full_client_ui:
+        if booked_slot_human:
+            return (
+                f"Ваш Telegram ID: <code>{user_telegram_id}</code>\n\n"
+                "Вы записаны на презентацию.\n"
+                f"Слот: {booked_slot_human}\n\n"
+                "Нажмите кнопку ниже, чтобы связаться с менеджером.\n\n"
+            )
         return (
             f"Ваш Telegram ID: <code>{user_telegram_id}</code>\n\n"
             "Сервис сейчас доступен по записи на презентацию.\n"
-            "Нажмите «Запросить презентацию» и отправьте инвайт-код одним сообщением.\n\n"
+            "Нажмите «Записаться на презентацию» и выберите свободный слот.\n\n"
         )
 
     text = f"""

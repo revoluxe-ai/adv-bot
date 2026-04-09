@@ -62,6 +62,7 @@ from .user_interface.handlers import (
     keyword_settings,
     min_views_for_ml_predict_ctr,
     orders_source_toggle,
+    presentation_booking,
     predict_ctr_mode_toggle,
     target_position_mode_toggle,
     sales_predict_method_toggle,
@@ -145,6 +146,7 @@ common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
 common_router.include_routers(time_settings.router)
+common_router.include_routers(presentation_booking.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(add_relevant_phrase_templates.router)
