@@ -44,7 +44,6 @@ class _FakeAdvSetting:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
-        wb_cabinet_id: int = 1,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -54,7 +53,6 @@ class _FakeAdvSetting:
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
-        self.wb_cabinet_id = wb_cabinet_id
 
 
 class _FakeSearchAdv:
