@@ -145,6 +145,12 @@ class ConnectExistingAdvsBackToShop(CallbackData, prefix="ce_back_shop"):
     wb_user_cabinet_original_id: int
 
 
+class ConnectExistingChangeNmid(CallbackData, prefix="ce_change_nmid"):
+    """Ввести другой артикул в сценарии «подключить существующие»."""
+
+    wb_user_cabinet_original_id: int
+
+
 class ConnectExistingCardNotFound(CallbackData, prefix="ce_card_not_found"):
     """Действие при «артикул по фильтру не найден»: поиск по полному списку или выход."""
 
@@ -459,6 +465,14 @@ class ChangeCommonBidInSearchAdvStatus(
 
 
 class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
+class RebindAdvCampaignIds(CallbackData, prefix="rebind_adv_ids"):
+    """Перепривязка кампаний WB: поле adv_id (авто) и колонка _search_adv_id (поиск)."""
+
+    action: str  # menu | auto | search | back
     adv_setting_original_id: int
     wb_user_cabinet_original_id: int
 

@@ -13,6 +13,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
+    RebindAdvCampaignIds,
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -166,6 +167,17 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Перепривязать кампании WB",
+            callback_data=RebindAdvCampaignIds(
+                action="menu",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
 
     watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
     watchdog_button = InlineKeyboardButton(

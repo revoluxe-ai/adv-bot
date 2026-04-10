@@ -91,6 +91,13 @@ class SetCommonBidManual(StatesGroup):
     waiting_for_bid = State()
 
 
+class RebindCampaignIds(StatesGroup):
+    """Ручной ввод новых adv_id и search_adv_id для AdvSetting."""
+
+    waiting_for_auto_adv_id = State()
+    waiting_for_search_adv_id = State()
+
+
 class ShopDefaultMaxCPM(StatesGroup):
     waiting_for_new_default_max_cpm = State()
 

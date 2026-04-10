@@ -183,15 +183,20 @@ async def _ensure_card_ready(shop_id: str, nmid: int) -> bool:
 
 
 
-async def _get_existing_adv_pair_not_done(
-    wb_cabinet_id: int, nmid: int
-) -> tuple[int | None, int | None] | None:
-    """Если есть в БД РК по артикулу (статус не refused/done, type 8 или 9) — вернуть (adv_id, search_adv_id), иначе None."""
+async def _get_matching_adv_setting_for_connect_existing(
+    wb_cabinet_id: int, nmid: int,
+) -> AdvSetting | None:
+    """Одна строка AdvSetting по фильтрам connect-existing; ORDER BY id — детерминизм при нескольких совпадениях."""
     async with sm(read_only=True) as session:
         stmt = (
             select(AdvSetting)
             .options(
-                load_only(AdvSetting.adv_id, AdvSetting._search_adv_id, AdvSetting.name)
+                load_only(
+                    AdvSetting.id,
+                    AdvSetting.adv_id,
+                    AdvSetting._search_adv_id,
+                    AdvSetting.name,
+                )
             )
             .where(
                 and_(
@@ -201,10 +206,28 @@ async def _get_existing_adv_pair_not_done(
                     AdvSetting.type.in_(EXISTING_ADV_TYPES),
                 )
             )
+            .order_by(AdvSetting.id)
             .limit(1)
         )
         result = await session.execute(stmt)
-        adv = result.scalars().one_or_none()
+        return result.scalars().one_or_none()
+
+
+async def _get_existing_adv_row_for_connect_not_done(
+    wb_cabinet_id: int, nmid: int,
+) -> tuple[int, int | None, int | None] | None:
+    """(adv_setting.id, adv_id, search_adv_id) для той же строки, что и пара ID; иначе None."""
+    adv = await _get_matching_adv_setting_for_connect_existing(wb_cabinet_id, nmid)
+    if adv is None:
+        return None
+    return adv.id, adv.adv_id, adv.search_adv_id
+
+
+async def _get_existing_adv_pair_not_done(
+    wb_cabinet_id: int, nmid: int
+) -> tuple[int | None, int | None] | None:
+    """Если есть в БД РК по артикулу (статус не refused/done, type 8 или 9) — вернуть (adv_id, search_adv_id), иначе None."""
+    adv = await _get_matching_adv_setting_for_connect_existing(wb_cabinet_id, nmid)
     if adv is None:
         return None
     return adv.adv_id, adv.search_adv_id
@@ -526,28 +549,48 @@ async def _connect_existing_after_card_resolved(
     wb_cabinet_id: int,
 ) -> None:
     """Продолжить сценарий «подключить существующие» после успешного получения карточки по артикулу."""
-    existing_pair = await _get_existing_adv_pair_not_done(wb_cabinet_id, nmid)
-    if existing_pair is not None:
-        existing_auto_id, existing_auction_id = existing_pair
+    existing_row = await _get_existing_adv_row_for_connect_not_done(
+        wb_cabinet_id, nmid
+    )
+    existing_pair = None
+    if existing_row is not None:
+        adv_setting_original_id, existing_auto_id, existing_auction_id = existing_row
+        existing_pair = (existing_auto_id, existing_auction_id)
         if existing_auto_id is not None and existing_auction_id is not None:
             ids_text = f"Аукцион: {existing_auction_id}, Авто: {existing_auto_id}"
             await state.clear()
+            first_row: list[InlineKeyboardButton] = [
+                InlineKeyboardButton(
+                    text="Перепривязать кампании WB",
+                    callback_data=callbacks.RebindAdvCampaignIds(
+                        action="menu",
+                        adv_setting_original_id=adv_setting_original_id,
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                    ).pack(),
+                ),
+                InlineKeyboardButton(
+                    text="В меню магазина",
+                    callback_data=callbacks.ConnectExistingAdvsBackToShop(
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id
+                    ).pack(),
+                ),
+            ]
+            second_row = [
+                InlineKeyboardButton(
+                    text="Ввести другой артикул",
+                    callback_data=callbacks.ConnectExistingChangeNmid(
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                    ).pack(),
+                ),
+            ]
             keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="В меню магазина",
-                            callback_data=callbacks.ConnectExistingAdvsBackToShop(
-                                wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                            ).pack(),
-                        )
-                    ],
-                ]
+                inline_keyboard=[first_row, second_row]
             )
             await bot.send_message(
                 chat_id,
                 f"Для этого артикула уже есть подключённые РК (Аукцион и Авто). "
-                f"ID кампаний: {ids_text}. Отмените создание и вернитесь в меню магазина.",
+                f"ID кампаний: {ids_text}. Перепривяжите кампании, введите другой артикул "
+                f"или вернитесь в меню магазина.",
                 reply_markup=keyboard,
             )
             return
@@ -1606,6 +1649,27 @@ async def connect_existing_continue_despite_invalid(
     finally:
         await state.clear()
     # После старта создания поисковой РК меню магазина не показываем.
+
+
+@router.callback_query(callbacks.ConnectExistingChangeNmid.filter())
+async def connect_existing_change_nmid(
+    callback: CallbackQuery,
+    callback_data: callbacks.ConnectExistingChangeNmid,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    """Снова запросить артикул (например, при уже подключённых к этому nm id РК)."""
+    await callback.answer()
+    if callback.message is None:
+        return
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    await state.clear()
+    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    await state.set_state(ConnectExistingAdvsStates.waiting_nmid)
+    await bot.send_message(
+        callback.message.chat.id,
+        "Введите артикул WB товара — одно число, больше 0:",
+    )
 
 
 @router.callback_query(callbacks.ConnectExistingAdvsBackToShop.filter())

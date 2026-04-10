@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Literal
 
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     GetAdvertsAdvertsItem,
@@ -155,3 +155,19 @@ def filter_and_classify_campaigns_by_nmid(
             )
 
     return ConnectExistingCandidatesResult(auction_candidates=auction, auto_candidates=auto)
+
+
+def classify_wb_campaign_for_rebind(
+    item: GetAdvertsAdvertsItem,
+) -> Literal["auction", "auto"] | None:
+    """
+    Определить тип РК для ручной перепривязки (adv_id авто vs _search_adv_id поиск).
+    Учитывает только «допустимые» статусы (как при подключении существующих РК).
+    """
+    if item.status not in ALLOWED_STATUSES:
+        return None
+    if _is_auction_campaign(item):
+        return "auction"
+    if _is_auto_campaign(item):
+        return "auto"
+    return None
