@@ -252,11 +252,8 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
-        AsyncMock(return_value=(100, 200)),
-    ), patch(
-        f"{MODULE}._get_existing_adv_setting_id_not_done",
-        AsyncMock(return_value=77),
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
+        AsyncMock(return_value=(77, 100, 200)),
     ):
         await connect_existing_advs.connect_existing_advs_nmid(
             message, bot, state
@@ -311,7 +308,7 @@ async def test_connect_existing_advs_nmid_success_both_empty() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -359,7 +356,7 @@ async def test_connect_existing_advs_nmid_get_candidates_api_forbidden() -> None
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -406,7 +403,7 @@ async def test_connect_existing_advs_nmid_bad_request_path_not_found() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -464,7 +461,7 @@ async def test_connect_existing_advs_nmid_success_auction_only() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -524,7 +521,7 @@ async def test_connect_existing_advs_nmid_success_auto_only() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -554,7 +551,7 @@ async def test_connect_existing_advs_nmid_success_auto_only() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None:
-    """nmid: existing_pair (None, 123) + both candidates -> confirm_type2, 'Аукционная РК уже подключена'."""
+    """nmid: existing row (None, None, 123) + both candidates -> confirm_type2, 'Аукционная РК уже подключена'."""
     from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
         GetAdvertsAdvertsItem,
     )
@@ -604,8 +601,8 @@ async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
-        AsyncMock(return_value=(None, 123)),
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
+        AsyncMock(return_value=(None, None, 123)),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(return_value=result_both),

@@ -183,15 +183,20 @@ async def _ensure_card_ready(shop_id: str, nmid: int) -> bool:
 
 
 
-async def _get_existing_adv_pair_not_done(
-    wb_cabinet_id: int, nmid: int
-) -> tuple[int | None, int | None] | None:
-    """Если есть в БД РК по артикулу (статус не refused/done, type 8 или 9) — вернуть (adv_id, search_adv_id), иначе None."""
+async def _get_matching_adv_setting_for_connect_existing(
+    wb_cabinet_id: int, nmid: int,
+) -> AdvSetting | None:
+    """Одна строка AdvSetting по фильтрам connect-existing; ORDER BY id — детерминизм при нескольких совпадениях."""
     async with sm(read_only=True) as session:
         stmt = (
             select(AdvSetting)
             .options(
-                load_only(AdvSetting.adv_id, AdvSetting._search_adv_id, AdvSetting.name)
+                load_only(
+                    AdvSetting.id,
+                    AdvSetting.adv_id,
+                    AdvSetting._search_adv_id,
+                    AdvSetting.name,
+                )
             )
             .where(
                 and_(
@@ -201,34 +206,31 @@ async def _get_existing_adv_pair_not_done(
                     AdvSetting.type.in_(EXISTING_ADV_TYPES),
                 )
             )
+            .order_by(AdvSetting.id)
             .limit(1)
         )
         result = await session.execute(stmt)
-        adv = result.scalars().one_or_none()
+        return result.scalars().one_or_none()
+
+
+async def _get_existing_adv_row_for_connect_not_done(
+    wb_cabinet_id: int, nmid: int,
+) -> tuple[int, int | None, int | None] | None:
+    """(adv_setting.id, adv_id, search_adv_id) для той же строки, что и пара ID; иначе None."""
+    adv = await _get_matching_adv_setting_for_connect_existing(wb_cabinet_id, nmid)
+    if adv is None:
+        return None
+    return adv.id, adv.adv_id, adv.search_adv_id
+
+
+async def _get_existing_adv_pair_not_done(
+    wb_cabinet_id: int, nmid: int
+) -> tuple[int | None, int | None] | None:
+    """Если есть в БД РК по артикулу (статус не refused/done, type 8 или 9) — вернуть (adv_id, search_adv_id), иначе None."""
+    adv = await _get_matching_adv_setting_for_connect_existing(wb_cabinet_id, nmid)
     if adv is None:
         return None
     return adv.adv_id, adv.search_adv_id
-
-
-async def _get_existing_adv_setting_id_not_done(
-    wb_cabinet_id: int, nmid: int
-) -> int | None:
-    """Вернуть id AdvSetting для уже подключенной РК по артикулу, если есть."""
-    async with sm(read_only=True) as session:
-        stmt = (
-            select(AdvSetting.id)
-            .where(
-                and_(
-                    AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                    AdvSetting.nmids == [nmid],
-                    AdvSetting.active_status.not_in(EXISTING_ADV_ACTIVE_STATUS_NOT_IN),
-                    AdvSetting.type.in_(EXISTING_ADV_TYPES),
-                )
-            )
-            .limit(1)
-        )
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
 
 
 router = Router()
@@ -547,27 +549,26 @@ async def _connect_existing_after_card_resolved(
     wb_cabinet_id: int,
 ) -> None:
     """Продолжить сценарий «подключить существующие» после успешного получения карточки по артикулу."""
-    existing_pair = await _get_existing_adv_pair_not_done(wb_cabinet_id, nmid)
-    if existing_pair is not None:
-        existing_auto_id, existing_auction_id = existing_pair
+    existing_row = await _get_existing_adv_row_for_connect_not_done(
+        wb_cabinet_id, nmid
+    )
+    existing_pair = None
+    if existing_row is not None:
+        adv_setting_original_id, existing_auto_id, existing_auction_id = existing_row
+        existing_pair = (existing_auto_id, existing_auction_id)
         if existing_auto_id is not None and existing_auction_id is not None:
-            adv_setting_original_id = await _get_existing_adv_setting_id_not_done(
-                wb_cabinet_id, nmid
-            )
             ids_text = f"Аукцион: {existing_auction_id}, Авто: {existing_auto_id}"
             await state.clear()
-            first_row: list[InlineKeyboardButton] = []
-            if adv_setting_original_id is not None:
-                first_row.append(
-                    InlineKeyboardButton(
-                        text="Перепривязать кампании WB",
-                        callback_data=callbacks.RebindAdvCampaignIds(
-                            action="menu",
-                            adv_setting_original_id=adv_setting_original_id,
-                            wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                        ).pack(),
-                    )
-                )
+            first_row: list[InlineKeyboardButton] = [
+                InlineKeyboardButton(
+                    text="Перепривязать кампании WB",
+                    callback_data=callbacks.RebindAdvCampaignIds(
+                        action="menu",
+                        adv_setting_original_id=adv_setting_original_id,
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                    ).pack(),
+                ),
+            ]
             first_row.append(
                 InlineKeyboardButton(
                     text="В меню магазина",
