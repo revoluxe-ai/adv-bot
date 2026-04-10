@@ -210,6 +210,27 @@ async def _get_existing_adv_pair_not_done(
     return adv.adv_id, adv.search_adv_id
 
 
+async def _get_existing_adv_setting_id_not_done(
+    wb_cabinet_id: int, nmid: int
+) -> int | None:
+    """Вернуть id AdvSetting для уже подключенной РК по артикулу, если есть."""
+    async with sm(read_only=True) as session:
+        stmt = (
+            select(AdvSetting.id)
+            .where(
+                and_(
+                    AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                    AdvSetting.nmids == [nmid],
+                    AdvSetting.active_status.not_in(EXISTING_ADV_ACTIVE_STATUS_NOT_IN),
+                    AdvSetting.type.in_(EXISTING_ADV_TYPES),
+                )
+            )
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
 router = Router()
 
 
@@ -530,20 +551,32 @@ async def _connect_existing_after_card_resolved(
     if existing_pair is not None:
         existing_auto_id, existing_auction_id = existing_pair
         if existing_auto_id is not None and existing_auction_id is not None:
+            adv_setting_original_id = await _get_existing_adv_setting_id_not_done(
+                wb_cabinet_id, nmid
+            )
             ids_text = f"Аукцион: {existing_auction_id}, Авто: {existing_auto_id}"
             await state.clear()
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="В меню магазина",
-                            callback_data=callbacks.ConnectExistingAdvsBackToShop(
-                                wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                            ).pack(),
-                        )
-                    ],
-                ]
+            first_row: list[InlineKeyboardButton] = []
+            if adv_setting_original_id is not None:
+                first_row.append(
+                    InlineKeyboardButton(
+                        text="Перепривязать кампании WB",
+                        callback_data=callbacks.RebindAdvCampaignIds(
+                            action="menu",
+                            adv_setting_original_id=adv_setting_original_id,
+                            wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                        ).pack(),
+                    )
+                )
+            first_row.append(
+                InlineKeyboardButton(
+                    text="В меню магазина",
+                    callback_data=callbacks.ConnectExistingAdvsBackToShop(
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id
+                    ).pack(),
+                )
             )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[first_row])
             await bot.send_message(
                 chat_id,
                 f"Для этого артикула уже есть подключённые РК (Аукцион и Авто). "
@@ -1606,6 +1639,27 @@ async def connect_existing_continue_despite_invalid(
     finally:
         await state.clear()
     # После старта создания поисковой РК меню магазина не показываем.
+
+
+@router.callback_query(callbacks.ConnectExistingChangeNmid.filter())
+async def connect_existing_change_nmid(
+    callback: CallbackQuery,
+    callback_data: callbacks.ConnectExistingChangeNmid,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    """Снова запросить артикул (например, при уже подключённых к этому nm id РК)."""
+    await callback.answer()
+    if callback.message is None:
+        return
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    await state.clear()
+    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    await state.set_state(ConnectExistingAdvsStates.waiting_nmid)
+    await bot.send_message(
+        callback.message.chat.id,
+        "Введите артикул WB товара — одно число, больше 0:",
+    )
 
 
 @router.callback_query(callbacks.ConnectExistingAdvsBackToShop.filter())

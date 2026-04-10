@@ -72,6 +72,7 @@ from .user_interface.handlers import (
     individual_keywords_target_place_toggle,
     reset_place_setting,
     set_common_bid_manual,
+    rebind_adv_campaign_ids,
     shop_settings,
     strategy_setting,
     rec_system_mode_toggle,
@@ -119,6 +120,7 @@ common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(common_budget_mode_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(set_common_bid_manual.router)
+common_router.include_routers(rebind_adv_campaign_ids.router)
 common_router.include_routers(individual_keywords_target_place_toggle.router)
 common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)

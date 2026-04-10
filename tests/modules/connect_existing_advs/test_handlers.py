@@ -44,7 +44,8 @@ def _make_callback(
     | callbacks.ConnectExistingConfirmType2
     | callbacks.ConnectExistingCreateBoth
     | callbacks.ConnectExistingContinueDespiteInvalid
-    | callbacks.ConnectExistingAdvsBackToShop,
+    | callbacks.ConnectExistingAdvsBackToShop
+    | callbacks.ConnectExistingChangeNmid,
     chat_id: int = 12345,
     from_user_id: int = 67890,
 ) -> CallbackQuery:
@@ -225,10 +226,6 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_existing_pair() -> None:
     """nmid handler: existing_pair not None -> message and keyboard BackToShop."""
-    from app.client_bot.user_interface.views.callbacks import (
-        ConnectExistingAdvsBackToShop,
-    )
-
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -257,6 +254,9 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     ), patch(
         f"{MODULE}._get_existing_adv_pair_not_done",
         AsyncMock(return_value=(100, 200)),
+    ), patch(
+        f"{MODULE}._get_existing_adv_setting_id_not_done",
+        AsyncMock(return_value=77),
     ):
         await connect_existing_advs.connect_existing_advs_nmid(
             message, bot, state
@@ -266,9 +266,14 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then "уже есть подключённые"
     assert "уже есть подключённые" in bot.send_message.call_args[0][1]
     reply_markup = bot.send_message.call_args[1]["reply_markup"]
-    btn = reply_markup.inline_keyboard[0][0]
-    assert btn.text == "В меню магазина"
-    assert ConnectExistingAdvsBackToShop.unpack(btn.callback_data) is not None
+    row = reply_markup.inline_keyboard[0]
+    assert len(row) == 2
+    assert row[0].text == "Перепривязать кампании WB"
+    cb = callbacks.RebindAdvCampaignIds.unpack(row[0].callback_data)
+    assert cb is not None
+    assert cb.adv_setting_original_id == 77
+    assert row[1].text == "В меню магазина"
+    assert callbacks.ConnectExistingAdvsBackToShop.unpack(row[1].callback_data) is not None
 
 
 @pytest.mark.unit
