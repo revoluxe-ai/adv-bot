@@ -568,20 +568,29 @@ async def _connect_existing_after_card_resolved(
                         wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                     ).pack(),
                 ),
-            ]
-            first_row.append(
                 InlineKeyboardButton(
                     text="В меню магазина",
                     callback_data=callbacks.ConnectExistingAdvsBackToShop(
                         wb_user_cabinet_original_id=wb_user_cabinet_original_id
                     ).pack(),
-                )
+                ),
+            ]
+            second_row = [
+                InlineKeyboardButton(
+                    text="Ввести другой артикул",
+                    callback_data=callbacks.ConnectExistingChangeNmid(
+                        wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                    ).pack(),
+                ),
+            ]
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[first_row, second_row]
             )
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[first_row])
             await bot.send_message(
                 chat_id,
                 f"Для этого артикула уже есть подключённые РК (Аукцион и Авто). "
-                f"ID кампаний: {ids_text}. Отмените создание и вернитесь в меню магазина.",
+                f"ID кампаний: {ids_text}. Перепривяжите кампании, введите другой артикул "
+                f"или вернитесь в меню магазина.",
                 reply_markup=keyboard,
             )
             return

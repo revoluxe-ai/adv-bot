@@ -225,7 +225,7 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_existing_pair() -> None:
-    """nmid handler: existing_pair not None -> message and keyboard BackToShop."""
+    """nmid handler: both IDs set -> rebind, shop, change nmid keyboard."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -263,14 +263,21 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then "уже есть подключённые"
     assert "уже есть подключённые" in bot.send_message.call_args[0][1]
     reply_markup = bot.send_message.call_args[1]["reply_markup"]
-    row = reply_markup.inline_keyboard[0]
-    assert len(row) == 2
-    assert row[0].text == "Перепривязать кампании WB"
-    cb = callbacks.RebindAdvCampaignIds.unpack(row[0].callback_data)
+    rows = reply_markup.inline_keyboard
+    assert len(rows) == 2
+    row0, row1 = rows
+    assert len(row0) == 2
+    assert row0[0].text == "Перепривязать кампании WB"
+    cb = callbacks.RebindAdvCampaignIds.unpack(row0[0].callback_data)
     assert cb is not None
     assert cb.adv_setting_original_id == 77
-    assert row[1].text == "В меню магазина"
-    assert callbacks.ConnectExistingAdvsBackToShop.unpack(row[1].callback_data) is not None
+    assert row0[1].text == "В меню магазина"
+    assert callbacks.ConnectExistingAdvsBackToShop.unpack(row0[1].callback_data) is not None
+    assert len(row1) == 1
+    assert row1[0].text == "Ввести другой артикул"
+    cn = callbacks.ConnectExistingChangeNmid.unpack(row1[0].callback_data)
+    assert cn is not None
+    assert cn.wb_user_cabinet_original_id == 5
 
 
 @pytest.mark.unit
@@ -1151,3 +1158,32 @@ async def test_connect_existing_advs_back_to_shop() -> None:
     state.clear.assert_called_once()
     mock_shop_menu.assert_called_once_with(bot, 444, state, 7)
     mock_shop_menu.return_value.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_change_nmid() -> None:
+    """change_nmid: clear, set waiting_nmid, prompt for new nmid."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.clear = AsyncMock()
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingChangeNmid(wb_user_cabinet_original_id=7),
+        chat_id=444,
+    )
+    callback_data = callbacks.ConnectExistingChangeNmid(
+        wb_user_cabinet_original_id=7
+    )
+
+    await connect_existing_advs.connect_existing_change_nmid(
+        callback, callback_data, bot, state
+    )
+
+    state.clear.assert_called_once()
+    state.update_data.assert_called_once_with(wb_user_cabinet_original_id=7)
+    state.set_state.assert_called_once_with(ConnectExistingAdvsStates.waiting_nmid)
+    bot.send_message.assert_called_once()
+    assert "артикул" in bot.send_message.call_args[0][1]
