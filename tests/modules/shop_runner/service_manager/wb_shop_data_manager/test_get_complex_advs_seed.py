@@ -58,6 +58,7 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
             fact_pay_for_order=450.0,
         ),
         # Для второй РК summary нет: факт как 0 заказов → план не выполнен → max_pay_for_order.
+        # Для второй РК summary отсутствует -> факт как None, план не выполнен -> max_pay.
     }
 
     with (

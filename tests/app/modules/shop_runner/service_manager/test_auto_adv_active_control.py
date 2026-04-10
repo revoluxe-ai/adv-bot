@@ -25,10 +25,8 @@ def _positive_cabinet_balance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Избегаем реального balance_manager: положительный баланс кабинета."""
     monkeypatch.setattr(
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
-        AsyncMock(return_value=(100.0, 0.0)),
+        AsyncMock(return_value=(1000.0, 0.0)),
     )
-
-
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
     return {aid: None for aid in adv_ids}

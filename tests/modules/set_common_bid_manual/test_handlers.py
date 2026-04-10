@@ -61,6 +61,9 @@ def _make_adv_setting(
     adv.wb_cabinet.shop_id = shop_id
     adv.nmids = nmids or [12345, 67890]
     adv.adv_id = adv_id
+    adv.plan_for_sales_for_day = None
+    adv.target_price_for_order = None
+    adv.max_price_for_order = None
     return adv
 
 
