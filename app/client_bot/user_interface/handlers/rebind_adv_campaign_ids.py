@@ -403,13 +403,19 @@ async def _apply_rebind_message(
             await session.commit()
     except IntegrityError:
         logger.warning(
-            "rebind adv_id integrity error adv_setting_id=%s new_id=%s",
+            "rebind adv_id integrity error adv_setting_id=%s new_id=%s expected_kind=%s",
             adv_oid,
             new_id,
+            expected_kind,
         )
-        await message.answer(
-            "Не удалось сохранить: этот ID автокампании уже занят другой записью."
-        )
+        if expected_kind == "auto":
+            await message.answer(
+                "Не удалось сохранить: этот ID автокампании уже занят другой записью."
+            )
+        else:
+            await message.answer(
+                "Не удалось сохранить: этот ID поисковой РК уже занят другой записью."
+            )
         return
 
     await state.clear()
