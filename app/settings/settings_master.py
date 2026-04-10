@@ -703,5 +703,14 @@ class Settings:
         return parsed
 
 
+    @property
+    def PROXY(self) -> str:
+        value = os.getenv("PROXY")
+        if not value:
+            return "http://xray-client.default.svc.cluster.local:8080"
+        return value
+
+
+
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

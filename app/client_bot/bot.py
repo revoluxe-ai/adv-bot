@@ -8,8 +8,9 @@ load_dotenv()
 
 
 session = AiohttpSession(
-    proxy="http://xray-client.default.svc.cluster.local:8080",
+    proxy=settings.PROXY
 )
+
 
 
 token = settings.TELEGRAM_BOT_TOKEN
