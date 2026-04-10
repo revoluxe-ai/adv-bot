@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Iterable
 
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
@@ -25,9 +26,14 @@ def _chunks(items: list[int], chunk_size: int) -> Iterable[list[int]]:
         yield items[i : i + chunk_size]
 
 
+# WB: ~5 GET /api/advert/v2/adverts per 1s (sliding). @retry_decorator(period=1, limit=5) paces
+# only whole-method calls; inner chunk loop must leave >0.2s between request *starts* (use 0.25).
+_V2_ADVERTS_INTER_CHUNK_SECONDS = 0.25
+
+
 class CampaignsInfoV2Adapter(BaseSectionAdapter):
     """Adapter for /api/advert/v2/adverts endpoint from promotion v2 client."""
-
+    # TODO: тут нормально переделать, вынеся чанки в отдельный метод под ретрай-декоратором
     @retry_decorator(period=1, limit=5)
     async def get_campaigns_info(
         self, adv_ids: list[int]
@@ -36,7 +42,9 @@ class CampaignsInfoV2Adapter(BaseSectionAdapter):
             return []
 
         campaigns: list[GetAdvertsAdvertsItem] = []
-        for chunk in _chunks(adv_ids, 50):
+        for chunk_idx, chunk in enumerate(_chunks(adv_ids, 50)):
+            if chunk_idx > 0:
+                await asyncio.sleep(_V2_ADVERTS_INTER_CHUNK_SECONDS)
             client = await self.auth_client_handler.get_proxy_client(self)
             response: Response[GetAdverts] = await with_raise_errors(
                 asyncio_detailed,
