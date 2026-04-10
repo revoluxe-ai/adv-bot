@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from aiogram import Bot
 from dotenv import load_dotenv
+
+from app.client_bot.bot import aclose_telegram_http_session, create_bot_for_token
 
 from app.modules.wb_adv_updater.modules.balance_exp_informer.dto import ReminderItem
 from app.modules.wb_adv_updater.modules.balance_exp_informer.levels import pick_level
@@ -47,7 +48,7 @@ async def test_send_balance_reminder_integration(days_left: float):
     if level is None:
         pytest.skip("days_left is outside of reminder zone")
 
-    bot = Bot(token=token)
+    bot = create_bot_for_token(token)
     try:
         reminder = ReminderItem(
             reminder_id=1,
@@ -72,5 +73,5 @@ async def test_send_balance_reminder_integration(days_left: float):
         )
         assert hasattr(response, "message_id")
     finally:
-        await bot.session.close()
+        await aclose_telegram_http_session()
     await asyncio.sleep(1)

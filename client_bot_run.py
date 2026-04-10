@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiohttp import ClientSession
 from fastapi import FastAPI, Request, Response
 
-from app.client_bot.bot import get_bot
+from app.client_bot.bot import aclose_telegram_http_session, get_bot
 from app.client_bot.global_router import global_router
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.settings import settings
@@ -74,7 +74,7 @@ async def lifespan(app_fast_api: FastAPI): # noqa
             finally:
                 logger.info("🧹 Удаление вебхука и закрытие сессии...")
                 await bot.delete_webhook()
-                await bot.session.close()
+                await aclose_telegram_http_session()
                 logger.info("✅ Завершено.")
 
     # Shutdown token monitoring system
@@ -188,7 +188,7 @@ if __name__ == "__main__":
                         # Запуск бота с использованием long polling
                         await dp.start_polling(bot)
             finally:
-                await bot.session.close()
+                await aclose_telegram_http_session()
                 logger.info("✅ Сессия бота завершена.")
 
         asyncio.run(start_polling())
