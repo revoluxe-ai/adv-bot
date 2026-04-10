@@ -4,7 +4,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy import select
 
 from app.client_bot import const
-from app.client_bot.bot import bot
+from app.client_bot.bot import get_bot
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -18,6 +18,7 @@ class NotValidTokens:
         self.shop_id = shop_id
 
     async def send_all_users(self):
+        bot = get_bot()
         async with sm() as session:
             stmt = (
                 select(User)
