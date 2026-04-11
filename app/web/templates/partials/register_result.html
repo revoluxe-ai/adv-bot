@@ -1,0 +1,12 @@
+{% if success %}
+<div class="register-result success">Регистрация успешна. Можно войти (логин будет добавлен отдельно).</div>
+{% else %}
+<div class="register-result error">
+  <p>Не удалось зарегистрироваться:</p>
+  <ul>
+    {% for err in errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

@@ -1,11 +1,13 @@
 import logging
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from aiogram import Dispatcher, types
 from aiogram.exceptions import TelegramAPIError
 from aiohttp import ClientSession
 from fastapi import FastAPI, Request, Response
+from starlette.staticfiles import StaticFiles
 
 from app.client_bot.bot import aclose_telegram_http_session, get_bot
 from app.client_bot.global_router import global_router
@@ -19,6 +21,7 @@ from app.modules.token_monitoring import (
     initialize_token_monitoring,
     shutdown_token_monitoring,
 )
+from app.web.routes.auth import router as web_auth_router
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +90,14 @@ async def lifespan(app_fast_api: FastAPI): # noqa
 
 
 app = FastAPI(lifespan=lifespan)
+
+_web_static_dir = Path(__file__).resolve().parent / "app" / "web" / "static"
+_ = app.mount(
+    "/web-static",
+    StaticFiles(directory=str(_web_static_dir)),
+    name="web_static",
+)
+_ = app.include_router(web_auth_router)
 
 
 # Эндпоинты для проверок
