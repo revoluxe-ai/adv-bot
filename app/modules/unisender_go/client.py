@@ -4,6 +4,7 @@ import json
 import logging
 
 import httpx
+from pydantic import ValidationError
 
 from app.modules.unisender_go.exceptions import UnisenderGoError
 from app.modules.unisender_go.schemas import (
@@ -123,7 +124,15 @@ class UnisenderGoClient:
 
         status = body.get("status") if isinstance(body, dict) else None
         if status == "error":
-            err = EmailSendErrorBody.model_validate(body)
+            try:
+                err = EmailSendErrorBody.model_validate(body)
+            except ValidationError as e:
+                logger.warning("Unisender Go error body parse issue: %s", text)
+                raise UnisenderGoError(
+                    "Unisender Go error response had unexpected shape",
+                    status_code=resp.status_code,
+                    response_body=text,
+                ) from e
             raise UnisenderGoError(
                 err.message or "Unisender Go API error",
                 status_code=resp.status_code,
@@ -139,7 +148,7 @@ class UnisenderGoClient:
 
         try:
             return EmailSendResponse.model_validate(body)
-        except ValueError as e:
+        except ValidationError as e:
             logger.warning("Unisender Go success response parse issue: %s", text)
             raise UnisenderGoError(
                 "Unisender Go success response missing expected fields",
@@ -157,7 +166,15 @@ class UnisenderGoClient:
                 response_body=text,
             ) from None
         if isinstance(raw, dict) and raw.get("status") == "error":
-            err = EmailSendErrorBody.model_validate(raw)
+            try:
+                err = EmailSendErrorBody.model_validate(raw)
+            except ValidationError as e:
+                logger.warning("Unisender Go HTTP error body parse issue: %s", text)
+                raise UnisenderGoError(
+                    f"Unisender Go HTTP {status_code}",
+                    status_code=status_code,
+                    response_body=text,
+                ) from e
             raise UnisenderGoError(
                 err.message or f"Unisender Go HTTP {status_code}",
                 status_code=status_code,
