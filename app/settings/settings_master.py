@@ -216,6 +216,14 @@ class Settings:
         return int(value)
 
     @property
+    def TELEGRAM_WEB_HOST(self) -> str:
+        """Bind address for FastAPI/uvicorn (client_bot_run). Default: all interfaces."""
+        value = os.environ.get("TELEGRAM_WEB_HOST")
+        if value is None or not str(value).strip():
+            return "0.0.0.0"
+        return str(value).strip()
+
+    @property
     def CH_MAX_THREAD(self) -> int:
         value = os.environ.get("CH_MAX_THREAD")
         if value is None:

@@ -11,7 +11,7 @@
 
 1. `poetry install`
 2. Apply migrations: `poetry run alembic upgrade head`
-3. Run app (existing process): `client_bot_run.py` / your deployment entrypoint.
+3. Run the client bot process: **always** `uvicorn` on `TELEGRAM_WEB_HOST`:`TELEGRAM_WEB_PORT` (e.g. `python client_bot_run.py` or `uvicorn client_bot_run:app --host … --port …`). HTTP (`/health`, `/register`, …) is served in the same process. `POLLING_MODE=true` runs Telegram long polling as a **background task**; `POLLING_MODE=false` registers a webhook with Telegram (needs a public `WEBHOOK_URL`).
 4. Open `/register`, submit form, verify row in `user` with `email`, `password_hash`, `user_telegram_id < 0`.
 
 ### Stage

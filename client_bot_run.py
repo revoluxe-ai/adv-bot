@@ -1,19 +1,25 @@
-import logging
 import asyncio
-from contextlib import asynccontextmanager
+import logging
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from aiogram import Dispatcher, types
-from aiogram.exceptions import TelegramAPIError
 from aiohttp import ClientSession
 from fastapi import FastAPI, Request, Response
 from starlette.staticfiles import StaticFiles
 
-from app.client_bot.bot import aclose_telegram_http_session, get_bot
+from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
+from app.client_bot.runner import (
+    configure_webhook_for_production,
+    ensure_no_webhook_for_polling,
+    remove_webhook_on_shutdown,
+    run_polling_forever,
+)
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.settings import settings
 from app.utils.redis_cache import setup_redis_cache
+from app.web.routes.auth import router as web_auth_router
 from python_modules.logger import setup_logging
 
 # Import token monitoring system
@@ -21,7 +27,6 @@ from app.modules.token_monitoring import (
     initialize_token_monitoring,
     shutdown_token_monitoring,
 )
-from app.web.routes.auth import router as web_auth_router
 
 logger = logging.getLogger(__name__)
 
@@ -41,52 +46,60 @@ POLLING_MODE = settings.polling_mode
 
 
 @asynccontextmanager
-async def lifespan(app_fast_api: FastAPI): # noqa
-    # Initialize token monitoring system
+async def lifespan(app_fast_api: FastAPI):
     try:
-        # TODO Надо с этим разобраться к чему это все
         await initialize_token_monitoring(
-            enable_decorator_monitoring=True, enable_expiration_scheduler=True
+            enable_decorator_monitoring=True,
+            enable_expiration_scheduler=True,
         )
-        logger.info("✅ Token monitoring system initialized")
+        logger.info("Token monitoring system initialized")
     except Exception as e:
-        logger.error("❌ Failed to initialize token monitoring: %s", e)
-        # Continue without token monitoring if it fails
+        logger.error("Failed to initialize token monitoring: %s", e)
 
-    async with ClientSession() as client_session:
-        dp = Dispatcher(
-            client_session=client_session,
-            billing_event_manager=billing_event_manager,
+    app_fast_api.state.dispatcher = None
+    app_fast_api.state.polling_task = None
+
+    if POLLING_MODE:
+        await ensure_no_webhook_for_polling(bot)
+        app_fast_api.state.polling_task = asyncio.create_task(
+            run_polling_forever(bot, billing_event_manager, app_fast_api),
+            name="telegram-long-polling",
         )
-        dp.include_router(global_router)
-        if POLLING_MODE:
-            logger.info("⚙️ POLLING_MODE=True: FastAPI только для health-check и info.")
-            yield  # FastAPI просто живёт, бот живёт отдельно
-        else:
-            full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
-            await bot.set_webhook(
-                url=full_url,
-                allowed_updates=dp.resolve_used_update_types(),
-                drop_pending_updates=True,
-                secret_token=WEBHOOK_SECRET_TOKEN,
-            )
-            logger.info(f"✅ Вебхук установлен: {full_url}")
+    else:
+        await configure_webhook_for_production(bot, billing_event_manager)
 
-            try:
-                yield
-            finally:
-                logger.info("🧹 Удаление вебхука и закрытие сессии...")
-                await bot.delete_webhook()
-                await aclose_telegram_http_session()
-                logger.info("✅ Завершено.")
-
-    # Shutdown token monitoring system
-    # TODO Надо с этим разобраться к чему это все
     try:
-        await shutdown_token_monitoring()
-        logger.info("✅ Token monitoring system shutdown completed")
-    except Exception as e:
-        logger.error(f"❌ Error during token monitoring shutdown: {e}")
+        yield
+    finally:
+        if POLLING_MODE:
+            dp = getattr(app_fast_api.state, "dispatcher", None)
+            if dp is not None:
+                try:
+                    await dp.stop_polling()
+                except Exception:
+                    logger.exception("stop_polling failed")
+            t = app_fast_api.state.polling_task
+            if t is not None:
+                try:
+                    await asyncio.wait_for(t, timeout=120)
+                except TimeoutError:
+                    logger.warning("Polling task did not finish in time, cancelling")
+                    _ = t.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await t
+                except Exception:
+                    logger.exception("Polling task failed")
+        else:
+            try:
+                await remove_webhook_on_shutdown(bot)
+            except Exception:
+                logger.exception("Webhook shutdown failed")
+
+        try:
+            await shutdown_token_monitoring()
+            logger.info("Token monitoring shutdown completed")
+        except Exception as e:
+            logger.error("Error during token monitoring shutdown: %s", e)
 
 
 app = FastAPI(lifespan=lifespan)
@@ -126,12 +139,15 @@ async def webhook_info():
     }
 
 
-# POST-обработчик вебхука
-@app.post(settings.WEBHOOK_PATH)
+# POST-обработчик вебхука (в проде задайте WEBHOOK_PATH; иначе дефолт для локальных тестов)
+_WEBHOOK_PATH: str = settings.WEBHOOK_PATH or "/webhook"
+
+
+@app.post(_WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
     token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     if token != WEBHOOK_SECRET_TOKEN:
-        logger.warning(f"⛔ Неверный Secret Token: {token}")
+        logger.warning("Неверный Secret Token: %s", token)
         return Response(status_code=403, content="Forbidden")
 
     update = types.Update.model_validate(await request.json())
@@ -140,69 +156,21 @@ async def telegram_webhook(request: Request):
             client_session=client_session,
             billing_event_manager=billing_event_manager,
         )
-        dp.include_router(global_router)
-    await dp.feed_update(bot, update)
+        _ = dp.include_router(global_router)
+        await dp.feed_update(bot, update)
     return {"status": "ok"}
 
 
-# TODO: Сделать полноценные Smoke Тесты, чтобы не гонять реальные магазины
-
-# Запуск в зависимости от режима
+# Запуск: всегда uvicorn (HTTP + polling task или webhook в lifespan)
 if __name__ == "__main__":
     import uvicorn
 
-    if POLLING_MODE:
-
-        async def start_polling():
-            logger.info("🚀 Стартуем в режиме POLLING...")
-
-            # Принудительное удаление вебхука
-            logger.info("🧹 Удаляем вебхук перед стартом POLLING...")
-            try:
-                # Проверяем текущий статус вебхука
-                webhook_info = await bot.get_webhook_info() # noqa
-                if webhook_info.url:
-                    # Если вебхук установлен, удаляем его с таймаутом
-                    try:
-                        # Устанавливаем таймаут в 10 секунд для операции удаления вебхука
-                        delete_task = asyncio.create_task(bot.delete_webhook())
-                        await asyncio.wait_for(delete_task, timeout=5)
-                        logger.info("✅ Вебхук удалён.")
-                    except TimeoutError:
-                        logger.warning(
-                            "⚠️ Таймаут при удалении вебхука. Продолжаем работу."
-                        )
-                else:
-                    logger.info("ℹ️ Вебхук не был установлен, пропускаем удаление.")
-            except TelegramAPIError as e:
-                logger.error(f"❌ Ошибка при работе с API Telegram: {e}")
-                logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
-            except Exception as e:
-                logger.error(f"❌ Непредвиденная ошибка при удалении вебхука: {e}")
-                logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
-                del e
-            from app.core.di.app_container import AppContainer
-            from app.core.di.di_manager import DIManager
-
-            try:
-                from app.core.di.app_container import AppContainer
-                from app.core.di.di_manager import DIManager
-
-                async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-                    async with ClientSession() as client_session:
-                        dp = Dispatcher(
-                            client_session=client_session,
-                            billing_event_manager=billing_event_manager,
-                        )
-                        dp.include_router(global_router)
-                        logger.info("🔄 Запуск бота в режиме POLLING...")
-                        # Запуск бота с использованием long polling
-                        await dp.start_polling(bot)
-            finally:
-                await aclose_telegram_http_session()
-                logger.info("✅ Сессия бота завершена.")
-
-        asyncio.run(start_polling())
-    else:
-        logger.info("🌐 Стартуем FastAPI в режиме WEBHOOK...")
-        uvicorn.run(app, host="0.0.0.0", port=8080)
+    host = settings.TELEGRAM_WEB_HOST
+    port = settings.TELEGRAM_WEB_PORT
+    logger.info(
+        "Старт uvicorn %s:%s POLLING_MODE=%s",
+        host,
+        port,
+        POLLING_MODE,
+    )
+    uvicorn.run(app, host=host, port=port)

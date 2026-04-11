@@ -2,6 +2,7 @@
 
 ## Project Structure & Module Organization
 - `app/` holds the main Python package and runtime code; most business logic lives under `app/modules/`.
+- **Client bot HTTP + Telegram:** [`client_bot_run.py`](client_bot_run.py) always serves FastAPI (health, web registration, webhook route) via uvicorn on `TELEGRAM_WEB_HOST` / `TELEGRAM_WEB_PORT`. `POLLING_MODE` only chooses Telegram delivery: long polling in a background task vs webhook registration — it does not disable HTTP.
 - `tests/` contains pytest suites; shared fixtures live in `conftest.py`.
 - `alembic_/` and `alembic.ini` manage database migrations.
 - `docs/`, `docks/`, and `DEVOPS_*.md` include operational notes and runbooks.
