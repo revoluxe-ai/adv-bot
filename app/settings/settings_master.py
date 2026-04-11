@@ -1,4 +1,4 @@
-﻿import dotenv
+import dotenv
 
 # TODO: Доделать рассылку по боту, сделать оффер и разослать
 
