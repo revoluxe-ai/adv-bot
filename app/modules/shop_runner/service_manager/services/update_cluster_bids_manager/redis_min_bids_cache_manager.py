@@ -26,7 +26,7 @@ class MinBidsAdvPlacementCacheMixin:
         placement: AdvPlacementType,
         nmid: int,
     ) -> int | None:
-        key = self.min_bids_v2_key(adv_id, placement, nmid)
+        key = MinBidsAdvPlacementCacheMixin.min_bids_v2_key(adv_id, placement, nmid)
         result = await self._client.get(key)  # pyright: ignore
         if not result:
             return None
@@ -41,7 +41,7 @@ class MinBidsAdvPlacementCacheMixin:
         cpm: int,
         ttl: int | None = None,
     ) -> None:
-        key = self.min_bids_v2_key(adv_id, placement, nmid)
+        key = MinBidsAdvPlacementCacheMixin.min_bids_v2_key(adv_id, placement, nmid)
         effective = (
             ttl
             if ttl is not None
