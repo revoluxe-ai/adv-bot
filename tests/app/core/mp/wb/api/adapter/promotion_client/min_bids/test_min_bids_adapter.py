@@ -70,6 +70,11 @@ def test_is_nms_not_belong_to_advert_error_other_bad_request() -> None:
     assert _is_nms_not_belong_to_advert_error(exc) is False
 
 
+def test_is_nms_not_belong_to_advert_error_none_detail() -> None:
+    exc = BadRequestError(None)
+    assert _is_nms_not_belong_to_advert_error(exc) is False
+
+
 @pytest.mark.asyncio
 async def test_post_api_success_without_split(
     min_bids_adapter: MinBidsAdapter,

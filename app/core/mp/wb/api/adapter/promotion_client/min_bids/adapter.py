@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
@@ -36,13 +36,15 @@ _NMS_NOT_BELONG_RE = re.compile(
 
 def _bad_request_payload(exc: BadRequestError) -> dict[str, Any] | None:
     raw = exc.detail
-    if not raw or not isinstance(raw, str):
+    if not raw:
         return None
     try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
+        parsed: Any = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
         return None
-    return parsed if isinstance(parsed, dict) else None
+    if not isinstance(parsed, dict):
+        return None
+    return cast(dict[str, Any], parsed)
 
 
 def _is_nms_not_belong_to_advert_error(exc: BadRequestError) -> bool:
@@ -55,8 +57,14 @@ def _is_nms_not_belong_to_advert_error(exc: BadRequestError) -> bool:
         if _NMS_NOT_BELONG_RE.search(combined):
             return True
     # Fallback: substring match on raw string (non-JSON or partial body)
-    if _NMS_NOT_BELONG_RE.search(exc.detail):
-        return True
+    raw = exc.detail
+    if not raw:
+        return False
+    try:
+        if _NMS_NOT_BELONG_RE.search(raw):
+            return True
+    except TypeError:
+        return False
     return False
 
 
