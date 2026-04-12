@@ -48,7 +48,7 @@ async def _get_complex_advs() -> list[ComplexAdv]:
     cabinet = await _get_cabinet(SHOP_ID)
     complex_advs: list[ComplexAdv] = []
     manager = WBShopDataManager(wb_cabinet=cabinet)
-    complex_advs.extend(await manager.get_complex_advs())
+    complex_advs.extend(await manager.get_complex_advs(load_extras=False))
     return complex_advs
 
 

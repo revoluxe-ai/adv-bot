@@ -287,7 +287,15 @@ class WBShopDataManager:
         ]
 
     @single_run()
-    async def get_complex_advs(self) -> list["ComplexAdv"]:
+    async def get_complex_advs(self, *, load_extras: bool = True) -> list["ComplexAdv"]:
+        """Собрать активные комплексы РК.
+
+        ``load_extras=True`` (по умолчанию): обогатить traffic-кликами (CH) и подтянуть
+        min bids — дорого при большом числе РК.
+
+        ``load_extras=False``: только данные из БД + nmids; для фоновых корутин, где нужны
+        id/nmids/настройки, а не клики/минимальные ставки из этого шага.
+        """
         # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
         # оба помечены `@single_run()`.
         #
@@ -329,7 +337,7 @@ class WBShopDataManager:
             lambda adv_=adv: self._traffic_clicks_manager.enrich(adv_)
             for adv in complex_advs
         ]
-        if handlers:
+        if load_extras and handlers:
             results = await run_tasks(
                 handlers,
                 max_workers=max(1, min(len(handlers), 16)),
@@ -347,7 +355,7 @@ class WBShopDataManager:
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
-        if complex_advs:
+        if load_extras and complex_advs:
             try:
                 min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
             except ClusterBidsUpdateError as exc:
