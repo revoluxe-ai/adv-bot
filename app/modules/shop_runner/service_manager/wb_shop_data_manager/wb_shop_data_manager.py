@@ -288,6 +288,14 @@ class WBShopDataManager:
 
     @single_run()
     async def get_complex_advs(self, *, load_extras: bool = True) -> list["ComplexAdv"]:
+        """Собрать активные комплексы РК.
+
+        ``load_extras=True`` (по умолчанию): обогатить traffic-кликами (CH) и подтянуть
+        min bids — дорого при большом числе РК.
+
+        ``load_extras=False``: только данные из БД + nmids; для фоновых корутин, где нужны
+        id/nmids/настройки, а не клики/минимальные ставки из этого шага.
+        """
         # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
         # оба помечены `@single_run()`.
         #

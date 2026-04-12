@@ -488,7 +488,9 @@ async def wb_update_minus_keywords(
                 wb_api_data_manager=hub.wb_data_manager,
                 wb_manager=hub.wb_manager,
             )
-            complex_advs = await wb_shop_data_manager.get_complex_advs()
+            complex_advs = await wb_shop_data_manager.get_complex_advs(
+                load_extras=False
+            )
             complex_adv = next(
                 (a for a in complex_advs if a.adv_setting_original_id == adv_setting_original_id),
                 None,
