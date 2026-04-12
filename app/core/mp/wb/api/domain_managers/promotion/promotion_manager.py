@@ -19,6 +19,9 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
+from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
+    GetMinBidsCommand,
+)
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
     filter_full_adv_stat_to_dates,
@@ -142,6 +145,18 @@ class PromotionManager:
             complex_advs,
         )
         return result
+
+    async def get_min_bids_for_command(
+        self,
+        command: GetMinBidsCommand,
+    ) -> AdvMinNmidsBids | None:
+        """Минимальные ставки по уже собранной команде (например урезанной по кешу)."""
+        from .methods.get_min_bids import method
+
+        return await method.get_min_bids_for_command(
+            self._client.min_bids_adapter,
+            command,
+        )
 
     async def get_campaigns_info(
         self, complex_advs: list[ComplexAdv], *, get_auto: bool = True
