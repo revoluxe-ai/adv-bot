@@ -262,7 +262,8 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5)
     async def update_common_sale_stat(self) -> None:
-        advs = await self._wb_shop_data_manager.get_complex_advs()
+        # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N РК)
+        advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
         if not advs:
             return None
         from .services.common_sale_stat_updater import (
