@@ -262,13 +262,18 @@ class WBShopDataManager:
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        search_adv_idv: dict[int, AdvSetting] = (
-            await self.__get_adv_id_to_search_adv_map(search_adv_ids)
-        )
         plan_fact_reader = PlanFactReader()
-        summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
-            [adv.adv_id for adv in adv_settings]
-        )
+        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        if search_adv_ids:
+            search_adv_idv, summaries_by_adv_id = await asyncio.gather(
+                self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
+            )
+        else:
+            search_adv_idv = {}
+            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                adv_ids_for_plan_fact
+            )
         return [
             PreComplexAdv(
                 auto_adv=adv,
