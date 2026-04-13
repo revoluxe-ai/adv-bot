@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
     pass
 
 MIN_BIDS_V2_DEFAULT_TTL_SEC = 12 * 60 * 60
+
+MinBidsV2Cell = tuple[int, AdvPlacementType, int]
 
 
 class MinBidsAdvPlacementCacheMixin:
@@ -52,6 +55,52 @@ class MinBidsAdvPlacementCacheMixin:
             json.dumps({"cpm": cpm}),
             ex=effective,
         )
+
+    async def get_min_bids_v2_batch(
+        self: "BaseRedisManagerProtocol",
+        cells: Sequence[MinBidsV2Cell],
+    ) -> dict[MinBidsV2Cell, int]:
+        if not cells:
+            return {}
+        keys = [
+            MinBidsAdvPlacementCacheMixin.min_bids_v2_key(a, p, n)
+            for a, p, n in cells
+        ]
+        raw_list = await self._client.mget(keys)  # pyright: ignore
+        out: dict[MinBidsV2Cell, int] = {}
+        for cell, raw in zip(cells, raw_list, strict=True):
+            if not raw:
+                continue
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            try:
+                data = json.loads(raw)
+                out[cell] = int(data["cpm"])
+            except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+                continue
+        return out
+
+    async def set_min_bids_v2_batch(
+        self: "BaseRedisManagerProtocol",
+        entries: Sequence[tuple[int, AdvPlacementType, int, int]],
+        ttl: int | None = None,
+    ) -> None:
+        if not entries:
+            return
+        effective = (
+            ttl if ttl is not None else MIN_BIDS_V2_DEFAULT_TTL_SEC
+        )
+        async with self._client.write_pipeline() as pipeline:  # pyright: ignore
+            for adv_id, placement, nmid, cpm in entries:
+                key = MinBidsAdvPlacementCacheMixin.min_bids_v2_key(
+                    adv_id, placement, nmid
+                )
+                pipeline.set(
+                    key,
+                    json.dumps({"cpm": cpm}),
+                    ex=effective,
+                )
+            await pipeline.execute()  # pyright: ignore
 
 
 class MinBidsCacheMixin:

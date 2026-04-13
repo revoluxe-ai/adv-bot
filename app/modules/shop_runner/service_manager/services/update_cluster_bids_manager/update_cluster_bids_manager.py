@@ -117,7 +117,9 @@ class UpdateClusterBidsManager:
             return await self._get_cluster_bids_for_maps(map_datas)
 
         async def _get_min_bids() -> AdvMinNmidsBids:
-            return await self._wb_manager.get_min_bids(advs, cache_possible=True)
+            return await self._wb_manager.get_min_bids_cache_only(
+                advs, context="update_cluster_bids"
+            )
 
         async def _get_fact_data() -> dict[int, FactData]:
             return await self._get_fact_datas(advs)

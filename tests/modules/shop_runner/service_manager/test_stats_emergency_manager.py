@@ -122,7 +122,9 @@ async def test_set_min_search_bid_for_keyword_uses_min_bids(fake_redis) -> None:
 
     min_bids = SimpleNamespace(search={101: 150, 202: 200})
     wb_manager_hub = SimpleNamespace(
-        wb_manager=SimpleNamespace(get_min_bids=AsyncMock(return_value=min_bids)),
+        wb_manager=SimpleNamespace(
+            get_min_bids_cache_only=AsyncMock(return_value=min_bids),
+        ),
         wb_modifier=SimpleNamespace(set_cluster_bids_for_adv=AsyncMock()),
     )
 

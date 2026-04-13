@@ -132,8 +132,9 @@ async def set_common_bid_manual_start(
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            min_bids = await hub.wb_manager.get_min_bids(
-                [complex_adv], cache_possible=True
+            min_bids = await hub.wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="set_common_bid_manual",
             )
     except Exception as e:
         logger.exception("get_min_bids failed for adv_setting_id=%s", adv_setting_original_id)
@@ -143,10 +144,10 @@ async def set_common_bid_manual_start(
         )
         return
 
-    if not min_bids or not min_bids.search:
+    if not min_bids.search:
         await bot.send_message(
             chat_id,
-            "Не удалось получить минимальную ставку из WB.",
+            "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
         )
         return
 

@@ -37,7 +37,7 @@ async def test_ensure_auto_bids_minimum_partial_nmids_in_min_bids_still_resets()
     adv.adv_setting.cpm = 900
     adv.shop_id = "shop-partial"
 
-    hub.wb_manager.get_min_bids = AsyncMock(
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
         return_value=AdvMinNmidsBids(
             auto={10: 150},
             search={},
@@ -72,7 +72,7 @@ async def test_ensure_auto_bids_minimum_no_matching_nmids_returns_early() -> Non
     adv.auto_adv_id = 502
     adv.adv_setting.cpm = 900
 
-    hub.wb_manager.get_min_bids = AsyncMock(
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
         return_value=AdvMinNmidsBids(auto={10: 50}, search={})
     )
 

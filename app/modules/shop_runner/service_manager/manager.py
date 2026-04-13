@@ -1,5 +1,6 @@
 import functools
 import logging
+import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import datetime
@@ -768,6 +769,48 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
+    async def preload_min_bids_cache(self) -> None:
+        """Периодически подгружает минимальные ставки в Redis; потребители читают только кеш."""
+        if not settings.AUTO_SETTING_ACTIVE:
+            return None
+        from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
+
+        wb_manager_hub = self._wb_manager_hub
+        container = ClusterBidsManagerContainer(
+            shop_id=self.shop_id,
+            redis_client=wb_manager_hub.redis_client_wrapper,
+        )
+        wb_manager = container.wb_manager()
+        t0 = time.perf_counter()
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        advs = [adv for adv in advs if adv.bot_active]
+        advs = [adv for adv in advs if adv.bidder_active]
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="preload_min_bids_cache"
+        )
+        if not advs_filtred:
+            return None
+        try:
+            await wb_manager.refresh_min_bids_cache(advs_filtred)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "preload_min_bids_cache failed shop_id=%s: %s",
+                self.shop_id,
+                exc,
+                exc_info=True,
+            )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.info(
+            "preload_min_bids_cache done shop_id=%s advs=%s elapsed_ms=%.0f",
+            self.shop_id,
+            len(advs_filtred),
+            elapsed_ms,
+        )
+        return None
+
+    @while_coroutine_decorator(60 * 5, 60)
     async def handle_stats_stale_emergency(self) -> None:
         """Emergency mode: stale stats over 6 hours => keep one top key and min bid."""
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
@@ -854,8 +897,9 @@ class CoroutinesManager:
         if search_adv_id is None:
             return None
         wb_manager_hub = self._wb_manager_hub
-        min_bids = await wb_manager_hub.wb_manager.get_min_bids(
-            [complex_adv], cache_possible=True
+        min_bids = await wb_manager_hub.wb_manager.get_min_bids_cache_only(
+            [complex_adv],
+            context="stats_stale_emergency_set_min_search_bid",
         )
         new_bids: list[NewBid] = []
         for nmid in complex_adv.nmids:
@@ -874,6 +918,12 @@ class CoroutinesManager:
                 )
             )
         if not new_bids:
+            logger.error(
+                "stats_stale_emergency: no min search bids in cache for any nmid "
+                "shop_id=%s adv_id=%s",
+                self.shop_id,
+                complex_adv.adv_id,
+            )
             return None
         command = UpdateBidsCommand(new_bids=new_bids)
         await wb_manager_hub.wb_modifier.set_cluster_bids_for_adv(command)
