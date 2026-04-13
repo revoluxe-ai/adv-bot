@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
     GetMinBidsCommand,
@@ -44,6 +45,35 @@ def _min_bids_cache_entries_for_item(
         if cpm is not None:
             out.append((item.adv_id, item.placement_type, nmid, int(cpm)))
     return out
+
+
+def _min_bids_cache_entries_for_item_miss_only(
+    item: GetMinBidsCommandItem,
+    fresh: AdvMinNmidsBids,
+    miss_set: set[MinBidsV2Cell],
+) -> list[tuple[int, AdvPlacementType, int, int]]:
+    full = _min_bids_cache_entries_for_item(item, fresh)
+    return [e for e in full if (e[0], e[1], e[2]) in miss_set]
+
+
+def _group_miss_cells_to_command_items(
+    miss_cells: list[MinBidsV2Cell],
+) -> list[GetMinBidsCommandItem]:
+    grouped: dict[tuple[int, AdvPlacementType], set[int]] = defaultdict(set)
+    for adv_id, placement, nmid in miss_cells:
+        grouped[(adv_id, placement)].add(nmid)
+    items: list[GetMinBidsCommandItem] = []
+    for (adv_id, placement), nmids in sorted(
+        grouped.items(), key=lambda x: (x[0][0], x[0][1].value)
+    ):
+        items.append(
+            GetMinBidsCommandItem(
+                adv_id=adv_id,
+                nmids=sorted(nmids),
+                placement_type=placement,
+            )
+        )
+    return items
 
 
 def _min_bids_cache_entries_for_adv(
@@ -137,6 +167,144 @@ class WBManager(WBBaseManager):
             self._shop_id,
             cells_written,
         )
+
+    @staticmethod
+    def expected_min_bids_v2_cells_from_advs(advs: list[ComplexAdv]) -> list[MinBidsV2Cell]:
+        """Все ожидаемые v2-ячейки для списка РК (как в dto_to_command)."""
+        full_command = dto_to_command(advs)
+        cells: list[MinBidsV2Cell] = []
+        for item in full_command.items:
+            for nmid in item.nmids:
+                cells.append((item.adv_id, item.placement_type, nmid))
+        return cells
+
+    async def find_min_bids_cache_miss_cells(
+        self,
+        advs: list[ComplexAdv],
+    ) -> list[MinBidsV2Cell]:
+        """Ячейки, отсутствующие в Redis v2 (cache miss)."""
+        cells = self.expected_min_bids_v2_cells_from_advs(advs)
+        if not cells:
+            return []
+        cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
+        cached_map = await cache_manager.get_min_bids_v2_batch(cells)
+        return [c for c in cells if c not in cached_map]
+
+    async def _refresh_min_bids_command_items_with_split(
+        self,
+        items: list[GetMinBidsCommandItem],
+        miss_set: set[MinBidsV2Cell],
+    ) -> int:
+        """Запрос WB пачкой; при ошибке или None — binary split по items или nmids."""
+        if not items:
+            return 0
+        wb_data = self.wb_manager_hub.wb_data_manager
+        cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
+
+        async def write_for_items(
+            batch_items: list[GetMinBidsCommandItem],
+            fresh: AdvMinNmidsBids,
+        ) -> int:
+            written = 0
+            for item in batch_items:
+                batch = _min_bids_cache_entries_for_item_miss_only(
+                    item, fresh, miss_set
+                )
+                if batch:
+                    await cache_manager.set_min_bids_v2_batch(batch)
+                    written += len(batch)
+            return written
+
+        cmd = GetMinBidsCommand(items=items)
+        fresh: AdvMinNmidsBids | None
+        try:
+            fresh = await wb_data.get_min_bids_for_command(cmd)
+        except Exception as exc:
+            return await self._split_min_bids_items_on_failure(
+                items, miss_set, exc=exc
+            )
+
+        if fresh is None:
+            return await self._split_min_bids_items_on_failure(
+                items, miss_set, exc=None
+            )
+
+        return await write_for_items(items, fresh)
+
+    async def _split_min_bids_items_on_failure(
+        self,
+        items: list[GetMinBidsCommandItem],
+        miss_set: set[MinBidsV2Cell],
+        *,
+        exc: Exception | None,
+    ) -> int:
+        if not items:
+            return 0
+
+        if len(items) > 1:
+            mid = len(items) // 2
+            a = await self._refresh_min_bids_command_items_with_split(
+                items[:mid], miss_set
+            )
+            b = await self._refresh_min_bids_command_items_with_split(
+                items[mid:], miss_set
+            )
+            return a + b
+
+        item = items[0]
+        if len(item.nmids) > 1:
+            mid_n = len(item.nmids) // 2
+            left = GetMinBidsCommandItem(
+                adv_id=item.adv_id,
+                nmids=item.nmids[:mid_n],
+                placement_type=item.placement_type,
+            )
+            right = GetMinBidsCommandItem(
+                adv_id=item.adv_id,
+                nmids=item.nmids[mid_n:],
+                placement_type=item.placement_type,
+            )
+            a = await self._refresh_min_bids_command_items_with_split(
+                [left], miss_set
+            )
+            b = await self._refresh_min_bids_command_items_with_split(
+                [right], miss_set
+            )
+            return a + b
+
+        nmid = item.nmids[0]
+        if exc is not None:
+            logger.error(
+                "refresh_min_bids_cache_miss: WB request failed for single cell "
+                "shop_id=%s adv_id=%s placement=%s nmid=%s: %s",
+                self._shop_id,
+                item.adv_id,
+                item.placement_type.value,
+                nmid,
+                exc,
+                exc_info=True,
+            )
+        else:
+            logger.error(
+                "refresh_min_bids_cache_miss: WB get_min_bids_for_command returned None "
+                "shop_id=%s adv_id=%s placement=%s nmid=%s",
+                self._shop_id,
+                item.adv_id,
+                item.placement_type.value,
+                nmid,
+            )
+        return 0
+
+    async def refresh_min_bids_cache_miss_cells(
+        self,
+        miss_cells: list[MinBidsV2Cell],
+    ) -> int:
+        """Догрузить только cache-miss ячейки: один запрос пачкой, split при сбое."""
+        if not miss_cells:
+            return 0
+        items = _group_miss_cells_to_command_items(miss_cells)
+        miss_set = set(miss_cells)
+        return await self._refresh_min_bids_command_items_with_split(items, miss_set)
 
     async def get_min_bids_cache_only(
         self,

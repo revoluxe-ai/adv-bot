@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import logging
 import time
@@ -152,6 +153,9 @@ class CoroutinesManager:
             redis_client_wrapper
         )
         self._adv_strategy_selector = AdvStrategySelector()
+        # Пока идёт приоритетная догрузка miss — old-ветка ждёт (parallel tasks + Event).
+        self._min_bids_old_refresh_permitted = asyncio.Event()
+        self._min_bids_old_refresh_permitted.set()
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -765,8 +769,62 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def preload_min_bids_cache(self) -> None:
-        """Периодически подгружает минимальные ставки в Redis; потребители читают только кеш."""
+    async def preload_min_bids_cache_miss(self) -> None:
+        """Приоритетная догрузка cache miss по min bids; на время запроса блокирует old-ветку через Event."""
+        if not settings.AUTO_SETTING_ACTIVE:
+            return None
+        from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
+
+        wb_manager_hub = self._wb_manager_hub
+        container = ClusterBidsManagerContainer(
+            shop_id=self.shop_id,
+            redis_client=wb_manager_hub.redis_client_wrapper,
+        )
+        wb_manager = container.wb_manager()
+        t0 = time.perf_counter()
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        advs = [adv for adv in advs if adv.bot_active]
+        if not advs:
+            return None
+        miss_cells_count = 0
+        miss_written = 0
+        try:
+            miss_cells = await wb_manager.find_min_bids_cache_miss_cells(advs)
+            miss_cells_count = len(miss_cells)
+            if not miss_cells:
+                return None
+            self._min_bids_old_refresh_permitted.clear()
+            try:
+                miss_written = await wb_manager.refresh_min_bids_cache_miss_cells(
+                    miss_cells
+                )
+            finally:
+                self._min_bids_old_refresh_permitted.set()
+        except Exception as exc:  # noqa: BLE001
+            self._min_bids_old_refresh_permitted.set()
+            logger.error(
+                "preload_min_bids_cache_miss failed shop_id=%s: %s",
+                self.shop_id,
+                exc,
+                exc_info=True,
+            )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.info(
+            "preload_min_bids_cache_miss done shop_id=%s miss_cells=%s "
+            "miss_written=%s advs=%s elapsed_ms=%.0f",
+            self.shop_id,
+            miss_cells_count,
+            miss_written,
+            len(advs),
+            elapsed_ms,
+        )
+        return None
+
+    @while_coroutine_decorator(60 * 5, 60)
+    async def preload_min_bids_cache_old(self) -> None:
+        """Фоновое обновление уже закэшированных min bids; ждёт Event, пока идёт miss-догрузка."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
@@ -785,17 +843,18 @@ class CoroutinesManager:
         if not advs:
             return None
         try:
+            _ = await self._min_bids_old_refresh_permitted.wait()
             await wb_manager.refresh_min_bids_cache(advs)
         except Exception as exc:  # noqa: BLE001
             logger.error(
-                "preload_min_bids_cache failed shop_id=%s: %s",
+                "preload_min_bids_cache_old failed shop_id=%s: %s",
                 self.shop_id,
                 exc,
                 exc_info=True,
             )
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
-            "preload_min_bids_cache done shop_id=%s advs=%s elapsed_ms=%.0f",
+            "preload_min_bids_cache_old done shop_id=%s advs=%s elapsed_ms=%.0f",
             self.shop_id,
             len(advs),
             elapsed_ms,

@@ -233,3 +233,156 @@ async def test_get_min_bids_api_none_raises_cluster_bids_update_error() -> None:
     ):
         mgr = WBManager("shop-x")
         await mgr.get_min_bids([_make_adv(nmids=[1], auto_id=700)], cache_possible=False)
+
+
+@pytest.mark.asyncio
+async def test_find_min_bids_cache_miss_cells_only_absent_keys() -> None:
+    hub = MagicMock()
+    hub.wb_data_manager.get_min_bids_for_command = AsyncMock()
+
+    async def cache_batch(
+        cells: list[tuple[int, AdvPlacementType, int]],
+    ) -> dict[tuple[int, AdvPlacementType, int], int]:
+        out: dict[tuple[int, AdvPlacementType, int], int] = {}
+        for cell in cells:
+            if cell[2] == 7:
+                out[cell] = 50
+        return out
+
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(side_effect=cache_batch)
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        miss = await mgr.find_min_bids_cache_miss_cells(
+            [_make_adv(nmids=[7, 8], auto_id=300)],
+        )
+
+    assert miss == [(300, AdvPlacementType.AUTO_ADV, 8)]
+    hub.wb_data_manager.get_min_bids_for_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_refresh_min_bids_cache_miss_cells_batches_one_api_call() -> None:
+    hub = MagicMock()
+    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(
+        return_value=AdvMinNmidsBids(auto={7: 40, 8: 41}, search={}),
+    )
+
+    cache_instance = MagicMock()
+    cache_instance.set_min_bids_v2_batch = AsyncMock()
+
+    miss_cells = [
+        (600, AdvPlacementType.AUTO_ADV, 7),
+        (600, AdvPlacementType.AUTO_ADV, 8),
+    ]
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        written = await mgr.refresh_min_bids_cache_miss_cells(miss_cells)
+
+    assert written == 2
+    hub.wb_data_manager.get_min_bids_for_command.assert_awaited_once()
+    cache_instance.set_min_bids_v2_batch.assert_awaited_once()
+    written_batch = cache_instance.set_min_bids_v2_batch.await_args.args[0]
+    assert len(written_batch) == 2
+    assert (600, AdvPlacementType.AUTO_ADV, 7, 40) in written_batch
+    assert (600, AdvPlacementType.AUTO_ADV, 8, 41) in written_batch
+
+
+@pytest.mark.asyncio
+async def test_refresh_min_bids_cache_miss_cells_splits_on_exception() -> None:
+    """Два item: первый падает целиком, второй успешен после split."""
+
+    class Boom(Exception):
+        pass
+
+    hub = MagicMock()
+
+    async def get_cmd(cmd) -> AdvMinNmidsBids:
+        items = cmd.items
+        if len(items) == 2:
+            raise Boom("batch")
+        if len(items) == 1 and items[0].adv_id == 1:
+            raise Boom("bad adv")
+        return AdvMinNmidsBids(auto={7: 10}, search={})
+
+    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(side_effect=get_cmd)
+
+    cache_instance = MagicMock()
+    cache_instance.set_min_bids_v2_batch = AsyncMock()
+
+    miss_cells = [
+        (1, AdvPlacementType.AUTO_ADV, 7),
+        (2, AdvPlacementType.AUTO_ADV, 7),
+    ]
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        written = await mgr.refresh_min_bids_cache_miss_cells(miss_cells)
+
+    assert written == 1
+    cache_instance.set_min_bids_v2_batch.assert_awaited_once()
+    batch = cache_instance.set_min_bids_v2_batch.await_args.args[0]
+    assert batch == [(2, AdvPlacementType.AUTO_ADV, 7, 10)]
+
+
+@pytest.mark.asyncio
+async def test_refresh_min_bids_cache_miss_cells_splits_nmids_on_none() -> None:
+    """Один item с двумя nmid: None на всей пачке, после split по nmid один успех."""
+
+    hub = MagicMock()
+    calls: list[int] = []
+
+    async def get_cmd(cmd) -> AdvMinNmidsBids | None:
+        calls.append(len(cmd.items[0].nmids))
+        if len(cmd.items[0].nmids) == 2:
+            return None
+        if cmd.items[0].nmids == [7]:
+            return AdvMinNmidsBids(auto={7: 11}, search={})
+        return None
+
+    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(side_effect=get_cmd)
+
+    cache_instance = MagicMock()
+    cache_instance.set_min_bids_v2_batch = AsyncMock()
+
+    miss_cells = [
+        (600, AdvPlacementType.AUTO_ADV, 7),
+        (600, AdvPlacementType.AUTO_ADV, 8),
+    ]
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        written = await mgr.refresh_min_bids_cache_miss_cells(miss_cells)
+
+    assert written == 1
+    assert calls == [2, 1, 1]
+    cache_instance.set_min_bids_v2_batch.assert_awaited_once()
+    assert cache_instance.set_min_bids_v2_batch.await_args.args[0] == [
+        (600, AdvPlacementType.AUTO_ADV, 7, 11),
+    ]
