@@ -143,8 +143,10 @@ class MinBidsAdapter(BaseSectionAdapter):
             )
             return []
 
-    # Лимит WB для /bids/min часто ~5 запросов на окно ~10–15 с; 3/5 слишком быстро.
-    @retry_decorator(period=14, limit=4, max_delay=120)
+    # Лимит WB для /bids/min: ~5 запросов / ~10–15 с; period/limit = базовый интервал между вызовами.
+    # 14/4 → 3.5 с давало 429; 60/5 → 12 с лучше, но пост-фикс логи всё ещё показывали 429 при next_pause 13–15 от API.
+    # 80/5 → 16 с — не ниже типичного Retry-After из ответов.
+    @retry_decorator(period=80, limit=5, max_delay=120)
     async def _http_post_min_bids(
         self,
         command_item: GetMinBidsCommandItem,

@@ -189,6 +189,40 @@ async def test_refresh_min_bids_cache_calls_api_and_batch_write() -> None:
 
 
 @pytest.mark.asyncio
+async def test_refresh_min_bids_cache_writes_per_command_item() -> None:
+    """auto + search => два WB-вызова и две отдельные записи в Redis по мере получения."""
+    hub = MagicMock()
+    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(
+        side_effect=[
+            AdvMinNmidsBids(auto={7: 40}, search={}),
+            AdvMinNmidsBids(auto={}, search={7: 50}),
+        ],
+    )
+
+    cache_instance = MagicMock()
+    cache_instance.set_min_bids_v2_batch = AsyncMock()
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        await mgr.refresh_min_bids_cache(
+            [_make_adv(nmids=[7], auto_id=600, search_id=601)],
+        )
+
+    assert hub.wb_data_manager.get_min_bids_for_command.await_count == 2
+    assert cache_instance.set_min_bids_v2_batch.await_count == 2
+    first_batch = cache_instance.set_min_bids_v2_batch.await_args_list[0].args[0]
+    second_batch = cache_instance.set_min_bids_v2_batch.await_args_list[1].args[0]
+    assert first_batch == [(600, AdvPlacementType.AUTO_ADV, 7, 40)]
+    assert second_batch == [(601, AdvPlacementType.SEARCH_ADV, 7, 50)]
+
+
+@pytest.mark.asyncio
 async def test_get_min_bids_api_none_raises_cluster_bids_update_error() -> None:
     hub = MagicMock()
     hub.wb_data_manager.get_min_bids = AsyncMock(return_value=None)

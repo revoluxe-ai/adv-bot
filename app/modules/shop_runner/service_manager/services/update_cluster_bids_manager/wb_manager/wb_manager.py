@@ -1,5 +1,9 @@
 import logging
 
+from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
+    GetMinBidsCommand,
+    GetMinBidsCommandItem,
+)
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_min_bids.convertor import (
     dto_to_command,
@@ -25,6 +29,48 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 logger = logging.getLogger(__name__)
 
 
+def _min_bids_cache_entries_for_item(
+    item: GetMinBidsCommandItem,
+    fresh: AdvMinNmidsBids,
+) -> list[tuple[int, AdvPlacementType, int, int]]:
+    out: list[tuple[int, AdvPlacementType, int, int]] = []
+    for nmid in item.nmids:
+        if item.placement_type == AdvPlacementType.AUTO_ADV:
+            cpm = fresh.auto.get(nmid)
+        elif item.placement_type == AdvPlacementType.SEARCH_ADV:
+            cpm = fresh.search.get(nmid)
+        else:
+            continue
+        if cpm is not None:
+            out.append((item.adv_id, item.placement_type, nmid, int(cpm)))
+    return out
+
+
+def _min_bids_cache_entries_for_adv(
+    adv: ComplexAdv,
+    fresh: AdvMinNmidsBids,
+) -> list[tuple[int, AdvPlacementType, int, int]]:
+    out: list[tuple[int, AdvPlacementType, int, int]] = []
+    for nmid in adv.nmids:
+        a = fresh.auto.get(nmid)
+        if a is not None:
+            out.append(
+                (adv.auto_adv_id, AdvPlacementType.AUTO_ADV, nmid, int(a)),
+            )
+        if adv.search_adv_id is not None:
+            s = fresh.search.get(nmid)
+            if s is not None:
+                out.append(
+                    (
+                        adv.search_adv_id,
+                        AdvPlacementType.SEARCH_ADV,
+                        nmid,
+                        int(s),
+                    )
+                )
+    return out
+
+
 class WBManager(WBBaseManager):
     async def get_current_bids(self, advs: list[ComplexAdv]) -> list[NormqueryBidDTO]:
         wb_manager_hub = self.wb_manager_hub
@@ -41,72 +87,55 @@ class WBManager(WBBaseManager):
         )
 
     async def refresh_min_bids_cache(self, advs: list[ComplexAdv]) -> None:
-        """Загрузить минимальные ставки из WB API и записать в Redis v2 (фоновая корутина)."""
+        """Загрузить минимальные ставки из WB API и записать в Redis v2 (фоновая корутина).
+
+        Запросы к WB идут по одному command_item / одной РК; после каждого успешного
+        ответа данные сразу пишутся в кеш, без ожидания остальных.
+        """
         if not advs:
             return
         full_command = dto_to_command(advs)
         wb_data = self.wb_manager_hub.wb_data_manager
         cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
-        to_write: list[tuple[int, AdvPlacementType, int, int]] = []
+        cells_written = 0
 
         if full_command.items:
-            fresh = await wb_data.get_min_bids_for_command(full_command)
-            if fresh is None:
-                logger.error(
-                    "refresh_min_bids_cache: WB get_min_bids_for_command returned None "
-                    "shop_id=%s",
-                    self._shop_id,
-                )
-                return
             for item in full_command.items:
-                for nmid in item.nmids:
-                    if item.placement_type == AdvPlacementType.AUTO_ADV:
-                        cpm = fresh.auto.get(nmid)
-                    elif item.placement_type == AdvPlacementType.SEARCH_ADV:
-                        cpm = fresh.search.get(nmid)
-                    else:
-                        continue
-                    if cpm is not None:
-                        to_write.append(
-                            (item.adv_id, item.placement_type, nmid, int(cpm))
-                        )
+                sub = GetMinBidsCommand(items=[item])
+                fresh = await wb_data.get_min_bids_for_command(sub)
+                if fresh is None:
+                    logger.error(
+                        "refresh_min_bids_cache: WB get_min_bids_for_command returned None "
+                        "shop_id=%s adv_id=%s placement=%s",
+                        self._shop_id,
+                        item.adv_id,
+                        item.placement_type.value,
+                    )
+                    continue
+                batch = _min_bids_cache_entries_for_item(item, fresh)
+                if batch:
+                    await cache_manager.set_min_bids_v2_batch(batch)
+                    cells_written += len(batch)
         else:
-            fresh = await wb_data.get_min_bids(advs)
-            if fresh is None:
-                logger.error(
-                    "refresh_min_bids_cache: WB get_min_bids returned None shop_id=%s",
-                    self._shop_id,
-                )
-                return
             for adv in advs:
-                for nmid in adv.nmids:
-                    a = fresh.auto.get(nmid)
-                    if a is not None:
-                        to_write.append(
-                            (
-                                adv.auto_adv_id,
-                                AdvPlacementType.AUTO_ADV,
-                                nmid,
-                                int(a),
-                            )
-                        )
-                    if adv.search_adv_id is not None:
-                        s = fresh.search.get(nmid)
-                        if s is not None:
-                            to_write.append(
-                                (
-                                    adv.search_adv_id,
-                                    AdvPlacementType.SEARCH_ADV,
-                                    nmid,
-                                    int(s),
-                                )
-                            )
+                fresh = await wb_data.get_min_bids([adv])
+                if fresh is None:
+                    logger.error(
+                        "refresh_min_bids_cache: WB get_min_bids returned None shop_id=%s "
+                        "auto_adv_id=%s",
+                        self._shop_id,
+                        adv.auto_adv_id,
+                    )
+                    continue
+                batch = _min_bids_cache_entries_for_adv(adv, fresh)
+                if batch:
+                    await cache_manager.set_min_bids_v2_batch(batch)
+                    cells_written += len(batch)
 
-        await cache_manager.set_min_bids_v2_batch(to_write)
         logger.info(
             "refresh_min_bids_cache shop_id=%s cells_written=%s",
             self._shop_id,
-            len(to_write),
+            cells_written,
         )
 
     async def get_min_bids_cache_only(
