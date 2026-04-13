@@ -61,6 +61,7 @@ class WBShop:
                 tg.create_task(
                     coroutines_manager.update_clusters_adv_stats_history()
                 )
+                tg.create_task(coroutines_manager.refresh_stats_freshness_cache())
                 tg.create_task(coroutines_manager.adv_settings_auto_update())
                 tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
                 tg.create_task(coroutines_manager.update_cluster_bids())

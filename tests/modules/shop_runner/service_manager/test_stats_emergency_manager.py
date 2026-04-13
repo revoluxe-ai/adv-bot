@@ -8,6 +8,9 @@ import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager import CoroutinesManager
+from app.modules.shop_runner.service_manager.services.stats_freshness_cache_manager import (
+    RedisStatsFreshnessStateCacheManager,
+)
 from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
     StatsFreshnessState,
 )
@@ -48,22 +51,77 @@ async def test_split_advs_by_stats_freshness_filters_correctly(fake_redis) -> No
     adv_stale = SimpleNamespace(adv_id=2)
     adv_emergency = SimpleNamespace(adv_id=3)
 
-    with patch(
-        "app.modules.shop_runner.service_manager.manager.run_tasks",
-        new=AsyncMock(
-            return_value=[
-                (adv_fresh, StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)),
-                (adv_stale, StatsFreshnessState(is_fresh=False, is_stale_over_6h=False)),
-                (adv_emergency, StatsFreshnessState(is_fresh=False, is_stale_over_6h=True)),
-            ]
-        ),
-    ):
-        fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
-            [adv_fresh, adv_stale, adv_emergency], operation_name="test_op"
-        )
+    cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
+    await cache.mset_states(
+        manager.shop_id,
+        [
+            (1, StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)),
+            (2, StatsFreshnessState(is_fresh=False, is_stale_over_6h=False)),
+            (3, StatsFreshnessState(is_fresh=False, is_stale_over_6h=True)),
+        ],
+    )
+    fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
+        [adv_fresh, adv_stale, adv_emergency], operation_name="test_op"
+    )
 
     assert fresh == [adv_fresh]
     assert stale_over_6h == [adv_emergency]
+
+
+@pytest.mark.asyncio
+async def test_split_advs_by_stats_freshness_fail_open_on_cache_miss(fake_redis) -> None:
+    manager = _build_manager(fake_redis)
+    adv = SimpleNamespace(adv_id=99)
+    fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
+        [adv], operation_name="test_op"
+    )
+    assert fresh == [adv]
+    assert stale_over_6h == []
+
+
+@pytest.mark.asyncio
+async def test_split_advs_by_stats_freshness_fail_open_on_invalid_payload(
+    fake_redis,
+) -> None:
+    manager = _build_manager(fake_redis)
+    adv = SimpleNamespace(adv_id=42)
+    key = RedisStatsFreshnessStateCacheManager.key(manager.shop_id, 42)
+    await fake_redis.set(key, "not-json")
+    fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
+        [adv], operation_name="test_op"
+    )
+    assert fresh == [adv]
+    assert stale_over_6h == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_stats_freshness_cache_writes_redis(fake_redis) -> None:
+    manager = _build_manager(fake_redis)
+    adv_ok = SimpleNamespace(adv_id=10)
+    adv_bad = SimpleNamespace(adv_id=20)
+
+    manager._wb_shop_data_manager.get_complex_advs = AsyncMock(
+        return_value=[adv_ok, adv_bad]
+    )
+
+    async def _evaluate(adv: SimpleNamespace) -> StatsFreshnessState:
+        if adv.adv_id == 20:
+            raise RuntimeError("ch boom")
+        return StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
+
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.StatsFreshnessManager"
+    ) as mgr_cls:
+        mgr_cls.return_value.evaluate = AsyncMock(side_effect=_evaluate)
+        await manager.refresh_stats_freshness_cache.__wrapped__(manager)
+
+    cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
+    loaded = await cache.mget_entries(manager.shop_id, [10, 20])
+    assert len(loaded) == 2
+    assert loaded[0] == (10, StatsFreshnessState(is_fresh=True, is_stale_over_6h=False), "hit")
+    assert loaded[1][0] == 20
+    assert loaded[1][1] is None
+    assert loaded[1][2] == "miss"
 
 
 @pytest.mark.asyncio

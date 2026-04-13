@@ -81,6 +81,7 @@ from .services.delete_keywords_from_wl_by_mean_auto_ctr_manager.delete_keywords_
     delete_keywords_from_wl_by_mean_auto_ctr,
 )
 from .services.adv_strategy_selector import AdvStrategySelector, StrategySelection
+from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
@@ -153,6 +154,9 @@ class CoroutinesManager:
             redis_client_wrapper
         )
         self._adv_strategy_selector = AdvStrategySelector()
+        self._redis_stats_freshness_cache = RedisStatsFreshnessStateCacheManager(
+            redis_client_wrapper
+        )
         # Пока идёт приоритетная догрузка miss — old-ветка ждёт (parallel tasks + Event).
         self._min_bids_old_refresh_permitted = asyncio.Event()
         self._min_bids_old_refresh_permitted.set()
@@ -169,28 +173,35 @@ class CoroutinesManager:
     ) -> tuple[list[ComplexAdv], list[ComplexAdv]]:
         if not advs:
             return [], []
-        handlers: list[Callable[[], Awaitable[tuple[ComplexAdv, StatsFreshnessState]]]] = [
-            lambda adv_=adv: self._evaluate_adv_freshness(adv_) for adv in advs
-        ]
-        results = await run_tasks(
-            handlers,
-            max_workers=self._max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
-            return_exceptions=True,
+        adv_ids = [adv.adv_id for adv in advs]
+        entries = await self._redis_stats_freshness_cache.mget_entries(
+            self.shop_id, adv_ids
         )
+        cache_hits = 0
+        cache_misses = 0
+        invalid_payloads = 0
         fresh: list[ComplexAdv] = []
         stale_over_6h: list[ComplexAdv] = []
-        for adv, result in zip(advs, results):
-            if isinstance(result, BaseException):
-                logger.error(
-                    "Stats freshness evaluation failed, skip automation: shop_id=%s adv_id=%s op=%s err=%s",
+        for adv, (_adv_id, state, kind) in zip(advs, entries, strict=True):
+            assert adv.adv_id == _adv_id
+            if kind == "hit":
+                cache_hits += 1
+            elif kind == "miss":
+                cache_misses += 1
+            else:
+                invalid_payloads += 1
+            if kind != "hit":
+                logger.info(
+                    "stats_freshness_cache fail-open (treat as fresh): shop_id=%s "
+                    "adv_id=%s op=%s kind=%s",
                     self.shop_id,
                     adv.adv_id,
                     operation_name,
-                    result,
+                    kind,
                 )
+                fresh.append(adv)
                 continue
-            _, state = result
+            assert state is not None
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
             elif state.is_fresh:
@@ -203,14 +214,43 @@ class CoroutinesManager:
                     operation_name,
                     state.reason,
                 )
+        logger.info(
+            "stats_freshness_cache shop_id=%s op=%s hits=%s misses=%s invalid=%s total=%s",
+            self.shop_id,
+            operation_name,
+            cache_hits,
+            cache_misses,
+            invalid_payloads,
+            len(advs),
+        )
         return fresh, stale_over_6h
 
-
-    @staticmethod
-    async def _evaluate_adv_freshness( adv: ComplexAdv
-    ) -> tuple[ComplexAdv, StatsFreshnessState]:
-        state = await StatsFreshnessManager().evaluate(adv)
-        return adv, state
+    @while_coroutine_decorator(60, 5)
+    async def refresh_stats_freshness_cache(self) -> None:
+        """Фоновое обновление Redis-кеша классификации свежести статы (CH → Redis)."""
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        if not advs:
+            return None
+        stats_freshness_manager = StatsFreshnessManager()
+        entries: list[tuple[int, StatsFreshnessState]] = []
+        for adv in advs:
+            try:
+                state = await stats_freshness_manager.evaluate(adv)
+                entries.append((adv.adv_id, state))
+            except Exception as exc:
+                logger.error(
+                    "Stats freshness evaluation failed in refresh coroutine: "
+                    "shop_id=%s adv_id=%s err=%s",
+                    self.shop_id,
+                    adv.adv_id,
+                    exc,
+                    exc_info=True,
+                )
+        if entries:
+            await self._redis_stats_freshness_cache.mset_states(self.shop_id, entries)
+        return None
 
     @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
