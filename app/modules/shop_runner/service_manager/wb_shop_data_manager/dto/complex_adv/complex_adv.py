@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Awaitable
 from dataclasses import dataclass
-from typing import Literal, overload
+from typing import Literal, Protocol, overload
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -22,6 +21,14 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+
+
+class GetKeywordsProvider(Protocol):
+    """Провайдер ключей: полный пересчёт или только Redis при ``cache_only=True``."""
+
+    async def __call__(
+        self, complex_adv: ComplexAdv, *, cache_only: bool = False
+    ) -> list[CalculatedKeyword] | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,20 +59,14 @@ class ComplexAdv:
         search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
-        get_keywords_func: (
-            Callable[
-                [ComplexAdv, bool],
-                Awaitable[list[CalculatedKeyword] | None],
-            ]
-            | None
-        ) = None,
+        get_keywords_func: GetKeywordsProvider | None = None,
         min_nmids_bids: AdvMinNmidsBids | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
-        self._get_keywords = get_keywords_func
+        self._get_keywords: GetKeywordsProvider | None = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
         if target_pay_for_order is None:
             target_pay_for_order = resolve_target_cost(
@@ -369,14 +370,14 @@ class ComplexAdv:
         if not self._get_keywords:
             raise RuntimeError("_get_keywords not set")
         if cache_only:
-            cached = await self._get_keywords(self, True)
+            cached = await self._get_keywords(self, cache_only=True)
             if cached is None:
                 return None
             if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
                 return [kw for kw in cached if kw.status == KeywordStatus.GOOD]
             return cached
         if not self._calculated_keywords:
-            loaded = await self._get_keywords(self, False)
+            loaded = await self._get_keywords(self, cache_only=False)
             if loaded is None:
                 raise RuntimeError(
                     "get_keywords provider returned None with cache_only=False"
