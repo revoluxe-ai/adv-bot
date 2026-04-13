@@ -273,7 +273,14 @@ class UpdateClusterBidsManager:
             return set()
         texts_in_this_adv = cluster_texts_from_ch
 
-        keywords: list[CalculatedKeyword] = await adv.get_keywords()
+        keywords_maybe = await adv.get_keywords(cache_only=True)
+        if keywords_maybe is None:
+            logger.debug(
+                "Redis cache miss for calculated keywords, skip bid maps adv_id=%s",
+                adv.adv_id,
+            )
+            return set()
+        keywords: list[CalculatedKeyword] = keywords_maybe
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
         matched_in_ch = [
@@ -398,7 +405,7 @@ class UpdateClusterBidsManager:
         return UpdateBidsCommand(new_bids)
 
     async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
-        handlers: list[Callable[[], Awaitable[FactData]]] = [
+        handlers: list[Callable[[], Awaitable[FactData | None]]] = [
             lambda adv_=adv: self.__get_fact_data(adv_) for adv in advs
         ]
         results = await run_tasks(
@@ -421,8 +428,14 @@ class UpdateClusterBidsManager:
         return adv_to_fact_map
 
     @staticmethod
-    async def __get_fact_data(adv: ComplexAdv) -> FactData:
-        keywords = await adv.get_keywords()
+    async def __get_fact_data(adv: ComplexAdv) -> FactData | None:
+        keywords = await adv.get_keywords(cache_only=True)
+        if keywords is None:
+            logger.debug(
+                "Redis cache miss for calculated keywords, skip fact adv_id=%s",
+                adv.adv_id,
+            )
+            return None
         provider = PlanFactProvider(adv.adv_setting)
         stat = await provider.get_stat_data(keywords)
         return await provider.get_fact_data(stat)

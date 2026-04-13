@@ -73,7 +73,19 @@ class WBShopDataManager:
         self._traffic_clicks_manager = TrafficClicksManager()
 
     @single_run()
-    async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
+    async def __get_calculated_keywords(
+        self, complex_adv: ComplexAdv, *, cache_only: bool = False
+    ) -> list[CalculatedKeyword] | None:
+        if cache_only:
+            from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+                RedisCalculatedKeywordsCacheManager,
+            )
+
+            redis_mgr = RedisCalculatedKeywordsCacheManager()
+            return await redis_mgr.get_all_calculated_keywords_for_adv(
+                complex_adv.adv_id
+            )
+
         from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
         if not complex_adv:

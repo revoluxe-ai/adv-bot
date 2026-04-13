@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Awaitable
 from dataclasses import dataclass
+from typing import Literal, overload
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -11,15 +14,14 @@ from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteLi
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.keyword_getting_mode import \
     KeywordGettingMode
 
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
-import typing
 
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
-
-if typing.TYPE_CHECKING:
-    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +52,13 @@ class ComplexAdv:
         search_adv: AdvSetting | None = None,
         target_pay_for_order: float | None = None,
         shop_id: str | None = None,
-        get_keywords_func: Callable[[...], Awaitable[list["CalculatedKeyword"]]] | None = None,
+        get_keywords_func: (
+            Callable[
+                [ComplexAdv, bool],
+                Awaitable[list[CalculatedKeyword] | None],
+            ]
+            | None
+        ) = None,
         min_nmids_bids: AdvMinNmidsBids | None = None,
     ):
         self._mean_auto_ctr: float | None = None
@@ -58,7 +66,7 @@ class ComplexAdv:
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
-        self._calculated_keywords: list["CalculatedKeyword"] | None = None
+        self._calculated_keywords: list[CalculatedKeyword] | None = None
         if target_pay_for_order is None:
             target_pay_for_order = resolve_target_cost(
                 adv_setting.plan_for_sales_for_day,
@@ -244,13 +252,13 @@ class ComplexAdv:
         return self._adv_setting.rec_system_mode
 
     @property
-    def traffic_clicks_dto(self) -> "TrafficClicksDTO | None":
+    def traffic_clicks_dto(self) -> TrafficClicksDTO | None:
         if not self.rec_system_promotion_mode_active:
             return None
         return self._traffic_clicks_dto
 
     @traffic_clicks_dto.setter
-    def traffic_clicks_dto(self, value: "TrafficClicksDTO | None") -> None:
+    def traffic_clicks_dto(self, value: TrafficClicksDTO | None) -> None:
         if not self.rec_system_promotion_mode_active:
             self._traffic_clicks_dto = None
             return
@@ -345,13 +353,39 @@ class ComplexAdv:
     def auto_update_setting_version(self) -> int:
         return self._adv_setting.automatic_version
 
-    async def get_keywords(self) -> list["CalculatedKeyword"]:
+    @overload
+    async def get_keywords(
+        self, *, cache_only: Literal[True]
+    ) -> list[CalculatedKeyword] | None: ...
+
+    @overload
+    async def get_keywords(
+        self, *, cache_only: Literal[False] = False
+    ) -> list[CalculatedKeyword]: ...
+
+    async def get_keywords(
+        self, *, cache_only: bool = False
+    ) -> list[CalculatedKeyword] | None:
+        if not self._get_keywords:
+            raise RuntimeError("_get_keywords not set")
+        if cache_only:
+            cached = await self._get_keywords(self, True)
+            if cached is None:
+                return None
+            if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
+                return [kw for kw in cached if kw.status == KeywordStatus.GOOD]
+            return cached
         if not self._calculated_keywords:
-            if not self._get_keywords:
-                raise RuntimeError("_get_keywords not set")
-            self._calculated_keywords = await self._get_keywords(self)
+            loaded = await self._get_keywords(self, False)
+            if loaded is None:
+                raise RuntimeError(
+                    "get_keywords provider returned None with cache_only=False"
+                )
+            self._calculated_keywords = loaded
         if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
-            keywords = [kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD]
+            keywords = [
+                kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD
+            ]
         else:
             keywords = self._calculated_keywords
         return keywords

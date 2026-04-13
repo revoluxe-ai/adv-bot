@@ -75,7 +75,7 @@ async def test_adv_settings_auto_update(
 
     wb_api = WBApi(access_mock, client_session_mock)
 
-    async def _get_keywords(_: ComplexAdv):
+    async def _get_keywords(_: ComplexAdv, cache_only: bool = False):
         return keywords_mocks
 
     test_complex_adv_instance = ComplexAdv(
