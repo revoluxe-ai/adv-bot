@@ -262,16 +262,16 @@ class UpdateClusterBidsManager:
             inputs.append(calculate_input)
         return inputs
 
-    @staticmethod
-    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData]:
-        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
-            .click_house_manager.click_house_manager import ClickHouseManager
+    async def __get_calculate_data(
+        self,
+        adv: ComplexAdv,
+        cluster_texts_from_ch: set[str],
+    ) -> set[AdvIdItemCalculateData]:
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
             logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
             return set()
-        ch_manager = ClickHouseManager()
-        texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
+        texts_in_this_adv = cluster_texts_from_ch
 
         keywords: list[CalculatedKeyword] = await adv.get_keywords()
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
@@ -309,9 +309,37 @@ class UpdateClusterBidsManager:
 
 
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
-        handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = [
-            lambda adv_=adv: self.__get_calculate_data(adv_) for adv in advs
-        ]
+        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
+            .click_house_manager.click_house_manager import ClickHouseManager
+
+        auction_ids_unique: list[int] = []
+        seen_auction: set[int] = set()
+        for adv in advs:
+            aid = adv.auction_adv_id
+            if aid is not None and aid not in seen_auction:
+                seen_auction.add(aid)
+                auction_ids_unique.append(aid)
+        ch_manager = ClickHouseManager()
+        texts_by_adv_id: dict[int, set[str]] = (
+            await ch_manager.get_cluster_texts_for_adv_ids(auction_ids_unique)
+            if auction_ids_unique
+            else {}
+        )
+        handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = []
+        for adv in advs:
+            cluster_texts: set[str] = (
+                texts_by_adv_id.get(adv.auction_adv_id, set())
+                if adv.auction_adv_id is not None
+                else set[str]()
+            )
+
+            async def _run(
+                a: ComplexAdv = adv,
+                texts: set[str] = cluster_texts,
+            ) -> set[AdvIdItemCalculateData]:
+                return await self.__get_calculate_data(a, texts)
+
+            handlers.append(_run)
         results = await run_tasks(
             handlers,
             max_workers=_max_workers_for(len(handlers), cap=16),
