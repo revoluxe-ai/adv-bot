@@ -111,7 +111,7 @@ class UpdateClusterBidsManager:
         map_datas: set[AdvIdItemCalculateData],
     ) -> BidderUpdateData:
         async def _get_cluster_bids() -> list[NormqueryBidDTO]:
-            return await self._get_cluster_bids_for_maps(map_datas, advs)
+            return await self._get_cluster_bids_for_maps(map_datas)
 
         async def _get_min_bids() -> AdvMinNmidsBids:
             return await self._wb_manager.get_min_bids(advs, cache_possible=True)
@@ -146,7 +146,6 @@ class UpdateClusterBidsManager:
     async def _get_cluster_bids_for_maps(
         self,
         map_datas: set[AdvIdItemCalculateData],
-        advs: list[ComplexAdv],
     ) -> list[NormqueryBidDTO]:
         if not map_datas:
             return []
@@ -177,26 +176,11 @@ class UpdateClusterBidsManager:
         }
         if missing_keys:
             logger.debug(
-                "Cluster bid cache MISS for %s/%s combinations",
+                "Cluster bid cache MISS for %s/%s combinations (no WB API fallback; "
+                "use cache_current_cluster_bids coroutine or current_cpm fallback)",
                 len(missing_keys),
                 total,
             )
-            missing_set = set(missing_keys)
-            wb_bids = await self._wb_manager.get_current_bids(advs)
-            for dto in wb_bids:
-                key = ClusterBidKey(
-                    adv_id=dto.advert_id,
-                    nmid=dto.nm_id,
-                    cluster=dto.norm_query,
-                )
-                if key in missing_set:
-                    bids_map[key] = dto
-            missing_after_api = [key for key in missing_set if key not in bids_map]
-            if missing_after_api:
-                logger.error(
-                    "WB API did not return bids for %s combinations",
-                    len(missing_after_api),
-                )
         return list(bids_map.values())
 
     async def _get_calculation_inputs(
