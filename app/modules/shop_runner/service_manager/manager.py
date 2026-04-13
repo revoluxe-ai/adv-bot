@@ -768,7 +768,7 @@ class CoroutinesManager:
         )
         return None
 
-    @while_coroutine_decorator(60 * 5, 60)
+    @while_coroutine_decorator(30, 60)
     async def preload_min_bids_cache_miss(self) -> None:
         """Приоритетная догрузка cache miss по min bids; на время запроса блокирует old-ветку через Event."""
         if not settings.AUTO_SETTING_ACTIVE:
@@ -822,7 +822,7 @@ class CoroutinesManager:
         )
         return None
 
-    @while_coroutine_decorator(60 * 5, 60)
+    @while_coroutine_decorator(60 * 60 * 12, 60)
     async def preload_min_bids_cache_old(self) -> None:
         """Фоновое обновление уже закэшированных min bids; ждёт Event, пока идёт miss-догрузка."""
         if not settings.AUTO_SETTING_ACTIVE:
