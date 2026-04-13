@@ -356,7 +356,7 @@ class AutoAdvActiveControlService:
                 return None
             if common_limit == 0 and auto_status != WBAdvActiveStatus.STARTED:
                 await self._set_auto_reason(
-                    auto_adv_id,
+                       auto_adv_id,
                     CampaignActivityCommand.PAUSE,
                     AutoReasonCode.COMMON_LIMIT_0,
                 )

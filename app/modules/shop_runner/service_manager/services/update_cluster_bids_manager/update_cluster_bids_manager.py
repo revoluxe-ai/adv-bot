@@ -102,8 +102,10 @@ class UpdateClusterBidsManager:
         )
         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
         await self._apply_command(new_bids_command)
+        # Timestamp key: search_adv_id when present (same as RedisClusterBidsTimestampManager._get_key).
         for adv in advs:  # TODO: Тут накостылил, чтобы быстрее в прод выложить
             await self._redis_cluster_bids_timestamp_manager.set(adv)
+        return None
 
     async def _get_bidder_update_data(
         self,
