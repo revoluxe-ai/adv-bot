@@ -750,14 +750,10 @@ class CoroutinesManager:
             load_extras=False
         )
         advs = [adv for adv in advs if adv.bot_active]
-        advs = [adv for adv in advs if adv.bidder_active]
-        advs_filtred, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="cache_current_cluster_bids"
-        )
-        if not advs_filtred:
+        if not advs:
             return None
 
-        bids = await wb_manager.get_current_bids(advs_filtred)
+        bids = await wb_manager.get_current_bids(advs)
         if bids:
             await redis_api_cluster_bids_manager.replace_from_api(bids)
         logger.info(
@@ -786,14 +782,10 @@ class CoroutinesManager:
             load_extras=False
         )
         advs = [adv for adv in advs if adv.bot_active]
-        advs = [adv for adv in advs if adv.bidder_active]
-        advs_filtred, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="preload_min_bids_cache"
-        )
-        if not advs_filtred:
+        if not advs:
             return None
         try:
-            await wb_manager.refresh_min_bids_cache(advs_filtred)
+            await wb_manager.refresh_min_bids_cache(advs)
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "preload_min_bids_cache failed shop_id=%s: %s",
@@ -805,7 +797,7 @@ class CoroutinesManager:
         logger.info(
             "preload_min_bids_cache done shop_id=%s advs=%s elapsed_ms=%.0f",
             self.shop_id,
-            len(advs_filtred),
+            len(advs),
             elapsed_ms,
         )
         return None
