@@ -193,7 +193,7 @@ class UpdateClusterBidsManager:
                     bids_map[key] = dto
             missing_after_api = [key for key in missing_set if key not in bids_map]
             if missing_after_api:
-                logger.debug(
+                logger.error(
                     "WB API did not return bids for %s combinations",
                     len(missing_after_api),
                 )
