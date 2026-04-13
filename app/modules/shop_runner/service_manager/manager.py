@@ -731,6 +731,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5, 60)
     async def cache_current_cluster_bids(self) -> None:
+        # TODO: Очень долго работает, надо оптимизировать
         """Fetch current normquery bids from WB API and warm Redis for cluster bid reads."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
