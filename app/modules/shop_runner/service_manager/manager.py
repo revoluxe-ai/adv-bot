@@ -734,7 +734,6 @@ class CoroutinesManager:
         """Fetch current normquery bids from WB API and warm Redis for cluster bid reads."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
-        from app.modules.cluster_bids_redis import ClusterBidEntry
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
 
         wb_manager_hub = self._wb_manager_hub
@@ -743,7 +742,7 @@ class CoroutinesManager:
             redis_client=wb_manager_hub.redis_client_wrapper,
         )
         wb_manager = container.wb_manager()
-        redis_cluster_bids_manager = container.redis_cluster_bids_manager()
+        redis_api_cluster_bids_manager = container.redis_api_cluster_bids_manager()
 
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
@@ -757,24 +756,13 @@ class CoroutinesManager:
             return None
 
         bids = await wb_manager.get_current_bids(advs_filtred)
-        entries = [
-            ClusterBidEntry(
-                adv_id=dto.advert_id,
-                nmid=dto.nm_id,
-                cluster=dto.norm_query,
-                new_bid=dto.bid,
-                step=None,
-                direct=None,
-            )
-            for dto in bids
-        ]
-        if entries:
-            await redis_cluster_bids_manager.remember_bids(entries)
+        if bids:
+            await redis_api_cluster_bids_manager.replace_from_api(bids)
         logger.info(
             "Cached current cluster bids from WB API: shop_id=%s fetched=%s written=%s",
             self.shop_id,
             len(bids),
-            len(entries),
+            len(bids),
         )
         return None
 

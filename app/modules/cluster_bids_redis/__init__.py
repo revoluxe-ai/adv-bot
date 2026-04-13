@@ -1,6 +1,9 @@
 """Redis storage for keyword cluster bids (set bid) and last update timestamp."""
 
 from app.modules.cluster_bids_redis.get_set_bid_map import get_set_bid_map
+from app.modules.cluster_bids_redis.redis_api_cluster_bids_manager import (
+    RedisApiClusterBidsManager,
+)
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import (
     ClusterBidEntry,
     ClusterBidKey,
@@ -17,6 +20,7 @@ __all__ = [
     "ClusterBidEntry",
     "ClusterBidState",
     "get_redis_client",
+    "RedisApiClusterBidsManager",
     "RedisClusterBidsManager",
     "RedisClusterBidsTimestampManager",
     "get_set_bid_map",

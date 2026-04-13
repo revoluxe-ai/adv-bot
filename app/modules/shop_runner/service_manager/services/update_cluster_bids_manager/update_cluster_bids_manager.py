@@ -12,6 +12,7 @@ from .mappers.adv_id_item_map import AdvIdItemCalculateData
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
+    RedisApiClusterBidsManager,
     RedisClusterBidsManager,
     RedisClusterBidsTimestampManager,
 )
@@ -60,11 +61,13 @@ class UpdateClusterBidsManager:
         wb_manager: WBManager,
         redis_keyword_bidder_status_manager: RedisKeywordBidderStatusManager,
         redis_cluster_bids_manager: RedisClusterBidsManager,
+        redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
         self._redis_cluster_bids_manager = redis_cluster_bids_manager
+        self._redis_api_cluster_bids_manager = redis_api_cluster_bids_manager
         self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
             redis_cluster_bids_timestamp_manager
         )
@@ -157,7 +160,7 @@ class UpdateClusterBidsManager:
             )
             for data in map_datas
         ]
-        cached = await self._redis_cluster_bids_manager.get_bids(keys)
+        cached = await self._redis_api_cluster_bids_manager.get_bids(keys)
         total = len(keys)
         cached_count = len(cached)
         if cached_count:
