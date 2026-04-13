@@ -143,7 +143,8 @@ class MinBidsAdapter(BaseSectionAdapter):
             )
             return []
 
-    @retry_decorator(period=3, limit=5)
+    # Лимит WB для /bids/min часто ~5 запросов на окно ~10–15 с; 3/5 слишком быстро.
+    @retry_decorator(period=14, limit=4, max_delay=120)
     async def _http_post_min_bids(
         self,
         command_item: GetMinBidsCommandItem,
