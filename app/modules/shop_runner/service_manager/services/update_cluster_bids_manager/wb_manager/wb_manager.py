@@ -1,8 +1,5 @@
 import logging
 
-from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
-    GetMinBidsCommand,
-)
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_min_bids.convertor import (
     dto_to_command,
