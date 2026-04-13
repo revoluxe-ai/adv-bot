@@ -64,6 +64,7 @@ class WBShop:
                 tg.create_task(coroutines_manager.adv_settings_auto_update())
                 tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
                 tg.create_task(coroutines_manager.update_cluster_bids())
+                tg.create_task(coroutines_manager.cache_current_cluster_bids())
                 tg.create_task(coroutines_manager.handle_stats_stale_emergency())
                 tg.create_task(coroutines_manager.update_plan_fact_stats())
                 tg.create_task(coroutines_manager.auto_budget_watchdog())
