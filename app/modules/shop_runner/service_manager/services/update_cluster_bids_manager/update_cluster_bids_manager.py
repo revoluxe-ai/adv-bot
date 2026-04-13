@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any, cast
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 def _max_workers_for(handler_count: int, cap: int) -> int:
     return max(1, min(handler_count, cap))
+
+
+_PREDICT_BIDS_MAX_CONCURRENT = 16
 
 """
 TODO: WB Стал передавать информацию о Depricated методах прям в методах,
@@ -105,8 +109,13 @@ class UpdateClusterBidsManager:
         )
         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
         await self._apply_command(new_bids_command)
-        for adv in advs:  # TODO: Тут накостылил, чтобы быстрее в прод выложить
-            await self._redis_cluster_bids_timestamp_manager.set(adv)
+        if advs:
+            _ = await asyncio.gather(
+                *(
+                    self._redis_cluster_bids_timestamp_manager.set(adv)
+                    for adv in advs
+                ),
+            )
 
     async def _get_bidder_update_data(
         self,
@@ -464,20 +473,50 @@ class UpdateClusterBidsManager:
             search_adv_id = adv.auction_adv_id
             if search_adv_id is None:
                 continue
-            if adv.individual_keywords_target_place_mode is False:
+            if not adv.individual_keywords_target_place_mode:
                 adv_result[search_adv_id] = None
+            else:
+                adv_result[search_adv_id] = {}
+
+        work: list[tuple[int, int, int]] = []
+        for adv in advs:
+            search_adv_id = adv.auction_adv_id
+            if search_adv_id is None or not adv.individual_keywords_target_place_mode:
                 continue
-            nmid_result: dict[int, dict[str, dict[int, int]]] = {}
             for nmid in adv.nmids:
                 min_bid = auction_min_bids_by_nmid[nmid]
-                bid_positions_result = await bids_for_positions_manager.get_bid_positions_normalized(
+                work.append((search_adv_id, nmid, min_bid))
+
+        if not work:
+            return adv_result
+
+        sem = asyncio.Semaphore(_PREDICT_BIDS_MAX_CONCURRENT)
+
+        async def _fetch(
+            item: tuple[int, int, int],
+        ) -> tuple[int, int, dict[str, dict[int, int]]]:
+            sid, nmid, min_bid = item
+            bid_positions_result = (
+                await bids_for_positions_manager.get_bid_positions_normalized(
                     nmid=nmid, min_bid=min_bid, positions_size=300
                 )
-                dict_result: dict[str, dict[int, int]] = {
-                    keyword_text: {pos.position: pos.bid for pos in row_list}
-                    for keyword_text, row_list in bid_positions_result.items()
-                }
-                nmid_result[nmid] = dict_result
-            adv_result[search_adv_id] = nmid_result
+            )
+            dict_result: dict[str, dict[int, int]] = {
+                keyword_text: {pos.position: pos.bid for pos in row_list}
+                for keyword_text, row_list in bid_positions_result.items()
+            }
+            return sid, nmid, dict_result
+
+        async def _guarded(
+            item: tuple[int, int, int],
+        ) -> tuple[int, int, dict[str, dict[int, int]]]:
+            async with sem:
+                return await _fetch(item)
+
+        results = await asyncio.gather(*(_guarded(w) for w in work))
+        for sid, nmid, dict_result in results:
+            bucket = adv_result.get(sid)
+            if isinstance(bucket, dict):
+                bucket[nmid] = dict_result
 
         return adv_result
