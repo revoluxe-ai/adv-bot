@@ -38,7 +38,7 @@ async def get_current_bids(
         sub = V0GetNormQueryBidsRequest(items=chunk)
         part = await normquery_bids_adapter.post_adv_v0_normquery_get_bids(sub)
         if part is None:
-            return None
+            continue
         merged.extend(part)
 
-    return merged
+    return merged or None

@@ -60,7 +60,7 @@ async def test_get_current_bids_splits_requests_when_over_100_items() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_get_current_bids_returns_none_when_chunk_returns_none() -> None:
+async def test_get_current_bids_keeps_partial_data_when_chunk_returns_none() -> None:
     items = [
         V0GetNormQueryBidsRequestItem(advert_id=1, nm_id=i) for i in range(150)
     ]
@@ -77,5 +77,6 @@ async def test_get_current_bids_returns_none_when_chunk_returns_none() -> None:
     ):
         result = await get_current_bids(adapter, [MagicMock()])
 
-    assert result is None
-    assert adapter.post_adv_v0_normquery_get_bids.call_count == 1
+    assert result is not None
+    assert len(result) == 50
+    assert adapter.post_adv_v0_normquery_get_bids.call_count == 2
