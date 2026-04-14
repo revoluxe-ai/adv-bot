@@ -459,7 +459,7 @@ class UpdateClusterBidsManager:
             search_adv_id = adv.auction_adv_id
             if search_adv_id is None:
                 continue
-            if not adv.individual_keywords_target_place_mode:
+            if adv.individual_keywords_target_place_mode is False:
                 adv_result[search_adv_id] = None
             else:
                 adv_result[search_adv_id] = {}
@@ -467,7 +467,10 @@ class UpdateClusterBidsManager:
         work: list[tuple[int, int, int]] = []
         for adv in advs:
             search_adv_id = adv.auction_adv_id
-            if search_adv_id is None or not adv.individual_keywords_target_place_mode:
+            if (
+                search_adv_id is None
+                or adv.individual_keywords_target_place_mode is False
+            ):
                 continue
             for nmid in adv.nmids:
                 try:
