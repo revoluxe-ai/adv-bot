@@ -800,8 +800,17 @@ class CoroutinesManager:
         if not advs:
             return None
 
-        bids = await wb_manager.get_current_bids(advs)
-        written = await redis_api_cluster_bids_manager.replace_from_api(bids)
+        try:
+            bids = await wb_manager.get_current_bids(advs)
+            written = await redis_api_cluster_bids_manager.replace_from_api(bids)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "cache_current_cluster_bids failed shop_id=%s: %s",
+                self.shop_id,
+                exc,
+                exc_info=True,
+            )
+            return None
         logger.info(
             "Cached current cluster bids from WB API: shop_id=%s fetched=%s written=%s",
             self.shop_id,
