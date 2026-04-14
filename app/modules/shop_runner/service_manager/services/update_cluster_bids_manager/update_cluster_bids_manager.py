@@ -443,15 +443,7 @@ class UpdateClusterBidsManager:
 
 
     async def __get_fact_data(self, adv: ComplexAdv) -> FactData | None:
-        keywords = await adv.get_keywords(cache_only=True)
-        if keywords is None:
-            logger.debug(
-                "Redis cache miss for calculated keywords, skip fact adv_id=%s",
-                adv.adv_id,
-            )
-            return None
-        fact_data: FactData | None = await self._get_fact_data_from_ch_cache(adv)
-        return fact_data
+        return await self._get_fact_data_from_ch_cache(adv)
 
 
     @staticmethod
