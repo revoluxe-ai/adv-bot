@@ -34,7 +34,8 @@ async def test_replace_from_api_persists_and_get_bids(
         NormqueryBidDTO(advert_id=1, nm_id=100, norm_query="q1", bid=42),
         NormqueryBidDTO(advert_id=2, nm_id=200, norm_query="q2", bid=99),
     ]
-    await redis_api_cluster_bids_manager.replace_from_api(bids)
+    written = await redis_api_cluster_bids_manager.replace_from_api(bids)
+    assert written == len(bids)
 
     for dto in bids:
         key = redis_api_cluster_bids_manager._get_key(
@@ -98,7 +99,8 @@ async def test_api_keys_do_not_overlap_cluster_bid_state(
 async def test_replace_from_api_empty_noop(
     redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
 ) -> None:
-    await redis_api_cluster_bids_manager.replace_from_api([])
+    written = await redis_api_cluster_bids_manager.replace_from_api([])
+    assert written == 0
 
 
 @pytest.mark.asyncio

@@ -20,9 +20,9 @@ class RedisApiClusterBidsManager(BaseRedisManager):
     def _get_key(self, adv_id: int, nmid: int, cluster: str) -> str:
         return f"{self.prefix}:{adv_id}:{nmid}:{cluster}"
 
-    async def replace_from_api(self, bids: list[NormqueryBidDTO]) -> None:
+    async def replace_from_api(self, bids: list[NormqueryBidDTO]) -> int:
         if not bids:
-            return
+            return 0
         ttl = self._resolve_ttl()
         async with self._client.write_pipeline() as pipeline:  # type: ignore[reportUnknownMemberType]
             for dto in bids:
@@ -32,7 +32,8 @@ class RedisApiClusterBidsManager(BaseRedisManager):
                     pipeline.set(key, payload, ex=ttl)
                 else:
                     pipeline.set(key, payload)
-            await pipeline.execute()  # type: ignore[reportUnknownMemberType]
+            responses = await pipeline.execute()  # type: ignore[reportUnknownMemberType]
+        return sum(1 for response in responses if not isinstance(response, Exception))
 
     async def get_bids(self, keys: Sequence[ClusterBidKey]) -> dict[ClusterBidKey, int]:
         if not keys:

@@ -798,13 +798,12 @@ class CoroutinesManager:
             return None
 
         bids = await wb_manager.get_current_bids(advs)
-        if bids:
-            await redis_api_cluster_bids_manager.replace_from_api(bids)
+        written = await redis_api_cluster_bids_manager.replace_from_api(bids)
         logger.info(
             "Cached current cluster bids from WB API: shop_id=%s fetched=%s written=%s",
             self.shop_id,
             len(bids),
-            len(bids),
+            written,
         )
         return None
 
