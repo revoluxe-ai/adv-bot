@@ -516,10 +516,3 @@ class UpdateClusterBidsManager:
 
         return adv_result
 
-    async def _get_fact_data_from_ch_cache(
-        self, adv: ComplexAdv
-    ) -> FactData | None:
-        summary = await PlanFactReader().get_latest_plan_fact(adv.adv_id)
-        return PlanFactProvider.fact_data_from_plan_fact_summary(
-            summary, adv.adv_setting
-        )

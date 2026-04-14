@@ -33,32 +33,6 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
     adv.get_keywords.assert_awaited_once_with(cache_only=True)
 
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_get_fact_data_from_ch_cache_returns_none_without_summary(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    manager = UpdateClusterBidsManager(
-        wb_manager=MagicMock(),
-        redis_keyword_bidder_status_manager=MagicMock(),
-        redis_cluster_bids_manager=MagicMock(),
-        redis_api_cluster_bids_manager=MagicMock(),
-        redis_cluster_bids_timestamp_manager=MagicMock(),
-    )
-    adv = MagicMock()
-    adv.adv_id = 42
-    adv.adv_setting = MagicMock()
-    single_mock = AsyncMock(return_value=None)
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager.PlanFactReader.get_latest_plan_fact",
-        single_mock,
-    )
-
-    result = await manager._get_fact_data_from_ch_cache(adv)
-    assert result is None
-    single_mock.assert_awaited_once_with(42)
-
-
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_fact_datas_uses_batch_plan_fact_reader_once(
