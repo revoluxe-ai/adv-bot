@@ -96,6 +96,9 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+# Если после кеша и WB API минимальная ставка по поиску неизвестна — emergency normquery.
+STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB = 150
+
 T = TypeVar("T")
 
 
@@ -995,14 +998,53 @@ class CoroutinesManager:
             [complex_adv],
             context="stats_stale_emergency_set_min_search_bid",
         )
+        missing_nmids = [nmid for nmid in complex_adv.nmids if nmid not in min_bids.search]
+        if missing_nmids:
+            logger.warning(
+                "stats_stale_emergency: min search bids cache miss, fallback to WB API "
+                "shop_id=%s adv_id=%s missing_nmids=%s",
+                self.shop_id,
+                complex_adv.adv_id,
+                missing_nmids,
+            )
+            try:
+                fresh_min_bids = await wb_manager_hub.wb_manager.get_min_bids(
+                    [complex_adv],
+                    cache_possible=False,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "stats_stale_emergency: fallback WB API get_min_bids failed "
+                    "shop_id=%s adv_id=%s err=%s",
+                    self.shop_id,
+                    complex_adv.adv_id,
+                    exc,
+                    exc_info=True,
+                )
+            else:
+                # Keep cache hits and backfill only missing nmids from live WB response.
+                for nmid in missing_nmids:
+                    fresh_bid = fresh_min_bids.search.get(nmid)
+                    if fresh_bid is not None:
+                        min_bids.search[nmid] = fresh_bid
         new_bids: list[NewBid] = []
         for nmid in complex_adv.nmids:
-            min_bid = min_bids.search.get(nmid)
-            if min_bid is None:
-                continue
+            raw_min = min_bids.search.get(nmid)
+            if raw_min is None:
+                logger.warning(
+                    "stats_stale_emergency: min search bid unknown, using default "
+                    "shop_id=%s adv_id=%s nmid=%s default_rub=%s",
+                    self.shop_id,
+                    complex_adv.adv_id,
+                    nmid,
+                    STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB,
+                )
+                min_bid = STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB
+            else:
+                min_bid = int(raw_min)
             new_bids.append(
                 NewBid(
-                    new_bid=int(min_bid),
+                    new_bid=min_bid,
                     adv_id=search_adv_id,
                     nmid=nmid,
                     cluster=keyword_text,
@@ -1013,7 +1055,7 @@ class CoroutinesManager:
             )
         if not new_bids:
             logger.error(
-                "stats_stale_emergency: no min search bids in cache for any nmid "
+                "stats_stale_emergency: no nmids to set search bid "
                 "shop_id=%s adv_id=%s",
                 self.shop_id,
                 complex_adv.adv_id,
