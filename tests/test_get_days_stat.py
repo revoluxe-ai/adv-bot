@@ -13,7 +13,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
     CommonCardStat,
 )
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.unit
 
 
 manager = CommonStatDataManager()
