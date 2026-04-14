@@ -484,7 +484,16 @@ class UpdateClusterBidsManager:
             if search_adv_id is None or not adv.individual_keywords_target_place_mode:
                 continue
             for nmid in adv.nmids:
-                min_bid = auction_min_bids_by_nmid[nmid]
+                try:
+                    min_bid = auction_min_bids_by_nmid[nmid]
+                except KeyError:
+                    logger.error(
+                        "predict_bids: нет min_bid для nmid=%s в min_bids.search "
+                        "(search_adv_id=%s), пропуск позиции",
+                        nmid,
+                        search_adv_id,
+                    )
+                    continue
                 work.append((search_adv_id, nmid, min_bid))
 
         if not work:
