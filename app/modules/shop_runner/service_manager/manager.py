@@ -160,9 +160,12 @@ class CoroutinesManager:
         self._redis_stats_freshness_cache = RedisStatsFreshnessStateCacheManager(
             redis_client_wrapper
         )
-        # Пока идёт приоритетная догрузка miss — old-ветка ждёт (parallel tasks + Event).
+        # Пока идёт приоритетная догрузка miss — следующий цикл old ждёт Event.
+        # Отдельный Lock: Event не останавливает уже начатый refresh_min_bids_cache,
+        # без Lock miss и old могли бы дергать WB API параллельно (напр. после общего initial delay).
         self._min_bids_old_refresh_permitted = asyncio.Event()
         self._min_bids_old_refresh_permitted.set()
+        self._min_bids_wb_refresh_lock = asyncio.Lock()
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -848,9 +851,10 @@ class CoroutinesManager:
                 return None
             self._min_bids_old_refresh_permitted.clear()
             try:
-                miss_written = await wb_manager.refresh_min_bids_cache_miss_cells(
-                    miss_cells
-                )
+                async with self._min_bids_wb_refresh_lock:
+                    miss_written = await wb_manager.refresh_min_bids_cache_miss_cells(
+                        miss_cells
+                    )
                 _ = await wb_manager.find_min_bids_cache_miss_cells(
                     advs,
                     emit_app_log=True,
@@ -899,7 +903,8 @@ class CoroutinesManager:
             return None
         try:
             _ = await self._min_bids_old_refresh_permitted.wait()
-            await wb_manager.refresh_min_bids_cache(advs)
+            async with self._min_bids_wb_refresh_lock:
+                await wb_manager.refresh_min_bids_cache(advs)
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "preload_min_bids_cache_old failed shop_id=%s: %s",
