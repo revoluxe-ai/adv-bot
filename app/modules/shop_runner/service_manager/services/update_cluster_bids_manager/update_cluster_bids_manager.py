@@ -20,6 +20,10 @@ from app.modules.cluster_bids_redis import (
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+    fact_data_from_plan_fact_summary,
+)
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
@@ -437,8 +441,8 @@ class UpdateClusterBidsManager:
                 adv_to_fact_map[adv.adv_id] = fact
         return adv_to_fact_map
 
-    @staticmethod
-    async def __get_fact_data(adv: ComplexAdv) -> FactData | None:
+
+    async def __get_fact_data(self, adv: ComplexAdv) -> FactData | None:
         keywords = await adv.get_keywords(cache_only=True)
         if keywords is None:
             logger.debug(
@@ -446,9 +450,8 @@ class UpdateClusterBidsManager:
                 adv.adv_id,
             )
             return None
-        provider = PlanFactProvider(adv.adv_setting)
-        stat = await provider.get_stat_data(keywords)
-        return await provider.get_fact_data(stat)
+        fact_data: FactData | None = await self._get_fact_data_from_ch_cache(adv)
+        return fact_data
 
 
     @staticmethod
@@ -530,3 +533,9 @@ class UpdateClusterBidsManager:
                 bucket[nmid] = dict_result
 
         return adv_result
+
+    async def _get_fact_data_from_ch_cache(
+        self, adv: ComplexAdv
+    ) -> FactData | None:
+        summary = await PlanFactReader().get_latest_plan_fact(adv.adv_id)
+        return fact_data_from_plan_fact_summary(summary, adv.adv_setting)

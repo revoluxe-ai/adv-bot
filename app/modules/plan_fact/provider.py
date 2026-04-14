@@ -50,6 +50,25 @@ class PlanFactProvider:
         return await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
+
+    @staticmethod
+    def fact_data_from_plan_fact_summary(
+        summary: object,
+        adv_setting: AdvSetting,
+    ) -> FactData | None:
+        """Собирает FactData из последнего снимка в ClickHouse (plan_fact_stats).
+
+        Реализация в ``plan_fact_reader``; ленивый импорт, чтобы не зациклить
+        загрузку ``PlanFactProvider`` с ``wb_shop_data_manager``.
+        """
+        from app.modules.shop_runner.service_manager.services.plan_fact_controller import (
+            plan_fact_reader,
+        )
+
+        return plan_fact_reader.fact_data_from_plan_fact_summary(
+            summary, adv_setting
+        )
+
     @staticmethod
     def _get_fact_data_from_stat(common_stat_data: CommonAdvsStatData) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None
