@@ -508,8 +508,24 @@ class UpdateClusterBidsManager:
             async with sem:
                 return await _fetch(item)
 
-        results = await asyncio.gather(*(_guarded(w) for w in work))
-        for sid, nmid, dict_result in results:
+        results: list[tuple[int, int, dict[str, dict[int, int]]] | BaseException] = (
+            await asyncio.gather(
+                *(_guarded(w) for w in work),
+                return_exceptions=True,
+            )
+        )
+        for item, result in zip(work, results, strict=False):
+            if isinstance(result, BaseException):
+                sid, nmid, _ = item
+                logger.error(
+                    "predict_bids: failed get_bid_positions_normalized "
+                    "(search_adv_id=%s, nmid=%s): %s",
+                    sid,
+                    nmid,
+                    result,
+                )
+                continue
+            sid, nmid, dict_result = result
             bucket = adv_result.get(sid)
             if isinstance(bucket, dict):
                 bucket[nmid] = dict_result
