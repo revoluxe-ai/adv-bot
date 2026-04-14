@@ -126,7 +126,7 @@ class UpdateClusterBidsManager:
         map_datas: set[AdvIdItemCalculateData],
     ) -> BidderUpdateData:
         async def _get_cluster_bids() -> list[NormqueryBidDTO]:
-            return await self._get_cluster_bids_for_maps(map_datas)
+            return await self._get_cluster_bids_for_maps(map_datas, advs)
 
         async def _get_min_bids() -> AdvMinNmidsBids:
             return await self._wb_manager.get_min_bids_cache_only(
@@ -163,6 +163,7 @@ class UpdateClusterBidsManager:
     async def _get_cluster_bids_for_maps(
         self,
         map_datas: set[AdvIdItemCalculateData],
+        advs: list[ComplexAdv],
     ) -> list[NormqueryBidDTO]:
         if not map_datas:
             return []
@@ -192,12 +193,52 @@ class UpdateClusterBidsManager:
             for key, value in cached.items()
         }
         if missing_keys:
-            logger.debug(
-                "Cluster bid cache MISS for %s/%s combinations (no WB API fallback; "
-                "use cache_current_cluster_bids coroutine or current_cpm fallback)",
-                len(missing_keys),
-                total,
-            )
+            needed_adv_ids = {k.adv_id for k in missing_keys}
+            sub_advs = [
+                a
+                for a in advs
+                if a.auction_adv_id is not None and a.auction_adv_id in needed_adv_ids
+            ]
+            if sub_advs:
+                logger.info(
+                    "Cluster bid Redis API cache MISS for %s/%s keys; "
+                    "loading from WB API for %s search campaign(s)",
+                    len(missing_keys),
+                    total,
+                    len({a.auction_adv_id for a in sub_advs if a.auction_adv_id}),
+                )
+                try:
+                    fresh = await self._wb_manager.get_current_bids(sub_advs)
+                except Exception:
+                    logger.exception(
+                        "Cluster bid WB API fallback failed (%s/%s miss)",
+                        len(missing_keys),
+                        total,
+                    )
+                else:
+                    try:
+                        _ = await self._redis_api_cluster_bids_manager.replace_from_api(
+                            fresh
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Cluster bid: failed to write WB fallback to Redis API cache"
+                        )
+                    by_key = {
+                        ClusterBidKey(b.advert_id, b.nm_id, b.norm_query): b
+                        for b in fresh
+                    }
+                    for mk in missing_keys:
+                        dto = by_key.get(mk)
+                        if dto is not None:
+                            bids_map[mk] = dto
+            else:
+                logger.debug(
+                    "Cluster bid cache MISS for %s/%s combinations; "
+                    "no ComplexAdv for WB fallback (auction_adv_id)",
+                    len(missing_keys),
+                    total,
+                )
         return list(bids_map.values())
 
     async def _get_calculation_inputs(
