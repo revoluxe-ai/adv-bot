@@ -847,7 +847,6 @@ class CoroutinesManager:
             finally:
                 self._min_bids_old_refresh_permitted.set()
         except Exception as exc:  # noqa: BLE001
-            self._min_bids_old_refresh_permitted.set()
             logger.error(
                 "preload_min_bids_cache_miss failed shop_id=%s: %s",
                 self.shop_id,
