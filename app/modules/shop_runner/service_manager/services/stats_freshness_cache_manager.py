@@ -18,7 +18,7 @@ class RedisStatsFreshnessStateCacheManager:
     """Caches automation freshness classification per WB adv_id for a shop."""
 
     _PREFIX = "stats_freshness_state"
-    _TTL_SEC = 120
+    _TTL_SEC = 6 * 60 * 60  # 6 hours — aligned with emergency stale window
 
     def __init__(self, redis_client: RedisClient) -> None:
         self._client = redis_client

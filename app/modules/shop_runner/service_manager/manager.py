@@ -191,7 +191,7 @@ class CoroutinesManager:
             else:
                 invalid_payloads += 1
             if kind != "hit":
-                logger.info(
+                logger.error(
                     "stats_freshness_cache fail-open (treat as fresh): shop_id=%s "
                     "adv_id=%s op=%s kind=%s",
                     self.shop_id,

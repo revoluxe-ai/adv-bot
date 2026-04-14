@@ -13,15 +13,12 @@ from app.modules.shop_runner.service_manager.services.stats_freshness_guard impo
     StatsFreshnessGuard,
 )
 
-MODULE = "app.modules.shop_runner.service_manager.services.stats_freshness_guard"
-
 
 def _make_guard(
     *,
     common_dt: datetime | None,
     full_adv_dt: datetime | None,
     cluster_dt: datetime | None,
-    update_period_sec: int = 3600,
 ) -> StatsFreshnessGuard:
     reader = MagicMock(spec=ClickHouseStatsFreshnessReader)
     reader.get_common_updated_at = AsyncMock(return_value=common_dt)
@@ -32,7 +29,9 @@ def _make_guard(
     return guard
 
 
-def _complex_adv(adv_id: int = 101, main_nmid: int = 1, all_adv_ids: set[int] | None = None) -> SimpleNamespace:
+def _complex_adv(
+    adv_id: int = 101, main_nmid: int = 1, all_adv_ids: set[int] | None = None
+) -> SimpleNamespace:
     if all_adv_ids is None:
         all_adv_ids = {adv_id}
     return SimpleNamespace(
@@ -43,8 +42,7 @@ def _complex_adv(adv_id: int = 101, main_nmid: int = 1, all_adv_ids: set[int] | 
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_returns_fresh(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(f"{MODULE}.settings", SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600))
+async def test_stats_freshness_guard_returns_fresh() -> None:
     now = datetime.now(timezone.utc)
     common_dt = now - timedelta(minutes=5)
     full_adv_dt = now - timedelta(minutes=3)
@@ -63,9 +61,8 @@ async def test_stats_freshness_guard_returns_fresh(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_missing_timestamp_not_emergency(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_stats_freshness_guard_missing_timestamp_not_emergency() -> None:
     """Missing timestamp = not yet collected (e.g. new campaign). Must not trigger emergency."""
-    monkeypatch.setattr(f"{MODULE}.settings", SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600))
     now = datetime.now(timezone.utc)
 
     guard = _make_guard(
@@ -82,10 +79,8 @@ async def test_stats_freshness_guard_missing_timestamp_not_emergency(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_all_timestamps_missing_not_emergency(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_stats_freshness_guard_all_timestamps_missing_not_emergency() -> None:
     """New campaign with no stats in DB yet must not be classified as emergency-stale."""
-    monkeypatch.setattr(f"{MODULE}.settings", SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600))
-
     guard = _make_guard(
         common_dt=None,
         full_adv_dt=None,
@@ -100,8 +95,8 @@ async def test_stats_freshness_guard_all_timestamps_missing_not_emergency(monkey
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_stale_but_not_emergency(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(f"{MODULE}.settings", SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600))
+async def test_stats_freshness_guard_stale_but_not_emergency() -> None:
+    """Age > 1h on one source => stale; other sources fresh; < 6h => not emergency."""
     now = datetime.now(timezone.utc)
     common_dt = now - timedelta(hours=2)
     full_adv_dt = now - timedelta(minutes=10)
@@ -120,8 +115,27 @@ async def test_stats_freshness_guard_stale_but_not_emergency(monkeypatch: pytest
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_emergency_when_older_than_6h(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(f"{MODULE}.settings", SimpleNamespace(UPDATE_FULL_ADV_STAT_PERIOD=3600))
+async def test_stats_freshness_guard_stale_over_1h_not_emergency() -> None:
+    """All sources > 1h stale but < 6h => stale, not emergency."""
+    now = datetime.now(timezone.utc)
+    common_dt = now - timedelta(hours=3)
+    full_adv_dt = now - timedelta(hours=2)
+    cluster_dt = now - timedelta(hours=2, minutes=30)
+
+    guard = _make_guard(
+        common_dt=common_dt,
+        full_adv_dt=full_adv_dt,
+        cluster_dt=cluster_dt,
+    )
+    adv = _complex_adv()
+    state = await guard.evaluate(adv)  # type: ignore[arg-type]
+
+    assert state.is_fresh is False
+    assert state.is_stale_over_6h is False
+
+
+@pytest.mark.asyncio
+async def test_stats_freshness_guard_emergency_when_older_than_6h() -> None:
     now = datetime.now(timezone.utc)
     common_dt = now - timedelta(hours=7)
     full_adv_dt = now - timedelta(minutes=10)

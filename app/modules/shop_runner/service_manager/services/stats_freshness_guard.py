@@ -9,7 +9,6 @@ from app.modules.shop_runner.service_manager.services.clickhouse_freshness_reade
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-from app.settings import settings
 
 
 @dataclass(frozen=True)
@@ -22,6 +21,7 @@ class StatsFreshnessState:
 class StatsFreshnessGuard:
     """Centralized guard for campaign automation based on stats freshness."""
 
+    _STALE_PERIOD = timedelta(hours=1)
     _EMERGENCY_STALE_PERIOD = timedelta(hours=6)
 
     def __init__(
@@ -56,7 +56,7 @@ class StatsFreshnessGuard:
         cluster_updated_at: datetime | None,
     ) -> StatsFreshnessState:
         now = datetime.now(timezone.utc)
-        fresh_period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
+        stale_period = self._STALE_PERIOD
         adv_id_repr = complex_adv.original_adv_setting_id
 
         common_age = self._calc_age(now, common_updated_at)
@@ -81,7 +81,7 @@ class StatsFreshnessGuard:
                     is_stale_over_6h=True,
                     reason=f"{source} stale over 6h for adv_id={adv_id_repr}",
                 )
-            if age > fresh_period:
+            if age > stale_period:
                 return StatsFreshnessState(
                     is_fresh=False,
                     is_stale_over_6h=False,

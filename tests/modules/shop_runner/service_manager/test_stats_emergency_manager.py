@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -69,7 +70,10 @@ async def test_split_advs_by_stats_freshness_filters_correctly(fake_redis) -> No
 
 
 @pytest.mark.asyncio
-async def test_split_advs_by_stats_freshness_fail_open_on_cache_miss(fake_redis) -> None:
+async def test_split_advs_by_stats_freshness_fail_open_on_cache_miss(
+    fake_redis, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.ERROR)
     manager = _build_manager(fake_redis)
     adv = SimpleNamespace(adv_id=99)
     fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
@@ -77,12 +81,18 @@ async def test_split_advs_by_stats_freshness_fail_open_on_cache_miss(fake_redis)
     )
     assert fresh == [adv]
     assert stale_over_6h == []
+    assert any(
+        "stats_freshness_cache fail-open" in r.message and r.levelno == logging.ERROR
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio
 async def test_split_advs_by_stats_freshness_fail_open_on_invalid_payload(
     fake_redis,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.ERROR)
     manager = _build_manager(fake_redis)
     adv = SimpleNamespace(adv_id=42)
     key = RedisStatsFreshnessStateCacheManager.key(manager.shop_id, 42)
@@ -92,6 +102,10 @@ async def test_split_advs_by_stats_freshness_fail_open_on_invalid_payload(
     )
     assert fresh == [adv]
     assert stale_over_6h == []
+    assert any(
+        "stats_freshness_cache fail-open" in r.message and r.levelno == logging.ERROR
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio
