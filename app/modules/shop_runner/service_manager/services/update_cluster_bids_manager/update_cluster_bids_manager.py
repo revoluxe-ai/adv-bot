@@ -349,7 +349,7 @@ class UpdateClusterBidsManager:
             cluster_texts: set[str] = (
                 texts_by_adv_id.get(adv.auction_adv_id, set())
                 if adv.auction_adv_id is not None
-                else set[str]()
+                else set()
             )
 
             async def _run(
