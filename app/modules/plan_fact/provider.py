@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -16,6 +17,11 @@ from app.modules.shop_runner.service_manager.services.increment_fact_data_manage
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+        PlanFactSummary,
+    )
 
 
 class PlanFactProvider:
@@ -53,7 +59,7 @@ class PlanFactProvider:
 
     @staticmethod
     def fact_data_from_plan_fact_summary(
-        summary: object,
+        summary: PlanFactSummary | None,
         adv_setting: AdvSetting,
     ) -> FactData | None:
         """Собирает FactData из последнего снимка в ClickHouse (plan_fact_stats).

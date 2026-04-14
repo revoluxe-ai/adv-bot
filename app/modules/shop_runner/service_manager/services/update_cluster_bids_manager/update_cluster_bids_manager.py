@@ -22,7 +22,6 @@ from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
-    fact_data_from_plan_fact_summary,
 )
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
@@ -429,7 +428,7 @@ class UpdateClusterBidsManager:
             return {}
         adv_to_fact_map: dict[int, FactData] = {}
         for adv in advs:
-            fact = fact_data_from_plan_fact_summary(
+            fact = PlanFactProvider.fact_data_from_plan_fact_summary(
                 summaries_by_adv_id.get(adv.adv_id),
                 adv.adv_setting,
             )
@@ -521,4 +520,6 @@ class UpdateClusterBidsManager:
         self, adv: ComplexAdv
     ) -> FactData | None:
         summary = await PlanFactReader().get_latest_plan_fact(adv.adv_id)
-        return fact_data_from_plan_fact_summary(summary, adv.adv_setting)
+        return PlanFactProvider.fact_data_from_plan_fact_summary(
+            summary, adv.adv_setting
+        )
