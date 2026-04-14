@@ -34,7 +34,7 @@ class AutoResetBidService:
             )
             return None
 
-        if not min_bids:
+        if not min_bids.auto:
             return None
 
         handlers: list[Callable[[], Awaitable[None]]] = []
