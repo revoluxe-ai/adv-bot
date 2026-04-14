@@ -33,7 +33,7 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
     adv.get_keywords.assert_awaited_once_with(cache_only=True)
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_fact_data_returns_none_on_keywords_cache_miss() -> None:
     manager = UpdateClusterBidsManager(
