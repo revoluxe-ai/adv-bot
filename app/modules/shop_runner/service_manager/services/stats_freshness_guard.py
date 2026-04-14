@@ -19,9 +19,14 @@ class StatsFreshnessState:
 
 
 class StatsFreshnessGuard:
-    """Centralized guard for campaign automation based on stats freshness."""
+    """Centralized guard for campaign automation based on stats freshness.
 
-    _STALE_PERIOD = timedelta(hours=1)
+    Product rule: campaign stats are considered stale when any source is older
+    than 1 hour. This threshold is intentionally fixed and does not depend on
+    UPDATE_FULL_ADV_STAT_PERIOD.
+    """
+
+    _STALE_PERIOD = timedelta(hours=1)  # Fixed product threshold for stale stats.
     _EMERGENCY_STALE_PERIOD = timedelta(hours=6)
 
     def __init__(

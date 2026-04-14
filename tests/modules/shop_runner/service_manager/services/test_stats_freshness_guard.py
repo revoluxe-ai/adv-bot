@@ -96,7 +96,7 @@ async def test_stats_freshness_guard_all_timestamps_missing_not_emergency() -> N
 
 @pytest.mark.asyncio
 async def test_stats_freshness_guard_stale_but_not_emergency() -> None:
-    """Age > 1h on one source => stale; other sources fresh; < 6h => not emergency."""
+    """Fixed stale threshold: age > 1h on one source => stale; < 6h => not emergency."""
     now = datetime.now(timezone.utc)
     common_dt = now - timedelta(hours=2)
     full_adv_dt = now - timedelta(minutes=10)
@@ -115,8 +115,8 @@ async def test_stats_freshness_guard_stale_but_not_emergency() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stats_freshness_guard_stale_over_1h_not_emergency() -> None:
-    """All sources > 1h stale but < 6h => stale, not emergency."""
+async def test_stats_freshness_guard_all_sources_stale_over_fixed_1h_not_emergency() -> None:
+    """Fixed stale threshold: all sources > 1h and < 6h => stale, not emergency."""
     now = datetime.now(timezone.utc)
     common_dt = now - timedelta(hours=3)
     full_adv_dt = now - timedelta(hours=2)
