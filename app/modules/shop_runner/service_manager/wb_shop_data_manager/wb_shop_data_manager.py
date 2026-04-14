@@ -370,7 +370,16 @@ class WBShopDataManager:
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
         if load_extras and complex_advs:
-            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            try:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            except Exception as exc:
+                logger.exception(
+                    "Ошибка получения min_bids (cache) в get_complex_advs, "
+                    "shop_id=%s. Возвращаю базовый список без min_nmids_bids",
+                    self.shop_id,
+                    exc_info=exc,
+                )
+                min_bids = None
             if min_bids is not None:
                 for adv in complex_advs:
                     adv.attach_min_nmids_bids(min_bids)
