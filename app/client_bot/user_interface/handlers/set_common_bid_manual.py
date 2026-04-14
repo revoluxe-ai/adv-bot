@@ -144,7 +144,23 @@ async def set_common_bid_manual_start(
         )
         return
 
-    min_common = max(min_bids.search.values())
+    nmids = list(adv_setting.nmids) if adv_setting.nmids else []
+    if not nmids:
+        await bot.send_message(
+            chat_id,
+            "В кампании нет товаров (nmids). Невозможно получить минимальную ставку.",
+        )
+        return
+
+    missing_nmids = [nmid for nmid in nmids if nmid not in min_bids.search]
+    if missing_nmids:
+        await bot.send_message(
+            chat_id,
+            "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
+        )
+        return
+
+    min_common = max(min_bids.search[nmid] for nmid in nmids)
     await state.update_data(
         adv_setting_original_id=adv_setting_original_id,
         wb_user_cabinet_original_id=wb_user_cabinet_original_id,
