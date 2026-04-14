@@ -821,6 +821,7 @@ class CoroutinesManager:
             redis_client=wb_manager_hub.redis_client_wrapper,
         )
         wb_manager = container.wb_manager()
+        t0 = time.perf_counter()
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
@@ -854,6 +855,7 @@ class CoroutinesManager:
                 exc,
                 exc_info=True,
             )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
             "preload_min_bids_cache_miss done shop_id=%s miss_cells=%s "
             "miss_written=%s advs=%s elapsed_ms=%.0f",
@@ -861,6 +863,7 @@ class CoroutinesManager:
             miss_cells_count,
             miss_written,
             len(advs),
+            elapsed_ms,
         )
         return None
 
