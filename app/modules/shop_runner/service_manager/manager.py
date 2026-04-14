@@ -1028,19 +1028,21 @@ class CoroutinesManager:
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.error(
-                    "stats_stale_emergency: fallback WB API get_min_bids failed "
-                    "shop_id=%s adv_id=%s err=%s",
+                    "stats_stale_emergency: fallback WB API get_min_bids failed; "
+                    "refusing emergency search bid update to avoid unsafe default bid "
+                    "shop_id=%s adv_id=%s missing_nmids=%s err=%s",
                     self.shop_id,
                     complex_adv.adv_id,
+                    missing_nmids,
                     exc,
                     exc_info=True,
                 )
-            else:
-                # Keep cache hits and backfill only missing nmids from live WB response.
-                for nmid in missing_nmids:
-                    fresh_bid = fresh_min_bids.search.get(nmid)
-                    if fresh_bid is not None:
-                        min_bids.search[nmid] = fresh_bid
+                return None
+            # Keep cache hits and backfill only missing nmids from live WB response.
+            for nmid in missing_nmids:
+                fresh_bid = fresh_min_bids.search.get(nmid)
+                if fresh_bid is not None:
+                    min_bids.search[nmid] = fresh_bid
         new_bids: list[NewBid] = []
         for nmid in complex_adv.nmids:
             raw_min = min_bids.search.get(nmid)

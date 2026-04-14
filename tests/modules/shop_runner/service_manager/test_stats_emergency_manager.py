@@ -214,3 +214,28 @@ async def test_set_min_search_bid_for_keyword_uses_min_bids(fake_redis) -> None:
     assert {bid.nmid for bid in command.new_bids} == {101, 202}
     assert {bid.new_bid for bid in command.new_bids} == {150, 200}
     assert {bid.cluster for bid in command.new_bids} == {"top_phrase"}
+
+
+@pytest.mark.asyncio
+async def test_set_min_search_bid_skips_when_wb_min_bids_fallback_fails(
+    fake_redis,
+) -> None:
+    """Live WB fallback must not leave silent use of emergency default after API error."""
+    manager = _build_manager(fake_redis)
+    complex_adv = SimpleNamespace(adv_id=9001, auction_adv_id=555, nmids=[101, 202])
+
+    min_bids = SimpleNamespace(search={101: 150})
+    get_min_bids_live = AsyncMock(side_effect=RuntimeError("WB API unavailable"))
+    wb_manager_hub = SimpleNamespace(
+        wb_manager=SimpleNamespace(
+            get_min_bids_cache_only=AsyncMock(return_value=min_bids),
+            get_min_bids=get_min_bids_live,
+        ),
+        wb_modifier=SimpleNamespace(set_cluster_bids_for_adv=AsyncMock()),
+    )
+
+    manager._wb_manager_hub = wb_manager_hub
+    await manager._set_min_search_bid_for_keyword(complex_adv, "top_phrase")  # type: ignore[arg-type]
+
+    get_min_bids_live.assert_awaited_once()
+    wb_manager_hub.wb_modifier.set_cluster_bids_for_adv.assert_not_awaited()
