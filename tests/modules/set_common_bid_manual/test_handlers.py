@@ -147,8 +147,8 @@ async def test_set_common_bid_manual_start_success() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_set_common_bid_manual_start_none_min_bids_from_manager() -> None:
-    """Test start when manager unexpectedly returns None for min bids."""
+async def test_set_common_bid_manual_start_empty_search_min_bids() -> None:
+    """Test start when cache response has no search bids."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock(spec=FSMContext)
@@ -163,6 +163,9 @@ async def test_set_common_bid_manual_start_none_min_bids_from_manager() -> None:
         wb_user_cabinet_original_id=10,
     )
     callback = _make_callback(callback_data, chat_id=111)
+
+    min_bids_mock = MagicMock()
+    min_bids_mock.search = {}
 
     with patch(f"{MODULE}.sm") as mock_sm:
         session_mock = MagicMock()
@@ -180,7 +183,9 @@ async def test_set_common_bid_manual_start_none_min_bids_from_manager() -> None:
             container = MagicMock()
             factory = MagicMock()
             hub = MagicMock()
-            hub.wb_manager.get_min_bids_cache_only = AsyncMock(return_value=None)
+            hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+                return_value=min_bids_mock
+            )
 
             factory.get_wb_manager_hub.return_value = hub
             container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
