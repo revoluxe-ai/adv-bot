@@ -1,7 +1,5 @@
 """Plan fact stats: ClickHouse sync and controllers."""
 
-__all__ = ["PlanFactController", "PlanFactManager"]
-
 
 def __getattr__(name: str) -> object:
     if name == "PlanFactController":
