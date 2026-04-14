@@ -81,19 +81,23 @@ class MinBidsAdapter(BaseSectionAdapter):
 
     async def post_api_advert_v1_bids_min(
         self, command: GetMinBidsCommand
-    ) -> list[MinBidForNmid]:
+    ) -> list[list[MinBidForNmid]]:
         """POST ``/api/advert/v1/bids/min``: одно тело = один ``advert_id`` (см. сгенерированный
         ``PostApiAdvertV1BidsMinBody``). Разные РК — разные HTTP-запросы. Внутри одной РК в теле
         передаётся список ``nm_ids`` и список ``placement_types``; при ошибке «чужие nm» —
-        bisection в ``_bisect_min_bids_for_item``."""
-        min_bids: list[MinBidForNmid] = []
+        bisection в ``_bisect_min_bids_for_item``.
+
+        Возвращает по одному списку ``MinBidForNmid`` на каждый ``command_item`` (порядок как
+        в ``command.items``), чтобы доменный слой не смешивал ответы разных РК в одном dict по
+        ``nmid``."""
+        grouped: list[list[MinBidForNmid]] = []
         for command_item in command.items:
-            min_bids.extend(
+            grouped.append(
                 await self._post_api_advert_v1_bids_min_single(
                     command_item=command_item,
                 )
             )
-        return min_bids
+        return grouped
 
     async def _post_api_advert_v1_bids_min_single(
         self,

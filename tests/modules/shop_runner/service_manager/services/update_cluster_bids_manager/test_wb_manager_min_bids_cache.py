@@ -271,8 +271,8 @@ async def test_find_min_bids_cache_miss_cells_only_absent_keys() -> None:
 @pytest.mark.asyncio
 async def test_refresh_min_bids_cache_miss_cells_batches_one_api_call() -> None:
     hub = MagicMock()
-    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(
-        return_value=AdvMinNmidsBids(auto={7: 40, 8: 41}, search={}),
+    hub.wb_data_manager.get_min_bids_per_command_item = AsyncMock(
+        return_value=[AdvMinNmidsBids(auto={7: 40, 8: 41}, search={})],
     )
 
     cache_instance = MagicMock()
@@ -294,7 +294,7 @@ async def test_refresh_min_bids_cache_miss_cells_batches_one_api_call() -> None:
         written = await mgr.refresh_min_bids_cache_miss_cells(miss_cells)
 
     assert written == 2
-    hub.wb_data_manager.get_min_bids_for_command.assert_awaited_once()
+    hub.wb_data_manager.get_min_bids_per_command_item.assert_awaited_once()
     cache_instance.set_min_bids_v2_batch.assert_awaited_once()
     written_batch = cache_instance.set_min_bids_v2_batch.await_args.args[0]
     assert len(written_batch) == 2
@@ -311,15 +311,13 @@ async def test_refresh_min_bids_cache_miss_cells_splits_on_exception() -> None:
 
     hub = MagicMock()
 
-    async def get_cmd(cmd) -> AdvMinNmidsBids:
+    async def get_per_item(cmd) -> list[AdvMinNmidsBids]:
         items = cmd.items
-        if len(items) == 2:
-            raise Boom("batch")
         if len(items) == 1 and items[0].adv_id == 1:
             raise Boom("bad adv")
-        return AdvMinNmidsBids(auto={7: 10}, search={})
+        return [AdvMinNmidsBids(auto={7: 10}, search={})]
 
-    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(side_effect=get_cmd)
+    hub.wb_data_manager.get_min_bids_per_command_item = AsyncMock(side_effect=get_per_item)
 
     cache_instance = MagicMock()
     cache_instance.set_min_bids_v2_batch = AsyncMock()
@@ -352,15 +350,15 @@ async def test_refresh_min_bids_cache_miss_cells_splits_nmids_on_none() -> None:
     hub = MagicMock()
     calls: list[int] = []
 
-    async def get_cmd(cmd) -> AdvMinNmidsBids | None:
+    async def get_per_item(cmd) -> list[AdvMinNmidsBids] | None:
         calls.append(len(cmd.items[0].nmids))
         if len(cmd.items[0].nmids) == 2:
             return None
         if cmd.items[0].nmids == [7]:
-            return AdvMinNmidsBids(auto={7: 11}, search={})
+            return [AdvMinNmidsBids(auto={7: 11}, search={})]
         return None
 
-    hub.wb_data_manager.get_min_bids_for_command = AsyncMock(side_effect=get_cmd)
+    hub.wb_data_manager.get_min_bids_per_command_item = AsyncMock(side_effect=get_per_item)
 
     cache_instance = MagicMock()
     cache_instance.set_min_bids_v2_batch = AsyncMock()

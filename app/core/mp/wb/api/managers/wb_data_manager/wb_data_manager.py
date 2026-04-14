@@ -126,6 +126,13 @@ class WBDataManager:
 
         return await self._promotion_manager.get_min_bids_for_command(command)
 
+    async def get_min_bids_per_command_item(
+        self, command: "GetMinBidsCommand"
+    ) -> list[AdvMinNmidsBids] | None:
+        """По одному результату на command item (для записи min_bids v2 в Redis по adv_id)."""
+
+        return await self._promotion_manager.get_min_bids_per_command_item(command)
+
     async def get_full_adv_stat(
         self,
         adv_ids: list[int],

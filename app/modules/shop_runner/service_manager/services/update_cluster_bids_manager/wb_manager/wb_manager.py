@@ -215,49 +215,52 @@ class WBManager(WBBaseManager):
             )
         return misses
 
+    async def _refresh_one_command_item_for_miss_cache(
+        self,
+        item: GetMinBidsCommandItem,
+        miss_set: set[MinBidsV2Cell],
+    ) -> int:
+        """Один WB command_item → сразу запись в Redis (как refresh_min_bids_cache).
+
+        Раньше все items ждали один общий ``await`` на весь список HTTP: до конца цикла
+        адаптера в Redis ничего не попадало; при отмене/рестарте после пары запросов
+        оставались те же cache miss.
+        """
+        wb_data = self.wb_manager_hub.wb_data_manager
+        cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
+        sub = GetMinBidsCommand(items=[item])
+        try:
+            per_item = await wb_data.get_min_bids_per_command_item(sub)
+        except Exception as exc:
+            return await self._split_min_bids_items_on_failure(
+                [item], miss_set, exc=exc
+            )
+
+        if per_item is None:
+            return await self._split_min_bids_items_on_failure(
+                [item], miss_set, exc=None
+            )
+
+        fresh = per_item[0]
+        batch = _min_bids_cache_entries_for_item_miss_only(item, fresh, miss_set)
+        if not batch:
+            return 0
+        await cache_manager.set_min_bids_v2_batch(batch)
+        return len(batch)
+
     async def _refresh_min_bids_command_items_with_split(
         self,
         items: list[GetMinBidsCommandItem],
         miss_set: set[MinBidsV2Cell],
     ) -> int:
-        """Запрос WB пачкой; при ошибке или None — binary split по items или nmids."""
+        """По одному command_item: запрос WB и немедленная запись; при ошибке — split по nmids."""
         if not items:
             return 0
-        wb_data = self.wb_manager_hub.wb_data_manager
-        cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
-
-        async def write_for_items(
-            batch_items: list[GetMinBidsCommandItem],
-            fresh: AdvMinNmidsBids,
-        ) -> int:
-            written = 0
-            for item in batch_items:
-                batch = _min_bids_cache_entries_for_item_miss_only(
-                    item, fresh, miss_set
-                )
-                if batch:
-                    await cache_manager.set_min_bids_v2_batch(batch)
-                    written += len(batch)
-            return written
-
-        cmd = GetMinBidsCommand(items=items)
-        fresh: AdvMinNmidsBids | None
-        try:
-            # Один доменный вызов с полным списком items; адаптер внутри обходит items
-            # последовательно (отдельные HTTP на пару advert+placement). При успехе —
-            # одна запись в Redis по всем items из ответа; при сбое — split ниже.
-            fresh = await wb_data.get_min_bids_for_command(cmd)
-        except Exception as exc:
-            return await self._split_min_bids_items_on_failure(
-                items, miss_set, exc=exc
+        written = 0
+        for item in items:
+            written += await self._refresh_one_command_item_for_miss_cache(
+                item, miss_set
             )
-
-        if fresh is None:
-            return await self._split_min_bids_items_on_failure(
-                items, miss_set, exc=None
-            )
-
-        written = await write_for_items(items, fresh)
         return written
 
     async def _split_min_bids_items_on_failure(
@@ -315,7 +318,7 @@ class WBManager(WBBaseManager):
             )
         else:
             logger.error(
-                "refresh_min_bids_cache_miss: WB get_min_bids_for_command returned None "
+                "refresh_min_bids_cache_miss: WB get_min_bids_per_command_item returned None "
                 "shop_id=%s adv_id=%s placement=%s nmid=%s",
                 self._shop_id,
                 item.adv_id,
@@ -330,10 +333,9 @@ class WBManager(WBBaseManager):
     ) -> int:
         """Догрузить только cache-miss ячейки.
 
-        Сначала один ``GetMinBidsCommand`` по всем сгруппированным miss-items. Если ответ
-        успешен — пишем в Redis miss-ячейки из ответа. Если исключение или ``None`` —
-        бинарный split по items / nmids и повторные запросы, пока не изолируем проблемную
-        связку (см. ``_split_min_bids_items_on_failure``).
+        По одному ``GetMinBidsCommandItem`` (сгруппированные miss): после каждого ответа WB
+        сразу пишем в Redis. При ошибке / ``None`` — split по ``nm_ids`` (см.
+        ``_split_min_bids_items_on_failure``).
         """
         if not miss_cells:
             return 0

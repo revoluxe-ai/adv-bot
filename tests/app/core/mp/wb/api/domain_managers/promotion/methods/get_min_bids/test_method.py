@@ -15,6 +15,7 @@ from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_min_bids.method import (
     get_min_bids,
     get_min_bids_for_command,
+    get_min_bids_per_command_item,
 )
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 
@@ -32,11 +33,13 @@ async def test_get_min_bids_partial_nmids_still_builds_adv_min_nmids_bids() -> N
     adapter = AsyncMock(spec=MinBidsAdapter)
     adapter.post_api_advert_v1_bids_min = AsyncMock(
         return_value=[
-            MinBidForNmid(
-                nmid=1,
-                placement_type=AdvPlacementType.AUTO_ADV,
-                min_cpm=250,
-            ),
+            [
+                MinBidForNmid(
+                    nmid=1,
+                    placement_type=AdvPlacementType.AUTO_ADV,
+                    min_cpm=250,
+                ),
+            ],
         ]
     )
     adv = MagicMock()
@@ -64,11 +67,13 @@ async def test_get_min_bids_for_command_delegates_to_adapter() -> None:
     adapter = AsyncMock(spec=MinBidsAdapter)
     adapter.post_api_advert_v1_bids_min = AsyncMock(
         return_value=[
-            MinBidForNmid(
-                nmid=3,
-                placement_type=AdvPlacementType.AUTO_ADV,
-                min_cpm=100,
-            ),
+            [
+                MinBidForNmid(
+                    nmid=3,
+                    placement_type=AdvPlacementType.AUTO_ADV,
+                    min_cpm=100,
+                ),
+            ],
         ]
     )
     cmd = GetMinBidsCommand(
@@ -83,3 +88,50 @@ async def test_get_min_bids_for_command_delegates_to_adapter() -> None:
     out = await get_min_bids_for_command(adapter, cmd)
     assert out is not None
     assert out.auto[3] == (100 + 99) // 100
+
+
+@pytest.mark.asyncio
+async def test_get_min_bids_per_command_item_keeps_distinct_nmids_across_adverts() -> None:
+    """Слияние в один dict по nmid затирает ставку соседней РК; per-item — сохраняет обе."""
+    adapter = AsyncMock(spec=MinBidsAdapter)
+    adapter.post_api_advert_v1_bids_min = AsyncMock(
+        return_value=[
+            [
+                MinBidForNmid(
+                    nmid=1,
+                    placement_type=AdvPlacementType.AUTO_ADV,
+                    min_cpm=100,
+                ),
+            ],
+            [
+                MinBidForNmid(
+                    nmid=1,
+                    placement_type=AdvPlacementType.AUTO_ADV,
+                    min_cpm=400,
+                ),
+            ],
+        ]
+    )
+    cmd = GetMinBidsCommand(
+        items=[
+            GetMinBidsCommandItem(
+                adv_id=10,
+                nmids=[1],
+                placement_type=AdvPlacementType.AUTO_ADV,
+            ),
+            GetMinBidsCommandItem(
+                adv_id=20,
+                nmids=[1],
+                placement_type=AdvPlacementType.AUTO_ADV,
+            ),
+        ]
+    )
+    per_item = await get_min_bids_per_command_item(adapter, cmd)
+    assert per_item is not None
+    assert len(per_item) == 2
+    assert per_item[0].auto[1] == (100 + 99) // 100
+    assert per_item[1].auto[1] == (400 + 99) // 100
+
+    merged = await get_min_bids_for_command(adapter, cmd)
+    assert merged is not None
+    assert merged.auto[1] == (400 + 99) // 100
