@@ -314,7 +314,6 @@ class WBManager(WBBaseManager):
                 item.placement_type.value,
                 nmid,
                 exc,
-                exc_info=True,
             )
         else:
             logger.error(
