@@ -144,7 +144,7 @@ async def set_common_bid_manual_start(
         )
         return
 
-    if not min_bids.search:
+    if min_bids is None or not min_bids.search:
         await bot.send_message(
             chat_id,
             "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
