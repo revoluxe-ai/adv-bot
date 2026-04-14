@@ -104,9 +104,6 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
         - Иначе список ``CalculatedKeyword`` (cache hit).
         """
         key = f"calculated_keywords:{adv_id}"
-        exists = await self.client.exists(key)
-        if not exists:
-            return None
         raw_map = await self.client.hgetall(key)
         if not raw_map:
             return None
