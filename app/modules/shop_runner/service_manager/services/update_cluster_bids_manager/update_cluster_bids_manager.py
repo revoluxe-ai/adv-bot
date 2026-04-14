@@ -414,12 +414,13 @@ class UpdateClusterBidsManager:
         return UpdateBidsCommand(new_bids)
 
     async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
+        _fact_cap = _max_workers_for(len(advs), cap=16)
         handlers: list[Callable[[], Awaitable[FactData | None]]] = [
             lambda adv_=adv: self.__get_fact_data(adv_) for adv in advs
         ]
         results = await run_tasks(
             handlers,
-            max_workers=_max_workers_for(len(handlers), cap=16),
+            max_workers=_fact_cap,
             return_exceptions=True,
         )
         facts: list[FactData | None] = []
