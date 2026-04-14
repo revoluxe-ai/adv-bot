@@ -2,7 +2,7 @@ from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
@@ -127,3 +127,44 @@ async def reset_white_list(
         callback.from_user.id, "Белый список сброшен, возвращаю меню кампании..."
     )
     await AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()
+
+
+@router.callback_query(callbacks.ResetNonRelevantPhrases.filter())
+async def reset_non_relevant_phrases(
+    callback: CallbackQuery,
+    bot: Bot,
+    state: FSMContext,
+    callback_data: callbacks.ResetNonRelevantPhrases,
+) -> None:
+    assert callback.from_user
+    await bot.send_message(
+        callback.from_user.id, "Сброс нерелевантных фраз (чёрный список)..."
+    )
+    adv_setting_id = callback_data.adv_setting_original_id
+    async with sm(read_only=False) as session:
+        stmt = (
+            update(KeywordSetting)
+            .where(
+                KeywordSetting.adv_setting_id == adv_setting_id,
+                KeywordSetting.hard_status == 0,
+            )
+            .values(hard_status=1)
+        )
+        await session.execute(stmt)
+        await session.commit()
+    async with sm() as session:
+        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+        adv = (await session.execute(stmt)).scalar()
+    assert adv
+    data = await state.get_data()
+    wb_user_cabinet_id: int = data["last_wb_user_cabinet_original_id"]
+    async with sm() as session:
+        stmt = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_id)
+        wb_user_cabinet = (await session.execute(stmt)).scalar()
+    assert wb_user_cabinet
+    await bot.send_message(
+        callback.from_user.id,
+        "Нерелевантные фразы сброшены, возвращаю меню кампании...",
+    )
+    await AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()
+    await callback.answer()

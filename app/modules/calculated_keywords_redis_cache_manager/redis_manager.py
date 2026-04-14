@@ -2,6 +2,8 @@ import json
 import logging
 from collections.abc import Awaitable
 
+from pydantic import ValidationError
+
 from app.core.redis_manager import RedisManager
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -90,4 +92,29 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
                 out[text] = CalculatedKeyword.model_validate(json.loads(raw))
             except (json.JSONDecodeError, Exception):  # noqa: BLE001
                 continue
+        return out
+
+    async def get_all_calculated_keywords_for_adv(
+        self, adv_id: int
+    ) -> list[CalculatedKeyword] | None:
+        """
+        Возвращает все ключевые слова из Redis hash ``calculated_keywords:{adv_id}``.
+
+        - Ключ отсутствует или hash пустой / все значения битые → ``None`` (cache miss).
+        - Иначе список ``CalculatedKeyword`` (cache hit).
+        """
+        key = f"calculated_keywords:{adv_id}"
+        raw_map = await self.client.hgetall(key)
+        if not raw_map:
+            return None
+        out: list[CalculatedKeyword] = []
+        for raw in raw_map.values():
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            try:
+                out.append(CalculatedKeyword.model_validate(json.loads(raw)))
+            except (json.JSONDecodeError, ValidationError, TypeError, ValueError):
+                continue
+        if not out:
+            return None
         return out

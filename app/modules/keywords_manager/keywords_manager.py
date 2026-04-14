@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import KeywordStat
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -23,6 +22,8 @@ class KeywordsManager:
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if keyword.views == 0:
                 return False
+            if keyword.reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID:
+                return False
             if keyword.hard_status != 1:
                 return False
             if keyword.status == KeywordStatus.GOOD:
@@ -31,11 +32,16 @@ class KeywordsManager:
                 return False
             if (complex_adv.rec_system_promotion_mode_active
                     and keyword.above_rec_conversion is False
-                    and complex_adv.auto_adv_active_status):
+                    and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed):
                 return False
             return True
 
-        keywords = await complex_adv.get_keywords()
+        keywords = sorted(
+            await complex_adv.get_keywords(),
+            key=lambda kw: kw.rating or 0,
+            reverse=True,
+        )
         candidates = list(filter(candidate_filter, keywords))
         return candidates
 
@@ -70,16 +76,16 @@ class KeywordsManager:
             session, original_adv_id, texts
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
-        relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
-        template_data = await relevant_phrase_manager.get_relevant_template_data()
-        not_rel_templator = NotRelevantTemplate(template_data)
+        adv_setting = complex_adv.adv_setting
+        flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
         for text in new_texts:
-            hard_status = 0 if not not_rel_templator.is_relevant(text) else 1
+            hard_status, relevant = flags_for(text)
             session.add(
                 KeywordSetting(
                     text=text,
                     hard_status=hard_status,
                     adv_setting_id=original_adv_id,
+                    relevant=relevant,
                 )
             )
 

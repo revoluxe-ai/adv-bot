@@ -1,4 +1,4 @@
-"""Redis manager that stores last balance snapshot per shop (balance, net, bonus)."""
+"""Redis manager that stores last balance snapshot per shop."""
 
 from __future__ import annotations
 
@@ -32,6 +32,9 @@ class RedisShopBalanceSnapshotManager:
         balance: int,
         net: int,
         bonus: int,
+        cashbacks_total: int = 0,
+        cashbacks_earliest_expiration: str | None = None,
+        cashbacks_best_percent: int | None = None,
     ) -> None:
         """Store balance snapshot for the given shop."""
         key = self._key(shop_id)
@@ -39,14 +42,17 @@ class RedisShopBalanceSnapshotManager:
             "balance": balance,
             "net": net,
             "bonus": bonus,
+            "cashbacks_total": cashbacks_total,
+            "cashbacks_earliest_expiration": cashbacks_earliest_expiration,
+            "cashbacks_best_percent": cashbacks_best_percent,
             "updated_at": _now_utc().isoformat(),
         }
-        await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
+        _ = await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
 
     async def get(
         self,
         shop_id: str | int,
-    ) -> dict[str, int | str] | None:
+    ) -> dict[str, int | str | None] | None:
         """Load the last stored balance snapshot. Returns None if missing or invalid."""
         key = self._key(shop_id)
         raw = await self._redis_client.get(key)
@@ -60,11 +66,25 @@ class RedisShopBalanceSnapshotManager:
             balance_raw: Any = data.get("balance", 0)
             net_raw: Any = data.get("net", 0)
             bonus_raw: Any = data.get("bonus", 0)
+            cashbacks_total_raw: Any = data.get("cashbacks_total", 0)
+            cashbacks_best_percent_raw: Any = data.get("cashbacks_best_percent", None)
+            cashbacks_earliest_expiration_raw: Any = data.get(
+                "cashbacks_earliest_expiration", None
+            )
             updated_at: str = str(data.get("updated_at", ""))
             return {
                 "balance": int(balance_raw) if balance_raw is not None else 0,
                 "net": int(net_raw) if net_raw is not None else 0,
                 "bonus": int(bonus_raw) if bonus_raw is not None else 0,
+                "cashbacks_total": int(cashbacks_total_raw)
+                if cashbacks_total_raw is not None
+                else 0,
+                "cashbacks_best_percent": int(cashbacks_best_percent_raw)
+                if cashbacks_best_percent_raw is not None
+                else None,
+                "cashbacks_earliest_expiration": str(cashbacks_earliest_expiration_raw)
+                if cashbacks_earliest_expiration_raw
+                else None,
                 "updated_at": updated_at,
             }
         except (json.JSONDecodeError, TypeError, ValueError):

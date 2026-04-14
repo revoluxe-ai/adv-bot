@@ -10,6 +10,7 @@ from app.core.mp.wb.api.adapter.promotion_client import (
     NormqueryBidsAdapter,
     MinBidsAdapter,
     PromotionClient,
+    PromotionCountAdapter,
     FinanceAdapter,
     CommonBidsAdapter,
     ProductCardsAdapter,
@@ -80,6 +81,13 @@ class PromotionContainer(containers.DeclarativeContainer):
         request_limit_manager=_request_limit_manager,
     )
 
+    _promotion_count_adapter = providers.Singleton(
+        PromotionCountAdapter,
+        base_url=_base_url,
+        auth_client_handler=_auth_client_handler,
+        request_limit_manager=_request_limit_manager,
+    )
+
     _common_bids_adapter = providers.Singleton(
         CommonBidsAdapter,
         base_url=_base_url,
@@ -111,6 +119,7 @@ class PromotionContainer(containers.DeclarativeContainer):
         campaigns_management_adapter=_campaigns_management_adapter,
         campaigns_info_v2_adapter=_campaigns_info_v2_adapter,
         cabinet_adverts_list_adapter=_cabinet_adverts_list_adapter,
+        promotion_count_adapter=_promotion_count_adapter,
         common_bids_adapter=_common_bids_adapter,
         product_cards_adapter=_product_cards_adapter,
         fullstats_adapter=_fullstats_adapter,

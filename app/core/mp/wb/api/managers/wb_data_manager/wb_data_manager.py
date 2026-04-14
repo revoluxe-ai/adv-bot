@@ -20,6 +20,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from app.shared.domains.wb.dto.current_common_bids_for_adv import CurrentCommonBidsForAdv
 
 if TYPE_CHECKING:
+    from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
+        GetMinBidsCommand,
+    )
     from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 
 if typing.TYPE_CHECKING:
@@ -115,6 +118,20 @@ class WBDataManager:
         """Получить минимальные ставки CPM (auto + search) для списка РК."""
 
         return await self._promotion_manager.get_min_bids_for_complex_adv(advs)
+
+    async def get_min_bids_for_command(
+        self, command: "GetMinBidsCommand"
+    ) -> AdvMinNmidsBids | None:
+        """Минимальные ставки по готовой команде (частичный набор nmids на item)."""
+
+        return await self._promotion_manager.get_min_bids_for_command(command)
+
+    async def get_min_bids_per_command_item(
+        self, command: "GetMinBidsCommand"
+    ) -> list[AdvMinNmidsBids] | None:
+        """По одному результату на command item (для записи min_bids v2 в Redis по adv_id)."""
+
+        return await self._promotion_manager.get_min_bids_per_command_item(command)
 
     async def get_full_adv_stat(
         self,

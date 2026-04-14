@@ -1,10 +1,13 @@
+import asyncio
 import cProfile
 import json
 import logging
 import pstats
+import time
+from dataclasses import dataclass
 from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from PIL import Image  # type: ignore
 from sqlalchemy import and_, func, select
@@ -20,6 +23,7 @@ from app.exc import (
 
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
+from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
     AdvSetting,
@@ -40,11 +44,159 @@ from app.utils.redis_manager.exc import DataNotFoundError
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+from ..common_slaves.wildberries import wb_db_manager
 
 
 logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
+_ensure_card_locks: dict[tuple[str, int], asyncio.Lock] = {}
+_ensure_card_locks_guard = asyncio.Lock()
+
+
+@dataclass(slots=True)
+class CardImageEnsureResult:
+    ok: bool
+    reason: str | None = None
+
+
+async def _card_exists_in_db(nmid: int) -> bool:
+    async with _sm(read_only=True) as session:
+        stmt = select(WBCard.nmid).where(WBCard.nmid == nmid).limit(1)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+
+async def _get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet | None:
+    try:
+        shop_id_int = int(shop_id)
+    except ValueError:
+        logger.warning("ensure_card_in_db: invalid shop_id=%s", shop_id)
+        return None
+
+    async with _sm(read_only=True) as session:
+        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id_int).limit(1)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+async def _get_ensure_lock(key: tuple[str, int]) -> asyncio.Lock:
+    async with _ensure_card_locks_guard:
+        lock = _ensure_card_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _ensure_card_locks[key] = lock
+        return lock
+
+
+async def _cleanup_ensure_lock(key: tuple[str, int], lock: asyncio.Lock) -> None:
+    async with _ensure_card_locks_guard:
+        current_lock = _ensure_card_locks.get(key)
+        if current_lock is lock and not lock.locked():
+            _ = _ensure_card_locks.pop(key, None)
+
+
+async def _card_has_photo_in_db(nmid: int) -> bool:
+    async with _sm(read_only=True) as session:
+        stmt = select(WBCard).where(WBCard.nmid == nmid).limit(1)
+        result = await session.execute(stmt)
+        wb_card = result.scalar_one_or_none()
+        if wb_card is None:
+            return False
+        try:
+            photos = wb_card.photos
+        except Exception:
+            return False
+        return bool(photos)
+
+
+async def ensure_card_in_db(shop_id: str, nmid: int, *, timeout_sec: int = 60) -> bool:
+    """Убедиться, что карточка артикула есть в БД.
+
+    Возвращает True, если карточка найдена/успешно загружена.
+    Возвращает False, если за timeout_sec не удалось подтвердить наличие карточки в БД.
+    Может пробросить CardNotFoundInWB и ошибки доступа к WB API.
+    """
+    if nmid <= 0:
+        return False
+    if await _card_exists_in_db(nmid):
+        return True
+
+    key = (shop_id, nmid)
+    lock = await _get_ensure_lock(key)
+    try:
+        async with lock:
+            if await _card_exists_in_db(nmid):
+                return True
+
+            wb_cabinet = await _get_wb_cabinet_by_shop_id(shop_id)
+            if wb_cabinet is None:
+                logger.warning(
+                    "ensure_card_in_db: wb_cabinet not found for shop_id=%s, nmid=%s",
+                    shop_id,
+                    nmid,
+                )
+                return False
+
+            from app.core.di.app_container import AppContainer
+            from app.core.di.di_manager import DIManager
+
+            async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
+                factory: Any = cast(
+                    Any,
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory(),  # type: ignore[reportUnknownMemberType]
+                )
+                hub: Any = cast(Any, factory.get_wb_manager_hub(shop_id))  # type: ignore[reportUnknownMemberType]
+                card_result: tuple[Any, CardFromWB] = cast(
+                    tuple[Any, CardFromWB],
+                    await cast(
+                        Any,
+                        hub.wb_data_manager.products_manager.get_card_by_nmid_for_db,  # type: ignore[reportUnknownMemberType]
+                    )(nmid),
+                )
+                _, target_card = card_result
+            await wb_db_manager.update_cards_in_db([target_card], wb_cabinet)
+
+            deadline = time.monotonic() + timeout_sec
+            while time.monotonic() < deadline:
+                if await _card_exists_in_db(nmid):
+                    return True
+                await asyncio.sleep(0.5)
+            return False
+    finally:
+        await _cleanup_ensure_lock(key, lock)
+
+
+async def ensure_card_with_image_for_ui(
+    shop_id: str,
+    nmid: int,
+    *,
+    timeout_sec: int = 60,
+) -> CardImageEnsureResult:
+    """Проверить, что карточка и фото готовы для UI меню РК."""
+    if nmid <= 0:
+        return CardImageEnsureResult(ok=False, reason="invalid_nmid")
+
+    if await _card_exists_in_db(nmid) and await _card_has_photo_in_db(nmid):
+        return CardImageEnsureResult(ok=True)
+
+    try:
+        card_ready = await ensure_card_in_db(shop_id, nmid, timeout_sec=timeout_sec)
+    except Exception as exc:
+        logger.warning(
+            "ensure_card_with_image_for_ui failed for shop_id=%s nmid=%s: %s",
+            shop_id,
+            nmid,
+            exc,
+        )
+        return CardImageEnsureResult(ok=False, reason="ensure_card_failed")
+
+    if not card_ready:
+        return CardImageEnsureResult(ok=False, reason="card_not_loaded")
+    if not await _card_has_photo_in_db(nmid):
+        return CardImageEnsureResult(ok=False, reason="photo_missing")
+    return CardImageEnsureResult(ok=True)
 
 
 async def get_keyword_statistic_clickhouse(
@@ -215,7 +367,7 @@ def profile_function(inner_func: Callable[..., Any], *args: Any, **kwargs: Any) 
     inner_func(*args, **kwargs)
     profiler.disable()
     stats = pstats.Stats(profiler).sort_stats("cumulative")
-    stats.print_stats(10)
+    _ = stats.print_stats(10)
 
 
 # async def convert_keyword_stats_in_clusters(
@@ -579,6 +731,21 @@ async def reset_black_phrases(adv_setting_id: int) -> None:
     await manager.update_black_phrases([])
 
 
+async def update_relevant_phrases_templates(
+    adv_setting_id: int, keywords: list[str]
+) -> None:
+    async with _sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
+    manager = RelevantPhraseManager(adv)
+    await manager.update_relevant_phrases_templates(keywords)
+
+
+async def reset_relevant_phrases_templates(adv_setting_id: int) -> None:
+    await update_relevant_phrases_templates(adv_setting_id, [])
+
+
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
         for text in keywords:
@@ -842,5 +1009,5 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
 
 async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
     shop_data_updater = ShopDataUpdater(wb_api)
-    await shop_data_updater.update_advs_data()
+    _ = await shop_data_updater.update_advs_data()
     return None

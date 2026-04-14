@@ -264,6 +264,8 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         common_card_stats,
         auto_views_by_day,
         result_keywords_views,
+        {},
+        {},
     )
 
     expected_text = """26.11.2025: Корз.:8(0) Зак.:0(0)шт.Себеc: 718.39р. Доп.пок.: 5000

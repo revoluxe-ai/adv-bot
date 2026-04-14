@@ -3,10 +3,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import datetime
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .validator import TokenPermissionsValidator
 
 
 @dataclass
@@ -40,6 +36,7 @@ class ValidationResult:
 
     is_valid_jwt: bool
     shop_id: str | None
+    is_personal: bool
     is_read_only: bool
     is_expired: bool
     expires: datetime.datetime | None
@@ -59,6 +56,7 @@ class ValidationResult:
         """Check if token can be used (valid, not read-only, not expired, has all required permissions)."""
         return (
             self.is_valid_jwt
+            and self.is_personal
             and not self.is_read_only
             and not self.is_expired
             and len(self.missing_required) == 0
@@ -69,6 +67,8 @@ class ValidationResult:
         """Get human-readable error message if token cannot be used."""
         if not self.is_valid_jwt:
             return "Токен не валиден"
+        if not self.is_personal:
+            return "Токен не персональный"
         if self.is_read_only:
             return "Токен только для чтения"
         if self.is_expired:

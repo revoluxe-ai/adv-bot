@@ -12,7 +12,7 @@ from app.modules.relevant_phrase_manager import RelevantPhraseManager
 def adv_with_black_phrases() -> MagicMock:
     adv = MagicMock(spec=AdvSetting)
     adv.id = 1
-    adv.black_phrases = ["not:spam", "any:word1,word2"]
+    adv.black_phrases = ["spam", r"cheap|discount"]
     return adv
 
 
@@ -38,7 +38,7 @@ async def test_get_relevant_template_data_returns_adv_black_phrases(
 ) -> None:
     manager = RelevantPhraseManager(adv_with_black_phrases)
     result = await manager.get_relevant_template_data()
-    assert result == ["not:spam", "any:word1,word2"]
+    assert result == ["spam", r"cheap|discount"]
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,7 @@ async def test_update_black_phrases_persists_and_updates_keywords() -> None:
         sm_mock,
     ):
         manager = RelevantPhraseManager(adv)
-        await manager.update_black_phrases(["phrase1", "not:phrase2"])
+        await manager.update_black_phrases(["phrase1", r"phrase2|alt"])
 
     assert len(executed) >= 1
     first_stmt = executed[0]

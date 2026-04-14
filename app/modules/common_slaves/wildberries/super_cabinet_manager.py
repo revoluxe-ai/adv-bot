@@ -83,6 +83,9 @@ async def get_access_for_wb_cabinet(
             if not token.check_valid():
                 logger.debug(f"Не валидный токен {token.api_key}")
                 continue
+            if not token.is_personal:
+                logger.debug("Не персональный токен, пропускаем: token_id=%s", token.id)
+                continue
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
@@ -105,6 +108,12 @@ async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
             wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
+                continue
+            if not wb_token.is_personal:
+                logger.debug(
+                    "Не персональный токен в get_common_access, пропускаем: token_id=%s",
+                    wb_token.id,
+                )
                 continue
             result = await token_check_righter.check_all_rights(
                 wb_token, client_session

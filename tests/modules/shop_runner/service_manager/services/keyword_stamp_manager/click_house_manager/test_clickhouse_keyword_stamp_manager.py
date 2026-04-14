@@ -1,3 +1,5 @@
+"""Integration tests: require real ClickHouse (clickhouse_client fixture)."""
+
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -11,6 +13,8 @@ from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.clic
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from tests.factories import KeywordStatFromJamFactory
+
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio

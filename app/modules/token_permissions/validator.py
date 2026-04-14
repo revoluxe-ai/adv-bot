@@ -54,6 +54,7 @@ class TokenPermissionsValidator:
                 return ValidationResult(
                     is_valid_jwt=False,
                     shop_id=None,
+                    is_personal=False,
                     is_read_only=False,
                     is_expired=False,
                     expires=None,
@@ -62,6 +63,7 @@ class TokenPermissionsValidator:
             
             # Now safely access properties
             shop_id = wb_token.get_shop_id_from_token()
+            is_personal = wb_token.is_personal
             is_read_only = wb_token.read_only
             is_expired = wb_token.is_expired
             expires = wb_token.expires
@@ -71,13 +73,14 @@ class TokenPermissionsValidator:
             return ValidationResult(
                 is_valid_jwt=False,
                 shop_id=None,
+                is_personal=False,
                 is_read_only=False,
                 is_expired=False,
                 expires=None,
                 permissions={},
             )
 
-        permissions = {}
+        permissions: dict[str, PermissionStatus] = {}
 
         permissions["Статистика"] = PermissionStatus(
             name="Статистика",
@@ -107,6 +110,7 @@ class TokenPermissionsValidator:
             return ValidationResult(
                 is_valid_jwt=True,
                 shop_id=shop_id,
+                is_personal=is_personal,
                 is_read_only=is_read_only,
                 is_expired=is_expired,
                 expires=expires,

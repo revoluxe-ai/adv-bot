@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
@@ -12,12 +13,16 @@ from .mappers.adv_id_item_map import AdvIdItemCalculateData
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
+    RedisApiClusterBidsManager,
     RedisClusterBidsManager,
     RedisClusterBidsTimestampManager,
 )
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from .wb_manager import WBManager
 from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
@@ -35,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 def _max_workers_for(handler_count: int, cap: int) -> int:
     return max(1, min(handler_count, cap))
+
+
+_PREDICT_BIDS_MAX_CONCURRENT = 16
 
 """
 TODO: WB Стал передавать информацию о Depricated методах прям в методах,
@@ -60,11 +68,13 @@ class UpdateClusterBidsManager:
         wb_manager: WBManager,
         redis_keyword_bidder_status_manager: RedisKeywordBidderStatusManager,
         redis_cluster_bids_manager: RedisClusterBidsManager,
+        redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
         self._redis_cluster_bids_manager = redis_cluster_bids_manager
+        self._redis_api_cluster_bids_manager = redis_api_cluster_bids_manager
         self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
             redis_cluster_bids_timestamp_manager
         )
@@ -96,12 +106,19 @@ class UpdateClusterBidsManager:
         )
 
     async def update_cluster_bids(self, advs: list[ComplexAdv]) -> None:
-         calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
-         calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(calculate_data)
-         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
-         await self._apply_command(new_bids_command)
-         for adv in advs: # TODO: Тут накостылил, чтобы быстрее в прод выложить
-             await self._redis_cluster_bids_timestamp_manager.set(adv)
+        calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
+        calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
+            calculate_data
+        )
+        new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
+        await self._apply_command(new_bids_command)
+        if advs:
+            _ = await asyncio.gather(
+                *(
+                    self._redis_cluster_bids_timestamp_manager.set(adv)
+                    for adv in advs
+                ),
+            )
 
     async def _get_bidder_update_data(
         self,
@@ -112,7 +129,9 @@ class UpdateClusterBidsManager:
             return await self._get_cluster_bids_for_maps(map_datas, advs)
 
         async def _get_min_bids() -> AdvMinNmidsBids:
-            return await self._wb_manager.get_min_bids(advs, cache_possible=True)
+            return await self._wb_manager.get_min_bids_cache_only(
+                advs, context="update_cluster_bids"
+            )
 
         async def _get_fact_data() -> dict[int, FactData]:
             return await self._get_fact_datas(advs)
@@ -156,7 +175,7 @@ class UpdateClusterBidsManager:
             )
             for data in map_datas
         ]
-        cached = await self._redis_cluster_bids_manager.get_bids(keys)
+        cached = await self._redis_api_cluster_bids_manager.get_bids(keys)
         total = len(keys)
         cached_count = len(cached)
         if cached_count:
@@ -174,26 +193,51 @@ class UpdateClusterBidsManager:
             for key, value in cached.items()
         }
         if missing_keys:
-            logger.debug(
-                "Cluster bid cache MISS for %s/%s combinations",
-                len(missing_keys),
-                total,
-            )
-            missing_set = set(missing_keys)
-            wb_bids = await self._wb_manager.get_current_bids(advs)
-            for dto in wb_bids:
-                key = ClusterBidKey(
-                    adv_id=dto.advert_id,
-                    nmid=dto.nm_id,
-                    cluster=dto.norm_query,
+            needed_adv_ids = {k.adv_id for k in missing_keys}
+            sub_advs = [
+                a
+                for a in advs
+                if a.auction_adv_id is not None and a.auction_adv_id in needed_adv_ids
+            ]
+            if sub_advs:
+                logger.info(
+                    "Cluster bid Redis API cache MISS for %s/%s keys; "
+                    "loading from WB API for %s search campaign(s)",
+                    len(missing_keys),
+                    total,
+                    len({a.auction_adv_id for a in sub_advs if a.auction_adv_id}),
                 )
-                if key in missing_set:
-                    bids_map[key] = dto
-            missing_after_api = [key for key in missing_set if key not in bids_map]
-            if missing_after_api:
+                try:
+                    fresh = await self._wb_manager.get_current_bids(sub_advs)
+                except Exception:
+                    logger.exception(
+                        "Cluster bid WB API fallback failed (%s/%s miss)",
+                        len(missing_keys),
+                        total,
+                    )
+                else:
+                    try:
+                        _ = await self._redis_api_cluster_bids_manager.replace_from_api(
+                            fresh
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Cluster bid: failed to write WB fallback to Redis API cache"
+                        )
+                    by_key = {
+                        ClusterBidKey(b.advert_id, b.nm_id, b.norm_query): b
+                        for b in fresh
+                    }
+                    for mk in missing_keys:
+                        dto = by_key.get(mk)
+                        if dto is not None:
+                            bids_map[mk] = dto
+            else:
                 logger.debug(
-                    "WB API did not return bids for %s combinations",
-                    len(missing_after_api),
+                    "Cluster bid cache MISS for %s/%s combinations; "
+                    "no ComplexAdv for WB fallback (auction_adv_id)",
+                    len(missing_keys),
+                    total,
                 )
         return list(bids_map.values())
 
@@ -271,23 +315,39 @@ class UpdateClusterBidsManager:
             inputs.append(calculate_input)
         return inputs
 
-    @staticmethod
-    async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData]:
-        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
-            .click_house_manager.click_house_manager import ClickHouseManager
+    async def __get_calculate_data(
+        self,
+        adv: ComplexAdv,
+        cluster_texts_from_ch: set[str],
+    ) -> set[AdvIdItemCalculateData]:
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
             logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
             return set()
-        ch_manager = ClickHouseManager()
-        texts_in_this_adv = set(await ch_manager.get_cluster_texts_for_adv(search_adv_id))
+        texts_in_this_adv = cluster_texts_from_ch
 
-        keywords: list[CalculatedKeyword] = await adv.get_keywords()
-        keywords = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
-        keywords = [kw for kw in keywords if kw.text in texts_in_this_adv]
+        keywords_maybe = await adv.get_keywords(cache_only=True)
+        if keywords_maybe is None:
+            logger.debug(
+                "Redis cache miss for calculated keywords, skip bid maps adv_id=%s",
+                adv.adv_id,
+            )
+            return set()
+        keywords: list[CalculatedKeyword] = keywords_maybe
+        keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
+        matched_in_ch = [
+            kw
+            for kw in keywords_good
+            if kw.cluster_stat.text in texts_in_this_adv or kw.text in texts_in_this_adv
+        ]
+        # Если единственные GOOD не попали в snapshots clusters_adv_stats (срез может отличаться
+        # от mv_clusters_*), всё равно участвуют в торгах по norm_query из cluster_stat.
+        keywords = matched_in_ch if matched_in_ch else keywords_good
         map_datas: set[AdvIdItemCalculateData] = set()
         for nmid in adv.nmids:
             for kw in keywords:
+                cluster_for_wb = kw.cluster_stat.text or kw.text
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
                 if adv.individual_keywords_target_place_mode and (keyword_target_place := kw.target_place):
@@ -297,7 +357,7 @@ class UpdateClusterBidsManager:
                 map_data = AdvIdItemCalculateData(
                     adv_id=search_adv_id,
                     nmid=nmid,
-                    cluster=kw.text,
+                    cluster=cluster_for_wb,
                     current_position=kw.position,
                     max_cpm=adv.max_user_cpm,
                     target_position=target_position,
@@ -309,9 +369,37 @@ class UpdateClusterBidsManager:
 
 
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
-        handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = [
-            lambda adv_=adv: self.__get_calculate_data(adv_) for adv in advs
-        ]
+        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
+            .click_house_manager.click_house_manager import ClickHouseManager
+
+        auction_ids_unique: list[int] = []
+        seen_auction: set[int] = set()
+        for adv in advs:
+            aid = adv.auction_adv_id
+            if aid is not None and aid not in seen_auction:
+                seen_auction.add(aid)
+                auction_ids_unique.append(aid)
+        ch_manager = ClickHouseManager()
+        texts_by_adv_id: dict[int, set[str]] = (
+            await ch_manager.get_cluster_texts_for_adv_ids(auction_ids_unique)
+            if auction_ids_unique
+            else {}
+        )
+        handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = []
+        for adv in advs:
+            cluster_texts: set[str] = (
+                texts_by_adv_id.get(adv.auction_adv_id, set())
+                if adv.auction_adv_id is not None
+                else set()
+            )
+
+            async def _run(
+                a: ComplexAdv = adv,
+                texts: set[str] = cluster_texts,
+            ) -> set[AdvIdItemCalculateData]:
+                return await self.__get_calculate_data(a, texts)
+
+            handlers.append(_run)
         results = await run_tasks(
             handlers,
             max_workers=_max_workers_for(len(handlers), cap=16),
@@ -369,36 +457,25 @@ class UpdateClusterBidsManager:
                 new_bids.append(new_bid)
         return UpdateBidsCommand(new_bids)
 
-    async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
-        handlers: list[Callable[[], Awaitable[FactData]]] = [
-            lambda adv_=adv: self.__get_fact_data(adv_) for adv in advs
-        ]
-        results = await run_tasks(
-            handlers,
-            max_workers=_max_workers_for(len(handlers), cap=16),
-            return_exceptions=True,
-        )
-        facts: list[FactData | None] = []
-        for result in results:
-            if isinstance(result, BaseException):
-                logger.error('Ошибка получения факта: %s', result)
-                facts.append(None)
-            else:
-                facts.append(result)
-        rows: Iterator[tuple[ComplexAdv, FactData | None]] = zip(advs, facts)
+    async def _get_fact_datas(self, advs: list[ComplexAdv]) -> dict[int, FactData]:
+        if not advs:
+            return {}
+        plan_fact_reader = PlanFactReader()
+        adv_ids = [adv.adv_id for adv in advs]
+        try:
+            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(adv_ids)
+        except Exception as error:
+            logger.error("Ошибка batch-получения факта из CH: %s", error)
+            return {}
         adv_to_fact_map: dict[int, FactData] = {}
-        for adv, fact in rows:
+        for adv in advs:
+            fact = PlanFactProvider.fact_data_from_plan_fact_summary(
+                summaries_by_adv_id.get(adv.adv_id),
+                adv.adv_setting,
+            )
             if fact is not None:
                 adv_to_fact_map[adv.adv_id] = fact
         return adv_to_fact_map
-
-    @staticmethod
-    async def __get_fact_data(adv: ComplexAdv) -> FactData:
-        keywords = await adv.get_keywords()
-        provider = PlanFactProvider(adv.adv_setting)
-        stat = await provider.get_stat_data(keywords)
-        return await provider.get_fact_data(stat)
-
 
     @staticmethod
     def _get_plan_data(advs: list[ComplexAdv]) -> dict[int, PlanData]:
@@ -425,18 +502,77 @@ class UpdateClusterBidsManager:
                 continue
             if adv.individual_keywords_target_place_mode is False:
                 adv_result[search_adv_id] = None
+            else:
+                adv_result[search_adv_id] = {}
+
+        work: list[tuple[int, int, int]] = []
+        for adv in advs:
+            search_adv_id = adv.auction_adv_id
+            if (
+                search_adv_id is None
+                or adv.individual_keywords_target_place_mode is False
+            ):
                 continue
-            nmid_result: dict[int, dict[str, dict[int, int]]] = {}
             for nmid in adv.nmids:
-                min_bid = auction_min_bids_by_nmid[nmid]
-                bid_positions_result = await bids_for_positions_manager.get_bid_positions_normalized(
+                try:
+                    min_bid = auction_min_bids_by_nmid[nmid]
+                except KeyError:
+                    logger.error(
+                        "predict_bids: нет min_bid для nmid=%s в min_bids.search "
+                        "(search_adv_id=%s), пропуск позиции",
+                        nmid,
+                        search_adv_id,
+                    )
+                    continue
+                work.append((search_adv_id, nmid, min_bid))
+
+        if not work:
+            return adv_result
+
+        sem = asyncio.Semaphore(_PREDICT_BIDS_MAX_CONCURRENT)
+
+        async def _fetch(
+            item: tuple[int, int, int],
+        ) -> tuple[int, int, dict[str, dict[int, int]]]:
+            sid, nmid, min_bid = item
+            bid_positions_result = (
+                await bids_for_positions_manager.get_bid_positions_normalized(
                     nmid=nmid, min_bid=min_bid, positions_size=300
                 )
-                dict_result: dict[str, dict[int, int]] = {
-                    keyword_text: {pos.position: pos.bid for pos in row_list}
-                    for keyword_text, row_list in bid_positions_result.items()
-                }
-                nmid_result[nmid] = dict_result
-            adv_result[search_adv_id] = nmid_result
+            )
+            dict_result: dict[str, dict[int, int]] = {
+                keyword_text: {pos.position: pos.bid for pos in row_list}
+                for keyword_text, row_list in bid_positions_result.items()
+            }
+            return sid, nmid, dict_result
+
+        async def _guarded(
+            item: tuple[int, int, int],
+        ) -> tuple[int, int, dict[str, dict[int, int]]]:
+            async with sem:
+                return await _fetch(item)
+
+        results: list[tuple[int, int, dict[str, dict[int, int]]] | BaseException] = (
+            await asyncio.gather(
+                *(_guarded(w) for w in work),
+                return_exceptions=True,
+            )
+        )
+        for item, result in zip(work, results, strict=False):
+            if isinstance(result, BaseException):
+                sid, nmid, _ = item
+                logger.error(
+                    "predict_bids: failed get_bid_positions_normalized "
+                    "(search_adv_id=%s, nmid=%s): %s",
+                    sid,
+                    nmid,
+                    result,
+                )
+                continue
+            sid, nmid, dict_result = result
+            bucket = adv_result.get(sid)
+            if isinstance(bucket, dict):
+                bucket[nmid] = dict_result
 
         return adv_result
+

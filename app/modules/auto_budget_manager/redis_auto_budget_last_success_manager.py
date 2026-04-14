@@ -30,7 +30,7 @@ class RedisAutoBudgetLastSuccessManager:
         """Store the timestamp of a successful top-up for the given campaign."""
         key = self._key(adv_setting_id)
         payload = {"at": _now_utc().isoformat()}
-        await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
+        _ = await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
 
     async def get(self, adv_setting_id: int) -> dict[str, str] | None:
         """Load the last successful top-up time. Returns None if missing or invalid."""

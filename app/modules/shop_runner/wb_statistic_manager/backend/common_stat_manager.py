@@ -124,6 +124,38 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
     return stats
 
 
+async def get_today_funnel_clicks(
+    nmids: list[int], *, at: datetime | None = None
+) -> int:
+    """Возвращает сумму карточных переходов (open_card) за сегодня по nmids."""
+    if not nmids:
+        return 0
+    today = (at or datetime.now()).strftime("%Y-%m-%d")
+    query = """
+    SELECT COALESCE(SUM(latest_open_card), 0) AS funnel_clicks
+    FROM (
+        SELECT
+            nmid,
+            argMax(open_card, version) AS latest_open_card
+        FROM wb_common_stat
+        WHERE nmid IN %(nmids)s
+          AND date = %(report_date)s
+        GROUP BY nmid
+    )
+    """
+    params = {
+        "nmids": nmids,
+        "report_date": today,
+    }
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(query, parameters=params)
+    if not result.result_rows:
+        return 0
+    return int(result.result_rows[0][0])
+
+
+
 class WBCommonStatManager:
     def __init__(self, wb_api: WBApi):
         self.wb_api = wb_api

@@ -34,13 +34,15 @@ async def is_campaign_done_on_wb(shop_id: str, adv_id: int) -> bool:
 async def get_connect_existing_candidates(
     shop_id: str,
     nmid: int,
+    extra_adv_ids: list[int] | None = None,
 ) -> ConnectExistingCandidatesResult:
     """
     Get candidates for connecting existing campaigns (auction + auto) by shop_id and nmid.
-    Uses WBManagerHub for the shop and PromotionManager.get_connect_existing_candidates.
+    extra_adv_ids: ids из БД по этому артикулу — запрашиваются у WB дополнительно, чтобы кампании,
+    не попавшие в список /adv/v1/adverts, всё равно оказались в кандидатах.
     """
     async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
         factory = container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
         hub = factory.get_wb_manager_hub(shop_id)
         pm = hub.wb_data_manager.promotion_manager
-        return await pm.get_connect_existing_candidates(nmid)
+        return await pm.get_connect_existing_candidates(nmid, extra_adv_ids=extra_adv_ids)

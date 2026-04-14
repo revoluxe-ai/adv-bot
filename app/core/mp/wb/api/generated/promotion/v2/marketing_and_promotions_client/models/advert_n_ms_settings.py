@@ -48,16 +48,24 @@ class AdvertNMsSettings:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any] | None) -> T:
         from ..models.advert_bids_kopecks import AdvertBidsKopecks
         from ..models.advert_subject import AdvertSubject
 
-        d = dict(src_dict)
-        bids_kopecks = AdvertBidsKopecks.from_dict(d.pop("bids_kopecks"))
+        d = dict(src_dict or {})
+        bids_raw = d.pop("bids_kopecks", None)
+        bids_kopecks = AdvertBidsKopecks.from_dict(
+            bids_raw if bids_raw is not None else {"search": 0, "recommendations": 0}
+        )
 
-        subject = AdvertSubject.from_dict(d.pop("subject"))
+        subject_raw = d.pop("subject", None)
+        subject = AdvertSubject.from_dict(
+            subject_raw if subject_raw is not None else {"id": 0, "name": ""}
+        )
 
-        nm_id = d.pop("nm_id")
+        nm_id = d.pop("nm_id", None)
+        if nm_id is None:
+            nm_id = 0
 
         advert_n_ms_settings = cls(
             bids_kopecks=bids_kopecks,

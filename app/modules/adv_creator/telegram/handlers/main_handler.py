@@ -9,9 +9,12 @@ from sqlalchemy import select
 
 from app.arq_workers.arq_redis_settings import arq_redis_settings
 from app.client_bot.user_interface.handlers.start import start_registration
+from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.modules.balance_manager import balance_service
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from ..into_callback import (
@@ -103,19 +106,59 @@ async def get_nmid(message: Message, state: FSMContext, bot: Bot):
     async with sm() as session:
         result = await session.execute(stmt)
         shop_id = result.scalar()
-    redis_task_pool = await create_pool(arq_redis_settings)
+    shop_id_str = str(shop_id)
+
+    await bot.send_message(
+        message.from_user.id,
+        "Проверяю наличие карточек в базе и догружаю отсутствующие...",
+    )
+
+    ready_nmids: list[int] = []
+    failed_nmids: list[str] = []
     for nmid in nmid_list:
         try:
+            is_ready = await wb_data_manager.ensure_card_in_db(shop_id_str, nmid)
+        except CardNotFoundInWB:
+            failed_nmids.append(f"{nmid}: карточка не найдена на WB")
+            continue
+        except ApiForbiddenError:
+            failed_nmids.append(f"{nmid}: нет доступа к API WB")
+            continue
+        except Exception:
+            logger.exception("create_new_adv: ensure_card_in_db failed for nmid=%s", nmid)
+            failed_nmids.append(f"{nmid}: ошибка проверки/загрузки карточки")
+            continue
+
+        if is_ready:
+            ready_nmids.append(nmid)
+        else:
+            failed_nmids.append(f"{nmid}: таймаут ожидания загрузки в БД")
+
+    if not ready_nmids:
+        lines = "\n".join(f"- {item}" for item in failed_nmids[:30])
+        await bot.send_message(
+            message.from_user.id,
+            "Не удалось подготовить карточки для создания рекламы.\n" + lines,
+        )
+        return
+
+    redis_task_pool = await create_pool(arq_redis_settings)
+    for nmid in ready_nmids:
+        try:
             await redis_task_pool.enqueue_job(
-                "create_complex_advs", nmid, shop_id, False, message.from_user.id
+                "create_complex_advs", nmid, shop_id_str, False, message.from_user.id
             )
             logger.debug(f"Задача для артикула {nmid} успешно поставлена")
         except Exception as e:
             logger.error(f"Ошибка постановки задачи для артикула {nmid}: {e}")
             raise e
-    await bot.send_message(
-        message.from_user.id, "Задачи на создание рекламы добавлены в очередь. Ждите."
+    summary_text = (
+        f"Задачи на создание рекламы добавлены в очередь: {len(ready_nmids)} шт."
     )
+    if failed_nmids:
+        failed_lines = "\n".join(f"- {item}" for item in failed_nmids[:30])
+        summary_text += "\nНе поставлены в очередь:\n" + failed_lines
+    await bot.send_message(message.from_user.id, summary_text)
 
 
 @router.callback_query(ConfirmCreateComplexAdv.filter())

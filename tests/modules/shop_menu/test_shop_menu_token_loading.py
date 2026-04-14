@@ -140,6 +140,7 @@ class TestShopMenuTokenLoading:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         # Initially, token status should not be loaded
@@ -219,6 +220,7 @@ class TestShopMenuTokenLoading:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         # Call _load_all_data which should handle token loading error
@@ -289,6 +291,7 @@ class TestShopMenuTokenLoading:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         await shop_menu._load_all_data()
@@ -358,6 +361,7 @@ class TestShopMenuTokenLoading:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         await shop_menu._load_all_data()
@@ -425,6 +429,7 @@ class TestShopMenuTokenLoading:
                             chat_id=123456789,
                             state=mock_state,
                             wb_user_cabinet_original_id=1,
+                            redis_client=None,
                         )
 
                         # Mock token status service to simulate a successful load for the *original* bug test

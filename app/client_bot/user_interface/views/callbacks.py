@@ -115,6 +115,18 @@ class ConnectExistingConfirmType2(CallbackData, prefix="ce_confirm_t2"):
     adv_id: int = 0  # 0 = нажата «Создать РК»
 
 
+class ConnectExistingChooseAuction(CallbackData, prefix="ce_choose_auc"):
+    """Выбор способа выбора аукционной РК: ввести ID, список, создать, назад."""
+
+    action: str  # enter_id | choose_list | create | back
+
+
+class ConnectExistingChooseAuto(CallbackData, prefix="ce_choose_auto"):
+    """Выбор способа выбора авто-РК: ввести ID, список, создать, назад."""
+
+    action: str  # enter_id | choose_list | create | back
+
+
 class ConnectExistingCreateBoth(CallbackData, prefix="ce_create_both"):
     """Подтверждение создания обеих кампаний (аукцион + авто) через create_complex_advs."""
 
@@ -131,6 +143,18 @@ class ConnectExistingAdvsBackToShop(CallbackData, prefix="ce_back_shop"):
     """Вернуться в меню магазина из сценария «подключить существующие» (уже есть РК или отмена)."""
 
     wb_user_cabinet_original_id: int
+
+
+class ConnectExistingChangeNmid(CallbackData, prefix="ce_change_nmid"):
+    """Ввести другой артикул в сценарии «подключить существующие»."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ConnectExistingCardNotFound(CallbackData, prefix="ce_card_not_found"):
+    """Действие при «артикул по фильтру не найден»: поиск по полному списку или выход."""
+
+    action: str  # retry_full_list
 
 
 class ShowShopsList(CallbackData, prefix="shops_list"):
@@ -253,6 +277,30 @@ class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
     adv_setting_id: int
 
 
+class TestBlackPhrasesTemplates(CallbackData, prefix="test_black_phrases"):
+    adv_setting_id: int
+
+
+class ExitBlackPhrasesTest(CallbackData, prefix="exit_black_phrases_test"):
+    adv_setting_id: int
+
+
+class AddRelevantPhraseTemplates(CallbackData, prefix="add_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class ResetRelevantPhraseTemplates(CallbackData, prefix="reset_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class TestRelevantPhraseTemplates(CallbackData, prefix="test_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
+class ExitRelevantPhraseTemplatesTest(CallbackData, prefix="exit_rel_phrase_test"):
+    adv_setting_id: int
+
+
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
 
@@ -294,6 +342,10 @@ class StrategyMenu(CallbackData, prefix="strategy_menu"):
 
 
 class ResetWhiteList(CallbackData, prefix="reset_white_list"):
+    adv_setting_original_id: int
+
+
+class ResetNonRelevantPhrases(CallbackData, prefix="reset_non_rel"):
     adv_setting_original_id: int
 
 
@@ -413,6 +465,14 @@ class ChangeCommonBidInSearchAdvStatus(
 
 
 class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
+class RebindAdvCampaignIds(CallbackData, prefix="rebind_adv_ids"):
+    """Перепривязка кампаний WB: поле adv_id (авто) и колонка _search_adv_id (поиск)."""
+
+    action: str  # menu | auto | search | back
     adv_setting_original_id: int
     wb_user_cabinet_original_id: int
 

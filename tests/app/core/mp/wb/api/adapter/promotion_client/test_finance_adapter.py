@@ -71,6 +71,28 @@ async def test_top_up_budget_resolves_balance_type(monkeypatch) -> None:
     assert body.type_ == 3  # bonus mapped to 3
 
 
+@pytest.mark.asyncio
+async def test_top_up_budget_sends_cashback_fields(monkeypatch) -> None:
+    adapter, mock_raise = _build_adapter(
+        monkeypatch, ResponseWithReturn(total=1500)
+    )
+
+    _ = await adapter.top_up_budget(
+        adv_id=456,
+        amount=700,
+        balance_type="net",
+        cashback_sum=350,
+        cashback_percent=50,
+    )
+
+    called_kwargs = mock_raise.call_args.kwargs
+    body = called_kwargs.get("body")
+    assert body is not None
+    assert body.type_ == 1
+    assert body.cashback_sum == 350
+    assert body.cashback_percent == 50
+
+
 def test_resolve_balance_type_unknown(monkeypatch) -> None:
     adapter, _ = _build_adapter(monkeypatch, None)
     with pytest.raises(BalanceTypeNotSupportedError):

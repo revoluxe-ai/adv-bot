@@ -1,13 +1,18 @@
 """
 Filter and classify v2 campaigns by nmid for «подключить существующие».
-Status v2 (generated client IntEnum): allow 4, 9, 11 (ready_for_start, active, pause); exclude -1, 7, 8 (done/deleted/cancelled).
+
+Статусы WB API v2 (GetAdvertsAdvertsItemStatus): -1=удалена, 4=готова к старту, 7=завершена (done),
+8=отклонена/отменена, 9=запущена, 11=пауза. API GET /api/advert/v2/adverts при запросе по ids
+статус не фильтрует — отдаёт все по id; фильтр только у нас в коде. Раньше отбрасывали 7 (done),
+из-за чего кампания была «в боте есть, в ответе WB нет». Теперь 7 разрешён — завершённые тоже
+показываем (можно создать поисковую к такой авто).
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Literal
 
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     GetAdvertsAdvertsItem,
@@ -21,9 +26,10 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 
 logger = logging.getLogger(__name__)
 
-# v2 status: allow only non-done (ready_for_start=4, active=9, pause=11)
+# v2 status: 4=ready_for_start, 9=active, 11=pause, 7=done (включаем, чтобы «есть в WB» совпадало с ботом)
 ALLOWED_STATUSES = {
     GetAdvertsAdvertsItemStatus.VALUE_4,
+    GetAdvertsAdvertsItemStatus.VALUE_7,
     GetAdvertsAdvertsItemStatus.VALUE_9,
     GetAdvertsAdvertsItemStatus.VALUE_11,
 }
@@ -96,17 +102,27 @@ def _is_auction_campaign(item: GetAdvertsAdvertsItem) -> bool:
 
 
 def _is_auto_campaign(item: GetAdvertsAdvertsItem) -> bool:
-    """Тип 2 (авто): bid_type unified, оплата CPM. Не требуем строго search=false/shelf/recommendations — API WB может отдавать по-разному."""
+    """Тип 2 (авто): bid_type unified ИЛИ bid_type manual без размещения «в поиске» (API WB может отдавать manual для авто-РК). Оплата CPM."""
     bid = (getattr(item, "bid_type", None) or "").lower()
-    if bid != "unified":
-        return False
     settings = getattr(item, "settings", None)
     if settings is None:
         return False
     pt = getattr(settings, "payment_type", None)
     if pt != AdvertSettingsPaymentType.CPM and str(pt).lower() != "cpm":
         return False
-    return True
+    if bid == "unified":
+        return True
+    if bid == "manual":
+        # Авто-РК с ручной ставкой: размещение не «в поиске» (search=false)
+        p = getattr(settings, "placements", None)
+        if p is None:
+            return True
+        search_val = getattr(p, "search", None)
+        if search_val is not None:
+            return bool(not search_val)
+        extra = getattr(p, "additional_properties", None) or {}
+        return not (extra.get("search") or extra.get("Search"))
+    return False
 
 
 def filter_and_classify_campaigns_by_nmid(
@@ -139,3 +155,19 @@ def filter_and_classify_campaigns_by_nmid(
             )
 
     return ConnectExistingCandidatesResult(auction_candidates=auction, auto_candidates=auto)
+
+
+def classify_wb_campaign_for_rebind(
+    item: GetAdvertsAdvertsItem,
+) -> Literal["auction", "auto"] | None:
+    """
+    Определить тип РК для ручной перепривязки (adv_id авто vs _search_adv_id поиск).
+    Учитывает только «допустимые» статусы (как при подключении существующих РК).
+    """
+    if item.status not in ALLOWED_STATUSES:
+        return None
+    if _is_auction_campaign(item):
+        return "auction"
+    if _is_auto_campaign(item):
+        return "auto"
+    return None

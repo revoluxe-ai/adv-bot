@@ -7,6 +7,7 @@ from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Update
 from aiogram.types.error_event import ErrorEvent
 
 from app import client_bot as tb
@@ -15,6 +16,23 @@ from app.core.wb_api.exceptions import ApiForbiddenError
 from app.exc import CardNotFoundInDB
 
 logger = logging.getLogger(__name__)
+
+
+def _chat_id_from_error_update(update: Update) -> int:
+    """User chat id from message or callback_query (shared error-handler resolution)."""
+    message = update.message
+    if message is None:
+        assert update.callback_query
+        assert update.callback_query.message
+        assert update.callback_query.message.chat
+        return int(update.callback_query.message.chat.id)
+    return message.chat.id
+
+
+async def _clear_fsm_and_get_chat_id(state: FSMContext, update: Update) -> int:
+    """Reset FSM state and return the user chat id for this update (error handlers)."""
+    await state.set_state()
+    return _chat_id_from_error_update(update)
 
 
 admin_telegram_id = 373435337
@@ -30,14 +48,7 @@ async def network_error_handler(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
     await state.set_state()
-    message = error_event.update.message
-    if message is None:
-        assert error_event.update.callback_query
-        assert error_event.update.callback_query.message
-        assert error_event.update.callback_query.message.chat
-        chat_id = int(error_event.update.callback_query.message.chat.id)
-    else:
-        chat_id = message.chat.id
+    chat_id = _chat_id_from_error_update(error_event.update)
     await bot.send_message(
         chat_id=chat_id,
         text="Ошибка сети Телеграм. Попробуйте еще раз через несколько минут.",
@@ -56,17 +67,41 @@ async def error_handler_for_telegram_bad_request_exception(
         exc_info=True,
     )
     error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
+    update = error_event.update
+    chat_id = await _clear_fsm_and_get_chat_id(state, update)
     if "caption is too long" in error_text:
-        raise error_event.exception
-    await state.set_state()
-    message = error_event.update.message
-    if message is None:
-        assert error_event.update.callback_query
-        assert error_event.update.callback_query.message
-        assert error_event.update.callback_query.message.chat
-        chat_id = int(error_event.update.callback_query.message.chat.id)
-    else:
-        chat_id = message.chat.id
+        message = update.message
+        if message is None:
+            cq = update.callback_query
+            assert cq is not None
+            user_name = cq.from_user.username
+            callback_data = getattr(cq, "data", None)
+        else:
+            assert message.from_user
+            user_name = message.from_user.username
+            callback_data = None
+
+        admin_text = (
+            "TelegramBadRequest: caption is too long\n"
+            f"chat_id={chat_id}\n"
+            f"user={user_name}\n"
+            f"callback_data={callback_data}\n"
+            f"exc={exc}"
+        )
+        for i in range(0, len(admin_text), const.MAX_MESSAGE_LENGTH):
+            await bot.send_message(
+                admin_telegram_id,
+                admin_text[i : i + const.MAX_MESSAGE_LENGTH],
+            )
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "Сообщение получилось слишком длинным и было автоматически сокращено. "
+                "Если проблема повторяется, обратитесь в поддержку -> "
+                f"{const.SUPPORT_LINK}"
+            ),
+        )
+        return
     await bot.send_message(
         chat_id=chat_id,
         text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "

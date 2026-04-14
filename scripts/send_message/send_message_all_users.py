@@ -5,14 +5,15 @@ import logging
 import os
 from hashlib import sha256
 
-from collections.abc import AsyncGenerator, AsyncIterable
-from typing import Any, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
+from typing import Any
 
 from aiogram import Bot
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.admin_bot.sender import redis_manager
+from app.client_bot.bot import aclose_telegram_http_session, get_bots_for_tokens
 from app.modules.common_slaves.wildberries.models.models import (
     WBUserCabinet,
 )
@@ -32,20 +33,20 @@ USER_TYPE = "user_with_active_company"
 
 test_users_ids = [373435337, 707068503]
 
-def get_bots() -> list[Bot]:
+def get_bots():
     tokens_str = os.environ.get("SEND_BOTS_TOKENS")
     if not tokens_str:
         raise RuntimeError("SEND_BOTS_TOKENS is required")
     tokens = [t for t in tokens_str.split(",") if t]
-    return [Bot(token=t) for t in tokens]
+    return get_bots_for_tokens(tokens)
 
 
-def get_test_bots() -> list[Bot]:
+def get_test_bots():
     tokens_str = os.environ.get("TEST_SEND_BOTS_TOKENS")
     if not tokens_str:
         raise RuntimeError("TEST_SEND_BOTS_TOKENS is required")
     tokens = [t for t in tokens_str.split(",") if t]
-    return [Bot(token=t) for t in tokens]
+    return get_bots_for_tokens(tokens)
 
 
 
@@ -124,12 +125,10 @@ async def send_message_to_users():
         print(f'Всего отправлено: {send_count}')
         print(f'Общая база рассылки: {not_send_count + send_count}')
     finally:
-        # закрываем ботов
-        for bot in bots:
-            try:
-                await bot.session.close()
-            except Exception as e:
-                logger.error(e)
+        try:
+            await aclose_telegram_http_session()
+        except Exception as e:
+            logger.error(e)
 
         # закрываем Redis (пул + сокеты)
         try:

@@ -7,6 +7,8 @@ Write-Host "=== Применение манифестов error-collector ===" -
 
 $namespace = "logging"
 $basePath = ".\error-collector"
+$repoRoot = Resolve-Path "$PSScriptRoot\..\.."
+$collectorPath = Join-Path $repoRoot "error_collector"
 
 # Проверяем, что мы в правильной директории
 if (-not (Test-Path "$basePath\deployment.yaml")) {
@@ -14,11 +16,24 @@ if (-not (Test-Path "$basePath\deployment.yaml")) {
     exit 1
 }
 
-# 1. ConfigMap
-Write-Host "`n1. Применяю ConfigMap..." -ForegroundColor Yellow
+# 1. Runtime ConfigMap
+Write-Host "`n1. Применяю runtime ConfigMap..." -ForegroundColor Yellow
 kubectl apply -f "$basePath\configmap.yaml"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Ошибка при применении ConfigMap" -ForegroundColor Red
+    exit 1
+}
+
+# 1.1 App code ConfigMap (from source files)
+Write-Host "`n1.1 Применяю app ConfigMap из source-файлов..." -ForegroundColor Yellow
+kubectl create configmap error-collector-app -n $namespace `
+  --from-file=main.py="$collectorPath\main.py" `
+  --from-file=redis_client.py="$collectorPath\redis_client.py" `
+  --from-file=requirements.txt="$collectorPath\requirements.txt" `
+  --from-file=__init__.py="$collectorPath\__init__.py" `
+  --dry-run=client -o yaml | kubectl apply -f -
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Ошибка при применении app ConfigMap из source" -ForegroundColor Red
     exit 1
 }
 

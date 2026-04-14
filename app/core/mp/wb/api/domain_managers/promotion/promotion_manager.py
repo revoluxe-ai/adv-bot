@@ -19,6 +19,9 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
+from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
+    GetMinBidsCommand,
+)
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.full_stat_adv_updater.full_adv_stat_utils import (
     filter_full_adv_stat_to_dates,
@@ -33,6 +36,7 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.m
     GetAdvV1BalanceResponse200,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    GetAdvertsAdvertsItem,
     GetAdvV1SupplierSubjectsResponse200Type0Item,
     PatchApiAdvertV1BidsBody,
     PostAdvV2SupplierNmsResponse200Item,
@@ -142,6 +146,30 @@ class PromotionManager:
         )
         return result
 
+    async def get_min_bids_for_command(
+        self,
+        command: GetMinBidsCommand,
+    ) -> AdvMinNmidsBids | None:
+        """Минимальные ставки по уже собранной команде (например урезанной по кешу)."""
+        from .methods.get_min_bids import method
+
+        return await method.get_min_bids_for_command(
+            self._client.min_bids_adapter,
+            command,
+        )
+
+    async def get_min_bids_per_command_item(
+        self,
+        command: GetMinBidsCommand,
+    ) -> list[AdvMinNmidsBids] | None:
+        """Минимальные ставки отдельно по каждому item команды (без слияния dict по nmid)."""
+        from .methods.get_min_bids import method
+
+        return await method.get_min_bids_per_command_item(
+            self._client.min_bids_adapter,
+            command,
+        )
+
     async def get_campaigns_info(
         self, complex_advs: list[ComplexAdv], *, get_auto: bool = True
     ) -> dict[int, "AdvInfoDTO"]:
@@ -178,12 +206,16 @@ class PromotionManager:
         amount: int,
         balance_type: str,
         return_total: bool = True,
+        cashback_sum: int | None = None,
+        cashback_percent: int | None = None,
     ) -> BudgetTopUpResult:
         response = await self._client.finance_adapter.top_up_budget(
             adv_id=adv_id,
             amount=amount,
             balance_type=balance_type,
             return_total=return_total,
+            cashback_sum=cashback_sum,
+            cashback_percent=cashback_percent,
         )
         raw: dict[str, Any] = response.to_dict() if response else {}
         total = raw.get("total")
@@ -213,22 +245,40 @@ class PromotionManager:
             adv_id=advert_id,
         )
 
+    async def get_adverts_v2_by_ids(self, adv_ids: list[int]) -> list[GetAdvertsAdvertsItem]:
+        """Сырые элементы GET /api/advert/v2/adverts по числовым id (не путать с get_campaigns_info)."""
+        return await self._client.campaigns_info_v2_adapter.get_campaigns_info(adv_ids)
+
     async def get_campaign_status(self, adv_id: int) -> int | None:
-        """Статус кампании на WB (например 7=завершена) или None, если не найдена."""
-        campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
-            [adv_id]
-        )
+        """Статус кампании на WB (например 7=завершена) или None, если не найдена.
+
+        None возвращается, когда GET /api/advert/v2/adverts?ids=<adv_id> отдаёт пустой список.
+        Мы не передаём параметр statuses — фильтрации по статусу с нашей стороны нет.
+        Пустой ответ возможен: кампания удалена; или WB по своему правилу не возвращает
+        часть кампаний (например, завершённые) при запросе по ids — зависит от API WB.
+        """
+        campaigns = await self.get_adverts_v2_by_ids([adv_id])
         if not campaigns:
             return None
         return int(campaigns[0].status)
 
-    async def get_connect_existing_candidates(self, nmid: int):
-        """Кандидаты для подключения существующих РК по nmid (аукцион + авто)."""
+    async def get_connect_existing_candidates(
+        self, nmid: int, extra_adv_ids: list[int] | None = None
+    ):
+        """Кандидаты для подключения существующих РК по nmid (аукцион + авто).
+
+        Используется тот же источник id, что и для регулярного обновления (update_advs_data_from_wb_to_pg):
+        1) GET /adv/v1/promotion/count (promotion_count) — список id кампаний типа 8 и 9.
+        2) GET /api/advert/v2/adverts (campaigns_info_v2) — полная инфа по id.
+        extra_adv_ids: id из БД по этому артикулу — добавляем к списку на случай рассинхрона.
+        """
         from app.modules.connect_existing_advs.candidates_service import (
             filter_and_classify_campaigns_by_nmid,
         )
 
-        adv_ids = await self._client.cabinet_adverts_list_adapter.get_cabinet_adv_ids()
+        adv_ids = await self._client.promotion_count_adapter.get_cabinet_adv_ids()
+        if extra_adv_ids:
+            adv_ids = list(set(adv_ids) | set(extra_adv_ids))
         if adv_ids:
             campaigns = await self._client.campaigns_info_v2_adapter.get_campaigns_info(
                 adv_ids
@@ -243,6 +293,14 @@ class PromotionManager:
             self._client.campaigns_management_adapter,
             adv_id=advert_id,
             new_name=new_name,
+        )
+
+    async def set_auction_placement(
+        self, adv_id: int, *, search: bool = True, recommendations: bool = False
+    ) -> None:
+        """Установить размещение для поисковой (аукционной) кампании (поиск / рекомендации)."""
+        await self._client.campaigns_management_adapter.put_auction_placements(
+            adv_id, search=search, recommendations=recommendations
         )
 
     async def get_supplier_subjects(

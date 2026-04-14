@@ -13,6 +13,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
+    RebindAdvCampaignIds,
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -166,6 +167,17 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Перепривязать кампании WB",
+            callback_data=RebindAdvCampaignIds(
+                action="menu",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
 
     watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
     watchdog_button = InlineKeyboardButton(
@@ -333,6 +345,15 @@ def get_adv_setting_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
+            text="Шаблоны релевантных фраз",
+            callback_data=callbacks.AddRelevantPhraseTemplates(
+                adv_setting_id=adv_setting.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
             text="Добавить фразы в продвижение (Белый список)",
             callback_data=callbacks.AddWhitePhrases(
                 adv_setting_id=adv_setting.id
@@ -436,6 +457,14 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(
         text="Сбросить белый список",
         callback_data=callbacks.ResetWhiteList(
+            adv_setting_original_id=adv_setting.id
+        ).pack(),
+    )
+    _ = builder.row(button)
+
+    button = InlineKeyboardButton(
+        text="Сбросить все нерелевантные фразы",
+        callback_data=callbacks.ResetNonRelevantPhrases(
             adv_setting_original_id=adv_setting.id
         ).pack(),
     )

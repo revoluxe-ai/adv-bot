@@ -78,23 +78,22 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
             )
         )
 
-    if getattr(adv_setting, "auto_budget_watchdog_enabled", False):
-        use_common_budget = getattr(adv_setting, "use_common_budget", False)
-        common_budget_text = (
-            "Включить раздельный бюджет на каждую РК"
-            if use_common_budget
-            else "Включить общий бюджет на две РК"
+    use_common_budget = getattr(adv_setting, "use_common_budget", False)
+    common_budget_text = (
+        "Включить раздельный бюджет на каждую РК"
+        if use_common_budget
+        else "Включить общий бюджет на две РК"
+    )
+    common_budget_callback = CommonBudgetModeToggle(
+        adv_setting_original_id=adv_setting.id,
+        new_status=not use_common_budget,
+    ).pack()
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=common_budget_text,
+            callback_data=common_budget_callback,
         )
-        common_budget_callback = CommonBudgetModeToggle(
-            adv_setting_original_id=adv_setting.id,
-            new_status=not use_common_budget,
-        ).pack()
-        _ = builder.row(
-            InlineKeyboardButton(
-                text=common_budget_text,
-                callback_data=common_budget_callback,
-            )
-        )
+    )
 
     _ = builder.row(
         InlineKeyboardButton(

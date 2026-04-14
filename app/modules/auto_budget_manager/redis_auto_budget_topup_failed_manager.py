@@ -39,7 +39,7 @@ class RedisAutoBudgetTopupFailedManager:
             "failed_at": _now_utc().isoformat(),
             "reason": reason,
         }
-        await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
+        _ = await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
 
     async def get(
         self,

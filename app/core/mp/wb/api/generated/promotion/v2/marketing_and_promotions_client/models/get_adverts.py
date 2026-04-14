@@ -45,7 +45,8 @@ class GetAdverts:
 
         d = dict(src_dict)
         adverts = []
-        _adverts = d.pop("adverts")
+        # WB may return "adverts": null
+        _adverts = d.pop("adverts", None) or []
         for adverts_item_data in _adverts:
             adverts_item = GetAdvertsAdvertsItem.from_dict(adverts_item_data)
 

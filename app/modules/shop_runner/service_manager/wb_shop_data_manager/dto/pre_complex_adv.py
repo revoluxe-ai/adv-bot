@@ -1,24 +1,44 @@
 from dataclasses import dataclass
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData, FactData
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
+)
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactSummary,
+)
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 @dataclass
 class PreComplexAdv:
     auto_adv: AdvSetting
-    plan_data: PlanData
-    fact_data: FactData
-    search_adv: AdvSetting | None
+    plan_data: PlanData | None
+    plan_fact_summary: PlanFactSummary | None = None
+    fact_data: FactData | None = None
+    search_adv: AdvSetting | None = None
 
     @property
-    def target_pay_for_order(self) -> int:
+    def resolved_target_pay_for_order(self) -> float | None:
         plan = self.plan_data
-        fact = self.fact_data
-        if fact.predict_orders >= plan.orders:
-            return plan.target_pay_for_order
-        else:
-            return plan.max_pay_for_order
+        if plan is None:
+            return None
+        summary = self.plan_fact_summary
+        fact_predict_orders = (
+            summary.fact_predict_orders if summary is not None else None
+        )
+        return resolve_target_cost(
+            plan.orders,
+            plan.target_pay_for_order,
+            plan.max_pay_for_order,
+            fact_predict_orders,
+        )
+
+    @property
+    def target_pay_for_order(self) -> float | None:
+        """Backward-compatible alias for code paths using previous name."""
+        return self.resolved_target_pay_for_order
     @property
     def adv_id(self) -> int:
         return self.auto_adv.adv_id

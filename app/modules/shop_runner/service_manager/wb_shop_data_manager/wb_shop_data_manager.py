@@ -17,12 +17,21 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    TrafficClicksManager,
+)
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
+    PreComplexAdv,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
@@ -54,16 +63,29 @@ class WBShopDataManager:
         wb_cabinet: WBCabinet,
         tasks_manager: TasksManager,
         wb_api_data_manager : WBDataManager,
-        wb_manager: WBManager,
+        wb_manager: WBManager | None,
     ):
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
         self._tasks_manager: TasksManager | None = tasks_manager
         self._wb_api_data_manager = wb_api_data_manager
         self._wb_manager = wb_manager
+        self._traffic_clicks_manager = TrafficClicksManager()
 
     @single_run()
-    async def __get_calculated_keywords(self, complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
+    async def __get_calculated_keywords(
+        self, complex_adv: ComplexAdv, *, cache_only: bool = False
+    ) -> list[CalculatedKeyword] | None:
+        if cache_only:
+            from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+                RedisCalculatedKeywordsCacheManager,
+            )
+
+            redis_mgr = RedisCalculatedKeywordsCacheManager()
+            return await redis_mgr.get_all_calculated_keywords_for_adv(
+                complex_adv.adv_id
+            )
+
         from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
         if not complex_adv:
@@ -81,7 +103,9 @@ class WBShopDataManager:
         stmt = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
-            .filter(WBCabinet.shop_id == shop_id, AdvSetting.active_status != 'done')
+            .filter(WBCabinet.shop_id == shop_id,
+                    AdvSetting.active_status != 'done',
+                    AdvSetting.bot_active.is_(True),)
         )
         async with sm() as session:
             result = await session.execute(stmt)
@@ -121,14 +145,26 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
+        reuse_min_bids = self._reuse_shared_min_bids_from_complex_advs(complex_advs)
+
         if search_adv_bids_override is not None:
-            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            if reuse_min_bids is not None:
+                min_bids = reuse_min_bids
+            else:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
             search_adv_bids = search_adv_bids_override
         else:
-            min_bids, search_adv_bids = await asyncio.gather(
-                self._get_min_bids(complex_advs, cache_possible=True),
-                self._get_search_adv_common_bids(complex_advs),
-            )
+            if reuse_min_bids is not None:
+                min_bids = reuse_min_bids
+                search_adv_bids = await self._get_search_adv_common_bids(complex_advs)
+            else:
+                # mypy 1.19: INTERNAL ERROR на `a, b = await gather(...)`; индексация обходит.
+                _gathered = await asyncio.gather(
+                    self._get_min_bids(complex_advs, cache_possible=True),
+                    self._get_search_adv_common_bids(complex_advs),
+                )
+                min_bids = _gathered[0]
+                search_adv_bids = _gathered[1]
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
 
@@ -175,6 +211,19 @@ class WBShopDataManager:
 
 
     @staticmethod
+    def _reuse_shared_min_bids_from_complex_advs(
+        complex_advs: list[ComplexAdv],
+    ) -> AdvMinNmidsBids | None:
+        if not complex_advs:
+            return None
+        first_bids = complex_advs[0].min_nmids_bids
+        if first_bids is None:
+            return None
+        if not all(a.min_nmids_bids is first_bids for a in complex_advs):
+            return None
+        return first_bids
+
+    @staticmethod
     async def _collect_plan_data(complex_adv: ComplexAdv) -> PlanData:
         plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
         if plan is None:
@@ -218,33 +267,121 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_complex_advs(self) -> list["ComplexAdv"]:
+    async def get_pre_complex_advs(self) -> list[PreComplexAdv]:
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
         )
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        search_adv_idv: dict[int, AdvSetting] = (
-            await self.__get_adv_id_to_search_adv_map(search_adv_ids)
-        )
-        complex_advs: list[ComplexAdv] = []
-        for adv in adv_settings:
-            search_adv = (
-                search_adv_idv.get(adv.search_adv_id)
-                if adv.search_adv_id is not None
-                else None
+        plan_fact_reader = PlanFactReader()
+        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        if search_adv_ids:
+            search_adv_idv, summaries_by_adv_id = await asyncio.gather(
+                self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
             )
+        else:
+            search_adv_idv = {}
+            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                adv_ids_for_plan_fact
+            )
+        return [
+            PreComplexAdv(
+                auto_adv=adv,
+                plan_data=PlanFactProvider.get_plan_data(adv),
+                plan_fact_summary=summaries_by_adv_id.get(adv.adv_id),
+                search_adv=(
+                    search_adv_idv.get(adv.search_adv_id)
+                    if adv.search_adv_id is not None
+                    else None
+                ),
+            )
+            for adv in adv_settings
+        ]
+
+    @single_run()
+    async def get_complex_advs(self, *, load_extras: bool = True) -> list["ComplexAdv"]:
+        """Собрать активные комплексы РК.
+
+        ``load_extras=True`` (по умолчанию): обогатить traffic-кликами (CH) и подтянуть
+        min bids — дорого при большом числе РК.
+
+        ``load_extras=False``: только данные из БД + nmids; для фоновых корутин, где нужны
+        id/nmids/настройки, а не клики/минимальные ставки из этого шага.
+        """
+        # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
+        # оба помечены `@single_run()`.
+        #
+        # Наш `single_run` реализован не через re-entrant lock, а через per-key "single-flight"
+        # на `asyncio.Event` (см. `single_run_decorator.py`). Это означает:
+        # - параллельные вызовы ОДНОГО и того же метода с одинаковыми args/kwargs будут ждать
+        #   один общий event и получать общий результат;
+        # - при этом повторный вход В ТОТ ЖЕ метод с теми же args/kwargs до завершения первого
+        #   вызова приводит к self-deadlock (второй вход будет ждать event, который выставит
+        #   только первый вход, но первый вход уже ждёт второго по цепочке вызовов).
+        #
+        # Текущее вложение `get_complex_advs()` -> `get_pre_complex_advs()` само по себе НЕ
+        # обязано дедлочиться, т.к. ключ в `single_run` включает имя функции, и это разные key.
+        # Однако это место становится "точкой риска" для будущих рефакторингов:
+        # достаточно случайно получить цикл вида
+        # `get_complex_advs()` -> ... -> `get_pre_complex_advs()` -> ... -> `get_complex_advs()`
+        # (или запуск фоновой задачи, которая внутри снова вызовет `get_complex_advs()`), и мы
+        # получим вечное ожидание.
+        #
+        # Что нужно сделать позже (выбрать один вариант):
+        # - добавить в `single_run` явную защиту от re-entrance в рамках одной asyncio.Task
+        #   (например, task-local стек ключей через `contextvars`): либо разрешать re-entrance
+        #   (re-entrant single-flight), либо падать с понятной ошибкой вместо "вечного await";
+        # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
+        #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
+        # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
+        pre_complex_advs = await self.get_pre_complex_advs()
+        complex_advs: list[ComplexAdv] = []
+        for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(
                 shop_id=self.shop_id,
-                adv_setting=adv,
+                adv_setting=pre_adv.auto_adv,
                 get_keywords_func=self.__get_calculated_keywords,
-                search_adv=search_adv,
+                search_adv=pre_adv.search_adv,
+                target_pay_for_order=pre_adv.resolved_target_pay_for_order,
             )
             complex_advs.append(complex_adv)
+        handlers: list[Callable[[], Awaitable[None]]] = [
+            lambda adv_=adv: self._traffic_clicks_manager.enrich(adv_)
+            for adv in complex_advs
+        ]
+        if load_extras and handlers:
+            results = await run_tasks(
+                handlers,
+                max_workers=max(1, min(len(handlers), 16)),
+                tasks_manager=self._tasks_manager,
+                return_exceptions=True,
+            )
+            for adv, result in zip(complex_advs, results):
+                if isinstance(result, BaseException):
+                    logger.error(
+                        "Ошибка enrich traffic_clicks_dto, adv_id=%s shop_id=%s",
+                        adv.adv_id,
+                        adv.shop_id,
+                        exc_info=result,
+                    )
         # TODO: Нашел лютый баг: все падало, если хотя бы в 1 РК нет nmids
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
+        if load_extras and complex_advs:
+            try:
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+            except Exception:
+                logger.exception(
+                    "Ошибка получения min_bids (cache) в get_complex_advs, "
+                    "shop_id=%s. Возвращаю базовый список без min_nmids_bids",
+                    self.shop_id,
+                )
+                min_bids = None
+            if min_bids is not None:
+                for adv in complex_advs:
+                    adv.attach_min_nmids_bids(min_bids)
         return complex_advs
 
     @staticmethod
@@ -289,10 +426,14 @@ class WBShopDataManager:
         return aggregated
 
     async def _get_min_bids(
-        self, complex_advs: list[ComplexAdv], cache_possible
+        self, complex_advs: list[ComplexAdv], cache_possible: bool
     ) -> AdvMinNmidsBids | None:
         if self._wb_manager is not None:
-            return await self._wb_manager.get_min_bids(complex_advs, cache_possible)
+            if cache_possible:
+                return await self._wb_manager.get_min_bids_cache_only(
+                    complex_advs, context="wb_shop_data_manager"
+                )
+            return await self._wb_manager.get_min_bids(complex_advs, cache_possible=False)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

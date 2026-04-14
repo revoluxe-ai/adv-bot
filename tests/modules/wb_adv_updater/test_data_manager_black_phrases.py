@@ -41,10 +41,10 @@ async def test_update_black_phrases_delegates_to_relevant_phrase_manager(
             return_value=manager_instance,
         ),
     ):
-        await data_manager.update_black_phrases(42, ["kw1", "not:kw2"])
+        await data_manager.update_black_phrases(42, ["kw1", r"kw2|extra"])
 
     session.get.assert_called_once_with(AdvSetting, 42)
-    manager_instance.update_black_phrases.assert_called_once_with(["kw1", "not:kw2"])
+    manager_instance.update_black_phrases.assert_called_once_with(["kw1", r"kw2|extra"])
 
 
 @pytest.mark.asyncio

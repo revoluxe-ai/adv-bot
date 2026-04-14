@@ -11,11 +11,8 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
-    ComplexAdv,
-)
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
+    PreComplexAdv,
 )
 
 
@@ -46,24 +43,19 @@ async def test_update_plan_fact_stats_success_with_full_data(
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
 
-    # Создаем моки для ComplexAdv
-    adv1 = MagicMock(spec=ComplexAdv)
-    adv1.adv_id = 11111
-    adv1.adv_setting = MagicMock()
-    adv1.get_keywords = AsyncMock(return_value=[])
-
-    adv2 = MagicMock(spec=ComplexAdv)
-    adv2.adv_id = 22222
-    adv2.adv_setting = MagicMock()
-    adv2.get_keywords = AsyncMock(return_value=[])
-
+    pre_adv1 = MagicMock(spec=PreComplexAdv)
+    pre_adv1.adv_id = 11111
+    pre_adv1.auto_adv = MagicMock()
+    pre_adv2 = MagicMock(spec=PreComplexAdv)
+    pre_adv2.adv_id = 22222
+    pre_adv2.auto_adv = MagicMock()
     mock_plan_fact_manager = MagicMock()
-    mock_plan_fact_manager.process_and_save = AsyncMock()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[adv1, adv2]),
+            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_pre_complex_advs",
+            new=AsyncMock(return_value=[pre_adv1, pre_adv2]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.PlanFactManager",
@@ -74,8 +66,8 @@ async def test_update_plan_fact_stats_success_with_full_data(
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
-    mock_plan_fact_manager.process_and_save.assert_called_once()
-    call_args = mock_plan_fact_manager.process_and_save.call_args
+    mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
+    call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
 
     assert len(advs_arg) == 2
@@ -92,11 +84,11 @@ async def test_update_plan_fact_stats_empty_advs_list(access_mock, fake_redis):
     manager = _create_manager(wb_api, redis_client_wrapper)
 
     mock_plan_fact_manager = MagicMock()
-    mock_plan_fact_manager.process_and_save = AsyncMock()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
+            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_pre_complex_advs",
             new=AsyncMock(return_value=[]),
         ),
         patch(
@@ -107,7 +99,7 @@ async def test_update_plan_fact_stats_empty_advs_list(access_mock, fake_redis):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
     # Проверяем, что process_and_save не был вызван (early return в корутине)
-    mock_plan_fact_manager.process_and_save.assert_not_called()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_not_called()
 
 
 @pytest.mark.unit
@@ -118,18 +110,17 @@ async def test_update_plan_fact_stats_calls_process_and_save(access_mock, fake_r
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
 
-    adv = MagicMock(spec=ComplexAdv)
-    adv.adv_id = 12345
-    adv.adv_setting = MagicMock()
-    adv.get_keywords = AsyncMock(return_value=[])
+    pre_adv = MagicMock(spec=PreComplexAdv)
+    pre_adv.adv_id = 12345
+    pre_adv.auto_adv = MagicMock()
 
     mock_plan_fact_manager = MagicMock()
-    mock_plan_fact_manager.process_and_save = AsyncMock()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[adv]),
+            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_pre_complex_advs",
+            new=AsyncMock(return_value=[pre_adv]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.PlanFactManager",
@@ -139,8 +130,8 @@ async def test_update_plan_fact_stats_calls_process_and_save(access_mock, fake_r
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
-    mock_plan_fact_manager.process_and_save.assert_called_once()
-    call_args = mock_plan_fact_manager.process_and_save.call_args
+    mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
+    call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
 
     assert len(advs_arg) == 1
@@ -155,21 +146,20 @@ async def test_update_plan_fact_stats_multiple_advs(access_mock, fake_redis):
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
 
-    advs = []
+    pre_advs = []
     for i in range(5):
-        adv = MagicMock(spec=ComplexAdv)
-        adv.adv_id = 10000 + i
-        adv.adv_setting = MagicMock()
-        adv.get_keywords = AsyncMock(return_value=[])
-        advs.append(adv)
+        pre_adv = MagicMock(spec=PreComplexAdv)
+        pre_adv.adv_id = 10000 + i
+        pre_adv.auto_adv = MagicMock()
+        pre_advs.append(pre_adv)
 
     mock_plan_fact_manager = MagicMock()
-    mock_plan_fact_manager.process_and_save = AsyncMock()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=advs),
+            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_pre_complex_advs",
+            new=AsyncMock(return_value=pre_advs),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.PlanFactManager",
@@ -179,8 +169,8 @@ async def test_update_plan_fact_stats_multiple_advs(access_mock, fake_redis):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
-    mock_plan_fact_manager.process_and_save.assert_called_once()
-    call_args = mock_plan_fact_manager.process_and_save.call_args
+    mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
+    call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
 
     assert len(advs_arg) == 5
@@ -196,18 +186,17 @@ async def test_update_plan_fact_stats_uses_wrapped(access_mock, fake_redis):
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
     manager = _create_manager(wb_api, redis_client_wrapper)
 
-    adv = MagicMock(spec=ComplexAdv)
-    adv.adv_id = 99999
-    adv.adv_setting = MagicMock()
-    adv.get_keywords = AsyncMock(return_value=[])
+    pre_adv = MagicMock(spec=PreComplexAdv)
+    pre_adv.adv_id = 99999
+    pre_adv.auto_adv = MagicMock()
 
     mock_plan_fact_manager = MagicMock()
-    mock_plan_fact_manager.process_and_save = AsyncMock()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[adv]),
+            "app.modules.shop_runner.service_manager.manager.WBShopDataManager.get_pre_complex_advs",
+            new=AsyncMock(return_value=[pre_adv]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.PlanFactManager",
@@ -218,4 +207,4 @@ async def test_update_plan_fact_stats_uses_wrapped(access_mock, fake_redis):
         await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
 
     # Проверяем, что метод был вызван
-    mock_plan_fact_manager.process_and_save.assert_called_once()
+    mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()

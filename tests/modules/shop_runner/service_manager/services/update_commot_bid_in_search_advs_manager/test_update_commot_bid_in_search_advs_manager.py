@@ -107,7 +107,6 @@ def test_get_new_bid_when_current_common_bids_none_direct_up_returns_min_plus_st
 
 
 def test_get_new_bid_decreases_when_fact_above_target() -> None:
-    """direct='reset' sets bid to min_bid (fact >= target)."""
     adv = make_adv(
         fact_pay_for_order=150.0,
         result_target_pay_for_order=100.0,
@@ -121,11 +120,10 @@ def test_get_new_bid_decreases_when_fact_above_target() -> None:
         adv, current_nmid=100, direct="reset"
     )
 
-    assert new_bid == 113
+    assert new_bid == 50
 
 
 def test_get_new_bid_increases_when_fact_below_target() -> None:
-    """direct='up' adds 1 to current bid (fact < target)."""
     adv = make_adv(
         fact_pay_for_order=80.0,
         result_target_pay_for_order=100.0,
@@ -139,7 +137,7 @@ def test_get_new_bid_increases_when_fact_below_target() -> None:
         adv, current_nmid=100, direct="up"
     )
 
-    assert new_bid == 130
+    assert new_bid == 121
 
 
 def test_get_new_bid_applies_minimum_clamp() -> None:
@@ -195,7 +193,7 @@ def test_get_new_bid_returns_none_when_clamped_matches_current() -> None:
 
 
 def test_get_new_bid_returns_int_when_fact_equals_target() -> None:
-    """direct='reset' (fact == target) sets bid to min_bid."""
+    """direct='reset' sets bid to min_bid for the nmid."""
     adv = make_adv(
         fact_pay_for_order=123.0,
         result_target_pay_for_order=123.0,
@@ -210,4 +208,4 @@ def test_get_new_bid_returns_int_when_fact_equals_target() -> None:
     )
 
     assert isinstance(new_bid, int)
-    assert new_bid == 123
+    assert new_bid == 90

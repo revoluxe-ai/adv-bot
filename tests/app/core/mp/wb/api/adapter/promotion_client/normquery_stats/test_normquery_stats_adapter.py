@@ -1,22 +1,31 @@
 import datetime
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.adapter import NormqueryStatsAdapter
+from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
+    NormqueryStat,
+    NormqueryStatsDTO,
+)
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.get_normquery_stats import (
     command_to_bodies,
 )
+from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
 from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
     dto_to_command,
 )
-from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
+from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import PromotionManager
 from app.core.mp.wb.api.generated.promotion.v4.marketing_and_promotions_client.marketing_and_promotions_client.models import (
-    V0GetNormQueryStatsRequest,
-    V0GetNormQueryStatsResponse,
     V0GetNormQueryStatsItem,
     V0GetNormQueryStatsItemStat,
+    V0GetNormQueryStatsResponse,
 )
+from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
+)
+from tests.factories.adv_factory import AdvSettingFactory
 
 
 @pytest.fixture
@@ -45,10 +54,13 @@ def normquery_stats_adapter(
 
 @pytest.mark.asyncio
 async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
-                                          mock_auth_client_handler,
-                                          complex_adv):
+                                          mock_auth_client_handler):
     today = datetime.date.today()
-    command = dto_to_command([complex_adv], today, today)
+    mock_adv = MagicMock()
+    mock_adv.nmids = [456]
+    mock_adv.auto_adv_id = 123
+    mock_adv.search_adv = None
+    command = dto_to_command([mock_adv], today, today)
     expected_body = command_to_bodies(command)[0]
     #
     # stat_mock = V0GetNormQueryStatsItemStat(
@@ -117,4 +129,68 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
         assert result[0].stats[0].cpc == 0.5
         assert result[0].stats[0].avr_pos == 3.0
         assert result[0].stats[0].spend == 10.0
+
+
+@pytest.fixture
+def mock_promotion_client():
+    return AsyncMock(spec=PromotionClient)
+
+
+@pytest.fixture
+def promotion_manager(mock_promotion_client):
+    return PromotionManager(promotion_client=mock_promotion_client)
+
+
+@pytest.mark.asyncio
+async def test_get_normquery_stats(promotion_manager, mock_promotion_client):
+    advert_id = 123
+    nm_id = 456
+    today = datetime.date.today()
+
+    mock_adv_setting = AdvSettingFactory.build(
+        adv_id=advert_id,
+        nmids=[nm_id],
+    )
+
+    async def mock_get_keywords_func(*args, **kwargs):
+        return []
+
+    complex_adv = ComplexAdv(
+        shop_id="test_shop_id",
+        adv_setting=mock_adv_setting,
+        search_adv=None,
+        get_keywords_func=mock_get_keywords_func,
+    )
+    complex_advs = [complex_adv]
+
+    expected_dto = [
+        NormqueryStatsDTO(
+            adv_id=advert_id,
+            nmid=nm_id,
+            stats=[
+                NormqueryStat(
+                    norm_query="test phrase",
+                    views=10,
+                    clicks=5,
+                    ctr=0.5,
+                    cpm=100.0,
+                    add_to_cart=5,
+                    orders=2,
+                    cpc=0.5,
+                    avr_pos=3.0,
+                )
+            ],
+        )
+    ]
+    mock_promotion_client.normquery_stats_adapter.get_adv_v0_normquery_stats = (
+        AsyncMock(return_value=expected_dto)
+    )
+
+    result = await promotion_manager.get_normquery_stats(complex_advs, today, today)
+
+    expected_command = dto_to_command(complex_advs, today, today)
+    mock_promotion_client.normquery_stats_adapter.get_adv_v0_normquery_stats.assert_awaited_once_with(
+        expected_command
+    )
+    assert result == expected_dto
 

@@ -71,10 +71,16 @@ class CPMSetting(StatesGroup):
 
 class AddBlackPhrasesTemplates(StatesGroup):
     waiting_for_black_phrases = State()
+    waiting_for_black_phrases_test = State()
 
 
 class AddRelevantPhrases(StatesGroup):
     waiting_for_relevant_phrases = State()
+
+
+class AddRelevantPhraseTemplatesGroup(StatesGroup):
+    waiting_for_relevant_phrase_templates = State()
+    waiting_for_relevant_phrase_templates_test = State()
 
 
 class ChangeCPM(StatesGroup):
@@ -83,6 +89,13 @@ class ChangeCPM(StatesGroup):
 
 class SetCommonBidManual(StatesGroup):
     waiting_for_bid = State()
+
+
+class RebindCampaignIds(StatesGroup):
+    """Ручной ввод новых adv_id и search_adv_id для AdvSetting."""
+
+    waiting_for_auto_adv_id = State()
+    waiting_for_search_adv_id = State()
 
 
 class ShopDefaultMaxCPM(StatesGroup):
@@ -121,5 +134,7 @@ class ConnectExistingAdvsStates(StatesGroup):
     waiting_nmid = State()
     confirm_type1 = State()  # показать РК по первому типу или «Создать РК»
     confirm_type2 = State()  # показать РК по второму типу или «Создать РК»
+    waiting_auction_adv_id = State()  # ввод ID поисковой (аукцион) кампании
+    waiting_auto_adv_id = State()  # ввод ID авто-кампании
     waiting_confirm_create_both = State()  # обе отсутствуют — подтверждение create_complex_advs
     waiting_confirm_continue_invalid = State()  # только авто без поиска — продолжить создание (деактивация + create)

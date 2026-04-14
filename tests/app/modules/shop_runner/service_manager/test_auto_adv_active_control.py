@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 from typing import Awaitable, Callable
 
@@ -19,6 +20,13 @@ _SERVICE_MODULE = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _positive_cabinet_balance(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Избегаем реального balance_manager: положительный баланс кабинета."""
+    monkeypatch.setattr(
+        f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
+        AsyncMock(return_value=(1000.0, 0.0)),
+    )
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
     return {aid: None for aid in adv_ids}
@@ -31,6 +39,7 @@ class _FakeAdvSetting:
         adv_id: int | None = None,
         *,
         adv_setting_id: int | None = None,
+        wb_cabinet_id: int = 1,
         plan_for_sales_for_day: int | None = None,
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
@@ -39,6 +48,7 @@ class _FakeAdvSetting:
         self.active_status = active_status
         self.adv_id = adv_id
         self.id = adv_setting_id if adv_setting_id is not None else (adv_id if adv_id is not None else 0)
+        self.wb_cabinet_id = wb_cabinet_id
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
@@ -268,6 +278,204 @@ async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
     wb_modifier.start_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_wb_wallet_fallback_when_bot_balance_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Нулевой баланс в БД бота, но положительный кошелёк WB — не пауза по insufficient_balance."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=50,
+        search_status="started",
+        auto_adv_id=20,
+        search_adv_id=21,
+    )
+    monkeypatch.setattr(
+        f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+    wb_balance = MagicMock()
+    wb_balance.balance = 5000
+    wb_balance.net = 0
+    wb_balance.bonus = 0
+    wb_balance.cashbacks = None
+
+    wb_modifier = MagicMock()
+    wb_modifier.get_campaign_balance = AsyncMock(return_value=wb_balance)
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(
+        handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs
+    ):
+        for handler in handlers:
+            await handler()
+        return []
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(
+        side_effect=_mock_load_time_settings_for_adv_ids
+    )
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+    wb_modifier.pause_auction_campaign.assert_not_awaited()
+    assert wb_modifier.get_campaign_balance.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_wb_wallet_fallback_single_flight_when_handlers_run_concurrently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Concurrent auto + search handlers for one adv must not duplicate get_campaign_balance."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=50,
+        search_status="started",
+        auto_adv_id=30,
+        search_adv_id=31,
+    )
+    monkeypatch.setattr(
+        f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+    wb_balance = MagicMock()
+    wb_balance.balance = 1000
+    wb_balance.net = 0
+    wb_balance.bonus = 0
+    wb_balance.cashbacks = None
+
+    wb_modifier = MagicMock()
+    wb_modifier.get_campaign_balance = AsyncMock(return_value=wb_balance)
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(
+        handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs
+    ):
+        await asyncio.gather(*(h() for h in handlers))
+        return []
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(
+        side_effect=_mock_load_time_settings_for_adv_ids
+    )
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    assert wb_modifier.get_campaign_balance.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_active_control_wb_wallet_fallback_cashbacks_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WB отдаёт 0 в balance/net/bonus, но есть cashback — fallback считает кошелёк положительным."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=50,
+        search_status="started",
+        auto_adv_id=22,
+        search_adv_id=23,
+    )
+    monkeypatch.setattr(
+        f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+    cb_item = MagicMock()
+    cb_item.sum_ = 3000
+    cb_item.percent = 50
+    cb_item.expiration_date = None
+    wb_balance = MagicMock()
+    wb_balance.balance = 0
+    wb_balance.net = 0
+    wb_balance.bonus = 0
+    wb_balance.cashbacks = [cb_item]
+
+    wb_modifier = MagicMock()
+    wb_modifier.get_campaign_balance = AsyncMock(return_value=wb_balance)
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(
+        handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs
+    ):
+        for handler in handlers:
+            await handler()
+        return []
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(
+        side_effect=_mock_load_time_settings_for_adv_ids
+    )
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+    wb_modifier.pause_auction_campaign.assert_not_awaited()
 
 
 @pytest.mark.asyncio

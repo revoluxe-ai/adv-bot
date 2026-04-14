@@ -128,10 +128,10 @@ poetry run alembic downgrade -1
 
 ### Test Structure
 
-- Unit tests should be marked with `@pytest.mark.unit`
-- Integration tests with `@pytest.mark.integration`
-- Async tests automatically detected via `asyncio_mode = auto`
-- Slow tests marked with `@pytest.mark.slow`
+- Every test has exactly one type: **unit** or **integration**. Use `poetry run pytest -m unit` or `poetry run pytest -m integration` to run by type.
+- Type is set by path (`tests/unit/` → unit, `tests/integration/` → integration) or by explicit `@pytest.mark.unit` / `@pytest.mark.integration`; tests without either default to unit (see `conftest.py`).
+- Unit tests: isolated, mocks only (no real PostgreSQL/Redis/ClickHouse). Integration tests: use test DB/Redis/ClickHouse or multi-component flow.
+- Async tests are detected via `asyncio_mode = auto`. Slow tests use `@pytest.mark.slow`; combine with type if needed (e.g. `-m "integration and not slow"`).
 
 ### Writing Tests
 

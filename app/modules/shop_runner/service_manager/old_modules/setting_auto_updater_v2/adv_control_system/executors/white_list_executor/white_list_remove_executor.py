@@ -16,6 +16,9 @@ from app.shared.domains.wb.utils.cost_resolver import (
     resolve_target_cost_from_context,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatusReason,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             kw for kw in keywords if kw.hard_status == 2
                                      and not kw.best_keyword_status
                                      and kw.views > 0
+                                     and kw.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
         ]
 
         if not white_keywords:

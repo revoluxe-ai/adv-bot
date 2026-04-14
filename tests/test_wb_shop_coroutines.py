@@ -75,7 +75,7 @@ async def test_adv_settings_auto_update(
 
     wb_api = WBApi(access_mock, client_session_mock)
 
-    async def _get_keywords(_: ComplexAdv):
+    async def _get_keywords(_: ComplexAdv, cache_only: bool = False):
         return keywords_mocks
 
     test_complex_adv_instance = ComplexAdv(
@@ -165,6 +165,7 @@ async def test_adv_settings_auto_update(
         await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
     await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")

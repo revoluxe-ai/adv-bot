@@ -11,7 +11,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 class WhiteListTrimmer:
-
     async def  trim(self, complex_adv: ComplexAdv) -> None:
         # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
@@ -94,11 +93,36 @@ class WhiteListTrimmer:
                 continue
             if (complex_adv.rec_system_promotion_mode_active
                     and kw.above_rec_conversion is False
-                    and complex_adv.auto_adv_active_status):
+                    and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed):
                 continue
             replacement_ids.append(kw_id)
             if len(replacement_ids) >= removed_count:
                 break
+        # Если из "хвоста" не удалось добрать до removed_count, делаем второй проход
+        # по всему списку: это закрывает кейс, когда валидные auto-кандидаты есть
+        # выше start_index и БС иначе монотонно уменьшается.
+        if len(replacement_ids) < removed_count:
+            already_selected = set(replacement_ids)
+            for kw in keywords:
+                if len(replacement_ids) >= removed_count:
+                    break
+                if kw.hard_status != 1:
+                    continue
+                if complex_adv.auto_add_only_relevant_phrase and not kw.relevant:
+                    continue
+                kw_id = kw.keyword_setting_original_id
+                if kw_id in removed_ids or kw_id in already_selected:
+                    continue
+                if (
+                    complex_adv.rec_system_promotion_mode_active
+                    and kw.above_rec_conversion is False
+                    and complex_adv.auto_adv_active_status
+                    and complex_adv.is_shelf_activation_allowed
+                ):
+                    continue
+                replacement_ids.append(kw_id)
+                already_selected.add(kw_id)
         return replacement_ids
 
 

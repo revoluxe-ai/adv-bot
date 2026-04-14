@@ -1,10 +1,9 @@
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
-from datetime import date as date_type
 from datetime import datetime, time, timedelta, timezone
 from operator import attrgetter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
 from aiogram import Bot
 from aiogram.types import (
     Message,
@@ -14,6 +13,7 @@ from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
 from app.client_bot import utils
+from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
@@ -67,6 +67,10 @@ from app.modules.shop_runner.service_manager.services.stats_freshness_manager im
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
+    TrafficClicksDTO,
+)
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    TrafficClicksManager,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
@@ -81,6 +85,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
+SAFE_CAPTION_LIMIT = 900
+# Prefer this many recent days in the campaign menu caption; rows may be dropped to fit.
+DAILY_STATS_CAPTION_MAX_DAYS = 5
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -122,7 +129,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._reason_auto = None
         self._reason_search = None
-        self._shop_balance_snapshot: dict[str, int | str] | None = None
+        self._shop_balance_snapshot: dict[str, int | str | None] | None = None
         self._topup_failed: dict[str, str] | None = None
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
@@ -133,6 +140,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._emergency_mode_reason: str | None = None
         self._stats_fresh: bool = True
         self._stats_stale_reason: str | None = None
+        self._traffic_clicks_dto: TrafficClicksDTO | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -202,7 +210,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         nmids = self.adv.nmids
         images = await data_manager.get_main_photos(nmids[:1])
-        image = images[0]
+        image = images[0] if images else "https://placehold.co/600x800/png?text=WB"
         self.image = image
 
         # last_update_keyword_stat: datetime | None = (
@@ -260,6 +268,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
 
         self.adv_stat: FullAdvStat | None = adv_stat
+        self._traffic_clicks_dto = await self._get_today_traffic_clicks_dto()
 
         adv_id = self.adv.adv_id
         last_common_bid_update = (
@@ -343,61 +352,57 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = ""
         if self._emergency_mode_active:
             text += (
-                "🚨 АВ.РЕЖ\n"
-                "СТ > 6ч\n"
-                "РАСХ ОГРАН\n"
+                "🚨 АВ.РЕЖ, СТ > 6ч, РАСХ ОГРАН\n"
             )
             if self._emergency_mode_reason:
                 text += f"{self._emergency_mode_reason}\n"
-            text += "\n"
-        elif not self._stats_fresh:
+        elif self._stats_fresh:
+            text += f"{self._fresh_reason_to_display()}\n"
+        else:
             text += "Ст не све, авт приост\n"
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
-            text += "\n"
+        text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
-            text += "Авто-акт. РК: выкл\n"
-            text += "Автопоп бюд: не вкл\n"
+            text += "Авто-акт: выкл\n"
+            text += "Автопоп: выкл\n"
         else:
-            text += "Авто-акт. РК: вкл\n"
+            text += "Авто-акт: вкл\n"
             use_common = getattr(self.adv, "use_common_budget", False)
             if use_common:
                 limit = self.adv.common_budget_daily_limit or 0
                 spend = (self._spend_auto_today or 0) + (self._spend_search_today or 0)
                 if self._spend_auto_today is None or self._spend_search_today is None:
-                    text += "Об бюд: потр: н/д\n"
+                    text += "Об.бюд потр: н/д\n"
                 else:
                     spend_rounded = int(round(spend))
                     remaining = max(0, limit - spend_rounded)
                     text += (
-                        f"Об. бюд: потр {spend_rounded} р., "
-                        f"ост. {remaining} р. (лим {limit} р./с)\n"
+                        f"Об.бюд: {spend_rounded}/{limit} р., ост {remaining}\n"
                     )
             else:
                 auto_limit = self.adv.auto_budget_daily_limit or 0
                 spend_auto = self._spend_auto_today or 0
                 if self._spend_auto_today is None:
-                    text += "Авто: потр: н/д\n"
+                    text += "Авто потр: н/д\n"
                 else:
                     spend_auto_rounded = int(round(spend_auto))
                     remaining_auto = max(0, auto_limit - spend_auto_rounded)
                     text += (
-                        f"Авто: потр. {spend_auto_rounded} р., "
-                        f"ост. {remaining_auto} р. (лим {auto_limit} р/с)\n"
+                        f"Авто: {spend_auto_rounded}/{auto_limit} р., ост {remaining_auto}\n"
                     )
                 if self.adv.search_adv_id:
                     search_limit = self.adv.search_auto_budget_daily_limit or 0
                     spend_search = self._spend_search_today or 0
                     if self._spend_search_today is None:
-                        text += "Аук: потр: н/д\n"
+                        text += "Аук потр: н/д\n"
                     else:
                         spend_search_rounded = int(round(spend_search))
                         remaining_search = max(0, search_limit - spend_search_rounded)
                         text += (
-                            f"Аук: потр {spend_search_rounded} р., "
-                            f"ост {remaining_search} р. (лим {search_limit} р/с)\n"
+                            f"Аук: {spend_search_rounded}/{search_limit} р., ост {remaining_search}\n"
                         )
                 else:
                     if self._spend_auto_today is not None:
@@ -414,29 +419,32 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             except (ValueError, TypeError):
                 failed_at_str = failed_at or "—"
             text += (
-                "⚠ Не удалось поп бюд: недост средств "
-                f"на балансе магазина ({failed_at_str})\n"
+                f"⚠ Поп.бюд не удался ({failed_at_str})\n"
             )
 
         # Остаток по балансу магазина (из Redis, обновляется при автопополнении)
         if self._shop_balance_snapshot:
-            bal: int = int(self._shop_balance_snapshot.get("balance", 0))
-            net: int = int(self._shop_balance_snapshot.get("net", 0))
-            bonus: int = int(self._shop_balance_snapshot.get("bonus", 0))
+            bal: int = int(self._shop_balance_snapshot.get("balance", 0) or 0)
+            net: int = int(self._shop_balance_snapshot.get("net", 0) or 0)
+            bonus: int = int(self._shop_balance_snapshot.get("bonus", 0) or 0)
             updated_at: str = str(self._shop_balance_snapshot.get("updated_at", ""))
             try:
                 dt = datetime.fromisoformat(
-                    updated_at.replace("Z", "+00:00")
+                    str(updated_at).replace("Z", "+00:00")
                 ).astimezone(MSK_TZ)
                 updated_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
-                updated_str = updated_at or "—"
+                updated_str = str(updated_at) if updated_at else "—"
             text += (
-                f"Бал маг: осн. {bal} р., нетто {net} р., "
-                f"бонус {bonus} р. (обн {updated_str})\n"
+                f"Бал: осн {bal}, нет {net}, бон {bonus} (обн {updated_str})\n"
             )
+            cashback_line = self._build_cashback_compact_line(
+                self._shop_balance_snapshot
+            )
+            if cashback_line:
+                text += cashback_line
         else:
-            text += "Бал маг: нет данных\n"
+            text += "Бал: н/д\n"
 
         # Последнее успешное пополнение
         at_val: str = (self._last_topup_success or {}).get("at", "")
@@ -448,9 +456,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 success_str: str = dt.strftime("%d.%m.%Y %H:%M")
             except (ValueError, TypeError):
                 success_str = at_val or "—"
-            text += f"Посл усп поп: {success_str}\n"
+            text += f"Поп посл: {success_str}\n"
         else:
-            text += "Посл усп поп: н/д\n"
+            text += "Поп посл: н/д\n"
 
         if self.adv.rec_system_mode:
             if not self._plan_set:
@@ -468,13 +476,19 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"План. себес. зак.: {target_str} (факт. рек.сис.: {avg_str})\n"
+                text += f"Себес зак: план {target_str}, факт {avg_str}\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
                 text += (
-                    "⚠️ Рек. сис. не раскр. "
-                    f"Макс.зак. >= {int(suggested)} р.\n"
+                    f"⚠ Рек.сис не раскр, макс.зак >= {int(suggested)} р.\n"
+                )
+            if self._traffic_clicks_dto is not None:
+                text += (
+                    "Клики сегодн: "
+                    f"орг {self._traffic_clicks_dto.organic_clicks}, "
+                    f"полки {self._traffic_clicks_dto.shelf_clicks}, "
+                    f"ключи {self._traffic_clicks_dto.keyword_clicks}\n"
                 )
 
         management_enabled = bool(
@@ -504,12 +518,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подкл"
         id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подк"
         text += (
-            f"📢 Камп: {self.adv.name}\n"
-            f"🆔 ID Авто: {id_auto}\n"
-            f"🆔 ID Аук: {id_auction}\n"
-            f"📌 Статус Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
-            f"📌 Статус Аук: {self._status_auction}{suffix_auction}\n"
-            f"🎯 Стратегия: {format_adv_strategy(self.adv.strategy)}\n"
+            f"📢 {self.adv.name}\n"
+            f"ID А:{id_auto} У:{id_auction}\n"
+            f"Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
+            f"Аук: {self._status_auction}{suffix_auction}\n"
+            f"🎯 {format_adv_strategy(self.adv.strategy)}\n"
         )
         mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "
         mark_conv = "▶ " if self._strategy == Strategy.MAX_CONV else "  "
@@ -523,28 +536,28 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._min_conv_views_to_orders is not None
             else "—"
         )
-        text += f"{mark_cpo}Мин. зак. на 1000₽: {val_1000rub}\n"
-        text += f"{mark_conv}Мин. зак. на 1000п: {val_1000views}\n"
+        text += f"{mark_cpo}Мин зак/1000р: {val_1000rub}\n"
+        text += f"{mark_conv}Мин зак/1000п: {val_1000views}\n"
 
-        text += "Посл.обнов:\n"
+        text += "Обновл:\n"
 
         text += (
             f"ворон: {self.last_update_common_stat_str}\n"
-            f"рек.стат.: {self.full_stat_update_time}\n"
+            f"рекст: {self.full_stat_update_time}\n"
             f"класт: {self.last_update_cluster_stat_str}\n"
-            f"минус в авто: {self.keywords_status_last_update_auto_adv}\n"
-            f"минус в аук.: {self.keywords_status_last_update_search_adv}\n"
-            f"став в класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Нет данных'}\n"
-            f"общей ставки аук: {self.last_common_bid_update_str}\n"
-            f"добав ключа в БС:"
+            f"минус авто: {self.keywords_status_last_update_auto_adv}\n"
+            f"минус аук: {self.keywords_status_last_update_search_adv}\n"
+            f"став класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Н/д'}\n"
+            f"общ.став аук: {self.last_common_bid_update_str}\n"
+            f"добавл в БС:"
             f" {self._update_informer.add_to_white_list_str}\n"
-            f"удал. ключа из БС:"
+            f"удал из БС:"
             f" {self._update_informer.delete_from_white_list_str}\n"
-            f"повыш. цел. поз:"
+            f"цел.поз +:"
             f" {self._update_informer.up_target_place_str}\n"
-            f"пониж. целевой поз:"
+            f"цел.поз -:"
             f" {self._update_informer.down_target_place_str}\n"
-            f"доб верх кл в БС:"
+            f"топ в БС:"
             f" {self._update_informer.update_top_key_str}\n"
         )
 
@@ -554,26 +567,68 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             days_stat: list[DayStats] = sorted(
                 adv_stat.days, key=attrgetter("date")
             )
-            stat_text = "Стат по дням:\n"
-            stat_text += "Дата | Зак | Себес зак\n"
-            stat_text += "--------------------------------\n"
+            text += AdvSettingMenu._build_caption_daily_stats_block(
+                days_stat, len(text)
+            )
 
-            def reverse_date(date_: date_type) -> str:
-                return date_.strftime("%d-%m-%Y")
+        return self._shrink_for_caption(text)
 
-            for day_stat in days_stat[-5:]:
-                date_str = reverse_date(day_stat.date)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                spend = day_stat.sum
-                orders = day_stat.orders
-                if orders:
-                    cost_per_order = spend / orders
-                else:
-                    cost_per_order = 0
-                stat_text += f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
+    @staticmethod
+    def _build_caption_daily_stats_block(
+        days_stat_chrono: list[DayStats],
+        prefix_char_len: int,
+    ) -> str:
+        """Block for «Стат дн»: up to ``DAILY_STATS_CAPTION_MAX_DAYS`` recent days.
 
-            text += stat_text
+        If ``prefix_char_len`` + block would exceed ``SAFE_CAPTION_LIMIT``, drops
+        older days first (keeps most recent). When fewer days fit than are
+        available in the window, the header notes «показано k из n дн.».
+        """
+        if not days_stat_chrono:
+            return ""
+        window = days_stat_chrono[-DAILY_STATS_CAPTION_MAX_DAYS:]
+        n_window = len(window)
 
-        return text
+        def line_for_day(day_stat: DayStats) -> str:
+            spend = day_stat.sum
+            orders = day_stat.orders
+            cost_per_order = spend / orders if orders else 0
+            date_str = day_stat.date.strftime("%d-%m-%Y")
+            return f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
+
+        for k in range(n_window, 0, -1):
+            subset = window[-k:]
+            title = (
+                f"Стат дн (показано {k} из {n_window} дн.):\n"
+                if k < n_window
+                else "Стат дн:\n"
+            )
+            stat_text = title + "Дата | Зак | Себес\n"
+            for ds in subset:
+                stat_text += line_for_day(ds)
+            if prefix_char_len + len(stat_text) <= SAFE_CAPTION_LIMIT:
+                return stat_text
+        return ""
+
+    @staticmethod
+    def _shrink_for_caption(text: str) -> str:
+        if len(text) <= SAFE_CAPTION_LIMIT:
+            return text
+        tail = "\n…[сокращено]"
+        max_len = max(0, SAFE_CAPTION_LIMIT - len(tail))
+        return text[:max_len] + tail
+
+    @staticmethod
+    def _build_cashback_compact_line(
+        snapshot: Mapping[str, int | str | None],
+    ) -> str | None:
+        parsed = parse_cashback_snapshot(snapshot)
+        if parsed is None:
+            return None
+        exp_part = ""
+        if parsed.expiration_msk:
+            exp_part = f", гор {parsed.expiration_msk.strftime('%d.%m')}"
+        return f"КБ: {parsed.total}{parsed.percent_part}{exp_part}\n"
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -618,9 +673,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         state = await StatsFreshnessManager().evaluate(complex_adv)
         if state.is_stale_over_6h:
             return True, self._guard_reason_to_display(state.reason), False, None
-        if not state.is_fresh and state.reason:
-            return False, None, False, self._stale_reason_to_display(state.reason)
-        return False, None, state.is_fresh, None
+        if not state.is_fresh:
+            if state.reason:
+                return False, None, False, self._stale_reason_to_display(state.reason)
+            return False, None, False, self._stale_reason_fallback_to_display()
+        return False, None, True, self._fresh_reason_to_display()
 
     @staticmethod
     def _stale_reason_to_display(reason: str) -> str:
@@ -653,3 +710,37 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         # Call site only passes reason when is_stale_over_6h is True; guard sets that
         # only for "stale over 6h", never for "not yet collected".
         return f"{name}: нет обн>6ч"
+
+    async def _get_today_traffic_clicks_dto(self) -> TrafficClicksDTO | None:
+        if not self.adv.rec_system_mode:
+            return None
+        try:
+            search_adv: AdvSetting | None = None
+            if self.adv.search_adv_id:
+                async with sm(read_only=True) as session:
+                    result = await session.execute(
+                        select(AdvSetting).where(
+                            AdvSetting.adv_id == self.adv.search_adv_id
+                        )
+                    )
+                    search_adv = result.scalar_one_or_none()
+            complex_adv = ComplexAdv(
+                adv_setting=self.adv,
+                search_adv=search_adv,
+            )
+            manager = TrafficClicksManager()
+            await manager.enrich(complex_adv)
+            return complex_adv.traffic_clicks_dto
+        except Exception:
+            logger.exception(
+                "Ошибка получения today traffic clicks для adv_id=%s", self.adv.adv_id
+            )
+            return None
+
+    @staticmethod
+    def _fresh_reason_to_display() -> str:
+        return "стата свежая"
+
+    @staticmethod
+    def _stale_reason_fallback_to_display() -> str:
+        return "стата не свежая"

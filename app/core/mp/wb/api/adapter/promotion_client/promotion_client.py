@@ -9,6 +9,7 @@ from .min_bids.adapter import MinBidsAdapter
 from .finance.adapter import FinanceAdapter
 from .common_bids.adapter import CommonBidsAdapter
 from .product_cards.adapter import ProductCardsAdapter
+from .promotion_count import PromotionCountAdapter
 
 
 class PromotionClient:
@@ -24,6 +25,7 @@ class PromotionClient:
         campaigns_management_adapter: CampaignsManagementAdapter,
         campaigns_info_v2_adapter: CampaignsInfoV2Adapter,
         cabinet_adverts_list_adapter: CabinetAdvertsListAdapter,
+        promotion_count_adapter: PromotionCountAdapter,
         common_bids_adapter: CommonBidsAdapter,
         product_cards_adapter: ProductCardsAdapter,
         fullstats_adapter: FullstatsAdapter,
@@ -36,6 +38,7 @@ class PromotionClient:
         self.__finance_adapter = finance_adapter
         self.__campaigns_info_v2_adapter = campaigns_info_v2_adapter
         self.__cabinet_adverts_list_adapter = cabinet_adverts_list_adapter
+        self.__promotion_count_adapter = promotion_count_adapter
         self.__common_bids_adapter = common_bids_adapter
         self.__product_cards_adapter = product_cards_adapter
         self.__fullstats_adapter = fullstats_adapter
@@ -67,6 +70,10 @@ class PromotionClient:
     @property
     def cabinet_adverts_list_adapter(self) -> CabinetAdvertsListAdapter:
         return self.__cabinet_adverts_list_adapter
+
+    @property
+    def promotion_count_adapter(self) -> PromotionCountAdapter:
+        return self.__promotion_count_adapter
 
     @property
     def campaigns_management_adapter(self) -> CampaignsManagementAdapter:

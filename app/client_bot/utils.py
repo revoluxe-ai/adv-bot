@@ -14,9 +14,13 @@ from app.client_bot.const import ALWAYS_ON, AUTO_MODE, BLACK_LIST, TURN_OFF, WHI
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -56,10 +60,19 @@ async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedK
         async with _sm(read_only=True) as session:
             result: Result = await session.execute(stmt)
             search_adv = result.scalar_one_or_none()
+    summary = await PlanFactReader().get_latest_plan_fact(adv_setting.adv_id)
+    fact_predict_orders = summary.fact_predict_orders if summary is not None else None
+    resolved_target_pay_for_order = resolve_target_cost(
+        adv_setting.plan_for_sales_for_day,
+        adv_setting.target_price_for_order,
+        adv_setting.max_price_for_order,
+        fact_predict_orders,
+    )
     complex_adv = ComplexAdv(
         shop_id=shop_id,
         adv_setting=adv_setting,
         search_adv=search_adv,
+        target_pay_for_order=resolved_target_pay_for_order,
     )
     all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(complex_adv)
     return all_phrases

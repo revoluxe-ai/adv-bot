@@ -157,7 +157,8 @@ class MainAdvManager:
                 )
             )
             result = await session.execute(stmt)
-            return {row[0] for row in result.all()}
+            out = {row[0] for row in result.all()}
+        return out
 
     async def _create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
         wb_cabinet = self.access.wb_cabinet
@@ -216,7 +217,7 @@ class MainAdvManager:
                 "adv_id": auto_adv_id,
                 "_search_adv_id": search_adv_id,  # Исправлено на _search_adv_id
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,
@@ -354,7 +355,7 @@ class MainAdvManager:
                 "adv_id": existing_auto_adv_id,
                 "_search_adv_id": search_adv_id,
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet_from_db.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,
@@ -446,7 +447,7 @@ class MainAdvManager:
                 "adv_id": auto_adv_id,
                 "_search_adv_id": existing_search_adv_id,
                 "max_place": 1,
-                "max_cpm": 250,
+                "max_cpm": wb_cabinet_from_db.default_max_cpm,
                 "reset_place": True,
                 "name": complex_adv_name,
                 "bidder_active": False,

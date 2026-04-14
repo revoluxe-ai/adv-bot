@@ -1126,19 +1126,29 @@ class WaitingForBlackPhrases(TextWithKeyboard):
             return f"""Текущий черный список:\n{blacklist}\n\nЧтобы обновить фразы, отправьте список еще раз. Список будет обновлен."""
         else:
             return (
-                "Укажите через знак переноса фразы, которые вы хотите добавить в черный список (фразы для исключения из продвижения)."
-                " Если фраза указана без кавычек, то будут учитываться вхождения, если с кавычками - точное соответствие. Пример:\n\n"
-                "платье женское\n"
-                "платье вечернее\n"
-                "платье летнее\n"
-                '"женское летнее"\n'
-                "\nЕсли перед фразой стоит восклицательный знак (!), то вхождение одной из обозначенных фраз ОБЯЗАТЕЛЬНО, "
-                "иначе фраза будет добавлена в не релевантные.\n"
+                "Укажите через перенос строки шаблоны для черного списка (исключение из продвижения).\n\n"
+                "Строка без кавычек — regex в синтаксисе RE2 (подмножество Python: без обратных ссылок и lookaround; поиск без учета регистра). "
+                "Строка в кавычках \"...\" или '...' (кавычка с начала или с конца) — точное совпадение "
+                "фразы без учета регистра.\n\n"
+                "Пример:\n"
+                "платье.*летн\n"
+                "дешев|подделк\n"
+                '"женское летнее"\n\n'
+                "Кнопка «Протестировать» — проверить список фраз по уже сохраненным правилам."
             )
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         builder = InlineKeyboardBuilder()
+
+        builder.row(
+            InlineKeyboardButton(
+                text="Протестировать",
+                callback_data=callbacks.TestBlackPhrasesTemplates(
+                    adv_setting_id=self.adv_setting_id
+                ).pack(),
+            )
+        )
 
         if self.black_phrases:
             builder.row(
@@ -1150,6 +1160,79 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 )
             )
 
+        builder.row(
+            InlineKeyboardButton(
+                text="Вернуться в настройки РК",
+                callback_data=callbacks.Adv(adv_original_id=self.adv_setting_id).pack(),
+            )
+        )
+        return builder.as_markup()
+
+
+class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
+    """Экран редактирования шаблонов релевантных фраз (зеркало WaitingForBlackPhrases)."""
+
+    async def __call__(self, adv_setting_id: int) -> None:
+        self.adv_setting_id: int = adv_setting_id
+        async with sm() as session:
+            adv: AdvSetting | None = await session.get(
+                AdvSetting, self.adv_setting_id
+            )
+        if adv is None:
+            raise ValueError(
+                f"AdvSetting с id {self.adv_setting_id} не найден."
+            )
+        rel_manager = RelevantPhraseManager(adv)
+        self.relevant_phrases: list[str] | None = (
+            await rel_manager.get_relevant_phrases_template_data()
+        )
+        return await super().__call__()
+
+    @property
+    def text(self) -> str:
+        if self.relevant_phrases:
+            lines = "\n".join(self.relevant_phrases)
+            return (
+                f"Текущие шаблоны релевантных фраз:\n{lines}\n\n"
+                "Чтобы обновить, отправьте список ещё раз — он будет заменён."
+            )
+        return (
+            "Укажите через перенос строки шаблоны для автоматической пометки "
+            "фраз как релевантных.\n\n"
+            "Строка без кавычек — regex в синтаксисе RE2 (подмножество Python: "
+            "без обратных ссылок и lookaround; поиск без учета регистра). "
+            "Строка в кавычках \"...\" или '...' — точное совпадение фразы "
+            "без учета регистра.\n\n"
+            "Пример:\n"
+            "платье.*женск\n"
+            "летн|вечерн\n"
+            '"сарафан летний"\n\n'
+            "Кнопка «Протестировать» — проверить фразы по уже сохранённым правилам.\n\n"
+            "При включённом режиме «только релевантные фразы» эти шаблоны задают "
+            "релевантность новых ключей; шаблоны чёрного списка в этом режиме не "
+            "применяются."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(
+                text="Протестировать",
+                callback_data=callbacks.TestRelevantPhraseTemplates(
+                    adv_setting_id=self.adv_setting_id
+                ).pack(),
+            )
+        )
+        if self.relevant_phrases:
+            builder.row(
+                InlineKeyboardButton(
+                    text="Сбросить шаблоны релевантных фраз",
+                    callback_data=callbacks.ResetRelevantPhraseTemplates(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
         builder.row(
             InlineKeyboardButton(
                 text="Вернуться в настройки РК",

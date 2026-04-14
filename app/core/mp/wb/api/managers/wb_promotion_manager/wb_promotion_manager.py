@@ -127,12 +127,16 @@ class WBModifier:
         amount: int,
         balance_type: str,
         return_total: bool = True,
+        cashback_sum: int | None = None,
+        cashback_percent: int | None = None,
     ) -> "BudgetTopUpResult":
         return await self._promotion_manager.top_up_budget(
             adv_id=adv_id,
             amount=amount,
             balance_type=balance_type,
             return_total=return_total,
+            cashback_sum=cashback_sum,
+            cashback_percent=cashback_percent,
         )
 
     async def get_campaign_balance(self) -> typing.Union["GetAdvV1BalanceResponse200", None]:

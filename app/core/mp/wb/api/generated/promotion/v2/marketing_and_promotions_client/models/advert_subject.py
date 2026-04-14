@@ -39,11 +39,13 @@ class AdvertSubject:
         return field_dict
 
     @classmethod
-    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        d = dict(src_dict)
-        id = d.pop("id")
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any] | None) -> T:
+        d = dict(src_dict or {})
+        id = d.pop("id", None)
+        if id is None:
+            id = 0
 
-        name = d.pop("name")
+        name = d.pop("name", None) or ""
 
         advert_subject = cls(
             id=id,

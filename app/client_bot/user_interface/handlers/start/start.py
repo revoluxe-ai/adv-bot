@@ -298,6 +298,15 @@ async def process_cabinet_api(
         _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
         return None
 
+    if not validation_result.is_personal:
+        logger.info("Token is not personal for user %s", user_telegram_id)
+        _ = await bot.send_message(
+            chat_id,
+            "Этот токен не персональный. Нужен персональный токен WB.",
+        )
+        await state.set_state(states.CabinetRegistration.api)
+        return None
+
     if validation_result.is_read_only:
         logger.info("Token is read-only for user %s", user_telegram_id)
         _= await bot.send_message(
@@ -565,6 +574,15 @@ async def process_add_new_token(
     if not validation_result.is_valid_jwt:
         logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
         await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        return None
+
+    if not validation_result.is_personal:
+        logger.info("Token is not personal for user %s", user_telegram_id)
+        await bot.send_message(
+            chat_id,
+            "Этот токен не персональный. Нужен персональный токен WB.",
+        )
+        await state.set_state(states.AddNewToken.token)
         return None
 
     if validation_result.is_read_only:

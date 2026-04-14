@@ -12,9 +12,6 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.mp.wb.api.excs import ApiForbiddenError
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.excs import (
-    ClusterBidsUpdateError,
-)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -98,18 +95,14 @@ async def open_change_auto_bid(
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            min_bids = await hub.wb_manager.get_min_bids([complex_adv], cache_possible=True)
+            min_bids = await hub.wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="change_auto_bid",
+            )
     except ApiForbiddenError:
         await callback.bot.send_message(
             chat_id,
             "Нет доступа к API WB. Проверьте токены магазина.",
-        )
-        return
-    except ClusterBidsUpdateError as e:
-        logger.warning("get_min_bids failed for adv_original_id=%s: %s", adv_original_id, e)
-        await callback.bot.send_message(
-            chat_id,
-            "Не удалось получить минимальную ставку от WB. Попробуйте позже.",
         )
         return
     except Exception as e:
@@ -120,9 +113,14 @@ async def open_change_auto_bid(
         )
         return
 
-    effective_min = max(
-        min_bids.auto.get(nmid, 0) for nmid in nmids
-    )
+    missing_nmids = [nmid for nmid in nmids if nmid not in min_bids.auto]
+    if missing_nmids:
+        await callback.bot.send_message(
+            chat_id,
+            "Нет минимальных ставок в кеше для части товаров. Дождитесь обновления кеша.",
+        )
+        return
+    effective_min = max(min_bids.auto[nmid] for nmid in nmids)
     if effective_min <= 0:
         await callback.bot.send_message(
             chat_id,

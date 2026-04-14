@@ -46,7 +46,6 @@ class AdvControlSystem:
         self.planner = ScenarioPlanner()
 
     async def process_adv(self, complex_adv: ComplexAdv, force: float = 1) -> None:
-
         keywords = await complex_adv.get_keywords()
         adv = complex_adv.adv_setting
         # 2. Получаем план
@@ -114,3 +113,4 @@ class AdvControlSystem:
 
         # 7. Сохраняем новое состояние план-факт
         await plan_fact_change.set_new_plan_fact(plan, fact)
+

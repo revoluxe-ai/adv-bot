@@ -141,6 +141,9 @@ class AdvMixin(WBAPIProtocol):
             bid_type=bid_type,
             placement_types=placement_types,
         )
+        # WB может не применить placement_types при создании — явно выставляем размещение «в поиске»,
+        # иначе /adv/v0/bids вернёт "Auction campaigns with disabled search placement cannot be processed".
+        await self.upcast_target_placement(adv_id, search=True, recommendations=False)
         return adv_id
 
     @try_except_decorator(1, 60)

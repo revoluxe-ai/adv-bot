@@ -3,7 +3,7 @@ import time
 from collections.abc import Iterable
 from datetime import datetime, date, timedelta
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
@@ -56,9 +56,9 @@ def concatenate_stats(
 
     concatenate_stats = []
 
-    for date in all_dates:
-        auto_stat = data_to_auto.get(date)
-        auction_stat = data_to_auction.get(date)
+    for day in all_dates:
+        auto_stat = data_to_auto.get(day)
+        auction_stat = data_to_auction.get(day)
         if auto_stat and auction_stat:
             # Объединяем статистику по дням
             auto_stat.views += auction_stat.views
@@ -393,6 +393,74 @@ async def get_keywords_spend(
 # TODO:  Добавить в бот указатель, который показывает, что по настройкам достигнут максимум и дальше поможет только перестроойка плана продаж
 
 
+_KeywordDailyMetric = Literal["views", "clicks"]
+
+
+def _keyword_daily_metric_sql_parts(metric: _KeywordDailyMetric) -> tuple[str, str, str]:
+    """Return (merge_state_column, inner_alias, total_alias) for mv_clusters_daily_agg."""
+    if metric == "views":
+        return "views_state", "views", "total_views"
+    return "clicks_state", "clicks", "total_clicks"
+
+
+async def _get_keywords_metric_by_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+    *,
+    metric: _KeywordDailyMetric,
+    error_log_message: str,
+) -> dict[date, int]:
+    """Shared: daily sum of views or clicks from `mv_clusters_daily_agg` by keyword clusters."""
+    if not adv_ids:
+        return {}
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+    merge_state, inner_alias, total_alias = _keyword_daily_metric_sql_parts(metric)
+
+    query = f"""
+        WITH aggregated AS (
+            SELECT
+                date,
+                argMaxMerge({merge_state}) AS {inner_alias}
+            FROM default_db.mv_clusters_daily_agg
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, nmid, norm_query, date
+        )
+        SELECT
+            date,
+            COALESCE(SUM({inner_alias}), 0) AS {total_alias}
+        FROM aggregated
+        GROUP BY date
+        ORDER BY date
+    """
+    try:
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(query)
+                rows = res.result_rows
+                result: dict[date, int] = {}
+                current = date.fromisoformat(start_date_str)
+                end_d = date.fromisoformat(end_date_str)
+                while current <= end_d:
+                    result[current] = 0
+                    current += timedelta(days=1)
+
+                for row in rows:
+                    if row and len(row) >= 2 and row[0] is not None:
+                        day = row[0]
+                        val = int(row[1]) if row[1] is not None else 0
+                        result[day] = val
+                return result
+    except Exception:
+        logger.error(error_log_message, exc_info=True)
+        return {}
+
+
 async def get_keywords_views_by_days(
     adv_ids: list[int],
     start_date: datetime,
@@ -405,60 +473,28 @@ async def get_keywords_views_by_days(
     Returns:
         dict[date, int]: {дата: суммарные показы по ключевым словам за этот день}
     """
-    import datetime as dt
+    return await _get_keywords_metric_by_days(
+        adv_ids,
+        start_date,
+        end_date,
+        metric="views",
+        error_log_message="Ошибка получения показов по ключам по дням из ClickHouse",
+    )
 
-    if not adv_ids:
-        return {}
 
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
-    adv_ids_str = ", ".join(map(str, adv_ids))
-
-    query = f"""
-        WITH aggregated AS (
-            SELECT
-                date,
-                argMaxMerge(views_state) AS views
-            FROM default_db.mv_clusters_daily_agg
-            WHERE
-                adv_id IN ({adv_ids_str})
-                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
-            GROUP BY adv_id, nmid, norm_query, date
-        )
-        SELECT
-            date,
-            COALESCE(SUM(views), 0) AS total_views
-        FROM aggregated
-        GROUP BY date
-        ORDER BY date
-    """
-
-    try:
-        async with anti_ch_crash_semaphore:
-            async with get_clickhouse_client() as client:
-                res = await client.query(query)
-                rows = res.result_rows
-
-                result: dict[dt.date, int] = {}
-                current_date = dt.date.fromisoformat(start_date_str)
-                end_date_obj = dt.date.fromisoformat(end_date_str)
-                while current_date <= end_date_obj:
-                    result[current_date] = 0
-                    current_date += dt.timedelta(days=1)
-
-                for row in rows:
-                    if row and len(row) >= 2 and row[0] is not None:
-                        date_val = row[0]
-                        views = int(row[1]) if row[1] is not None else 0
-                        result[date_val] = views
-                return result
-
-    except Exception:
-        logger.error(
-            "Ошибка получения показов по ключам по дням из ClickHouse",
-            exc_info=True,
-        )
-        return {}
+async def get_keywords_clicks_by_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+) -> dict[date, int]:
+    """Возвращает клики по ключевым словам по дням за период."""
+    return await _get_keywords_metric_by_days(
+        adv_ids,
+        start_date,
+        end_date,
+        metric="clicks",
+        error_log_message="Ошибка получения кликов по ключам по дням",
+    )
 
 
 async def get_keywords_views_orders_by_days(
@@ -576,3 +612,13 @@ async def get_keywords_clicks_and_views(
             exc_info=True,
         )
         return 0, 0
+
+
+async def get_auto_total_clicks_today(
+    adv_id: int, *, at: datetime | None = None
+) -> int:
+    """Возвращает суммарные клики авто-РК за сегодня."""
+    end_date = at or datetime.now()
+    start_date = end_date
+    stats = await get_stats_by_last_days([adv_id], start_date, end_date)
+    return int(stats.clicks or 0)

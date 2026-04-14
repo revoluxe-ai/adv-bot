@@ -4,6 +4,10 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
+from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
+    compute_organic_clicks,
+    compute_shelf_clicks,
+)
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
@@ -28,10 +32,19 @@ class CommonStatDataManager:
         auto_views_by_day: dict[datetime.date, int] = {
             stat.date: stat.views for stat in auto_adv_stats
         }
+        auto_clicks_by_day: dict[datetime.date, int] = {
+            stat.date: stat.clicks for stat in auto_adv_stats
+        }
 
         keywords_views_by_day = await full_wb_adv_stat.get_keywords_views_by_days(
             [auto_adv_id], start_date, end_date
         )
+        keywords_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
+            [auto_adv_id], start_date, end_date
+        )
+        # Safety: ClickHouse/stat helpers must return dicts; if something returns None, don't crash UI.
+        keywords_views_by_day = keywords_views_by_day or {}
+        keywords_clicks_by_day = keywords_clicks_by_day or {}
 
         text_stat = "\n\nСтатистика по дням:\n"
         text_stat += await self._get_days_static_text(
@@ -40,6 +53,8 @@ class CommonStatDataManager:
             common_card_stat,
             auto_views_by_day,
             keywords_views_by_day,
+            auto_clicks_by_day,
+            keywords_clicks_by_day,
         )
         return text_stat
 
@@ -80,6 +95,8 @@ class CommonStatDataManager:
         common_card_stats: list[CommonCardStat],
         auto_views_by_day: dict[datetime.date, int],
         keywords_views_by_day: dict[datetime.date, int],
+        auto_clicks_by_day: dict[datetime.date, int],
+        keywords_clicks_by_day: dict[datetime.date, int],
     ) -> str:
         """
         Получает текст статистики по дням
@@ -132,6 +149,18 @@ class CommonStatDataManager:
             extra_views = auto_views - keywords_views
             if extra_views > 0:
                 text_row += f" Доп.пок.: {extra_views}"
+            if adv.rec_system_mode:
+                auto_clicks = auto_clicks_by_day.get(date, 0)
+                auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
+                shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
+                # В organic исключаем клики всех РК комплекса за день (auto + search).
+                organic_clicks = compute_organic_clicks(
+                    common_stat.open_card,
+                    stat.clicks,
+                )
+                text_row += (
+                    f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
+                )
 
             text_row += "\n"
             text += text_row

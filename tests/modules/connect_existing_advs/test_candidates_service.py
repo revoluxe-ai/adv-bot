@@ -6,6 +6,7 @@ from app.modules.connect_existing_advs.candidates_service import (
     filter_and_classify_campaigns_by_nmid,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    GetAdverts,
     GetAdvertsAdvertsItem,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models.get_adverts_adverts_item_status import (
@@ -86,10 +87,9 @@ def test_filter_and_classify_empty_list() -> None:
 
 
 @pytest.mark.unit
-def test_filter_by_status_excludes_done() -> None:
-    """Status 7 (done) and -1 (deleted) must be excluded."""
+def test_filter_by_status_includes_done() -> None:
+    """Status 7 (done) is now allowed so WB and bot show same campaigns."""
     nmid = 100
-    # Auction campaign but status done (7)
     item_done = _make_item(
         id=1,
         bid_type="manual",
@@ -101,6 +101,26 @@ def test_filter_by_status_excludes_done() -> None:
         status=GetAdvertsAdvertsItemStatus.VALUE_7,
     )
     result = filter_and_classify_campaigns_by_nmid([item_done], nmid)
+    assert len(result.auction_candidates) == 1
+    assert result.auction_candidates[0].id == 1
+    assert result.auto_candidates == []
+
+
+@pytest.mark.unit
+def test_filter_by_status_excludes_refused() -> None:
+    """Status 8 (refused/cancelled) must be excluded."""
+    nmid = 100
+    item_refused = _make_item(
+        id=1,
+        bid_type="unified",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=False,
+        recommendations=False,
+        shelf=False,
+        nmid=nmid,
+        status=GetAdvertsAdvertsItemStatus.VALUE_8,
+    )
+    result = filter_and_classify_campaigns_by_nmid([item_refused], nmid)
     assert result.auction_candidates == []
     assert result.auto_candidates == []
 
@@ -294,3 +314,63 @@ def test_filter_by_nmid_includes_campaign_with_multiple_nm_ids() -> None:
     result = filter_and_classify_campaigns_by_nmid([item], target_nmid)
     assert len(result.auction_candidates) == 1
     assert result.auto_candidates == []
+
+
+@pytest.mark.unit
+def test_get_adverts_adverts_item_from_dict_null_nm_settings() -> None:
+    """WB may return nm_settings: null; from_dict must not raise (regression)."""
+    item = _make_item(
+        id=1,
+        bid_type="manual",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=True,
+        recommendations=False,
+        shelf=False,
+        nmid=100,
+        status=GetAdvertsAdvertsItemStatus.VALUE_9,
+    )
+    raw = item.to_dict()
+    raw["nm_settings"] = None
+    parsed = GetAdvertsAdvertsItem.from_dict(raw)
+    assert parsed.nm_settings == []
+
+
+@pytest.mark.unit
+def test_get_adverts_from_dict_null_adverts() -> None:
+    """WB may return adverts: null on GET /api/advert/v2/adverts."""
+    parsed = GetAdverts.from_dict({"adverts": None})
+    assert parsed.adverts == []
+
+
+@pytest.mark.unit
+def test_get_adverts_adverts_item_from_dict_null_settings_and_timestamps() -> None:
+    """Null settings/timestamps must not raise (dict(None) / missing nested)."""
+    item = _make_item(
+        id=1,
+        bid_type="manual",
+        payment_type=AdvertSettingsPaymentType.CPM,
+        search=True,
+        recommendations=False,
+        shelf=False,
+        nmid=100,
+        status=GetAdvertsAdvertsItemStatus.VALUE_9,
+    )
+    raw = item.to_dict()
+    raw["settings"] = None
+    raw["timestamps"] = None
+    parsed = GetAdvertsAdvertsItem.from_dict(raw)
+    assert parsed.settings.payment_type == AdvertSettingsPaymentType.CPM
+    assert parsed.timestamps.created is not None
+
+
+@pytest.mark.unit
+def test_advert_settings_from_dict_null_placements() -> None:
+    from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models.advert_settings import (
+        AdvertSettings,
+    )
+
+    s = AdvertSettings.from_dict(
+        {"payment_type": "cpm", "name": "x", "placements": None}
+    )
+    assert s.placements.search is False
+    assert s.placements.recommendations is False

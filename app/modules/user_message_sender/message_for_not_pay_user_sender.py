@@ -5,7 +5,7 @@ import dotenv
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 dotenv.load_dotenv()
-from app.client_bot.bot import get_bot
+from app.client_bot.bot import aclose_telegram_http_session, get_bot
 from app.utils import redis_manager
 from python_modules.logger import setup_logging
 
@@ -59,7 +59,7 @@ async def send_messages_to_users() -> None:
     except Exception as e:
         logger.error(f"Error in the process: {e}")
     try:
-        await bot.session.close()
+        await aclose_telegram_http_session()
     except Exception as e:
         logger.error(f"Error closing bot session: {e}")
 
