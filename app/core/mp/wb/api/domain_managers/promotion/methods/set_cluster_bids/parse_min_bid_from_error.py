@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, cast
 
 _MIN_PATTERN = re.compile(r"min:\s*(?P<min>\d+)", re.IGNORECASE)
 
@@ -14,22 +14,25 @@ def parse_min_bid_from_bad_request_detail(detail: str) -> int | None:
     if not detail or not detail.strip():
         return None
     try:
-        parsed: Any = json.loads(detail)
+        parsed_raw: object = json.loads(detail)
     except (json.JSONDecodeError, TypeError):
         return _min_from_plain_text(detail)
 
-    if isinstance(parsed, dict):
-        errors = parsed.get("errors")
+    if isinstance(parsed_raw, dict):
+        obj = cast(dict[str, Any], parsed_raw)
+        errors = obj.get("errors")
         if isinstance(errors, list):
-            for err in errors:
+            errors_list = cast(list[Any], errors)
+            for err in errors_list:
                 if not isinstance(err, dict):
                     continue
-                d = str(err.get("detail", "") or "")
+                err_map = cast(dict[str, Any], err)
+                d = str(err_map.get("detail", "") or "")
                 m = _extract_min_if_wrong_bid(d)
                 if m is not None:
                     return m
         for key in ("detail", "title", "message"):
-            val = parsed.get(key)
+            val = obj.get(key)
             if isinstance(val, str):
                 m = _extract_min_if_wrong_bid(val)
                 if m is not None:
