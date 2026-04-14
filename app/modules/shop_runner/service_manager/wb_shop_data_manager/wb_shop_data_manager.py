@@ -360,7 +360,7 @@ class WBShopDataManager:
             )
             for adv, result in zip(complex_advs, results):
                 if isinstance(result, BaseException):
-                    logger.exception(
+                    logger.error(
                         "Ошибка enrich traffic_clicks_dto, adv_id=%s shop_id=%s",
                         adv.adv_id,
                         adv.shop_id,
@@ -372,12 +372,11 @@ class WBShopDataManager:
         if load_extras and complex_advs:
             try:
                 min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
-            except Exception as exc:
+            except Exception:
                 logger.exception(
                     "Ошибка получения min_bids (cache) в get_complex_advs, "
                     "shop_id=%s. Возвращаю базовый список без min_nmids_bids",
                     self.shop_id,
-                    exc_info=exc,
                 )
                 min_bids = None
             if min_bids is not None:
