@@ -1,7 +1,6 @@
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
-from datetime import date as date_type
 from datetime import datetime, time, timedelta, timezone
 from operator import attrgetter
 from typing import TYPE_CHECKING, Mapping
@@ -87,6 +86,8 @@ logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
 SAFE_CAPTION_LIMIT = 900
+# Prefer this many recent days in the campaign menu caption; rows may be dropped to fit.
+DAILY_STATS_CAPTION_MAX_DAYS = 5
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -566,25 +567,48 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             days_stat: list[DayStats] = sorted(
                 adv_stat.days, key=attrgetter("date")
             )
-            stat_text = "Стат дн:\n"
-            stat_text += "Дата | Зак | Себес\n"
-
-            def reverse_date(date_: date_type) -> str:
-                return date_.strftime("%d-%m-%Y")
-
-            for day_stat in days_stat[-3:]:
-                date_str = reverse_date(day_stat.date)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                spend = day_stat.sum
-                orders = day_stat.orders
-                if orders:
-                    cost_per_order = spend / orders
-                else:
-                    cost_per_order = 0
-                stat_text += f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
-
-            text += stat_text
+            text += AdvSettingMenu._build_caption_daily_stats_block(
+                days_stat, len(text)
+            )
 
         return self._shrink_for_caption(text)
+
+    @staticmethod
+    def _build_caption_daily_stats_block(
+        days_stat_chrono: list[DayStats],
+        prefix_char_len: int,
+    ) -> str:
+        """Block for «Стат дн»: up to ``DAILY_STATS_CAPTION_MAX_DAYS`` recent days.
+
+        If ``prefix_char_len`` + block would exceed ``SAFE_CAPTION_LIMIT``, drops
+        older days first (keeps most recent). When fewer days fit than are
+        available in the window, the header notes «показано k из n дн.».
+        """
+        if not days_stat_chrono:
+            return ""
+        window = days_stat_chrono[-DAILY_STATS_CAPTION_MAX_DAYS:]
+        n_window = len(window)
+
+        def line_for_day(day_stat: DayStats) -> str:
+            spend = day_stat.sum
+            orders = day_stat.orders
+            cost_per_order = spend / orders if orders else 0
+            date_str = day_stat.date.strftime("%d-%m-%Y")
+            return f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
+
+        for k in range(n_window, 0, -1):
+            subset = window[-k:]
+            title = (
+                f"Стат дн (показано {k} из {n_window} дн.):\n"
+                if k < n_window
+                else "Стат дн:\n"
+            )
+            stat_text = title + "Дата | Зак | Себес\n"
+            for ds in subset:
+                stat_text += line_for_day(ds)
+            if prefix_char_len + len(stat_text) <= SAFE_CAPTION_LIMIT:
+                return stat_text
+        return ""
 
     @staticmethod
     def _shrink_for_caption(text: str) -> str:
