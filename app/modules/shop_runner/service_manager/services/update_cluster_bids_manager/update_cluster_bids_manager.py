@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
@@ -417,34 +417,25 @@ class UpdateClusterBidsManager:
                 new_bids.append(new_bid)
         return UpdateBidsCommand(new_bids)
 
-    async def _get_fact_datas(self, advs: list[ComplexAdv])-> dict[int, FactData]:
-        _fact_cap = _max_workers_for(len(advs), cap=16)
-        handlers: list[Callable[[], Awaitable[FactData | None]]] = [
-            lambda adv_=adv: self.__get_fact_data(adv_) for adv in advs
-        ]
-        results = await run_tasks(
-            handlers,
-            max_workers=_fact_cap,
-            return_exceptions=True,
-        )
-        facts: list[FactData | None] = []
-        for result in results:
-            if isinstance(result, BaseException):
-                logger.error('Ошибка получения факта: %s', result)
-                facts.append(None)
-            else:
-                facts.append(result)
-        rows: Iterator[tuple[ComplexAdv, FactData | None]] = zip(advs, facts)
+    async def _get_fact_datas(self, advs: list[ComplexAdv]) -> dict[int, FactData]:
+        if not advs:
+            return {}
+        plan_fact_reader = PlanFactReader()
+        adv_ids = [adv.adv_id for adv in advs]
+        try:
+            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(adv_ids)
+        except Exception as error:
+            logger.error("Ошибка batch-получения факта из CH: %s", error)
+            return {}
         adv_to_fact_map: dict[int, FactData] = {}
-        for adv, fact in rows:
+        for adv in advs:
+            fact = fact_data_from_plan_fact_summary(
+                summaries_by_adv_id.get(adv.adv_id),
+                adv.adv_setting,
+            )
             if fact is not None:
                 adv_to_fact_map[adv.adv_id] = fact
         return adv_to_fact_map
-
-
-    async def __get_fact_data(self, adv: ComplexAdv) -> FactData | None:
-        return await self._get_fact_data_from_ch_cache(adv)
-
 
     @staticmethod
     def _get_plan_data(advs: list[ComplexAdv]) -> dict[int, PlanData]:
