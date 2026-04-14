@@ -77,3 +77,56 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     by_adv_id = {adv.adv_id: adv for adv in complex_advs}
     assert by_adv_id[111].target_pay_for_order == 500.0
     assert by_adv_id[222].target_pay_for_order == 900.0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() -> None:
+    wb_cabinet = MagicMock()
+    wb_cabinet.shop_id = "shop-1"
+    manager = WBShopDataManager(
+        wb_cabinet=wb_cabinet,
+        tasks_manager=None,
+        wb_api_data_manager=MagicMock(),
+        wb_manager=MagicMock(),
+    )
+
+    adv = MagicMock()
+    adv.id = 10
+    adv.adv_id = 111
+    adv.nmids = [1]
+    adv.search_adv_id = None
+    adv.rec_system_mode = False
+
+    manager._get_active_advs = AsyncMock(return_value=[adv])
+    manager._WBShopDataManager__get_adv_id_to_search_adv_map = AsyncMock(return_value={})
+    manager._traffic_clicks_manager.enrich = AsyncMock(return_value=None)
+    manager._get_min_bids = AsyncMock(side_effect=ConnectionError("redis mget failed"))
+
+    plans = [PlanData(orders=100, target_pay_for_order=500, max_pay_for_order=800)]
+    summaries = {
+        111: PlanFactSummary(
+            adv_id=111,
+            plan_orders=100,
+            plan_target_pay_for_order=500,
+            plan_max_pay_for_order=800,
+            fact_predict_orders=120.0,
+            fact_pay_for_order=450.0,
+        ),
+    }
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactProvider.get_plan_data",
+            side_effect=plans,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactReader.get_latest_plan_facts",
+            new=AsyncMock(return_value=summaries),
+        ),
+    ):
+        complex_advs = await manager.get_complex_advs()
+
+    assert len(complex_advs) == 1
+    assert complex_advs[0].adv_id == 111
+    assert complex_advs[0].min_nmids_bids is None

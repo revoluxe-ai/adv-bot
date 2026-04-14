@@ -9,6 +9,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     WBManager,
 )
 from app.modules.cluster_bids_redis import (
+    RedisApiClusterBidsManager,
     RedisClusterBidsManager,
     RedisClusterBidsTimestampManager,
 )
@@ -30,6 +31,9 @@ class ClusterBidsManagerContainer(containers.DeclarativeContainer):
     redis_cluster_bids_manager: providers.Singleton[
         RedisClusterBidsManager
     ] = providers.Singleton(RedisClusterBidsManager, redis_client=redis_client)
+    redis_api_cluster_bids_manager: providers.Singleton[
+        RedisApiClusterBidsManager
+    ] = providers.Singleton(RedisApiClusterBidsManager, redis_client=redis_client)
     redis_cluster_bids_timestamp_manager: providers.Singleton[
         RedisClusterBidsTimestampManager
     ] = providers.Singleton(
@@ -41,6 +45,7 @@ class ClusterBidsManagerContainer(containers.DeclarativeContainer):
             wb_manager=wb_manager,
             redis_keyword_bidder_status_manager=redis_keyword_bidder_status_manager,
             redis_cluster_bids_manager=redis_cluster_bids_manager,
+            redis_api_cluster_bids_manager=redis_api_cluster_bids_manager,
             redis_cluster_bids_timestamp_manager=redis_cluster_bids_timestamp_manager,
         )
     )

@@ -12,8 +12,8 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 async def test_get_latest_plan_facts_returns_mapping() -> None:
     reader = PlanFactReader()
     rows = [
-        (111, 100, 500, 800, 95.5, 520.0),
-        (222, 200, 600, 900, 180.0, 610.0),
+        (111, 100, 500, 800, 95.5, 520.0, 90.0, "DIRECT_SALES"),
+        (222, 200, 600, 900, 180.0, 610.0, 175.0, "BY_CARTS"),
     ]
     mock_result = AsyncMock()
     mock_result.result_rows = rows
@@ -37,8 +37,12 @@ async def test_get_latest_plan_facts_returns_mapping() -> None:
     assert set(result.keys()) == {111, 222}
     assert result[111].plan_orders == 100
     assert result[111].fact_predict_orders == 95.5
+    assert result[111].fact_original_orders == 90.0
+    assert result[111].fact_method == "DIRECT_SALES"
     assert result[222].plan_target_pay_for_order == 600
     assert result[222].fact_pay_for_order == 610.0
+    assert result[222].fact_original_orders == 175.0
+    assert result[222].fact_method == "BY_CARTS"
 
 
 @pytest.mark.unit

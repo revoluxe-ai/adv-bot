@@ -105,7 +105,7 @@ async def test_post_api_success_without_split(
         out = await min_bids_adapter.post_api_advert_v1_bids_min(
             GetMinBidsCommand(items=[item])
         )
-    assert out == expected
+    assert out == [expected]
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_bisect_batch_then_partial_success(
         out = await min_bids_adapter.post_api_advert_v1_bids_min(
             GetMinBidsCommand(items=[item])
         )
-    assert out == [good_bid]
+    assert out == [[good_bid]]
 
 
 @pytest.mark.asyncio
@@ -170,7 +170,7 @@ async def test_singleton_invalid_nmid_logs_error_and_returns_empty(
         out = await min_bids_adapter.post_api_advert_v1_bids_min(
             GetMinBidsCommand(items=[item])
         )
-    assert out == []
+    assert out == [[]]
     assert "min_bids invalid nmid for advert (dropped)" in caplog.text
     assert "req-xyz" in caplog.text
     assert str(nmid) in caplog.text
@@ -219,5 +219,5 @@ async def test_empty_nmids_returns_empty(
         out = await min_bids_adapter.post_api_advert_v1_bids_min(
             GetMinBidsCommand(items=[item])
         )
-    assert out == []
+    assert out == [[]]
     mock_http.assert_not_called()

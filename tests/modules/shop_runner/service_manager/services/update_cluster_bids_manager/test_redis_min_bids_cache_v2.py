@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -70,3 +70,45 @@ async def test_get_min_bid_v2_miss_returns_none() -> None:
         )
         is None
     )
+
+
+@pytest.mark.asyncio
+async def test_get_min_bids_v2_batch_uses_mget() -> None:
+    mock_client = AsyncMock()
+    mock_client.mget = AsyncMock(
+        return_value=[
+            json.dumps({"cpm": 10}),
+            None,
+        ]
+    )
+    mgr = MinBidsCacheManager(mock_client)
+    cells = [
+        (1, AdvPlacementType.AUTO_ADV, 100),
+        (1, AdvPlacementType.AUTO_ADV, 101),
+    ]
+    out = await mgr.get_min_bids_v2_batch(cells)
+    assert out[(1, AdvPlacementType.AUTO_ADV, 100)] == 10
+    assert len(out) == 1
+    mock_client.mget.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_min_bids_v2_batch_uses_pipeline() -> None:
+    pipeline = MagicMock()
+    pipeline.set = MagicMock()
+    pipeline.execute = AsyncMock()
+
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=pipeline)
+    cm.__aexit__ = AsyncMock(return_value=None)
+
+    mock_client = AsyncMock()
+    mock_client.write_pipeline = MagicMock(return_value=cm)
+
+    mgr = MinBidsCacheManager(mock_client)
+    await mgr.set_min_bids_v2_batch(
+        [(42, AdvPlacementType.SEARCH_ADV, 7, 55)],
+    )
+
+    pipeline.set.assert_called_once()
+    pipeline.execute.assert_awaited_once()

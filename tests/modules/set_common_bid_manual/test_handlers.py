@@ -115,7 +115,9 @@ async def test_set_common_bid_manual_start_success() -> None:
             container = MagicMock()
             factory = MagicMock()
             hub = MagicMock()
-            hub.wb_manager.get_min_bids = AsyncMock(return_value=min_bids_mock)
+            hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+                return_value=min_bids_mock
+            )
 
             factory.get_wb_manager_hub.return_value = hub
             container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
@@ -141,6 +143,66 @@ async def test_set_common_bid_manual_start_success() -> None:
     assert call_args[0][0] == 111
     assert "75 р." in call_args[0][1]
     assert "Минимальная ставка для аукциона" in call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_common_bid_manual_start_empty_search_min_bids() -> None:
+    """Test start when cache response has no search bids."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+
+    adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999)
+
+    callback_data = callbacks.SetCommonBidManual(
+        adv_setting_original_id=1,
+        wb_user_cabinet_original_id=10,
+    )
+    callback = _make_callback(callback_data, chat_id=111)
+
+    min_bids_mock = MagicMock()
+    min_bids_mock.search = {}
+
+    with patch(f"{MODULE}.sm") as mock_sm:
+        session_mock = MagicMock()
+        session_mock.__aenter__ = AsyncMock(return_value=session_mock)
+        session_mock.__aexit__ = AsyncMock(return_value=None)
+        mock_sm.return_value = session_mock
+
+        result_mock_1 = MagicMock()
+        result_mock_1.scalar_one_or_none.return_value = adv_setting
+        result_mock_2 = MagicMock()
+        result_mock_2.scalar_one_or_none.return_value = search_adv_setting
+        session_mock.execute = AsyncMock(side_effect=[result_mock_1, result_mock_2])
+
+        with patch(f"{MODULE}.DIManager.create") as mock_di:
+            container = MagicMock()
+            factory = MagicMock()
+            hub = MagicMock()
+            hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+                return_value=min_bids_mock
+            )
+
+            factory.get_wb_manager_hub.return_value = hub
+            container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
+
+            mock_di.return_value.__aenter__ = AsyncMock(return_value=container)
+            mock_di.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            await set_common_bid_manual.set_common_bid_manual_start(
+                callback, callback_data, bot, state
+            )
+
+    state.update_data.assert_not_called()
+    state.set_state.assert_not_called()
+    bot.send_message.assert_called_once_with(
+        111,
+        "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
+    )
 
 
 @pytest.mark.unit

@@ -158,6 +158,18 @@ class PromotionManager:
             command,
         )
 
+    async def get_min_bids_per_command_item(
+        self,
+        command: GetMinBidsCommand,
+    ) -> list[AdvMinNmidsBids] | None:
+        """Минимальные ставки отдельно по каждому item команды (без слияния dict по nmid)."""
+        from .methods.get_min_bids import method
+
+        return await method.get_min_bids_per_command_item(
+            self._client.min_bids_adapter,
+            command,
+        )
+
     async def get_campaigns_info(
         self, complex_advs: list[ComplexAdv], *, get_auto: bool = True
     ) -> dict[int, "AdvInfoDTO"]:

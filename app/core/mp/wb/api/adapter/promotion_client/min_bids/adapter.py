@@ -81,15 +81,23 @@ class MinBidsAdapter(BaseSectionAdapter):
 
     async def post_api_advert_v1_bids_min(
         self, command: GetMinBidsCommand
-    ) -> list[MinBidForNmid]:
-        min_bids: list[MinBidForNmid] = []
+    ) -> list[list[MinBidForNmid]]:
+        """POST ``/api/advert/v1/bids/min``: одно тело = один ``advert_id`` (см. сгенерированный
+        ``PostApiAdvertV1BidsMinBody``). Разные РК — разные HTTP-запросы. Внутри одной РК в теле
+        передаётся список ``nm_ids`` и список ``placement_types``; при ошибке «чужие nm» —
+        bisection в ``_bisect_min_bids_for_item``.
+
+        Возвращает по одному списку ``MinBidForNmid`` на каждый ``command_item`` (порядок как
+        в ``command.items``), чтобы доменный слой не смешивал ответы разных РК в одном dict по
+        ``nmid``."""
+        grouped: list[list[MinBidForNmid]] = []
         for command_item in command.items:
-            min_bids.extend(
+            grouped.append(
                 await self._post_api_advert_v1_bids_min_single(
                     command_item=command_item,
                 )
             )
-        return min_bids
+        return grouped
 
     async def _post_api_advert_v1_bids_min_single(
         self,
@@ -143,7 +151,10 @@ class MinBidsAdapter(BaseSectionAdapter):
             )
             return []
 
-    @retry_decorator(period=3, limit=5)
+    # Лимит WB для /bids/min: ~5 запросов / ~10–15 с; period/limit = базовый интервал между вызовами.
+    # 14/4 → 3.5 с давало 429; 60/5 → 12 с лучше, но пост-фикс логи всё ещё показывали 429 при next_pause 13–15 от API.
+    # 80/5 → 16 с — не ниже типичного Retry-After из ответов.
+    @retry_decorator(period=80, limit=5, max_delay=120)
     async def _http_post_min_bids(
         self,
         command_item: GetMinBidsCommandItem,

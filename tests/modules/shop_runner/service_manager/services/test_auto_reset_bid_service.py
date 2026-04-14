@@ -37,7 +37,7 @@ async def test_ensure_auto_bids_minimum_partial_nmids_in_min_bids_still_resets()
     adv.adv_setting.cpm = 900
     adv.shop_id = "shop-partial"
 
-    hub.wb_manager.get_min_bids = AsyncMock(
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
         return_value=AdvMinNmidsBids(
             auto={10: 150},
             search={},
@@ -72,8 +72,38 @@ async def test_ensure_auto_bids_minimum_no_matching_nmids_returns_early() -> Non
     adv.auto_adv_id = 502
     adv.adv_setting.cpm = 900
 
-    hub.wb_manager.get_min_bids = AsyncMock(
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
         return_value=AdvMinNmidsBids(auto={10: 50}, search={})
+    )
+
+    service = AutoResetBidService(hub, MagicMock())
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_reset_bid_service.run_tasks",
+        new=_run_handlers_inline,
+    ):
+        await service.ensure_auto_bids_minimum([adv])
+
+    hub.wb_modifier.update_auto_adv_cpm.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ensure_auto_bids_minimum_empty_auto_cache_returns_early() -> None:
+    """When Redis has no auto min bids, exit before scheduling resets (truthy AdvMinNmidsBids)."""
+    hub = MagicMock()
+    hub.wb_manager = MagicMock()
+    hub.wb_modifier = MagicMock()
+    hub.wb_modifier.update_auto_adv_cpm = AsyncMock()
+
+    adv = MagicMock()
+    adv.bot_active = True
+    adv.bidder_for_auto = True
+    adv.nmids = [10]
+    adv.auto_adv_id = 503
+    adv.adv_setting.cpm = 900
+
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+        return_value=AdvMinNmidsBids(auto={}, search={10: 50})
     )
 
     service = AutoResetBidService(hub, MagicMock())

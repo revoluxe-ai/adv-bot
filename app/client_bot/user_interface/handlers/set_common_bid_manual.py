@@ -52,7 +52,7 @@ async def _reload_adv_setting_menu(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
-        
+
         adv_result = await session.execute(
             select(AdvSetting)
             .options(joinedload(AdvSetting.wb_cabinet))
@@ -132,8 +132,9 @@ async def set_common_bid_manual_start(
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            min_bids = await hub.wb_manager.get_min_bids(
-                [complex_adv], cache_possible=True
+            min_bids = await hub.wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="set_common_bid_manual",
             )
     except Exception as e:
         logger.exception("get_min_bids failed for adv_setting_id=%s", adv_setting_original_id)
@@ -143,14 +144,23 @@ async def set_common_bid_manual_start(
         )
         return
 
-    if not min_bids or not min_bids.search:
+    nmids = list(adv_setting.nmids) if adv_setting.nmids else []
+    if not nmids:
         await bot.send_message(
             chat_id,
-            "Не удалось получить минимальную ставку из WB.",
+            "В кампании нет товаров (nmids). Невозможно получить минимальную ставку.",
         )
         return
 
-    min_common = max(min_bids.search.values())
+    missing_nmids = [nmid for nmid in nmids if nmid not in min_bids.search]
+    if missing_nmids:
+        await bot.send_message(
+            chat_id,
+            "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
+        )
+        return
+
+    min_common = max(min_bids.search[nmid] for nmid in nmids)
     await state.update_data(
         adv_setting_original_id=adv_setting_original_id,
         wb_user_cabinet_original_id=wb_user_cabinet_original_id,
@@ -172,23 +182,23 @@ async def set_common_bid_manual_apply(
 ) -> None:
     chat_id = message.chat.id
     data: dict[str, Any] = await state.get_data()
-    
+
     adv_setting_original_id = data.get("adv_setting_original_id")
     wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
     min_bid = data.get("min_bid_search")
-    
+
     if adv_setting_original_id is None or wb_user_cabinet_original_id is None or min_bid is None:
         await state.set_state(None)
         await message.answer(
             f"Произошла ошибка: не найдены сохраненные данные. Начните заново.\n\n"
             f"Если проблема будет повторяться, обратитесь в поддержку -> {const.SUPPORT_LINK}"
         )
-        
+
         await asyncio.sleep(1)
-        
+
         if wb_user_cabinet_original_id and adv_setting_original_id:
             await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
-        
+
         return
 
     text = message.text or ""

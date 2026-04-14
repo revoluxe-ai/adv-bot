@@ -88,7 +88,8 @@ def single_run() -> (
                 raise
             finally:
                 event.set()
-                await asyncio.sleep(1)  # Даем время другим задачам обработать событие
+                # Yield to the loop so waiters can observe the result; avoid a fixed 1s stall.
+                await asyncio.sleep(0)
                 if self._single_run_call_counter[key] <= 0:
                     events.pop(key, None)
                     results.pop(key, None)

@@ -30,6 +30,12 @@ def _aggregate_min_bid_results(results: list[MinBidForNmid]) -> AdvMinNmidsBids:
     return AdvMinNmidsBids(auto=auto, search=search)
 
 
+def _flatten_grouped_min_bids(
+    grouped: list[list[MinBidForNmid]],
+) -> list[MinBidForNmid]:
+    return [bid for group in grouped for bid in group]
+
+
 async def get_min_bids_for_command(
     min_bids_adapter: MinBidsAdapter,
     command: GetMinBidsCommand,
@@ -37,8 +43,20 @@ async def get_min_bids_for_command(
     if not command.items:
         return None
 
-    results = await min_bids_adapter.post_api_advert_v1_bids_min(command)
-    return _aggregate_min_bid_results(results)
+    grouped = await min_bids_adapter.post_api_advert_v1_bids_min(command)
+    return _aggregate_min_bid_results(_flatten_grouped_min_bids(grouped))
+
+
+async def get_min_bids_per_command_item(
+    min_bids_adapter: MinBidsAdapter,
+    command: GetMinBidsCommand,
+) -> list[AdvMinNmidsBids] | None:
+    """Один ``AdvMinNmidsBids`` на каждый ``command_item`` — без коллизий nmid между разными РК."""
+    if not command.items:
+        return None
+
+    grouped = await min_bids_adapter.post_api_advert_v1_bids_min(command)
+    return [_aggregate_min_bid_results(g) for g in grouped]
 
 
 async def get_min_bids(

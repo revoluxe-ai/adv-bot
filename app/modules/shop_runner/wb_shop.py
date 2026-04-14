@@ -61,9 +61,13 @@ class WBShop:
                 tg.create_task(
                     coroutines_manager.update_clusters_adv_stats_history()
                 )
+                tg.create_task(coroutines_manager.refresh_stats_freshness_cache())
                 tg.create_task(coroutines_manager.adv_settings_auto_update())
                 tg.create_task(coroutines_manager.update_minus_phrases_in_advs())
                 tg.create_task(coroutines_manager.update_cluster_bids())
+                tg.create_task(coroutines_manager.cache_current_cluster_bids())
+                tg.create_task(coroutines_manager.preload_min_bids_cache_miss())
+                tg.create_task(coroutines_manager.preload_min_bids_cache_old())
                 tg.create_task(coroutines_manager.handle_stats_stale_emergency())
                 tg.create_task(coroutines_manager.update_plan_fact_stats())
                 tg.create_task(coroutines_manager.auto_budget_watchdog())
