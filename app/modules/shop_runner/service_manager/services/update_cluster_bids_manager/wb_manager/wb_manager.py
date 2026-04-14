@@ -56,6 +56,14 @@ def _min_bids_cache_entries_for_item_miss_only(
     return [e for e in full if (e[0], e[1], e[2]) in miss_set]
 
 
+def _miss_cells_count_by_adv_id(misses: list[MinBidsV2Cell]) -> dict[int, int]:
+    """Число незакэшированных v2-ячеек min bids по id кампании WB (advert_id в ячейке)."""
+    counts: dict[int, int] = defaultdict(int)
+    for adv_id, _placement, _nmid in misses:
+        counts[adv_id] += 1
+    return dict(sorted(counts.items(), key=lambda x: (-x[1], x[0])))
+
+
 def _group_miss_cells_to_command_items(
     miss_cells: list[MinBidsV2Cell],
 ) -> list[GetMinBidsCommandItem]:
@@ -181,6 +189,9 @@ class WBManager(WBBaseManager):
     async def find_min_bids_cache_miss_cells(
         self,
         advs: list[ComplexAdv],
+        *,
+        emit_app_log: bool = True,
+        log_label: str = "min_bids_cache_miss snapshot",
     ) -> list[MinBidsV2Cell]:
         """Ячейки, отсутствующие в Redis v2 (cache miss)."""
         cells = self.expected_min_bids_v2_cells_from_advs(advs)
@@ -188,7 +199,21 @@ class WBManager(WBBaseManager):
             return []
         cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
         cached_map = await cache_manager.get_min_bids_v2_batch(cells)
-        return [c for c in cells if c not in cached_map]
+        misses = [c for c in cells if c not in cached_map]
+        miss_by_adv = _miss_cells_count_by_adv_id(misses)
+        if emit_app_log:
+            logger.info(
+                "%s shop_id=%s cells_expected=%s cells_cached=%s cells_missed=%s "
+                "distinct_adverts_with_miss=%s miss_by_adv_id=%s",
+                log_label,
+                self._shop_id,
+                len(cells),
+                len(cached_map),
+                len(misses),
+                len(miss_by_adv),
+                miss_by_adv,
+            )
+        return misses
 
     async def _refresh_min_bids_command_items_with_split(
         self,
@@ -218,6 +243,9 @@ class WBManager(WBBaseManager):
         cmd = GetMinBidsCommand(items=items)
         fresh: AdvMinNmidsBids | None
         try:
+            # Один доменный вызов с полным списком items; адаптер внутри обходит items
+            # последовательно (отдельные HTTP на пару advert+placement). При успехе —
+            # одна запись в Redis по всем items из ответа; при сбое — split ниже.
             fresh = await wb_data.get_min_bids_for_command(cmd)
         except Exception as exc:
             return await self._split_min_bids_items_on_failure(
@@ -229,7 +257,8 @@ class WBManager(WBBaseManager):
                 items, miss_set, exc=None
             )
 
-        return await write_for_items(items, fresh)
+        written = await write_for_items(items, fresh)
+        return written
 
     async def _split_min_bids_items_on_failure(
         self,
@@ -299,12 +328,19 @@ class WBManager(WBBaseManager):
         self,
         miss_cells: list[MinBidsV2Cell],
     ) -> int:
-        """Догрузить только cache-miss ячейки: один запрос пачкой, split при сбое."""
+        """Догрузить только cache-miss ячейки.
+
+        Сначала один ``GetMinBidsCommand`` по всем сгруппированным miss-items. Если ответ
+        успешен — пишем в Redis miss-ячейки из ответа. Если исключение или ``None`` —
+        бинарный split по items / nmids и повторные запросы, пока не изолируем проблемную
+        связку (см. ``_split_min_bids_items_on_failure``).
+        """
         if not miss_cells:
             return 0
         items = _group_miss_cells_to_command_items(miss_cells)
         miss_set = set(miss_cells)
-        return await self._refresh_min_bids_command_items_with_split(items, miss_set)
+        written = await self._refresh_min_bids_command_items_with_split(items, miss_set)
+        return written
 
     async def get_min_bids_cache_only(
         self,

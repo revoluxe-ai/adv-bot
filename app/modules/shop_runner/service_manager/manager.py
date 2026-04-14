@@ -839,6 +839,11 @@ class CoroutinesManager:
                 miss_written = await wb_manager.refresh_min_bids_cache_miss_cells(
                     miss_cells
                 )
+                _ = await wb_manager.find_min_bids_cache_miss_cells(
+                    advs,
+                    emit_app_log=True,
+                    log_label="min_bids_cache_miss after refresh",
+                )
             finally:
                 self._min_bids_old_refresh_permitted.set()
         except Exception as exc:  # noqa: BLE001

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -70,7 +70,16 @@ async def test_preload_min_bids_cache_miss_calls_only_miss_refresh() -> None:
         )
         await _unwrap(mgr.preload_min_bids_cache_miss)(mgr)
 
-    wb_manager.find_min_bids_cache_miss_cells.assert_awaited_once()
+    wb_manager.find_min_bids_cache_miss_cells.assert_has_calls(
+        [
+            call([adv]),
+            call(
+                [adv],
+                emit_app_log=True,
+                log_label="min_bids_cache_miss after refresh",
+            ),
+        ]
+    )
     wb_manager.refresh_min_bids_cache_miss_cells.assert_awaited_once()
     wb_manager.refresh_min_bids_cache.assert_not_called()
 
