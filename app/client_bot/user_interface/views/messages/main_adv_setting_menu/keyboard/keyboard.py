@@ -436,15 +436,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-    if in_favorites:
-        button = InlineKeyboardButton(
-            text="Удалить из избранного",
-            callback_data=callbacks.RemoveFromFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-        _ = builder.row(button)
-
     wb_user_cabinet_original_id = wb_user_cabinet.id
     _ = builder.row(
         InlineKeyboardButton(
