@@ -17,8 +17,8 @@ class ReturnToStart(BaseMiddleware):
         event: Message,
         data: dict[str, Any],
     ) -> Any:
-        text = event.text
-        if "/start" in text:
+        payload = (event.text or event.caption or "").strip()
+        if "/start" in payload:
             bot = data["bot"]
             state: FSMContext = data["state"]
             await state.clear()
