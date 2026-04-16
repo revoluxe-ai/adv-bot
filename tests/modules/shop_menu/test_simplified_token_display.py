@@ -64,6 +64,7 @@ class TestSimplifiedTokenDisplay:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         valid_tokens = [token_info] if status == "Complete" else []
