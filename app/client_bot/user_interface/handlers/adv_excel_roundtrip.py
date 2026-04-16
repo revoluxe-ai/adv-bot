@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 from datetime import datetime
 import math
+import logging
 
 import aiogram
 from aiogram import F, Router
@@ -27,6 +28,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.import_apply imp
 from app.client_bot.user_interface.views import callbacks
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 class _ProgressReporter:
@@ -85,19 +87,30 @@ async def export_shop_adv_excel(
     )
     await progress.start()
 
-    headers, rows = await build_adv_excel_export(
-        wb_user_cabinet_id=wb_uc_id,
-        progress_callback=progress.tick,
-    )
+    try:
+        headers, rows = await build_adv_excel_export(
+            wb_user_cabinet_id=wb_uc_id,
+            progress_callback=progress.tick,
+        )
 
-    raw = write_adv_excel_workbook(headers, rows)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M")
-    fname = f"adv_campaigns_shop_{stamp}.xlsx"
-    await bot.send_document(
-        chat_id=chat_id,
-        document=BufferedInputFile(raw, fname),
-        caption=f"Все активные РК магазина в одном файле: {len(rows)} строк.",
-    )
+        raw = write_adv_excel_workbook(headers, rows)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M")
+        fname = f"adv_campaigns_shop_{stamp}.xlsx"
+        await bot.send_document(
+            chat_id=chat_id,
+            document=BufferedInputFile(raw, fname),
+            caption=f"Все активные РК магазина в одном файле: {len(rows)} строк.",
+        )
+    except Exception:
+        logger.exception(
+            "adv excel export failed telegram_user_id=%s wb_user_cabinet_id=%s",
+            callback.from_user.id,
+            wb_uc_id,
+        )
+        await bot.send_message(
+            chat_id,
+            "Не удалось сформировать выгрузку Excel. Попробуйте снова чуть позже.",
+        )
 
 
 @router.callback_query(callbacks.ImportShopAdvExcel.filter())

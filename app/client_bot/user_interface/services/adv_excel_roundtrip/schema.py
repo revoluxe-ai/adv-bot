@@ -190,6 +190,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "search_adv_id": "ID ручной ставки (поиск)",
     "nmid": "NMID",
     "offer_id": "Артикул продавца",
+    "export_issue": "Проблема данных РК (выгрузка)",
     "fact_orders_per_day": "Факт заказов в день",
     "fact_cost_per_order": "Фактическая себестоимость заказа",
     "plan_orders_per_day": "План заказов в день",

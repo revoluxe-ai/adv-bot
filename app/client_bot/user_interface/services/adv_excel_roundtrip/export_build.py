@@ -37,17 +37,25 @@ def _first_nmid(adv: AdvSetting) -> int | None:
     return int(adv.nmids[0])
 
 
-def _first_offer_id_from_nmid(
+def _offer_id_and_export_issue(
     adv: AdvSetting, *, first_nmid: int | None, offer_by_nmid: dict[int, str]
-) -> str:
+) -> tuple[str, str]:
+    """Возвращает offer_id и текст проблемы для экспорта (если есть).
+
+    Важно: экспорт не должен падать из-за одной РК с неполными данными.
+    """
     if first_nmid is None:
-        raise ValueError(f"Для кампании id={adv.id} не найден первый NMID")
+        issue = "Нет NMID: offer_id недоступен"
+        logger.warning("adv excel: missing first NMID adv_setting_id=%s", adv.id)
+        return "", issue
     offer_id = offer_by_nmid.get(int(first_nmid))
     if not offer_id:
-        raise ValueError(
-            f"Для кампании id={adv.id} не найден WBCard.offer_id по NMID={first_nmid}"
+        issue = f"Нет WBCard.offer_id по NMID={first_nmid}"
+        logger.warning(
+            "adv excel: missing offer_id adv_setting_id=%s nmid=%s", adv.id, first_nmid
         )
-    return offer_id
+        return "", issue
+    return offer_id, ""
 
 
 async def _fact_snapshot(adv: AdvSetting) -> tuple[float | None, float | None]:
@@ -84,6 +92,7 @@ def _base_ro_columns() -> list[str]:
         column_header("RO", "search_adv_id"),
         column_header("RO", "nmid"),
         column_header("RO", "offer_id"),
+        column_header("RO", "export_issue"),
         column_header("RO", "fact_orders_per_day"),
         column_header("RO", "fact_cost_per_order"),
         column_header("RO", "plan_orders_per_day"),
@@ -147,6 +156,9 @@ async def build_adv_excel_export(
             target_cost_per_order=target_c,
         )
         nmid = _first_nmid(adv)
+        offer_id, export_issue = _offer_id_and_export_issue(
+            adv, first_nmid=nmid, offer_by_nmid=offer_by_nmid
+        )
         row: dict[str, Any] = {
             column_header("RO", "excel_template_version"): EXCEL_TEMPLATE_VERSION,
             column_header("RO", "snapshot_at"): now,
@@ -154,9 +166,8 @@ async def build_adv_excel_export(
             column_header("RO", "adv_id"): adv.adv_id if adv.adv_id is not None else "",
             column_header("RO", "search_adv_id"): adv.search_adv_id or "",
             column_header("RO", "nmid"): nmid if nmid is not None else "",
-            column_header("RO", "offer_id"): _first_offer_id_from_nmid(
-                adv, first_nmid=nmid, offer_by_nmid=offer_by_nmid
-            ),
+            column_header("RO", "offer_id"): offer_id,
+            column_header("RO", "export_issue"): export_issue,
             column_header("RO", "fact_orders_per_day"): fact_o if fact_o is not None else "",
             column_header("RO", "fact_cost_per_order"): fact_cost if fact_cost is not None else "",
             column_header("RO", "plan_orders_per_day"): plan_orders if plan_orders is not None else "",
