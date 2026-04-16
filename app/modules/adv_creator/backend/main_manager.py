@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import insert  # Добавляем импо
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from app.client_bot import const
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.wb_api.data_classes.advs.other_classes import Balances
@@ -159,7 +158,7 @@ class MainAdvManager:
             out = {row[0] for row in result.all()}
         return out
 
-    async def _create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
+    async def _create_complex_advs(self, nmid: int) -> tuple[int, int]:
         wb_cabinet = self.access.wb_cabinet
         assert wb_cabinet is not None
         shop_id = str(wb_cabinet.shop_id)
@@ -235,9 +234,7 @@ class MainAdvManager:
 
         await self._apply_default_settings_to_adv(auto_adv_id)
 
-        update_cpm_status = True
-
-        return auto_adv_id, search_adv_id, update_cpm_status
+        return auto_adv_id, search_adv_id
 
     async def create_complex_advs(
         # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
@@ -258,18 +255,7 @@ class MainAdvManager:
             await self.__turn_off_advs(bot, user_telegram_id, all_adv_ids)
 
         # Кампаний не найдено - создавать новую
-        auto_adv_id, search_adv_id, update_cpm_status = await self._create_complex_advs(
-            nmid
-        )
-        if not update_cpm_status:
-            await bot.send_message(
-                user_telegram_id,
-                f"но не удалось установить стартовые ставки. "
-                f"Пожалуйста, проверьте и установите ставки вручную. "
-                f"ID Авто-РК: {auto_adv_id},"
-                f" ID Поисковой РК: {search_adv_id}. "
-                f"Если проблема повторится, обратитесь в поддержку {const.SUPPORT_LINK}.",
-            )
+        auto_adv_id, search_adv_id = await self._create_complex_advs(nmid)
 
         return auto_adv_id, search_adv_id
 
