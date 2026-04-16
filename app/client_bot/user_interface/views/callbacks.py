@@ -176,9 +176,23 @@ class Gate(CallbackData, prefix="gate"):
 
 
 class RequestPresentation(CallbackData, prefix="presentation"):
-    """Запрос презентации: после ввода валидного инвайта — уведомление саппорту."""
+    """Legacy callback заявки на презентацию (без инвайта)."""
 
     action: str = "request"
+
+
+class PresentationBooking(CallbackData, prefix="presentation_booking"):
+    """Пользовательская запись на презентацию по доступным слотам."""
+
+    action: str
+    slot_id: int | None = None
+
+
+class PresentationSlotsAdmin(CallbackData, prefix="presentation_slots_admin"):
+    """Админское управление слотами презентаций."""
+
+    action: str
+    slot_id: int | None = None
 
 
 class InviteShow(CallbackData, prefix="invite"):

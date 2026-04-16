@@ -14,7 +14,8 @@ from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.exc import IntegrityError
 
 from app.client_bot import const
-from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
+from app.client_bot.admin_access import is_bot_admin
+from app.client_bot.presentation_booking_service import get_user_upcoming_booked_slot_human
 from app.client_bot.utils import create_user
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
@@ -90,21 +91,16 @@ async def callback_start_registration(
                 adv_updater_user_chat_id=chat_id,
             )
 
-        minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
-        if minimal:
-            await MainMenu(bot, chat_id, full_client_ui=False)()
-            return
-
-        if (
-            settings.invite_gate
-            and not user.passed_gate
-            and not is_bot_admin(user_id)
-        ):
-            _= await bot.send_message(
+        if not user.passed_gate and not is_bot_admin(user_id):
+            booked_slot = None
+            if settings.presentation_only:
+                booked_slot = await get_user_upcoming_booked_slot_human(user_id)
+            await MainMenu(
+                bot,
                 chat_id,
-                get_gate_message_text(),
-                reply_markup=get_gate_keyboard(),
-            )
+                full_client_ui=False,
+                booked_slot_human=booked_slot,
+            )()
             return
         await MainMenu(bot, chat_id, full_client_ui=True)()
     return

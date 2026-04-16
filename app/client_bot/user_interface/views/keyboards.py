@@ -998,6 +998,12 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="🎟️ Слоты презентации",
+                    callback_data=AdminPanel(action="presentation_slots_menu").pack(),
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="🔙 Назад",
                     callback_data=callbacks.Start().pack(),
                 )

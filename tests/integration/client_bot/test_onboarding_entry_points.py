@@ -14,7 +14,6 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 )
 from app.client_bot.user_interface.handlers.shop_settings import delete_wb_user_cabinet
 from app.client_bot.user_interface.views import callbacks
-from app.client_bot.user_interface.views.gate import get_gate_message_text
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.settings.settings_master import Settings
@@ -123,10 +122,10 @@ async def test_gate_invite_success_calls_main_menu(
         mock_main_menu.return_value.assert_awaited_once()
 
 
-async def test_start_registration_new_user_creates_user_and_shows_gate(
+async def test_start_registration_new_user_creates_user_and_shows_booking_entry(
     async_session,
 ):
-    """New user (no record in DB): start_registration creates user, shows gate screen, does not call MainMenu."""
+    """New user (no record in DB): start_registration creates user and shows booking entry menu."""
     telegram_id = 88880
     chat_id = 88880
     # Ensure no user with this id (we do not create one)
@@ -172,16 +171,11 @@ async def test_start_registration_new_user_creates_user_and_shows_gate(
     assert user.username == "new_user_88880"
     assert user.passed_gate is False
 
-    # Gate screen was sent
-    bot.send_message.assert_awaited_once()
-    call_args, call_kw = bot.send_message.call_args
-    assert call_args[0] == chat_id
-    text = call_args[1] if len(call_args) > 1 else call_kw.get("text", "")
-    assert get_gate_message_text() in text or "Доступ" in text
-    assert call_kw.get("reply_markup") is not None
-
-    # MainMenu was not called (user has not passed gate)
-    mock_main_menu.assert_not_called()
+    # MainMenu was called in minimal mode
+    mock_main_menu.assert_called_once_with(
+        bot, chat_id, full_client_ui=False, booked_slot_human=None
+    )
+    mock_main_menu.return_value.assert_awaited_once()
 
 
 async def test_start_registration_passed_gate_calls_main_menu(
