@@ -60,6 +60,7 @@ class TokenInfo:
     is_read_only: bool
     is_valid: bool
     is_expired: bool
+    is_personal: bool
 
     @classmethod
     def from_wb_token(cls, wb_token: WBToken) -> "TokenInfo":
@@ -76,6 +77,7 @@ class TokenInfo:
             is_read_only=wb_token.read_only,
             is_valid=wb_token.check_valid(),
             is_expired=expires_utc <= now,
+            is_personal=wb_token.is_personal,
         )
 
 
@@ -144,35 +146,27 @@ class TokenStatusReport:
 
     @property
     def service_expiration_date(self) -> datetime.datetime | None:
-        """Calculate when the service will break due to missing required permissions.
+        """Latest expiry among personal tokens that contribute required permissions.
 
-        Returns the earliest date when we'll lose a required permission,
-        making the service non-functional.
+        Only personal tokens are considered (service/base tokens are ignored for this
+        display). If there is no qualifying personal token, returns None.
         """
         if self.status == "Complete":
-            # Find the earliest expiration of tokens that provide required permissions
-            earliest_expiration = None
-
-            for token in self.valid_tokens:
-                # Check if this token provides any required permissions
-                token_required_perms = token.categories & REQUIRED_RIGHTS
-                if token_required_perms:
-                    if (
-                        earliest_expiration is None
-                        or token.expires < earliest_expiration
-                    ):
-                        earliest_expiration = token.expires
-
-            return earliest_expiration
-        else:
-            # Service is already broken - no required permissions available
-            return None
+            candidates = [
+                token
+                for token in self.valid_tokens
+                if token.is_personal and (token.categories & REQUIRED_RIGHTS)
+            ]
+            if not candidates:
+                return None
+            return max(candidates, key=lambda t: t.expires).expires
+        return None
 
     @property
     def days_until_service_breaks(self) -> int | None:
-        """Calculate days until service becomes non-functional.
+        """Days until the latest qualifying personal token expires (see service_expiration_date).
 
-        Returns None if service is already broken or no valid tokens.
+        Returns None if status is not Complete or no qualifying personal token exists.
         """
         expiration_date = self.service_expiration_date
         if expiration_date:

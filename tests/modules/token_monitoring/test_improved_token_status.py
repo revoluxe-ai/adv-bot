@@ -5,8 +5,6 @@ Tests the new simplified token status messages and expiration date features.
 """
 
 import datetime
-import pytest
-from unittest.mock import MagicMock
 
 from app.modules.token_monitoring.services.token_info_service import (
     TokenStatusReport,
@@ -20,9 +18,6 @@ class TestImprovedTokenStatus:
 
     def test_service_expiration_date_complete_status(self):
         """Test service expiration date calculation when status is Complete."""
-        pytest.skip(
-            "Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-        )
         # Create token infos with different expiration dates
         token1 = TokenInfo(
             id=1,
@@ -34,6 +29,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         token2 = TokenInfo(
@@ -47,6 +43,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         report = TokenStatusReport(
@@ -62,13 +59,14 @@ class TestImprovedTokenStatus:
             expiring_tokens=[],
         )
 
-        # Should return the earliest expiration date (token2 - 10 days)
+        # Latest personal expiry is token1 (30 days)
         expiration_date = report.service_expiration_date
         assert expiration_date is not None
+        assert expiration_date == token1.expires
 
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
-        assert 9 <= days_until_break <= 10  # Allow for timing differences
+        assert 29 <= days_until_break <= 30  # Allow for timing differences
 
     def test_service_expiration_date_insufficient_status(self):
         """Test service expiration date when status is Insufficient (already broken)."""
@@ -82,6 +80,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         report = TokenStatusReport(
@@ -103,10 +102,7 @@ class TestImprovedTokenStatus:
 
     def test_service_expiration_only_relevant_tokens(self):
         """Test that only tokens with required permissions affect expiration date."""
-        pytest.skip(
-            "Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-        )
-        # Token with required permissions
+        # Personal token with required permissions
         required_token = TokenInfo(
             id=1,
             api_key="key1",
@@ -117,9 +113,10 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
-        # Token with non-required permissions (should be ignored)
+        # Non-personal token with earlier expiry (ignored for service date)
         irrelevant_token = TokenInfo(
             id=2,
             api_key="key2",
@@ -131,6 +128,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=False,
         )
 
         report = TokenStatusReport(
@@ -158,9 +156,6 @@ class TestImprovedTokenStatus:
 
     def test_days_until_service_breaks_edge_cases(self):
         """Test edge cases for days calculation."""
-        pytest.skip(
-            "Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-        )
         # Token expiring very soon
         soon_token = TokenInfo(
             id=1,
@@ -173,6 +168,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         report = TokenStatusReport(
@@ -205,6 +201,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         report = TokenStatusReport(
@@ -231,9 +228,6 @@ class TestImprovedTokenStatus:
 
     def test_multiple_tokens_same_earliest_expiration(self):
         """Test when multiple tokens have the same earliest expiration."""
-        pytest.skip(
-            "Failing due to TypeError: can't subtract offset-naive and offset-aware datetimes"
-        )
         same_date = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7)
 
         token1 = TokenInfo(
@@ -246,6 +240,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         token2 = TokenInfo(
@@ -258,6 +253,7 @@ class TestImprovedTokenStatus:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         report = TokenStatusReport(

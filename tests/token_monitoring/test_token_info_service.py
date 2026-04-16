@@ -227,6 +227,7 @@ class TestTokenInfoService:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         expiring_token = ExpiringToken(
@@ -260,6 +261,7 @@ class TestTokenInfoService:
             is_read_only=False,
             is_valid=True,
             is_expired=False,
+            is_personal=True,
         )
 
         expired_token = TokenInfo(
@@ -272,6 +274,7 @@ class TestTokenInfoService:
             is_read_only=False,
             is_valid=False,
             is_expired=True,
+            is_personal=True,
         )
 
         report = TokenStatusReport(
