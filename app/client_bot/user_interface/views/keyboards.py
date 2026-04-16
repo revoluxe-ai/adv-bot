@@ -766,18 +766,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    adv_original_id = adv.id
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад",
-            callback_data=callbacks.Adv(adv_original_id=adv_original_id).pack(),
-        )
-    )
-    return builder.as_markup()
-
-
 def get_setting_min_views_for_predict_ctr_keyboard(
     adv: AdvSetting,
 ) -> InlineKeyboardMarkup:

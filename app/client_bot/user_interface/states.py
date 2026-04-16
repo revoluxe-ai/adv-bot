@@ -27,10 +27,6 @@ class KeywordTargetPlace(StatesGroup):
     waiting_for_new_target_place = State()
 
 
-class ChangeMaxCPC(StatesGroup):
-    waiting_for_new_max_cpc = State()
-
-
 class ChangeAutoBid(StatesGroup):
     waiting_for_new_bid = State()
 

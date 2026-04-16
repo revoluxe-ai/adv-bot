@@ -13,7 +13,6 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
 
 UI_HANDLER_BY_FIELD: dict[str, str] = {
     "bot_active": "app/client_bot/user_interface/handlers/adv_setting.py",
-    "max_cpc": "app/client_bot/user_interface/handlers/change_max_cpc.py",
     "max_cpm": "app/client_bot/user_interface/handlers/cpm_builder.py",
     "min_views_for_ml_predict": "app/client_bot/user_interface/handlers/min_views_for_ml_predict_ctr.py",
     "clusters_mode": "app/client_bot/user_interface/handlers/clusters.py",

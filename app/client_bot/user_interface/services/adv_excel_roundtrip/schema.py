@@ -43,6 +43,7 @@ READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
         "last_update",
         "hard_min_ctr",
         "cpm",
+        "max_cpc",
         "type",
     }
 )
@@ -51,7 +52,6 @@ READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
 EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
     {
         "bot_active",
-        "max_cpc",
         "max_cpm",
         "min_views_for_ml_predict",
         "clusters_mode",
@@ -204,7 +204,6 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "max_price_for_order": "Максимальная себестоимость",
     "strategy": "Стратегия",
     "bot_active": "Бот включен",
-    "max_cpc": "Максимальный CPC",
     "max_cpm": "Максимальный CPM",
     "min_views_for_ml_predict": "Мин. просмотров для ML-прогноза",
     "clusters_mode": "Кластерный режим",

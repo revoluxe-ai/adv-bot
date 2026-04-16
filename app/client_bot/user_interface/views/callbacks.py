@@ -187,11 +187,6 @@ class InviteShow(CallbackData, prefix="invite"):
     action: str = "show"
 
 
-class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
-    action: str
-    adv_original_id: int
-
-
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
     action: str
     adv_original_id: int
