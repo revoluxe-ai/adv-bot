@@ -1,4 +1,16 @@
-"""Валидация и применение загруженного Excel."""
+"""Валидация и применение загруженного Excel.
+
+Архитектурное решение по ошибкам импорта:
+- Любая ошибка валидации/применения поднимается как исключение и НЕ обрабатывается
+  локально в handler импорта.
+- Ответ пользователю формируется единообразно в глобальном error-handler'е
+  (`app.client_bot.user_interface.handlers.exceptions`): без детальных причин.
+- Детали причины (строка/колонка/значение) остаются в тексте исключения для
+  логов и уведомления администратора, но не являются user-facing контрактом.
+
+Таким образом импорт придерживается политики "fail-fast + единый UX ошибок":
+файл отклоняется целиком, а диагностика уходит в технический контур.
+"""
 
 from __future__ import annotations
 
@@ -104,9 +116,12 @@ def _row_value(
 
 
 class AdvExcelImportError(Exception):
-    def __init__(self, messages: list[str]) -> None:
-        self.messages = messages
-        super().__init__("\n".join(messages))
+    """Техническая ошибка импорта Excel.
+
+    ВАЖНО: это НЕ user-facing исключение.
+    Его текст предназначен для логов/админ-диагностики в общем error-handler'е,
+    а пользователь получает стандартное общее сообщение об ошибке интерфейса.
+    """
 
 
 async def apply_adv_excel_rows(
@@ -116,38 +131,44 @@ async def apply_adv_excel_rows(
     rows: list[dict[str, Any]],
     progress_callback: ProgressCallback | None = None,
 ) -> int:
-    """Применить строки Excel. Возвращает число обновлённых РК. Любая ошибка — исключение."""
+    """Применить строки Excel и вернуть число обновлённых РК.
+
+    Контракт по ошибкам:
+    - при любой проблеме выбрасывается `AdvExcelImportError`;
+    - исключение специально пробрасывается вверх до общего error-handler'а;
+    - локально здесь ошибки не "очеловечиваются" для пользователя.
+    """
     if not rows:
-        raise AdvExcelImportError(["Файл не содержит строк с данными"])
+        raise AdvExcelImportError("Файл не содержит строк с данными")
 
     tpl_col = column_header("RO", "excel_template_version")
     v0 = _row_value(rows[0], kind="RO", field="excel_template_version")
     if _is_blank(v0):
-        raise AdvExcelImportError([f"Нет колонки или значения {tpl_col}"])
+        raise AdvExcelImportError(f"Нет колонки или значения {tpl_col}")
     try:
         tv = int(float(v0))
     except (TypeError, ValueError) as e:
-        raise AdvExcelImportError([f"Неверная версия шаблона: {v0!r}"]) from e
+        raise AdvExcelImportError(f"Неверная версия шаблона: {v0!r}") from e
     if tv != EXCEL_TEMPLATE_VERSION:
         raise AdvExcelImportError(
-            [f"Версия шаблона {tv}, ожидается {EXCEL_TEMPLATE_VERSION}"]
+            f"Версия шаблона {tv}, ожидается {EXCEL_TEMPLATE_VERSION}"
         )
 
     updated = 0
     async with _sm(read_only=False) as session:
         wuc_check = await session.get(WBUserCabinet, expected_wb_user_cabinet_id)
         if not wuc_check:
-            raise AdvExcelImportError(["Сессия магазина не найдена"])
+            raise AdvExcelImportError("Сессия магазина не найдена")
         if not await _telegram_may_access_wb_user_cabinet(
             session, telegram_user_id=telegram_user_id, wuc=wuc_check
         ):
-            raise AdvExcelImportError(["Нет доступа к этому магазину"])
+            raise AdvExcelImportError("Нет доступа к этому магазину")
 
         total = len(rows)
         for i, row in enumerate(rows, start=1):
             aid = _coerce_int(_row_value(row, kind="RO", field="adv_setting_id"))
             if aid is None:
-                raise AdvExcelImportError([f"Строка {i}: нет RO__adv_setting_id"])
+                raise AdvExcelImportError(f"Строка {i}: нет RO__adv_setting_id")
 
             adv = await session.get(
                 AdvSetting,
@@ -155,16 +176,16 @@ async def apply_adv_excel_rows(
                 options=[joinedload(AdvSetting.wb_cabinet)],
             )
             if not adv:
-                raise AdvExcelImportError([f"Строка {i}: РК id={aid} не найдена"])
+                raise AdvExcelImportError(f"Строка {i}: РК id={aid} не найдена")
 
             if adv.wb_cabinet_id != wuc_check.wb_cabinet_id:
                 raise AdvExcelImportError(
-                    [f"Строка {i}: РК не относится к выбранному магазину"]
+                    f"Строка {i}: РК не относится к выбранному магазину"
                 )
 
             if not _is_active_adv(adv):
                 raise AdvExcelImportError(
-                    [f"Строка {i}: РК не активна (нужны active_status и bot_active)"]
+                    f"Строка {i}: РК не активна (нужны active_status и bot_active)"
                 )
 
             ro_adv = _coerce_int(_row_value(row, kind="RO", field="adv_id"))
@@ -173,16 +194,16 @@ async def apply_adv_excel_rows(
 
             if not _same_optional_int(ro_adv, adv.adv_id):
                 raise AdvExcelImportError(
-                    [f"Строка {i}: RO__adv_id не совпадает с данными сервера"]
+                    f"Строка {i}: RO__adv_id не совпадает с данными сервера"
                 )
             if not _same_optional_int(ro_search, adv.search_adv_id):
                 raise AdvExcelImportError(
-                    [f"Строка {i}: RO__search_adv_id не совпадает с данными сервера"]
+                    f"Строка {i}: RO__search_adv_id не совпадает с данными сервера"
                 )
             first_nmid = int(adv.nmids[0]) if adv.nmids else None
             if not _same_optional_int(ro_nmid, first_nmid):
                 raise AdvExcelImportError(
-                    [f"Строка {i}: RO__nmid не совпадает с данными сервера"]
+                    f"Строка {i}: RO__nmid не совпадает с данными сервера"
                 )
 
             for field in sorted(EDITABLE_ADV_SETTING_COLUMNS):
@@ -195,16 +216,14 @@ async def apply_adv_excel_rows(
                 try:
                     val = parse_edit_value(field, raw)
                 except ValueError as e:
-                    raise AdvExcelImportError(
-                        [f"Строка {i}, колонка {h}: {e}"]
-                    ) from e
+                    raise AdvExcelImportError(f"Строка {i}, колонка {h}: {e}") from e
                 if field in {
                     "plan_for_sales_for_day",
                     "target_price_for_order",
                     "max_price_for_order",
                 } and float(val) < 1:
                     raise AdvExcelImportError(
-                        [f"Строка {i}, колонка {h}: значение должно быть >= 1"]
+                        f"Строка {i}, колонка {h}: значение должно быть >= 1"
                     )
                 setattr(adv, field, val)
 
