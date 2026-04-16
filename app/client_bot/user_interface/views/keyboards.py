@@ -23,9 +23,6 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from app.modules.predict_ctr_exponent_settings import (
-    ChangeExponentSettinginAdvSettingCallback,
-)
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
@@ -481,17 +478,6 @@ def get_keywords_setting_keyboard(
     ]
     bottoms.append(bottom)
 
-    bottom = [
-        InlineKeyboardButton(
-            text="Показать ключи вне индекса",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id, type="only_out_index", page=page
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(bottom)
-
     if not hide_keywords_is_not_relevant:
         bottom = [
             InlineKeyboardButton(
@@ -528,86 +514,8 @@ def get_keywords_setting_keyboard(
 
     bottoms.append(bottom)
 
-    bottom = [
-        InlineKeyboardButton(
-            text="Сортировать по ФАКТ CTR по Уб.",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id,
-                type="sort_by_ctr_desc",
-                page=page,
-            ).pack(),
-        )
-    ]
-    bottoms.append(bottom)
-
     adv_id = adv_setting.adv_id
     assert adv_id
-    button = [
-        InlineKeyboardButton(
-            text="Изменить экспоненту прог. ctr",
-            callback_data=ChangeExponentSettinginAdvSettingCallback(
-                adv_id=adv_id, wb_user_cabinet_original_id=wb_user_cabinet_original_id
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    button = [
-        InlineKeyboardButton(
-            text="Фильтр по прогнозируемым показам",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id, type="filter_by_query", page=page
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    button = [
-        InlineKeyboardButton(
-            text="Сбросить добавочные клики",
-            callback_data=callbacks.ResetAddedClicks(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
-        UpdatePositionsForActivePhrase,
-    )
-
-    button = [
-        InlineKeyboardButton(
-            text="Перепроверить позиции ключей из БС",
-            callback_data=UpdatePositionsForActivePhrase(
-                adv_setting_original_id=adv_setting.id,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                target="white_list",
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
-        UpdatePositionsForActivePhrase,
-    )
-
-    button = [
-        InlineKeyboardButton(
-            text="Перепроверить позиции активный ключей",
-            callback_data=UpdatePositionsForActivePhrase(
-                adv_setting_original_id=adv_setting.id,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                target="active_phrases",
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
 
     # Кнопка для переключения скрытия ключей без рекламных просмотров
     if adv_setting.hide_zero_views_keywords:
@@ -855,27 +763,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
         )
     )
 
-    return builder.as_markup()
-
-
-def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    adv_original_id = adv.id
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад",
-            callback_data=callbacks.Adv(adv_original_id=adv_original_id).pack(),
-        )
-    )
-
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Отключить максимальную стоимость клика",
-            callback_data=callbacks.ChangeMaxCPC(
-                action="turn_off_max_cpc", adv_original_id=adv_original_id
-            ).pack(),
-        )
-    )
     return builder.as_markup()
 
 

@@ -27,10 +27,6 @@ class KeywordTargetPlace(StatesGroup):
     waiting_for_new_target_place = State()
 
 
-class ChangeMaxCPC(StatesGroup):
-    waiting_for_new_max_cpc = State()
-
-
 class ChangeAutoBid(StatesGroup):
     waiting_for_new_bid = State()
 
@@ -126,6 +122,12 @@ class AdminGrantGate(StatesGroup):
     """Админ: открыть гейт пользователю по Telegram ID."""
 
     waiting_telegram_id = State()
+
+
+class AdvExcelRoundtrip(StatesGroup):
+    """Ожидание .xlsx для импорта настроек РК."""
+
+    waiting_for_workbook = State()
 
 
 class ConnectExistingAdvsStates(StatesGroup):

@@ -50,11 +50,11 @@ from .user_interface.handlers import (
     adv_setting,
     change_auto_bid,
     change_cpm,
-    change_max_cpc,
     clusters,
     connect_existing_advs,
     cpm_builder,
     download_keywords,
+    adv_excel_roundtrip,
     exceptions,
     favorite_advs_for_users,
     get_shop_for_admin,
@@ -144,6 +144,7 @@ common_router.include_routers(invite_show.router)
 common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
+common_router.include_routers(adv_excel_roundtrip.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
 common_router.include_routers(time_settings.router)
@@ -154,7 +155,6 @@ common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
-common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(change_auto_bid.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 # TODO(legacy-remove): модуль содержит legacy callbacks.StrategySetting;
