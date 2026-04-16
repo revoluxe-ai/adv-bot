@@ -55,6 +55,7 @@ from .user_interface.handlers import (
     connect_existing_advs,
     cpm_builder,
     download_keywords,
+    adv_excel_roundtrip,
     exceptions,
     favorite_advs_for_users,
     get_shop_for_admin,
@@ -144,6 +145,7 @@ common_router.include_routers(invite_show.router)
 common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
+common_router.include_routers(adv_excel_roundtrip.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
 common_router.include_routers(time_settings.router)

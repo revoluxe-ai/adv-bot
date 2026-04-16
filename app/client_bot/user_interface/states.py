@@ -128,6 +128,12 @@ class AdminGrantGate(StatesGroup):
     waiting_telegram_id = State()
 
 
+class AdvExcelRoundtrip(StatesGroup):
+    """Ожидание .xlsx для импорта настроек РК."""
+
+    waiting_for_workbook = State()
+
+
 class ConnectExistingAdvsStates(StatesGroup):
     """Подключение существующих рекламных кампаний WB по NM-id."""
 

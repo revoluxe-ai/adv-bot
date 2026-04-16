@@ -305,6 +305,18 @@ class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
 
 
+class ExportShopAdvExcel(CallbackData, prefix="shop_adv_excel_export"):
+    """Выгрузка всех активных РК магазина в один Excel (меню магазина)."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ImportShopAdvExcel(CallbackData, prefix="shop_adv_excel_import"):
+    """Загрузка Excel с правками по магазину; далее ожидается документ в FSM."""
+
+    wb_user_cabinet_original_id: int
+
+
 class TurnClusters(CallbackData, prefix="turn_clusters"):
     action: str
     adv_original_id: int

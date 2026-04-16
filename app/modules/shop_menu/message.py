@@ -14,7 +14,13 @@ from sqlalchemy.orm import selectinload
 from app.client_bot import const
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
+from app.client_bot.user_interface.views.callbacks import (
+    AddNewToken,
+    ApplyDefaultsForShop,
+    ChangeShopDefaultMaxCPM,
+    ExportShopAdvExcel,
+    ImportShopAdvExcel,
+)
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
@@ -526,6 +532,22 @@ class ShopMenu(TextWithKeyboard):
         button = InlineKeyboardButton(
             text="Применить дефолты всем кампаниям",
             callback_data=ApplyDefaultsForShop(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="Выгрузить все РК в Excel",
+            callback_data=ExportShopAdvExcel(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="Загрузить настройки из Excel",
+            callback_data=ImportShopAdvExcel(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )
