@@ -58,6 +58,21 @@ def _offer_id_and_export_issue(
     return offer_id, ""
 
 
+def _first_offer_id_from_nmid(
+    adv: AdvSetting, *, first_nmid: int | None, offer_by_nmid: dict[int, str]
+) -> str:
+    """Backward-compatible helper used by unit tests.
+
+    Historical contract: return offer_id or raise ValueError when it's unavailable.
+    """
+    offer_id, _issue = _offer_id_and_export_issue(
+        adv, first_nmid=first_nmid, offer_by_nmid=offer_by_nmid
+    )
+    if not offer_id:
+        raise ValueError("offer_id is unavailable for the provided NMID")
+    return offer_id
+
+
 async def _fact_snapshot(adv: AdvSetting) -> tuple[float | None, float | None]:
     """Факт: прогноз заказов/день и себестоимость заказа (как в PlanFact)."""
     if not adv.nmids:
