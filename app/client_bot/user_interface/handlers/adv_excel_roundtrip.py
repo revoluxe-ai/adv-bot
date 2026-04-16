@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import io
-import logging
 from datetime import datetime
+import math
 
 import aiogram
 from aiogram import F, Router
@@ -21,15 +21,41 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.excel_io import 
     write_adv_excel_workbook,
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.import_apply import (
-    AdvExcelImportError,
     apply_adv_excel_rows,
     verify_user_owns_wb_user_cabinet,
 )
 from app.client_bot.user_interface.views import callbacks
 
-logger = logging.getLogger(__name__)
-
 router = Router()
+
+
+class _ProgressReporter:
+    def __init__(
+        self, *, bot: aiogram.Bot, chat_id: int, title: str, min_step: int = 10
+    ) -> None:
+        self._bot = bot
+        self._chat_id = chat_id
+        self._title = title
+        self._min_step = min_step
+        self._last_sent = 0
+        self._last_percent_bucket = 0
+
+    async def start(self) -> None:
+        await self._bot.send_message(self._chat_id, f"{self._title}: начали обработку…")
+
+    async def tick(self, done: int, total: int) -> None:
+        if total <= 0:
+            return
+        percent = int(math.floor((done / total) * 100))
+        percent_bucket = percent // 10
+        should_send = (done - self._last_sent) >= self._min_step or percent_bucket > self._last_percent_bucket
+        if not should_send and done != total:
+            return
+        self._last_sent = done
+        self._last_percent_bucket = percent_bucket
+        await self._bot.send_message(
+            self._chat_id, f"{self._title}: {done}/{total} ({percent}%)"
+        )
 
 
 @router.callback_query(callbacks.ExportShopAdvExcel.filter())
@@ -54,15 +80,15 @@ async def export_shop_adv_excel(
         return
 
     await state.update_data(last_wb_user_cabinet_original_id=wb_uc_id)
+    progress = _ProgressReporter(
+        bot=bot, chat_id=chat_id, title="Выгрузка Excel", min_step=10
+    )
+    await progress.start()
 
-    try:
-        headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wb_uc_id)
-    except Exception:
-        logger.exception("export_shop_adv_excel failed wb_uc_id=%s", wb_uc_id)
-        await bot.send_message(
-            chat_id, "Ошибка при формировании выгрузки. Попробуйте позже."
-        )
-        return
+    headers, rows = await build_adv_excel_export(
+        wb_user_cabinet_id=wb_uc_id,
+        progress_callback=progress.tick,
+    )
 
     raw = write_adv_excel_workbook(headers, rows)
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -104,7 +130,8 @@ async def import_shop_adv_excel_start(
     await bot.send_message(
         chat_id,
         "Пришлите файл .xlsx (тот же формат, что и выгрузка «все РК магазина»). "
-        "Меняйте только колонки EDIT__*. Любая ошибка — файл будет отклонён целиком.",
+        "Меняйте только колонки с тех. ключом вида (EDIT__...). "
+        "Любая ошибка — файл будет отклонён целиком.",
     )
 
 
@@ -139,26 +166,17 @@ async def import_adv_excel_file(
         )
         return
 
-    try:
-        _headers, rows = read_adv_excel_upload(content)
-        n = await apply_adv_excel_rows(
-            telegram_user_id=message.from_user.id,
-            expected_wb_user_cabinet_id=int(wb_uc_id),
-            rows=rows,
-        )
-    except AdvExcelImportError as e:
-        text = "Импорт отклонён:\n" + "\n".join(f"• {m}" for m in e.messages[:50])
-        if len(e.messages) > 50:
-            text += f"\n… и ещё {len(e.messages) - 50} ошибок"
-        await message.answer(text)
-        return
-    except Exception:
-        logger.exception("import_adv_excel_file failed")
-        await state.clear()
-        await message.answer(
-            "Ошибка при разборе файла. Проверьте формат и попробуйте снова."
-        )
-        return
+    progress = _ProgressReporter(
+        bot=bot, chat_id=chat_id, title="Импорт Excel", min_step=10
+    )
+    await progress.start()
+    _headers, rows = read_adv_excel_upload(content)
+    n = await apply_adv_excel_rows(
+        telegram_user_id=message.from_user.id,
+        expected_wb_user_cabinet_id=int(wb_uc_id),
+        rows=rows,
+        progress_callback=progress.tick,
+    )
 
     await state.clear()
     await message.answer(f"Готово. Обновлено кампаний: {n}.")

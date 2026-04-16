@@ -1,6 +1,8 @@
 """Unit-тесты Excel roundtrip (план/факт KPI и парсинг)."""
 
 import math
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -9,8 +11,14 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EXCEL_TEMPLATE_VERSION,
+    column_header,
+    enum_names_for_field,
     parse_edit_value,
     parse_header,
+)
+from app.client_bot.user_interface.handlers.adv_excel_roundtrip import _ProgressReporter
+from app.client_bot.user_interface.services.adv_excel_roundtrip.export_build import (
+    _first_offer_id_from_nmid,
 )
 
 
@@ -50,11 +58,79 @@ def test_parse_header_edit_bool() -> None:
 
 
 @pytest.mark.unit
+def test_parse_header_with_russian_label_and_tech_key() -> None:
+    h = "Стратегия (EDIT__strategy__ENUM)"
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "strategy"
+    assert s == "ENUM"
+
+
+@pytest.mark.unit
+def test_column_header_contains_tech_key() -> None:
+    h = column_header("RO", "adv_id")
+    assert "ID единой ставки" in h
+    assert "(RO__adv_id)" in h
+
+
+@pytest.mark.unit
+def test_parse_header_backward_compatible_with_old_template() -> None:
+    k, f, s = parse_header("RO__adv_setting_id")
+    assert k == "RO"
+    assert f == "adv_setting_id"
+    assert s == ""
+
+
+@pytest.mark.unit
 def test_parse_edit_bool_from_excel() -> None:
     assert parse_edit_value("bot_active", True) is True
     assert parse_edit_value("bot_active", "FALSE") is False
 
 
 @pytest.mark.unit
+def test_parse_edit_enum_accepts_enum_name() -> None:
+    v = parse_edit_value("strategy", "MIN_CPO")
+    assert str(v.name) == "MIN_CPO"
+
+
+@pytest.mark.unit
+def test_enum_names_for_field_strategy() -> None:
+    values = enum_names_for_field("strategy")
+    assert "MIN_CPO" in values
+    assert "MAX_CONV" in values
+
+
+@pytest.mark.unit
 def test_template_version_constant() -> None:
     assert EXCEL_TEMPLATE_VERSION >= 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_progress_reporter_throttles_messages() -> None:
+    bot = AsyncMock()
+    reporter = _ProgressReporter(bot=bot, chat_id=1, title="Импорт Excel", min_step=10)
+    await reporter.start()
+    await reporter.tick(1, 100)
+    await reporter.tick(5, 100)
+    await reporter.tick(10, 100)
+    await reporter.tick(20, 100)
+
+    # start + 10% + 20%
+    assert bot.send_message.await_count == 3
+
+
+@pytest.mark.unit
+def test_first_offer_id_by_nmid_returns_value() -> None:
+    adv = SimpleNamespace(id=7)
+    assert (
+        _first_offer_id_from_nmid(adv, first_nmid=123, offer_by_nmid={123: "ABC-123"})
+        == "ABC-123"
+    )
+
+
+@pytest.mark.unit
+def test_first_offer_id_by_nmid_raises_when_missing() -> None:
+    adv = SimpleNamespace(id=7)
+    with pytest.raises(ValueError):
+        _first_offer_id_from_nmid(adv, first_nmid=123, offer_by_nmid={})

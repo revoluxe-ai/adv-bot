@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+import re
 from typing import Any, Literal
 
 from sqlalchemy import Boolean, Enum as SAEnumColumn, Float, Integer, String
@@ -22,6 +23,7 @@ from app.modules.common_slaves.wildberries.models.models import (
 )
 
 ExcelColumnKind = Literal["RO", "EDIT"]
+TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 
 # Версия шаблона: при несовпадении импорт отклоняется
 EXCEL_TEMPLATE_VERSION = 1
@@ -81,7 +83,6 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "use_common_budget",
         "common_budget_daily_limit",
         "auto_adv_target_status",
-        "auction_adv_target_status",
         "auto_add_only_relevant_phrase",
         "orders_source_for_auto_mode",
         "predict_ctr_mode",
@@ -103,6 +104,12 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
 
 
 def column_header(kind: ExcelColumnKind, field: str, suffix: str = "") -> str:
+    tech = f"{kind}__{field}__{suffix}" if suffix else f"{kind}__{field}"
+    title = display_name_for_field(field)
+    return f"{title} ({tech})"
+
+
+def technical_column_header(kind: ExcelColumnKind, field: str, suffix: str = "") -> str:
     if suffix:
         return f"{kind}__{field}__{suffix}"
     return f"{kind}__{field}"
@@ -129,14 +136,16 @@ def edit_header(field: str) -> str:
 
 def parse_header(name: str) -> tuple[ExcelColumnKind | None, str, str]:
     """Разбор заголовка RO__field или EDIT__field__TYPE."""
-    parts = name.split("__")
-    if len(parts) < 2:
+    m = TECH_HEADER_RE.search(name.strip())
+    if m is None and name.strip().endswith(")"):
+        left = name.rfind("(")
+        if left >= 0:
+            m = TECH_HEADER_RE.fullmatch(name[left + 1 : -1].strip())
+    if m is None:
         return None, "", ""
-    kind_raw = parts[0].upper()
-    if kind_raw not in ("RO", "EDIT"):
-        return None, "", ""
-    field = parts[1]
-    suffix = "__".join(parts[2:]) if len(parts) > 2 else ""
+    kind_raw = m.group(1).upper()
+    field = m.group(2)
+    suffix = (m.group(3) or "").strip()
     return kind_raw, field, suffix  # type: ignore[return-value]
 
 
@@ -174,6 +183,85 @@ def enum_class_for_field(field: str) -> type[Enum] | None:
         "bidder_coroutine_type": BidderCoroutineType,
     }
     return mapping.get(field)
+
+
+def enum_names_for_field(field: str) -> list[str]:
+    ec = enum_class_for_field(field)
+    if ec is None:
+        return []
+    return [x.name for x in ec]
+
+
+_FIELD_DISPLAY_NAMES: dict[str, str] = {
+    "excel_template_version": "Версия шаблона",
+    "snapshot_at": "Дата снимка",
+    "adv_setting_id": "Внутренний ID кампании",
+    "adv_id": "ID единой ставки",
+    "search_adv_id": "ID ручной ставки (поиск)",
+    "nmid": "NMID",
+    "offer_id": "Артикул продавца",
+    "fact_orders_per_day": "Факт заказов в день",
+    "fact_cost_per_order": "Фактическая себестоимость заказа",
+    "plan_orders_per_day": "План заказов в день",
+    "plan_target_cost": "Плановая целевая себестоимость заказа",
+    "plan_max_cost": "Плановая максимальная себестоимость заказа",
+    "orders_dev_pct": "Отклонение по заказам, %",
+    "cost_dev_pct": "Отклонение по себестоимости заказа, %",
+    "deviation_score": "Итоговое отклонение",
+    "plan_for_sales_for_day": "План продаж в день",
+    "target_price_for_order": "Целевая себестоимость",
+    "max_price_for_order": "Максимальная себестоимость",
+    "strategy": "Стратегия",
+    "bot_active": "Бот включен",
+    "parsing_active": "Парсинг включен",
+    "pass_days": "Дней пропуска",
+    "boost": "Буст ставки",
+    "max_cpc": "Максимальный CPC",
+    "max_cpm": "Максимальный CPM",
+    "min_views_for_ml_predict": "Мин. просмотров для ML-прогноза",
+    "clusters_mode": "Кластерный режим",
+    "target_ctr_mode": "Режим целевого CTR",
+    "hide_small_query_keywords": "Скрывать низкочастотные ключи",
+    "bidder_coroutine_type": "Тип корутины биддера",
+    "target_ctr_mode_strategy": "Стратегия режима целевого CTR",
+    "new_auto_min_ctr_mode": "Новый режим минимального CTR (авто)",
+    "reset_place": "Сброс позиции",
+    "exponent_predict_ctr": "Экспонента прогноза CTR",
+    "bidder_step": "Шаг биддера",
+    "auction_boost_all_phrase_mode": "Буст всех фраз в аукционе",
+    "bidder_for_auto": "Биддер для авто",
+    "auto_update_white_list": "Автообновление белого списка",
+    "auto_budget_watchdog_enabled": "Контроль автобюджета",
+    "auto_update_target_place": "Автообновление целевой позиции",
+    "auto_update_exponent": "Автообновление экспоненты",
+    "rec_system_mode": "Режим рекомендательной системы",
+    "hide_zero_views_keywords": "Скрывать ключи без просмотров",
+    "max_balance_adding_for_day": "Лимит пополнения баланса в день",
+    "auto_budget_daily_limit": "Дневной лимит автобюджета",
+    "search_auto_budget_daily_limit": "Дневной лимит автобюджета (поиск)",
+    "use_common_budget": "Использовать общий бюджет",
+    "common_budget_daily_limit": "Дневной лимит общего бюджета",
+    "auto_adv_target_status": "Целевой статус авто-РК",
+    "auto_add_only_relevant_phrase": "Добавлять только релевантные фразы",
+    "orders_source_for_auto_mode": "Источник заказов для авто-режима",
+    "predict_ctr_mode": "Режим прогноза CTR",
+    "sales_predict_method": "Метод прогноза продаж",
+    "automatic_version": "Версия автоматики",
+    "white_list_mode": "Режим белого списка",
+    "individual_keywords_target_place_mode": "Режим целевой позиции по ключам",
+    "min_target_position": "Минимальная целевая позиция",
+    "target_position_mode": "Режим целевой позиции",
+    "auto_update_strategy": "Автообновление стратегии",
+    "updater_common_bid_in_search_adv_active_status": "Обновление общей ставки в поиске",
+    "bidder_mode": "Режим биддера",
+    "use_incremental_stats": "Использовать инкрементальную статистику",
+    "min_block_position": "Минимальная позиция блока",
+    "max_place": "Максимальная позиция",
+}
+
+
+def display_name_for_field(field: str) -> str:
+    return _FIELD_DISPLAY_NAMES.get(field, field)
 
 
 def serialize_cell_value(field: str, value: Any) -> Any:
