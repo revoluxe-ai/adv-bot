@@ -1,4 +1,3 @@
-import asyncio
 from typing import TYPE_CHECKING, Literal, get_args
 
 from aiogram import Bot
@@ -236,24 +235,7 @@ class MainAdvManager:
 
         await self._apply_default_settings_to_adv(auto_adv_id)
 
-        task_update_cpm_auto = self.wb_api.update_cpm(
-            auto_adv_id,
-            nmid,
-            10,
-        )
-
-        task_update_cpm_auction = self.wb_api.update_cpm(
-            search_adv_id,
-            nmid,
-            10,
-        )
-
-        try:
-            await asyncio.gather(task_update_cpm_auto, task_update_cpm_auction)
-            update_cpm_status = True
-        except Exception as exc:
-            logger.error(exc, exc_info=True)
-            update_cpm_status = False
+        update_cpm_status = True
 
         return auto_adv_id, search_adv_id, update_cpm_status
 
@@ -374,13 +356,6 @@ class MainAdvManager:
 
         await self._apply_default_settings_to_adv(existing_auto_adv_id)
 
-        task_update_cpm_auto = self.wb_api.update_cpm(existing_auto_adv_id, nmid, 10)
-        task_update_cpm_auction = self.wb_api.update_cpm(search_adv_id, nmid, 10)
-        try:
-            await asyncio.gather(task_update_cpm_auto, task_update_cpm_auction)
-        except Exception as exc:
-            logger.error(exc, exc_info=True)
-
         return search_adv_id
 
     async def create_auto_only(
@@ -465,15 +440,6 @@ class MainAdvManager:
             await self._perform_adv_setting_upsert(session, adv_data)
 
         await self._apply_default_settings_to_adv(auto_adv_id)
-
-        task_update_cpm_auto = self.wb_api.update_cpm(auto_adv_id, nmid, 10)
-        task_update_cpm_auction = self.wb_api.update_cpm(
-            existing_search_adv_id, nmid, 10
-        )
-        try:
-            await asyncio.gather(task_update_cpm_auto, task_update_cpm_auction)
-        except Exception as exc:
-            logger.error(exc, exc_info=True)
 
         return auto_adv_id
 
