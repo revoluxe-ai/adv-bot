@@ -198,7 +198,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "plan_max_cost": "Плановая максимальная себестоимость заказа",
     "orders_dev_pct": "Отклонение по заказам, %",
     "cost_dev_pct": "Отклонение по себестоимости заказа, %",
-    "deviation_score": "Итоговое отклонение",
+    "deviation_score": "Итоговое отклонение, п.п.",
     "plan_for_sales_for_day": "План продаж в день",
     "target_price_for_order": "Целевая себестоимость",
     "max_price_for_order": "Максимальная себестоимость",
