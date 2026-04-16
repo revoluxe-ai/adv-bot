@@ -59,14 +59,14 @@ class TestImprovedTokenStatus:
             expiring_tokens=[],
         )
 
-        # Latest personal expiry is token1 (30 days)
+        # Service breaks when token2 expires because unique rights are split across tokens.
         expiration_date = report.service_expiration_date
         assert expiration_date is not None
-        assert expiration_date == token1.expires
+        assert expiration_date == token2.expires
 
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
-        assert 29 <= days_until_break <= 30  # Allow for timing differences
+        assert 9 <= days_until_break <= 10  # Allow for timing differences
 
     def test_service_expiration_date_insufficient_status(self):
         """Test service expiration date when status is Insufficient (already broken)."""
@@ -102,14 +102,14 @@ class TestImprovedTokenStatus:
 
     def test_service_expiration_only_relevant_tokens(self):
         """Test that only tokens with required permissions affect expiration date."""
-        # Personal token with required permissions
+        # Personal token with all required permissions.
         required_token = TokenInfo(
             id=1,
             api_key="key1",
             user_id=123,
             shop_id="shop1",
             expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5),
-            categories={"Контент", "Аналитика"},
+            categories=REQUIRED_RIGHTS,
             is_read_only=False,
             is_valid=True,
             is_expired=False,
@@ -140,7 +140,9 @@ class TestImprovedTokenStatus:
             expired_tokens=[],
             available_permissions={
                 "Контент",
+                "Статистика",
                 "Аналитика",
+                "Продвижение",
                 "Цены и скидки",
                 "Маркетплейс",
             },
@@ -226,8 +228,8 @@ class TestImprovedTokenStatus:
         expected_rights = {"Контент", "Статистика", "Аналитика", "Продвижение"}
         assert REQUIRED_RIGHTS == expected_rights
 
-    def test_multiple_tokens_same_earliest_expiration(self):
-        """Test when multiple tokens have the same earliest expiration."""
+    def test_multiple_tokens_same_service_break_date(self):
+        """Test when multiple tokens have the same service-break expiration."""
         same_date = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7)
 
         token1 = TokenInfo(
@@ -273,3 +275,48 @@ class TestImprovedTokenStatus:
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
         assert 6 <= days_until_break <= 7
+
+    def test_service_expiration_with_redundant_rights_uses_later_date(self):
+        """Service should continue if other personal tokens still cover all rights."""
+        full_rights_long = TokenInfo(
+            id=1,
+            api_key="key1",
+            user_id=123,
+            shop_id="shop1",
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
+            categories=REQUIRED_RIGHTS,
+            is_read_only=False,
+            is_valid=True,
+            is_expired=False,
+            is_personal=True,
+        )
+        partial_short = TokenInfo(
+            id=2,
+            api_key="key2",
+            user_id=123,
+            shop_id="shop1",
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=10),
+            categories={"Контент", "Статистика"},
+            is_read_only=False,
+            is_valid=True,
+            is_expired=False,
+            is_personal=True,
+        )
+
+        report = TokenStatusReport(
+            shop_id="shop1",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[full_rights_long, partial_short],
+            valid_tokens=[full_rights_long, partial_short],
+            expired_tokens=[],
+            available_permissions=REQUIRED_RIGHTS,
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[],
+        )
+
+        assert report.service_expiration_date == full_rights_long.expires
+        days_until_break = report.days_until_service_breaks
+        assert days_until_break is not None
+        assert 29 <= days_until_break <= 30

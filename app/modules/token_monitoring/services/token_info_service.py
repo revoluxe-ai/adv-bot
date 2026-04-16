@@ -146,28 +146,44 @@ class TokenStatusReport:
 
     @property
     def service_expiration_date(self) -> datetime.datetime | None:
-        """Latest expiry among personal tokens that contribute required permissions.
+        """Date when required-rights coverage is first lost for personal tokens.
 
-        Only personal tokens are considered (service/base tokens are ignored for this
-        display). If there is no qualifying personal token, returns None.
+        Uses only personal valid tokens that contribute at least one required right.
+        The returned date is the earliest token expiry moment after which the union
+        of active personal-token rights no longer covers REQUIRED_RIGHTS.
         """
-        if self.status == "Complete":
-            candidates = [
-                token
-                for token in self.valid_tokens
-                if token.is_personal and (token.categories & REQUIRED_RIGHTS)
-            ]
-            if not candidates:
-                return None
-            return max(candidates, key=lambda t: t.expires).expires
+        if self.status != "Complete":
+            return None
+
+        personal_tokens = [
+            token
+            for token in self.valid_tokens
+            if token.is_personal and (token.categories & REQUIRED_RIGHTS)
+        ]
+        if not personal_tokens:
+            return None
+
+        # Process expiry events from earliest to latest and detect first coverage loss.
+        rights_coverage_count: dict[str, int] = {right: 0 for right in REQUIRED_RIGHTS}
+        for token in personal_tokens:
+            for right in token.categories & REQUIRED_RIGHTS:
+                rights_coverage_count[right] += 1
+
+        if any(count == 0 for count in rights_coverage_count.values()):
+            return None
+
+        for token in sorted(personal_tokens, key=lambda t: t.expires):
+            for right in token.categories & REQUIRED_RIGHTS:
+                rights_coverage_count[right] -= 1
+
+            if any(count == 0 for count in rights_coverage_count.values()):
+                return token.expires
+
         return None
 
     @property
     def days_until_service_breaks(self) -> int | None:
-        """Days until the latest qualifying personal token expires (see service_expiration_date).
-
-        Returns None if status is not Complete or no qualifying personal token exists.
-        """
+        """Days until first personal-token coverage loss (see service_expiration_date)."""
         expiration_date = self.service_expiration_date
         if expiration_date:
             days = (expiration_date - utcnow()).days
