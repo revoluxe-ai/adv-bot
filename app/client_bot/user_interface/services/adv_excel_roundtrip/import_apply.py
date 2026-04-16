@@ -20,6 +20,9 @@ from typing import Any, Awaitable, Callable
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from app.client_bot.user_interface.services.adv_excel_roundtrip.active_adv import (
+    is_active_adv,
+)
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EXCEL_TEMPLATE_VERSION,
     column_header,
@@ -101,10 +104,6 @@ def _same_optional_int(a: int | None, b: int | None) -> bool:
     return int(a) == int(b)
 
 
-def _is_active_adv(a: AdvSetting) -> bool:
-    return bool(a.active_status and a.bot_active)
-
-
 def _row_value(
     row: dict[str, Any], *, kind: str, field: str, suffix: str = ""
 ) -> Any:
@@ -183,7 +182,7 @@ async def apply_adv_excel_rows(
                     f"Строка {i}: РК не относится к выбранному магазину"
                 )
 
-            if not _is_active_adv(adv):
+            if not is_active_adv(adv):
                 raise AdvExcelImportError(
                     f"Строка {i}: РК не активна (нужны active_status и bot_active)"
                 )

@@ -9,6 +9,9 @@ from typing import Any, Awaitable, Callable
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from app.client_bot.user_interface.services.adv_excel_roundtrip.active_adv import (
+    is_active_adv,
+)
 from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import (
     compute_deviation_metrics,
 )
@@ -24,11 +27,6 @@ from app.utils.db.session_maker import get_async_session_maker
 logger = logging.getLogger(__name__)
 _sm = get_async_session_maker
 ProgressCallback = Callable[[int, int], Awaitable[None] | None]
-
-
-def _is_active_adv(a: AdvSetting) -> bool:
-    """Совпадает с сортировкой в списке кампаний: активная + бот включён."""
-    return bool(a.active_status and a.bot_active)
 
 
 def _first_nmid(adv: AdvSetting) -> int | None:
@@ -153,7 +151,7 @@ async def build_adv_excel_export(
                 if offer_id:
                     offer_by_nmid[int(nmid)] = str(offer_id)
 
-    active = [a for a in advs if _is_active_adv(a)]
+    active = [a for a in advs if is_active_adv(a)]
     headers = _base_ro_columns() + [edit_header(f) for f in _ordered_edit_fields()]
 
     rows: list[dict[str, Any]] = []
