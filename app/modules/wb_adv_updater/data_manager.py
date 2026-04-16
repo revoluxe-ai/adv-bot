@@ -68,14 +68,8 @@ async def _card_exists_in_db(nmid: int) -> bool:
 
 
 async def _get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet | None:
-    try:
-        shop_id_int = int(shop_id)
-    except ValueError:
-        logger.warning("ensure_card_in_db: invalid shop_id=%s", shop_id)
-        return None
-
     async with _sm(read_only=True) as session:
-        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id_int).limit(1)
+        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id).limit(1)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
