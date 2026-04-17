@@ -62,3 +62,19 @@ async def test_candidates_allow_below_rec_when_organic_above_shelf() -> None:
 
     result = await manager.get_candidates_to_white_list(complex_adv)
     assert result == [below_rec]
+
+
+@pytest.mark.asyncio
+async def test_candidates_include_zero_views() -> None:
+    manager = KeywordsManager()
+    zero_views = _kw(views=0, rating=5)
+    complex_adv = SimpleNamespace(
+        auto_add_only_relevant_phrase=False,
+        rec_system_promotion_mode_active=False,
+        auto_adv_active_status=False,
+        is_shelf_activation_allowed=False,
+        get_keywords=AsyncMock(return_value=[zero_views]),
+    )
+
+    result = await manager.get_candidates_to_white_list(complex_adv)
+    assert result == [zero_views]

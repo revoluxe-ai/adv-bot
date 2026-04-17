@@ -20,8 +20,6 @@ class KeywordsManager:
         # TODO: Централизовать отбор кандидатов в БС
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
-            if keyword.views == 0:
-                return False
             if keyword.reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID:
                 return False
             if keyword.hard_status != 1:
