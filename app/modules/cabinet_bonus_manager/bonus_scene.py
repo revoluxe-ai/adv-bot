@@ -14,11 +14,15 @@ from sqlalchemy import select
 
 from app.client_bot.const import ADMINS
 from app.modules.cabinet_bonus_manager.bonus_service import (
+    add_balance,
     add_bonus,
     get_cabinet_by_id,
     get_wb_cabinet_by_shop_id,
+    reset_balance,
     reset_bonus,
+    subtract_balance,
     subtract_bonus,
+    subtract_total_with_bonus_priority,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.cabinet_bonus_manager.keyboards import (
@@ -31,7 +35,15 @@ from app.utils.db.session_maker import get_async_session_maker
 logger = logging.getLogger(__name__)
 
 # Словарь для хранения операций, обрабатываемых менеджером состояний
-OPERATIONS = {"add": "добавление", "subtract": "снятие", "reset": "обнуление"}
+OPERATIONS = {
+    "add": "добавление бонусов",
+    "subtract": "снятие бонусов",
+    "reset": "обнуление бонусов",
+    "add_balance": "пополнение баланса",
+    "subtract_balance": "снятие баланса",
+    "reset_balance": "обнуление баланса",
+    "subtract_priority": "списание (сначала бонусы, затем баланс)",
+}
 
 
 class BonusScene(Scene, state="bonus_scene"):
@@ -203,14 +215,19 @@ class BonusScene(Scene, state="bonus_scene"):
             current_balance = data.get("current_balance", 0)
             shop_id = data.get("shop_id")
 
-            # Проверяем достаточно ли бонусов для subtract
+            # Локальные проверки на достаточность средств
             if operation == "subtract" and amount > current_bonus:
                 await message.answer(
                     f"Недостаточно бонусов для снятия. Текущий баланс бонусов: {current_bonus} руб.\n"
                     f"Введите меньшую сумму:"
                 )
                 return
-
+            if operation == "subtract_balance" and amount > current_balance:
+                await message.answer(
+                    f"Недостаточно баланса для снятия. Текущий баланс: {current_balance} руб.\n"
+                    f"Введите меньшую сумму:"
+                )
+                return
             # Переходим к вводу описания
             await state.update_data(action="description")
             await message.answer(
@@ -248,13 +265,22 @@ class BonusScene(Scene, state="bonus_scene"):
                     f"Описание: {description or 'Не указано'}\n\n"
                     f"Подтвердите операцию:"
                 )
+            elif operation == "reset_balance":
+                confirm_message = (
+                    f"🏪 Магазин: {shop_id}\n"
+                    f"💰 Текущий баланс: {current_balance} руб.\n"
+                    f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
+                    f"Вы собираетесь ОБНУЛИТЬ весь баланс этого кабинета!\n"
+                    f"Описание: {description or 'Не указано'}\n\n"
+                    f"Подтвердите операцию:"
+                )
             else:
                 operation_name = OPERATIONS.get(operation, "операция")
                 confirm_message = (
                     f"🏪 Магазин: {shop_id}\n"
                     f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                     f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
-                    f"Операция: {operation_name.upper()} бонусов\n"
+                    f"Операция: {operation_name.upper()}\n"
                     f"Сумма: {amount} руб.\n"
                     f"Описание: {description or 'Не указано'}\n\n"
                     f"Подтвердите операцию:"
@@ -322,7 +348,21 @@ class BonusScene(Scene, state="bonus_scene"):
                 ),  # Используем cabinet.id
             )
 
-    @on.callback_query(AdminBonus.filter(F.action.in_(["add", "subtract", "reset"])))
+    @on.callback_query(
+        AdminBonus.filter(
+            F.action.in_(
+                [
+                    "add",
+                    "subtract",
+                    "reset",
+                    "add_balance",
+                    "subtract_balance",
+                    "reset_balance",
+                    "subtract_priority",
+                ]
+            )
+        )
+    )
     async def process_shop_bonus_callback(
         self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext
     ):
@@ -338,24 +378,31 @@ class BonusScene(Scene, state="bonus_scene"):
 
         await state.update_data(operation=callback_data.action)
 
-        if callback_data.action == "reset":
+        if callback_data.action in ("reset", "reset_balance"):
             await state.update_data(action="description")
+            reset_subject = (
+                "бонусов" if callback_data.action == "reset" else "баланса"
+            )
             await callback.message.edit_text(
                 f"🏪 Магазин: {shop_id}\n"
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
-                f"Введите описание операции обнуления:"
+                f"Введите описание операции обнуления {reset_subject}:"
             )
         else:
             await state.update_data(action="amount")
-            operation_name = (
-                "пополнения" if callback_data.action == "add" else "списания"
-            )
+            operation_name = {
+                "add": "пополнения бонусов",
+                "subtract": "списания бонусов",
+                "add_balance": "пополнения баланса",
+                "subtract_balance": "списания баланса",
+                "subtract_priority": "списания (сначала бонусы, затем баланс)",
+            }.get(callback_data.action, "операции")
             await callback.message.edit_text(
                 f"🏪 Магазин: {shop_id}\n"
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
-                f"Введите сумму для {operation_name} бонусов:"
+                f"Введите сумму для {operation_name}:"
             )
 
     @on.callback_query(AdminBonus.filter(F.action == "menu"))
@@ -412,6 +459,17 @@ class BonusScene(Scene, state="bonus_scene"):
                     f"✅ Бонусы успешно добавлены в кабинет {shop_id}"
                     f" \nСумма: {callback_data.amount} руб."
                 )
+            elif operation == "add_balance":
+                result = await add_balance(
+                    wb_cabinet_original_id,
+                    callback_data.amount,
+                    admin_user_id,
+                    full_description,
+                )
+                operation_text = (
+                    f"✅ Баланс успешно пополнен для кабинета {shop_id}\n"
+                    f"Сумма: {callback_data.amount} руб."
+                )
             elif operation == "subtract":
                 result = await subtract_bonus(
                     wb_cabinet_original_id,
@@ -423,11 +481,42 @@ class BonusScene(Scene, state="bonus_scene"):
                     f"✅ Бонусы успешно списаны с кабинета {shop_id}!\n"
                     f"Сумма: {callback_data.amount} руб."
                 )
+            elif operation == "subtract_balance":
+                result = await subtract_balance(
+                    wb_cabinet_original_id,
+                    callback_data.amount,
+                    admin_user_id,
+                    full_description,
+                )
+                operation_text = (
+                    f"✅ Баланс успешно списан с кабинета {shop_id}!\n"
+                    f"Сумма: {callback_data.amount} руб."
+                )
             elif operation == "reset":
                 result = await reset_bonus(
                     wb_cabinet_original_id, admin_user_id, full_description
                 )
                 operation_text = f"✅ Бонусы кабинета {shop_id} успешно обнулены!"
+            elif operation == "reset_balance":
+                result = await reset_balance(
+                    wb_cabinet_original_id, admin_user_id, full_description
+                )
+                operation_text = f"✅ Баланс кабинета {shop_id} успешно обнулен!"
+            elif operation == "subtract_priority":
+                result, bonus_spent, balance_spent = (
+                    await subtract_total_with_bonus_priority(
+                        wb_cabinet_original_id,
+                        callback_data.amount,
+                        admin_user_id,
+                        full_description,
+                    )
+                )
+                operation_text = (
+                    f"✅ Списание выполнено для кабинета {shop_id}.\n"
+                    f"Всего: {callback_data.amount} руб.\n"
+                    f"Из бонусов: {bonus_spent:.0f} руб.\n"
+                    f"С баланса: {balance_spent:.0f} руб."
+                )
             else:
                 raise ValueError(f"Неизвестная операция: {operation}")
 
