@@ -631,6 +631,11 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def auto_budget_watchdog(self) -> None:
+        """Сначала автопополнение бюджетов, затем запуск/пауза РК.
+
+        Раньше `auto_adv_active_control` крутился отдельной задачей с тем же интервалом,
+        из‑за чего WB мог отвечать ``Low Budget`` на ``start`` до пополнения счёта кампании.
+        """
         advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
         if not advs:
             return None
@@ -725,7 +730,64 @@ class CoroutinesManager:
                     result.campaign_type,
                     result.adv_id,
                 )
+        await self._run_auto_adv_active_control()
         return None
+
+    async def _run_auto_adv_active_control(self) -> None:
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        advs = [adv for adv in advs if adv.bot_active]
+        wb_manager_hub = self._wb_manager_hub
+        service = AutoAdvActiveControlService(
+            wb_modifier=wb_manager_hub.wb_modifier,
+            tasks_manager=self._tasks_manager,
+            plan_fact_reader=self._plan_fact_reader,
+            redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
+            budget_ensure_before_start_retry=self._ensure_budget_for_campaign_start_retry,
+        )
+        await service.ensure_campaigns_active(advs)
+        return None
+
+    async def _ensure_budget_for_campaign_start_retry(
+        self,
+        adv: ComplexAdv,
+        kind: str,
+    ) -> None:
+        """Повторный ensure после ответа WB Low Budget на старт РК.
+
+        ``force_after_start_rejection`` обходит гейт «stale full adv stats», иначе
+        повторный ensure сразу возвращает NOT_NEW_ADV_STATS без пополнения.
+        """
+        hub = self._wb_manager_hub
+        setting_id = adv.adv_setting.id
+        force = True
+        if adv.use_common_budget:
+            failure_ct = (
+                AdvType.SEARCH if kind == "search" else AdvType.AUTO
+            )
+            _ = await self._auto_budget_service.ensure_common_budget(
+                setting_id,
+                hub,
+                force_after_start_rejection=force,
+                start_failure_campaign=failure_ct,
+            )
+            return
+        if kind == "search" and (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
+            _ = await self._auto_budget_service.ensure_budget(
+                setting_id,
+                AdvType.SEARCH,
+                hub,
+                force_after_start_rejection=force,
+            )
+            return
+        if kind == "auto" and (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
+            _ = await self._auto_budget_service.ensure_budget(
+                setting_id,
+                AdvType.AUTO,
+                hub,
+                force_after_start_rejection=force,
+            )
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
@@ -1140,20 +1202,14 @@ class CoroutinesManager:
                     campaign_type,
             )
 
-    @while_coroutine_decorator(1 * 60, 60)
     async def auto_adv_active_control(self) -> None:
-        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
-        )
-        advs = [adv for adv in advs if adv.bot_active]
-        wb_manager_hub = self._wb_manager_hub
-        service = AutoAdvActiveControlService(
-            wb_modifier=wb_manager_hub.wb_modifier,
-            tasks_manager=self._tasks_manager,
-            plan_fact_reader=self._plan_fact_reader,
-            redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
-        )
-        await service.ensure_campaigns_active(advs)
+        """Один проход контроля активности РК (без собственного цикла).
+
+        Основной цикл: `auto_budget_watchdog` вызывает `_run_auto_adv_active_control`
+        сразу после автопополнения. Метод оставлен для обратной совместимости
+        (ручной вызов, старые тесты).
+        """
+        await self._run_auto_adv_active_control()
         return None
 
     @while_coroutine_decorator(60 * 60 * 4, 60)
