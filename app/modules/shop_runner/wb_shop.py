@@ -71,7 +71,6 @@ class WBShop:
                 tg.create_task(coroutines_manager.handle_stats_stale_emergency())
                 tg.create_task(coroutines_manager.update_plan_fact_stats())
                 tg.create_task(coroutines_manager.auto_budget_watchdog())
-                tg.create_task(coroutines_manager.auto_adv_active_control())
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
                 tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
                 tg.create_task(coroutines_manager.increment_fact_data_stats())

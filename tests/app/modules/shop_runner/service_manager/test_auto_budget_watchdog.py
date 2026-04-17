@@ -6,9 +6,6 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
-)
 
 
 @pytest.mark.asyncio
@@ -78,6 +75,9 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
     ), patch(
         "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
         new=mock_split_fresh,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._run_auto_adv_active_control",
+        new=AsyncMock(),
     ):
         plan_fact_reader = MagicMock(spec=PlanFactReader)
         plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
@@ -153,6 +153,9 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     ), patch(
         "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
         new=mock_split_fresh,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._run_auto_adv_active_control",
+        new=AsyncMock(),
     ):
         plan_fact_reader = MagicMock(spec=PlanFactReader)
         plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)

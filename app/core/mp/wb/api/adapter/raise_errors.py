@@ -39,7 +39,8 @@ async def with_raise_errors(
 
     if 200 <= status < 300:
         return result
-    elif status in [400, 404]:
+    elif status in [400, 404, 422]:
+        # 422: в т.ч. «AdvertChangeStatus: Low Budget» на /adv/v0/start (см. get_adv_v0_start)
         detail = result.content.decode()
         raise BadRequestError(detail)
     elif status in [401, 403]:

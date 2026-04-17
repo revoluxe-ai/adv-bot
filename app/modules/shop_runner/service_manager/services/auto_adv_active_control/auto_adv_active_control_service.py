@@ -23,8 +23,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, Literal, cast
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
 
@@ -37,6 +39,7 @@ from app.client_bot.user_interface.handlers.time_settings.repository import (
     TimeSettingsDbState,
     TimeSettingsRepository,
 )
+from app.core.mp.wb.api.excs import BadRequestError, StandardError
 from app.core.mp.wb.api.managers import WBModifier
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -68,6 +71,55 @@ logger = logging.getLogger(__name__)
 MSK_TZ = timezone(timedelta(hours=3))
 
 _time_settings_repo = TimeSettingsRepository()
+
+
+def _is_wb_low_budget_start_error(detail: str) -> bool:
+    d = detail.lower()
+    if "low budget" in d or "not enough budget" in d:
+        return True
+    try:
+        obj = json.loads(detail)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if isinstance(obj, dict):
+        payload = cast(dict[str, Any], obj)
+        err = str(payload.get("error", "")).lower()
+        return "low budget" in err or "not enough budget" in err
+    return False
+
+
+def _text_suggests_low_budget(text: str) -> bool:
+    t = text.lower()
+    if "low budget" in t or "not enough budget" in t:
+        return True
+    if "недостат" in t and "бюдж" in t:
+        return True
+    return False
+
+
+def _exception_text_blob(exc: BaseException) -> str:
+    parts: list[str] = [str(exc), repr(exc)]
+    if isinstance(exc, BadRequestError):
+        parts.append(exc.detail)
+    if isinstance(exc, StandardError):
+        parts.append(getattr(exc, "message", ""))
+        parts.append(getattr(exc, "title", ""))
+    return " ".join(parts)
+
+
+def _exception_chain_indicates_low_budget_on_start(exc: BaseException) -> bool:
+    """True if this or __cause__/__context__ looks like WB «мало бюджета» for start/pause."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        blob = _exception_text_blob(cur)
+        if _text_suggests_low_budget(blob):
+            return True
+        if isinstance(cur, BadRequestError) and _is_wb_low_budget_start_error(cur.detail):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
 
 
 @dataclass
@@ -106,11 +158,16 @@ class AutoAdvActiveControlService:
         tasks_manager: TasksManager,
         plan_fact_reader: PlanFactReader | None = None,
         redis_campaign_activity_reason_manager: RedisCampaignActivityReasonManager | None = None,
+        budget_ensure_before_start_retry: Callable[
+            [ComplexAdv, Literal["auto", "search"]], Awaitable[None]
+        ]
+        | None = None,
     ) -> None:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()  # просят тесты, потом все это исправить, техдолг
         self._reason_manager = redis_campaign_activity_reason_manager
+        self._budget_ensure_before_start_retry = budget_ensure_before_start_retry
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
         """Привести активность РК в соответствие с бюджетом и расписанием.
@@ -225,6 +282,50 @@ class AutoAdvActiveControlService:
                 "search",
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
+
+    async def _start_auto_campaign_maybe_retry(self, adv: ComplexAdv) -> None:
+        try:
+            await self._wb_modifier.start_auto_campaign(adv)
+        except Exception as exc:
+            if not _exception_chain_indicates_low_budget_on_start(exc):
+                raise
+            if self._budget_ensure_before_start_retry is None:
+                logger.warning(
+                    "Auto start rejected (low budget), no retry hook: shop_id=%s auto_adv_id=%s",
+                    adv.shop_id,
+                    adv.auto_adv_id,
+                )
+                raise
+            logger.info(
+                "Auto start low budget from WB, ensure budget then single retry: "
+                "shop_id=%s auto_adv_id=%s",
+                adv.shop_id,
+                adv.auto_adv_id,
+            )
+            await self._budget_ensure_before_start_retry(adv, "auto")
+            await self._wb_modifier.start_auto_campaign(adv)
+
+    async def _start_auction_campaign_maybe_retry(self, adv: ComplexAdv) -> None:
+        try:
+            await self._wb_modifier.start_auction_campaign(adv)
+        except Exception as exc:
+            if not _exception_chain_indicates_low_budget_on_start(exc):
+                raise
+            if self._budget_ensure_before_start_retry is None:
+                logger.warning(
+                    "Auction start rejected (low budget), no retry hook: shop_id=%s search_adv_id=%s",
+                    adv.shop_id,
+                    adv.search_adv_id,
+                )
+                raise
+            logger.info(
+                "Auction start low budget from WB, ensure budget then single retry: "
+                "shop_id=%s search_adv_id=%s",
+                adv.shop_id,
+                adv.search_adv_id,
+            )
+            await self._budget_ensure_before_start_retry(adv, "search")
+            await self._wb_modifier.start_auction_campaign(adv)
 
     async def _cabinet_has_positive_balance(
         self,
@@ -479,7 +580,7 @@ class AutoAdvActiveControlService:
                 auto_adv_id,
                 adv.shop_id,
             )
-            await self._wb_modifier.start_auto_campaign(adv)
+            await self._start_auto_campaign_maybe_retry(adv)
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.STARTED,
@@ -601,7 +702,7 @@ class AutoAdvActiveControlService:
                     adv_id,
                     adv.shop_id,
                 )
-                await self._wb_modifier.start_auction_campaign(adv)
+                await self._start_auction_campaign_maybe_retry(adv)
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.STARTED,
@@ -645,7 +746,7 @@ class AutoAdvActiveControlService:
                 adv_id,
                 adv.shop_id,
             )
-            await self._wb_modifier.start_auction_campaign(adv)
+            await self._start_auction_campaign_maybe_retry(adv)
             await self._set_search_reason(
                 adv_id,
                 CampaignActivityCommand.STARTED,
