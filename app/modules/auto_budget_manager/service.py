@@ -456,6 +456,7 @@ class AutoBudgetService:
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
         await self._last_success_manager.set(adv_setting.id)
+        await self._topup_failed_manager.clear(adv_setting.id)
 
         return AutoBudgetEnsureResult(
             status=result_status,
@@ -1058,6 +1059,7 @@ class AutoBudgetService:
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
         await self._last_success_manager.set(adv_setting.id)
+        await self._topup_failed_manager.clear(adv_setting.id)
         return AutoBudgetEnsureResult(
             status=result_status,
             campaign_type=target_campaign_type,
