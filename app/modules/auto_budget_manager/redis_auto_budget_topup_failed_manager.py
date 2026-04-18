@@ -41,6 +41,10 @@ class RedisAutoBudgetTopupFailedManager:
         }
         _ = await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
 
+    async def clear(self, adv_setting_id: int) -> None:
+        """Убрать запись об ошибке после успешного (или принятого) автопополнения."""
+        _ = await self._redis_client.delete(self._key(adv_setting_id))
+
     async def get(
         self,
         adv_setting_id: int,

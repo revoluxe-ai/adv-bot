@@ -177,3 +177,76 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     called_args = auto_budget_service_instance.ensure_common_budget.call_args[0]
     assert called_args[0] == adv_setting.id
     auto_budget_service_instance.ensure_budget.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_budget_watchdog_runs_active_control_without_budget_handlers():
+    """Нет кандидатов на автобюджет — ensure не вызывается, контроль активности всё равно один раз."""
+    wb_api = MagicMock()
+    wb_api.wb_cabinet = MagicMock()
+    wb_api.access = MagicMock()
+    wb_api.shop_id = "test-shop"
+    wb_api.session = MagicMock()
+
+    adv_setting = MagicMock()
+    adv_setting.id = 99
+
+    # Включён watchdog, но лимиты 0 — не попадает в handlers
+    adv = MagicMock()
+    adv.auto_budget_daily_limit = 0
+    adv.search_auto_budget_daily_limit = 0
+    adv.adv_id = 101
+    adv.search_adv_id = None
+    adv.auto_budget_watchdog_enabled = True
+    adv.use_common_budget = False
+    adv.common_budget_daily_limit = 0
+    adv.adv_setting = adv_setting
+
+    wb_shop_data_manager_instance = MagicMock()
+    wb_shop_data_manager_instance.get_complex_advs = AsyncMock(return_value=[adv])
+
+    auto_budget_service_instance = MagicMock()
+    auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
+    auto_budget_service_instance.ensure_common_budget = AsyncMock(return_value=None)
+
+    active_control = AsyncMock()
+    wb_manager_hub = MagicMock()
+
+    async def mock_split_fresh(self, candidates, *, operation_name):
+        return candidates, []
+
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.WBShopDataManager",
+        return_value=wb_shop_data_manager_instance,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.AutoBudgetService",
+        return_value=auto_budget_service_instance,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.WBManagerHubFactory.get_wb_manager_from_context",
+        return_value=wb_manager_hub,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
+        new=mock_split_fresh,
+    ), patch(
+        "app.modules.shop_runner.service_manager.manager.CoroutinesManager._run_auto_adv_active_control",
+        new=active_control,
+    ):
+        plan_fact_reader = MagicMock(spec=PlanFactReader)
+        plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+
+        fake_wb_manager_hub = MagicMock()
+        fake_wb_manager_hub.wb_data_manager = MagicMock()
+        fake_wb_manager_hub.wb_manager = MagicMock()
+
+        coroutines_manager = CoroutinesManager(
+            wb_api,
+            MagicMock(),
+            tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=plan_fact_reader,
+            wb_manager_hub=fake_wb_manager_hub,
+        )
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
+
+    auto_budget_service_instance.ensure_budget.assert_not_called()
+    auto_budget_service_instance.ensure_common_budget.assert_not_called()
+    active_control.assert_awaited_once()
