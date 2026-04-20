@@ -691,7 +691,9 @@ class NeedSubscribe(TextWithKeyboard):
 class OrderSubscribe(Text):
     @property
     def text(self) -> str:
-        return f"В случае проблем с оплатой свяжитесь по этому контакту -> {const.SUPPORT_LINK}"
+        return (f"Не работает оплата?\n"
+                f"Напишите сразу {const.SUPPORT_LINK} — пришлю рабочую ссылку, оплатите без проблем")
+
 
 
 class ExpiredSubscription(TextWithKeyboard):
