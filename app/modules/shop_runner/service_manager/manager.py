@@ -737,7 +737,7 @@ class CoroutinesManager:
             return None
         finally:
             await self._run_auto_adv_active_control(advs)
-            return None
+
 
     async def _run_auto_adv_active_control(self, advs: list[ComplexAdv]) -> None:
         wb_manager_hub = self._wb_manager_hub
