@@ -72,6 +72,8 @@ class PlanFactProvider:
 
         Реализация в ``plan_fact_reader``; ленивый импорт, чтобы не зациклить
         загрузку ``PlanFactProvider`` с ``wb_shop_data_manager``.
+        Важно: целевые значения (plan/target/max) берутся не из CH-сводки,
+        а из текущих настроек ``AdvSetting`` через ``get_plan_data``.
         """
         from app.modules.shop_runner.service_manager.services.plan_fact_controller import (
             plan_fact_reader,

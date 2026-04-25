@@ -189,25 +189,16 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         mapping = {
             1: PlanFactSummary(
                 adv_id=1,
-                plan_orders=1,
-                plan_target_pay_for_order=100,
-                plan_max_pay_for_order=200,
                 fact_predict_orders=2.0,
                 fact_pay_for_order=150.0,
             ),
             3: PlanFactSummary(
                 adv_id=3,
-                plan_orders=1,
-                plan_target_pay_for_order=100,
-                plan_max_pay_for_order=200,
                 fact_predict_orders=2.0,
                 fact_pay_for_order=150.0,
             ),
             5: PlanFactSummary(
                 adv_id=5,
-                plan_orders=1,
-                plan_target_pay_for_order=100,
-                plan_max_pay_for_order=200,
                 fact_predict_orders=2.0,
                 fact_pay_for_order=150.0,
             ),
@@ -506,9 +497,6 @@ async def test_auto_adv_active_control_service_pauses_when_daily_limit_exceeded(
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=7,
-            plan_orders=1,
-            plan_target_pay_for_order=100,
-            plan_max_pay_for_order=200,
             fact_predict_orders=0.0,
             fact_pay_for_order=0.0,
         )
@@ -633,9 +621,6 @@ async def test_auto_adv_active_control_common_budget_starts_when_under_limit():
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=13,
-            plan_orders=10,
-            plan_target_pay_for_order=100,
-            plan_max_pay_for_order=200,
             fact_predict_orders=12.0,
             fact_pay_for_order=90.0,
         )
@@ -696,9 +681,6 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=10,
-            plan_orders=10,
-            plan_target_pay_for_order=100,
-            plan_max_pay_for_order=200,
             fact_predict_orders=12.0,
             fact_pay_for_order=120.0,
         )
@@ -757,9 +739,6 @@ async def test_auto_adv_avg_cost_starts_when_below_target():
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=11,
-            plan_orders=10,
-            plan_target_pay_for_order=120,
-            plan_max_pay_for_order=220,
             fact_predict_orders=15.0,
             fact_pay_for_order=110.0,
         )
@@ -820,9 +799,6 @@ async def test_auto_adv_does_not_start_when_avg_cost_above_target():
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=20,
-            plan_orders=10,
-            plan_target_pay_for_order=100,
-            plan_max_pay_for_order=200,
             fact_predict_orders=15.0,
             fact_pay_for_order=110.0,
         )
@@ -935,9 +911,6 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=24,
-            plan_orders=10,
-            plan_target_pay_for_order=100,
-            plan_max_pay_for_order=200,
             fact_predict_orders=12.0,
             fact_pay_for_order=90.0,
         )
