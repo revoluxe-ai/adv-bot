@@ -19,6 +19,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
 
 TItem = TypeVar("TItem")
 
+
 class PlanFactManager:
     """Менеджер для обработки план-факта данных всех кампаний и записи в ClickHouse"""
 
@@ -36,7 +37,6 @@ class PlanFactManager:
             return None
 
         version = time.time()
-
         handlers: list[Callable[[], Awaitable[PlanFactStatDTO | None]]] = [
             lambda item_=item: processor(item_, version) for item in items
         ]

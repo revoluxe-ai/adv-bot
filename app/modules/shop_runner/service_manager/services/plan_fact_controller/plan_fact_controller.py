@@ -44,7 +44,12 @@ class PlanFactController:
 
 
     @staticmethod
-    async def _resolve_fact_for_pre_adv(pre_adv: PreComplexAdv) -> FactData:
+    async def _resolve_fact_for_pre_adv(
+        pre_adv: PreComplexAdv,
+    ) -> FactData:
+        from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+            RedisCalculatedKeywordsCacheManager,
+        )
         from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
         complex_adv = ComplexAdv(
@@ -53,10 +58,26 @@ class PlanFactController:
             search_adv=pre_adv.search_adv,
             target_pay_for_order=pre_adv.resolved_target_pay_for_order,
         )
-        keywords = await get_good_bad_phrases(complex_adv)
+        redis_kw = RedisCalculatedKeywordsCacheManager()
+        cached_keywords = await redis_kw.get_all_calculated_keywords_for_adv(
+            complex_adv.adv_id
+        )
+        if cached_keywords:
+            keywords = sorted(
+                cached_keywords,
+                key=lambda kw: kw.rating or 0,
+                reverse=True,
+            )
+        else:
+            keywords = await get_good_bad_phrases(complex_adv)
         provider = PlanFactProvider(pre_adv.auto_adv)
-        stat = await provider.get_stat_data(keywords)
-        return await provider.get_fact_data(stat)
+
+        # Сначала пробуем инкрементальный факт без расчета stat.
+        fact = await provider.try_get_incremental_fact_data()
+        if fact is None:
+            stat = await provider.get_stat_data(keywords)
+            fact = await provider.get_fact_data(stat)
+        return fact
 
     @staticmethod
     async def process_adv(
@@ -93,7 +114,8 @@ class PlanFactController:
 
     @staticmethod
     async def process_pre_adv(
-        pre_adv: PreComplexAdv, version: float
+        pre_adv: PreComplexAdv,
+        version: float,
     ) -> PlanFactStatDTO | None:
         fact = await PlanFactController._resolve_fact_for_pre_adv(pre_adv)
         return PlanFactStatDTO.create(
