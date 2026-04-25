@@ -64,12 +64,6 @@ class PlanFactReader:
         raise TypeError(f"Expected int-convertible value, got {type(value)!r}")
 
     @staticmethod
-    def _as_int_or_none(value: object) -> int | None:
-        if value is None:
-            return None
-        return PlanFactReader._as_int(value)
-
-    @staticmethod
     def _as_float_or_none(value: object) -> float | None:
         if value is None:
             return None
