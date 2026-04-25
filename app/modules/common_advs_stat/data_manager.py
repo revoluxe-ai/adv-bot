@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from . import clickhouse_manager
@@ -49,33 +50,43 @@ class CommonAdvsStatData:
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
 
+    @staticmethod
+    async def _fetch_auction_cpm_if_any(adv_setting: AdvSetting) -> int | None:
+        search_adv_id = adv_setting.search_adv_id
+        if not search_adv_id:
+            return None
+        stmt = select(AdvSetting.cpm).where(AdvSetting.adv_id == search_adv_id)
+        async with _sm() as session:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+
     async def get_data(
         self, adv_setting: AdvSetting, keywords: list[CalculatedKeyword], last_days: int
     ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
-        # Получаем CPM для аукциона
-        auction_cpm: int | None = None
-        if search_adv_id := adv_setting.search_adv_id:
-            stmt = select(AdvSetting.cpm).where(AdvSetting.adv_id == search_adv_id)
-            async with _sm() as session:
-                result = await session.execute(stmt)
-                auction_cpm = result.scalar_one_or_none()
+        auction_cpm: int | None = await self._fetch_auction_cpm_if_any(adv_setting)
 
         pass_days = last_days - 1
         end_date = datetime.now()
         start_date = end_date - timedelta(days=pass_days)
 
-        # Статистика для авто-рекламы
-        full_adv_stat_for_last_days_for_auto_adv = (
-            await full_wb_adv_stat.get_stats_by_last_days(
-                [adv_setting.adv_id], start_date, end_date
+        async def _auction_adv_ch_stat() -> SmallFullAdvStat:
+            sid = adv_setting.search_adv_id
+            if not sid:
+                return SmallFullAdvStat(0, 0, 0.0, 0, 0, 0.0)
+            return await full_wb_adv_stat.get_stats_by_last_days(
+                [sid], start_date, end_date
             )
-        )
 
-        # Статистика для аукциона
-        full_adv_stat_for_last_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_setting.search_adv_id], start_date, end_date  # type: ignore[list-item]
+        (
+            full_adv_stat_for_last_days_for_auto_adv,
+            full_adv_stat_for_last_days_for_auction,
+        ) = await asyncio.gather(
+            full_wb_adv_stat.get_stats_by_last_days(
+                [adv_setting.adv_id], start_date, end_date
+            ),
+            _auction_adv_ch_stat(),
         )
 
         # Общий расход
@@ -84,7 +95,6 @@ class CommonAdvsStatDataManager:
             + full_adv_stat_for_last_days_for_auction.spend
         )
 
-        # Общая статистика
         common_stat: CommonCardStat | None = (
             await common_stat_manager.get_stats_for_last_period(
                 int(adv_setting.nmids[0]), pass_days
@@ -134,20 +144,21 @@ class CommonAdvsStatDataManager:
             spend_for_inner_advs_for_days / max(base_common_orders, 1)
         )
 
-        # Получаем расходы на ключевые слова
-        spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
-            [adv_setting.adv_id], start_date, end_date
+        (
+            spend_for_keywords_in_auto_adv,
+            cost_per_order_from_additional_last_week,
+        ) = await asyncio.gather(
+            full_wb_adv_stat.get_keywords_spend(
+                [adv_setting.adv_id], start_date, end_date
+            ),
+            full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+                adv_setting.adv_id, days=7
+            ),
         )
 
         addition_spend_in_adv = (
             full_adv_stat_for_last_days_for_auto_adv.spend
             - spend_for_keywords_in_auto_adv
-        )
-
-        cost_per_order_from_additional_last_week = (
-            await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-                adv_setting.adv_id, days=7
-            )
         )
 
         from app.modules.wb_adv_updater import phrases_processor

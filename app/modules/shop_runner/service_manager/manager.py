@@ -1203,6 +1203,9 @@ class CoroutinesManager:
                 adv_id,
                     campaign_type,
             )
+
+
+
     @while_coroutine_decorator(60 * 60 * 4, 60)
     async def auto_reset_bid_for_auto_adv(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
