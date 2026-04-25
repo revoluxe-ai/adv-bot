@@ -71,12 +71,8 @@ class PlanFactController:
         else:
             keywords = await get_good_bad_phrases(complex_adv)
         provider = PlanFactProvider(pre_adv.auto_adv)
-
-        # Сначала пробуем инкрементальный факт без расчета stat.
-        fact = await provider.try_get_incremental_fact_data()
-        if fact is None:
-            stat = await provider.get_stat_data(keywords)
-            fact = await provider.get_fact_data(stat)
+        stat = await provider.get_stat_data(keywords)
+        fact = await provider.get_fact_data(stat)
         return fact
 
     @staticmethod
