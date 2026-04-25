@@ -134,6 +134,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
+        self._plan_fact_ch_max_ts_str: str | None = None
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
         self._emergency_mode_active: bool = False
@@ -293,6 +294,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._avg_cost_additional = cost_metrics.avg_cost
         self._is_campaign_active_by_cost = cost_metrics.is_active
         self._plan_set = cost_metrics.plan_set
+        self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -476,7 +478,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"Себес зак: план {target_str}, факт {avg_str}\n"
+                ch_suffix = (
+                    f" (пл-ф CH: {self._plan_fact_ch_max_ts_str} МСК)"
+                    if self._plan_fact_ch_max_ts_str
+                    else ""
+                )
+                text += f"Себес зак: план {target_str}, факт {avg_str}{ch_suffix}\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)

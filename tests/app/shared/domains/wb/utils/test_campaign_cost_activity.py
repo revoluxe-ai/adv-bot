@@ -34,7 +34,10 @@ async def test_is_auto_campaign_active_returns_true_when_avg_cost_below_target()
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(fact_predict_orders=12.0)
+            return_value=SimpleNamespace(
+                fact_predict_orders=12.0,
+                plan_fact_ch_ts_msk="01.01.2025 00:00",
+            )
         )
     )
 
@@ -57,7 +60,10 @@ async def test_is_auto_campaign_active_returns_false_when_avg_cost_above_target(
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(fact_predict_orders=15.0)
+            return_value=SimpleNamespace(
+                fact_predict_orders=15.0,
+                plan_fact_ch_ts_msk="01.01.2025 00:00",
+            )
         )
     )
 
@@ -99,7 +105,10 @@ async def test_get_auto_campaign_cost_activity_metrics_returns_none_when_avg_mis
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(fact_predict_orders=12.0)
+            return_value=SimpleNamespace(
+                fact_predict_orders=12.0,
+                plan_fact_ch_ts_msk="07.06.2025 08:09",
+            )
         )
     )
 
@@ -115,3 +124,4 @@ async def test_get_auto_campaign_cost_activity_metrics_returns_none_when_avg_mis
     assert metrics.target_cost == 120.0
     assert metrics.avg_cost is None
     assert metrics.is_active is None
+    assert metrics.plan_fact_ch_ts_msk == "07.06.2025 08:09"
