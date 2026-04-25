@@ -1,8 +1,5 @@
 SELECT
     adv_id,
-    argMax(plan_orders, timestamp) AS plan_orders,
-    argMax(plan_target_pay_for_order, timestamp) AS plan_target_pay_for_order,
-    argMax(plan_max_pay_for_order, timestamp) AS plan_max_pay_for_order,
     argMax(fact_predict_orders, timestamp) AS fact_predict_orders,
     argMax(fact_pay_for_order, timestamp) AS fact_pay_for_order,
     argMax(fact_original_orders, timestamp) AS fact_original_orders,

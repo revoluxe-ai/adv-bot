@@ -51,9 +51,6 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     summaries = {
         111: PlanFactSummary(
             adv_id=111,
-            plan_orders=100,
-            plan_target_pay_for_order=500,
-            plan_max_pay_for_order=800,
             fact_predict_orders=120.0,
             fact_pay_for_order=450.0,
         ),
@@ -107,9 +104,6 @@ async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() ->
     summaries = {
         111: PlanFactSummary(
             adv_id=111,
-            plan_orders=100,
-            plan_target_pay_for_order=500,
-            plan_max_pay_for_order=800,
             fact_predict_orders=120.0,
             fact_pay_for_order=450.0,
         ),

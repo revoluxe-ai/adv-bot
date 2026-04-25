@@ -20,9 +20,6 @@ PLAN_FACT_CH_TS_FORMAT_MSK = "%d.%m.%Y %H:%i"
 @dataclass
 class PlanFactSummary:
     adv_id: int
-    plan_orders: int | None
-    plan_target_pay_for_order: int | None
-    plan_max_pay_for_order: int | None
     fact_predict_orders: float | None
     fact_pay_for_order: float | None
     fact_original_orders: float | None = None
@@ -93,16 +90,13 @@ class PlanFactReader:
 
     @staticmethod
     def _row_to_summary(row: Sequence[object]) -> PlanFactSummary:
-        ts_raw = row[8] if len(row) > 8 else None
+        ts_raw = row[5] if len(row) > 5 else None
         return PlanFactSummary(
             adv_id=PlanFactReader._as_int(row[0]),
-            plan_orders=PlanFactReader._as_int_or_none(row[1]),
-            plan_target_pay_for_order=PlanFactReader._as_int_or_none(row[2]),
-            plan_max_pay_for_order=PlanFactReader._as_int_or_none(row[3]),
-            fact_predict_orders=PlanFactReader._as_float_or_none(row[4]),
-            fact_pay_for_order=PlanFactReader._as_float_or_none(row[5]),
-            fact_original_orders=PlanFactReader._as_float_or_none(row[6]),
-            fact_method=PlanFactReader._as_str_or_none(row[7]),
+            fact_predict_orders=PlanFactReader._as_float_or_none(row[1]),
+            fact_pay_for_order=PlanFactReader._as_float_or_none(row[2]),
+            fact_original_orders=PlanFactReader._as_float_or_none(row[3]),
+            fact_method=PlanFactReader._as_str_or_none(row[4]),
             plan_fact_ch_ts_msk=PlanFactReader._as_str_or_none(ts_raw),
         )
 
@@ -111,11 +105,10 @@ class PlanFactReader:
     ) -> PlanFactSummary | None:
         """Возвращает последнюю запись план-факт по adv_id из ClickHouse.
 
-        Поля plan_* — снимок на момент записи в кеш; для расчёта целевой
-        себестоимости и иной бизнес-логики по плану используйте текущие
-        настройки AdvSetting (PlanFactProvider.get_plan_data). Из данного
-        метода для логики берите факт: fact_predict_orders, fact_pay_for_order,
-        fact_original_orders, fact_method (при сборке FactData из кеша).
+        Для бизнес-логики используйте только факт:
+        fact_predict_orders, fact_pay_for_order, fact_original_orders, fact_method
+        (при сборке FactData из кеша). Целевые значения (plan/target/max)
+        должны приходить из текущих настроек AdvSetting/PlanData.
         plan_fact_ch_ts_msk — max(timestamp) по adv_id, отформатированный в CH в Europe/Moscow.
         """
         query = self._load_query()
@@ -145,9 +138,6 @@ class PlanFactReader:
         query = """
         SELECT
             adv_id,
-            argMax(plan_orders, timestamp) AS plan_orders,
-            argMax(plan_target_pay_for_order, timestamp) AS plan_target_pay_for_order,
-            argMax(plan_max_pay_for_order, timestamp) AS plan_max_pay_for_order,
             argMax(fact_predict_orders, timestamp) AS fact_predict_orders,
             argMax(fact_pay_for_order, timestamp) AS fact_pay_for_order,
             argMax(fact_original_orders, timestamp) AS fact_original_orders,

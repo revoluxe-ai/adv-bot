@@ -87,15 +87,23 @@ def resolve_target_cost(
     return plan_m
 
 
-def resolve_target_cost_from_summary(summary: PlanFactSummary | None) -> float | None:
-    """Определяет целевую себестоимость заказа из PlanFactSummary.
+def resolve_target_cost_from_summary(
+    summary: PlanFactSummary | None,
+    *,
+    plan_orders: int | None,
+    plan_target_pay_for_order: int | float | None,
+    plan_max_pay_for_order: int | float | None,
+) -> float | None:
+    """Определяет целевую себестоимость заказа из факта + актуального плана.
 
-    Делегирует в resolve_target_cost. Поля плана в summary — снимок из кеша;
-    для бизнес-логики предпочтительно брать план из AdvSetting и вызывать
-    resolve_target_cost(plan.orders, plan.target_pay_for_order, plan.max_pay_for_order, fact_predict_orders).
+    Факт/прогноз заказов берётся из ``PlanFactSummary`` (CH-кеш), а значения
+    плана/target/max передаются отдельно из текущих настроек AdvSetting/PlanData.
 
     Args:
-        summary: Сводка план-факт или None
+        summary: Сводка план-факт или None (используется только ``fact_predict_orders``)
+        plan_orders: Текущий план заказов
+        plan_target_pay_for_order: Текущая целевая себестоимость
+        plan_max_pay_for_order: Текущая максимальная себестоимость
 
     Returns:
         Целевая себестоимость заказа или None если данные невалидны
@@ -103,8 +111,8 @@ def resolve_target_cost_from_summary(summary: PlanFactSummary | None) -> float |
     if not summary:
         return None
     return resolve_target_cost(
-        summary.plan_orders,
-        summary.plan_target_pay_for_order,
-        summary.plan_max_pay_for_order,
+        plan_orders,
+        plan_target_pay_for_order,
+        plan_max_pay_for_order,
         summary.fact_predict_orders,
     )
