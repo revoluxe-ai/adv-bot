@@ -127,10 +127,12 @@ async def process_payment_for_advs() -> None:
         try:
             async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
                 run_attempt = 0
+                billing_attempt = 0
                 logger.info("Billing loop started")
                 while True:
                     try:
                         await billing_process_payment_for_advs(global_ttl=900)
+                        billing_attempt = 0
                         logger.info(
                             "Billing run completed",
                             extra={
@@ -139,9 +141,10 @@ async def process_payment_for_advs() -> None:
                             },
                         )
                     except Exception as exc:
+                        billing_attempt += 1
                         is_infra = _is_infra_error(exc)
                         pause = _calc_backoff(
-                            attempt=1,
+                            attempt=billing_attempt,
                             base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
                             max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
                         )
@@ -153,7 +156,7 @@ async def process_payment_for_advs() -> None:
                                 "error_class": type(exc).__name__,
                                 "is_infra": is_infra,
                                 "retry_in_sec": round(pause, 2),
-                                "restart_count": 0,
+                                "restart_count": billing_attempt,
                             },
                         )
                         await asyncio.sleep(pause)

@@ -69,3 +69,46 @@ async def test_process_payment_for_advs_retries_after_di_bootstrap_failure(
 
     assert create_calls >= 2
     assert billing_calls == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_payment_for_advs_increases_inner_backoff_on_consecutive_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StopLoop(Exception):
+        pass
+
+    @asynccontextmanager
+    async def fake_context():
+        yield object()
+
+    async def fake_create(_container_cls):  # type: ignore[no-untyped-def]
+        return fake_context()
+
+    billing_calls = 0
+
+    async def fake_billing(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        nonlocal billing_calls
+        billing_calls += 1
+        if billing_calls <= 2:
+            raise RuntimeError("name or service not known")
+        return None
+
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        if len(sleep_calls) >= 3:
+            raise StopLoop()
+        return None
+
+    monkeypatch.setattr(runner.DIManager, "create", fake_create)
+    monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
+    monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(runner.random, "uniform", lambda _a, _b: 0.0)
+
+    with pytest.raises(StopLoop):
+        await runner.process_payment_for_advs()
+
+    assert sleep_calls[:2] == [5, 10]
