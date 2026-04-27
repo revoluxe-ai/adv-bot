@@ -23,15 +23,21 @@ def retry_delay_with_jitter(
     max_seconds: int,
     jitter_ratio: float = 0.3,
 ) -> float:
-    """Exponential backoff capped at ``max_seconds``, plus uniform jitter.
+    """Exponential backoff capped at ``max_seconds``, with proportional jitter.
 
-    Jitter spans ``[0, jitter_ratio * exp]`` where ``exp`` is the capped exponential
-    delay, then the sum is capped again at ``max_seconds`` (same as wb_adv_updater runner).
+    Draws uniformly from ``[exp*(1-j), min(max_seconds, exp*(1+j))]`` where ``exp`` is
+    the capped exponential delay and ``j`` is ``jitter_ratio``. Below the cap this
+    spreads retries around ``exp``; at the ceiling (``exp == max_seconds``) the interval
+    becomes ``[max_seconds*(1-j), max_seconds]``, so jitter still separates workers
+    instead of collapsing to a single delay after ``min(..., exp + jitter)``.
     """
     exp = exponential_retry_delay_seconds(
         attempt, base_seconds=base_seconds, max_seconds=max_seconds
     )
     if jitter_ratio <= 0.0:
         return exp
-    jitter = random.uniform(0.0, jitter_ratio * exp)
-    return min(float(max_seconds), exp + jitter)
+    low = max(0.0, exp * (1.0 - jitter_ratio))
+    high = min(float(max_seconds), exp * (1.0 + jitter_ratio))
+    if high <= low:
+        return exp
+    return random.uniform(low, high)
