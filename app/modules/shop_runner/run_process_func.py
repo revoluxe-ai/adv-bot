@@ -28,6 +28,14 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+UNKNOWN_ERROR_RETRY_BASE_SECONDS = 10
+UNKNOWN_ERROR_RETRY_MAX_SECONDS = 120
+
+
+def _retry_delay(attempt: int) -> int:
+    return min(UNKNOWN_ERROR_RETRY_MAX_SECONDS, UNKNOWN_ERROR_RETRY_BASE_SECONDS * (2 ** max(0, attempt - 1)))
+
+
 async def run_shop_task(
     shop_id: str,
     client_session: ClientSession,
@@ -202,6 +210,7 @@ async def _run_shops_loop(
 ) -> None:
     redis_manager = RedisShopManager()
     active_tasks: dict[str, Task[None]] = {}
+    unknown_error_attempt = 0
     while True:
         try:
             await _update_tasks(
@@ -211,6 +220,7 @@ async def _run_shops_loop(
                 tasks_manager=tasks_manager,
                 plan_fact_reader=plan_fact_reader,
             )
+            unknown_error_attempt = 0
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)
@@ -220,7 +230,12 @@ async def _run_shops_loop(
             )
             await asyncio.sleep(30)
         except Exception as exc:
+            unknown_error_attempt += 1
+            pause = _retry_delay(unknown_error_attempt)
             logger.error(
-                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
+                "Ошибка обработки задач обновления магазинов, повтор через %ss: %s",
+                pause,
+                exc,
+                exc_info=True,
             )
-            raise exc
+            await asyncio.sleep(pause)

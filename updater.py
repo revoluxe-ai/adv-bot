@@ -24,7 +24,6 @@ setup_redis_cache()
 
 logger = logging.getLogger(__name__)
 
-
 AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
 
 
@@ -60,21 +59,39 @@ def run_coroutines(coroutine_func:  AsyncEntry) -> None:
 
 
 def main() -> None:
-    processes: list[Process] = []
-    process_pids: list[int | None] = []
-    process_names: list[str] = []
+    process_registry: dict[str, Process] = {}
+    restart_count: dict[str, int] = {entry.__name__: 0 for entry in run_own_process_list}
+
+    def _start_named_process(name: str) -> Process:
+        run_own_process = next(
+            entry for entry in run_own_process_list if entry.__name__ == name
+        )
+        func = partial(run_coroutines, run_own_process)
+        process = Process(target=func, name=name)
+        process.start()
+        logger.info("Запущен процесс %s - %s", process.pid, name)
+        return process
 
     for run_own_process in run_own_process_list:
-        func = partial(run_coroutines, run_own_process)
-        process = Process(target=func, name=run_own_process.__name__)
-        process.start()
-        logger.info(f"Запущен процесс {process.pid} - {run_own_process.__name__}")
-        processes.append(process)
-        process_pids.append(process.pid)
-        process_names.append(run_own_process.__name__)
+        name = run_own_process.__name__
+        process_registry[name] = _start_named_process(name)
 
-    for process in processes:
-        process.join()
+    while True:
+        for name, process in list(process_registry.items()):
+            if process.is_alive():
+                continue
+
+            exit_code = process.exitcode
+            restart_count[name] += 1
+            logger.error(
+                "Процесс %s завершился (exit_code=%s), перезапуск #%s",
+                name,
+                exit_code,
+                restart_count[name],
+            )
+            process_registry[name] = _start_named_process(name)
+
+        time.sleep(2)
     return None
 
 

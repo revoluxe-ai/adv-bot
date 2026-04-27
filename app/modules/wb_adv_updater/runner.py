@@ -3,8 +3,12 @@
 import asyncio
 import datetime
 import logging
+import random
+import socket
 
 from aiohttp import ClientSession
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
@@ -27,8 +31,42 @@ sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
+INFRA_RETRY_BASE_SECONDS = 5
+INFRA_RETRY_MAX_SECONDS = 300
+UNKNOWN_RETRY_BASE_SECONDS = 10
+UNKNOWN_RETRY_MAX_SECONDS = 120
+
 
 # TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
+
+
+def _calc_backoff(
+    attempt: int,
+    base_seconds: int,
+    max_seconds: int,
+) -> float:
+    exp = min(max_seconds, base_seconds * (2 ** max(0, attempt - 1)))
+    # small jitter to avoid synchronized restart storm
+    return min(max_seconds, exp + random.uniform(0, 0.3 * exp))
+
+
+def _is_infra_error(exc: BaseException) -> bool:
+    if isinstance(exc, (RedisConnectionError, RedisTimeoutError, TimeoutError)):
+        return True
+    message = str(exc).lower()
+    if any(
+        hint in message
+        for hint in (
+            "name or service not known",
+            "temporary failure in name resolution",
+            "nodename nor servname provided",
+            "connection refused",
+            "max retries exceeded",
+            "failed to resolve",
+        )
+    ):
+        return True
+    return isinstance(exc, socket.gaierror)
 
 async def run_update_all_keywords_on_wb() -> None:
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
@@ -83,17 +121,64 @@ async def process_payment_for_advs() -> None:
     from app.modules.billing import (
         process_payment_for_advs as billing_process_payment_for_advs,
     )
-    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-        """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
-        while True:
-            try:
-                await billing_process_payment_for_advs(global_ttl=900)
-                logger.info("Обработка платежей завершена успешно")
-            except Exception as e:
-                logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
-                await asyncio.sleep(60)
-                continue
-            await asyncio.sleep(60 * 60)
+    """Запуск периодического списания с self-heal retry и backoff."""
+    run_attempt = 0
+    while True:
+        try:
+            async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+                run_attempt = 0
+                logger.info("Billing loop started")
+                while True:
+                    try:
+                        await billing_process_payment_for_advs(global_ttl=900)
+                        logger.info(
+                            "Billing run completed",
+                            extra={
+                                "component": "billing_loop",
+                                "is_infra": False,
+                            },
+                        )
+                    except Exception as exc:
+                        is_infra = _is_infra_error(exc)
+                        pause = _calc_backoff(
+                            attempt=1,
+                            base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
+                            max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
+                        )
+                        logger.error(
+                            "Billing run failed; retry scheduled",
+                            exc_info=True,
+                            extra={
+                                "component": "billing_loop",
+                                "error_class": type(exc).__name__,
+                                "is_infra": is_infra,
+                                "retry_in_sec": round(pause, 2),
+                                "restart_count": 0,
+                            },
+                        )
+                        await asyncio.sleep(pause)
+                        continue
+                    await asyncio.sleep(60 * 60)
+        except Exception as exc:
+            run_attempt += 1
+            is_infra = _is_infra_error(exc)
+            pause = _calc_backoff(
+                attempt=run_attempt,
+                base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
+                max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
+            )
+            logger.error(
+                "Billing loop bootstrap failed; restarting loop",
+                exc_info=True,
+                extra={
+                    "component": "billing_loop_bootstrap",
+                    "error_class": type(exc).__name__,
+                    "is_infra": is_infra,
+                    "retry_in_sec": round(pause, 2),
+                    "restart_count": run_attempt,
+                },
+            )
+            await asyncio.sleep(pause)
 
 
 
@@ -114,9 +199,28 @@ async def run_main_coroutines() -> None:
         await __run_main_coroutines(event_manager)
 
 async def __run_main_coroutines(event_manager: BillingEventManager) -> None:
+    run_attempt = 0
     while True:
         try:
             await main_loop(event_manager)
-        except Exception as e:
-            logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
-            await asyncio.sleep(0)
+            run_attempt = 0
+        except Exception as exc:
+            run_attempt += 1
+            is_infra = _is_infra_error(exc)
+            pause = _calc_backoff(
+                attempt=run_attempt,
+                base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
+                max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
+            )
+            logger.error(
+                "Main updater loop crashed; restarting",
+                exc_info=True,
+                extra={
+                    "component": "main_updater_loop",
+                    "error_class": type(exc).__name__,
+                    "is_infra": is_infra,
+                    "retry_in_sec": round(pause, 2),
+                    "restart_count": run_attempt,
+                },
+            )
+            await asyncio.sleep(pause)
