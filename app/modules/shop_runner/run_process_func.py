@@ -164,6 +164,9 @@ async def _update_tasks(
                         f"Не обработанная ошибка выполнения задачи магазина: %s",
                         exc
                     )
+                    # Удаляем до raise: иначе при retry внешнего цикла та же запись
+                    # остаётся done-with-exception и блокирует обход навсегда.
+                    del active_tasks[shop_id]
                     raise exc
                 del active_tasks[shop_id]
 
