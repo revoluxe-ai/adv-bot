@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import pytest
 
 from app.modules.wb_adv_updater import runner
+from app.utils import backoff
 
 
 @pytest.mark.unit
@@ -14,7 +15,7 @@ def test_is_infra_error_detects_dns_resolution_message() -> None:
 
 @pytest.mark.unit
 def test_calc_backoff_capped_and_monotonic_with_zero_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(runner.random, "uniform", lambda _a, _b: 0.0)
+    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
     first = runner._calc_backoff(attempt=1, base_seconds=5, max_seconds=300)
     second = runner._calc_backoff(attempt=2, base_seconds=5, max_seconds=300)
     capped = runner._calc_backoff(attempt=100, base_seconds=5, max_seconds=300)
@@ -62,7 +63,7 @@ async def test_process_payment_for_advs_retries_after_di_bootstrap_failure(
     monkeypatch.setattr(runner.DIManager, "create", fake_create)
     monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
     monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(runner.random, "uniform", lambda _a, _b: 0.0)
+    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
 
     with pytest.raises(StopLoop):
         await runner.process_payment_for_advs()
@@ -106,7 +107,7 @@ async def test_process_payment_for_advs_increases_inner_backoff_on_consecutive_f
     monkeypatch.setattr(runner.DIManager, "create", fake_create)
     monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
     monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(runner.random, "uniform", lambda _a, _b: 0.0)
+    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
 
     with pytest.raises(StopLoop):
         await runner.process_payment_for_advs()

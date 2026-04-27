@@ -3,7 +3,6 @@
 import asyncio
 import datetime
 import logging
-import random
 import socket
 
 from aiohttp import ClientSession
@@ -17,6 +16,7 @@ from app.core.di.di_manager import DIManager
 from app.modules.token_monitoring.services.token_expiration_service import (
     run_token_expiration_check,
 )
+from app.utils.backoff import retry_delay_with_jitter
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
@@ -45,9 +45,11 @@ def _calc_backoff(
     base_seconds: int,
     max_seconds: int,
 ) -> float:
-    exp = min(max_seconds, base_seconds * (2 ** max(0, attempt - 1)))
-    # small jitter to avoid synchronized restart storm
-    return min(max_seconds, exp + random.uniform(0, 0.3 * exp))
+    return retry_delay_with_jitter(
+        attempt,
+        base_seconds=base_seconds,
+        max_seconds=max_seconds,
+    )
 
 
 def _is_infra_error(exc: BaseException) -> bool:

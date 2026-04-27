@@ -18,6 +18,7 @@ from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManag
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
+from app.utils.backoff import exponential_retry_delay_seconds
 from app.utils.db.session_maker import get_async_session_maker as sm
 import typing
 
@@ -30,10 +31,6 @@ logger = logging.getLogger(__name__)
 
 UNKNOWN_ERROR_RETRY_BASE_SECONDS = 10
 UNKNOWN_ERROR_RETRY_MAX_SECONDS = 120
-
-
-def _retry_delay(attempt: int) -> int:
-    return min(UNKNOWN_ERROR_RETRY_MAX_SECONDS, UNKNOWN_ERROR_RETRY_BASE_SECONDS * (2 ** max(0, attempt - 1)))
 
 
 async def run_shop_task(
@@ -231,7 +228,13 @@ async def _run_shops_loop(
             await asyncio.sleep(30)
         except Exception as exc:
             unknown_error_attempt += 1
-            pause = _retry_delay(unknown_error_attempt)
+            pause = int(
+                exponential_retry_delay_seconds(
+                    unknown_error_attempt,
+                    base_seconds=UNKNOWN_ERROR_RETRY_BASE_SECONDS,
+                    max_seconds=UNKNOWN_ERROR_RETRY_MAX_SECONDS,
+                )
+            )
             logger.error(
                 "Ошибка обработки задач обновления магазинов, повтор через %ss: %s",
                 pause,
