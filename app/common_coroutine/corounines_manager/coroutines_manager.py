@@ -19,17 +19,6 @@ class CommonCoroutineManager:
         while True:
             try:
                 await worker.run()
-                logger.warning(
-                    "Worker %s stopped unexpectedly, restarting in %ss",
-                    worker_name,
-                    WORKER_RESTART_DELAY_SECONDS,
-                    extra={
-                        "component": "common_coroutine_worker",
-                        "worker": worker_name,
-                        "restart_count": restart_count,
-                        "retry_in_sec": WORKER_RESTART_DELAY_SECONDS,
-                    },
-                )
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -38,6 +27,19 @@ class CommonCoroutineManager:
                     "Worker %s crashed, restarting",
                     worker_name,
                     exc_info=True,
+                    extra={
+                        "component": "common_coroutine_worker",
+                        "worker": worker_name,
+                        "restart_count": restart_count,
+                        "retry_in_sec": WORKER_RESTART_DELAY_SECONDS,
+                    },
+                )
+            else:
+                restart_count += 1
+                logger.warning(
+                    "Worker %s stopped unexpectedly, restarting in %ss",
+                    worker_name,
+                    WORKER_RESTART_DELAY_SECONDS,
                     extra={
                         "component": "common_coroutine_worker",
                         "worker": worker_name,
