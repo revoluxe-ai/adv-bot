@@ -17,12 +17,46 @@ python tools/generate_wb_api_client.py
 python tools/generate_wb_api_client.py --spec-key products
 ```
 
+### Что хранится в `vN/swagger`
+
+Для каждой версии клиента сохраняются:
+
+- исходная спецификация, например `08-promotion.yaml`;
+- (при необходимости) транслитерированная версия `*-translit.yaml`;
+- `spec.lock.json` с fingerprint спецификации:
+  - `spec_key`, `spec_url`, `spec_filename`
+  - `sha256`, `size_bytes`
+  - `downloaded_at_utc`
+  - `generator`, `generator_meta`
+
+Это позволяет проверять, менялась ли удалённая спека, и повторно генерировать клиент из локально зафиксированного YAML.
+
 ### Опции, пригодные для отладки
 
 - `--spec-key` — выбрать другой прописанный Swagger (там же добавляйте будущие секции).
 - `--force-version N` — явно задать номер версии `vN`, если нужно повторно сгенерировать тот же каталог (новые версии автоматически (`v1`, `v2`, `v3`, …) создаются без удаления старых).
 - `--spec-url`, `--spec-filename`, `--package-name`, `--target-root` — позволяют переопределить поведение маппинга.
 - `--meta none` и `--python-cmd openapi-python-client` остаются по умолчанию, но можно указать свои значения для тестов.
+- `--check-spec-changed` — режим проверки: не генерирует клиент, сравнивает удалённый Swagger с последним `spec.lock.json`.
+- `--use-cached-spec` — генерирует клиент из уже сохранённой спеки (`vN/swagger/<spec>.yaml`) и не скачивает её повторно. Требует `--force-version N` и существующую `vN`.
+
+### Проверка изменений Swagger в CI
+
+```bash
+python tools/generate_wb_api_client.py --spec-key promotion --check-spec-changed
+```
+
+Коды завершения:
+
+- `0` — изменений нет;
+- `10` — удалённая спека изменилась относительно последнего lock;
+- `1` — ошибка (нет lock, сетевой сбой, некорректный lock и т.п.).
+
+Пример воспроизводимой перегенерации без сети из зафиксированного YAML:
+
+```bash
+python tools/generate_wb_api_client.py --spec-key promotion --force-version 4 --use-cached-spec
+```
 
 ### Транслитерация
 
