@@ -313,9 +313,6 @@ def main() -> int:
         )
         write_spec_lock(lock_path, lock_data)
 
-    if args.use_cached_spec:
-        # Preserve old lock metadata but refresh timestamped source info for visibility.
-        lock_data = read_spec_lock(lock_path)
     spec_sha = compute_sha256(spec_bytes)
     spec_size = len(spec_bytes)
 
