@@ -95,15 +95,10 @@ async def test_create_complex_advs(
         "app.modules.adv_creator.backend.main_manager.wb_db_manager"
     ) as wb_db_manager_mock, patch(
         "app.modules.adv_creator.backend.main_manager.sm"
-    ) as sm_mock, patch(
-        "app.modules.adv_creator.backend.main_manager.asyncio"
-    ) as asyncio_mock:
+    ) as sm_mock:
         WBAPI_mock_instance = AsyncMock(return_value=None)
         WBAPI_mock_class.return_value = WBAPI_mock_instance
         wb_db_manager_mock.update_cards_in_db = AsyncMock(return_value=None)
-
-        # Mock asyncio.gather to simulate successful execution
-        asyncio_mock.gather = AsyncMock(return_value=None)
 
         # Mock the session maker
         session_mock = AsyncMock()
@@ -153,19 +148,13 @@ async def test_create_complex_advs(
             result = await manager.create_complex_advs(
                 bot_mock, user_telegram_id, nmid, hard_mode=hard_mode
             )
-            assert result
-            # Verify update_cpm was called for both auto and search campaigns
-            assert WBAPI_mock_instance.update_cpm.call_count == 2
-
-            # Check calls to update_cpm
-            calls = WBAPI_mock_instance.update_cpm.call_args_list
-            # First call should be for auto campaign
-            assert calls[0][0] == (111111, nmid, 10)
-            # Second call should be for search campaign
-            assert calls[1][0] == (222222, nmid, 10)
-
-            # Verify asyncio.gather was called with both update_cpm tasks
-            assert asyncio_mock.gather.called
+            assert result == (111111, 222222)
+            mock_di_create.assert_awaited()
+            WBAPI_mock_instance.get_adv_balances.assert_awaited()
+            WBAPI_mock_instance.create_auto_adv.assert_awaited()
+            WBAPI_mock_instance.create_search_adv.assert_awaited()
+            wb_db_manager_mock.update_cards_in_db.assert_awaited()
+            assert WBAPI_mock_instance.add_to_balance.await_count >= 2
 
 
 @pytest.mark.asyncio
