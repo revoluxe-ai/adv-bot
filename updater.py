@@ -18,7 +18,7 @@ from app.modules.wb_adv_updater.runner import (
 from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
 
-dotenv.load_dotenv()
+_ = dotenv.load_dotenv()
 setup_redis_cache()
 
 
@@ -59,37 +59,42 @@ def run_coroutines(coroutine_func:  AsyncEntry) -> None:
 
 
 def main() -> None:
-    process_registry: dict[str, Process] = {}
-    restart_count: dict[str, int] = {entry.__name__: 0 for entry in run_own_process_list}
+    process_registry: dict[int, Process] = {}
+    restart_count: dict[int, int] = {i: 0 for i, _entry in enumerate(run_own_process_list)}
 
-    def _start_named_process(name: str) -> Process:
-        run_own_process = next(
-            entry for entry in run_own_process_list if entry.__name__ == name
-        )
+    def _process_label(index: int, run_own_process: AsyncEntry) -> str:
+        return f"{run_own_process.__name__}#{index}"
+
+    def _start_process(index: int, run_own_process: AsyncEntry) -> Process:
         func = partial(run_coroutines, run_own_process)
-        process = Process(target=func, name=name)
+        process = Process(target=func, name=_process_label(index, run_own_process))
         process.start()
-        logger.info("Запущен процесс %s - %s", process.pid, name)
+        logger.info(
+            "Запущен процесс %s - %s",
+            process.pid,
+            _process_label(index, run_own_process),
+        )
         return process
 
-    for run_own_process in run_own_process_list:
-        name = run_own_process.__name__
-        process_registry[name] = _start_named_process(name)
+    for index, run_own_process in enumerate(run_own_process_list):
+        process_registry[index] = _start_process(index, run_own_process)
 
     while True:
-        for name, process in list(process_registry.items()):
+        for index, process in list(process_registry.items()):
             if process.is_alive():
                 continue
 
             exit_code = process.exitcode
-            restart_count[name] += 1
+            run_own_process = run_own_process_list[index]
+            restart_count[index] += 1
+            process_name = _process_label(index, run_own_process)
             logger.error(
                 "Процесс %s завершился (exit_code=%s), перезапуск #%s",
-                name,
+                process_name,
                 exit_code,
-                restart_count[name],
+                restart_count[index],
             )
-            process_registry[name] = _start_named_process(name)
+            process_registry[index] = _start_process(index, run_own_process)
 
         time.sleep(2)
     return None
