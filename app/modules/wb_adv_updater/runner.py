@@ -40,18 +40,6 @@ UNKNOWN_RETRY_MAX_SECONDS = 120
 # TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
 
 
-def _calc_backoff(
-    attempt: int,
-    base_seconds: int,
-    max_seconds: int,
-) -> float:
-    return retry_delay_with_jitter(
-        attempt,
-        base_seconds=base_seconds,
-        max_seconds=max_seconds,
-    )
-
-
 def _is_infra_error(exc: BaseException) -> bool:
     if isinstance(exc, (RedisConnectionError, RedisTimeoutError, TimeoutError)):
         return True
@@ -145,7 +133,7 @@ async def process_payment_for_advs() -> None:
                     except Exception as exc:
                         billing_attempt += 1
                         is_infra = _is_infra_error(exc)
-                        pause = _calc_backoff(
+                        pause = retry_delay_with_jitter(
                             attempt=billing_attempt,
                             base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
                             max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
@@ -167,7 +155,7 @@ async def process_payment_for_advs() -> None:
         except Exception as exc:
             run_attempt += 1
             is_infra = _is_infra_error(exc)
-            pause = _calc_backoff(
+            pause = retry_delay_with_jitter(
                 attempt=run_attempt,
                 base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
                 max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,
@@ -212,7 +200,7 @@ async def __run_main_coroutines(event_manager: BillingEventManager) -> None:
         except Exception as exc:
             run_attempt += 1
             is_infra = _is_infra_error(exc)
-            pause = _calc_backoff(
+            pause = retry_delay_with_jitter(
                 attempt=run_attempt,
                 base_seconds=INFRA_RETRY_BASE_SECONDS if is_infra else UNKNOWN_RETRY_BASE_SECONDS,
                 max_seconds=INFRA_RETRY_MAX_SECONDS if is_infra else UNKNOWN_RETRY_MAX_SECONDS,

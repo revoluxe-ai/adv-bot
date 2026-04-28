@@ -31,11 +31,15 @@ def test_is_infra_error_detects_dns_resolution_message() -> None:
 
 
 @pytest.mark.unit
-def test_calc_backoff_capped_and_monotonic_with_zero_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_delay_with_jitter_capped_and_monotonic_with_zero_jitter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _disable_jitter(monkeypatch)
-    first = runner._calc_backoff(attempt=1, base_seconds=5, max_seconds=300)
-    second = runner._calc_backoff(attempt=2, base_seconds=5, max_seconds=300)
-    capped = runner._calc_backoff(attempt=100, base_seconds=5, max_seconds=300)
+    first = runner.retry_delay_with_jitter(attempt=1, base_seconds=5, max_seconds=300)
+    second = runner.retry_delay_with_jitter(attempt=2, base_seconds=5, max_seconds=300)
+    capped = runner.retry_delay_with_jitter(
+        attempt=100, base_seconds=5, max_seconds=300
+    )
     assert first == 5
     assert second == 10
     assert capped == 300
