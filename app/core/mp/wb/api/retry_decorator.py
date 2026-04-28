@@ -40,6 +40,7 @@ def retry_decorator(
 
             interval_seconds = float(period)
             requests_per_interval = float(limit)
+            min_pause = interval_seconds / requests_per_interval
 
             method_name = func.__name__
             api_call_state: dict[str, ApiCallState] = (
@@ -51,7 +52,7 @@ def retry_decorator(
             if method_name not in api_call_state:
                 api_call_state[method_name] = {
                     "_last_query_time": None,
-                    "_current_pause": interval_seconds / requests_per_interval,
+                    "_current_pause": min_pause,
                     "_attempts": 0,
                     "_lock": asyncio.Lock(),
                 }
@@ -61,6 +62,8 @@ def retry_decorator(
             locker = state["_lock"]
             async with locker:
                 while True:
+                    time_since_last_query: float | None = None
+                    time_to_wait = 0.0
                     last_query_time = state["_last_query_time"]
                     if last_query_time is not None:
                         current_time = time.time()
@@ -68,17 +71,17 @@ def retry_decorator(
                         time_to_wait = max(
                             state["_current_pause"] - time_since_last_query, 0.0
                         )
-                        await asyncio.sleep(time_to_wait)
+                    await asyncio.sleep(time_to_wait)
 
                     try:
                         result = await func(instance, *args, **kwargs)
                         state["_last_query_time"] = time.time()
-                        next_pause = (
-                            interval_seconds / requests_per_interval
-                            + state["_current_pause"]
+                        blended_pause = (
+                            min_pause + state["_current_pause"]
                         ) / 2
-
-                        state["_current_pause"] = next_pause
+                        # После 429 WB задаёт паузу ниже period/limit; без нижней границы
+                        # усреднение разгоняло следующие запросы слишком близко друг к другу.
+                        state["_current_pause"] = max(min_pause, blended_pause)
                         state["_attempts"] = 0
                         return result
 
@@ -102,15 +105,19 @@ def retry_decorator(
                     except TooManyRequests as e:
                         state["_last_query_time"] = time.time()
                         state["_attempts"] += 1
-                        if state["_attempts"] >= max_attempts:
-                            raise MaxAttemptsError() from e
                         next_pause = e.next_pause
                         if next_pause:
-                            state["_current_pause"] = next_pause
+                            # Не уходить ниже period/limit: в логах min_bids Retry-After 13–15 с
+                            # всё равно приводил к повторным 429 при целевом интервале 16 с.
+                            state["_current_pause"] = max(
+                                float(next_pause), min_pause
+                            )
                         else:
                             state["_current_pause"] = min(
                                 max(state["_current_pause"], 1.0) * 2, float(max_delay)
                             )
+                        if state["_attempts"] >= max_attempts:
+                            raise MaxAttemptsError() from e
 
                     except (
                         UnknownApiRequestError,

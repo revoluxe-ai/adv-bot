@@ -18,6 +18,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PLAN_FACT_CH_TS_FORMAT_MSK,
     PlanFactReader,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -201,6 +202,24 @@ async def test_full_cycle_plan_fact_stats(
     assert row[9] == 520.0  # fact_pay_for_order
     assert row[10] == "DIRECT_SALES"  # fact_method
     assert isinstance(row[11], float)  # version
+
+    reader = PlanFactReader()
+    summary = await reader.get_latest_plan_fact(complex_adv.adv_id)
+    assert summary is not None
+    assert summary.plan_fact_ch_ts_msk is not None
+    fmt_res = await clickhouse_client.query(
+        """
+        SELECT formatDateTime(max(timestamp), %(plan_fact_ts_format)s, 'Europe/Moscow')
+        FROM default_db.plan_fact_stats
+        WHERE adv_id = %(adv_id)s
+        """,
+        parameters={
+            "adv_id": complex_adv.adv_id,
+            "plan_fact_ts_format": PLAN_FACT_CH_TS_FORMAT_MSK,
+        },
+    )
+    assert fmt_res.result_rows
+    assert summary.plan_fact_ch_ts_msk == fmt_res.result_rows[0][0]
 
 
 @pytest.mark.integration

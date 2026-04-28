@@ -145,6 +145,12 @@ class ConnectExistingAdvsBackToShop(CallbackData, prefix="ce_back_shop"):
     wb_user_cabinet_original_id: int
 
 
+class ConnectExistingChangeNmid(CallbackData, prefix="ce_change_nmid"):
+    """Ввести другой артикул в сценарии «подключить существующие»."""
+
+    wb_user_cabinet_original_id: int
+
+
 class ConnectExistingCardNotFound(CallbackData, prefix="ce_card_not_found"):
     """Действие при «артикул по фильтру не найден»: поиск по полному списку или выход."""
 
@@ -179,11 +185,6 @@ class InviteShow(CallbackData, prefix="invite"):
     """Показать инвайт (для приглашения). Только для passed_gate."""
 
     action: str = "show"
-
-
-class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
-    action: str
-    adv_original_id: int
 
 
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
@@ -297,6 +298,18 @@ class ExitRelevantPhraseTemplatesTest(CallbackData, prefix="exit_rel_phrase_test
 
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
+
+
+class ExportShopAdvExcel(CallbackData, prefix="shop_adv_excel_export"):
+    """Выгрузка всех активных РК магазина в один Excel (меню магазина)."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ImportShopAdvExcel(CallbackData, prefix="shop_adv_excel_import"):
+    """Загрузка Excel с правками по магазину; далее ожидается документ в FSM."""
+
+    wb_user_cabinet_original_id: int
 
 
 class TurnClusters(CallbackData, prefix="turn_clusters"):
@@ -459,6 +472,14 @@ class ChangeCommonBidInSearchAdvStatus(
 
 
 class SetCommonBidManual(CallbackData, prefix="set_common_bid_manual"):
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
+class RebindAdvCampaignIds(CallbackData, prefix="rebind_adv_ids"):
+    """Перепривязка кампаний WB: поле adv_id (авто) и колонка _search_adv_id (поиск)."""
+
+    action: str  # menu | auto | search | back
     adv_setting_original_id: int
     wb_user_cabinet_original_id: int
 

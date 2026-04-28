@@ -134,6 +134,7 @@ async def _update_cards_in_db(
         card_values: list[dict[str, Any]] = [
             {
                 "nmid": card.nmid,
+                "offer_id": card.offer_id,
                 "name": card.name,
                 "json": json.dumps(card.data),
                 "wb_category_id": existing_categories[card.wb_category_name].id,
@@ -146,6 +147,7 @@ async def _update_cards_in_db(
         stmt_on_conflict = stmt_for_insert_cards.on_conflict_do_update(
             index_elements=["nmid"],
             set_={
+                "offer_id": stmt_for_insert_cards.excluded.offer_id,
                 "name": stmt_for_insert_cards.excluded.name,
                 "json": stmt_for_insert_cards.excluded.json,
                 "wb_category_id": stmt_for_insert_cards.excluded.wb_category_id,

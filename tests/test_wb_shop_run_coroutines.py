@@ -12,11 +12,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.modules.shop_runner.wb_shop import WBShop
 
-pytestmark = pytest.mark.integration
-
-
-async def _completed_coro() -> None:
-    return None
+pytestmark = pytest.mark.unit
 
 
 def _build_coroutines_manager_mock() -> MagicMock:
@@ -28,13 +24,16 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "update_full_adv_stat",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
+        "refresh_stats_freshness_cache",
         "adv_settings_auto_update",
         "update_minus_phrases_in_advs",
         "update_cluster_bids",
+        "cache_current_cluster_bids",
+        "preload_min_bids_cache_miss",
+        "preload_min_bids_cache_old",
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",
@@ -46,7 +45,7 @@ def _build_coroutines_manager_mock() -> MagicMock:
 
     manager = MagicMock()
     for method in methods:
-        setattr(manager, method, AsyncMock(side_effect=_completed_coro))
+        setattr(manager, method, AsyncMock(return_value=None))
     return manager
 
 
@@ -97,7 +96,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
-    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=RecordingTaskGroup):
+    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(return_value=None)), patch("asyncio.TaskGroup", new=RecordingTaskGroup):
         await wb_shop.run()
 
     for method in (
@@ -109,11 +108,14 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
+        "refresh_stats_freshness_cache",
         "update_cluster_bids",
+        "cache_current_cluster_bids",
+        "preload_min_bids_cache_miss",
+        "preload_min_bids_cache_old",
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",
@@ -154,11 +156,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     with patch(
         "app.modules.shop_runner.wb_shop.CoroutinesManager",
         return_value=coroutines_manager_mock,
-    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(side_effect=_completed_coro)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
+    ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(return_value=None)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    # 1 _alive_worker_run + 20 coroutines from WBShop.run() TaskGroup
-    assert len(recorded_group.created) == 21
+    # 1 _alive_worker_run + 23 coroutines from WBShop.run() TaskGroup
+    assert len(recorded_group.created) == 24
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
@@ -168,11 +170,14 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
+        "refresh_stats_freshness_cache",
         "update_cluster_bids",
+        "cache_current_cluster_bids",
+        "preload_min_bids_cache_miss",
+        "preload_min_bids_cache_old",
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",

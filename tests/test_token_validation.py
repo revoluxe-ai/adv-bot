@@ -2,7 +2,7 @@ import pytest
 
 from app.modules.common_slaves.wildberries.models import WBToken
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.unit
 
 
 # Токены из файла CSV пользователя. Валидным считается только первый.

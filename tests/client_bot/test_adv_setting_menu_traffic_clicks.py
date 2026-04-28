@@ -1,11 +1,15 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu import (
+    DAILY_STATS_CAPTION_MAX_DAYS,
+    SAFE_CAPTION_LIMIT,
     AdvSettingMenu,
 )
+from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     TrafficClicksDTO,
 )
@@ -54,6 +58,51 @@ async def test_get_today_traffic_clicks_dto_returns_values_when_rec_mode_enabled
     assert dto.keyword_clicks == 30
     assert dto.shelf_clicks == 70
     assert dto.organic_clicks == 70
+
+
+def _day(d_iso: str, spend: float, orders: int) -> DayStats:
+    return DayStats(
+        date=datetime.fromisoformat(d_iso),
+        views=0,
+        clicks=0,
+        ctr=0.0,
+        cpc=0.0,
+        sum=spend,
+        atbs=0,
+        orders=orders,
+        cr=0.0,
+        shks=0,
+        sum_price=0.0,
+    )
+
+
+def test_build_caption_daily_stats_shows_up_to_five_days_without_trim_note() -> None:
+    days = [
+        _day("2026-04-10T12:00:00", 100.0, 2),
+        _day("2026-04-11T12:00:00", 200.0, 4),
+        _day("2026-04-12T12:00:00", 0.0, 0),
+        _day("2026-04-13T12:00:00", 50.0, 1),
+        _day("2026-04-14T12:00:00", 300.0, 5),
+    ]
+    block = AdvSettingMenu._build_caption_daily_stats_block(days, 0)  # type: ignore[attr-defined]
+    assert block.startswith("Стат дн:\n")
+    assert "показано" not in block
+    assert block.count("\n") >= 2 + DAILY_STATS_CAPTION_MAX_DAYS
+    assert "14-04-2026" in block
+
+
+def test_build_caption_daily_stats_notes_when_fewer_days_fit_than_window() -> None:
+    days = [
+        _day("2026-04-10T12:00:00", 100.0, 2),
+        _day("2026-04-11T12:00:00", 200.0, 4),
+        _day("2026-04-12T12:00:00", 0.0, 0),
+        _day("2026-04-13T12:00:00", 50.0, 1),
+        _day("2026-04-14T12:00:00", 300.0, 5),
+    ]
+    prefix_len = SAFE_CAPTION_LIMIT - 120
+    block = AdvSettingMenu._build_caption_daily_stats_block(days, prefix_len)  # type: ignore[attr-defined]
+    assert "показано" in block
+    assert prefix_len + len(block) <= SAFE_CAPTION_LIMIT
 
 
 def test_adv_setting_cashback_compact_line_is_short_and_informative() -> None:

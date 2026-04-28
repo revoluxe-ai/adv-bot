@@ -15,7 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
-from app.client_bot import const, utils
+from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.message_templates.templates import (
@@ -44,7 +44,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason, KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 from app.shared.domains.wb.enums import (
     AdvType,
@@ -691,7 +691,9 @@ class NeedSubscribe(TextWithKeyboard):
 class OrderSubscribe(Text):
     @property
     def text(self) -> str:
-        return f"В случае проблем с оплатой свяжитесь по этому контакту -> {const.SUPPORT_LINK}"
+        return (f"Не работает оплата?\n"
+                f"Напишите сразу {const.SUPPORT_LINK} — пришлю рабочую ссылку, оплатите без проблем")
+
 
 
 class ExpiredSubscription(TextWithKeyboard):
@@ -721,74 +723,6 @@ class ExpiredSubscription(TextWithKeyboard):
         return keyboards.get_payment_keyboard(
             wb_cabinet_original_id=cabinet_id,
         )
-
-class MaxCPCSetting(TextWithKeyboard):
-    async def __call__(self, adv_original_id: int):
-        async with sm() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
-            adv: AdvSetting | None = result.scalar()
-            if adv is None:
-                raise ValueError('Не найдена РК в базе')
-
-        self._adv: AdvSetting = adv
-
-        keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
-        keywords   = [
-            kw
-            for kw in keywords
-            if str(kw.status) == KeywordStatus.GOOD
-            or kw.reason == KeywordStatusReason.MAX_CPC
-        ]
-        keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
-
-        def safe_sort(kw: CalculatedKeyword) -> float:
-            return kw.cpc if kw.cpc is not None else float('-inf')
-
-        keywords.sort(key=safe_sort, reverse=True)
-        if not self._adv.max_cpc:
-            top_kw_list = []
-            down_kw_list = keywords
-        else:
-            top_kw_list: list[CalculatedKeyword] = []
-            down_kw_list: list[CalculatedKeyword] = []
-            for keyword in keywords:
-                cpc: float | None = keyword.cpc
-                if cpc is None:
-                    continue
-                if cpc > self._adv.max_cpc:
-                    top_kw_list.append(keyword)
-                else:
-                    down_kw_list.append(keyword)
-        self._top_kw_list: list[CalculatedKeyword] = top_kw_list[-10:]
-        self._down_kw_list = down_kw_list[:10]
-        return await super().__call__()
-
-    @property
-    def text(self):
-        text = f"""Максимальная цена клика {"для кампании " + self._adv.name + " равна " + str(round(self._adv.max_cpc, 2)) + " р." if self._adv.max_cpc else "не задана"}\n"""
-        for keyword in self._top_kw_list:
-            cpc = keyword.cpc
-            if cpc is None:
-                continue
-            text += f"""{keyword.text} - {round(cpc, 2)} р. ❌\n"""
-
-        text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
-
-        for keyword in self._down_kw_list:
-            cpc = keyword.cpc
-            if cpc is None:
-                continue
-            text += f"""{keyword.text} - {round(cpc, 2)} р. ✅\n"""
-
-        text += "Введите новую максимальную цену клика для кампании:"
-        return text
-
-    @property
-    def keyboard(self):
-        return keyboards.get_setting_max_cpc_keyboard(self._adv)
-
 
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
     async def __call__(self, adv_original_id: int):

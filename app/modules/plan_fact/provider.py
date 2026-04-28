@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -17,6 +18,11 @@ from app.modules.shop_runner.service_manager.services.increment_fact_data_manage
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+        PlanFactSummary,
+    )
+
 
 class PlanFactProvider:
     def __init__(
@@ -29,17 +35,23 @@ class PlanFactProvider:
         self._max_last_period = max_last_period
         self._fact_sales_manager = fact_sales_manager or FactSalesDeltaManager()
 
+    async def try_get_incremental_fact_data(self) -> FactData | None:
+        """Пытается получить факт из инкрементальных снапшотов без расчёта stat."""
+        if not self._adv.use_incremental_stats:
+            return None
+        fact_data: FactData | None = await self._fact_sales_manager.calculate_fact_data(
+            self._adv.adv_id,
+            self._adv.sales_predict_method,
+            self._adv.nmids,
+        )
+        return fact_data
+
     async def get_fact_data(
         self, stat: CommonAdvsStatData
     ) ->FactData:
-        if self._adv.use_incremental_stats:
-            fact_data: FactData | None = await self._fact_sales_manager.calculate_fact_data(
-                self._adv.adv_id,
-                self._adv.sales_predict_method,
-                self._adv.nmids,
-            )
-            if fact_data:
-                return fact_data
+        fact_data = await self.try_get_incremental_fact_data()
+        if fact_data is not None:
+            return fact_data
         return self._get_fact_data_from_stat(stat)
 
 
@@ -50,6 +62,27 @@ class PlanFactProvider:
         return await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
+
+    @staticmethod
+    def fact_data_from_plan_fact_summary(
+        summary: PlanFactSummary | None,
+        adv_setting: AdvSetting,
+    ) -> FactData | None:
+        """Собирает FactData из последнего снимка в ClickHouse (plan_fact_stats).
+
+        Реализация в ``plan_fact_reader``; ленивый импорт, чтобы не зациклить
+        загрузку ``PlanFactProvider`` с ``wb_shop_data_manager``.
+        Важно: целевые значения (plan/target/max) берутся не из CH-сводки,
+        а из текущих настроек ``AdvSetting`` через ``get_plan_data``.
+        """
+        from app.modules.shop_runner.service_manager.services.plan_fact_controller import (
+            plan_fact_reader,
+        )
+
+        return plan_fact_reader.fact_data_from_plan_fact_summary(
+            summary, adv_setting
+        )
+
     @staticmethod
     def _get_fact_data_from_stat(common_stat_data: CommonAdvsStatData) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None

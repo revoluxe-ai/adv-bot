@@ -131,92 +131,111 @@ class TestResolveTargetCostFromSummary:
     """Tests for resolve_target_cost_from_summary."""
 
     def test_returns_target_when_plan_fulfilled(self):
-        """When plan is fulfilled, should return plan_target_pay_for_order."""
+        """When plan is fulfilled, should return current target."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = 100  # plan fulfilled
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result == 500.0
 
     def test_returns_max_when_plan_not_fulfilled(self):
-        """When plan is not fulfilled, should return plan_max_pay_for_order."""
+        """When plan is not fulfilled, should return current max."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = 50  # plan not fulfilled
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result == 800.0
 
     def test_returns_target_when_plan_exceeded(self):
-        """When plan is exceeded, should return plan_target_pay_for_order."""
+        """When plan is exceeded, should return current target."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = 150  # plan exceeded
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result == 500.0
 
     def test_returns_none_when_summary_is_none(self):
         """When summary is None, should return None."""
-        result = resolve_target_cost_from_summary(None)
+        result = resolve_target_cost_from_summary(
+            None,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result is None
 
-    def test_returns_none_when_plan_orders_is_none(self):
-        """When plan_orders is None, should return None."""
+    def test_returns_none_when_current_plan_orders_is_none(self):
+        """When current plan_orders is None, should return None."""
         summary = Mock()
-        summary.plan_orders = None
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = 100
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=None,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result is None
 
-    def test_returns_none_when_plan_target_pay_for_order_is_none(self):
-        """When plan_target_pay_for_order is None, should return None."""
+    def test_returns_none_when_current_target_is_none(self):
+        """When current plan_target_pay_for_order is None, should return None."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = None
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = 100
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=None,
+            plan_max_pay_for_order=800.0,
+        )
 
         assert result is None
 
-    def test_returns_none_when_plan_max_pay_for_order_is_none(self):
-        """When plan_max_pay_for_order is None, should return None."""
+    def test_returns_none_when_current_max_is_none(self):
+        """When current plan_max_pay_for_order is None, should return None."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = None
         summary.fact_predict_orders = 50
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=None,
+        )
 
         assert result is None
 
     def test_treats_none_fact_orders_as_zero(self):
         """When fact_predict_orders is None, should treat as 0."""
         summary = Mock()
-        summary.plan_orders = 100
-        summary.plan_target_pay_for_order = 500.0
-        summary.plan_max_pay_for_order = 800.0
         summary.fact_predict_orders = None  # treated as 0
 
-        result = resolve_target_cost_from_summary(summary)
+        result = resolve_target_cost_from_summary(
+            summary,
+            plan_orders=100,
+            plan_target_pay_for_order=500.0,
+            plan_max_pay_for_order=800.0,
+        )
 
         # 0 < 100, so should return max
         assert result == 800.0

@@ -19,17 +19,17 @@ from app.client_bot.user_interface.views.callbacks import (
     ApplyDefaultsForShop,
     ChangeShopDefaultMaxCPM,
     ToggleCabinetActive,
+    ExportShopAdvExcel,
+    ImportShopAdvExcel,
 )
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
     ConnectExistingAdvs,
-    DeleteWbUserCabinet,
     ShowShopsList,
     TurnBot,
     TurnWhiteListUpdate,
 )
-from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
@@ -437,7 +437,6 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        user_telegram_id = self._user_telegram_id
         wb_user_cabinet = self._wb_user_cabinet
         wb_cabinet = self._wb_cabinet
         wb_cabinet_original_id = wb_cabinet.id
@@ -472,15 +471,6 @@ class ShopMenu(TextWithKeyboard):
         builder.row(button)
 
         button = InlineKeyboardButton(
-            text="Создать и настроить кампании",
-            callback_data=CreateNewAdvs(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-
-        builder.row(button)
-
-        button = InlineKeyboardButton(
             text="Подключить существующие кампании",
             callback_data=ConnectExistingAdvs(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
@@ -497,16 +487,6 @@ class ShopMenu(TextWithKeyboard):
 
         builder.row(button)
         #
-
-        if user_telegram_id in const.ADMINS:
-            button = InlineKeyboardButton(
-                text="Удалить личный кабинет магазина",
-                callback_data=DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id=self._wb_user_cabinet.id
-                ).pack(),
-            )
-
-            builder.row(button)
 
         button = InlineKeyboardButton(
             text="Отключить все кампании",
@@ -546,6 +526,22 @@ class ShopMenu(TextWithKeyboard):
         button = InlineKeyboardButton(
             text="Применить дефолты всем кампаниям",
             callback_data=ApplyDefaultsForShop(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="Выгрузить все РК в Excel",
+            callback_data=ExportShopAdvExcel(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="Загрузить настройки из Excel",
+            callback_data=ImportShopAdvExcel(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )

@@ -12,9 +12,10 @@ async def catch_special_errors(awaitable: Awaitable[T]) -> T | None:
     try:
         return await awaitable
     except BadRequestError as exc:
-        detail =exc.detail
-        if "norm_query disabled for nm" in detail:
-            logger.warning(exc.detail)
+        raw_detail = getattr(exc, "detail", None)
+        detail = raw_detail if isinstance(raw_detail, str) else str(raw_detail or "")
+        if "norm_query disabled for nm" in detail.lower():
+            logger.warning(detail)
             return None
         raise
 

@@ -13,6 +13,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
+    RebindAdvCampaignIds,
 )
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -35,9 +36,6 @@ from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbac
 from app.client_bot.user_interface.handlers.time_settings.callbacks import TS
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
-)
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
-    AutoUpdateWhiteListSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -167,6 +165,17 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Перепривязать кампании WB",
+            callback_data=RebindAdvCampaignIds(
+                action="menu",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
+
     watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
     watchdog_button = InlineKeyboardButton(
         text=(
@@ -231,19 +240,6 @@ def get_adv_setting_keyboard(
                 ).pack(),
             )
         )
-
-    if adv_setting.auto_update_white_list:
-        text = "$ Выключить автообновление белого списка"
-        new_status = False
-    else:
-        text = "Включить автообновление белого списка (платно, см. тарифы)"
-        new_status = True
-
-    callback = AutoUpdateWhiteListSetting(
-        new_status=new_status, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
 
     if adv_setting.auto_update_target_place:
         text = "$ Выключить автоуправление целевой позицией"
@@ -385,24 +381,6 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
 
-    if adv_setting.reset_place is not None and adv_setting.reset_place:
-        button = InlineKeyboardButton(
-            text="Выключить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="off", adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Включить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="on", adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-
-    _ = builder.row(button)
-
-
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
         callback_data=callbacks.WBUpdate(
@@ -456,32 +434,6 @@ def get_adv_setting_keyboard(
             adv_setting_original_id=adv_setting.id
         ).pack(),
     )
-    _ = builder.row(button)
-
-    button = InlineKeyboardButton(
-        text="Задать/Изменить максимальную стоимость клика",
-        callback_data=callbacks.ChangeMaxCPC(
-            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
-
-    if not in_favorites:
-        button = InlineKeyboardButton(
-            text="Добавить в избранное",
-            callback_data=callbacks.AddToFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Удалить из избранного",
-            callback_data=callbacks.RemoveFromFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-
     _ = builder.row(button)
 
     wb_user_cabinet_original_id = wb_user_cabinet.id

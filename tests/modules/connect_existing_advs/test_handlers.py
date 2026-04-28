@@ -44,7 +44,8 @@ def _make_callback(
     | callbacks.ConnectExistingConfirmType2
     | callbacks.ConnectExistingCreateBoth
     | callbacks.ConnectExistingContinueDespiteInvalid
-    | callbacks.ConnectExistingAdvsBackToShop,
+    | callbacks.ConnectExistingAdvsBackToShop
+    | callbacks.ConnectExistingChangeNmid,
     chat_id: int = 12345,
     from_user_id: int = 67890,
 ) -> CallbackQuery:
@@ -224,11 +225,7 @@ async def test_connect_existing_advs_nmid_card_not_found() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_existing_pair() -> None:
-    """nmid handler: existing_pair not None -> message and keyboard BackToShop."""
-    from app.client_bot.user_interface.views.callbacks import (
-        ConnectExistingAdvsBackToShop,
-    )
-
+    """nmid handler: both IDs set -> rebind, shop, change nmid keyboard."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock()
@@ -255,8 +252,8 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
-        AsyncMock(return_value=(100, 200)),
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
+        AsyncMock(return_value=(77, 100, 200)),
     ):
         await connect_existing_advs.connect_existing_advs_nmid(
             message, bot, state
@@ -266,9 +263,21 @@ async def test_connect_existing_advs_nmid_existing_pair() -> None:
     assert bot.send_message.call_count == 2  # WB_WAIT_MESSAGE, then "уже есть подключённые"
     assert "уже есть подключённые" in bot.send_message.call_args[0][1]
     reply_markup = bot.send_message.call_args[1]["reply_markup"]
-    btn = reply_markup.inline_keyboard[0][0]
-    assert btn.text == "В меню магазина"
-    assert ConnectExistingAdvsBackToShop.unpack(btn.callback_data) is not None
+    rows = reply_markup.inline_keyboard
+    assert len(rows) == 2
+    row0, row1 = rows
+    assert len(row0) == 2
+    assert row0[0].text == "Перепривязать кампании WB"
+    cb = callbacks.RebindAdvCampaignIds.unpack(row0[0].callback_data)
+    assert cb is not None
+    assert cb.adv_setting_original_id == 77
+    assert row0[1].text == "В меню магазина"
+    assert callbacks.ConnectExistingAdvsBackToShop.unpack(row0[1].callback_data) is not None
+    assert len(row1) == 1
+    assert row1[0].text == "Ввести другой артикул"
+    cn = callbacks.ConnectExistingChangeNmid.unpack(row1[0].callback_data)
+    assert cn is not None
+    assert cn.wb_user_cabinet_original_id == 5
 
 
 @pytest.mark.unit
@@ -306,7 +315,7 @@ async def test_connect_existing_advs_nmid_success_both_empty() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -354,7 +363,7 @@ async def test_connect_existing_advs_nmid_get_candidates_api_forbidden() -> None
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -401,7 +410,7 @@ async def test_connect_existing_advs_nmid_bad_request_path_not_found() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -459,7 +468,7 @@ async def test_connect_existing_advs_nmid_success_auction_only() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -519,7 +528,7 @@ async def test_connect_existing_advs_nmid_success_auto_only() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
         AsyncMock(return_value=None),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
@@ -549,7 +558,7 @@ async def test_connect_existing_advs_nmid_success_auto_only() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None:
-    """nmid: existing_pair (None, 123) + both candidates -> confirm_type2, 'Аукционная РК уже подключена'."""
+    """nmid: existing row (None, None, 123) + both candidates -> confirm_type2, 'Аукционная РК уже подключена'."""
     from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
         GetAdvertsAdvertsItem,
     )
@@ -599,8 +608,8 @@ async def test_connect_existing_advs_nmid_existing_auction_id_in_state() -> None
     with patch(f"{MODULE}.sm", mock_sm), patch(
         f"{MODULE}.DIManager.create", mock_di_create
     ), patch(
-        f"{MODULE}._get_existing_adv_pair_not_done",
-        AsyncMock(return_value=(None, 123)),
+        f"{MODULE}._get_existing_adv_row_for_connect_not_done",
+        AsyncMock(return_value=(None, None, 123)),
     ), patch(
         f"{MODULE}.get_connect_existing_candidates",
         AsyncMock(return_value=result_both),
@@ -1149,3 +1158,32 @@ async def test_connect_existing_advs_back_to_shop() -> None:
     state.clear.assert_called_once()
     mock_shop_menu.assert_called_once_with(bot, 444, state, 7)
     mock_shop_menu.return_value.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_change_nmid() -> None:
+    """change_nmid: clear, set waiting_nmid, prompt for new nmid."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.clear = AsyncMock()
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingChangeNmid(wb_user_cabinet_original_id=7),
+        chat_id=444,
+    )
+    callback_data = callbacks.ConnectExistingChangeNmid(
+        wb_user_cabinet_original_id=7
+    )
+
+    await connect_existing_advs.connect_existing_change_nmid(
+        callback, callback_data, bot, state
+    )
+
+    state.clear.assert_called_once()
+    state.update_data.assert_called_once_with(wb_user_cabinet_original_id=7)
+    state.set_state.assert_called_once_with(ConnectExistingAdvsStates.waiting_nmid)
+    bot.send_message.assert_called_once()
+    assert "артикул" in bot.send_message.call_args[0][1]

@@ -73,6 +73,13 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
+        token_info.is_personal = True
+        token_info.categories = {
+            "Контент",
+            "Статистика",
+            "Аналитика",
+            "Продвижение",
+        }
         token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
 
         return TokenStatusReport(
@@ -95,6 +102,8 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
+        token_info.is_personal = True
+        token_info.categories = {"Контент", "Статистика"}
         token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)
 
         return TokenStatusReport(
@@ -121,6 +130,13 @@ class TestShopMenuTokenIntegration:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
+        token_info.is_personal = True
+        token_info.categories = {
+            "Контент",
+            "Статистика",
+            "Аналитика",
+            "Продвижение",
+        }
         token_info.expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=3)
 
         expiring_token = ExpiringToken(

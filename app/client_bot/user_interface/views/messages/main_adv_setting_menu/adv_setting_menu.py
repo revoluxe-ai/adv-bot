@@ -1,7 +1,6 @@
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
-from datetime import date as date_type
 from datetime import datetime, time, timedelta, timezone
 from operator import attrgetter
 from typing import TYPE_CHECKING, Mapping
@@ -87,6 +86,8 @@ logger = logging.getLogger(__name__)
 
 MSK_TZ = timezone(timedelta(hours=3))
 SAFE_CAPTION_LIMIT = 900
+# Prefer this many recent days in the campaign menu caption; rows may be dropped to fit.
+DAILY_STATS_CAPTION_MAX_DAYS = 5
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -133,6 +134,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
         self._plan_set: bool = False
+        self._plan_fact_ch_max_ts_str: str | None = None
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
         self._emergency_mode_active: bool = False
@@ -209,7 +211,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         nmids = self.adv.nmids
         images = await data_manager.get_main_photos(nmids[:1])
-        image = images[0]
+        image = images[0] if images else "https://placehold.co/600x800/png?text=WB"
         self.image = image
 
         # last_update_keyword_stat: datetime | None = (
@@ -292,6 +294,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._avg_cost_additional = cost_metrics.avg_cost
         self._is_campaign_active_by_cost = cost_metrics.is_active
         self._plan_set = cost_metrics.plan_set
+        self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -351,18 +354,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = ""
         if self._emergency_mode_active:
             text += (
-                "🚨 АВ.РЕЖ\n"
-                "СТ > 6ч\n"
-                "РАСХ ОГРАН\n"
+                "🚨 АВ.РЕЖ, СТ > 6ч, РАСХ ОГРАН\n"
             )
             if self._emergency_mode_reason:
                 text += f"{self._emergency_mode_reason}\n"
-            text += "\n"
-        elif not self._stats_fresh:
+        elif self._stats_fresh:
+            text += f"{self._fresh_reason_to_display()}\n"
+        else:
             text += "Ст не све, авт приост\n"
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
-            text += "\n"
+        text += "\n"
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
@@ -476,7 +478,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"Себес зак: план {target_str}, факт {avg_str}\n"
+                ch_suffix = (
+                    f" (пл-ф CH: {self._plan_fact_ch_max_ts_str} МСК)"
+                    if self._plan_fact_ch_max_ts_str
+                    else ""
+                )
+                text += f"Себес зак: план {target_str}, факт {avg_str}{ch_suffix}\n"
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
@@ -567,25 +574,48 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             days_stat: list[DayStats] = sorted(
                 adv_stat.days, key=attrgetter("date")
             )
-            stat_text = "Стат дн:\n"
-            stat_text += "Дата | Зак | Себес\n"
-
-            def reverse_date(date_: date_type) -> str:
-                return date_.strftime("%d-%m-%Y")
-
-            for day_stat in days_stat[-3:]:
-                date_str = reverse_date(day_stat.date)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                spend = day_stat.sum
-                orders = day_stat.orders
-                if orders:
-                    cost_per_order = spend / orders
-                else:
-                    cost_per_order = 0
-                stat_text += f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
-
-            text += stat_text
+            text += AdvSettingMenu._build_caption_daily_stats_block(
+                days_stat, len(text)
+            )
 
         return self._shrink_for_caption(text)
+
+    @staticmethod
+    def _build_caption_daily_stats_block(
+        days_stat_chrono: list[DayStats],
+        prefix_char_len: int,
+    ) -> str:
+        """Block for «Стат дн»: up to ``DAILY_STATS_CAPTION_MAX_DAYS`` recent days.
+
+        If ``prefix_char_len`` + block would exceed ``SAFE_CAPTION_LIMIT``, drops
+        older days first (keeps most recent). When fewer days fit than are
+        available in the window, the header notes «показано k из n дн.».
+        """
+        if not days_stat_chrono:
+            return ""
+        window = days_stat_chrono[-DAILY_STATS_CAPTION_MAX_DAYS:]
+        n_window = len(window)
+
+        def line_for_day(day_stat: DayStats) -> str:
+            spend = day_stat.sum
+            orders = day_stat.orders
+            cost_per_order = spend / orders if orders else 0
+            date_str = day_stat.date.strftime("%d-%m-%Y")
+            return f"{date_str} | {orders} | {round(cost_per_order, 0)} р.\n"
+
+        for k in range(n_window, 0, -1):
+            subset = window[-k:]
+            title = (
+                f"Стат дн (показано {k} из {n_window} дн.):\n"
+                if k < n_window
+                else "Стат дн:\n"
+            )
+            stat_text = title + "Дата | Зак | Себес\n"
+            for ds in subset:
+                stat_text += line_for_day(ds)
+            if prefix_char_len + len(stat_text) <= SAFE_CAPTION_LIMIT:
+                return stat_text
+        return ""
 
     @staticmethod
     def _shrink_for_caption(text: str) -> str:
@@ -650,9 +680,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         state = await StatsFreshnessManager().evaluate(complex_adv)
         if state.is_stale_over_6h:
             return True, self._guard_reason_to_display(state.reason), False, None
-        if not state.is_fresh and state.reason:
-            return False, None, False, self._stale_reason_to_display(state.reason)
-        return False, None, state.is_fresh, None
+        if not state.is_fresh:
+            if state.reason:
+                return False, None, False, self._stale_reason_to_display(state.reason)
+            return False, None, False, self._stale_reason_fallback_to_display()
+        return False, None, True, self._fresh_reason_to_display()
 
     @staticmethod
     def _stale_reason_to_display(reason: str) -> str:
@@ -711,3 +743,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 "Ошибка получения today traffic clicks для adv_id=%s", self.adv.adv_id
             )
             return None
+
+    @staticmethod
+    def _fresh_reason_to_display() -> str:
+        return "стата свежая"
+
+    @staticmethod
+    def _stale_reason_fallback_to_display() -> str:
+        return "стата не свежая"

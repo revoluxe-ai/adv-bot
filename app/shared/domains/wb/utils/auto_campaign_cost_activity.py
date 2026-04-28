@@ -22,6 +22,7 @@ class AutoCampaignCostActivityMetrics:
     avg_cost: float | None
     is_active: bool | None
     plan_set: bool  # True if plan (orders/target/max) is present for this adv
+    plan_fact_ch_ts_msk: str | None
 
 
 async def get_auto_campaign_cost_activity_metrics(
@@ -59,11 +60,18 @@ async def get_auto_campaign_cost_activity_metrics(
     else:
         is_active = avg_cost <= target_cost
 
+    ch_ts = (
+        plan_fact_summary.plan_fact_ch_ts_msk
+        if plan_fact_summary is not None
+        else None
+    )
+
     return AutoCampaignCostActivityMetrics(
         target_cost=target_cost,
         avg_cost=avg_cost,
         is_active=is_active,
         plan_set=plan is not None,
+        plan_fact_ch_ts_msk=ch_ts,
     )
 
 

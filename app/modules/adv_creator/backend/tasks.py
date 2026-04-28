@@ -7,7 +7,7 @@ from app.client_bot import const
 from app.client_bot.bot import get_bot
 from app.core.di import DIManager
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
+from app.core.wb_api.mixins.excs import AdvNotFoundInWBError, CardNotFoundInWB
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.core.mp.wb.api.excs import HttpTimeOutError, MaxAttemptsError
@@ -61,6 +61,23 @@ async def _create_search_only(
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access, client_session)
+
+    try:
+        card_ready = await data_manager.ensure_card_in_db(shop_id, nmid)
+    except CardNotFoundInWB:
+        await bot.send_message(
+            user_telegram_id,
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
+            f" проверьте правильность артикула!",
+        )
+        return
+    if not card_ready:
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось дождаться загрузки карточки {nmid} в базу. Попробуйте позже.",
+        )
+        return
+
     async with aiohttp.ClientSession() as client_session:
         wb_api = WBApi(access, client_session)
         await data_manager.update_advs_data_from_wb_to_pg(wb_api)
@@ -139,6 +156,23 @@ async def _create_auto_only(
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access, client_session)
+
+    try:
+        card_ready = await data_manager.ensure_card_in_db(shop_id, nmid)
+    except CardNotFoundInWB:
+        await bot.send_message(
+            user_telegram_id,
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
+            f" проверьте правильность артикула!",
+        )
+        return
+    if not card_ready:
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось дождаться загрузки карточки {nmid} в базу. Попробуйте позже.",
+        )
+        return
+
     async with aiohttp.ClientSession() as client_session:
         wb_api = WBApi(access, client_session)
         await data_manager.update_advs_data_from_wb_to_pg(wb_api)
@@ -209,6 +243,23 @@ async def _create_complex_advs(
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access, client_session)
+
+    try:
+        card_ready = await data_manager.ensure_card_in_db(shop_id, nmid)
+    except CardNotFoundInWB:
+        await bot.send_message(
+            user_telegram_id,
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
+            f"проверьте правильность артикула!",
+        )
+        return
+    if not card_ready:
+        await bot.send_message(
+            user_telegram_id,
+            f"Не удалось дождаться загрузки карточки {nmid} в базу. Попробуйте позже.",
+        )
+        return
+
     async with aiohttp.ClientSession() as client_session:
         wb_api = WBApi(access, client_session)
         await data_manager.update_advs_data_from_wb_to_pg(wb_api)

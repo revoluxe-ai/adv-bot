@@ -133,6 +133,8 @@ class AutoBudgetService:
         adv_setting_id: int,
         campaign_type: AdvType,
         wb_manager_hub: "WBManagerHub",
+        *,
+        force_after_start_rejection: bool = False,
     ) -> AutoBudgetEnsureResult | None:
         lock_key = self._lock_key(adv_setting_id, campaign_type)
         acquired = await self._acquire_lock(lock_key)
@@ -146,7 +148,10 @@ class AutoBudgetService:
             )
         try:
             result = await self._ensure_budget_locked(
-                adv_setting_id, campaign_type, wb_manager_hub
+                adv_setting_id,
+                campaign_type,
+                wb_manager_hub,
+                force_after_start_rejection=force_after_start_rejection,
             )
 
             return result
@@ -161,6 +166,8 @@ class AutoBudgetService:
         adv_setting_id: int,
         campaign_type: AdvType,
         wb_manager_hub: "WBManagerHub",
+        *,
+        force_after_start_rejection: bool = False,
     ) -> AutoBudgetEnsureResult:
 
         async with sm(read_only=True) as session:
@@ -209,7 +216,7 @@ class AutoBudgetService:
             + timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
         )
         cached_budget_info = None
-        if stats_too_old:
+        if stats_too_old and not force_after_start_rejection:
             cached_budget_info = await wb_manager_hub.wb_modifier.get_campaign_budget(
                 config.adv_id
             )
@@ -276,14 +283,15 @@ class AutoBudgetService:
             current_budget is not None
             and current_budget >= self._min_balance > 0
         ):
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
-                campaign_type=campaign_type,
-                adv_id=config.adv_id,
-                spend_today=spend_today,
-                budget_total_before=current_budget,
-                available_limit=limit - spend_today,
-            )
+            if not force_after_start_rejection:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
+                    campaign_type=campaign_type,
+                    adv_id=config.adv_id,
+                    spend_today=spend_today,
+                    budget_total_before=current_budget,
+                    available_limit=limit - spend_today,
+                )
 
         # Следующее пополнение всегда происходит фиксированным шагом из настроек.
         # Предыдущая проверка гарантийно запрещает топап, если суммарно уже пополнили больше лимита,
@@ -448,6 +456,7 @@ class AutoBudgetService:
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
         await self._last_success_manager.set(adv_setting.id)
+        await self._topup_failed_manager.clear(adv_setting.id)
 
         return AutoBudgetEnsureResult(
             status=result_status,
@@ -678,6 +687,9 @@ class AutoBudgetService:
         self,
         adv_setting_id: int,
         wb_manager_hub: "WBManagerHub",
+        *,
+        force_after_start_rejection: bool = False,
+        start_failure_campaign: AdvType | None = None,
     ) -> AutoBudgetEnsureResult | None:
         """Ensure combined budget for both campaigns (common budget mode)."""
         lock_key = self._lock_key_common(adv_setting_id)
@@ -692,7 +704,10 @@ class AutoBudgetService:
             )
         try:
             result = await self._ensure_common_budget_locked(
-                adv_setting_id, wb_manager_hub
+                adv_setting_id,
+                wb_manager_hub,
+                force_after_start_rejection=force_after_start_rejection,
+                start_failure_campaign=start_failure_campaign,
             )
             return result
         except Exception:  # noqa
@@ -705,6 +720,9 @@ class AutoBudgetService:
         self,
         adv_setting_id: int,
         wb_manager_hub: "WBManagerHub",
+        *,
+        force_after_start_rejection: bool = False,
+        start_failure_campaign: AdvType | None = None,
     ) -> AutoBudgetEnsureResult:
         async with sm(read_only=True) as session:
             result = await session.execute(
@@ -754,14 +772,24 @@ class AutoBudgetService:
         last_auto = await self._get_last_full_stat_update(adv_id_auto)
         last_search = await self._get_last_full_stat_update(adv_id_search)
         if last_auto is None or last_search is None:
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
-                campaign_type=AdvType.AUTO,
-                adv_id=adv_id_auto,
-                spend_today=0.0,
-                reason="Missing full adv stats for one or both campaigns",
+            if not force_after_start_rejection:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                    campaign_type=AdvType.AUTO,
+                    adv_id=adv_id_auto,
+                    spend_today=0.0,
+                    reason="Missing full adv stats for one or both campaigns",
+                )
+        if last_auto is not None and last_search is not None:
+            stats_stale_common = (
+                now_msk > last_auto + period or now_msk > last_search + period
             )
-        stats_stale_common = now_msk > last_auto + period or now_msk > last_search + period
+        elif last_auto is not None:
+            stats_stale_common = now_msk > last_auto + period
+        elif last_search is not None:
+            stats_stale_common = now_msk > last_search + period
+        else:
+            stats_stale_common = True
         cached_info_auto = None
         cached_info_search = None
         if stats_stale_common:
@@ -777,7 +805,7 @@ class AutoBudgetService:
             both_comfortable_on_wb = (
                 ba_pre >= threshold and bs_pre >= threshold
             )
-            if both_comfortable_on_wb:
+            if both_comfortable_on_wb and not force_after_start_rejection:
                 return AutoBudgetEnsureResult(
                     status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
                     campaign_type=AdvType.AUTO,
@@ -844,14 +872,18 @@ class AutoBudgetService:
             and b_auto >= self._min_balance
             and b_search >= self._min_balance
         ):
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
-                campaign_type=AdvType.AUTO,
-                adv_id=adv_id_auto,
-                spend_today=spend_today,
-                budget_total_before=int(combined_budget),
-                available_limit=limit - spend_today,
-            )
+            if not (
+                force_after_start_rejection
+                and start_failure_campaign is not None
+            ):
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.BALANCE_SUFFICIENT,
+                    campaign_type=AdvType.AUTO,
+                    adv_id=adv_id_auto,
+                    spend_today=spend_today,
+                    budget_total_before=int(combined_budget),
+                    available_limit=limit - spend_today,
+                )
         planned_amount = self._compute_planned_amount()
         if planned_amount <= 0:
             return AutoBudgetEnsureResult(
@@ -863,7 +895,19 @@ class AutoBudgetService:
                 reason="Computed planned amount is zero",
             )
 
-        if (budget_auto or 0) <= (budget_search or 0):
+        if (
+            force_after_start_rejection
+            and start_failure_campaign == AdvType.SEARCH
+        ):
+            target_adv_id = adv_id_search
+            target_campaign_type = AdvType.SEARCH
+        elif (
+            force_after_start_rejection
+            and start_failure_campaign == AdvType.AUTO
+        ):
+            target_adv_id = adv_id_auto
+            target_campaign_type = AdvType.AUTO
+        elif (budget_auto or 0) <= (budget_search or 0):
             target_adv_id = adv_id_auto
             target_campaign_type = AdvType.AUTO
         else:
@@ -1015,6 +1059,7 @@ class AutoBudgetService:
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
         await self._last_success_manager.set(adv_setting.id)
+        await self._topup_failed_manager.clear(adv_setting.id)
         return AutoBudgetEnsureResult(
             status=result_status,
             campaign_type=target_campaign_type,

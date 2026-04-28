@@ -7,7 +7,7 @@ dotenv.load_dotenv()
 import logging
 
 from app.arq_workers.arq_redis_settings import arq_redis_settings
-from app.client_bot.bot import get_bot
+from app.client_bot.bot import aclose_telegram_http_session, get_bot
 from app.modules.adv_creator.backend.tasks import (
     create_auto_only,
     create_complex_advs,
@@ -34,7 +34,7 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     """Закрытие сессии бота при завершении работы воркера."""
     if "bot" in ctx:
         logger.debug("Закрытие сессии бота")
-        await ctx["bot"].session.close()
+        await aclose_telegram_http_session()
         logger.debug("Сессия бота закрыта")
     client_session: ClientSession = ctx["client_session"]
     await client_session.close()

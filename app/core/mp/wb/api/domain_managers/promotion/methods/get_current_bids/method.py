@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids import (
     NormqueryBidsAdapter,
 )
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
     NormqueryBidDTO,
+)
+from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
+    V0GetNormQueryBidsRequest,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -14,10 +15,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 
 from . import convertor
 
-if TYPE_CHECKING:
-    from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
-        V0GetNormQueryBidsRequest,
-    )
+# WB camp-api-public-cache: "too many items: N, maximum allowed is 100"
+MAX_ITEMS_PER_REQUEST = 100
 
 
 async def get_current_bids(
@@ -29,8 +28,17 @@ async def get_current_bids(
     if not complex_advs:
         return None
 
-    command: V0GetNormQueryBidsRequest = convertor.dto_to_request(complex_advs)
+    command = convertor.dto_to_request(complex_advs)
     if not command.items:
         return None
 
-    return await normquery_bids_adapter.post_adv_v0_normquery_get_bids(command)
+    merged: list[NormqueryBidDTO] = []
+    for start in range(0, len(command.items), MAX_ITEMS_PER_REQUEST):
+        chunk = command.items[start : start + MAX_ITEMS_PER_REQUEST]
+        sub = V0GetNormQueryBidsRequest(items=chunk)
+        part = await normquery_bids_adapter.post_adv_v0_normquery_get_bids(sub)
+        if part is None:
+            continue
+        merged.extend(part)
+
+    return merged or None

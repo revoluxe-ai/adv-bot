@@ -10,6 +10,7 @@ from typing import Any
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
+from app.client_bot.bot import create_bot_for_token
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class NotificationSender:
             raise ValueError("At least one token is required to send notifications")
 
         self._tokens = list(tokens)
-        self._bot_factory = bot_factory or Bot
+        self._bot_factory = bot_factory or create_bot_for_token
         self._bots: dict[str, Bot] = {}
         self._lock = asyncio.Lock()
         self._next_index = 0
@@ -94,3 +95,9 @@ def get_notification_sender() -> NotificationSender:
     if _notification_sender is None:
         _notification_sender = NotificationSender(settings.TG_TOKENS_FOR_SENDING)
     return _notification_sender
+
+
+def reset_notification_sender() -> None:
+    """Drop the shared sender so the next get_notification_sender() builds fresh bots."""
+    global _notification_sender
+    _notification_sender = None

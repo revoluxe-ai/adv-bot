@@ -107,7 +107,6 @@ def test_get_new_bid_when_current_common_bids_none_direct_up_returns_min_plus_st
 
 
 def test_get_new_bid_decreases_when_fact_above_target() -> None:
-    """direct='reset' sets bid to search min_bid (ignores bid_step)."""
     adv = make_adv(
         fact_pay_for_order=150.0,
         result_target_pay_for_order=100.0,
@@ -125,7 +124,6 @@ def test_get_new_bid_decreases_when_fact_above_target() -> None:
 
 
 def test_get_new_bid_increases_when_fact_below_target() -> None:
-    """direct='up' adds 1 to current bid (step size fixed in implementation)."""
     adv = make_adv(
         fact_pay_for_order=80.0,
         result_target_pay_for_order=100.0,

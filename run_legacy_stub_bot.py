@@ -3,6 +3,8 @@ import logging
 import os
 
 from aiogram import Bot, Dispatcher, Router, F
+
+from app.client_bot.bot import aclose_telegram_http_session, create_bot_for_token
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramForbiddenError
@@ -53,12 +55,17 @@ async def any_callback(c: CallbackQuery, bot: Bot):
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    bot = Bot(token=LEGACY_BOT_TOKEN)
+    if not LEGACY_BOT_TOKEN:
+        raise RuntimeError("LEGACY_BOT_TOKEN is not set")
+    bot = create_bot_for_token(LEGACY_BOT_TOKEN)
     dp = Dispatcher()
     dp.include_router(router)
 
     # Важно: не подключай другие роутеры/хэндлеры/команды.
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await aclose_telegram_http_session()
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -25,14 +25,16 @@ class AutoResetBidService:
                       ]
 
         try:
-            min_bids = await self._wb_manager.get_min_bids(candidates, cache_possible=True)
+            min_bids = await self._wb_manager.get_min_bids_cache_only(
+                candidates, context="auto_reset_bid_service"
+            )
         except Exception as error:  # noqa: BLE001
             logger.error(
                 "Не удалось получить минимальные ставки для сброса CPM: %s", error, exc_info=True
             )
             return None
 
-        if not min_bids:
+        if not min_bids.auto:
             return None
 
         handlers: list[Callable[[], Awaitable[None]]] = []

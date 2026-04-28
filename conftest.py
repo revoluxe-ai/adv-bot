@@ -516,6 +516,9 @@ def adv_setting_mock():
     adv_setting_mock.nmids = [222811118]
     adv_setting_mock.search_adv_id = None
     adv_setting_mock.active_status = "started"
+    adv_setting_mock.plan_for_sales_for_day = None
+    adv_setting_mock.target_price_for_order = None
+    adv_setting_mock.max_price_for_order = None
     return adv_setting_mock
 
 
@@ -636,7 +639,11 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     )
     cabinet_shop_id = seed.adv_setting.wb_cabinet.shop_id
 
-    async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
+    async def get_keywords_func(
+        _: ComplexAdv, *, cache_only: bool = False
+    ) -> list[CalculatedKeyword] | None:
+        if cache_only:
+            return seed.calculated_keywords
         return seed.calculated_keywords
 
     complex_adv = ComplexAdv(

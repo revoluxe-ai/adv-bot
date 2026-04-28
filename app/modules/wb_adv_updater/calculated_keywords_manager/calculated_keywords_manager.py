@@ -542,7 +542,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             wb_manager = cast(WBManager, wb_manager_raw())
         else:
             wb_manager = wb_manager_raw
-        min_bids = await wb_manager.get_min_bids([complex_adv], cache_possible=True)
+        min_bids = await wb_manager.get_min_bids_cache_only(
+            [complex_adv],
+            context=f"calculated_keywords adv_id={complex_adv.adv_id}",
+        )
         return max_search_min_bid_for_complex_nmids(nmids, min_bids)
 
     @staticmethod

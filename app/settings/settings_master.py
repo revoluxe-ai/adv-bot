@@ -703,5 +703,55 @@ class Settings:
         return parsed
 
 
+    @property
+    def PROXY(self) -> str:
+        value = os.getenv("PROXY")
+        if not value:
+            return "http://xray-client.default.svc.cluster.local:8080"
+        return value
+
+    @property
+    def unisender_go_api_key(self) -> str | None:
+        value = os.environ.get("UNISENDER_GO_API_KEY")
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
+
+    @property
+    def unisender_go_api_base(self) -> str:
+        value = os.environ.get("UNISENDER_GO_API_BASE")
+        if value is None or not str(value).strip():
+            return "https://goapi.unisender.ru/ru/transactional/api/v1"
+        return str(value).strip().rstrip("/")
+
+    @property
+    def unisender_go_request_timeout_sec(self) -> float:
+        value = os.environ.get("UNISENDER_GO_REQUEST_TIMEOUT_SEC")
+        if value is None or not str(value).strip():
+            return 30.0
+        return float(str(value).strip())
+
+    @property
+    def unisender_go_default_from_email(self) -> str | None:
+        value = os.environ.get("UNISENDER_GO_DEFAULT_FROM_EMAIL")
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
+
+    @property
+    def unisender_go_default_global_language(self) -> str | None:
+        value = os.environ.get("UNISENDER_GO_DEFAULT_GLOBAL_LANGUAGE")
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
+
+    @property
+    def unisender_go_integration_test_recipient(self) -> str | None:
+        value = os.environ.get("UNISENDER_GO_INTEGRATION_TEST_RECIPIENT")
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
+
+
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

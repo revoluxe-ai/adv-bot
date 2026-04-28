@@ -60,6 +60,7 @@ class TokenInfo:
     is_read_only: bool
     is_valid: bool
     is_expired: bool
+    is_personal: bool
 
     @classmethod
     def from_wb_token(cls, wb_token: WBToken) -> "TokenInfo":
@@ -76,6 +77,7 @@ class TokenInfo:
             is_read_only=wb_token.read_only,
             is_valid=wb_token.check_valid(),
             is_expired=expires_utc <= now,
+            is_personal=wb_token.is_personal,
         )
 
 
@@ -144,36 +146,44 @@ class TokenStatusReport:
 
     @property
     def service_expiration_date(self) -> datetime.datetime | None:
-        """Calculate when the service will break due to missing required permissions.
+        """Date when required-rights coverage is first lost for personal tokens.
 
-        Returns the earliest date when we'll lose a required permission,
-        making the service non-functional.
+        Uses only personal valid tokens that contribute at least one required right.
+        The returned date is the earliest token expiry moment after which the union
+        of active personal-token rights no longer covers REQUIRED_RIGHTS.
         """
-        if self.status == "Complete":
-            # Find the earliest expiration of tokens that provide required permissions
-            earliest_expiration = None
-
-            for token in self.valid_tokens:
-                # Check if this token provides any required permissions
-                token_required_perms = token.categories & REQUIRED_RIGHTS
-                if token_required_perms:
-                    if (
-                        earliest_expiration is None
-                        or token.expires < earliest_expiration
-                    ):
-                        earliest_expiration = token.expires
-
-            return earliest_expiration
-        else:
-            # Service is already broken - no required permissions available
+        if self.status != "Complete":
             return None
+
+        personal_tokens = [
+            token
+            for token in self.valid_tokens
+            if token.is_personal and (token.categories & REQUIRED_RIGHTS)
+        ]
+        if not personal_tokens:
+            return None
+
+        # Process expiry events from earliest to latest and detect first coverage loss.
+        rights_coverage_count: dict[str, int] = {right: 0 for right in REQUIRED_RIGHTS}
+        for token in personal_tokens:
+            for right in token.categories & REQUIRED_RIGHTS:
+                rights_coverage_count[right] += 1
+
+        if any(count == 0 for count in rights_coverage_count.values()):
+            return None
+
+        for token in sorted(personal_tokens, key=lambda t: t.expires):
+            for right in token.categories & REQUIRED_RIGHTS:
+                rights_coverage_count[right] -= 1
+
+            if any(count == 0 for count in rights_coverage_count.values()):
+                return token.expires
+
+        return None
 
     @property
     def days_until_service_breaks(self) -> int | None:
-        """Calculate days until service becomes non-functional.
-
-        Returns None if service is already broken or no valid tokens.
-        """
+        """Days until first personal-token coverage loss (see service_expiration_date)."""
         expiration_date = self.service_expiration_date
         if expiration_date:
             days = (expiration_date - utcnow()).days
