@@ -13,15 +13,17 @@ from ..modules.cabinet_bonus_manager.bonus_scene import (
 )
 from .common_routers import common_router
 from .middlewars.gate import GateMiddleware
+from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 _ = global_router.message.middleware(GateMiddleware())
 # Pre-answer must run before GateMiddleware/DB work to avoid stale callbacks.
+_ = global_router.message.middleware(ReturnToStart())
+_ = global_router.callback_query.middleware(GateMiddleware())
 _ = global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )
-_ = global_router.callback_query.middleware(GateMiddleware())
 
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.

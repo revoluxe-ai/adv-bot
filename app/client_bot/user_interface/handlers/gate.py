@@ -11,6 +11,9 @@ from sqlalchemy import select, update
 from app.client_bot.user_interface.handlers.presentation_invite import (
     normalize_invite_code,
 )
+from app.client_bot.user_interface.handlers.start_registration_func import (
+    start_registration,
+)
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
 from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.callbacks import Gate
@@ -45,7 +48,21 @@ async def gate_invite_process_code(
     """Приём инвайт-кода: атомарная активация или ошибка + gate."""
     if not message.text or not message.from_user:
         return
-    code = normalize_invite_code(message.text)
+    text = message.text.strip()
+    if text.startswith("/"):
+        first_token = text.split(maxsplit=1)[0].lower()
+        if first_token == "/start" or first_token.startswith("/start@"):
+            await state.clear()
+            await start_registration(message, bot, state)
+            return
+        _ = await bot.send_message(
+            message.chat.id,
+            "Сейчас ожидается инвайт-код одним сообщением. "
+            "Отправьте код или нажмите /start для возврата в меню.",
+            reply_markup=get_gate_keyboard(),
+        )
+        return
+    code = normalize_invite_code(text)
     if not code:
         _ = await bot.send_message(
             message.chat.id,
