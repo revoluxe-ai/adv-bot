@@ -22,6 +22,7 @@ from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManag
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
+from app.utils.backoff import exponential_retry_delay_seconds
 from app.utils.db.session_maker import get_async_session_maker as sm
 import typing
 
@@ -31,6 +32,10 @@ if typing.TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+UNKNOWN_ERROR_RETRY_BASE_SECONDS = 10
+UNKNOWN_ERROR_RETRY_MAX_SECONDS = 120
+
 
 async def run_shop_task(
     shop_id: str,
@@ -160,6 +165,9 @@ async def _update_tasks(
                         "Не обработанная ошибка выполнения задачи магазина: %s",
                         exc,
                     )
+                    # Удаляем до raise: иначе при retry внешнего цикла та же запись
+                    # остаётся done-with-exception и блокирует обход навсегда.
+                    del active_tasks[shop_id]
                     raise exc
                 del active_tasks[shop_id]
 
@@ -203,6 +211,7 @@ async def _run_shops_loop(
 ) -> None:
     redis_manager = RedisShopManager()
     active_tasks: dict[str, Task[None]] = {}
+    unknown_error_attempt = 0
     while True:
         try:
             await _update_tasks(
@@ -212,6 +221,7 @@ async def _run_shops_loop(
                 tasks_manager=tasks_manager,
                 plan_fact_reader=plan_fact_reader,
             )
+            unknown_error_attempt = 0
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)
@@ -221,7 +231,18 @@ async def _run_shops_loop(
             )
             await asyncio.sleep(30)
         except Exception as exc:
-            logger.error(
-                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
+            unknown_error_attempt += 1
+            pause = int(
+                exponential_retry_delay_seconds(
+                    unknown_error_attempt,
+                    base_seconds=UNKNOWN_ERROR_RETRY_BASE_SECONDS,
+                    max_seconds=UNKNOWN_ERROR_RETRY_MAX_SECONDS,
+                )
             )
-            raise exc
+            logger.error(
+                "Ошибка обработки задач обновления магазинов, повтор через %ss: %s",
+                pause,
+                exc,
+                exc_info=True,
+            )
+            await asyncio.sleep(pause)

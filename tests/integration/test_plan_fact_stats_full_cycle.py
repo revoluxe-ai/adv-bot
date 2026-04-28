@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
     PreComplexAdv,
 )
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+    RedisCalculatedKeywordsCacheManager,
+)
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
@@ -112,6 +115,15 @@ def _enter_pre_adv_mocks(
         patch(
             "app.modules.wb_adv_updater.phrases_processor.get_good_bad_phrases",
             new=AsyncMock(return_value=[]),
+        )
+    )
+    # Глобальный redis.asyncio клиент из app.core.redis_manager привязан к loop первого теста;
+    # без мока второй async-тест ловит «Event loop is closed». Кэш ключевых слов здесь не цель теста.
+    stack.enter_context(
+        patch.object(
+            RedisCalculatedKeywordsCacheManager,
+            "get_all_calculated_keywords_for_adv",
+            new=AsyncMock(return_value=None),
         )
     )
 

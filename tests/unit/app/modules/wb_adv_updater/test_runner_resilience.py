@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+import pytest
+
+from app.modules.wb_adv_updater import runner
+from app.utils import backoff
+
+
+def _disable_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _retry_without_jitter(
+        attempt: int,
+        *,
+        base_seconds: int,
+        max_seconds: int,
+    ) -> float:
+        return backoff.retry_delay_with_jitter(
+            attempt,
+            base_seconds=base_seconds,
+            max_seconds=max_seconds,
+            jitter_ratio=0.0,
+        )
+
+    monkeypatch.setattr(runner, "retry_delay_with_jitter", _retry_without_jitter)
+
+
+@pytest.mark.unit
+def test_is_infra_error_detects_dns_resolution_message() -> None:
+    exc = RuntimeError("Failed to resolve host: Name or service not known")
+    assert runner._is_infra_error(exc) is True
+
+
+@pytest.mark.unit
+def test_retry_delay_with_jitter_capped_and_monotonic_with_zero_jitter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _disable_jitter(monkeypatch)
+    first = runner.retry_delay_with_jitter(attempt=1, base_seconds=5, max_seconds=300)
+    second = runner.retry_delay_with_jitter(attempt=2, base_seconds=5, max_seconds=300)
+    capped = runner.retry_delay_with_jitter(
+        attempt=100, base_seconds=5, max_seconds=300
+    )
+    assert first == 5
+    assert second == 10
+    assert capped == 300
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_payment_for_advs_retries_after_di_bootstrap_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StopLoop(Exception):
+        pass
+
+    create_calls = 0
+    billing_calls = 0
+
+    @asynccontextmanager
+    async def fake_context():
+        yield object()
+
+    async def fake_create(_container_cls):  # type: ignore[no-untyped-def]
+        nonlocal create_calls
+        create_calls += 1
+        if create_calls == 1:
+            raise RuntimeError("name or service not known")
+        return fake_context()
+
+    async def fake_billing(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        nonlocal billing_calls
+        billing_calls += 1
+        return None
+
+    sleep_calls = 0
+
+    async def fake_sleep(_seconds: float) -> None:
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 2:
+            raise StopLoop()
+        return None
+
+    monkeypatch.setattr(runner.DIManager, "create", fake_create)
+    monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
+    monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
+    _disable_jitter(monkeypatch)
+
+    with pytest.raises(StopLoop):
+        await runner.process_payment_for_advs()
+
+    assert create_calls >= 2
+    assert billing_calls == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_payment_for_advs_increases_inner_backoff_on_consecutive_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StopLoop(Exception):
+        pass
+
+    @asynccontextmanager
+    async def fake_context():
+        yield object()
+
+    async def fake_create(_container_cls):  # type: ignore[no-untyped-def]
+        return fake_context()
+
+    billing_calls = 0
+
+    async def fake_billing(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        nonlocal billing_calls
+        billing_calls += 1
+        if billing_calls <= 2:
+            raise RuntimeError("name or service not known")
+        return None
+
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        if len(sleep_calls) >= 3:
+            raise StopLoop()
+        return None
+
+    monkeypatch.setattr(runner.DIManager, "create", fake_create)
+    monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
+    monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
+    _disable_jitter(monkeypatch)
+
+    with pytest.raises(StopLoop):
+        await runner.process_payment_for_advs()
+
+    assert sleep_calls[:2] == [5, 10]
