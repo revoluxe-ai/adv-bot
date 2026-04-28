@@ -7,6 +7,23 @@ from app.modules.wb_adv_updater import runner
 from app.utils import backoff
 
 
+def _disable_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _retry_without_jitter(
+        attempt: int,
+        *,
+        base_seconds: int,
+        max_seconds: int,
+    ) -> float:
+        return backoff.retry_delay_with_jitter(
+            attempt,
+            base_seconds=base_seconds,
+            max_seconds=max_seconds,
+            jitter_ratio=0.0,
+        )
+
+    monkeypatch.setattr(runner, "retry_delay_with_jitter", _retry_without_jitter)
+
+
 @pytest.mark.unit
 def test_is_infra_error_detects_dns_resolution_message() -> None:
     exc = RuntimeError("Failed to resolve host: Name or service not known")
@@ -15,7 +32,7 @@ def test_is_infra_error_detects_dns_resolution_message() -> None:
 
 @pytest.mark.unit
 def test_calc_backoff_capped_and_monotonic_with_zero_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
+    _disable_jitter(monkeypatch)
     first = runner._calc_backoff(attempt=1, base_seconds=5, max_seconds=300)
     second = runner._calc_backoff(attempt=2, base_seconds=5, max_seconds=300)
     capped = runner._calc_backoff(attempt=100, base_seconds=5, max_seconds=300)
@@ -63,7 +80,7 @@ async def test_process_payment_for_advs_retries_after_di_bootstrap_failure(
     monkeypatch.setattr(runner.DIManager, "create", fake_create)
     monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
     monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
+    _disable_jitter(monkeypatch)
 
     with pytest.raises(StopLoop):
         await runner.process_payment_for_advs()
@@ -107,7 +124,7 @@ async def test_process_payment_for_advs_increases_inner_backoff_on_consecutive_f
     monkeypatch.setattr(runner.DIManager, "create", fake_create)
     monkeypatch.setattr("app.modules.billing.process_payment_for_advs", fake_billing)
     monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(backoff.random, "uniform", lambda _a, _b: 0.0)
+    _disable_jitter(monkeypatch)
 
     with pytest.raises(StopLoop):
         await runner.process_payment_for_advs()
