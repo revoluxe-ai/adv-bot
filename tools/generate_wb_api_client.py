@@ -15,14 +15,6 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 
-def download_spec(url: str, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    request = Request(url, headers={"User-Agent": "wb-api-client-generator/1.0"})
-    with urlopen(request) as response:
-        data = response.read()
-    destination.write_bytes(data)
-
-
 def fetch_spec_bytes(url: str) -> bytes:
     request = Request(url, headers={"User-Agent": "wb-api-client-generator/1.0"})
     with urlopen(request) as response:
@@ -188,12 +180,8 @@ def parse_args() -> argparse.Namespace:
 def determine_next_version(target_root: Path, force_version: int | None) -> int:
     if force_version is not None:
         return force_version
-    versions: list[int] = []
-    if target_root.exists():
-        for entry in target_root.iterdir():
-            if entry.is_dir() and entry.name.startswith("v") and entry.name[1:].isdigit():
-                versions.append(int(entry.name[1:]))
-    highest = max(versions, default=0)
+    version_dirs = iter_version_dirs(target_root)
+    highest = max((int(version_dir.name[1:]) for version_dir in version_dirs), default=0)
     return highest + 1
 
 
@@ -321,9 +309,6 @@ def main() -> int:
         )
         write_spec_lock(lock_path, lock_data)
 
-    if args.use_cached_spec:
-        # Preserve old lock metadata but refresh timestamped source info for visibility.
-        lock_data = read_spec_lock(lock_path)
     spec_sha = compute_sha256(spec_bytes)
     spec_size = len(spec_bytes)
 
