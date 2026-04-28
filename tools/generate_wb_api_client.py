@@ -180,12 +180,8 @@ def parse_args() -> argparse.Namespace:
 def determine_next_version(target_root: Path, force_version: int | None) -> int:
     if force_version is not None:
         return force_version
-    versions: list[int] = []
-    if target_root.exists():
-        for entry in target_root.iterdir():
-            if entry.is_dir() and entry.name.startswith("v") and entry.name[1:].isdigit():
-                versions.append(int(entry.name[1:]))
-    highest = max(versions, default=0)
+    version_dirs = iter_version_dirs(target_root)
+    highest = max((int(version_dir.name[1:]) for version_dir in version_dirs), default=0)
     return highest + 1
 
 
