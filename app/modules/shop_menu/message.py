@@ -21,6 +21,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ToggleCabinetActive,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
+    ToggleCabinetActive,
 )
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
