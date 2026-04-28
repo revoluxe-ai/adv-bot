@@ -8,7 +8,11 @@ from sqlalchemy import select
 
 from app.client_bot.notification_sender import get_notification_sender
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from app.modules.token_monitoring.models import NotificationType, TokenNotificationTracker
+from app.modules.token_monitoring.models import (
+    CABINET_DEACTIVATED_NOTIFICATION_TYPE,
+    NotificationType,
+    TokenNotificationTracker,
+)
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
     get_wb_user_cabinets_for_shop,
@@ -22,7 +26,7 @@ sm = get_async_session_maker
 # When the cabinet is active again, resolve these so a later deactivation can notify.
 _CABINET_REACTIVATION_RESOLVE_TYPES: tuple[str, ...] = (
     NotificationType.TOKEN_DEACTIVATED.value,
-    NotificationType.CABINET_DEACTIVATED.value,
+    CABINET_DEACTIVATED_NOTIFICATION_TYPE,
 )
 
 

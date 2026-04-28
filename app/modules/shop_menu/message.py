@@ -573,7 +573,7 @@ class ShopMenu(TextWithKeyboard):
             text += "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n"
 
         # Shop information
-        cabinet_active = self._wb_cabinet.active is True
+        cabinet_active = getattr(self._wb_cabinet, "active", True) is True
         cabinet_status_human = "Активен" if cabinet_active else "Не активен"
         text += (
             "\n===================================\n"

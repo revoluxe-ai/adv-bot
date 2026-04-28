@@ -149,7 +149,7 @@ def get_shops_list_keyboard(
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
         wb_cabinet = wb_user_cabinet.wb_cabinet
-        cabinet_ok = wb_cabinet.active is True
+        cabinet_ok = getattr(wb_cabinet, "active", True) is True
         token_ok = shop_ids_with_active_tokens is None or (
             wb_cabinet.shop_id in shop_ids_with_active_tokens
         )

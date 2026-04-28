@@ -11,6 +11,8 @@ from app.client_bot.user_interface.handlers.shop_choice_message import (
 )
 from app.client_bot.user_interface.views import callbacks
 
+pytestmark = pytest.mark.unit
+
 
 def _make_wb_user_cabinet(
     name: str,
@@ -36,6 +38,7 @@ def test_shops_list_page_text_equals_title() -> None:
     assert "Добавить магазин" in page.text
     assert "✅" in page.text
     assert "❌" in page.text
+    assert "[Каб][Ток]" in page.text
 
 
 def test_get_shops_list_keyboard_empty_list() -> None:
@@ -99,6 +102,18 @@ def test_get_shops_list_keyboard_shop_ids_none_uses_only_active(mock_settings) -
     uc_inactive = _make_wb_user_cabinet("Shop4", 4, "shop_4", active=False)
     kb2 = get_shops_list_keyboard([uc_inactive], 123, shop_ids_with_active_tokens=None)
     assert kb2.inline_keyboard[1][0].text.strip() == "❌✅ Shop4"
+
+
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+def test_get_shops_list_keyboard_missing_active_falls_back_to_token_state(
+    mock_settings,
+) -> None:
+    """Отсутствующий wb_cabinet.active обрабатывается как active=True (fallback)."""
+    mock_settings.invite_gate = True
+    uc = _make_wb_user_cabinet("ShopFallback", 5, "shop_5", active=True)
+    del uc.wb_cabinet.active
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens={"shop_5"})
+    assert kb.inline_keyboard[1][0].text.strip() == "ShopFallback ✅"
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
