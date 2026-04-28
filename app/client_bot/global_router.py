@@ -13,10 +13,12 @@ from ..modules.cabinet_bonus_manager.bonus_scene import (
 )
 from .common_routers import common_router
 from .middlewars.gate import GateMiddleware
+from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 _ = global_router.message.middleware(GateMiddleware())
+_ = global_router.message.middleware(ReturnToStart())
 _ = global_router.callback_query.middleware(GateMiddleware())
 _ = global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
