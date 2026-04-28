@@ -51,9 +51,8 @@ class CommonCoroutineManager:
                     },
                 )
             else:
-                # If the worker exits without crashing, treat it as a successful run
-                # and restart the backoff sequence for the next unexpected stop.
-                restart_count = 0
+                # If worker stops unexpectedly without an exception, keep increasing
+                # the restart backoff as for other instability cases.
                 restart_count += 1
                 retry_in_sec = exponential_retry_delay_seconds(
                     restart_count,
