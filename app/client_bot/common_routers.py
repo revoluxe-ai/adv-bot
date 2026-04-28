@@ -33,7 +33,6 @@ from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
 from app.modules.white_list_updater import router as white_list_updater_router
 
 from ..settings import settings
-from .middlewars.return_to_start_from_state import ReturnToStart
 
 from .user_interface.handlers.keywords_positions_history import (
     KeywordsPositionsHistoryRouter,
@@ -101,8 +100,6 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
 
-
-_ = common_router.message.middleware.register(ReturnToStart())
 
 # Router includes reorganized for new module
 common_router.include_routers(manual_update_phrase_position_router)
