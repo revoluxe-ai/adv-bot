@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING
 from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
-from app.utils.db.session_maker import get_async_session_maker as sm
+from app.modules.token_monitoring.models import NotificationType
+from app.modules.token_monitoring.services.cabinet_status_service import (
+    deactivate_cabinet_atomic_with_user_trackers,
+)
 from .models.wb_cabinet import WBCabinet
 
 if TYPE_CHECKING:
@@ -98,11 +101,11 @@ class ABC_WB_API(WbRequestApiMixin): # noqa
                 )
 
             try:
-                async with sm(read_only=False) as session:
-                    fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
-                    if fresh_cabinet:
-                        fresh_cabinet.active = False
-                        await session.commit()
+                shop_id_str = str(wb_cabinet.shop_id)
+                await deactivate_cabinet_atomic_with_user_trackers(
+                    shop_id_str,
+                    notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+                )
             except Exception as e:
                 logger.error(
                     f"Ошибка при отключении кабинета {wb_cabinet.shop_id}: {e}",

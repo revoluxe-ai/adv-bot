@@ -29,6 +29,21 @@ logger = logging.getLogger(__name__)
 # TODO: Сделать уникальность токенов на уровне пользователя, сейчас проверка при только при добавлении в базу
 
 
+async def get_wb_user_cabinets_for_shop(
+    session: AsyncSession, shop_id: str
+) -> list[WBUserCabinet]:
+    """Load all WBUserCabinet rows for a shop with User relationship eager-loaded."""
+    stmt = (
+        select(WBUserCabinet)
+        .options(selectinload(WBUserCabinet.user))
+        .join(WBCabinet)
+        .join(User)
+        .where(WBCabinet.shop_id == shop_id)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 class NotificationManager:
     """Manager for sending token-related notifications to users."""
 
@@ -36,6 +51,11 @@ class NotificationManager:
     MESSAGE_TEMPLATES = {
         NotificationType.TOKEN_DEACTIVATED.value: (
             "Токен истек или деактивирован, сделайте срочно новый и добавьте в магазин {shop_name}"
+        ),
+        NotificationType.CABINET_DEACTIVATED.value: (
+            "Магазин {shop_name} деактивирован в боте. "
+            "Чтобы снова запустить автообработку, откройте меню магазина и нажмите «Активировать магазин» "
+            "или обновите токен."
         ),
         NotificationType.TOKEN_EXPIRING_14_DAYS.value: (
             "Токен для магазина {shop_name} истекает через 2 недели ({expiry_date}). "
@@ -74,6 +94,21 @@ class NotificationManager:
         else:
             self._notification_sender = get_notification_sender()
 
+    def format_shop_notification_message(
+        self,
+        notification_type: str,
+        shop_name: str,
+        expiry_date: datetime.datetime | None = None,
+    ) -> str:
+        """Public wrapper for template formatting (used by cabinet status flow)."""
+        return self._format_message(notification_type, shop_name, expiry_date)
+
+    @staticmethod
+    def naive_utc_now() -> datetime.datetime:
+        """Current UTC time as naive datetime for TIMESTAMP WITHOUT TIME ZONE columns."""
+        now = datetime.datetime.now(datetime.UTC)
+        return now.astimezone(datetime.UTC).replace(tzinfo=None)
+
     @staticmethod
     def _to_naive_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
         """
@@ -106,7 +141,7 @@ class NotificationManager:
         try:
             async with self.session_maker(read_only=False) as session:
                 # Get all users for this shop
-                shop_users = await self._get_shop_users(session, shop_id)
+                shop_users = await get_wb_user_cabinets_for_shop(session, shop_id)
 
                 if not shop_users:
                     logger.warning("No users found for shop %s", shop_id)
@@ -227,20 +262,6 @@ class NotificationManager:
                 exc_info=True,
             )
             return False
-
-    async def _get_shop_users(
-        self, session: AsyncSession, shop_id: str
-    ) -> list[WBUserCabinet]:
-        """Get all user cabinets for a shop."""
-        stmt = (
-            select(WBUserCabinet)
-            .options(selectinload(WBUserCabinet.user))
-            .join(WBCabinet)
-            .join(User)
-            .where(WBCabinet.shop_id == shop_id)
-        )
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
 
     def _format_message(
         self,

@@ -5,7 +5,7 @@ import logging
 from typing import Any
 from collections.abc import Callable
 
-from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
 from app.modules.token_monitoring.models import NotificationType
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,8 @@ class TokenMonitoringService:
 
                     except ApiForbiddenError as e:
                         # Token deactivation detected - all tokens have failed
+                        if getattr(e, "text", None) == NO_FREE_TOKENS_MESSAGE:
+                            raise
                         shop_id = getattr(instance, "shop_id", None)
 
                         if shop_id:

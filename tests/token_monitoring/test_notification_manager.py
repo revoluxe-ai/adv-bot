@@ -71,15 +71,14 @@ class TestNotificationManager:
         """Test sending token deactivation notification."""
         session_maker, session = mock_session_maker
 
-        # Mock _get_shop_users to return sample user
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
-
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Verify notification sender was called
         mock_notification_sender.send_message.assert_called_once()
@@ -102,17 +101,17 @@ class TestNotificationManager:
         """Test sending 14-day expiration notification."""
         session_maker, session = mock_session_maker
 
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
-
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=14)
 
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_EXPIRING_14_DAYS.value,
-            expiry_date=expiry_date,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_EXPIRING_14_DAYS.value,
+                expiry_date=expiry_date,
+            )
 
         # Verify message content
         mock_notification_sender.send_message.assert_called_once()
@@ -133,17 +132,17 @@ class TestNotificationManager:
         """Test sending 3-day expiration notification."""
         session_maker, session = mock_session_maker
 
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
-
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=3)
 
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_EXPIRING_3_DAYS.value,
-            expiry_date=expiry_date,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_EXPIRING_3_DAYS.value,
+                expiry_date=expiry_date,
+            )
 
         args, kwargs = mock_notification_sender.send_message.call_args
         message = args[1]
@@ -162,17 +161,17 @@ class TestNotificationManager:
         """Test sending 1-day expiration notification."""
         session_maker, session = mock_session_maker
 
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
-
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=1)
 
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_EXPIRING_1_DAY.value,
-            expiry_date=expiry_date,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_EXPIRING_1_DAY.value,
+                expiry_date=expiry_date,
+            )
 
         args, kwargs = mock_notification_sender.send_message.call_args
         message = args[1]
@@ -195,15 +194,16 @@ class TestNotificationManager:
         mock_notification_sender.send_message.side_effect = Exception(
             "Forbidden: bot was blocked by the user"
         )
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
 
-        # Should not raise exception
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            # Should not raise exception
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Bot message was attempted but failed
         mock_notification_sender.send_message.assert_called_once()
@@ -221,18 +221,18 @@ class TestNotificationManager:
         """Test handling duplicate notifications via database constraint."""
         session_maker, session = mock_session_maker
 
-        notification_manager._get_shop_users = AsyncMock(
-            return_value=[sample_user_cabinet]
-        )
-
         # Mock IntegrityError for duplicate constraint violation
         orig_error = Exception("original error")
         session.flush.side_effect = IntegrityError("duplicate key", orig_error, None)
 
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[sample_user_cabinet]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Message was sent but database rollback occurred
         mock_notification_sender.send_message.assert_called_once()
@@ -259,12 +259,14 @@ class TestNotificationManager:
             cabinet.user = user
             users.append(cabinet)
 
-        notification_manager._get_shop_users = AsyncMock(return_value=users)
-
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=users),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # Verify message sent to all users
         assert mock_notification_sender.send_message.call_count == 3
@@ -401,12 +403,14 @@ class TestNotificationManager:
         """Test notification when no users found for shop."""
         session_maker, session = mock_session_maker
 
-        notification_manager._get_shop_users = AsyncMock(return_value=[])
-
-        await notification_manager.notify_token_issue(
-            shop_id="test_shop_123",
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
+        with patch(
+            "app.modules.token_monitoring.services.notification_manager.get_wb_user_cabinets_for_shop",
+            new=AsyncMock(return_value=[]),
+        ):
+            await notification_manager.notify_token_issue(
+                shop_id="test_shop_123",
+                notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+            )
 
         # No messages should be sent
         mock_notification_sender.send_message.assert_not_called()
