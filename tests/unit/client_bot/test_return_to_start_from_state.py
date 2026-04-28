@@ -54,6 +54,31 @@ async def test_return_to_start_in_text_triggers_registration(
     "app.client_bot.middlewars.return_to_start_from_state.start_registration",
     new_callable=AsyncMock,
 )
+async def test_return_to_start_does_not_intercept_similar_command(
+    mock_start_registration: AsyncMock,
+) -> None:
+    """Похожая команда (/starting) не должна считаться /start."""
+    msg = MagicMock(spec=Message)
+    msg.text = "/starting"
+    msg.caption = None
+    next_handler = AsyncMock(return_value="next")
+    data: dict = {"bot": MagicMock(), "state": MagicMock()}
+    state = data["state"]
+    state.clear = AsyncMock()
+
+    result = await ReturnToStart()(next_handler, msg, data)
+
+    assert result == "next"
+    next_handler.assert_awaited_once_with(msg, data)
+    state.clear.assert_not_awaited()
+    mock_start_registration.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.client_bot.middlewars.return_to_start_from_state.start_registration",
+    new_callable=AsyncMock,
+)
 async def test_return_to_start_in_caption_triggers_registration(
     mock_start_registration: AsyncMock,
 ) -> None:

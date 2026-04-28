@@ -18,7 +18,9 @@ class ReturnToStart(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         payload = (event.text or event.caption or "").strip()
-        if "/start" in payload:
+        first_token = payload.split(maxsplit=1)[0].lower() if payload else ""
+        is_start_command = first_token == "/start" or first_token.startswith("/start@")
+        if is_start_command:
             bot = data["bot"]
             state: FSMContext = data["state"]
             await state.clear()
