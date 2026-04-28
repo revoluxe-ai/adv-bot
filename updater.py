@@ -5,7 +5,6 @@ from functools import partial
 from multiprocessing import Process
 
 import dotenv
-import psutil # pyright: ignore
 from typing import Any
 from collections.abc import Callable, Coroutine
 
@@ -34,20 +33,6 @@ run_own_process_list: list[AsyncEntry] = [
     # TODO: привести все процессы к единому интерфейсу
     common_coroutine.run # type: ignore # pyright: ignore
 ]
-
-
-def process_controller(process_pids: list[int], process_names: list[str]) -> None:
-    time.sleep(10)
-    while True:
-        for pid, name in zip(process_pids, process_names, strict=False):
-            logger.debug(f"Проверка процесса: {name}")
-            try:
-                proc = psutil.Process(pid)
-                assert proc.is_running()
-            except psutil.NoSuchProcess:
-                logger.error(f"Процесс с PID {pid} (имя: {name}) не существует.")
-                continue
-        time.sleep(60)
 
 
 # Обновлена типизация: принимаем обычную async-функцию без аргументов
