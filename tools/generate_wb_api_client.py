@@ -15,14 +15,6 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 
-def download_spec(url: str, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    request = Request(url, headers={"User-Agent": "wb-api-client-generator/1.0"})
-    with urlopen(request) as response:
-        data = response.read()
-    destination.write_bytes(data)
-
-
 def fetch_spec_bytes(url: str) -> bytes:
     request = Request(url, headers={"User-Agent": "wb-api-client-generator/1.0"})
     with urlopen(request) as response:
