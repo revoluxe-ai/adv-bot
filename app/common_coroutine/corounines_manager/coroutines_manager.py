@@ -2,10 +2,12 @@ import asyncio
 import logging
 
 from app.common_coroutine.corounines_manager.base_worker import BaseWorker
+from app.utils.backoff import exponential_retry_delay_seconds
 
 logger = logging.getLogger(__name__)
 
-WORKER_RESTART_DELAY_SECONDS = 5
+WORKER_RESTART_BASE_DELAY_SECONDS = 5
+WORKER_RESTART_MAX_DELAY_SECONDS = 300
 
 
 class CommonCoroutineManager:
@@ -23,6 +25,11 @@ class CommonCoroutineManager:
                 raise
             except Exception:
                 restart_count += 1
+                retry_in_sec = exponential_retry_delay_seconds(
+                    restart_count,
+                    base_seconds=WORKER_RESTART_BASE_DELAY_SECONDS,
+                    max_seconds=WORKER_RESTART_MAX_DELAY_SECONDS,
+                )
                 logger.error(
                     "Worker %s crashed, restarting",
                     worker_name,
@@ -31,28 +38,33 @@ class CommonCoroutineManager:
                         "component": "common_coroutine_worker",
                         "worker": worker_name,
                         "restart_count": restart_count,
-                        "retry_in_sec": WORKER_RESTART_DELAY_SECONDS,
+                        "retry_in_sec": retry_in_sec,
                     },
                 )
             else:
                 restart_count += 1
+                retry_in_sec = exponential_retry_delay_seconds(
+                    restart_count,
+                    base_seconds=WORKER_RESTART_BASE_DELAY_SECONDS,
+                    max_seconds=WORKER_RESTART_MAX_DELAY_SECONDS,
+                )
                 logger.warning(
                     "Worker %s stopped unexpectedly, restarting in %ss",
                     worker_name,
-                    WORKER_RESTART_DELAY_SECONDS,
+                    retry_in_sec,
                     extra={
                         "component": "common_coroutine_worker",
                         "worker": worker_name,
                         "restart_count": restart_count,
-                        "retry_in_sec": WORKER_RESTART_DELAY_SECONDS,
+                        "retry_in_sec": retry_in_sec,
                     },
                 )
-            await asyncio.sleep(WORKER_RESTART_DELAY_SECONDS)
+            await asyncio.sleep(retry_in_sec)
 
     async def run(self):
         logger.debug(f"Gathering {len(self._workers)} worker(s)")
-        await asyncio.gather(
-            *[self._run_worker_forever(worker) for worker in self._workers]
+        _ = await asyncio.gather(
+            *(self._run_worker_forever(worker) for worker in self._workers)
         )
 
 
