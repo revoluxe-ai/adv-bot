@@ -1,0 +1,76 @@
+from typing import Any, Dict, List, Type, TypeVar, Union
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="PostAdvV2SupplierNmsResponse200Item")
+
+
+@_attrs_define
+class PostAdvV2SupplierNmsResponse200Item:
+    """
+    Attributes:
+        title (Union[Unset, str]): Product name Example: Плед.
+        nm (Union[Unset, int]): WB article Example: 146168367.
+        subject_id (Union[Unset, int]): Subject ID Example: 765.
+    """
+
+    title: Union[Unset, str] = UNSET
+    nm: Union[Unset, int] = UNSET
+    subject_id: Union[Unset, int] = UNSET
+    additional_properties: Dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        title = self.title
+
+        nm = self.nm
+
+        subject_id = self.subject_id
+
+        field_dict: Dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update({})
+        if title is not UNSET:
+            field_dict["title"] = title
+        if nm is not UNSET:
+            field_dict["nm"] = nm
+        if subject_id is not UNSET:
+            field_dict["subjectId"] = subject_id
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+        d = src_dict.copy()
+        title = d.pop("title", UNSET)
+
+        nm = d.pop("nm", UNSET)
+
+        subject_id = d.pop("subjectId", UNSET)
+
+        post_adv_v2_supplier_nms_response_200_item = cls(
+            title=title,
+            nm=nm,
+            subject_id=subject_id,
+        )
+
+        post_adv_v2_supplier_nms_response_200_item.additional_properties = d
+        return post_adv_v2_supplier_nms_response_200_item
+
+    @property
+    def additional_keys(self) -> List[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties
