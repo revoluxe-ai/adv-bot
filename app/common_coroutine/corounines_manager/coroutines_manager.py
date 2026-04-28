@@ -51,11 +51,11 @@ class CommonCoroutineManager:
                     },
                 )
             else:
-                # If worker stops unexpectedly without an exception, keep increasing
-                # the restart backoff as for other instability cases.
-                restart_count += 1
+                # A clean stop means crash streak is broken. Restart with base delay,
+                # but keep counter reset so a future crash starts from attempt #1 too.
+                restart_count = 0
                 retry_in_sec = exponential_retry_delay_seconds(
-                    restart_count,
+                    1,
                     base_seconds=WORKER_RESTART_BASE_DELAY_SECONDS,
                     max_seconds=WORKER_RESTART_MAX_DELAY_SECONDS,
                 )
