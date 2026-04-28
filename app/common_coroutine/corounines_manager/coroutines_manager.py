@@ -31,8 +31,9 @@ class CommonCoroutineManager:
                     max_seconds=WORKER_RESTART_MAX_DELAY_SECONDS,
                 )
                 logger.error(
-                    "Worker %s crashed, restarting",
+                    "Worker %s crashed, restarting in %ss",
                     worker_name,
+                    retry_in_sec,
                     exc_info=True,
                     extra={
                         "component": "common_coroutine_worker",
