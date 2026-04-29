@@ -23,6 +23,7 @@ if typing.TYPE_CHECKING:
         PromotionManager,
         CampaignBudgetInfo,
         BudgetTopUpResult,
+        SetMinusPhrasesFallbackResult,
     )
     from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
         GetAdvV1BalanceResponse200,
@@ -53,6 +54,25 @@ class WBModifier:
             raise e
         await update_redis_timestamp_manager.set_one(adv_id=adv_id)
         return None
+
+    async def set_minus_phrases_with_fallback_for_adv(
+        self,
+        adv_id: int,
+        nmid: int,
+        phrases: list[str],
+        update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager,
+    ) -> "SetMinusPhrasesFallbackResult":
+        try:
+            result = await self._promotion_manager.set_minus_phrases_with_fallback(
+                advert_id=adv_id,
+                nm_id=nmid,
+                phrases=phrases,
+            )
+        except Exception as e:
+            logger.error("Ошибка обновления минус-фраз: %s", e, exc_info=True)
+            raise e
+        await update_redis_timestamp_manager.set_one(adv_id=adv_id)
+        return result
 
     async def get_minus_phrases_for_adv(self, adv_id: int, nmid: int) -> list[str]:
         """Получить текущий список минус-фраз для пары кампания + номенклатура."""
