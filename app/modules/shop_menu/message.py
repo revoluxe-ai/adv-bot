@@ -28,7 +28,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingAdvs,
     ShowShopsList,
     TurnBot,
-    TurnWhiteListUpdate,
 )
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
@@ -494,23 +493,6 @@ class ShopMenu(TextWithKeyboard):
                 action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )
-        builder.row(button)
-
-        if bool(self._wb_cabinet.white_list_update_active):
-            button = InlineKeyboardButton(
-                text="Выключить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="off"
-                ).pack(),
-            )
-        else:
-            button = InlineKeyboardButton(
-                text="Включить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="on"
-                ).pack(),
-            )
-
         builder.row(button)
 
         # Добавляем кнопку для настройки дефолтной максимальной ставки (CPM)

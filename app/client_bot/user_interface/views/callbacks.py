@@ -389,11 +389,6 @@ class ResetPlace(CallbackData, prefix="reset_place"):
     adv_setting_original_id: int
 
 
-class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
-    action: str
-    wb_cabinet_original_id: int
-
-
 class OrdersSourceToggle(CallbackData, prefix="orders_source_toggle"):
     new_source: OrdersSourceForAutoMode
     adv_setting_original_id: int

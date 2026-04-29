@@ -48,9 +48,6 @@ class WBCabinet(BaseTable):
     bonus: Mapped[float] = mapped_column(
         Float, default=0, server_default=text("0"), nullable=False
     )
-    white_list_update_active: Mapped[bool | None] = mapped_column(
-        Boolean, default=False, nullable=True
-    )
     balance_payments: Mapped[list[WBBalancePayment]] = relationship(
         "WBBalancePayment", back_populates="wb_cabinet", uselist=True
     )

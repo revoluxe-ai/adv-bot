@@ -296,7 +296,6 @@ def setup_test_database(docker_compose_cmd):
                         "bonus": 0.0,
                         "demo": True,
                         "expiration_alarm_days_pass": None,
-                        "white_list_update_active": False,
                     }
                     insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
                     on_conflict_stmt = insert_stmt.on_conflict_do_update(

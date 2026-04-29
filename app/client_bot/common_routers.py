@@ -30,7 +30,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
 )
 from app.modules.user_message_sender import middleware_for_adding_task
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
-from app.modules.white_list_updater import router as white_list_updater_router
 
 from ..settings import settings
 from .middlewars.return_to_start_from_state import ReturnToStart
@@ -135,7 +134,6 @@ common_router.include_routers(connect_existing_advs.router)
 common_router.include_routers(rec_system_mode_toggle.router)
 common_router.include_routers(white_list_mode_toggle.router)
 common_router.include_routers(WhiteListModeSettingsRouter)
-common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)

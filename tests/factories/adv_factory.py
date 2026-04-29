@@ -20,7 +20,6 @@ class WBCabinetFactory(SQLAlchemyModelFactory):
     bonus = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0, max_value=100), 2))
     demo = False
     expiration_alarm_days_pass = None
-    white_list_update_active = False
 
 
 class WBUserCabinetFactory(SQLAlchemyModelFactory):

@@ -69,7 +69,6 @@ def test_shop_menu_keyboard_back_to_shops_uses_show_shops_list() -> None:
     )
     wb_cabinet = MagicMock()
     wb_cabinet.id = 1
-    wb_cabinet.white_list_update_active = False
     wb_cabinet.default_max_cpm = 100
     wb_user_cabinet = MagicMock()
     wb_user_cabinet.id = 1
@@ -107,7 +106,6 @@ def test_shop_menu_keyboard_connect_existing_advs_button() -> None:
     )
     wb_cabinet = MagicMock()
     wb_cabinet.id = 1
-    wb_cabinet.white_list_update_active = False
     wb_cabinet.default_max_cpm = 100
     wb_user_cabinet = MagicMock()
     wb_user_cabinet.id = cabinet_id
