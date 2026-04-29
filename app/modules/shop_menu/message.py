@@ -52,6 +52,12 @@ from app.utils.suffixes import get_day_suffix
 logger = logging.getLogger(__name__)
 
 
+def _is_admin_user(user_telegram_id: int | None) -> bool:
+    if user_telegram_id is None:
+        return False
+    return user_telegram_id in const.ADMINS
+
+
 class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
@@ -218,7 +224,7 @@ class ShopMenu(TextWithKeyboard):
         if not work_tokens:
             logger.warning(f"Токены не найдены для магазина {shop_id}")
             # Для админов делаем исключение
-            if user.user_telegram_id in const.ADMINS:
+            if _is_admin_user(user.user_telegram_id):
                 logger.debug(f"Админ {user.user_telegram_id} получает временный токен")
                 expiration_time = datetime.now() + timedelta(days=30)
                 self.expiration_time = expiration_time
@@ -240,7 +246,7 @@ class ShopMenu(TextWithKeyboard):
         )
 
         # Определение срока действия
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             expiration_time = datetime.now() + timedelta(days=30)
             logger.debug(
                 "Пользователь - админ, установлен временный срок действия токена"
@@ -259,7 +265,7 @@ class ShopMenu(TextWithKeyboard):
         # Проверка на истечение срока действия
         if (
             expiration_time < datetime.now()
-            and user.user_telegram_id not in const.ADMINS
+            and not _is_admin_user(user.user_telegram_id)
         ):
             await self.bot.send_message(
                 self.chat_id,
@@ -269,7 +275,7 @@ class ShopMenu(TextWithKeyboard):
             return False
 
         # Сохранение срока действия для дальнейшего использования
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             # Для админов устанавливаем временное значение
             self.expiration_time = datetime.now() + timedelta(days=30)
             self.last_days_for_token = 30

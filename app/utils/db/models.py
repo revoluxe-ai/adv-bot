@@ -51,7 +51,9 @@ from app.utils.db.base import BaseTable
 
 class User(BaseTable):
     # TODO Модель расшарена, отрефакторить перед изменениями
-    user_telegram_id: Mapped[int] = mapped_column(BIGINT, nullable=True, unique=True)
+    user_telegram_id: Mapped[int | None] = mapped_column(
+        BIGINT, nullable=True, unique=True
+    )
     username: Mapped[str] = mapped_column(String, nullable=True)
     # Web registration (phase 1: nullable; phase 2 may tighten to NOT NULL/UNIQUE)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
