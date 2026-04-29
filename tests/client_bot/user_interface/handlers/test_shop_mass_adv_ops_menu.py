@@ -35,6 +35,7 @@ async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
     assert "Отключить все кампании" in texts
     assert "Применить дефолты всем кампаниям" in texts
+    assert "Сбросить все НРФ во всех РК" in texts
     assert "Назад" in texts
 
 

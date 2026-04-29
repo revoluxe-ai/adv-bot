@@ -507,6 +507,10 @@ class ApplyDefaultsForShop(CallbackData, prefix="apply_shop_defaults"):
     wb_user_cabinet_original_id: int
 
 
+class ResetShopNonRelevantPhrases(CallbackData, prefix="reset_shop_non_rel"):
+    wb_user_cabinet_original_id: int
+
+
 class ToggleCabinetActive(CallbackData, prefix="toggle_cabinet_active"):
     """Переключить WBCabinet.active из меню магазина."""
 

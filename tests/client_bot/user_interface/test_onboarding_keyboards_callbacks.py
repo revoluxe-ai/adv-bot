@@ -163,7 +163,7 @@ def test_shop_menu_keyboard_mass_ops_button_and_hidden_bulk_buttons() -> None:
 
 
 def test_shop_mass_adv_ops_keyboard_buttons() -> None:
-    """Mass operations keyboard has 3 actions and back button."""
+    """Mass operations keyboard has all actions and back button."""
     from app.modules.shop_menu.message import build_shop_mass_adv_ops_keyboard
 
     cabinet_id = 42
@@ -181,6 +181,9 @@ def test_shop_mass_adv_ops_keyboard_buttons() -> None:
         "Применить дефолты всем кампаниям": callbacks.ApplyDefaultsForShop(
             wb_user_cabinet_original_id=cabinet_id
         ).pack(),
+        "Сбросить все НРФ во всех РК": callbacks.ResetShopNonRelevantPhrases(
+            wb_user_cabinet_original_id=cabinet_id
+        ).pack(),
         "Назад": callbacks.ShopMassAdvOpsBack(
             wb_user_cabinet_original_id=cabinet_id
         ).pack(),
@@ -189,5 +192,19 @@ def test_shop_mass_adv_ops_keyboard_buttons() -> None:
 
     assert found["Отключить все кампании"] == expected_callbacks["Отключить все кампании"]
     assert found["Применить дефолты всем кампаниям"] == expected_callbacks["Применить дефолты всем кампаниям"]
+    assert (
+        found["Сбросить все НРФ во всех РК"]
+        == expected_callbacks["Сбросить все НРФ во всех РК"]
+    )
     assert found["Назад"] == expected_callbacks["Назад"]
     assert any(text.startswith("Дефолтная максимальная ставка (CPM) (100)") for text in found)
+
+
+def test_reset_shop_non_relevant_phrases_callback_pack_unpack() -> None:
+    """ResetShopNonRelevantPhrases callback is serializable and stable."""
+    packed = callbacks.ResetShopNonRelevantPhrases(
+        wb_user_cabinet_original_id=321
+    ).pack()
+    unpacked = callbacks.ResetShopNonRelevantPhrases.unpack(packed)
+    assert unpacked.wb_user_cabinet_original_id == 321
+    assert packed.startswith("reset_shop_non_rel:")

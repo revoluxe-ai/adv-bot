@@ -4,7 +4,7 @@ from typing import Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result
+from sqlalchemy import Result, func, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -13,6 +13,7 @@ from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    KeywordSetting,
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -573,3 +574,45 @@ async def apply_defaults_for_shop(
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
 
     return
+
+
+@router.callback_query(callbacks.ResetShopNonRelevantPhrases.filter())
+async def reset_shop_non_relevant_phrases(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ResetShopNonRelevantPhrases,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+
+    async with sm(read_only=False) as session:
+        adv_setting_ids_subquery = (
+            select(AdvSetting.id)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+        count_stmt = select(func.count(KeywordSetting.id)).where(
+            KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
+            KeywordSetting.hard_status == const.BLACK_LIST,
+        )
+        updated_count = int((await session.execute(count_stmt)).scalar_one())
+        stmt = (
+            update(KeywordSetting)
+            .where(
+                KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
+                KeywordSetting.hard_status == const.BLACK_LIST,
+            )
+            .values(hard_status=const.AUTO_MODE)
+        )
+        _ = await session.execute(stmt)
+        await session.commit()
+
+    await bot.send_message(
+        chat_id,
+        f"Сброшено НРФ: {updated_count}. Возвращаю в меню магазина...",
+    )
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
