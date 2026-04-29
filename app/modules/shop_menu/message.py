@@ -19,6 +19,7 @@ from app.client_bot.user_interface.views.callbacks import (
     AddNewToken,
     ApplyDefaultsForShop,
     ChangeShopDefaultMaxCPM,
+    ResetShopNonRelevantPhrases,
     ShopMassAdvOpsBack,
     ShopMassAdvOpsMenu,
     ToggleCabinetActive,
@@ -181,6 +182,15 @@ def build_shop_mass_adv_ops_keyboard(
         InlineKeyboardButton(
             text="Применить дефолты всем кампаниям",
             callback_data=ApplyDefaultsForShop(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Сбросить все НРФ во всех РК",
+            callback_data=ResetShopNonRelevantPhrases(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )
