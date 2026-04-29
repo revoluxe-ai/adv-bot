@@ -103,3 +103,28 @@ async def test_update_minus_phrases_isolates_nmid_failures(caplog: pytest.LogCap
 
     assert wb_modifier.set_minus_phrases_with_fallback_for_adv.await_count == 2
     assert "Ошибка обновления РК по nmid" in caplog.text
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_minus_phrases_does_not_clear_when_nmid_has_no_overlap() -> None:
+    wb_modifier = SimpleNamespace(
+        get_minus_phrases_for_adv=AsyncMock(return_value=["already_exists"]),
+        set_minus_phrases_with_fallback_for_adv=AsyncMock(),
+    )
+    wb_hub = SimpleNamespace(wb_modifier=wb_modifier)
+    click_house = SimpleNamespace(
+        get_cluster_texts_for_adv_nmid=AsyncMock(
+            side_effect=[["unrelated_11"], ["unrelated_22"]]
+        )
+    )
+    manager = MinusPhraseManager(
+        wb_api_manager_hub=wb_hub,
+        click_house_manager=click_house,
+        update_redis_timestamp_manager=SimpleNamespace(),
+    )
+
+    await manager.update_minus_phrases(_make_complex_adv())
+
+    assert wb_modifier.get_minus_phrases_for_adv.await_count == 0
+    wb_modifier.set_minus_phrases_with_fallback_for_adv.assert_not_awaited()

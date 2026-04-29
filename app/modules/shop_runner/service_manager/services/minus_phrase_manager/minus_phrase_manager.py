@@ -109,6 +109,8 @@ class MinusPhraseManager:
             adv_id, nmid
         )
         bad_keywords_for_nmid = set(common_bad_phrases) & set(keywords_from_this_adv_nmid)
+        if not bad_keywords_for_nmid:
+            return None
         minus_phrases_to_send = list(bad_keywords_for_nmid)[:1000]
         target_set = set(minus_phrases_to_send)
 
