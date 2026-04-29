@@ -46,7 +46,12 @@ async def gate_invite_process_code(
     if not message.text or not message.from_user:
         return
     text = message.text.strip()
-    if text.startswith("/"):
+    first_token = text.split(maxsplit=1)[0].lower() if text else ""
+    is_start_command = first_token == "/start" or first_token.startswith("/start@")
+    if is_start_command:
+        # /start централизованно перехватывается ReturnToStart middleware на global_router.
+        return
+    if first_token.startswith("/"):
         _ = await bot.send_message(
             message.chat.id,
             "Сейчас ожидается инвайт-код одним сообщением. "
