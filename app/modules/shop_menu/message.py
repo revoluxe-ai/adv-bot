@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import (
@@ -28,7 +29,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingAdvs,
     ShowShopsList,
     TurnBot,
-    TurnWhiteListUpdate,
 )
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
@@ -51,6 +51,12 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
 
 logger = logging.getLogger(__name__)
+
+
+def _is_admin_user(user_telegram_id: int | None) -> bool:
+    if user_telegram_id is None:
+        return False
+    return is_bot_admin(user_telegram_id)
 
 
 class ShopMenu(TextWithKeyboard):
@@ -219,7 +225,7 @@ class ShopMenu(TextWithKeyboard):
         if not work_tokens:
             logger.warning(f"Токены не найдены для магазина {shop_id}")
             # Для админов делаем исключение
-            if user.user_telegram_id in const.ADMINS:
+            if _is_admin_user(user.user_telegram_id):
                 logger.debug(f"Админ {user.user_telegram_id} получает временный токен")
                 expiration_time = datetime.now() + timedelta(days=30)
                 self.expiration_time = expiration_time
@@ -241,7 +247,7 @@ class ShopMenu(TextWithKeyboard):
         )
 
         # Определение срока действия
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             expiration_time = datetime.now() + timedelta(days=30)
             logger.debug(
                 "Пользователь - админ, установлен временный срок действия токена"
@@ -260,7 +266,7 @@ class ShopMenu(TextWithKeyboard):
         # Проверка на истечение срока действия
         if (
             expiration_time < datetime.now()
-            and user.user_telegram_id not in const.ADMINS
+            and not _is_admin_user(user.user_telegram_id)
         ):
             await self.bot.send_message(
                 self.chat_id,
@@ -270,7 +276,7 @@ class ShopMenu(TextWithKeyboard):
             return False
 
         # Сохранение срока действия для дальнейшего использования
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             # Для админов устанавливаем временное значение
             self.expiration_time = datetime.now() + timedelta(days=30)
             self.last_days_for_token = 30
@@ -494,23 +500,6 @@ class ShopMenu(TextWithKeyboard):
                 action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
             ).pack(),
         )
-        builder.row(button)
-
-        if bool(self._wb_cabinet.white_list_update_active):
-            button = InlineKeyboardButton(
-                text="Выключить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="off"
-                ).pack(),
-            )
-        else:
-            button = InlineKeyboardButton(
-                text="Включить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="on"
-                ).pack(),
-            )
-
         builder.row(button)
 
         # Добавляем кнопку для настройки дефолтной максимальной ставки (CPM)

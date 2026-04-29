@@ -10,7 +10,7 @@ class TestShopMenuTariffDisplay:
         menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
         m = cast(Any, menu)
         m._wb_user_cabinet = type("WBUC", (), {"name": "Test Shop", "id": 1})()
-        m._wb_cabinet = type("WBC", (), {"shop_id": "shop_1", "id": 1})()
+        m._wb_cabinet = type("WBC", (), {"shop_id": "shop_1", "id": 1, "active": True})()
         m._balance = 1000.0
         m._bonus = 0.0
         m._total_active_advs_count = 2

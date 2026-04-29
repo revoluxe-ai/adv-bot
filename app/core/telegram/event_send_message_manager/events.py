@@ -27,6 +27,13 @@ class NotValidTokens:
             )
             users = (await session.execute(stmt)).scalars().all()
             for user in users:
+                if user.user_telegram_id is None:
+                    logger.debug(
+                        "Skip token warning for web-only user id=%s username=%s",
+                        user.id,
+                        user.username,
+                    )
+                    continue
                 try:
                     await bot.send_message(
                         user.user_telegram_id,

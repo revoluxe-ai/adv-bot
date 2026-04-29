@@ -229,7 +229,6 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         bonus=0.0,
         demo=False,
         expiration_alarm_days_pass=None,
-        white_list_update_active=False,
     )
 
     adv_setting = AdvSetting(

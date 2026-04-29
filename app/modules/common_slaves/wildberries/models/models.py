@@ -496,6 +496,13 @@ class AdvSetting(BaseTable):
         server_default="true",
         comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
     )  # поле от недоделанного модуля инкрементальной статистики
+    use_cluster_stats_in_freshness = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+        comment="Учитывать кластерную статистику при проверке свежести",
+    )
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)

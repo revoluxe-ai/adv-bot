@@ -46,7 +46,6 @@ class TestTokenLoadingBugReproduction:
         wb_cabinet.expiration_time = datetime.datetime.now() + datetime.timedelta(
             days=30
         )
-        wb_cabinet.white_list_update_active = False
         wb_cabinet.adv_settings = []
 
         wb_user_cabinet = MagicMock()

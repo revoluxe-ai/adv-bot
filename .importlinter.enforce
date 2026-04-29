@@ -36,7 +36,6 @@ type = "forbidden"
 source_modules =
     app.modules.manual_phrase_positions_update.backend.frontend.telegram
     app.modules.wb_adv_updater.modules.bidder.tg_bot_handlers
-    app.modules.white_list_updater.telegram
     app.modules.predict_ctr_exponent_settings.telegram
     app.modules.bidder_auto_mode
     app.modules.balance_manager
