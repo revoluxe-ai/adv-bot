@@ -1,10 +1,11 @@
 import logging
 import aiogram
-from typing import Sequence, cast
+from typing import Any, Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result, func, update
+from sqlalchemy import Result, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -595,11 +596,6 @@ async def reset_shop_non_relevant_phrases(
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        count_stmt = select(func.count(KeywordSetting.id)).where(
-            KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
-            KeywordSetting.hard_status == const.BLACK_LIST,
-        )
-        updated_count = int((await session.execute(count_stmt)).scalar_one())
         stmt = (
             update(KeywordSetting)
             .where(
@@ -608,7 +604,8 @@ async def reset_shop_non_relevant_phrases(
             )
             .values(hard_status=const.AUTO_MODE)
         )
-        _ = await session.execute(stmt)
+        update_result = cast(CursorResult[Any], await session.execute(stmt))
+        updated_count = int(update_result.rowcount or 0)
         await session.commit()
 
     await bot.send_message(
