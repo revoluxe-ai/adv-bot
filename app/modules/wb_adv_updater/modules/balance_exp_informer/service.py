@@ -333,7 +333,7 @@ class BalanceReminderService:
             )
         )
 
-        result: Result[tuple[BalanceReminder, int, str]] = await session.execute(stmt)
+        result: Result[tuple[BalanceReminder, int | None, str]] = await session.execute(stmt)
         rows = result.all()
 
         items_map: dict[int, list[ReminderItem]] = defaultdict(list)
