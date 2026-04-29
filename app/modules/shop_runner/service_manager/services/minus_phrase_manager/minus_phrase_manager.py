@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable
+
 from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -13,9 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class MinusPhraseManager:
-    def __init__(self, wb_api_manager_hub: WBManagerHub,
-                 click_house_manager: ClickHouseManager,
-                 update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager):
+    def __init__(
+        self,
+        wb_api_manager_hub: WBManagerHub,
+        click_house_manager: ClickHouseManager,
+        update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager,
+    ):
         self._wb_api = wb_api_manager_hub
         self._click_house = click_house_manager
         self._update_redis_timestamp_manager = update_redis_timestamp_manager
@@ -35,63 +39,104 @@ class MinusPhraseManager:
 
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         keywords = await complex_adv.get_keywords()
-        bad_keywords: list[str] = [kw.text for kw in keywords if kw.status==KeywordStatus.BAD]
+        bad_keywords: list[str] = [
+            kw.text for kw in keywords if kw.status == KeywordStatus.BAD
+        ]
         if not bad_keywords:
             return None
         await asyncio.gather(
             self._update_minuses_in_auto_adv(complex_adv, bad_keywords),
-            self._update_minuses_in_search_adv(complex_adv, bad_keywords)
+            self._update_minuses_in_search_adv(complex_adv, bad_keywords),
         )
         return None
 
-    async def __update_minus_phrases(self,
-                                     adv_id: int,
-                                     nmids: list[int],
-                                     common_bad_phrases: list[str],
-        ) -> None:
-        keywords_from_this_adv: list[str] = await self._get_clusters_for_adv(adv_id)
-
-        bad_keywords_for_this_adv = set(common_bad_phrases) & set(keywords_from_this_adv)
-        if not bad_keywords_for_this_adv:
+    async def __update_minus_phrases(
+        self,
+        adv_id: int,
+        nmids: list[int],
+        common_bad_phrases: list[str],
+    ) -> None:
+        if not common_bad_phrases:
             return None
 
-        minus_phrases_to_send = list(bad_keywords_for_this_adv)[:1000]
-        target_set = set(minus_phrases_to_send)
-
-
-        tasks: list[Awaitable[None]] = []
+        tasks: list[Awaitable[tuple[int, list[str], int] | None]] = []
         for nmid in nmids:
-            current_minus_keywords = await self._wb_api.wb_modifier.get_minus_phrases_for_adv(adv_id, nmid)
-            if set(current_minus_keywords) != target_set:
-                task = self._wb_api.wb_modifier.set_minus_phrases_for_adv(
+            tasks.append(
+                self._sync_minus_phrases_for_nmid(
                     adv_id=adv_id,
                     nmid=nmid,
-                    phrases=minus_phrases_to_send,
-                    update_redis_timestamp_manager=self._update_redis_timestamp_manager,
+                    common_bad_phrases=common_bad_phrases,
                 )
-                tasks.append(task)
+            )
+        if not tasks:
+            return None
 
-        results: list[None | BaseException] = await asyncio.gather(
+        results: list[tuple[int, list[str], int] | None | BaseException] = await asyncio.gather(
             *tasks, return_exceptions=True
         )
         for result in results:
             if isinstance(result, Exception):
-                logger.error("Ошибка обновления РК: %s", result, exc_info=True)
+                logger.error(
+                    "Ошибка обновления РК по nmid для adv_id=%s: %s",
+                    adv_id,
+                    result,
+                    exc_info=(type(result), result, result.__traceback__),
+                )
+                continue
+            if result is None:
+                continue
+            nmid, dropped_invalid, final_count = result
+            if dropped_invalid:
+                logger.warning(
+                    "Обновление минус-фраз с fallback adv_id=%s nmid=%s "
+                    "отброшено=%s итог_фраз=%s",
+                    adv_id,
+                    nmid,
+                    dropped_invalid,
+                    final_count,
+                )
 
         return None
 
-    async def _get_clusters_for_adv(self, adv_id: int) -> list[str]:
-        keywords: list[str] = await self._click_house.get_cluster_texts_for_adv(adv_id)
-        return keywords
+    async def _sync_minus_phrases_for_nmid(
+        self,
+        *,
+        adv_id: int,
+        nmid: int,
+        common_bad_phrases: list[str],
+    ) -> tuple[int, list[str], int] | None:
+        keywords_from_this_adv_nmid = await self._click_house.get_cluster_texts_for_adv_nmid(
+            adv_id, nmid
+        )
+        bad_keywords_for_nmid = set(common_bad_phrases) & set(keywords_from_this_adv_nmid)
+        minus_phrases_to_send = list(bad_keywords_for_nmid)[:1000]
+        target_set = set(minus_phrases_to_send)
 
-    async def _update_minuses_in_auto_adv(self, complex_adv: ComplexAdv, bad_keywords: list[str]) -> None:
+        current_minus_keywords = await self._wb_api.wb_modifier.get_minus_phrases_for_adv(
+            adv_id, nmid
+        )
+        if set(current_minus_keywords) == target_set:
+            return None
+
+        fallback_result = await self._wb_api.wb_modifier.set_minus_phrases_with_fallback_for_adv(
+            adv_id=adv_id,
+            nmid=nmid,
+            phrases=minus_phrases_to_send,
+            update_redis_timestamp_manager=self._update_redis_timestamp_manager,
+        )
+        return (nmid, fallback_result.dropped_invalid_phrases, len(fallback_result.applied_phrases))
+
+    async def _update_minuses_in_auto_adv(
+        self, complex_adv: ComplexAdv, bad_keywords: list[str]
+    ) -> None:
         adv_id = complex_adv.auto_adv_id
         nmids = complex_adv.adv_setting.nmids
         await self.__update_minus_phrases(adv_id, nmids, bad_keywords)
         return None
 
-
-    async def _update_minuses_in_search_adv(self, complex_adv: ComplexAdv, bad_keywords: list[str]) -> None:
+    async def _update_minuses_in_search_adv(
+        self, complex_adv: ComplexAdv, bad_keywords: list[str]
+    ) -> None:
         search_adv = complex_adv.search_adv
         if not search_adv:
             return None

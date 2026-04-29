@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import json
+import re
 from typing import Any
 import datetime
 from typing import List, TYPE_CHECKING
@@ -19,6 +21,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
+from app.core.mp.wb.api.excs import BadRequestError
 from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
     GetMinBidsCommand,
 )
@@ -61,6 +64,45 @@ class BudgetTopUpResult:
     raw: dict[str, Any]
 
 
+@dataclass(slots=True, frozen=True)
+class SetMinusPhrasesFallbackResult:
+    applied_phrases: list[str]
+    dropped_invalid_phrases: list[str]
+    attempts: int
+
+
+_INVALID_NORM_QUERY_PATTERNS = (
+    re.compile(r"norm_query\s+'(.+?)'\s+is not valid for nm\s+\d+"),
+    re.compile(r'norm_query\s+"(.+?)"\s+is not valid for nm\s+\d+'),
+    re.compile(r"norm_query\s+'(.+?)'\s+is not valid for nm"),
+    re.compile(r'norm_query\s+"(.+?)"\s+is not valid for nm'),
+)
+
+
+def _extract_invalid_norm_query(detail: str) -> str | None:
+    if not isinstance(detail, str):
+        return None
+    try:
+        payload = json.loads(detail)
+    except json.JSONDecodeError:
+        payload = None
+
+    message = detail
+    if isinstance(payload, dict):
+        parsed_detail = payload.get("detail")
+        if isinstance(parsed_detail, str):
+            message = parsed_detail
+
+    for pattern in _INVALID_NORM_QUERY_PATTERNS:
+        match = pattern.search(message)
+        if match is None:
+            continue
+        invalid_phrase = match.group(1).strip()
+        if invalid_phrase:
+            return invalid_phrase
+    return None
+
+
 class PromotionManager:
     """Доменный менеджер для работы с сущностями продвижения (WB API)."""
 
@@ -79,6 +121,42 @@ class PromotionManager:
         await request(
             self._client.minus_phrases_adapter.post_adv_v0_normquery_set_minus,
             command,
+        )
+
+    async def set_minus_phrases_with_fallback(
+        self,
+        advert_id: int,
+        nm_id: int,
+        phrases: list[str],
+        *,
+        max_attempts: int | None = None,
+    ) -> SetMinusPhrasesFallbackResult:
+        active_phrases = list(dict.fromkeys(phrases))
+        dropped_invalid_phrases: list[str] = []
+        # Максимум одна "полезная" попытка на каждую уникальную фразу
+        # плюс финальная попытка после удалений.
+        effective_max_attempts = (
+            max_attempts if max_attempts is not None else len(active_phrases) + 1
+        )
+
+        for attempt in range(1, effective_max_attempts + 1):
+            try:
+                await self.set_minus_phrases(advert_id, nm_id, active_phrases)
+                return SetMinusPhrasesFallbackResult(
+                    applied_phrases=active_phrases,
+                    dropped_invalid_phrases=dropped_invalid_phrases,
+                    attempts=attempt,
+                )
+            except BadRequestError as exc:
+                invalid_phrase = _extract_invalid_norm_query(exc.detail)
+                if invalid_phrase is None or invalid_phrase not in active_phrases:
+                    raise
+                active_phrases = [p for p in active_phrases if p != invalid_phrase]
+                dropped_invalid_phrases.append(invalid_phrase)
+                continue
+        raise BadRequestError(
+            "Max attempts reached for set_minus_phrases_with_fallback "
+            f"advert_id={advert_id} nm_id={nm_id} attempts={effective_max_attempts}"
         )
 
     async def get_minus_phrases(self, advert_id: int, nm_id: int) -> list[str]:
