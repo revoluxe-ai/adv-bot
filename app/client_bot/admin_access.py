@@ -3,13 +3,13 @@
 from aiogram.filters import BaseFilter
 from aiogram.types import TelegramObject
 
-from app.client_bot.const import ADMINS
+from app.client_bot import const
 from app.settings import settings
 
 
 def is_bot_admin(telegram_id: int) -> bool:
     """Админы из ADMINS и из EXTRA_ADMIN_TELEGRAM_IDS (через запятую)."""
-    if telegram_id in ADMINS:
+    if telegram_id in const.ADMINS:
         return True
     return telegram_id in settings.extra_admin_telegram_ids
 

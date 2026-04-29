@@ -126,3 +126,68 @@ def test_shop_menu_keyboard_connect_existing_advs_button() -> None:
                 found = True
                 break
     assert found
+
+
+def test_shop_menu_keyboard_mass_ops_button_and_hidden_bulk_buttons() -> None:
+    """ShopMenu main keyboard has mass ops entry and hides moved bulk buttons."""
+    from app.modules.shop_menu.message import ShopMenu
+
+    bot = MagicMock()
+    state = MagicMock()
+    state.update_data = MagicMock(return_value=None)
+    cabinet_id = 42
+    menu = ShopMenu(
+        bot=bot,
+        chat_id=123,
+        state=state,
+        wb_user_cabinet_original_id=cabinet_id,
+        redis_client=None,
+    )
+    wb_cabinet = MagicMock()
+    wb_cabinet.id = 1
+    wb_cabinet.white_list_update_active = False
+    wb_cabinet.default_max_cpm = 100
+    wb_user_cabinet = MagicMock()
+    wb_user_cabinet.id = cabinet_id
+    wb_user_cabinet.wb_cabinet = wb_cabinet
+    menu._wb_user_cabinet = wb_user_cabinet
+    menu._wb_cabinet = wb_cabinet
+    menu._user_telegram_id = 123
+
+    kb = menu.keyboard
+    all_texts = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "Массовые операции с РК" in all_texts
+    assert "Отключить все кампании" not in all_texts
+    assert "Применить дефолты всем кампаниям" not in all_texts
+    assert not any(text.startswith("Дефолтная максимальная ставка (CPM)") for text in all_texts)
+
+
+def test_shop_mass_adv_ops_keyboard_buttons() -> None:
+    """Mass operations keyboard has 3 actions and back button."""
+    from app.modules.shop_menu.message import build_shop_mass_adv_ops_keyboard
+
+    cabinet_id = 42
+    wb_cabinet = MagicMock()
+    wb_cabinet.default_max_cpm = 100
+    wb_user_cabinet = MagicMock()
+    wb_user_cabinet.id = cabinet_id
+    wb_user_cabinet.wb_cabinet = wb_cabinet
+
+    kb = build_shop_mass_adv_ops_keyboard(wb_user_cabinet, wb_cabinet)
+    expected_callbacks = {
+        "Отключить все кампании": callbacks.TurnBot(
+            action="off_all", wb_user_cabinet_original_id=cabinet_id
+        ).pack(),
+        "Применить дефолты всем кампаниям": callbacks.ApplyDefaultsForShop(
+            wb_user_cabinet_original_id=cabinet_id
+        ).pack(),
+        "Назад": callbacks.ShopMassAdvOpsBack(
+            wb_user_cabinet_original_id=cabinet_id
+        ).pack(),
+    }
+    found = {btn.text: btn.callback_data for row in kb.inline_keyboard for btn in row}
+
+    assert found["Отключить все кампании"] == expected_callbacks["Отключить все кампании"]
+    assert found["Применить дефолты всем кампаниям"] == expected_callbacks["Применить дефолты всем кампаниям"]
+    assert found["Назад"] == expected_callbacks["Назад"]
+    assert any(text.startswith("Дефолтная максимальная ставка (CPM) (100)") for text in found)

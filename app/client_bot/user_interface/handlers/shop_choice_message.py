@@ -155,8 +155,9 @@ def get_shops_list_keyboard(
         )
         cab_icon = "✅" if cabinet_ok else "❌"
         tok_icon = "✅" if token_ok else "❌"
-        full_shop_name = f"{cab_icon}{tok_icon} {shop_name}" + ' ' * 1000
-        full_shop_name = full_shop_name[:100]
+        # Keep both cabinet/token indicators as documented in title,
+        # while preserving predictable truncation without artificial padding.
+        full_shop_name = f"{cab_icon}{tok_icon} {shop_name}"[:100]
         button = InlineKeyboardButton(
             text=full_shop_name,
             callback_data=callbacks.Shop(

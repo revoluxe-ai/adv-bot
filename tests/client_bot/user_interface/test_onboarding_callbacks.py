@@ -8,6 +8,8 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingContinueDespiteInvalid,
     ConnectExistingCreateBoth,
     ShowShopsList,
+    ShopMassAdvOpsBack,
+    ShopMassAdvOpsMenu,
     ShopsListPaginator,
     Start,
 )
@@ -113,3 +115,19 @@ def test_connect_existing_advs_back_to_shop_pack_unpack() -> None:
     unpacked = ConnectExistingAdvsBackToShop.unpack(packed)
     assert unpacked is not None
     assert unpacked.wb_user_cabinet_original_id == 77
+
+
+def test_shop_mass_adv_ops_menu_pack_unpack() -> None:
+    """ShopMassAdvOpsMenu pack/unpack preserves wb_user_cabinet_original_id."""
+    packed = ShopMassAdvOpsMenu(wb_user_cabinet_original_id=88).pack()
+    unpacked = ShopMassAdvOpsMenu.unpack(packed)
+    assert unpacked is not None
+    assert unpacked.wb_user_cabinet_original_id == 88
+
+
+def test_shop_mass_adv_ops_back_pack_unpack() -> None:
+    """ShopMassAdvOpsBack pack/unpack preserves wb_user_cabinet_original_id."""
+    packed = ShopMassAdvOpsBack(wb_user_cabinet_original_id=99).pack()
+    unpacked = ShopMassAdvOpsBack.unpack(packed)
+    assert unpacked is not None
+    assert unpacked.wb_user_cabinet_original_id == 99

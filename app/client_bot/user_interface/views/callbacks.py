@@ -29,6 +29,14 @@ class Shop(CallbackData, prefix="shop"):
     wb_user_cabinet_original_id: int
 
 
+class ShopMassAdvOpsMenu(CallbackData, prefix="shop_mass_adv_ops_menu"):
+    wb_user_cabinet_original_id: int
+
+
+class ShopMassAdvOpsBack(CallbackData, prefix="shop_mass_adv_ops_back"):
+    wb_user_cabinet_original_id: int
+
+
 class ShopNew(CallbackData, prefix="shop_new"):
     pass
 
