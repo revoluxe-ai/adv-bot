@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import (
@@ -55,7 +56,7 @@ logger = logging.getLogger(__name__)
 def _is_admin_user(user_telegram_id: int | None) -> bool:
     if user_telegram_id is None:
         return False
-    return user_telegram_id in const.ADMINS
+    return is_bot_admin(user_telegram_id)
 
 
 class ShopMenu(TextWithKeyboard):
