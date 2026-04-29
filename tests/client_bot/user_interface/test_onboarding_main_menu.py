@@ -49,7 +49,7 @@ def test_get_main_menu_keyboard_invite_visible_when_invite_gate_off(mock_setting
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-@patch("app.client_bot.admin_access.ADMINS", [123])
+@patch("app.client_bot.admin_access.const.ADMINS", [123])
 def test_get_main_menu_keyboard_admin_four_buttons(mock_settings) -> None:
     """Админ: Панель, Мои магазины, Мой баланс, Показать инвайт."""
     mock_settings.presentation_only = False
