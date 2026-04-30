@@ -14,6 +14,7 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.t
 from ..base_section_adapter import BaseSectionAdapter
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 from app.core.mp.wb.api.adapter.raise_errors import with_raise_errors
+from app.core.mp.wb.api.excs import BadRequestError
 
 from .get_adv_v0_normquery_get_minus import GetMinusPhrasesCommand
 from .get_adv_v0_normquery_get_minus import command_to_body as get_minus_command_to_body
@@ -36,6 +37,11 @@ class MinusPhrasesAdapter(BaseSectionAdapter):
             response = await with_raise_errors(post_adv_v0_normquery_set_minus.asyncio_detailed,
                                            client,
                                            body=body)
+        except BadRequestError:
+            # Это ожидаемый сценарий для fallback: верхний слой может
+            # перехватить ошибку, удалить невалидную фразу и успешно повторить.
+            logger.debug("WB отклонил часть минус-фраз (recoverable для fallback)")
+            raise
         except Exception as exc:
             logger.error('Ошибка обновления минус-фраз', exc_info=True)
             raise exc
