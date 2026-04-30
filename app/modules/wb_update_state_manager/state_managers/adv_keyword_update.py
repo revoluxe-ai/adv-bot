@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
@@ -5,6 +6,7 @@ from app.core.redis_manager.base_redis_manager import BaseRedis
 
 class AdvActiveKeywordUpdateStateManager(BaseRedis):
     time_str_format = "%d-%m-%Y %H:%M:%S"
+    invalid_norm_query_ttl_seconds = 60 * 60 * 24
 
     @staticmethod
     def _get_key(adv_id: int) -> str:
@@ -12,6 +14,10 @@ class AdvActiveKeywordUpdateStateManager(BaseRedis):
         Формирует ключ для хранения данных в Redis.
         """
         return f"minus_update:{adv_id}"
+
+    @staticmethod
+    def _get_invalid_norm_queries_key(adv_id: int, nmid: int) -> str:
+        return f"minus_invalid_norm_queries:{adv_id}:{nmid}"
 
     async def set_one(self, adv_id: int) -> None:
         """
@@ -44,3 +50,31 @@ class AdvActiveKeywordUpdateStateManager(BaseRedis):
         except:
             return None
         return d  # Преобразование строки в datetime
+
+    async def get_invalid_norm_queries(self, adv_id: int, nmid: int) -> list[str]:
+        key = self._get_invalid_norm_queries_key(adv_id, nmid)
+        value = await self._client.get(key)
+        if value is None:
+            return []
+        try:
+            payload = json.loads(value.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return []
+        if not isinstance(payload, list):
+            return []
+        return [item for item in payload if isinstance(item, str)]
+
+    async def add_invalid_norm_queries(
+        self, adv_id: int, nmid: int, phrases: list[str]
+    ) -> list[str]:
+        if not phrases:
+            return await self.get_invalid_norm_queries(adv_id, nmid)
+        existing = await self.get_invalid_norm_queries(adv_id, nmid)
+        merged = list(dict.fromkeys([*existing, *phrases]))
+        key = self._get_invalid_norm_queries_key(adv_id, nmid)
+        await self._client.set(
+            key,
+            json.dumps(merged, ensure_ascii=False),
+            ex=self.invalid_norm_query_ttl_seconds,
+        )
+        return merged

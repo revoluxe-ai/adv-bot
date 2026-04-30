@@ -44,7 +44,7 @@ class MinusPhraseManager:
         ]
         if not bad_keywords:
             return None
-        await asyncio.gather(
+        _ = await asyncio.gather(
             self._update_minuses_in_auto_adv(complex_adv, bad_keywords),
             self._update_minuses_in_search_adv(complex_adv, bad_keywords),
         )
@@ -75,7 +75,7 @@ class MinusPhraseManager:
             *tasks, return_exceptions=True
         )
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(
                     "Ошибка обновления РК по nmid для adv_id=%s: %s",
                     adv_id,
@@ -111,7 +111,13 @@ class MinusPhraseManager:
         bad_keywords_for_nmid = set(common_bad_phrases) & set(keywords_from_this_adv_nmid)
         if not bad_keywords_for_nmid:
             return None
-        minus_phrases_to_send = list(bad_keywords_for_nmid)[:1000]
+
+        known_invalid_phrases = set(
+            await self._update_redis_timestamp_manager.get_invalid_norm_queries(adv_id, nmid)
+        )
+        minus_phrases_to_send = sorted(bad_keywords_for_nmid - known_invalid_phrases)[:1000]
+        if not minus_phrases_to_send:
+            return None
         target_set = set(minus_phrases_to_send)
 
         current_minus_keywords = await self._wb_api.wb_modifier.get_minus_phrases_for_adv(
@@ -126,6 +132,12 @@ class MinusPhraseManager:
             phrases=minus_phrases_to_send,
             update_redis_timestamp_manager=self._update_redis_timestamp_manager,
         )
+        if fallback_result.dropped_invalid_phrases:
+            _ = await self._update_redis_timestamp_manager.add_invalid_norm_queries(
+                adv_id=adv_id,
+                nmid=nmid,
+                phrases=fallback_result.dropped_invalid_phrases,
+            )
         return (nmid, fallback_result.dropped_invalid_phrases, len(fallback_result.applied_phrases))
 
     async def _update_minuses_in_auto_adv(
