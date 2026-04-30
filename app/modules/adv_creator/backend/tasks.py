@@ -1,4 +1,5 @@
 import logging
+import traceback
 from typing import Any
 
 import aiohttp
@@ -17,8 +18,111 @@ from app.modules.adv_creator.backend.exc import (
 from app.core.di.app_container import AppContainer
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
+_ARQ_ADV_CREATOR_MAX_TRIES = 10  # Keep in sync with app/arq_workers/workers.py
+
+
+def _to_int(value: Any, *, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_final_arq_try(ctx: dict[str, Any]) -> tuple[bool, int, int]:
+    current_try = _to_int(ctx.get("job_try"), default=1)
+    max_tries = _to_int(ctx.get("max_tries"), default=_ARQ_ADV_CREATOR_MAX_TRIES)
+    return current_try >= max_tries, current_try, max_tries
+
+
+def _iter_admin_telegram_ids() -> list[int]:
+    admin_ids = set(const.ADMINS)
+    admin_ids.update(settings.extra_admin_telegram_ids)
+    return sorted(admin_ids)
+
+
+def _split_chunks(text: str, chunk_size: int = const.MAX_MESSAGE_LENGTH) -> list[str]:
+    if not text:
+        return []
+    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+async def _notify_unexpected_adv_creator_error(
+    *,
+    ctx: dict[str, Any],
+    task_name: str,
+    user_telegram_id: int,
+    exception: Exception,
+    context: dict[str, Any],
+) -> None:
+    is_final_try, current_try, max_tries = _is_final_arq_try(ctx)
+    logger.error(
+        "Неожиданная ошибка в задаче %s (attempt %s/%s): %s",
+        task_name,
+        current_try,
+        max_tries,
+        exception,
+        exc_info=True,
+    )
+    if not is_final_try:
+        logger.warning(
+            "Уведомления для %s отложены: attempt %s/%s",
+            task_name,
+            current_try,
+            max_tries,
+        )
+        return
+
+    bot = get_bot()
+    user_text = (
+        "Произошла внутренняя ошибка при создании/подключении рекламной кампании. "
+        "Проблема уже зафиксирована, попробуйте повторить позже или обратитесь в поддержку "
+        f"{const.SUPPORT_LINK}"
+    )
+    try:
+        await bot.send_message(user_telegram_id, user_text)
+    except Exception:
+        logger.exception(
+            "Не удалось отправить сообщение пользователю %s о сбое %s",
+            user_telegram_id,
+            task_name,
+        )
+
+    admin_ids = _iter_admin_telegram_ids()
+    if not admin_ids:
+        logger.error(
+            "Не найдены админы для уведомления об ошибке %s (user=%s)",
+            task_name,
+            user_telegram_id,
+        )
+        return
+
+    trace_error = "".join(
+        traceback.format_exception(type(exception), exception, exception.__traceback__)
+    )
+    context_lines = [f"{key}={value}" for key, value in context.items()]
+    admin_text = (
+        f"ARQ job failed: {task_name}\n"
+        f"attempt={current_try}/{max_tries}\n"
+        f"user_telegram_id={user_telegram_id}\n"
+        f"job_id={ctx.get('job_id')}\n"
+        f"{chr(10).join(context_lines)}\n\n"
+        f"exception={type(exception).__name__}: {exception}\n\n"
+        f"traceback:\n{trace_error}"
+    )
+    chunks = _split_chunks(admin_text)
+    for admin_id in admin_ids:
+        for chunk in chunks:
+            try:
+                await bot.send_message(admin_id, chunk)
+            except Exception:
+                logger.exception(
+                    "Не удалось отправить admin-уведомление о %s для admin_id=%s",
+                    task_name,
+                    admin_id,
+                )
 
 
 async def create_search_only(
@@ -41,11 +145,18 @@ async def create_search_only(
             )
             return
         except Exception as e:
-            logger.error(
-                "Ошибка задачи create_search_only",
-                exc_info=True,
+            await _notify_unexpected_adv_creator_error(
+                ctx=ctx,
+                task_name="create_search_only",
+                user_telegram_id=user_telegram_id,
+                exception=e,
+                context={
+                    "nmid": nmid,
+                    "shop_id": shop_id,
+                    "existing_auto_adv_id": existing_auto_adv_id,
+                },
             )
-            raise e
+            raise
 
 
 async def _create_search_only(
@@ -136,11 +247,18 @@ async def create_auto_only(
             )
             return
         except Exception as e:
-            logger.error(
-                "Ошибка задачи create_auto_only",
-                exc_info=True,
+            await _notify_unexpected_adv_creator_error(
+                ctx=ctx,
+                task_name="create_auto_only",
+                user_telegram_id=user_telegram_id,
+                exception=e,
+                context={
+                    "nmid": nmid,
+                    "shop_id": shop_id,
+                    "existing_search_adv_id": existing_search_adv_id,
+                },
             )
-            raise e
+            raise
 
 
 async def _create_auto_only(
@@ -226,12 +344,18 @@ async def create_complex_advs(
             )
             return
         except Exception as e:
-            logger.error(
-                "Ошибка задачи create_complex_advs",
-                exc_info=True,
+            await _notify_unexpected_adv_creator_error(
+                ctx=ctx,
+                task_name="create_complex_advs",
+                user_telegram_id=user_telegram_id,
+                exception=e,
+                context={
+                    "nmid": nmid,
+                    "shop_id": shop_id,
+                    "hard_mode": hard_mode,
+                },
             )
-
-            raise e
+            raise
 
 
 async def _create_complex_advs(
