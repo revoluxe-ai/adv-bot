@@ -61,7 +61,10 @@ from app.modules.token_monitoring.services.cabinet_status_service import (
 from app.modules.token_monitoring.services.notification_manager import (
     NotificationManager,
 )
-from app.modules.token_monitoring.models import NotificationType
+from app.modules.token_monitoring.models import (
+    CABINET_DEACTIVATED_NOTIFICATION_TYPE,
+    NotificationType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -777,7 +780,7 @@ async def process_add_new_token(
             NotificationType.TOKEN_EXPIRING_3_DAYS.value,
             NotificationType.TOKEN_EXPIRING_1_DAY.value,
             NotificationType.TOKEN_DEACTIVATED.value,
-            NotificationType.CABINET_DEACTIVATED.value,
+            CABINET_DEACTIVATED_NOTIFICATION_TYPE,
         ]
 
         for notif_type in notification_types:
@@ -850,7 +853,7 @@ async def toggle_cabinet_active_handler(
     if wb_user_cabinet.wb_cabinet.active is True:
         deactivated = await deactivate_cabinet_atomic_with_user_trackers(
             shop_id,
-            notification_type=NotificationType.CABINET_DEACTIVATED.value,
+            notification_type=CABINET_DEACTIVATED_NOTIFICATION_TYPE,
         )
         if not deactivated:
             await bot.send_message(chat_id, "Не удалось деактивировать магазин.")

@@ -18,6 +18,7 @@ from app.client_bot.notification_sender import (
     get_notification_sender,
 )
 from app.modules.token_monitoring.models import (
+    CABINET_DEACTIVATED_NOTIFICATION_TYPE,
     NotificationType,
     TokenNotificationTracker,
 )
@@ -52,7 +53,7 @@ class NotificationManager:
         NotificationType.TOKEN_DEACTIVATED.value: (
             "Токен истек или деактивирован, сделайте срочно новый и добавьте в магазин {shop_name}"
         ),
-        NotificationType.CABINET_DEACTIVATED.value: (
+        CABINET_DEACTIVATED_NOTIFICATION_TYPE: (
             "Магазин {shop_name} деактивирован в боте. "
             "Чтобы снова запустить автообработку, откройте меню магазина и нажмите «Активировать магазин» "
             "или обновите токен."

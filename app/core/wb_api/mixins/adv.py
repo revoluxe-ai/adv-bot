@@ -408,7 +408,7 @@ class AdvMixin(WBAPIProtocol):
         async with self.session.request(
             method=type_query, url=url, headers=self.headers.standart, json=data
         ) as response:
-            if response.status != 200:
+            if response.status not in (200, 204):
                 response_text = await response.text()
                 logger.error(
                     f"Ошибка при обновлении таргетинга размещений"

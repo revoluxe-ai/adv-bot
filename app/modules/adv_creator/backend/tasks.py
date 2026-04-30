@@ -1,4 +1,5 @@
 import logging
+import traceback
 from typing import Any
 
 import aiohttp
@@ -17,8 +18,40 @@ from app.modules.adv_creator.backend.exc import (
 from app.core.di.app_container import AppContainer
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def _notify_unknown_task_error(
+    *,
+    bot: Any,
+    user_telegram_id: int,
+    task_name: str,
+    context_data: dict[str, Any],
+) -> None:
+    user_text = (
+        "Произошла ошибка, но не волнуйтесь! Бот продолжает работать "
+        "и по прежнему выполняет свои функции. Проблема только в интерфейсе, а администратор"
+        " уже уведомлен о ней. Попробуйте выполнить нужное вам действие еще раз или вернитесь"
+        " в главное меню, через команду /start . Связаться с разработчиком вы можете по "
+        f"этому контакту: {const.SUPPORT_LINK}"
+    )
+    await bot.send_message(user_telegram_id, user_text)
+
+    trace_error = traceback.format_exc()
+    context_text = (
+        f"ARQ task failed: {task_name}\n"
+        f"user_telegram_id: {user_telegram_id}\n"
+        f"context: {context_data}\n\n"
+    )
+    admin_text = context_text + trace_error
+    for admin_telegram_id in set(const.ADMINS):
+        part = admin_text
+        while part:
+            chunk = part[: const.MAX_MESSAGE_LENGTH]
+            await bot.send_message(admin_telegram_id, chunk)
+            part = part[const.MAX_MESSAGE_LENGTH :]
 
 
 async def create_search_only(
@@ -45,6 +78,22 @@ async def create_search_only(
                 "Ошибка задачи create_search_only",
                 exc_info=True,
             )
+            bot = get_bot()
+            try:
+                await _notify_unknown_task_error(
+                    bot=bot,
+                    user_telegram_id=user_telegram_id,
+                    task_name="create_search_only",
+                    context_data={
+                        "nmid": nmid,
+                        "shop_id": shop_id,
+                        "existing_auto_adv_id": existing_auto_adv_id,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "Ошибка отправки уведомлений по unknown error create_search_only"
+                )
             raise e
 
 
@@ -140,6 +189,22 @@ async def create_auto_only(
                 "Ошибка задачи create_auto_only",
                 exc_info=True,
             )
+            bot = get_bot()
+            try:
+                await _notify_unknown_task_error(
+                    bot=bot,
+                    user_telegram_id=user_telegram_id,
+                    task_name="create_auto_only",
+                    context_data={
+                        "nmid": nmid,
+                        "shop_id": shop_id,
+                        "existing_search_adv_id": existing_search_adv_id,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "Ошибка отправки уведомлений по unknown error create_auto_only"
+                )
             raise e
 
 
@@ -230,7 +295,22 @@ async def create_complex_advs(
                 "Ошибка задачи create_complex_advs",
                 exc_info=True,
             )
-
+            bot = get_bot()
+            try:
+                await _notify_unknown_task_error(
+                    bot=bot,
+                    user_telegram_id=user_telegram_id,
+                    task_name="create_complex_advs",
+                    context_data={
+                        "nmid": nmid,
+                        "shop_id": shop_id,
+                        "hard_mode": hard_mode,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "Ошибка отправки уведомлений по unknown error create_complex_advs"
+                )
             raise e
 
 

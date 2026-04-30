@@ -9,19 +9,23 @@ from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.a
     get_adv_v0_start,
     get_adv_v0_stop,
     post_adv_v0_rename,
-    put_adv_v0_auction_placements,
 )
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
     PostAdvV0RenameBody,
-    PutAdvV0AuctionPlacementsBody,
-    PutAdvV0AuctionPlacementsBodyPlacementsItem,
-    PutAdvV0AuctionPlacementsBodyPlacementsItemPlacements,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.api.upravlenie_kampanijami.patch_api_advert_v1_bids import (
     asyncio_detailed as patch_api_advert_v1_bids_async,
 )
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     PatchApiAdvertV1BidsBody,
+)
+from app.core.mp.wb.api.generated.promotion.v5.marketing_and_promotions_client.marketing_and_promotions_client.api.campaigns_management import (
+    put_adv_v0_auction_placements,
+)
+from app.core.mp.wb.api.generated.promotion.v5.marketing_and_promotions_client.marketing_and_promotions_client.models import (
+    PutAdvV0AuctionPlacementsBody,
+    PutAdvV0AuctionPlacementsBodyPlacementsItem,
+    PutAdvV0AuctionPlacementsBodyPlacementsItemPlacements,
 )
 from app.core.mp.wb.api.retry_decorator import retry_decorator
 
