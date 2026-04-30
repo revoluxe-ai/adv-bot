@@ -79,7 +79,9 @@ _INVALID_NORM_QUERY_PATTERNS = (
 )
 
 
-def _extract_invalid_norm_query(detail: str) -> str | None:
+def _extract_invalid_norm_query(detail: str | None) -> str | None:
+    if not isinstance(detail, str):
+        return None
     payload: dict[str, Any] | None = None
     try:
         loaded_payload = json.loads(detail)

@@ -87,9 +87,8 @@ def build_shop_main_keyboard(
         )
     )
 
-    toggle_label = (
-        "Деактивировать магазин" if wb_cabinet.active is True else "Активировать магазин"
-    )
+    cabinet_active = getattr(wb_cabinet, "active", True) is True
+    toggle_label = "Деактивировать магазин" if cabinet_active else "Активировать магазин"
     _ = builder.row(
         InlineKeyboardButton(
             text=toggle_label,

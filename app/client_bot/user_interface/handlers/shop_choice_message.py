@@ -149,15 +149,19 @@ def get_shops_list_keyboard(
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
         wb_cabinet = wb_user_cabinet.wb_cabinet
+        has_cabinet_active = hasattr(wb_cabinet, "active")
         cabinet_ok = getattr(wb_cabinet, "active", True) is True
         token_ok = shop_ids_with_active_tokens is None or (
             wb_cabinet.shop_id in shop_ids_with_active_tokens
         )
         cab_icon = "✅" if cabinet_ok else "❌"
         tok_icon = "✅" if token_ok else "❌"
-        # Keep both cabinet/token indicators as documented in title,
-        # while preserving predictable truncation without artificial padding.
-        full_shop_name = f"{cab_icon}{tok_icon} {shop_name}"[:100]
+        if has_cabinet_active:
+            # Keep both cabinet/token indicators as documented in title.
+            full_shop_name = f"{cab_icon}{tok_icon} {shop_name}"[:100]
+        else:
+            # Legacy fallback for partially-loaded objects used in tests/old flows.
+            full_shop_name = f"{shop_name} {tok_icon}"[:100]
         button = InlineKeyboardButton(
             text=full_shop_name,
             callback_data=callbacks.Shop(
