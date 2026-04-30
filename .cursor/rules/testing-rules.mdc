@@ -7,3 +7,31 @@ alwaysApply: false
 1. Перед началом теста активируй окружение .\.venv\Scripts\activate
 2. Запускай тесты python -m pytest -vvx, чтобы падал первый тест и исправляй его
 3. Если я попрошу внести опыт в правила, то редактируй текущее правило
+
+4. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
+   - Перед изменениями составь failure matrix:
+     - happy path
+     - recoverable failures (fallback/partial success)
+     - non-recoverable failures (must bubble up)
+     - idempotency на повторном запуске
+     - cross-iteration behavior (следующий тик/цикл)
+     - видимость логов при production LOG_LEVEL
+   - Обязательный минимальный набор тестов:
+     - unit-тесты парсера/экстрактора на edge-cases
+     - unit-тесты termination retry/fallback loop
+     - integration-style тест orchestration слоя, который использует результат fallback
+     - regression-тест, воспроизводящий найденный продовый баг
+     - idempotency-тест: второй запуск не должен повторять невалидные запросы
+   - Контракт между слоями:
+     - если нижний слой трансформирует payload (например, удаляет невалидные элементы),
+       верхний слой обязан использовать transformed/applied результат в последующих сравнениях
+       и решениях; сравнение только с исходным target запрещено.
+   - Blocking gate перед завершением задачи:
+     - нельзя завершать задачу без зелёных targeted tests и regression-теста для инцидента.
+   - Логирование:
+     - recoverable ошибки не должны спамиться как hard ERROR в циклах;
+       нужен summary-лог по сущности (attempts, dropped items, applied items).
+   - В финальном отчёте обязательно укажи:
+     - какой продовый симптом предотвращён,
+     - какой тест упадёт при возврате бага,
+     - какие допущения зависят от runtime/prod конфигурации.
