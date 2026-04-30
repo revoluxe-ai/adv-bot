@@ -13,13 +13,13 @@ class NotificationType(Enum):
     """Enumeration of token notification types."""
 
     TOKEN_DEACTIVATED = "TOKEN_DEACTIVATED"
+    CABINET_DEACTIVATED = "CABINET_DEACTIVATED"
     TOKEN_EXPIRING_14_DAYS = "TOKEN_EXPIRING_14_DAYS"
     TOKEN_EXPIRING_3_DAYS = "TOKEN_EXPIRING_3_DAYS"
     TOKEN_EXPIRING_1_DAY = "TOKEN_EXPIRING_1_DAY"
 
 
-# Keep separate from NotificationType to preserve historical enum contract in tests.
-CABINET_DEACTIVATED_NOTIFICATION_TYPE = "CABINET_DEACTIVATED"
+CABINET_DEACTIVATED_NOTIFICATION_TYPE = NotificationType.CABINET_DEACTIVATED.value
 
 
 class TokenNotificationTracker(BaseTable):

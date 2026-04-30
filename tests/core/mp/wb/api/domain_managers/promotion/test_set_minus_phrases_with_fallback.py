@@ -99,6 +99,105 @@ async def test_set_minus_phrases_with_fallback_propagates_unrelated_bad_request(
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_succeeds_on_first_attempt() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    manager.set_minus_phrases = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    result = await manager.set_minus_phrases_with_fallback(
+        advert_id=42,
+        nm_id=77,
+        phrases=["one", "two"],
+    )
+
+    manager.set_minus_phrases.assert_awaited_once_with(42, 77, ["one", "two"])
+    assert result.applied_phrases == ["one", "two"]
+    assert result.dropped_invalid_phrases == []
+    assert result.attempts == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_empty_phrases_returns_success() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    manager.set_minus_phrases = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    result = await manager.set_minus_phrases_with_fallback(
+        advert_id=42,
+        nm_id=77,
+        phrases=[],
+    )
+
+    manager.set_minus_phrases.assert_awaited_once_with(42, 77, [])
+    assert result.applied_phrases == []
+    assert result.dropped_invalid_phrases == []
+    assert result.attempts == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_deduplicates_input_phrases() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    calls: list[list[str]] = []
+
+    async def _fake_set_minus(advert_id: int, nm_id: int, phrases: list[str]) -> None:
+        assert advert_id == 100
+        assert nm_id == 200
+        calls.append(list(phrases))
+
+    manager.set_minus_phrases = AsyncMock(side_effect=_fake_set_minus)  # type: ignore[method-assign]
+
+    result = await manager.set_minus_phrases_with_fallback(
+        advert_id=100,
+        nm_id=200,
+        phrases=["dup", "keep", "dup", "keep", "new"],
+    )
+
+    assert calls == [["dup", "keep", "new"]]
+    assert result.applied_phrases == ["dup", "keep", "new"]
+    assert result.dropped_invalid_phrases == []
+    assert result.attempts == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_raises_when_max_attempts_exceeded() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    manager.set_minus_phrases = AsyncMock(  # type: ignore[method-assign]
+        side_effect=BadRequestError(
+            json.dumps({"detail": "norm_query 'bad' is not valid for nm 2"})
+        )
+    )
+
+    with pytest.raises(BadRequestError, match="Max attempts reached"):
+        await manager.set_minus_phrases_with_fallback(
+            advert_id=1,
+            nm_id=2,
+            phrases=["good", "bad"],
+            max_attempts=1,
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_reraises_when_invalid_not_in_active_list() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    manager.set_minus_phrases = AsyncMock(  # type: ignore[method-assign]
+        side_effect=BadRequestError(
+            json.dumps({"detail": "norm_query 'ghost' is not valid for nm 2"})
+        )
+    )
+
+    with pytest.raises(BadRequestError):
+        await manager.set_minus_phrases_with_fallback(
+            advert_id=1,
+            nm_id=2,
+            phrases=["good", "bad"],
+        )
+    manager.set_minus_phrases.assert_awaited_once()
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     ("detail", "expected"),
     [
