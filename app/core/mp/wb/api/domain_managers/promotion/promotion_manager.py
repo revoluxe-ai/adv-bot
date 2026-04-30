@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import re
-from typing import Any
+from typing import Any, cast
 import datetime
 from typing import List, TYPE_CHECKING
 
@@ -80,15 +80,16 @@ _INVALID_NORM_QUERY_PATTERNS = (
 
 
 def _extract_invalid_norm_query(detail: str) -> str | None:
-    if not isinstance(detail, str):
-        return None
+    payload: dict[str, Any] | None = None
     try:
-        payload = json.loads(detail)
+        loaded_payload = json.loads(detail)
+        if isinstance(loaded_payload, dict):
+            payload = cast(dict[str, Any], loaded_payload)
     except json.JSONDecodeError:
-        payload = None
+        pass
 
     message = detail
-    if isinstance(payload, dict):
+    if payload is not None:
         parsed_detail = payload.get("detail")
         if isinstance(parsed_detail, str):
             message = parsed_detail
