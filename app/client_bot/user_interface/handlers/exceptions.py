@@ -18,6 +18,57 @@ from app.exc import CardNotFoundInDB
 
 logger = logging.getLogger(__name__)
 
+_SECTION_EXTRA = "\n\n--- extra ---\n\n"
+_SECTION_APP_LINES = "\n\n--- app lines ---\n\n"
+_SECTION_FULL_TRACEBACK = "\n\n--- full traceback ---\n\n"
+_SECTION_FOOTER = "\n\n--- footer ---\n\n"
+
+admin_telegram_id = 373435337
+
+
+async def _send_text_chunks(
+    bot: aiogram.Bot,
+    chat_id: int,
+    full_text: str,
+) -> None:
+    """Send long text in Telegram-sized chunks; per-chunk failures are logged only."""
+    max_len = tb.const.MAX_MESSAGE_LENGTH
+    remaining = full_text
+    while remaining:
+        chunk = remaining[:max_len]
+        remaining = remaining[max_len:]
+        try:
+            _ = await bot.send_message(chat_id=chat_id, text=chunk)
+        except Exception:
+            logger.exception(
+                "Failed to send chunked message (chat_id=%s, chunk_len=%s)",
+                chat_id,
+                len(chunk),
+            )
+
+
+async def send_admin_error_report(
+    bot: aiogram.Bot,
+    *,
+    headline: str,
+    traceback_text: str | None = None,
+    extra: str | None = None,
+    brief_trace_app_lines: str | None = None,
+    footer: str | None = None,
+) -> None:
+    """Build one admin report (headline → extra → app lines → full traceback → footer) and chunk-send."""
+    parts: list[str] = [headline.strip()]
+    if extra is not None and extra.strip():
+        parts.append(_SECTION_EXTRA + extra.strip())
+    if brief_trace_app_lines is not None and brief_trace_app_lines.strip():
+        parts.append(_SECTION_APP_LINES + brief_trace_app_lines.strip())
+    if traceback_text is not None and traceback_text.strip():
+        parts.append(_SECTION_FULL_TRACEBACK + traceback_text.strip())
+    if footer is not None and footer.strip():
+        parts.append(_SECTION_FOOTER + footer.strip())
+    report = "".join(parts)
+    await _send_text_chunks(bot, admin_telegram_id, report)
+
 
 def _chat_id_from_error_update(update: Update) -> int:
     """User chat id from message or callback_query (shared error-handler resolution)."""
@@ -29,8 +80,6 @@ def _chat_id_from_error_update(update: Update) -> int:
         return int(update.callback_query.message.chat.id)
     return message.chat.id
 
-
-admin_telegram_id = 373435337
 
 user_router = Router()
 
@@ -104,7 +153,11 @@ async def not_found_wb_card_error_handler(
         chat_id=chat_id,
         text=f"Ошибка получения карточки, обратитесь в поддержку -> {const.SUPPORT_LINK}",
     )
-    await bot.send_message(admin_telegram_id, str(exception))
+    await send_admin_error_report(
+        bot,
+        headline="CardNotFoundInDB",
+        extra=str(exception),
+    )
     return
 
 
@@ -132,29 +185,23 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
     trace_error = traceback.format_exc()
     logger.error(trace_error)
 
-    # Отправляем полный трейс администратору
-    part_of_trace = trace_error
-    while part_of_trace:
-        chunk = part_of_trace[: tb.const.MAX_MESSAGE_LENGTH]
-        await bot.send_message(admin_telegram_id, chunk)
-        part_of_trace = part_of_trace[tb.const.MAX_MESSAGE_LENGTH :]
-
-    # Фильтруем и отправляем строки с упоминанием пакета 'app' из уже полученного трейса
     lines_with_package_name = [
         line for line in trace_error.splitlines() if "app" in line
     ]
     if lines_with_package_name:
-        brief_trace = "\n".join(lines_with_package_name)
-        # Отправляем краткий трейс администратору частями, если он слишком длинный
-        part_of_brief_trace = brief_trace
-        while part_of_brief_trace:
-            chunk = part_of_brief_trace[: tb.const.MAX_MESSAGE_LENGTH]
-            await bot.send_message(admin_telegram_id, chunk)
-            part_of_brief_trace = part_of_brief_trace[tb.const.MAX_MESSAGE_LENGTH :]
+        brief_trace_app_lines = "\n".join(lines_with_package_name)
+        extra_for_admin: str | None = None
     else:
-        # Если в трейсе нет упоминания пакета, информируем об этом
-        await bot.send_message(
-            admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены."
+        brief_trace_app_lines = None
+        extra_for_admin = (
+            "Строки с названием пакета 'app' в трейсе не найдены."
         )
 
-    await bot.send_message(admin_telegram_id, f"Ник пользователя: {user_name}")
+    await send_admin_error_report(
+        bot,
+        headline="Unhandled exception in client bot handler",
+        traceback_text=trace_error,
+        extra=extra_for_admin,
+        brief_trace_app_lines=brief_trace_app_lines,
+        footer=f"Ник пользователя: {user_name}",
+    )
