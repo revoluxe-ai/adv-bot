@@ -5,6 +5,7 @@ import typing
 import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Update
@@ -27,12 +28,6 @@ def _chat_id_from_error_update(update: Update) -> int:
         assert update.callback_query.message.chat
         return int(update.callback_query.message.chat.id)
     return message.chat.id
-
-
-async def _clear_fsm_and_get_chat_id(state: FSMContext, update: Update) -> int:
-    """Reset FSM state and return the user chat id for this update (error handlers)."""
-    await state.set_state()
-    return _chat_id_from_error_update(update)
 
 
 admin_telegram_id = 373435337
@@ -59,54 +54,8 @@ async def network_error_handler(
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
-    exc = error_event.exception
-    logger.warning(
-        "TelegramBadRequest: %s (message=%s)",
-        exc,
-        getattr(exc, "message", None),
-        exc_info=True,
-    )
-    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
-    update = error_event.update
-    chat_id = await _clear_fsm_and_get_chat_id(state, update)
-    if "caption is too long" in error_text:
-        message = update.message
-        if message is None:
-            cq = update.callback_query
-            assert cq is not None
-            user_name = cq.from_user.username
-            callback_data = getattr(cq, "data", None)
-        else:
-            assert message.from_user
-            user_name = message.from_user.username
-            callback_data = None
-
-        admin_text = (
-            "TelegramBadRequest: caption is too long\n"
-            f"chat_id={chat_id}\n"
-            f"user={user_name}\n"
-            f"callback_data={callback_data}\n"
-            f"exc={exc}"
-        )
-        for i in range(0, len(admin_text), const.MAX_MESSAGE_LENGTH):
-            await bot.send_message(
-                admin_telegram_id,
-                admin_text[i : i + const.MAX_MESSAGE_LENGTH],
-            )
-        await bot.send_message(
-            chat_id=chat_id,
-            text=(
-                "Сообщение получилось слишком длинным и было автоматически сокращено. "
-                "Если проблема повторяется, обратитесь в поддержку -> "
-                f"{const.SUPPORT_LINK}"
-            ),
-        )
-        return
-    await bot.send_message(
-        chat_id=chat_id,
-        text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
-        f"проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}",
-    )
+    """Не обрабатываем здесь: передаём следующему error-handler (общий Exception)."""
+    raise SkipHandler()
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
