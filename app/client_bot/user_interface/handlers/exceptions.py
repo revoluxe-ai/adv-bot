@@ -5,6 +5,7 @@ import typing
 import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Update
@@ -27,12 +28,6 @@ def _chat_id_from_error_update(update: Update) -> int:
         assert update.callback_query.message.chat
         return int(update.callback_query.message.chat.id)
     return message.chat.id
-
-
-async def _clear_fsm_and_get_chat_id(state: FSMContext, update: Update) -> int:
-    """Reset FSM state and return the user chat id for this update (error handlers)."""
-    await state.set_state()
-    return _chat_id_from_error_update(update)
 
 
 admin_telegram_id = 373435337
@@ -59,15 +54,8 @@ async def network_error_handler(
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
-    exc = error_event.exception
-    logger.warning(
-        "TelegramBadRequest: %s (message=%s)",
-        exc,
-        getattr(exc, "message", None),
-        exc_info=True,
-    )
-    raise exc
-
+    """Не обрабатываем здесь: передаём следующему error-handler (общий Exception)."""
+    raise SkipHandler()
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
