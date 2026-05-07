@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.client_bot import const
 from app.client_bot.telegram_message_split import split_telegram_plain_text
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.utils.phrases_txt import phrases_to_txt_bytes
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
@@ -26,13 +27,6 @@ router = Router()
 
 def _templates_from_message(text: str) -> list[str]:
     return [line.strip() for line in text.split("\n") if line.strip()]
-
-
-def _phrases_to_txt(phrases: list[str]) -> bytes:
-    text = "\n".join(phrases)
-    if text and not text.endswith("\n"):
-        text += "\n"
-    return text.encode("utf-8")
 
 
 def _exit_test_keyboard(adv_setting_id: int) -> InlineKeyboardBuilder:
@@ -219,7 +213,7 @@ async def export_relevant_phrase_templates(
 
     rel_manager = RelevantPhraseManager(adv)
     phrases = await rel_manager.get_relevant_phrases_template_data() or []
-    payload = _phrases_to_txt(phrases)
+    payload = phrases_to_txt_bytes(phrases)
     document = BufferedInputFile(payload, filename="relevant_phrase_templates.txt")
     assert callback.from_user
     await bot.send_document(
