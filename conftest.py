@@ -464,6 +464,7 @@ def pytest_configure(config) -> None:
     Конфигурация pytest для корректного поиска и запуска тестов
     """
     # Добавляем метки для тестов
+    config.addinivalue_line("markers", "fast: быстрый набор тестов для быстрого прогона")
     config.addinivalue_line("markers", "unit: маркирует unit-тесты")
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
 
@@ -472,17 +473,22 @@ def pytest_collection_modifyitems(config, items: list[pytest.Item]) -> None:
     """
     Каждый тест получает ровно один тип: unit или integration.
     - tests/unit/ -> unit; tests/integration/ -> integration.
+    - tests/unit/ дополнительно получают marker fast.
     - Остальные без маркера типа -> unit по умолчанию.
     """
     for item in items:
+        path = str(item.fspath).replace("\\", "/")
+        is_unit_path = "/tests/unit/" in path or path.endswith("/tests/unit")
+        if is_unit_path and item.get_closest_marker("fast") is None:
+            item.add_marker(pytest.mark.fast)
+
         has_unit = item.get_closest_marker("unit") is not None
         has_integration = item.get_closest_marker("integration") is not None
         if has_unit or has_integration:
             continue
-        path = str(item.fspath).replace("\\", "/")
         if "/integration/" in path or "integration" in item.fspath.basename or "/tests_entry_points/" in path:
             item.add_marker(pytest.mark.integration)
-        elif "/tests/unit/" in path or path.endswith("/tests/unit"):
+        elif is_unit_path:
             item.add_marker(pytest.mark.unit)
         elif "/tests/integration/" in path or path.endswith("/tests/integration"):
             item.add_marker(pytest.mark.integration)
