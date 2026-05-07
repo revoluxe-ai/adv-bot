@@ -288,6 +288,10 @@ class ExitBlackPhrasesTest(CallbackData, prefix="exit_black_phrases_test"):
     adv_setting_id: int
 
 
+class ExportBlackPhrases(CallbackData, prefix="export_black_phrases"):
+    adv_setting_id: int
+
+
 class AddRelevantPhraseTemplates(CallbackData, prefix="add_rel_phrase_tpl"):
     adv_setting_id: int
 
@@ -301,6 +305,10 @@ class TestRelevantPhraseTemplates(CallbackData, prefix="test_rel_phrase_tpl"):
 
 
 class ExitRelevantPhraseTemplatesTest(CallbackData, prefix="exit_rel_phrase_test"):
+    adv_setting_id: int
+
+
+class ExportRelevantPhraseTemplates(CallbackData, prefix="export_rel_phrase_tpl"):
     adv_setting_id: int
 
 

@@ -1,7 +1,7 @@
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
@@ -18,6 +18,13 @@ router = Router()
 
 def _black_phrases_from_message(text: str) -> list[str]:
     return [line.strip() for line in text.split("\n") if line.strip()]
+
+
+def _phrases_to_txt(phrases: list[str]) -> bytes:
+    text = "\n".join(phrases)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text.encode("utf-8")
 
 
 def _exit_test_keyboard(adv_setting_id: int) -> InlineKeyboardBuilder:
@@ -170,3 +177,29 @@ async def reset_black_phrases(
     await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(
         callback_data.adv_setting_id
     )
+
+
+@router.callback_query(callbacks.ExportBlackPhrases.filter())
+async def export_black_phrases(
+    callback: CallbackQuery,
+    bot: Bot,
+    callback_data: callbacks.ExportBlackPhrases,
+) -> None:
+    adv_setting_id = callback_data.adv_setting_id
+    async with sm(read_only=True) as session:
+        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+    if adv is None:
+        await callback.answer("Кампания не найдена.", show_alert=True)
+        return
+
+    rel_manager = RelevantPhraseManager(adv)
+    phrases = await rel_manager.get_relevant_template_data() or []
+    payload = _phrases_to_txt(phrases)
+    document = BufferedInputFile(payload, filename="black_phrases.txt")
+    assert callback.from_user
+    await bot.send_document(
+        chat_id=callback.from_user.id,
+        document=document,
+        caption="Выгрузка черного списка фраз",
+    )
+    await callback.answer()
