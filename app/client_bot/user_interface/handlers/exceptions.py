@@ -1,6 +1,7 @@
 import logging
 import traceback
 import typing
+from typing import Any
 
 import aiogram
 from aiogram import Router
@@ -70,6 +71,28 @@ async def send_admin_error_report(
     await _send_text_chunks(bot, admin_telegram_id, report)
 
 
+def is_telegram_message_too_long(exc: BaseException) -> bool:
+    """Detect Telegram API response for over-limit message length."""
+    if not isinstance(exc, TelegramBadRequest):
+        return False
+    error_text = (getattr(exc, "message", None) or str(exc)).lower()
+    return "message is too long" in error_text
+
+
+def extract_telegram_method_payload(method: Any) -> str | None:
+    """Extract text-like payload from TelegramMethod for diagnostics."""
+    for attr in ("text", "caption"):
+        value = getattr(method, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def describe_telegram_method(method: Any) -> str:
+    """Fallback representation if no text/caption payload exists."""
+    return f"{type(method).__name__}: {method!r}"
+
+
 def _chat_id_from_error_update(update: Update) -> int:
     """User chat id from message or callback_query (shared error-handler resolution)."""
     message = update.message
@@ -103,8 +126,52 @@ async def network_error_handler(
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
-    """Не обрабатываем здесь: передаём следующему error-handler (общий Exception)."""
-    raise SkipHandler()
+    exception = error_event.exception
+    if not isinstance(exception, TelegramBadRequest):
+        raise SkipHandler()
+    if not is_telegram_message_too_long(exception):
+        raise SkipHandler()
+
+    method = exception.method
+    method_name = type(method).__name__
+    chat_from_method = getattr(method, "chat_id", None)
+    payload = extract_telegram_method_payload(method)
+    payload_len = len(payload) if payload is not None else 0
+
+    logger.warning(
+        "Telegram message too long: method=%s chat_id=%s payload_chars=%s",
+        method_name,
+        chat_from_method,
+        payload_len,
+    )
+
+    meta = (
+        "TelegramBadRequest: message is too long\n"
+        f"method={method_name}\n"
+        f"chat_id={chat_from_method}\n"
+        f"payload_chars={payload_len}"
+    )
+    await send_admin_error_report(
+        bot,
+        headline="Telegram send_message overflow",
+        extra=meta
+        + "\n\n--- payload ---\n\n"
+        + (payload if payload is not None else describe_telegram_method(method)),
+    )
+
+    try:
+        user_chat_id = _chat_id_from_error_update(error_event.update)
+        await bot.send_message(
+            chat_id=user_chat_id,
+            text=(
+                "Сообщение слишком длинное для Telegram (лимит символов). "
+                f"Обратитесь в поддержку: {const.SUPPORT_LINK}"
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to notify user after message-too-long error")
+
+    return
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
