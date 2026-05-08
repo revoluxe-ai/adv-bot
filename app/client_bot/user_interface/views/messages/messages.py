@@ -1080,7 +1080,7 @@ class WaitingForBlackPhrases(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.black_phrases:
-            text, is_truncated = _render_phrase_templates_preview(
+            text, _ = _render_phrase_templates_preview(
                 title="Текущий черный список:",
                 phrases=self.black_phrases,
                 update_hint=(
@@ -1088,7 +1088,6 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                     "Список будет обновлен."
                 ),
             )
-            self._is_black_phrases_truncated = is_truncated
             return text
         else:
             return (
@@ -1165,7 +1164,7 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.relevant_phrases:
-            text, is_truncated = _render_phrase_templates_preview(
+            text, _ = _render_phrase_templates_preview(
                 title="Текущие шаблоны релевантных фраз:",
                 phrases=self.relevant_phrases,
                 update_hint=(
@@ -1173,7 +1172,6 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
                     "он будет заменён."
                 ),
             )
-            self._is_relevant_phrases_truncated = is_truncated
             return text
         return (
             "Укажите через перенос строки шаблоны для автоматической пометки "
