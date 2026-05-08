@@ -1,12 +1,13 @@
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
 from app.client_bot.telegram_message_split import split_telegram_plain_text
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.utils.phrases_txt import phrases_to_txt_bytes
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
@@ -193,5 +194,31 @@ async def reset_relevant_phrase_templates(
     assert callback.from_user
     await messages.WaitingForRelevantPhraseTemplates(bot, callback.from_user.id)(
         callback_data.adv_setting_id
+    )
+    await callback.answer()
+
+
+@router.callback_query(callbacks.ExportRelevantPhraseTemplates.filter())
+async def export_relevant_phrase_templates(
+    callback: CallbackQuery,
+    bot: Bot,
+    callback_data: callbacks.ExportRelevantPhraseTemplates,
+) -> None:
+    adv_setting_id = callback_data.adv_setting_id
+    async with sm(read_only=True) as session:
+        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+    if adv is None:
+        await callback.answer("Кампания не найдена.", show_alert=True)
+        return
+
+    rel_manager = RelevantPhraseManager(adv)
+    phrases = await rel_manager.get_relevant_phrases_template_data() or []
+    payload = phrases_to_txt_bytes(phrases)
+    document = BufferedInputFile(payload, filename="relevant_phrase_templates.txt")
+    assert callback.from_user
+    await bot.send_document(
+        chat_id=callback.from_user.id,
+        document=document,
+        caption="Выгрузка шаблонов релевантных фраз",
     )
     await callback.answer()

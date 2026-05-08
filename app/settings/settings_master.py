@@ -704,11 +704,11 @@ class Settings:
 
 
     @property
-    def PROXY(self) -> str:
+    def PROXY(self) -> str | None:
         value = os.getenv("PROXY")
-        if not value:
-            return "http://xray-client.default.svc.cluster.local:8080"
-        return value
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
 
     @property
     def unisender_go_api_key(self) -> str | None:
