@@ -29,7 +29,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums import (
+    KeywordStrategyMode,
+    OrdersSourceForAutoMode,
+    TargetPositionMode,
+)
 from .bidder_mode import BidderMode
 from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
@@ -792,6 +796,12 @@ class KeywordSetting(BaseTable):
         uselist=True,
     )
     hard_status: Mapped[int] = mapped_column(Integer, default=1)
+    strategy_mode: Mapped[KeywordStrategyMode] = mapped_column(
+        SAEnum(KeywordStrategyMode),
+        nullable=False,
+        default=KeywordStrategyMode.MIN_CPA,
+        server_default=KeywordStrategyMode.MIN_CPA.name,
+    )
     added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
