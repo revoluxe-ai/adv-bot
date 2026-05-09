@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bebra-shared-proxy
+  namespace: prod-adv-bot
+  labels:
+    app: bebra-shared-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bebra-shared-proxy
+  template:
+    metadata:
+      labels:
+        app: bebra-shared-proxy
+    spec:
+      containers:
+        - name: xray-proxy
+          image: teddysun/xray:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              cat >/etc/xray/config.json <<EOF
+              {
+                "log": {
+                  "loglevel": "warning"
+                },
+                "inbounds": [
+                  {
+                    "port": 8080,
+                    "listen": "0.0.0.0",
+                    "protocol": "http",
+                    "settings": {}
+                  }
+                ],
+                "outbounds": [
+                  {
+                    "protocol": "shadowsocks",
+                    "settings": {
+                      "servers": [
+                        {
+                          "address": "${SERVER}",
+                          "port": ${SERVER_PORT},
+                          "method": "${METHOD}",
+                          "password": "${PASSWORD}"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+              EOF
+              exec /usr/bin/xray run -c /etc/xray/config.json
+          ports:
+            - containerPort: 8080
+              name: http-proxy
+          env:
+            - name: SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: bebra-proxy-params
+                  key: server
+            - name: SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: bebra-proxy-params
+                  key: server_port
+            - name: METHOD
+              valueFrom:
+                secretKeyRef:
+                  name: bebra-proxy-params
+                  key: method
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bebra-proxy-params
+                  key: password
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bebra-shared-proxy
+  namespace: prod-adv-bot
+  labels:
+    app: bebra-shared-proxy
+spec:
+  selector:
+    app: bebra-shared-proxy
+  ports:
+    - name: http-proxy
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
