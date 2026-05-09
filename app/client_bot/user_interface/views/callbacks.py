@@ -422,6 +422,18 @@ class AutoUpdaterVersionToggle(CallbackData, prefix="auto_updater_version_toggle
     adv_setting_original_id: int
 
 
+class AutoUpdaterVersionMenuOpen(CallbackData, prefix="auto_updater_ver_menu_open"):
+    """Открыть отдельное сообщение с выбором версии АвтоАпдейтера."""
+
+    adv_setting_original_id: int
+
+
+class AutoUpdaterVersionMenuBack(CallbackData, prefix="auto_updater_ver_menu_back"):
+    """Закрыть сообщение подменю версии (кнопка «Назад»)."""
+
+    pass
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):

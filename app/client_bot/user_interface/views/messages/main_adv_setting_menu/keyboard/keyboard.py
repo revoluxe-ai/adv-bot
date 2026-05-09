@@ -3,12 +3,16 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot.user_interface.views import callbacks
+from .automatic_version_ui import (
+    automatic_version_main_menu_button,
+    normalize_automatic_version_ui,
+    show_relevant_phrase_toggle,
+)
 from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
     SalesPredictMethodToggle,
-    AutoUpdaterVersionToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
@@ -254,7 +258,9 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    if adv_setting.automatic_version == 2:
+    if show_relevant_phrase_toggle(
+        normalize_automatic_version_ui(adv_setting.automatic_version)
+    ):
         # Кнопка для auto_add_only_relevant_phrase
         if adv_setting.auto_add_only_relevant_phrase:
             relevant_text = "Выключить добавление только релевантных фраз"
@@ -304,19 +310,8 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    # Кнопка переключения версии АвтоАпдейтера
-    if adv_setting.automatic_version == 1:
-        text = "Переключить на АвтоАпдейтер V2"
-        new_version = 2
-    else:
-        text = "Переключить на АвтоАпдейтер V1"
-        new_version = 1
-
-    callback = AutoUpdaterVersionToggle(
-        new_version=new_version, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
+    # Версии АвтоАпдейтера: отдельное сообщение с выбором V1/V2/V3 и «Назад»
+    _ = builder.row(automatic_version_main_menu_button(adv_setting))
 
 
     button = InlineKeyboardButton(

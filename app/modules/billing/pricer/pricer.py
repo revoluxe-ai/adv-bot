@@ -244,11 +244,11 @@ class Pricer:
     ) -> bool:
         if override_white_list or override_target_place or override_individual_keywords:
             return True
-        auto_version = adv.automatic_version or 0
+        auto_version = adv.automatic_version if adv.automatic_version is not None else 2
         white_list_active = bool(adv.auto_update_white_list)
         target_place_active = bool(adv.auto_update_target_place)
         individual_keywords_mode_active = bool(adv.individual_keywords_target_place_mode)
-        if auto_version in (1, 2):
+        if auto_version in (1, 2, 3):
             return any(
                 [
                     white_list_active,

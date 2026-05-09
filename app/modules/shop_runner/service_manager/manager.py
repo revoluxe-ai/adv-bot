@@ -476,7 +476,12 @@ class CoroutinesManager:
             adv
             for adv in complex_advs
             if adv.rec_system_promotion_mode_active
-            and adv.auto_update_setting_version == 2
+            and (
+                2
+                if adv.auto_update_setting_version is None
+                else adv.auto_update_setting_version
+            )
+            in (2, 3)
             and adv.is_white_list_control_enabled
             and adv.bot_active
         ]

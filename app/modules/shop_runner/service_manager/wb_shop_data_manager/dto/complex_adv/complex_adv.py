@@ -327,7 +327,7 @@ class ComplexAdv:
         return self._adv_setting.auto_update_exponent
 
     @property
-    def auto_updater_version(self) -> int:
+    def auto_updater_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
     @property
@@ -336,7 +336,12 @@ class ComplexAdv:
         individual_keywords_mode_active = bool(
             adv.individual_keywords_target_place_mode
         )
-        if self.auto_updater_version in (1, 2):
+        ver = (
+            self.auto_updater_version
+            if self.auto_updater_version is not None
+            else 2
+        )
+        if ver in (1, 2, 3):
             return any(
                 [
                     adv.auto_update_white_list,
@@ -351,7 +356,7 @@ class ComplexAdv:
         return self._adv_setting
 
     @property
-    def auto_update_setting_version(self) -> int:
+    def auto_update_setting_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
     @overload
