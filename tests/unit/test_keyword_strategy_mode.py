@@ -16,13 +16,13 @@ def test_keyword_strategy_mode_values() -> None:
 
 @pytest.mark.unit
 def test_keyword_setting_strategy_mode_column_defaults() -> None:
-    """ORM __init__ may leave defaulted columns unset until flush; DB default is defined on column."""
+    """ORM/DB defaults match KeywordSetting.strategy_mode in models.py."""
     col = KeywordSetting.__table__.c.strategy_mode
     assert col.nullable is False
     assert col.default is not None
-    assert col.default.arg == KeywordStrategyMode.OFF
+    assert col.default.arg == KeywordStrategyMode.MIN_CPA
     assert col.server_default is not None
-    assert col.server_default.arg == KeywordStrategyMode.OFF.name
+    assert col.server_default.arg == KeywordStrategyMode.MIN_CPA.name
 
 
 @pytest.mark.unit
