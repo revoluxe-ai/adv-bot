@@ -190,6 +190,7 @@ class WBCommonStatManager:
                 stat.orders,
                 stat.orders_sum,
                 stat.buy_outs,
+                stat.buyouts_sum_rub,
             )
             for stat in statistics
         ]
@@ -199,7 +200,7 @@ class WBCommonStatManager:
         # Формируем запрос на вставку данных
         query = """
         INSERT INTO wb_common_stat
-        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, version)
+        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, buyouts_sum_rub, version)
         VALUES
         """
 

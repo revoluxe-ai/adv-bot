@@ -37,7 +37,7 @@ _USER_LOADING_OPTIONS = (
     .selectinload(WBUserCabinet.wb_cabinet)
     .load_only(WBCabinet.id, WBCabinet.shop_id, WBCabinet.balance, WBCabinet.bonus)
     .selectinload(WBCabinet.adv_settings)
-    .load_only(AdvSetting.id, AdvSetting.bot_active),
+    .load_only(AdvSetting.id, AdvSetting.bot_active, AdvSetting.nmids),
 )
 
 _pricer = Pricer()

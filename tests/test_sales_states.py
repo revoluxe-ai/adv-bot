@@ -60,7 +60,7 @@ pytestmark = pytest.mark.unit
                             SalesStates.OPTIMAL),
                          ])
 
-@pytest.mark.asyncio
+
 def test_detect_campaign_state(plan, fact, expected_state):
     state = detect_campaign_state(plan, fact)
     assert state == expected_state
@@ -73,6 +73,87 @@ def test_detect_campaign_state_returns_none_when_fact_pay_for_order_is_none():
         predict_orders=15.0,
         pay_for_order=None,
         original_orders=15,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) is None
+
+
+def test_detect_campaign_state_pay_equals_max_not_overspend_underperform_unavailable():
+    """pay == max is not OVERSPEND (> max only); with predict < orders it hits None branch."""
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=300.0,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) is None
+
+
+def test_detect_campaign_state_predict_orders_equals_plan_orders_stable_when_pay_above_target():
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=400)
+    fact = FactData(
+        predict_orders=10.0,
+        pay_for_order=150.0,
+        original_orders=10,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.STABLE
+
+
+def test_detect_campaign_state_predict_orders_equals_plan_orders_optimal_when_pay_equals_target():
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=400)
+    fact = FactData(
+        predict_orders=10.0,
+        pay_for_order=100.0,
+        original_orders=10,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL
+
+
+def test_detect_campaign_state_overspend_priority_over_underperform():
+    """pay_for_order > max triggers OVERSPEND even if predict_orders < plan.orders."""
+    plan = PlanData(orders=30, target_pay_for_order=120, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=350.0,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.OVERSPEND
+
+
+def test_detect_campaign_state_returns_none_when_plan_fields_all_zero():
+    plan = PlanData(orders=0, target_pay_for_order=0, max_pay_for_order=0)
+    fact = FactData(
+        predict_orders=1.0,
+        pay_for_order=10.0,
+        original_orders=1,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) is None
+
+
+def test_detect_campaign_state_when_plan_orders_zero_treats_as_plan_met():
+    """predict_orders >= plan.orders when plan.orders==0 — enters completed-plan branch."""
+    plan = PlanData(orders=0, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=1.0,
+        pay_for_order=50.0,
+        original_orders=1,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL
+
+
+def test_detect_campaign_state_returns_none_when_orders_met_but_ambiguous_gap():
+    """predict_orders below plan but pay already at max — not OVERSPEND (> max only)."""
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=8.0,
+        pay_for_order=300.0,
+        original_orders=8,
         fact_method=FactMethods.DIRECT_SALES,
     )
     assert detect_campaign_state(plan, fact) is None

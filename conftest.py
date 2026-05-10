@@ -855,6 +855,7 @@ async def clickhouse_client(setup_test_database):
             orders UInt32,
             orders_sum Float64,
             buy_outs UInt32,
+            buyouts_sum_rub Float64 DEFAULT 0,
             version Float64,
             INDEX idx_wb_common_stat_date date TYPE minmax GRANULARITY 1
         )

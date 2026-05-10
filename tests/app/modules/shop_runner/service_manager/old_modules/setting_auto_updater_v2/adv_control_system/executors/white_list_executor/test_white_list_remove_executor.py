@@ -15,7 +15,10 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     WhiteListRemoveExecutor,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+    KeywordStatusReason,
+)
 
 
 def create_mock_keyword(
@@ -29,6 +32,7 @@ def create_mock_keyword(
     pay_for_order: float = 100.0,
     best_keyword_status: bool = False,
     views: int = 1,
+    reason: KeywordStatusReason = KeywordStatusReason.WHITE_LIST,
 ) -> CalculatedKeyword:
     """Создает мок CalculatedKeyword."""
     keyword = MagicMock(spec=CalculatedKeyword)
@@ -44,6 +48,7 @@ def create_mock_keyword(
     keyword.best_keyword_status = best_keyword_status
     keyword.status = KeywordStatus.GOOD
     keyword.views = views  # для фильтра white_keywords (kw.views > 0)
+    keyword.reason = reason
     return keyword
 
 
@@ -304,3 +309,39 @@ async def test_skips_when_white_list_control_disabled():
     
     ctx.session.execute.assert_not_called()
     ctx.session.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_no_remove_when_only_best_keyword_in_white_list() -> None:
+    keywords = [
+        create_mock_keyword(1, "only_best", best_keyword_status=True),
+    ]
+    ctx = create_mock_context(keywords=keywords)
+    result = await WhiteListRemoveExecutor().execute(ctx)
+    assert result.success is False
+    ctx.session.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_no_remove_when_white_keyword_has_zero_views() -> None:
+    keywords = [
+        create_mock_keyword(1, "noview", views=0, best_keyword_status=False),
+    ]
+    ctx = create_mock_context(keywords=keywords)
+    result = await WhiteListRemoveExecutor().execute(ctx)
+    assert result.success is False
+
+
+@pytest.mark.asyncio
+async def test_no_remove_when_white_keyword_has_above_target_at_min_bid_reason() -> None:
+    keywords = [
+        create_mock_keyword(
+            1,
+            "protected",
+            reason=KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID,
+            best_keyword_status=False,
+        ),
+    ]
+    ctx = create_mock_context(keywords=keywords)
+    result = await WhiteListRemoveExecutor().execute(ctx)
+    assert result.success is False

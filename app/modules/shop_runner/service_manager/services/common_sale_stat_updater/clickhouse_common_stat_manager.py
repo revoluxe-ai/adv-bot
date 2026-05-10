@@ -21,6 +21,7 @@ class ClickHouseCommonStatManager:
                 row.orders,
                 row.orders_sum,
                 row.buy_outs,
+                row.buyouts_sum_rub,
             )
             for row in rows
         ]
@@ -29,11 +30,11 @@ class ClickHouseCommonStatManager:
 
         query = """
         INSERT INTO wb_common_stat
-        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, version)
+        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, buyouts_sum_rub, version)
         VALUES
         """
         query += ",".join(
-            ["(%s, %s, %s, %s, %s, %s, %s, %s)" % (*value, version) for value in values]
+            ["(%s, %s, %s, %s, %s, %s, %s, %s, %s)" % (*value, version) for value in values]
         )
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:

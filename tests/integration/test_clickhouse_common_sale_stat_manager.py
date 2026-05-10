@@ -29,6 +29,7 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
             orders=2,
             orders_sum=199.99,
             buy_outs=1,
+            buyouts_sum_rub=50.0,
         ),
         CommonSaleStatRow(
             nmid=456,
@@ -38,6 +39,7 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
             orders=4,
             orders_sum=399.5,
             buy_outs=2,
+            buyouts_sum_rub=100.0,
         ),
     ]
 
@@ -47,7 +49,7 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
         # Assert
         result = await clickhouse_client.query(
             """
-            SELECT nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs
+            SELECT nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, buyouts_sum_rub
             FROM default_db.wb_common_stat
             WHERE nmid IN (123, 456) AND date = '2025-12-21'
             ORDER BY nmid
@@ -56,8 +58,8 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
 
     assert result is not None
     assert result.result_rows == [
-        (123, day, 10, 3, 2, 199.99, 1),
-        (456, day, 20, 6, 4, 399.5, 2),
+        (123, day, 10, 3, 2, 199.99, 1, 50.0),
+        (456, day, 20, 6, 4, 399.5, 2, 100.0),
     ]
 
 
