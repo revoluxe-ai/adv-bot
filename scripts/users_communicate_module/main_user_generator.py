@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from sqlalchemy import select
 from sqlalchemy.orm import load_only, selectinload
@@ -16,7 +16,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from scripts.get_users.get_users import get_users
 from scripts.users_csv_exporter.dto import UserDTO
 
-batch_size = 30
+DEFAULT_USER_BATCH_SIZE = 30
 
 # Список Telegram ID пользователей для тестовой рассылки.
 TEST_TELEGRAM_IDS: list[int] = [373435337]
@@ -71,11 +71,19 @@ async def get_test_users_iterator() -> AsyncGenerator[UserDTO, None]:
 
 async def get_users_iterator(
     only_with_auto_campaign: bool = True,
+    *,
+    batch_size: int | None = None,
 ) -> AsyncIterator[UserDTO]:
+    """Iterate users from DB in batches (``batch_size`` rows per query; default 30)."""
+    effective_batch = (
+        batch_size if batch_size is not None else DEFAULT_USER_BATCH_SIZE
+    )
+    if effective_batch < 1:
+        raise ValueError("batch_size must be >= 1")
     get_users_generator = get_users(
-        batch_size=batch_size,
+        batch_size=effective_batch,
         telegram_ids_filter=None,
         only_with_auto_campaign=False,
-        balance_more_than_0=False
+        balance_more_than_0=False,
     )
     return get_users_generator

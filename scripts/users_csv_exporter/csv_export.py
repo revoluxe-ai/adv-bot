@@ -41,11 +41,14 @@ async def export_users_to_csv(
     limit: int | None = None,
     batch_size: int,
 ) -> Path:
-    """Write per-cabinet rows into ``dest_path`` (CSV, UTF-8)."""
+    """Write per-cabinet rows into ``dest_path`` (CSV, UTF-8).
+
+    ``batch_size`` is the number of users loaded per DB query (see ``get_users``).
+    """
     output = Path(dest_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     written = 0
-    users_async_iterator = await get_users_iterator()
+    users_async_iterator = await get_users_iterator(batch_size=batch_size)
     with output.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=_FIELDNAMES)
         writer.writeheader()
@@ -69,12 +72,15 @@ async def export_users_to_excel(
     limit: int | None = None,
     batch_size: int,
 ) -> Path:
-    """Write per-cabinet rows into ``dest_path`` (.xlsx)."""
+    """Write per-cabinet rows into ``dest_path`` (.xlsx).
+
+    ``batch_size`` is the number of users loaded per DB query (see ``get_users``).
+    """
     output = Path(dest_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, object]] = []
     written = 0
-    users_async_iterator = await get_users_iterator()
+    users_async_iterator = await get_users_iterator(batch_size=batch_size)
     async for user in users_async_iterator:
         user_base = {
             "user_id": user.user_id,
