@@ -62,6 +62,30 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_MAX_TEMPLATE_PREVIEW_TEXT_LEN = 1400
+_TEMPLATE_EXPORT_HINT = (
+    'Чтобы получить весь список, нажмите кнопку "Выгрузить фразы"'
+)
+
+
+def _render_phrase_templates_preview(
+    *,
+    title: str,
+    phrases: list[str],
+    update_hint: str,
+) -> tuple[str, bool]:
+    full_lines = [title, *phrases, "", update_hint]
+    full_text = "\n".join(full_lines)
+    if len(full_text) <= _MAX_TEMPLATE_PREVIEW_TEXT_LEN:
+        return full_text, False
+
+    hint_block = f"\n\n{_TEMPLATE_EXPORT_HINT}"
+    max_body_len = _MAX_TEMPLATE_PREVIEW_TEXT_LEN - len(hint_block) - 1
+    if max_body_len < 1:
+        max_body_len = 1
+    body_preview = full_text[:max_body_len].rstrip()
+    return f"{body_preview}\n{hint_block}", True
+
 
 def _campaign_type_display(campaign_type: AdvType | None) -> str:
     if campaign_type is None:
@@ -1056,8 +1080,15 @@ class WaitingForBlackPhrases(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.black_phrases:
-            blacklist = "\n".join(self.black_phrases)
-            return f"""Текущий черный список:\n{blacklist}\n\nЧтобы обновить фразы, отправьте список еще раз. Список будет обновлен."""
+            text, _ = _render_phrase_templates_preview(
+                title="Текущий черный список:",
+                phrases=self.black_phrases,
+                update_hint=(
+                    "Чтобы обновить фразы, отправьте список еще раз. "
+                    "Список будет обновлен."
+                ),
+            )
+            return text
         else:
             return (
                 "Укажите через перенос строки шаблоны для черного списка (исключение из продвижения).\n\n"
@@ -1089,6 +1120,14 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 InlineKeyboardButton(
                     text="Сбросить черный список",
                     callback_data=callbacks.ResetBlackPhrases(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
+            builder.row(
+                InlineKeyboardButton(
+                    text="Выгрузить фразы",
+                    callback_data=callbacks.ExportBlackPhrases(
                         adv_setting_id=self.adv_setting_id
                     ).pack(),
                 )
@@ -1125,11 +1164,15 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.relevant_phrases:
-            lines = "\n".join(self.relevant_phrases)
-            return (
-                f"Текущие шаблоны релевантных фраз:\n{lines}\n\n"
-                "Чтобы обновить, отправьте список ещё раз — он будет заменён."
+            text, _ = _render_phrase_templates_preview(
+                title="Текущие шаблоны релевантных фраз:",
+                phrases=self.relevant_phrases,
+                update_hint=(
+                    "Чтобы обновить, отправьте список ещё раз — "
+                    "он будет заменён."
+                ),
             )
+            return text
         return (
             "Укажите через перенос строки шаблоны для автоматической пометки "
             "фраз как релевантных.\n\n"
@@ -1163,6 +1206,14 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
                 InlineKeyboardButton(
                     text="Сбросить шаблоны релевантных фраз",
                     callback_data=callbacks.ResetRelevantPhraseTemplates(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
+            builder.row(
+                InlineKeyboardButton(
+                    text="Выгрузить фразы",
+                    callback_data=callbacks.ExportRelevantPhraseTemplates(
                         adv_setting_id=self.adv_setting_id
                     ).pack(),
                 )

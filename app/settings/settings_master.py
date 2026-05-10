@@ -707,7 +707,7 @@ class Settings:
     def PROXY(self) -> str | None:
         value = os.getenv("PROXY")
         if not value:
-            return None
+            return "http://xray-client.default.svc.cluster.local:8080"
         return value
 
     @property
