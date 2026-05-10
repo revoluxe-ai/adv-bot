@@ -15,49 +15,11 @@ spec:
       labels:
         app: bebra-shared-proxy
     spec:
-      containers:
-        - name: xray-proxy
-          image: teddysun/xray:latest
+      initContainers:
+        # Python json.dump avoids shell expansion of secret metacharacters (unquoted <<EOF).
+        - name: render-xray-config
+          image: python:3.12-alpine
           imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-          args:
-            - |
-              cat >/etc/xray/config.json <<EOF
-              {
-                "log": {
-                  "loglevel": "warning"
-                },
-                "inbounds": [
-                  {
-                    "port": 8080,
-                    "listen": "0.0.0.0",
-                    "protocol": "http",
-                    "settings": {}
-                  }
-                ],
-                "outbounds": [
-                  {
-                    "protocol": "shadowsocks",
-                    "settings": {
-                      "servers": [
-                        {
-                          "address": "${SERVER}",
-                          "port": ${SERVER_PORT},
-                          "method": "${METHOD}",
-                          "password": "${PASSWORD}"
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-              EOF
-              exec /usr/bin/xray run -c /etc/xray/config.json
-          ports:
-            - containerPort: 8080
-              name: http-proxy
           env:
             - name: SERVER
               valueFrom:
@@ -79,6 +41,62 @@ spec:
                 secretKeyRef:
                   name: bebra-proxy-params
                   key: password
+          volumeMounts:
+            - name: xray-config
+              mountPath: /out
+          command:
+            - python3
+            - -c
+            - |
+              import json
+              import os
+
+              port_raw = os.environ["SERVER_PORT"].strip()
+              port = int(port_raw)
+
+              cfg = {
+                  "log": {"loglevel": "warning"},
+                  "inbounds": [
+                      {
+                          "port": 8080,
+                          "listen": "0.0.0.0",
+                          "protocol": "http",
+                          "settings": {},
+                      }
+                  ],
+                  "outbounds": [
+                      {
+                          "protocol": "shadowsocks",
+                          "settings": {
+                              "servers": [
+                                  {
+                                      "address": os.environ["SERVER"],
+                                      "port": port,
+                                      "method": os.environ["METHOD"],
+                                      "password": os.environ["PASSWORD"],
+                                  }
+                              ]
+                          },
+                      }
+                  ],
+              }
+              with open("/out/config.json", "w", encoding="utf-8") as f:
+                  json.dump(cfg, f, indent=2)
+                  f.write("\n")
+      volumes:
+        - name: xray-config
+          emptyDir: {}
+      containers:
+        - name: xray-proxy
+          image: teddysun/xray:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/bin/xray", "run", "-c", "/etc/xray/config.json"]
+          volumeMounts:
+            - name: xray-config
+              mountPath: /etc/xray
+          ports:
+            - containerPort: 8080
+              name: http-proxy
           readinessProbe:
             tcpSocket:
               port: 8080
