@@ -22,6 +22,7 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     FSM_ADV_AUTO_VER_MENU_ADV_SETTING_ID,
     FSM_ADV_AUTO_VER_PARENT_MESSAGE_ID,
     build_automatic_version_submenu_markup,
+    normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 from app.modules.wb_adv_updater import data_manager
@@ -39,10 +40,6 @@ _SUBMENU_TEXT = (
     "Выберите версию АвтоАпдейтера.\n"
     "Текущая отмечена галочкой. «Назад» — снова показать меню РК (это сообщение в чате остаётся)."
 )
-
-
-def _normalize_db_version(raw: int | None) -> int:
-    return 2 if raw is None else raw
 
 
 async def _wb_user_cabinet_for_adv(
@@ -173,7 +170,7 @@ async def toggle_auto_updater_version(
             await callback_query.answer("Кампания не найдена.", show_alert=True)
             return
 
-        current_norm = _normalize_db_version(adv_before.automatic_version)
+        current_norm = normalize_automatic_version_ui(adv_before.automatic_version)
         if new_version == current_norm:
             await callback_query.answer("Уже выбрано", show_alert=False)
             return
