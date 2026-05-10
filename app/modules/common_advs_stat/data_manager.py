@@ -5,10 +5,8 @@ from . import clickhouse_manager
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-    FactMethods,
-)
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
