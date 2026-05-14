@@ -272,7 +272,7 @@ class UpdateClusterBidsManager:
                     continue
                 current_bid = fallback_bid
             current_position = mapper.get_current_position(map_data)
-            target_position: int = mapper.get_target_position(map_data)
+            target_position: int | None = mapper.get_target_position(map_data)
             adv_id = map_data.adv_id
             nmid = map_data.nmid
             state_key = ClusterBidKey(
@@ -326,6 +326,8 @@ class UpdateClusterBidsManager:
         Поле ``snap_to_min_bid_no_keyword_target`` выставляется в теле метода при
         ``individual_keywords_target_place_mode`` и отсутствии ``target_place`` у
         ключевого слова; интерпретация флага в калькуляторе — в ``new_bid_calculate``.
+        В этом snap-случае ``target_position`` в карте — ``None`` (цель РК сюда не
+        подставляется).
         """
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
@@ -366,7 +368,9 @@ class UpdateClusterBidsManager:
                     target_position = keyword_target_place
                     snap_to_min = False
                 elif adv.individual_keywords_target_place_mode:
-                    target_position = adv.target_place
+                    # Минимальная ставка WB — через snap_to_min + new_bid_calculate, не через
+                    # target_position; цель РК (adv.target_place) в карту не кладём.
+                    target_position = None
                     snap_to_min = True
                 else:
                     target_position = adv.target_place

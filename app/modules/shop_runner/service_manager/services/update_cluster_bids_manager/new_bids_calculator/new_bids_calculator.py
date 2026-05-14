@@ -5,7 +5,8 @@
 - **Режим snap** (``snap_to_min_bid_no_keyword_target``): целевая ставка — минимум WB
   (``min_bid``). Потолок пользователя **не** ограничивает эту ветку: если минимум площадки
   выше max_cpm, всё равно возвращаем ``min_bid`` со статусом GOOD — иначе нельзя
-  корректно выставить ставку на WB.
+  корректно выставить ставку на WB. Результат **не зависит** от ``target_position``
+  (в т.ч. ``None``) и от ``predict_target_bids``.
 
 - **Обычный режим**: сначала считаем кандидата (predict / шаг), применяем потолок
   ``new_bid >= max_bid → max_bid``, затем классическую развилку с ``min_bid``.
@@ -39,14 +40,16 @@ def _resolve_effective_step(calculation_input: CalculationInput, direct: DirectE
     return max(prev_step // 2, 1)
 
 
-def _resolve_predict_bid(calculation_input: CalculationInput) -> int | None:
+def _resolve_predict_bid(
+    calculation_input: CalculationInput, target_position: int
+) -> int | None:
     predict_map = calculation_input.predict_target_bids
     if not predict_map:
         return None
     cluster_map = predict_map.get(calculation_input.cluster)
     if not cluster_map:
         return None
-    predict_bid = cluster_map.get(calculation_input.target_position)
+    predict_bid = cluster_map.get(target_position)
     if predict_bid is None:
         return None
     return int(round(predict_bid))
@@ -56,8 +59,8 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     """Вернуть новую ставку или ``None``, если менять нечего / нет ``min_bid``.
 
     См. модульный докстринг: ветка ``snap_to_min_bid_no_keyword_target`` не режет по
-    ``max_bid``; в обычной ветке после ограничения сверху гарантируется
-    ``new_bid >= min_bid`` при известном ``min_bid``.
+    ``max_bid`` и не использует ``target_position``; в обычной ветке после ограничения
+    сверху гарантируется ``new_bid >= min_bid`` при известном ``min_bid``.
     """
     current_bid = calculation_input.current_bid
     min_bid: int | None = calculation_input.min_bid
@@ -80,12 +83,19 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
             direct=direct,
         )
 
+    target_position = calculation_input.target_position
+    assert target_position is not None, (
+        "target_position required when snap_to_min_bid_no_keyword_target is False"
+    )
+
     current_position = calculation_input.current_position
     if current_position < 1: # фоллбек на всякий случай
         current_position  = 1
-    direct = _resolve_direct(current_position, calculation_input.target_position)
+    direct = _resolve_direct(current_position, target_position)
     effective_step = _resolve_effective_step(calculation_input, direct)
-    predict_bid_for_target_position = _resolve_predict_bid(calculation_input)
+    predict_bid_for_target_position = _resolve_predict_bid(
+        calculation_input, target_position
+    )
     max_bid = calculation_input.max_bid
     new_bid: int
 

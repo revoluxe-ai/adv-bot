@@ -124,6 +124,28 @@ def test_snap_to_min_uses_platform_min_when_min_exceeds_user_max() -> None:
 
 
 @pytest.mark.unit
+def test_snap_to_min_result_independent_of_target_position() -> None:
+    """В snap-ветке итог не зависит от target_position (None vs экстремум)."""
+    common = dict(
+        adv_id=1,
+        nmid=99,
+        cluster="kw",
+        current_bid=200,
+        current_position=10.0,
+        step=10,
+        max_bid=500,
+        min_bid=50,
+        predict_target_bids=None,
+        snap_to_min_bid_no_keyword_target=True,
+    )
+    out_none = new_bid_calculate(CalculationInput(**common, target_position=None))
+    out_big = new_bid_calculate(CalculationInput(**common, target_position=9999))
+    assert out_none is not None and out_big is not None
+    assert out_none.new_bid == out_big.new_bid == 50
+    assert out_none.direct == out_big.direct
+
+
+@pytest.mark.unit
 def test_normal_path_after_max_clamp_snaps_up_to_min_when_min_above_max() -> None:
     """If max clamp would sit below platform min, raise to min (align with snap branch)."""
     inp = CalculationInput(
