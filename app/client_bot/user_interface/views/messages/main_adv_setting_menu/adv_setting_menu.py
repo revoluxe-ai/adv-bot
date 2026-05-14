@@ -133,6 +133,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._topup_failed: dict[str, str] | None = None
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
+        self._cost_threshold_kind: str | None = None
         self._plan_set: bool = False
         self._plan_fact_ch_max_ts_str: str | None = None
         self._spend_auto_today: float | None = None
@@ -293,6 +294,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._target_cost = cost_metrics.target_cost
         self._avg_cost_additional = cost_metrics.avg_cost
         self._is_campaign_active_by_cost = cost_metrics.is_active
+        self._cost_threshold_kind = cost_metrics.cost_threshold_kind
         self._plan_set = cost_metrics.plan_set
         self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
 
@@ -487,8 +489,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
+                cost_label = (
+                    "цель зак"
+                    if self._cost_threshold_kind == "target"
+                    else "макс.зак"
+                )
                 text += (
-                    f"⚠ Рек.сис не раскр, макс.зак >= {int(suggested)} р.\n"
+                    f"⚠ Рек.сис не раскр, {cost_label} >= {int(suggested)} р.\n"
                 )
             if self._traffic_clicks_dto is not None:
                 text += (

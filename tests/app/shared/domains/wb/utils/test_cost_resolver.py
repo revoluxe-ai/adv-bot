@@ -7,6 +7,7 @@ from app.shared.domains.wb.utils.cost_resolver import (
     resolve_target_cost,
     resolve_target_cost_from_context,
     resolve_target_cost_from_summary,
+    resolve_target_cost_threshold_kind,
 )
 
 
@@ -286,3 +287,19 @@ class TestResolveTargetCost:
         result = resolve_target_cost(100, 500, 800, 100.0)
         assert result == 500.0
         assert isinstance(result, float)
+
+
+class TestResolveTargetCostThresholdKind:
+    """resolve_target_cost_threshold_kind stays aligned with resolve_target_cost."""
+
+    def test_returns_target_when_plan_fulfilled(self) -> None:
+        assert resolve_target_cost_threshold_kind(100, 500.0, 800.0, 100.0) == "target"
+
+    def test_returns_max_when_plan_not_fulfilled(self) -> None:
+        assert resolve_target_cost_threshold_kind(100, 500.0, 800.0, 50.0) == "max"
+
+    def test_returns_none_when_resolve_returns_none(self) -> None:
+        assert resolve_target_cost_threshold_kind(None, 500.0, 800.0, 100.0) is None
+
+    def test_none_fact_same_as_resolve_uses_zero_branch(self) -> None:
+        assert resolve_target_cost_threshold_kind(100, 500.0, 800.0, None) == "max"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
@@ -85,6 +85,34 @@ def resolve_target_cost(
     if fact_orders >= plan_o:
         return plan_t
     return plan_m
+
+
+def resolve_target_cost_threshold_kind(
+    plan_orders: int | None,
+    plan_target_pay_for_order: int | float | None,
+    plan_max_pay_for_order: int | float | None,
+    fact_predict_orders: float | None,
+) -> Literal["target", "max"] | None:
+    """Та же ветвление, что у ``resolve_target_cost``: какой порог применён.
+
+    Возвращает None там же, где ``resolve_target_cost`` вернул бы None.
+    """
+    if not (
+        _is_real_number(plan_orders)
+        and _is_real_number(plan_target_pay_for_order)
+        and _is_real_number(plan_max_pay_for_order)
+    ):
+        return None
+    plan_o = float(plan_orders)
+    if fact_predict_orders is None:
+        fact_orders = 0.0
+    elif not _is_real_number(fact_predict_orders):
+        return None
+    else:
+        fact_orders = float(fact_predict_orders)
+    if fact_orders >= plan_o:
+        return "target"
+    return "max"
 
 
 def resolve_target_cost_from_summary(
