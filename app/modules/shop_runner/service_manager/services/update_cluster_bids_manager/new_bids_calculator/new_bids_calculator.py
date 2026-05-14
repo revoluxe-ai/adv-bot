@@ -59,7 +59,8 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     """Вернуть новую ставку или ``None``, если менять нечего / нет ``min_bid``.
 
     См. модульный докстринг: ветка ``snap_to_min_bid_no_keyword_target`` не режет по
-    ``max_bid`` и не использует ``target_position``; в обычной ветке после ограничения
+    ``max_bid`` и не использует ``target_position``; в обычной ветке нужен
+    ``target_position`` (иначе ``None`` в ответе и запись в лог). После ограничения
     сверху гарантируется ``new_bid >= min_bid`` при известном ``min_bid``.
     """
     current_bid = calculation_input.current_bid
@@ -84,9 +85,15 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
         )
 
     target_position = calculation_input.target_position
-    assert target_position is not None, (
-        "target_position required when snap_to_min_bid_no_keyword_target is False"
-    )
+    if target_position is None:
+        logger.error(
+            "Нет target_position при snap_to_min_bid_no_keyword_target=False: "
+            "adv_id=%s nmid=%s cluster=%s",
+            calculation_input.adv_id,
+            calculation_input.nmid,
+            calculation_input.cluster,
+        )
+        return None
 
     current_position = calculation_input.current_position
     if current_position < 1: # фоллбек на всякий случай

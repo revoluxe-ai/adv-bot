@@ -146,6 +146,25 @@ def test_snap_to_min_result_independent_of_target_position() -> None:
 
 
 @pytest.mark.unit
+def test_normal_mode_returns_none_when_target_position_missing() -> None:
+    """Обычный режим без target_position: не считаем ставку (как при отсутствии min_bid)."""
+    inp = CalculationInput(
+        adv_id=42,
+        nmid=7,
+        cluster="cluster_x",
+        current_bid=100,
+        current_position=5.0,
+        target_position=None,
+        step=10,
+        max_bid=500,
+        min_bid=50,
+        predict_target_bids=None,
+        snap_to_min_bid_no_keyword_target=False,
+    )
+    assert new_bid_calculate(inp) is None
+
+
+@pytest.mark.unit
 def test_normal_path_after_max_clamp_snaps_up_to_min_when_min_above_max() -> None:
     """If max clamp would sit below platform min, raise to min (align with snap branch)."""
     inp = CalculationInput(
