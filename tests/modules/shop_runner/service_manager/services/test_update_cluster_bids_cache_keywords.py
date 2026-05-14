@@ -13,6 +13,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager import (
     UpdateClusterBidsManager,
 )
+from tests.factories.keyword_pipeline import GoodKeywordFactory
 
 
 @pytest.mark.unit
@@ -35,6 +36,50 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
     )
     assert result == set()
     adv.get_keywords.assert_awaited_once_with(cache_only=True)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize("adv_target_place", [99, None])
+async def test_get_calculate_data_individual_mode_no_kw_target_snap_ignores_adv_target_place(
+    adv_target_place: int | None,
+) -> None:
+    """Нет target_place у ключа: snap, target_position=None, цель РК в карту не попадает."""
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+    )
+    cluster_text = "normquery_snap_test"
+    kw = GoodKeywordFactory.build(
+        keyword_setting__text=cluster_text,
+        keyword_setting__target_place=None,
+        cluster_stat__norm_query=cluster_text,
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 10
+    adv.adv_id = 1
+    adv.nmids = [200]
+    adv.individual_keywords_target_place_mode = True
+    adv.target_place = adv_target_place
+    adv.max_user_cpm = 500
+    adv.bid_cpm_step = 10
+    adv.get_keywords = AsyncMock(return_value=[kw])
+
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(
+        adv, {cluster_text}
+    )
+
+    assert len(result) == 1
+    (md,) = tuple(result)
+    assert md.snap_to_min_bid_no_keyword_target is True
+    assert md.target_position is None
+    assert md.nmid == 200
+    assert md.cluster == cluster_text
+    if adv_target_place is not None:
+        assert md.target_position is not adv_target_place
 
 
 @pytest.mark.unit
