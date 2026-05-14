@@ -693,17 +693,6 @@ class Settings:
         return False
 
     @property
-    def GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE(self) -> int:
-        value = os.getenv("GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE")
-        if not value:
-            return 2
-        parsed = int(value)
-        if parsed <= 0:
-            return 2
-        return parsed
-
-
-    @property
     def PROXY(self) -> str | None:
         value = os.getenv("PROXY")
         if value is None or not str(value).strip():

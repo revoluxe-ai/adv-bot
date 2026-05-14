@@ -4,7 +4,6 @@ from app.modules.bids_for_positions_manager.dto import BidPositionRow
 from ..bids_for_positions_manager.bids_for_positions_manager import BidsForPositionsManager
 
 from ..common_slaves.wildberries.models.enums.strategy import Strategy
-from ...settings import settings
 from ...shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 from .clickhouse_manager import ClickHouseManager
@@ -17,10 +16,8 @@ logger = logging.getLogger(__name__)
 # - В результат попадают только ключи, по которым есть данные по конверсиям (get_conv_cart_to_views).
 # - Ключи с нормализованными ставками (rows), но без conv (нет в clusters_adv_deltas_5m), в словарь
 #   не включаются — без conv нельзя посчитать MIN_CPO (pay_for_cart) или MAX_CONV.
-# - Вызывающий код (KeywordTargetPlaceUpdater._set_new_target_places) ожидает отсутствие ключа для
-#   таких случаев и подставляет GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE + логирует. Менять логику не
-#   обязательно: текущее поведение согласовано. При желании можно вернуть дефолт из этого модуля,
-#   чтобы убрать лог, или ввести fallback «позиция с min(bid)» — это уже изменение продукта.
+# - Вызывающий код (KeywordTargetPlaceUpdater._set_new_target_places) при отсутствии ключа в
+#   результате оставляет KeywordSetting.target_place = NULL и логирует отсутствие данных.
 
 
 class PredictKeywordsTargetPlace:
@@ -76,7 +73,7 @@ class PredictKeywordsTargetPlace:
             ]
             convs_for_keyword = convs.get(key)
             if not convs_for_keyword:
-                continue  # Ключ без данных по конверсиям — не включаем; вызывающий код даст дефолт
+                continue  # Ключ без данных по конверсиям — не включаем; апдейтер оставит target_place NULL
             result[key] = self._fill_positions_convs(positions, convs_for_keyword)
         return result
 
@@ -89,9 +86,9 @@ class PredictKeywordsTargetPlace:
         result_target_positions: dict[str, int] = {}
         for keyword, positions in bids_for_positions.items():
             if not positions:
-                logger.error("Пустой список позиций для прогноза целевой позиции")
-                result_target_positions[keyword] = (
-                    settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
+                logger.error(
+                    "Пустой список позиций для прогноза целевой позиции, keyword=%s — ключ не попадёт в результат",
+                    keyword,
                 )
                 continue
             if strategy == Strategy.MIN_CPO:

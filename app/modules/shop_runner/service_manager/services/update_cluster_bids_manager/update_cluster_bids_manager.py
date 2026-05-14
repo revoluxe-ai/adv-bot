@@ -311,6 +311,7 @@ class UpdateClusterBidsManager:
                 predict_target_bids=predict_target_bids,
                 prev_direct=prev_direct,
                 prev_step=prev_step,
+                snap_to_min_bid_no_keyword_target=map_data.snap_to_min_bid_no_keyword_target,
             )
             inputs.append(calculate_input)
         return inputs
@@ -320,6 +321,12 @@ class UpdateClusterBidsManager:
         adv: ComplexAdv,
         cluster_texts_from_ch: set[str],
     ) -> set[AdvIdItemCalculateData]:
+        """Построить набор карт (nmid × кластер) для расчёта ставок по одной ComplexAdv.
+
+        Поле ``snap_to_min_bid_no_keyword_target`` выставляется в теле метода при
+        ``individual_keywords_target_place_mode`` и отсутствии ``target_place`` у
+        ключевого слова; интерпретация флага в калькуляторе — в ``new_bid_calculate``.
+        """
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
             logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
@@ -350,10 +357,20 @@ class UpdateClusterBidsManager:
                 cluster_for_wb = kw.cluster_stat.text or kw.text
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
-                if adv.individual_keywords_target_place_mode and (keyword_target_place := kw.target_place):
+                # snap_to_min: при индивидуальных целях по фразам, но без target_place у
+                # ключевого слова — торгуем «на минимум WB»; max_cpm на эту ветку в
+                # калькуляторе не клампит (см. new_bids_calculator / CalculationInput).
+                if adv.individual_keywords_target_place_mode and (
+                    keyword_target_place := kw.target_place
+                ):
                     target_position = keyword_target_place
+                    snap_to_min = False
+                elif adv.individual_keywords_target_place_mode:
+                    target_position = adv.target_place
+                    snap_to_min = True
                 else:
                     target_position = adv.target_place
+                    snap_to_min = False
                 map_data = AdvIdItemCalculateData(
                     adv_id=search_adv_id,
                     nmid=nmid,
@@ -363,6 +380,7 @@ class UpdateClusterBidsManager:
                     target_position=target_position,
                     step=adv.bid_cpm_step,
                     current_cpm=current_cpm,
+                    snap_to_min_bid_no_keyword_target=snap_to_min,
                 )
                 map_datas.add(map_data)
         return map_datas

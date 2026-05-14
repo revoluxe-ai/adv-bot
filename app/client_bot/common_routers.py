@@ -19,7 +19,7 @@ from app.modules.white_list_mode_settings import router as WhiteListModeSettings
 from app.modules.shop_runner.auction_boost_mode_settings import (
     AuctionBoostModeSettingsRouter,
 )
-from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram import (
     auto_updater_target_place_setting_router,
 )
 from app.modules.shop_runner.service_manager.auto_updater_version_toggle import (
