@@ -1,8 +1,8 @@
+from collections.abc import Mapping
 from sqlalchemy import select, Result
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
-from app.settings import settings
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -24,28 +24,33 @@ class KeywordTargetPlaceUpdater:
         return None
 
     @staticmethod
-    async def _set_new_target_places(adv: WBAdvDTO, target_places: dict[str, int | None]) -> None:
+    async def _set_new_target_places(adv: WBAdvDTO, target_places: Mapping[str, int]) -> None:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv.adv_setting_original_id)
         async with sm(read_only=False) as session:
             result: Result[tuple[KeywordSetting]] = await session.execute(stmt)
             keywords = result.scalars().all()
             for keyword in keywords:
                 text = keyword.text
-                target_place = target_places.get(text.lower())
-                if target_place is None:
-                    # Ожидаемо для ключей без данных по конверсиям в PredictKeywordsTargetPlace (нет в
-                    # clusters_adv_deltas_5m). Контракт: такой ключ не попадает в target_places, здесь
-                    # подставляем дефолт. Не баг — см. комментарии в predict_keywords_target_place.py
-                    # TODO: Продумать уведомление об ошибке (срочно настроить сбор логов)
-                    logger.error("No target place found for %s , adv_id: %s Set Default place = 2" ,
-                                 text, adv.adv_id)
-                    target_place = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE  # 2 - по опыту чаще всего наиболее рентабельное место
-                elif target_place <= 0: # TODO: На всяк случай, выпилить
-                    target_place = settings.GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE
-                keyword.target_place = target_place
+                resolved = target_places.get(text.lower())
+                if resolved is None:
+                    logger.error(
+                        "No target place data for keyword %s, adv_id=%s; leaving target_place unset",
+                        text,
+                        adv.adv_id,
+                    )
+                    keyword.target_place = None
+                elif resolved <= 0:
+                    logger.error(
+                        "Invalid target place %s for keyword %s, adv_id=%s; clearing target_place",
+                        resolved,
+                        text,
+                        adv.adv_id,
+                    )
+                    keyword.target_place = None
+                else:
+                    keyword.target_place = resolved
             await session.commit()
 
         return None
-
 
 

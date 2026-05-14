@@ -19,3 +19,4 @@ class CalculationInput:
     predict_target_bids: dict[str, dict[int, int]] | None
     prev_direct: "DirectEnum | None" = None
     prev_step: int | None = None
+    snap_to_min_bid_no_keyword_target: bool = False

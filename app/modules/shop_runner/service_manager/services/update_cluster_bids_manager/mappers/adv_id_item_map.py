@@ -11,3 +11,4 @@ class AdvIdItemCalculateData:
     max_cpm: int
     step: int
     current_cpm: int | None
+    snap_to_min_bid_no_keyword_target: bool = False

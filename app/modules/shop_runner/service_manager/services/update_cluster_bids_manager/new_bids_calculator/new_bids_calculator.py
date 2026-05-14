@@ -38,6 +38,26 @@ def _resolve_predict_bid(calculation_input: CalculationInput) -> int | None:
 
 def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     current_bid = calculation_input.current_bid
+    min_bid: int | None = calculation_input.min_bid
+    if calculation_input.snap_to_min_bid_no_keyword_target:
+        if min_bid is None:
+            logger.error("Нет минимальной ставки: не могу снизить ставку!!!")
+            return None
+        new_bid = min_bid
+        if new_bid == current_bid:
+            return None
+        direct = DirectEnum.DOWN if new_bid < current_bid else DirectEnum.UP
+        effective_step = max(1, calculation_input.step)
+        return NewBid(
+            adv_id=calculation_input.adv_id,
+            nmid=calculation_input.nmid,
+            new_bid=new_bid,
+            bidder_keyword_status=BidderKeywordStatus.GOOD,
+            cluster=calculation_input.cluster,
+            step=effective_step,
+            direct=direct,
+        )
+
     current_position = calculation_input.current_position
     if current_position < 1: # фоллбек на всякий случай
         current_position  = 1
@@ -45,7 +65,6 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     effective_step = _resolve_effective_step(calculation_input, direct)
     predict_bid_for_target_position = _resolve_predict_bid(calculation_input)
     max_bid = calculation_input.max_bid
-    min_bid: int | None = calculation_input.min_bid
     new_bid: int
 
     if (
