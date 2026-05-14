@@ -1,4 +1,10 @@
-"""Unit tests for new_bid_calculate snap_to_min_bid_no_keyword_target."""
+"""Тесты ``new_bid_calculate``: snap и согласование min/max.
+
+Политика (как в докстринге ``new_bids_calculator``): при ``snap_to_min_bid_no_keyword_target``
+ставка принудительно к минимуму WB; ``max_bid`` не ограничивает эту ветку. В обычном
+режиме после клампа по ``max_bid`` ставка не остаётся ниже ``min_bid`` (подъём до min
+со статусом BAD).
+"""
 
 import pytest
 
@@ -93,3 +99,47 @@ def test_snap_to_min_raises_to_min_when_current_below_min() -> None:
     assert out is not None
     assert out.new_bid == 50
     assert out.direct == DirectEnum.UP
+
+
+@pytest.mark.unit
+def test_snap_to_min_uses_platform_min_when_min_exceeds_user_max() -> None:
+    """Same as snap semantics: WB minimum wins over user max_cpm."""
+    inp = CalculationInput(
+        adv_id=1,
+        nmid=99,
+        cluster="kw",
+        current_bid=200,
+        current_position=10.0,
+        target_position=5,
+        step=10,
+        max_bid=100,
+        min_bid=150,
+        predict_target_bids=None,
+        snap_to_min_bid_no_keyword_target=True,
+    )
+    out = new_bid_calculate(inp)
+    assert out is not None
+    assert out.new_bid == 150
+    assert out.bidder_keyword_status == BidderKeywordStatus.GOOD
+
+
+@pytest.mark.unit
+def test_normal_path_after_max_clamp_snaps_up_to_min_when_min_above_max() -> None:
+    """If max clamp would sit below platform min, raise to min (align with snap branch)."""
+    inp = CalculationInput(
+        adv_id=1,
+        nmid=99,
+        cluster="kw",
+        current_bid=280,
+        current_position=10.0,
+        target_position=5,
+        step=50,
+        max_bid=300,
+        min_bid=400,
+        predict_target_bids=None,
+        snap_to_min_bid_no_keyword_target=False,
+    )
+    out = new_bid_calculate(inp)
+    assert out is not None
+    assert out.new_bid == 400
+    assert out.bidder_keyword_status == BidderKeywordStatus.BAD
