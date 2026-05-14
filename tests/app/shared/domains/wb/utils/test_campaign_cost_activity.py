@@ -125,3 +125,60 @@ async def test_get_auto_campaign_cost_activity_metrics_returns_none_when_avg_mis
     assert metrics.avg_cost is None
     assert metrics.is_active is None
     assert metrics.plan_fact_ch_ts_msk == "07.06.2025 08:09"
+    assert metrics.cost_threshold_kind == "target"
+
+
+@pytest.mark.asyncio
+async def test_get_auto_campaign_cost_activity_metrics_threshold_kind_target() -> None:
+    adv = _FakeAdvSetting(
+        201,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=300,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=SimpleNamespace(
+                fact_predict_orders=15.0,
+                plan_fact_ch_ts_msk="01.01.2025 00:00",
+            )
+        )
+    )
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=50.0),
+    ):
+        metrics = await get_auto_campaign_cost_activity_metrics(
+            adv,
+            plan_fact_reader=reader,
+        )
+    assert metrics.target_cost == 100.0
+    assert metrics.cost_threshold_kind == "target"
+
+
+@pytest.mark.asyncio
+async def test_get_auto_campaign_cost_activity_metrics_threshold_kind_max() -> None:
+    adv = _FakeAdvSetting(
+        202,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=300,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=SimpleNamespace(
+                fact_predict_orders=5.0,
+                plan_fact_ch_ts_msk="01.01.2025 00:00",
+            )
+        )
+    )
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=50.0),
+    ):
+        metrics = await get_auto_campaign_cost_activity_metrics(
+            adv,
+            plan_fact_reader=reader,
+        )
+    assert metrics.target_cost == 300.0
+    assert metrics.cost_threshold_kind == "max"

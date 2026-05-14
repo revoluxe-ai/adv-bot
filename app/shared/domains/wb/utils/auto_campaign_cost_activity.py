@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost_and_threshold_kind,
+)
 
 if TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -23,6 +25,7 @@ class AutoCampaignCostActivityMetrics:
     is_active: bool | None
     plan_set: bool  # True if plan (orders/target/max) is present for this adv
     plan_fact_ch_ts_msk: str | None
+    cost_threshold_kind: Literal["target", "max"] | None
 
 
 async def get_auto_campaign_cost_activity_metrics(
@@ -36,6 +39,7 @@ async def get_auto_campaign_cost_activity_metrics(
     plan = PlanFactProvider.get_plan_data(adv_setting)
     plan_fact_summary = await reader.get_latest_plan_fact(adv_setting.adv_id)
 
+    cost_threshold_kind: Literal["target", "max"] | None = None
     if (
         plan is None
         or plan_fact_summary is None
@@ -43,12 +47,17 @@ async def get_auto_campaign_cost_activity_metrics(
     ):
         target_cost = None
     else:
-        target_cost = resolve_target_cost(
+        resolved = resolve_target_cost_and_threshold_kind(
             plan.orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
             plan_fact_summary.fact_predict_orders,
         )
+        if resolved is None:
+            target_cost = None
+            cost_threshold_kind = None
+        else:
+            target_cost, cost_threshold_kind = resolved
     avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
         adv_setting.adv_id,
         days=days_for_avg,
@@ -72,6 +81,7 @@ async def get_auto_campaign_cost_activity_metrics(
         is_active=is_active,
         plan_set=plan is not None,
         plan_fact_ch_ts_msk=ch_ts,
+        cost_threshold_kind=cost_threshold_kind,
     )
 
 
