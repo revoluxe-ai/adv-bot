@@ -11,8 +11,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.cost_resolver import (
-    resolve_target_cost,
-    resolve_target_cost_threshold_kind,
+    resolve_target_cost_and_threshold_kind,
 )
 
 if TYPE_CHECKING:
@@ -48,20 +47,17 @@ async def get_auto_campaign_cost_activity_metrics(
     ):
         target_cost = None
     else:
-        target_cost = resolve_target_cost(
+        resolved = resolve_target_cost_and_threshold_kind(
             plan.orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
             plan_fact_summary.fact_predict_orders,
         )
-        cost_threshold_kind = resolve_target_cost_threshold_kind(
-            plan.orders,
-            plan.target_pay_for_order,
-            plan.max_pay_for_order,
-            plan_fact_summary.fact_predict_orders,
-        )
-        if target_cost is None:
+        if resolved is None:
+            target_cost = None
             cost_threshold_kind = None
+        else:
+            target_cost, cost_threshold_kind = resolved
     avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
         adv_setting.adv_id,
         days=days_for_avg,

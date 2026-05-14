@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, TypeGuard
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
@@ -40,9 +40,41 @@ def resolve_target_cost_from_context(ctx: PipelineContext) -> float | None:
         return None
 
 
-def _is_real_number(value: object) -> bool:
+def _is_real_number(value: object) -> TypeGuard[int | float]:
     """True для int/float, не bool (bool — подкласс int)."""
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _resolve_target_cost_pair(
+    plan_orders: int | None,
+    plan_target_pay_for_order: int | float | None,
+    plan_max_pay_for_order: int | float | None,
+    fact_predict_orders: float | None,
+) -> tuple[float, Literal["target", "max"]] | None:
+    """Единая валидация и ветвление: (себестоимость, какой порог) или None.
+
+    ``resolve_target_cost`` и ``resolve_target_cost_threshold_kind`` — тонкие
+    обёртки; вызывающим кодам, нужным оба значения, использовать
+    ``resolve_target_cost_and_threshold_kind``.
+    """
+    if not (
+        _is_real_number(plan_orders)
+        and _is_real_number(plan_target_pay_for_order)
+        and _is_real_number(plan_max_pay_for_order)
+    ):
+        return None
+    plan_o = float(plan_orders)
+    plan_t = float(plan_target_pay_for_order)
+    plan_m = float(plan_max_pay_for_order)
+    if fact_predict_orders is None:
+        fact_orders = 0.0
+    elif not _is_real_number(fact_predict_orders):
+        return None
+    else:
+        fact_orders = float(fact_predict_orders)
+    if fact_orders >= plan_o:
+        return (plan_t, "target")
+    return (plan_m, "max")
 
 
 def resolve_target_cost(
@@ -67,24 +99,13 @@ def resolve_target_cost(
     Returns:
         Целевая себестоимость заказа или None если данные невалидны.
     """
-    if not (
-        _is_real_number(plan_orders)
-        and _is_real_number(plan_target_pay_for_order)
-        and _is_real_number(plan_max_pay_for_order)
-    ):
-        return None
-    plan_o = float(plan_orders)
-    plan_t = float(plan_target_pay_for_order)
-    plan_m = float(plan_max_pay_for_order)
-    if fact_predict_orders is None:
-        fact_orders = 0.0
-    elif not _is_real_number(fact_predict_orders):
-        return None
-    else:
-        fact_orders = float(fact_predict_orders)
-    if fact_orders >= plan_o:
-        return plan_t
-    return plan_m
+    pair = _resolve_target_cost_pair(
+        plan_orders,
+        plan_target_pay_for_order,
+        plan_max_pay_for_order,
+        fact_predict_orders,
+    )
+    return pair[0] if pair else None
 
 
 def resolve_target_cost_threshold_kind(
@@ -93,26 +114,29 @@ def resolve_target_cost_threshold_kind(
     plan_max_pay_for_order: int | float | None,
     fact_predict_orders: float | None,
 ) -> Literal["target", "max"] | None:
-    """Та же ветвление, что у ``resolve_target_cost``: какой порог применён.
+    """Какой порог применён при том же правиле, что и ``resolve_target_cost``."""
+    pair = _resolve_target_cost_pair(
+        plan_orders,
+        plan_target_pay_for_order,
+        plan_max_pay_for_order,
+        fact_predict_orders,
+    )
+    return pair[1] if pair else None
 
-    Возвращает None там же, где ``resolve_target_cost`` вернул бы None.
-    """
-    if not (
-        _is_real_number(plan_orders)
-        and _is_real_number(plan_target_pay_for_order)
-        and _is_real_number(plan_max_pay_for_order)
-    ):
-        return None
-    plan_o = float(plan_orders)
-    if fact_predict_orders is None:
-        fact_orders = 0.0
-    elif not _is_real_number(fact_predict_orders):
-        return None
-    else:
-        fact_orders = float(fact_predict_orders)
-    if fact_orders >= plan_o:
-        return "target"
-    return "max"
+
+def resolve_target_cost_and_threshold_kind(
+    plan_orders: int | None,
+    plan_target_pay_for_order: int | float | None,
+    plan_max_pay_for_order: int | float | None,
+    fact_predict_orders: float | None,
+) -> tuple[float, Literal["target", "max"]] | None:
+    """Себестоимость и вид порога одним проходом (см. ``resolve_target_cost``)."""
+    return _resolve_target_cost_pair(
+        plan_orders,
+        plan_target_pay_for_order,
+        plan_max_pay_for_order,
+        fact_predict_orders,
+    )
 
 
 def resolve_target_cost_from_summary(
