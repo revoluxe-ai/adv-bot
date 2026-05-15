@@ -66,3 +66,39 @@ async def test_get_keywords_clicks_by_days_prefills_full_range(
         date(2026, 3, 26): 7,
     }
 
+
+@pytest.mark.asyncio
+async def test_get_keywords_clicks_by_days_passes_multiple_adv_ids_to_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Запрос к CH должен включать все adv_id (авто + поиск) одним списком."""
+    from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import (
+        full_wb_adv_stat,
+    )
+
+    captured: list[str] = []
+
+    class _CapturingClient:
+        async def query(self, query: str, *_args, **_kwargs):
+            captured.append(query)
+            return _DummyResult([])
+
+    class _CapturingCM:
+        async def __aenter__(self):
+            return _CapturingClient()
+
+        async def __aexit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(
+        full_wb_adv_stat, "get_clickhouse_client", lambda: _CapturingCM()
+    )
+    monkeypatch.setattr(full_wb_adv_stat, "anti_ch_crash_semaphore", _DummySemaphore())
+
+    start = datetime(2026, 3, 24, 10, 0, 0)
+    end = datetime(2026, 3, 24, 23, 0, 0)
+    await full_wb_adv_stat.get_keywords_clicks_by_days([111, 222], start, end)
+
+    assert len(captured) == 1
+    assert "111" in captured[0] and "222" in captured[0]
+

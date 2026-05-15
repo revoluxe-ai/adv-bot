@@ -54,6 +54,11 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
         "common_stat_data_manager"
     )
     with (
+        patch.object(
+            manager,
+            "get_concatinated_stats",
+            new=AsyncMock(return_value=[stat_mock]),
+        ),
         patch(
             f"{mod}.full_wb_adv_stat.get_daily_stats_by_last_days",
             new=AsyncMock(return_value=[stat_mock]),
@@ -68,7 +73,7 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
         ),
         patch(
             f"{mod}.full_wb_adv_stat.get_keywords_clicks_by_days",
-            new=AsyncMock(return_value={}),
+            new=AsyncMock(side_effect=[{test_date: 1}, {test_date: 7}]),
         ),
         patch(
             f"{mod}.is_rec_system_shelf_mode_operational",
@@ -78,13 +83,14 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
         text = await manager.get_days_static_text(adv_setting_mock, last_days)
         assert isinstance(text, str)
         assert len(text) > 0
-        assert "Кл(рек.кл/орг/пол)" not in text
+        assert "Кл(рек.кл/орг/пол): 7/90/9 (106)" in text
+        assert " ⚠" not in text
         print("\n", text)
 
 
 @pytest.mark.asyncio
-async def test_days_stat_uses_all_campaign_clicks_for_organic_today_only() -> None:
-    """Блок Кл только за сегодня; органика по сумме кликов комплекса."""
+async def test_days_stat_uses_all_campaign_clicks_for_organic() -> None:
+    """Органика по сумме кликов комплекса в строке Кл(...)."""
     test_date = datetime.datetime.now().date()
     adv_setting_mock = AsyncMock()
     adv_setting_mock.rec_system_mode = False
@@ -130,13 +136,14 @@ async def test_days_stat_uses_all_campaign_clicks_for_organic_today_only() -> No
             keywords_views_by_day={test_date: 80},
             auto_clicks_by_day={test_date: 4},
             keywords_clicks_by_day={test_date: 1},
+            cluster_keyword_clicks_by_day={test_date: 15},
         )
-    assert "Кл(рек.кл/орг/пол): 10/90/3" in text
+    assert "Кл(рек.кл/орг/пол): 15/90/3 (108)" in text
 
 
 @pytest.mark.asyncio
-async def test_days_stat_clicks_and_warning_only_on_today_line() -> None:
-    """Вчера без Кл(...); сегодня с Кл и ⚠ при полках и рек < полки."""
+async def test_days_stat_warning_suffix_only_on_today_line() -> None:
+    """Кл(...) на каждой строке; ⚠ только у сегодня при полках и рек < полки."""
     today_d = datetime.datetime.now().date()
     yesterday_d = today_d - datetime.timedelta(days=1)
 
@@ -189,9 +196,10 @@ async def test_days_stat_clicks_and_warning_only_on_today_line() -> None:
             keywords_views_by_day={today_d: 0, yesterday_d: 0},
             auto_clicks_by_day={today_d: 50, yesterday_d: 1},
             keywords_clicks_by_day={today_d: 10, yesterday_d: 0},
+            cluster_keyword_clicks_by_day={today_d: 3, yesterday_d: 50},
         )
 
-    assert text.count("Кл(рек.кл/орг/пол)") == 1
+    assert text.count("Кл(рек.кл/орг/пол)") == 2
     lines = [ln for ln in text.splitlines() if ln.strip()]
     today_lines = [ln for ln in lines if ln.startswith(today_d.strftime("%d.%m.%Y"))]
     yesterday_lines = [ln for ln in lines if ln.startswith(yesterday_d.strftime("%d.%m.%Y"))]
@@ -199,4 +207,5 @@ async def test_days_stat_clicks_and_warning_only_on_today_line() -> None:
     assert "Кл(рек.кл/орг/пол)" in today_lines[0]
     assert " ⚠" in today_lines[0]
     assert len(yesterday_lines) == 1
-    assert "Кл(рек.кл/орг/пол)" not in yesterday_lines[0]
+    assert "Кл(рек.кл/орг/пол)" in yesterday_lines[0]
+    assert " ⚠" not in yesterday_lines[0]
