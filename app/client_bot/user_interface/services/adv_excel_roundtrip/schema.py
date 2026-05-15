@@ -25,8 +25,9 @@ from app.modules.common_slaves.wildberries.models.models import (
 ExcelColumnKind = Literal["RO", "EDIT"]
 TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 
-# Версия шаблона: при несовпадении импорт отклоняется
-EXCEL_TEMPLATE_VERSION = 1
+# Версия шаблона: при несовпадении импорт отклоняется.
+# v2: EDIT-колонка агрессивности V3 — техключ ``aggressiveness`` (ранее ``v3_rollout_aggressiveness``).
+EXCEL_TEMPLATE_VERSION = 2
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
@@ -81,6 +82,7 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "predict_ctr_mode",
         "sales_predict_method",
         "automatic_version",
+        "aggressiveness",
         "white_list_mode",
         "individual_keywords_target_place_mode",
         "target_position_mode",
@@ -230,6 +232,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "predict_ctr_mode": "Режим прогноза CTR",
     "sales_predict_method": "Метод прогноза продаж",
     "automatic_version": "Версия автоматики",
+    "aggressiveness": "V3: агрессивность раскрутки (1–3, вне полок)",
     "white_list_mode": "Режим белого списка",
     "individual_keywords_target_place_mode": "Режим целевой позиции по ключам",
     "target_position_mode": "Режим целевой позиции",
