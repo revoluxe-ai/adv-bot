@@ -47,9 +47,16 @@ class CommonStatDataManager:
         keywords_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
             [auto_adv_id], start_date, end_date
         )
+        adv_ids_for_cluster_keywords: list[int] = [auto_adv_id]
+        if adv_setting.search_adv_id:
+            adv_ids_for_cluster_keywords.append(adv_setting.search_adv_id)
+        cluster_keyword_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
+            adv_ids_for_cluster_keywords, start_date, end_date
+        )
         # Safety: ClickHouse/stat helpers must return dicts; if something returns None, don't crash UI.
         keywords_views_by_day = keywords_views_by_day or {}
         keywords_clicks_by_day = keywords_clicks_by_day or {}
+        cluster_keyword_clicks_by_day = cluster_keyword_clicks_by_day or {}
 
         text_stat = "\n\nСтатистика по дням:\n"
         text_stat += await self._get_days_static_text(
@@ -60,6 +67,7 @@ class CommonStatDataManager:
             keywords_views_by_day,
             auto_clicks_by_day,
             keywords_clicks_by_day,
+            cluster_keyword_clicks_by_day,
         )
         return text_stat
 
@@ -102,6 +110,7 @@ class CommonStatDataManager:
         keywords_views_by_day: dict[datetime.date, int],
         auto_clicks_by_day: dict[datetime.date, int],
         keywords_clicks_by_day: dict[datetime.date, int],
+        cluster_keyword_clicks_by_day: dict[datetime.date, int],
     ) -> str:
         """
         Получает текст статистики по дням
@@ -109,6 +118,8 @@ class CommonStatDataManager:
             concatenated_adv_stat_result: Объединенный результат статистики
             auto_views_by_day: Показы авто-РК по дням
             keywords_views_by_day: Показы по ключевым словам по дням
+            keywords_clicks_by_day: Клики по ключам из кластеров только авто-РК (для полок)
+            cluster_keyword_clicks_by_day: Клики по ключам из кластеров авто+search (первое число в Кл)
 
         Returns:
             str: Текст статистики по дням
@@ -163,13 +174,16 @@ class CommonStatDataManager:
                 common_stat.open_card,
                 stat.clicks,
             )
+            cluster_rek_clicks = cluster_keyword_clicks_by_day.get(date, 0)
+            clicks_control_sum = cluster_rek_clicks + organic_clicks + shelf_clicks
             text_row += (
-                f" Кл(рек.кл/орг/пол): {stat.clicks}/{organic_clicks}/{shelf_clicks}"
+                f" Кл(рек.кл/орг/пол): {cluster_rek_clicks}/{organic_clicks}/"
+                f"{shelf_clicks} ({clicks_control_sum})"
             )
             if date == today_date:
                 warn = should_show_clicks_warning(
                     shelves_operational=shelves_operational,
-                    adv_clicks=stat.clicks,
+                    adv_clicks=cluster_rek_clicks,
                     organic_clicks=organic_clicks,
                     shelf_clicks=shelf_clicks,
                 )

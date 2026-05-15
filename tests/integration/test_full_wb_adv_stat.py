@@ -257,19 +257,25 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
 
     stat_data_manager = CommonStatDataManager()
 
-    generated_text = await stat_data_manager._get_days_static_text(
-        adv_setting,
-        concatenated_adv_stat_result,
-        common_card_stats,
-        auto_views_by_day,
-        result_keywords_views,
-        {},
-        {},
-    )
+    with patch(
+        "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend."
+        "common_stat_data_manager.is_rec_system_shelf_mode_operational",
+        new=AsyncMock(return_value=False),
+    ):
+        generated_text = await stat_data_manager._get_days_static_text(
+            adv_setting,
+            concatenated_adv_stat_result,
+            common_card_stats,
+            auto_views_by_day,
+            result_keywords_views,
+            {},
+            {},
+            {},
+        )
 
-    expected_text = """26.11.2025: Корз.:8(0) Зак.:0(0)шт.Себеc: 718.39р. Доп.пок.: 5000
-27.11.2025: Корз.:8(0) Зак.:2(0)шт.Себеc: 258.81р. Доп.пок.: 5000
-28.11.2025: Корз.:2(0) Зак.:0(0)шт.Себеc: 679.28р. Доп.пок.: 10000
+    expected_text = """26.11.2025: Корз.:8(0) Зак.:0(0)шт.Себеc: 718.39р. Доп.пок.: 5000 Кл(рек.кл/орг/пол): 0/100/0 (100)
+27.11.2025: Корз.:8(0) Зак.:2(0)шт.Себеc: 258.81р. Доп.пок.: 5000 Кл(рек.кл/орг/пол): 0/100/0 (100)
+28.11.2025: Корз.:2(0) Зак.:0(0)шт.Себеc: 679.28р. Доп.пок.: 10000 Кл(рек.кл/орг/пол): 0/100/0 (100)
 План: продажи: 15 Цель: 45.0р. Макс: 200.0р.
 """
     # Ожидаемый текст нужно будет скорректировать под фактические значения mean_pay_for_order
