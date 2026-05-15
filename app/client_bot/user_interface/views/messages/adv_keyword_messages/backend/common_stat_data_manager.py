@@ -149,18 +149,17 @@ class CommonStatDataManager:
             extra_views = auto_views - keywords_views
             if extra_views > 0:
                 text_row += f" Доп.пок.: {extra_views}"
-            if adv.rec_system_mode:
-                auto_clicks = auto_clicks_by_day.get(date, 0)
-                auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
-                shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
-                # В organic исключаем клики всех РК комплекса за день (auto + search).
-                organic_clicks = compute_organic_clicks(
-                    common_stat.open_card,
-                    stat.clicks,
-                )
-                text_row += (
-                    f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
-                )
+            auto_clicks = auto_clicks_by_day.get(date, 0)
+            auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
+            shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
+            # В organic исключаем клики всех РК комплекса за день (auto + search).
+            organic_clicks = compute_organic_clicks(
+                common_stat.open_card,
+                stat.clicks,
+            )
+            text_row += (
+                f" Кл(рек.кл/орг/пол): {stat.clicks}/{organic_clicks}/{shelf_clicks}"
+            )
 
             text_row += "\n"
             text += text_row

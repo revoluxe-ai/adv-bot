@@ -70,9 +70,10 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
 
 @pytest.mark.asyncio
 async def test_days_stat_uses_all_campaign_clicks_for_organic() -> None:
+    """Органика по сумме кликов комплекса; Кл(рек.кл/орг/пол) всегда, в т.ч. при rec_system_mode=False."""
     test_date = (datetime.datetime.now() - datetime.timedelta(days=1)).date()
     adv_setting_mock = AsyncMock()
-    adv_setting_mock.rec_system_mode = True
+    adv_setting_mock.rec_system_mode = False
     adv_setting_mock.plan_for_sales_for_day = None
     adv_setting_mock.target_price_for_order = None
     adv_setting_mock.max_price_for_order = None
@@ -107,4 +108,4 @@ async def test_days_stat_uses_all_campaign_clicks_for_organic() -> None:
         auto_clicks_by_day={test_date: 4},
         keywords_clicks_by_day={test_date: 1},
     )
-    assert "Кл(орг/пол): 90/3" in text
+    assert "Кл(рек.кл/орг/пол): 10/90/3" in text
