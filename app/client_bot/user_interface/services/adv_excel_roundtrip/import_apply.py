@@ -24,14 +24,13 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.active_adv impor
     is_active_adv,
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
+    EDITABLE_ADV_SETTING_COLUMNS,
     EXCEL_TEMPLATE_VERSION,
+    ExcelColumnKind,
     column_header,
     edit_header,
     parse_edit_value,
     technical_column_header,
-)
-from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
-    EDITABLE_ADV_SETTING_COLUMNS,
 )
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
@@ -105,7 +104,7 @@ def _same_optional_int(a: int | None, b: int | None) -> bool:
 
 
 def _row_value(
-    row: dict[str, Any], *, kind: str, field: str, suffix: str = ""
+    row: dict[str, Any], *, kind: ExcelColumnKind, field: str, suffix: str = ""
 ) -> Any:
     ui_h = column_header(kind, field, suffix)
     if ui_h in row:
