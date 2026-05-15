@@ -17,8 +17,16 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 class KeywordsManager:
     @staticmethod
     async def get_candidates_to_white_list(complex_adv: ComplexAdv):
+        """Кандидаты в белый список (авто ``hard_status=1``, не GOOD, …).
+
+        Полочный фильтр (``rec_system`` + авто started + ``is_shelf_activation_allowed``):
+        отсекаются ключи с ``above_rec_conversion is False`` — остаются более «полочные».
+        При доминировании органики (``organic > shelf``) или без DTO этот фильтр **выключен** —
+        кандидаты шире, не только полочные (остальные условия фильтра сохраняются).
+
+        Сравнение кликов на стратегию MIN_CPO/MAX_CONV — в ``AdvStrategySelector``, не здесь.
+        """
         # TODO: Централизовать отбор кандидатов в БС
-        # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if keyword.reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID:
                 return False

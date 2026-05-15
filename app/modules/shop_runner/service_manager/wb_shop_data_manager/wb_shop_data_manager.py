@@ -305,10 +305,11 @@ class WBShopDataManager:
         """Собрать активные комплексы РК.
 
         ``load_extras=True`` (по умолчанию): обогатить traffic-кликами (CH) и подтянуть
-        min bids — дорого при большом числе РК.
+        min bids — дорого при большом числе РК. Нужно для ``change_adv_strategy``
+        (сравнение ``organic_clicks`` / ``shelf_clicks`` в ``AdvStrategySelector``).
 
-        ``load_extras=False``: только данные из БД + nmids; для фоновых корутин, где нужны
-        id/nmids/настройки, а не клики/минимальные ставки из этого шага.
+        ``load_extras=False``: только данные из БД + nmids; для ``adv_settings_auto_update``
+        и прочих фоновых корутин — без ``traffic_clicks_dto`` (полочный gate по кликам не сработает).
         """
         # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
         # оба помечены `@single_run()`.

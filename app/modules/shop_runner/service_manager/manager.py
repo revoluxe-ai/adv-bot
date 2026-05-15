@@ -1487,7 +1487,12 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def change_adv_strategy(self):
-        # AdvStrategySelector использует traffic_clicks_dto при rec_system_promotion_mode
+        """Периодически выставляет ``AdvSetting.strategy`` (MIN_CPO / MAX_CONV).
+
+        ``load_extras=True`` — обогащение ``traffic_clicks_dto`` для сравнения орг/пол.
+        Логика полок и кликов: ``AdvStrategySelector`` (модульный докстринг).
+        Не меняет V3-лестницу ключей; основной цикл ``adv_settings_auto_update`` идёт без extras.
+        """
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=True
         )

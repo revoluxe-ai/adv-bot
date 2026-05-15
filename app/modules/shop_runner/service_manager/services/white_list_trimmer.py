@@ -70,6 +70,7 @@ class WhiteListTrimmer:
         removed_ids: set[int],
         removed_count: int,
     ) -> list[int]:
+        """Замены в БС после trim; те же правила полок, что в ``KeywordsManager`` (``is_shelf_activation_allowed``)."""
         if removed_count <= 0:
             return []
 
