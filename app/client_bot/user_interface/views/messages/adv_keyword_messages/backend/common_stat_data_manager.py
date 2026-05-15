@@ -11,6 +11,11 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
+from app.shared.domains.wb.utils.rec_system_shelf_mode import (
+    is_rec_system_shelf_mode_operational,
+    should_show_clicks_warning,
+    warning_suffix,
+)
 
 
 class CommonStatDataManager:
@@ -115,6 +120,7 @@ class CommonStatDataManager:
 
         text = ""
         today_date = datetime.datetime.now().date()
+        shelves_operational = await is_rec_system_shelf_mode_operational(adv)
         for stat in concatenated_adv_stat_result:
             date = stat.date
             date_str = date.strftime("%d.%m.%Y")
@@ -149,7 +155,7 @@ class CommonStatDataManager:
             extra_views = auto_views - keywords_views
             if extra_views > 0:
                 text_row += f" Доп.пок.: {extra_views}"
-            if adv.rec_system_mode:
+            if date == today_date:
                 auto_clicks = auto_clicks_by_day.get(date, 0)
                 auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
                 shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
@@ -159,8 +165,15 @@ class CommonStatDataManager:
                     stat.clicks,
                 )
                 text_row += (
-                    f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
+                    f" Кл(рек.кл/орг/пол): {stat.clicks}/{organic_clicks}/{shelf_clicks}"
                 )
+                warn = should_show_clicks_warning(
+                    shelves_operational=shelves_operational,
+                    adv_clicks=stat.clicks,
+                    organic_clicks=organic_clicks,
+                    shelf_clicks=shelf_clicks,
+                )
+                text_row += warning_suffix(warn)
 
             text_row += "\n"
             text += text_row
