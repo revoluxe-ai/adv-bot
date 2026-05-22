@@ -74,6 +74,7 @@ class WBShop:
                 tg.create_task(coroutines_manager.update_top_key_in_advs())
                 tg.create_task(coroutines_manager.update_common_bid_in_search_adv())
                 tg.create_task(coroutines_manager.increment_fact_data_stats())
+                tg.create_task(coroutines_manager.auto_shelf_bid_increment_stats())
                 tg.create_task(coroutines_manager.white_list_tail_trimmer())
                 tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv())
                 tg.create_task(coroutines_manager.update_individual_keyword_target_places())
