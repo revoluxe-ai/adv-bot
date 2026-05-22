@@ -41,7 +41,10 @@
     "app/modules/shop_runner/service_manager/services/white_list_trimmer.py",
     "app/common_coroutine/coroutines/target_keyword_place_priors_updater",
     "app/client_bot/user_interface/views/messages/main_adv_setting_menu",
-    "app/modules/keywords_manager"
+    "app/modules/keywords_manager",
+    "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager",
+    "tests/unit/test_auto_shelf_bid_increment_manager.py",
+    "tests/test_wb_shop_run_coroutines.py"
   ],
 
   "exclude": [

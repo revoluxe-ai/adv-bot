@@ -1,0 +1,348 @@
+from __future__ import annotations
+
+from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_increment_manager import (
+    AutoShelfBidIncrementManager,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.dto import (
+    AutoShelfBidSnapshot,
+    AutoShelfRawStat,
+)
+
+
+pytestmark = pytest.mark.unit
+
+
+def _build_manager() -> tuple[AutoShelfBidIncrementManager, MagicMock, MagicMock, MagicMock]:
+    repository = MagicMock()
+    writer = MagicMock()
+    writer.insert_interval = AsyncMock()
+    lock_manager = MagicMock()
+    lock_manager.acquire = AsyncMock(return_value=True)
+    lock_manager.release = AsyncMock(return_value=None)
+    manager = AutoShelfBidIncrementManager(
+        redis_client=MagicMock(),
+        wb_manager_hub=MagicMock(),
+        repository=repository,
+        writer=writer,
+        lock_manager=lock_manager,
+    )
+    state_manager = MagicMock()
+    state_manager.get = AsyncMock()
+    state_manager.persist = AsyncMock()
+    manager._last_state_manager = state_manager
+    return manager, repository, writer, state_manager
+
+
+def _build_adv(nmids: list[int]) -> SimpleNamespace:
+    return SimpleNamespace(
+        adv_id=111,
+        auto_adv_id=222,
+        shop_id="5fd8c93d-3f59-4de8-b413-7d4c90f96313",
+        nmids=nmids,
+    )
+
+
+def _build_snapshot(
+    nmid: int,
+    impressions: int,
+    clicks: int,
+    carts: int,
+    orders: int,
+    spend: float,
+    *,
+    price_minor: int | None = 99900,
+    price_currency: str | None = "RUB",
+) -> AutoShelfBidSnapshot:
+    now = datetime.now(ZoneInfo("Europe/Moscow")).replace(microsecond=0)
+    return AutoShelfBidSnapshot(
+        nmid=nmid,
+        src_ts=now,
+        bucket_start=now.replace(minute=0, second=0),
+        version=1,
+        mode="main",
+        bid_minor=1500,
+        currency="RUB",
+        price_minor=price_minor,
+        price_currency=price_currency or "RUB",
+        impressions=impressions,
+        clicks=clicks,
+        carts=carts,
+        orders=orders,
+        spend=spend,
+    )
+
+
+@pytest.mark.asyncio
+async def test_single_nmid_guard_skips_no_nmids() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    await manager.update(_build_adv([]))
+    repository.fetch_total_auto_stat.assert_not_called()
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_single_nmid_guard_skips_multi_nmids() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    await manager.update(_build_adv([1, 2]))
+    repository.fetch_total_auto_stat.assert_not_called()
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_first_snapshot_persists_only_prev() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(100, 10, 3, 1, 50.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 0, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1200)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=150000)
+    state_manager.get.return_value = (None, "none")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_positive_delta_inserts_interval_and_persists_prev() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_awaited_once()
+    state_manager.persist.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    assert inserted_row.nmid == 123
+    assert inserted_row.delta_impressions == 10
+    assert inserted_row.delta_clicks == 2
+    assert inserted_row.delta_carts == 1
+    assert inserted_row.delta_orders == 1
+    assert inserted_row.delta_spend == 10.0
+    assert inserted_row.mode == "main"
+    assert inserted_row.bid_minor == 1300
+    assert inserted_row.currency == "RUB"
+
+
+@pytest.mark.asyncio
+async def test_zero_delta_skips_interval_but_persists_prev() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(100, 10, 3, 1, 50.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 0, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1200)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=150000)
+    prev = _build_snapshot(123, impressions=80, clicks=8, carts=2, orders=1, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_awaited()
+    state_manager.persist.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_negative_recommendations_skips_all_persist_and_insert() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(10, 1, 0, 0, 5.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 0, 0, 6.0))
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_missing_bid_skips_interval_and_prev() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(100, 10, 3, 1, 50.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 0, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=None)
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_price_fetch_error_is_non_blocking() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(side_effect=RuntimeError("permission denied"))
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    assert inserted_row.price_minor is None
+    assert inserted_row.price_currency == "RUB"
+    state_manager.persist.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_negative_delta_follows_reference_flow_and_still_inserts() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(120, 12, 5, 2, 50.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
+    prev = _build_snapshot(123, impressions=150, clicks=20, carts=7, orders=5, spend=70.0)
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    assert inserted_row.delta_impressions < 0
+    assert inserted_row.delta_spend < 0
+    state_manager.persist.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_price_change_known_vs_known_skips_interval_persists_prev_and_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=170000)
+    prev = _build_snapshot(
+        123,
+        impressions=90,
+        clicks=8,
+        carts=2,
+        orders=0,
+        spend=40.0,
+        price_minor=150000,
+        price_currency="RUB",
+    )
+    state_manager.get.return_value = (prev, "redis")
+
+    with caplog.at_level("INFO"):
+        await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_awaited()
+    state_manager.persist.assert_awaited_once()
+    assert "auto_shelf_bid_price_changed" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_known_vs_unknown_does_not_stop_flow() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    repository.fetch_current_price_minor = AsyncMock(return_value=170000)
+    prev = _build_snapshot(
+        123,
+        impressions=90,
+        clicks=8,
+        carts=2,
+        orders=0,
+        spend=40.0,
+        price_minor=None,
+        price_currency="RUB",
+    )
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_awaited_once()
+    state_manager.persist.assert_awaited_once()
+
+
+def test_known_price_helper_requires_minor_and_currency_not_null() -> None:
+    is_known = AutoShelfBidIncrementManager._is_known_price
+    assert is_known(1000, "RUB")
+    assert not is_known(None, "RUB")
+    assert not is_known(1000, None)
+    assert not is_known(None, None)
+
+
+def test_clickhouse_ddl_contains_required_contract() -> None:
+    from pathlib import Path
+
+    ddl = Path(
+        "scripts/clickhouse_migrations/004_create_auto_shelf_bid_increment_tables.sql"
+    ).read_text(encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS default_db.auto_shelf_bid_intervals" in ddl
+    assert "CREATE TABLE IF NOT EXISTS default_db.auto_shelf_bid_prev" in ddl
+    assert "PARTITION BY toYYYYMM(event_date)" in ddl
+    assert "bid_minor Int64" in ddl
+    assert "price_minor Nullable(Int64)" in ddl
+    assert "delta_spend Float64" in ddl
+    ddl_lower = ddl.lower()
+    assert "delta_revenue" not in ddl_lower
+    assert "\n    revenue " not in ddl_lower
+
+
+def test_validation_sql_contains_known_plus_unknown_wildcard_filter() -> None:
+    from pathlib import Path
+
+    known_sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/validate_auto_shelf_bid_intervals_by_bid_price.sql"
+    ).read_text(encoding="utf-8")
+    assert "nmid = %(nmid)s" in known_sql
+    assert "(price_minor = %(current_price_minor)s AND price_currency = %(current_price_currency)s)" in known_sql
+    assert "OR price_minor IS NULL" in known_sql
+    assert "OR price_currency IS NULL" in known_sql
+
+
+def test_validation_sql_unknown_mode_has_no_price_filter() -> None:
+    from pathlib import Path
+
+    unknown_sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/validate_auto_shelf_bid_intervals_by_bid_price_unknown.sql"
+    ).read_text(encoding="utf-8")
+    assert "nmid = %(nmid)s" in unknown_sql
+    assert "current_price_minor" not in unknown_sql
+    assert "current_price_currency" not in unknown_sql
+    where_block = unknown_sql.split("GROUP BY")[0]
+    assert "price_minor =" not in where_block
+    assert "price_currency =" not in where_block
+

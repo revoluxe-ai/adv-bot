@@ -1,0 +1,53 @@
+-- ============================================================================
+-- insert_auto_shelf_bid_interval.sql
+-- ============================================================================
+-- Назначение:
+--   Вставить одну строку инкрементального интервала (дельта метрик полок
+--   между prev и current snapshot за 5-минутный bucket).
+--
+-- Таблица: default_db.auto_shelf_bid_intervals
+--   Ключ сегмента: nmid + mode + bid_minor + currency + price_* + bucket/version.
+--
+-- Параметры: поля AutoShelfBidIntervalRow (event_date, event_id, src_ts,
+--   bucket_start, version, nmid, mode, bid_minor, currency, price_minor,
+--   price_currency, delta_impressions … delta_spend).
+--
+-- Вызывается: ClickHouseAutoShelfBidWriter.insert_interval после расчёта delta.
+-- ============================================================================
+
+INSERT INTO default_db.auto_shelf_bid_intervals (
+    event_date,
+    event_id,
+    src_ts,
+    bucket_start,
+    version,
+    nmid,
+    mode,
+    bid_minor,
+    currency,
+    price_minor,
+    price_currency,
+    delta_impressions,
+    delta_clicks,
+    delta_carts,
+    delta_orders,
+    delta_spend
+)
+VALUES (
+    %(event_date)s,
+    %(event_id)s,
+    %(src_ts)s,
+    %(bucket_start)s,
+    %(version)s,
+    %(nmid)s,
+    %(mode)s,
+    %(bid_minor)s,
+    %(currency)s,
+    %(price_minor)s,
+    %(price_currency)s,
+    %(delta_impressions)s,
+    %(delta_clicks)s,
+    %(delta_carts)s,
+    %(delta_orders)s,
+    %(delta_spend)s
+)
