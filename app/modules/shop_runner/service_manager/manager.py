@@ -54,6 +54,7 @@ from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .services.increment_fact_data_manager.increment_fact_data_manager import (
     IncrementFactDataManager,
 )
+from .services.auto_shelf_bid_increment_manager import AutoShelfBidIncrementManager
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -152,6 +153,10 @@ class CoroutinesManager:
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()
         self._increment_fact_data_manager = IncrementFactDataManager(
             redis_client_wrapper,
+        )
+        self._auto_shelf_bid_increment_manager = AutoShelfBidIncrementManager(
+            redis_client=redis_client_wrapper,
+            wb_manager_hub=self._wb_manager_hub,
         )
         self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
             redis_client_wrapper
@@ -1313,6 +1318,38 @@ class CoroutinesManager:
             if isinstance(result, BaseException):
                 logger.exception(
                     "increment_fact_data_stats failed for adv_id=%s shop_id=%s",
+                    adv.auto_adv_id,
+                    adv.shop_id,
+                    exc_info=result,
+                )
+
+        return None
+
+    @while_coroutine_decorator(60 * 5, 60)
+    async def auto_shelf_bid_increment_stats(self) -> None:
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        if not complex_advs:
+            return None
+
+        handlers: list[Callable[[], Awaitable[None]]] = []
+        for adv in complex_advs:
+            handler = functools.partial(self._auto_shelf_bid_increment_manager.update, adv)
+            handlers.append(handler)
+
+        max_workers = self._max_workers_for(len(handlers), 16)
+        results = await run_tasks(
+            handlers=handlers,
+            max_workers=max_workers,
+            tasks_manager=self._tasks_manager,
+            return_exceptions=True,
+        )
+
+        for adv, result in zip(complex_advs, results):
+            if isinstance(result, BaseException):
+                logger.exception(
+                    "auto_shelf_bid_increment_stats failed for adv_id=%s shop_id=%s",
                     adv.auto_adv_id,
                     adv.shop_id,
                     exc_info=result,
