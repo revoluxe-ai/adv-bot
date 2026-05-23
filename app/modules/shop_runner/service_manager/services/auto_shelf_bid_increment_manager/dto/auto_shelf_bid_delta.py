@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+SPEND_EPSILON = 1e-9
+
 
 @dataclass(frozen=True)
 class AutoShelfBidDelta:
@@ -23,7 +25,7 @@ class AutoShelfBidDelta:
                 self.delta_clicks < 0,
                 self.delta_carts < 0,
                 self.delta_orders < 0,
-                self.delta_spend < 0,
+                self.delta_spend < -SPEND_EPSILON,
             )
         )
 
@@ -34,18 +36,18 @@ class AutoShelfBidDelta:
             and self.delta_clicks == 0
             and self.delta_carts == 0
             and self.delta_orders == 0
-            and self.delta_spend == 0
+            and abs(self.delta_spend) <= SPEND_EPSILON
         )
 
     def nonzero_count(self) -> int:
         """Число ненулевых компонент дельты (для логов и skip insert)."""
+        spend_nonzero = abs(self.delta_spend) > SPEND_EPSILON
         return sum(
-            value != 0
-            for value in (
-                self.delta_impressions,
-                self.delta_clicks,
-                self.delta_carts,
-                self.delta_orders,
-                self.delta_spend,
+            (
+                self.delta_impressions != 0,
+                self.delta_clicks != 0,
+                self.delta_carts != 0,
+                self.delta_orders != 0,
+                spend_nonzero,
             )
         )

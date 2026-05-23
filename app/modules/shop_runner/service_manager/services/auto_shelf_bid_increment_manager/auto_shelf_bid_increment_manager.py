@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import socket
-import time
 import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -84,18 +83,31 @@ class AutoShelfBidIncrementManager:
         """
         nmids = complex_adv.nmids
         if not nmids:
-            logger.warning(
-                "auto_shelf_bid_single_nmid_guard_skip reason=no_nmids adv_id=%s shop_id=%s",
-                complex_adv.adv_id,
-                complex_adv.shop_id,
+            self._log_contract_event(
+                "auto_shelf_bid_single_nmid_guard_skip",
+                reason="single_nmid_guard_empty",
+                nmid=None,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=None,
+                level=logging.WARNING,
             )
             return
         if len(nmids) > 1:
-            logger.warning(
-                "auto_shelf_bid_single_nmid_guard_skip reason=multi_nmids adv_id=%s shop_id=%s nmids=%s",
-                complex_adv.adv_id,
-                complex_adv.shop_id,
-                nmids,
+            self._log_contract_event(
+                "auto_shelf_bid_single_nmid_guard_skip",
+                reason="single_nmid_guard_multiple",
+                nmid=None,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=None,
+                level=logging.WARNING,
             )
             return
         nmid = nmids[0]
@@ -128,10 +140,17 @@ class AutoShelfBidIncrementManager:
             )
             return
         if total_auto_stat is None:
-            logger.warning(
-                "auto_shelf_bid_total_auto_stat_not_found nmid=%s auto_adv_id=%s",
-                nmid,
-                auto_adv_id,
+            self._log_contract_event(
+                "auto_shelf_bid_total_auto_stat_not_found",
+                reason="no_total_stat",
+                nmid=nmid,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=bucket_start,
+                level=logging.WARNING,
             )
             return
 
@@ -145,31 +164,48 @@ class AutoShelfBidIncrementManager:
             )
             return
         if keyword_stat is None:
-            logger.info(
-                "auto_shelf_bid_keyword_stat_not_found_use_zero nmid=%s auto_adv_id=%s",
-                nmid,
-                auto_adv_id,
+            self._log_contract_event(
+                "auto_shelf_bid_keyword_stat_not_found_use_zero",
+                reason="keyword_stat_missing_use_zero",
+                nmid=nmid,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=bucket_start,
             )
             keyword_stat = AutoShelfRawStat.zero()
 
         recommendations_stat = total_auto_stat.minus(keyword_stat)
         if recommendations_stat.has_negative_values():
-            logger.warning(
-                "auto_shelf_bid_negative_recommendations_stat nmid=%s auto_adv_id=%s total=%s keyword=%s recommendations=%s",
-                nmid,
-                auto_adv_id,
-                total_auto_stat,
-                keyword_stat,
-                recommendations_stat,
+            self._log_contract_event(
+                "auto_shelf_bid_negative_recommendations",
+                reason="negative_recommendations_skipped",
+                nmid=nmid,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=bucket_start,
+                level=logging.WARNING,
             )
             return
 
         bid_minor = await self._repository.fetch_current_auto_common_bid(complex_adv, nmid)
         if bid_minor is None:
-            logger.warning(
-                "auto_shelf_bid_bid_not_found nmid=%s auto_adv_id=%s bid_source=redis_cache",
-                nmid,
-                auto_adv_id,
+            self._log_contract_event(
+                "auto_shelf_bid_no_bid",
+                reason="no_bid",
+                nmid=nmid,
+                mode=None,
+                bid_minor=None,
+                currency=None,
+                price_minor=None,
+                price_currency=None,
+                bucket_start=bucket_start,
+                level=logging.WARNING,
             )
             return
 
@@ -180,11 +216,17 @@ class AutoShelfBidIncrementManager:
         try:
             price_minor = await self._repository.fetch_current_price_minor(nmid)
         except Exception:
-            logger.warning(
-                "auto_shelf_bid_price_fetch_failed nmid=%s auto_adv_id=%s",
-                nmid,
-                auto_adv_id,
-                exc_info=True,
+            self._log_contract_event(
+                "auto_shelf_bid_price_fetch_failed",
+                reason="price_fetch_failed_non_blocking",
+                nmid=nmid,
+                mode=mode,
+                bid_minor=bid_minor,
+                currency="RUB",
+                price_minor=None,
+                price_currency="RUB",
+                bucket_start=bucket_start,
+                level=logging.WARNING,
             )
             price_minor = None
         price_currency = "RUB"
@@ -231,55 +273,84 @@ class AutoShelfBidIncrementManager:
             self._writer_id,
         )
         try:
-            prev_snapshot, prev_source = await self._last_state_manager.get(nmid)
+            prev_snapshot, _ = await self._last_state_manager.get(nmid)
             if prev_snapshot is None:
                 await self._last_state_manager.persist(current_snapshot)
-                logger.info(
-                    "auto_shelf_bid_init_state nmid=%s bucket=%s prev_source=%s",
-                    nmid,
-                    bucket_start,
-                    prev_source,
+                self._log_contract_event(
+                    "auto_shelf_bid_prev_missing_initialized",
+                    reason="prev_missing_initialized",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
                 )
                 return
 
-            if self._is_price_context_changed_known_vs_known(
-                prev_price_minor=prev_snapshot.price_minor,
-                prev_price_currency=prev_snapshot.price_currency,
-                current_price_minor=current_snapshot.price_minor,
-                current_price_currency=current_snapshot.price_currency,
-            ):
+            context_changed, changed_fields = self._is_context_changed(
+                prev_snapshot,
+                current_snapshot,
+            )
+            if context_changed:
                 await self._last_state_manager.persist(current_snapshot)
-                logger.info(
-                    "auto_shelf_bid_price_changed nmid=%s prev_price_minor=%s prev_price_currency=%s current_price_minor=%s current_price_currency=%s bucket=%s prev_source=%s",
-                    nmid,
-                    prev_snapshot.price_minor,
-                    prev_snapshot.price_currency,
-                    current_snapshot.price_minor,
-                    current_snapshot.price_currency,
-                    bucket_start,
-                    prev_source,
+                self._log_contract_event(
+                    "auto_shelf_bid_context_changed_resync",
+                    reason="context_changed_resync",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
                 )
+                if "price_minor" in changed_fields or "price_currency" in changed_fields:
+                    self._log_contract_event(
+                        "auto_shelf_bid_price_changed",
+                        reason="price_changed_resync",
+                        nmid=nmid,
+                        mode=current_snapshot.mode,
+                        bid_minor=current_snapshot.bid_minor,
+                        currency=current_snapshot.currency,
+                        price_minor=current_snapshot.price_minor,
+                        price_currency=current_snapshot.price_currency,
+                        bucket_start=bucket_start,
+                    )
                 return
 
             delta = current_snapshot.delta(prev_snapshot)
-            delta_nonzero = delta.nonzero_count()
-            if delta_nonzero == 0:
+            if delta.has_negative_values():
                 await self._last_state_manager.persist(current_snapshot)
-                logger.info(
-                    "auto_shelf_bid_insert_skip nmid=%s bucket=%s prev_source=%s delta_nonzero_count=0",
-                    nmid,
-                    bucket_start,
-                    prev_source,
+                self._log_contract_event(
+                    "auto_shelf_bid_negative_delta_skipped",
+                    reason="negative_delta_skipped",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
+                    level=logging.WARNING,
                 )
                 return
 
-            if delta.has_negative_values():
-                logger.warning(
-                    "auto_shelf_bid_negative_delta_detected nmid=%s bucket=%s delta=%s",
-                    nmid,
-                    bucket_start,
-                    delta,
+            if delta.nonzero_count() == 0:
+                await self._last_state_manager.persist(current_snapshot)
+                self._log_contract_event(
+                    "auto_shelf_bid_zero_delta_skipped",
+                    reason="zero_delta_skipped",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
                 )
+                return
 
             row = AutoShelfBidIntervalRow(
                 event_date=current_snapshot.src_ts.date(),
@@ -299,18 +370,18 @@ class AutoShelfBidIncrementManager:
                 delta_orders=delta.delta_orders,
                 delta_spend=delta.delta_spend,
             )
-            start = time.perf_counter()
             await self._writer.insert_interval(row)
-            latency = time.perf_counter() - start
             await self._last_state_manager.persist(current_snapshot)
-            logger.info(
-                "auto_shelf_bid_insert_ok nmid=%s bucket=%s version=%s latency=%.03f prev_source=%s delta_nonzero_count=%s bid_source=redis_cache",
-                nmid,
-                bucket_start,
-                version,
-                latency,
-                prev_source,
-                delta_nonzero,
+            self._log_contract_event(
+                "auto_shelf_bid_insert_ok",
+                reason="insert_ok",
+                nmid=nmid,
+                mode=current_snapshot.mode,
+                bid_minor=current_snapshot.bid_minor,
+                currency=current_snapshot.currency,
+                price_minor=current_snapshot.price_minor,
+                price_currency=current_snapshot.price_currency,
+                bucket_start=bucket_start,
             )
         except Exception:
             logger.exception(
@@ -329,24 +400,50 @@ class AutoShelfBidIncrementManager:
         return f"lock:auto_shelf_bid:{shop_id}:{nmid}:{bucket_epoch}"
 
     @staticmethod
-    def _is_known_price(price_minor: int | None, price_currency: str | None) -> bool:
-        """Известная цена: оба поля не NULL."""
-        return price_minor is not None and price_currency is not None
+    def _is_context_changed(
+        prev_snapshot: AutoShelfBidSnapshot,
+        current_snapshot: AutoShelfBidSnapshot,
+    ) -> tuple[bool, list[str]]:
+        """Проверить смену контекста наблюдения до расчета дельты."""
+        fields = (
+            "bid_minor",
+            "currency",
+            "mode",
+            "price_minor",
+            "price_currency",
+        )
+        changed_fields = [
+            field
+            for field in fields
+            if getattr(prev_snapshot, field) != getattr(current_snapshot, field)
+        ]
+        return bool(changed_fields), changed_fields
 
-    @classmethod
-    def _is_price_context_changed_known_vs_known(
-        cls,
-        prev_price_minor: int | None,
-        prev_price_currency: str | None,
-        current_price_minor: int | None,
-        current_price_currency: str | None,
-    ) -> bool:
-        """Смена ценового сегмента только known→known; NULL не останавливает поток."""
-        if not cls._is_known_price(prev_price_minor, prev_price_currency):
-            return False
-        if not cls._is_known_price(current_price_minor, current_price_currency):
-            return False
-        return (
-            prev_price_minor != current_price_minor
-            or prev_price_currency != current_price_currency
+    @staticmethod
+    def _log_contract_event(
+        event_name: str,
+        *,
+        reason: str,
+        nmid: int | None,
+        mode: str | None,
+        bid_minor: int | None,
+        currency: str | None,
+        price_minor: int | None,
+        price_currency: str | None,
+        bucket_start: datetime | None,
+        level: int = logging.INFO,
+    ) -> None:
+        """Structured-log событий data quality контракта."""
+        logger.log(
+            level,
+            "%s reason=%s nmid=%s mode=%s bid_minor=%s currency=%s price_minor=%s price_currency=%s bucket_start=%s",
+            event_name,
+            reason,
+            nmid,
+            mode,
+            bid_minor,
+            currency,
+            price_minor,
+            price_currency,
+            bucket_start,
         )
