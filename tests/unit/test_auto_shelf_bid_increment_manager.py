@@ -36,6 +36,9 @@ def _build_manager() -> tuple[AutoShelfBidIncrementManager, MagicMock, MagicMock
     state_manager = MagicMock()
     state_manager.get = AsyncMock()
     state_manager.persist = AsyncMock()
+    state_manager.mark_resync_required = AsyncMock()
+    state_manager.is_resync_required = AsyncMock(return_value=False)
+    state_manager.clear_resync_required = AsyncMock()
     manager._last_state_manager = state_manager
     return manager, repository, writer, state_manager
 
@@ -181,6 +184,27 @@ async def test_negative_recommendations_skips_all_persist_and_insert() -> None:
 
     writer.insert_interval.assert_not_called()
     state_manager.persist.assert_not_called()
+    state_manager.mark_resync_required.assert_awaited_once_with(123)
+
+
+@pytest.mark.asyncio
+async def test_resync_required_persists_current_snapshot_without_interval() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+    state_manager.is_resync_required = AsyncMock(return_value=True)
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_awaited()
+    state_manager.persist.assert_awaited_once()
+    state_manager.clear_resync_required.assert_awaited_once_with(123)
 
 
 @pytest.mark.asyncio

@@ -31,6 +31,11 @@ class LastAutoShelfBidStateManager:
         """Ключ last:auto_shelf_bid:{nmid}."""
         return f"last:auto_shelf_bid:{nmid}"
 
+    @staticmethod
+    def _resync_key(nmid: int) -> str:
+        """Ключ маркера resync после negative recommendations."""
+        return f"resync:auto_shelf_bid:{nmid}"
+
     async def get(self, nmid: int) -> tuple[AutoShelfBidSnapshot | None, str]:
         """Вернуть (snapshot, source): redis | clickhouse | none."""
         key = self._redis_key(nmid)
@@ -51,3 +56,18 @@ class LastAutoShelfBidStateManager:
         key = self._redis_key(snapshot.nmid)
         _ = await self._redis_client.set(key, snapshot.to_redis(), ex=self._TTL)
         await self._writer.insert_prev(snapshot)
+
+    async def mark_resync_required(self, nmid: int) -> None:
+        """Выставить флаг обязательного resync на первом валидном тике."""
+        key = self._resync_key(nmid)
+        _ = await self._redis_client.set(key, "1", ex=self._TTL)
+
+    async def is_resync_required(self, nmid: int) -> bool:
+        """Проверить, нужен ли принудительный resync после negative ветки."""
+        key = self._resync_key(nmid)
+        return bool(await self._redis_client.get(key))
+
+    async def clear_resync_required(self, nmid: int) -> None:
+        """Снять флаг resync после успешного persist валидного snapshot."""
+        key = self._resync_key(nmid)
+        _ = await self._redis_client.delete(key)

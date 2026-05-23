@@ -180,6 +180,7 @@ class AutoShelfBidIncrementManager:
 
         recommendations_stat = total_auto_stat.minus(keyword_stat)
         if recommendations_stat.has_negative_values():
+            await self._last_state_manager.mark_resync_required(nmid)
             self._log_contract_event(
                 "auto_shelf_bid_negative_recommendations",
                 reason="negative_recommendations_skipped",
@@ -257,9 +258,26 @@ class AutoShelfBidIncrementManager:
             prev_snapshot, _ = await self._last_state_manager.get(nmid)
             if prev_snapshot is None:
                 await self._last_state_manager.persist(current_snapshot)
+                await self._last_state_manager.clear_resync_required(nmid)
                 self._log_contract_event(
                     "auto_shelf_bid_prev_missing_initialized",
                     reason="prev_missing_initialized",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
+                )
+                return
+
+            if await self._last_state_manager.is_resync_required(nmid):
+                await self._last_state_manager.persist(current_snapshot)
+                await self._last_state_manager.clear_resync_required(nmid)
+                self._log_contract_event(
+                    "auto_shelf_bid_negative_recommendations_resync",
+                    reason="negative_recommendations_resync",
                     nmid=nmid,
                     mode=current_snapshot.mode,
                     bid_minor=current_snapshot.bid_minor,
