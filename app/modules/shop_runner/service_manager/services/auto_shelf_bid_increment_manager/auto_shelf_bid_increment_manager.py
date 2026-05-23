@@ -45,7 +45,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 
 from .auto_shelf_bid_repository import AutoShelfBidRepository
 from .clickhouse_auto_shelf_bid_writer import ClickHouseAutoShelfBidWriter
-from .dto import AutoShelfBidIntervalRow, AutoShelfBidSnapshot, AutoShelfRawStat
+from .dto import AutoShelfBidIntervalRow, AutoShelfBidSnapshot
 from .last_auto_shelf_bid_state_manager import LastAutoShelfBidStateManager
 from .redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
@@ -211,8 +211,8 @@ class AutoShelfBidIncrementManager:
             return
         if keyword_stat is None:
             self._log_contract_event(
-                "auto_shelf_bid_keyword_stat_not_found_use_zero",
-                reason="keyword_stat_missing_use_zero",
+                "auto_shelf_bid_keyword_stat_not_found_skip",
+                reason="keyword_stat_missing_skip",
                 nmid=nmid,
                 mode=None,
                 bid_minor=None,
@@ -220,8 +220,12 @@ class AutoShelfBidIncrementManager:
                 price_minor=None,
                 price_currency=None,
                 bucket_start=bucket_start,
+                level=logging.ERROR,
             )
-            keyword_stat = AutoShelfRawStat.zero()
+            # Empty keyword payload на уровне repository трактуем как "данные не готовы/
+            # неполны", а не как валидный ноль. Иначе формула total-keyword может
+            # временно переоценить shelf-трафик.
+            return
 
         recommendations_stat = total_auto_stat.minus(keyword_stat)
         if recommendations_stat.has_negative_values():

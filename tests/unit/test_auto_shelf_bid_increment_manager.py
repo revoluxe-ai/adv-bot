@@ -232,6 +232,21 @@ async def test_resync_required_persists_current_snapshot_without_interval() -> N
 
 
 @pytest.mark.asyncio
+async def test_missing_keyword_stat_skips_tick_with_no_insert_or_persist() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(100, 10, 3, 1, 50.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=None)
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_not_called()
+    state_manager.persist.assert_not_called()
+    state_manager.mark_resync_required.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_missing_bid_skips_interval_and_prev() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
