@@ -1,4 +1,11 @@
-"""Кэш и persist последнего снимка: Redis + fallback ClickHouse prev."""
+"""Менеджер состояния последнего snapshot для auto_shelf инкрементов.
+
+Роль в пайплайне:
+    - читать `prev` сначала из Redis (быстро), затем fallback из ClickHouse;
+    - persist-ить новый `prev` одновременно в Redis и ClickHouse;
+    - хранить Redis-маркер `resync_required` для сценариев, где нужно
+      выравнивание состояния без записи interval (например, после negative phase).
+"""
 
 from __future__ import annotations
 
@@ -12,7 +19,14 @@ from .dto import AutoShelfBidSnapshot
 
 
 class LastAutoShelfBidStateManager:
-    """Читает prev из Redis, при промахе — из CH; persist пишет Redis и CH."""
+    """Инкапсулирует read/write last-state и resync-флаг.
+
+    Почему вынесено отдельно:
+        - логика восстановления после рестартов (fallback в CH) не размазывается
+          по бизнес-коду менеджера;
+        - единая точка для изменения TTL/ключей Redis;
+        - упрощение тестирования контрактных веток update().
+    """
 
     _TTL = int(timedelta(hours=24).total_seconds())
 
@@ -37,7 +51,11 @@ class LastAutoShelfBidStateManager:
         return f"resync:auto_shelf_bid:{nmid}"
 
     async def get(self, nmid: int) -> tuple[AutoShelfBidSnapshot | None, str]:
-        """Вернуть (snapshot, source): redis | clickhouse | none."""
+        """Вернуть `(snapshot, source)`, где source: `redis | clickhouse | none`.
+
+        При чтении из ClickHouse snapshot прогревается обратно в Redis, чтобы
+        следующий тик брал состояние из кэша.
+        """
         key = self._redis_key(nmid)
         raw = await self._redis_client.get(key)
         if raw:
@@ -52,18 +70,27 @@ class LastAutoShelfBidStateManager:
         return None, "none"
 
     async def persist(self, snapshot: AutoShelfBidSnapshot) -> None:
-        """Обновить Redis-кэш и записать prev в ClickHouse."""
+        """Обновить Redis-кэш и записать prev в ClickHouse.
+
+        Порядок `Redis -> ClickHouse` выбран, чтобы следующий тик в процессе мог
+        быстрее увидеть свежий `prev` даже при задержке записи в CH.
+        """
         key = self._redis_key(snapshot.nmid)
         _ = await self._redis_client.set(key, snapshot.to_redis(), ex=self._TTL)
         await self._writer.insert_prev(snapshot)
 
     async def mark_resync_required(self, nmid: int) -> None:
-        """Выставить флаг обязательного resync на первом валидном тике."""
+        """Выставить флаг обязательного resync на первом валидном тике.
+
+        Используется, когда текущий тик нельзя безопасно использовать для
+        атрибуции interval, но нужно помнить, что на ближайшем валидном тике
+        требуется выравнивание `prev`.
+        """
         key = self._resync_key(nmid)
         _ = await self._redis_client.set(key, "1", ex=self._TTL)
 
     async def is_resync_required(self, nmid: int) -> bool:
-        """Проверить, нужен ли принудительный resync после negative ветки."""
+        """Проверить необходимость принудительного resync для `nmid`."""
         key = self._resync_key(nmid)
         return bool(await self._redis_client.get(key))
 
