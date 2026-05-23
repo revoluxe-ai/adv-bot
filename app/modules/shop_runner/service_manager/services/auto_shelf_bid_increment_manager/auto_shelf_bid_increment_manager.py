@@ -33,6 +33,9 @@ from .auto_shelf_bid_repository import AutoShelfBidRepository
 from .clickhouse_auto_shelf_bid_writer import ClickHouseAutoShelfBidWriter
 from .dto import AutoShelfBidIntervalRow, AutoShelfBidSnapshot, AutoShelfRawStat
 from .last_auto_shelf_bid_state_manager import LastAutoShelfBidStateManager
+from .redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +54,15 @@ class AutoShelfBidIncrementManager:
         repository: AutoShelfBidRepository | None = None,
         lock_manager: RedisLockManager | None = None,
         writer: ClickHouseAutoShelfBidWriter | None = None,
+        auto_recommendations_bid_cache_manager: RedisAutoRecommendationsBidValueManager | None = None,
         lock_ttl: int = LOCK_TTL,
     ) -> None:
         """Собирает зависимости; lock_ttl ограничен диапазоном 60–180 с."""
         self._bucket_calculator = bucket_calculator or BucketCalculator()
         self._version_calculator = version_calculator or VersionCalculator()
         self._repository = repository or AutoShelfBidRepository(
-            wb_manager_hub=wb_manager_hub
+            wb_manager_hub=wb_manager_hub,
+            auto_recommendations_bid_cache_manager=auto_recommendations_bid_cache_manager,
         )
         self._writer = writer or ClickHouseAutoShelfBidWriter()
         self._last_state_manager = LastAutoShelfBidStateManager(
@@ -162,7 +167,7 @@ class AutoShelfBidIncrementManager:
         bid_minor = await self._repository.fetch_current_auto_common_bid(complex_adv, nmid)
         if bid_minor is None:
             logger.warning(
-                "auto_shelf_bid_bid_not_found nmid=%s auto_adv_id=%s",
+                "auto_shelf_bid_bid_not_found nmid=%s auto_adv_id=%s bid_source=redis_cache",
                 nmid,
                 auto_adv_id,
             )
@@ -299,7 +304,7 @@ class AutoShelfBidIncrementManager:
             latency = time.perf_counter() - start
             await self._last_state_manager.persist(current_snapshot)
             logger.info(
-                "auto_shelf_bid_insert_ok nmid=%s bucket=%s version=%s latency=%.03f prev_source=%s delta_nonzero_count=%s",
+                "auto_shelf_bid_insert_ok nmid=%s bucket=%s version=%s latency=%.03f prev_source=%s delta_nonzero_count=%s bid_source=redis_cache",
                 nmid,
                 bucket_start,
                 version,
@@ -345,4 +350,3 @@ class AutoShelfBidIncrementManager:
             prev_price_minor != current_price_minor
             or prev_price_currency != current_price_currency
         )
-

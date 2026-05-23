@@ -1,3 +1,5 @@
+"""Сервисные операции обновления данных кампаний/карточек и вспомогательных расчётов."""
+
 import asyncio
 import cProfile
 import json
@@ -1001,7 +1003,15 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
     return max(cpm_values)
 
 
-async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
-    shop_data_updater = ShopDataUpdater(wb_api)
+async def update_advs_data_from_wb_to_pg(
+    wb_api: WBApi,
+    *,
+    auto_recommendations_bid_cache_manager: ShopDataUpdater.AutoRecommendationsBidCacheManager | None = None,
+):
+    """Обновить кампании из WB в PG и при необходимости заполнить Redis-кэш ставок полок."""
+    shop_data_updater = ShopDataUpdater(
+        wb_api,
+        auto_recommendations_bid_cache_manager=auto_recommendations_bid_cache_manager,
+    )
     _ = await shop_data_updater.update_advs_data()
     return None

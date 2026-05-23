@@ -17,7 +17,8 @@
 --   CTE latest: argMax(metric, version) по adv_id за день.
 --   Итог: одна строка impressions/clicks/carts/orders/spend.
 --
--- Если строк нет: пустой result_set → repository None → update прерывается.
+-- Если строк в full_adv_wb_stat нет: has_data.cnt=0 → пустой result_set (не ложный 0).
+-- Если строк нет: repository None → update прерывается.
 -- ============================================================================
 
 WITH latest AS (
@@ -32,6 +33,9 @@ WITH latest AS (
     WHERE date = %(report_date)s
       AND adv_id = %(auto_adv_id)s
     GROUP BY adv_id
+),
+has_data AS (
+    SELECT count() AS cnt FROM latest
 )
 SELECT
     COALESCE(SUM(toInt64(views)), 0) AS impressions,
@@ -40,3 +44,5 @@ SELECT
     COALESCE(SUM(toInt64(orders)), 0) AS orders,
     COALESCE(SUM(toFloat64(spend)), 0.0) AS spend
 FROM latest
+CROSS JOIN has_data
+WHERE has_data.cnt > 0

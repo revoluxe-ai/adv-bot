@@ -1,4 +1,4 @@
-"""Чтение статистики из ClickHouse и контекста (ставка, цена) из WB/Postgres."""
+"""Чтение статистики из ClickHouse и контекста (ставка из Redis-кэша, цена из Postgres)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,9 @@ from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .dto import AutoShelfBidSnapshot, AutoShelfRawStat
+from .redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +31,21 @@ logger = logging.getLogger(__name__)
 class AutoShelfBidRepository:
     """Загрузка SQL из sql/ и маппинг результатов в DTO."""
 
-    def __init__(self, wb_manager_hub: WBManagerHub, tz_name: str = "Europe/Moscow") -> None:
+    def __init__(
+        self,
+        wb_manager_hub: WBManagerHub,
+        tz_name: str = "Europe/Moscow",
+        auto_recommendations_bid_cache_manager: RedisAutoRecommendationsBidValueManager | None = None,
+        max_bid_age_sec: int = 60 * 5,
+    ) -> None:
         """tz_name — часовой пояс для report_date (по умолчанию Москва)."""
         self._wb_manager_hub = wb_manager_hub
         self._tz = ZoneInfo(tz_name)
         self._sql_dir = Path(__file__).parent.joinpath("sql")
+        self._auto_recommendations_bid_cache_manager = (
+            auto_recommendations_bid_cache_manager
+        )
+        self._max_bid_age_sec = max(30, max_bid_age_sec)
 
     def _today_date(self) -> str:
         """Текущая дата отчёта YYYY-MM-DD в tz репозитория."""
@@ -103,17 +116,44 @@ class AutoShelfBidRepository:
         complex_adv: ComplexAdv,
         nmid: int,
     ) -> int | None:
-        """Ставка полок в копейках: recommendations_bid_kopecks из campaigns_info_v2."""
-        adv_infos = await self._wb_manager_hub.wb_data_manager.promotion_manager.get_campaigns_info(
-            [complex_adv], get_auto=True
-        )
-        info = adv_infos.get(complex_adv.adv_id)
-        if info is None or info.auto_adv is None:
+        """Ставка полок из Redis-кэша, заполненного минутным updater потоком."""
+        cache_manager = self._auto_recommendations_bid_cache_manager
+        auto_adv_id = complex_adv.auto_adv_id
+        if cache_manager is None:
+            logger.warning(
+                "auto_recommendations_bid_cache_unconfigured auto_adv_id=%s nmid=%s",
+                auto_adv_id,
+                nmid,
+            )
             return None
-        for nm_setting in info.auto_adv.nmids_settings:
-            if nm_setting.nmid == nmid:
-                return int(nm_setting.recommendations_bid_kopecks)
-        return None
+        cached = await cache_manager.get_bid(auto_adv_id, nmid)
+        if cached is None:
+            logger.warning(
+                "auto_recommendations_bid_cache_miss auto_adv_id=%s nmid=%s",
+                auto_adv_id,
+                nmid,
+            )
+            return None
+        cached_updated_at = cached.updated_at
+        if cached_updated_at.tzinfo is None:
+            cached_updated_at = cached_updated_at.replace(tzinfo=self._tz)
+        age_sec = (datetime.now(self._tz) - cached_updated_at).total_seconds()
+        if age_sec > self._max_bid_age_sec:
+            logger.warning(
+                "auto_recommendations_bid_cache_stale auto_adv_id=%s nmid=%s age_sec=%.3f max_age_sec=%s",
+                auto_adv_id,
+                nmid,
+                age_sec,
+                self._max_bid_age_sec,
+            )
+            return None
+        logger.info(
+            "auto_recommendations_bid_cache_hit auto_adv_id=%s nmid=%s age_sec=%.3f",
+            auto_adv_id,
+            nmid,
+            age_sec,
+        )
+        return cached.bid_minor
 
     async def fetch_current_price_minor(self, nmid: int) -> int | None:
         """Цена в minor из WBCard.json; ошибки → None (не блокирует update)."""

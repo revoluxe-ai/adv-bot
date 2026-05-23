@@ -159,3 +159,11 @@ def test_v2_advert_item_to_legacy_empty_nm_settings() -> None:
     assert legacy["autoParams"]["subject"] == {"id": 0, "name": ""}
     assert legacy["unitedParams"] == [{"searchCPM": 0, "subject": {"id": 0, "name": ""}, "nms": []}]
     assert legacy["auction_multibids"] == [{"bid": 0}]
+
+
+@pytest.mark.unit
+def test_v2_advert_item_to_legacy_exports_recommendations_bids_map(
+    v2_item_unified: dict,
+) -> None:
+    legacy = v2_advert_item_to_legacy(v2_item_unified)
+    assert legacy["recommendationsBidsByNmidKopecks"] == {2000002: 3000}

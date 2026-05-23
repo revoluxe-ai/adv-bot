@@ -1,3 +1,5 @@
+"""Оркестратор фоновых корутин shop_runner и их инфраструктурных зависимостей."""
+
 import asyncio
 import functools
 import logging
@@ -55,6 +57,9 @@ from .services.increment_fact_data_manager.increment_fact_data_manager import (
     IncrementFactDataManager,
 )
 from .services.auto_shelf_bid_increment_manager import AutoShelfBidIncrementManager
+from .services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -148,6 +153,9 @@ class CoroutinesManager:
         self._redis_common_bid_value_manager = RedisCommonBidValueManager(
             redis_client_wrapper
         )
+        self._redis_auto_recommendations_bid_value_manager = (
+            RedisAutoRecommendationsBidValueManager(redis_client_wrapper)
+        )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()
@@ -157,6 +165,7 @@ class CoroutinesManager:
         self._auto_shelf_bid_increment_manager = AutoShelfBidIncrementManager(
             redis_client=redis_client_wrapper,
             wb_manager_hub=self._wb_manager_hub,
+            auto_recommendations_bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
         )
         self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
             redis_client_wrapper
@@ -377,7 +386,10 @@ class CoroutinesManager:
     @while_coroutine_decorator(1 * 60)
     async def update_advs_data_from_wb_to_pg(self) -> None:
         from app.modules.wb_adv_updater import data_manager
-        await data_manager.update_advs_data_from_wb_to_pg(self._wb_api)
+        await data_manager.update_advs_data_from_wb_to_pg(
+            self._wb_api,
+            auto_recommendations_bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+        )
         return None
 
 
@@ -1339,10 +1351,10 @@ class CoroutinesManager:
             handlers.append(handler)
 
         max_workers = self._max_workers_for(len(handlers), 16)
+        # Локальный TasksManager: общая очередь shop-runner может не доходить до handlers.
         results = await run_tasks(
             handlers=handlers,
             max_workers=max_workers,
-            tasks_manager=self._tasks_manager,
             return_exceptions=True,
         )
 
