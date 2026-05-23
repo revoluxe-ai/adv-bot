@@ -13,6 +13,12 @@
 --   price_currency, delta_impressions … delta_spend).
 --
 -- Вызывается: ClickHouseAutoShelfBidWriter.insert_interval после расчёта delta.
+--
+-- Идемпотентность:
+--   Повторный тик с тем же event_id (например, после partial-failure между
+--   interval insert и persist prev) не должен создавать вторую строку.
+--   Для этого используется INSERT ... SELECT ... WHERE NOT EXISTS по
+--   (event_date, event_id).
 -- ============================================================================
 
 INSERT INTO default_db.auto_shelf_bid_intervals (
@@ -33,7 +39,7 @@ INSERT INTO default_db.auto_shelf_bid_intervals (
     delta_orders,
     delta_spend
 )
-VALUES (
+SELECT
     %(event_date)s,
     %(event_id)s,
     %(src_ts)s,
@@ -50,4 +56,9 @@ VALUES (
     %(delta_carts)s,
     %(delta_orders)s,
     %(delta_spend)s
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM default_db.auto_shelf_bid_intervals
+    WHERE event_date = %(event_date)s
+      AND event_id = %(event_id)s
 )

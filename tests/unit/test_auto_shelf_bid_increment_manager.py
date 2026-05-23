@@ -147,6 +147,30 @@ async def test_positive_delta_inserts_interval_and_persists_prev() -> None:
 
 
 @pytest.mark.asyncio
+async def test_insert_success_then_persist_fail_marks_resync_and_next_tick_keeps_single_interval() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+    state_manager.persist = AsyncMock(side_effect=[RuntimeError("persist failed"), None])
+    state_manager.is_resync_required = AsyncMock(side_effect=[False, True])
+
+    await manager.update(_build_adv([123]))
+    await manager.update(_build_adv([123]))
+
+    # Первый тик: interval вставлен, persist упал.
+    # Второй тик: resync-ветка только выравнивает prev, новый interval не пишет.
+    writer.insert_interval.assert_awaited_once()
+    state_manager.mark_resync_required.assert_awaited_once_with(123)
+    state_manager.clear_resync_required.assert_awaited_once_with(123)
+
+
+@pytest.mark.asyncio
 async def test_zero_delta_skips_interval_but_persists_prev() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
@@ -392,4 +416,45 @@ def test_validation_sql_unknown_mode_has_no_price_filter() -> None:
     where_block = unknown_sql.split("GROUP BY")[0]
     assert "price_minor =" not in where_block
     assert "price_currency =" not in where_block
+
+
+def test_interval_insert_sql_is_idempotent_by_event_id() -> None:
+    from pathlib import Path
+
+    sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/insert_auto_shelf_bid_interval.sql"
+    ).read_text(encoding="utf-8")
+    assert "WHERE NOT EXISTS" in sql
+    assert "event_date = %(event_date)s" in sql
+    assert "event_id = %(event_id)s" in sql
+
+
+def test_validation_sql_uses_event_id_dedup_pattern() -> None:
+    from pathlib import Path
+
+    known_sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/validate_auto_shelf_bid_intervals_by_bid_price.sql"
+    ).read_text(encoding="utf-8")
+    unknown_sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/validate_auto_shelf_bid_intervals_by_bid_price_unknown.sql"
+    ).read_text(encoding="utf-8")
+    dedup_checks = (
+        "GROUP BY event_date, event_id",
+        "argMax(delta_impressions, version)",
+        "argMax(delta_spend, version)",
+    )
+    for expected in dedup_checks:
+        assert expected in known_sql
+        assert expected in unknown_sql
+
+
+def test_sum_dedup_sql_exists_for_auto_shelf_analytics() -> None:
+    from pathlib import Path
+
+    sql = Path(
+        "app/modules/shop_runner/service_manager/services/auto_shelf_bid_increment_manager/sql/sum_auto_shelf_bid_interval_deltas_dedup.sql"
+    ).read_text(encoding="utf-8")
+    assert "GROUP BY event_date, event_id" in sql
+    assert "argMax(delta_impressions, version)" in sql
+    assert "argMax(delta_spend, version)" in sql
 

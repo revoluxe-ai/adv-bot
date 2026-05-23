@@ -13,6 +13,9 @@
        первый следующий валидный тик используется только для выравнивания prev.
     4) В v1 цена намеренно unknown (`price_minor=None`), чтобы поток инкрементов
        не зависел от внешнего источника цены.
+    5) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
+       reason `persist_failed_after_interval`, поднимается resync-маркер; итоговая
+       аналитика защищается дедупом по `event_date + event_id`.
 """
 
 from __future__ import annotations
@@ -407,7 +410,27 @@ class AutoShelfBidIncrementManager:
                 delta_spend=delta.delta_spend,
             )
             await self._writer.insert_interval(row)
-            await self._last_state_manager.persist(current_snapshot)
+            try:
+                await self._last_state_manager.persist(current_snapshot)
+            except Exception:
+                # Частичный сбой: interval уже в CH, а prev не обновился.
+                # Ставим resync-флаг и отдельный reason, чтобы:
+                # 1) восстановить prev на следующем валидном тике,
+                # 2) явно наблюдать это окно в логах.
+                await self._last_state_manager.mark_resync_required(nmid)
+                self._log_contract_event(
+                    "auto_shelf_bid_persist_failed_after_interval",
+                    reason="persist_failed_after_interval",
+                    nmid=nmid,
+                    mode=current_snapshot.mode,
+                    bid_minor=current_snapshot.bid_minor,
+                    currency=current_snapshot.currency,
+                    price_minor=current_snapshot.price_minor,
+                    price_currency=current_snapshot.price_currency,
+                    bucket_start=bucket_start,
+                    level=logging.WARNING,
+                )
+                raise
             self._log_contract_event(
                 "auto_shelf_bid_insert_ok",
                 reason="insert_ok",

@@ -33,6 +33,13 @@
    - Чтение: сначала Redis, затем fallback в CH.
    - Запись: Redis и CH одновременно для устойчивости к рестартам.
 
+8. **Дедуп-контракт по `event_id` (write + read)**
+   - Write-time: insert в `auto_shelf_bid_intervals` идемпотентен по `(event_date, event_id)`.
+   - Read-time: аналитические SQL по intervals должны дедупить через
+     `GROUP BY event_date, event_id` + `argMax(..., version)`.
+   - Даже если физдубль строки появился из-за partial-failure, аналитические суммы
+     не должны задваиваться.
+
 ## Основные события в логах
 
 - `insert_ok` — успешная запись интервала.
@@ -40,9 +47,12 @@
 - `negative_recommendations_skipped` — отрицательный `recommendations`, интервал пропущен.
 - `negative_recommendations_resync` — первый валидный тик после negative-фазы, только resync.
 - `negative_delta_skipped` / `zero_delta_skipped` — дельта невалидна для insert.
+- `persist_failed_after_interval` — interval вставлен, но persist prev не удался.
 
 ## Что считать корректным поведением
 
 - Возможны тики без записи интервала — это ожидаемо в resync/guard ветках.
 - Пропуск "пограничной" дельты при смене контекста — намеренное поведение для строгой атрибуции.
 - Отсутствие цены (`price_minor=NULL`) в v1 — нормальный сценарий.
+- При `persist_failed_after_interval` допускается окно частичного сбоя; корректность
+  аналитики обеспечивается дедупом по `event_date + event_id`.
