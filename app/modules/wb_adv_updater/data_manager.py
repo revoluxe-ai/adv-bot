@@ -1,3 +1,5 @@
+"""Сервисные операции обновления данных кампаний/карточек и вспомогательных расчётов."""
+
 import asyncio
 import cProfile
 import json
@@ -9,6 +11,7 @@ from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 
+from dependency_injector.wiring import Provide, inject
 from PIL import Image  # type: ignore
 from sqlalchemy import and_, func, select
 
@@ -17,11 +20,15 @@ from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.functions import coalesce
 
 from app.client_bot.const import ALWAYS_ON
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.exc import (
     CardNotFoundInDB,
 )
 
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
@@ -1001,7 +1008,27 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
     return max(cpm_values)
 
 
-async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
-    shop_data_updater = ShopDataUpdater(wb_api)
+@inject
+async def update_advs_data_from_wb_to_pg(
+    wb_api: WBApi,
+    *,
+    auto_recommendations_bid_cache_manager: ShopDataUpdater.AutoRecommendationsBidCacheManager | None = None,
+    redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    """Обновить кампании из WB в PG и заполнить Redis-кэш ставок полок.
+
+    Если cache manager не передан явно (например, из adv-creator tasks),
+    используется дефолтный `RedisAutoRecommendationsBidValueManager` через DI,
+    чтобы shelf increments не попадали в `no_bid` до следующего shop-runner sync.
+    """
+    bid_cache_manager = auto_recommendations_bid_cache_manager
+    if bid_cache_manager is None:
+        bid_cache_manager = RedisAutoRecommendationsBidValueManager(
+            redis_client=redis_client_wrapper,
+        )
+    shop_data_updater = ShopDataUpdater(
+        wb_api,
+        auto_recommendations_bid_cache_manager=bid_cache_manager,
+    )
     _ = await shop_data_updater.update_advs_data()
     return None
