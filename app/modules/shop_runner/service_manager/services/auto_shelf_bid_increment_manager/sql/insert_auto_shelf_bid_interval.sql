@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Назначение:
 --   Вставить одну строку инкрементального интервала (дельта метрик полок
---   между prev и current snapshot за 5-минутный bucket).
+--   между prev и current snapshot за 15-минутный bucket).
 --
 -- Таблица: default_db.auto_shelf_bid_intervals
 --   Ключ сегмента: nmid + mode + bid_minor + currency + price_* + bucket/version.

@@ -16,6 +16,8 @@
     5) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
        reason `persist_failed_after_interval`, поднимается resync-маркер; итоговая
        аналитика защищается дедупом по `event_date + event_id`.
+    6) Bucket агрегации для intervals/lock — 15 минут (общий BucketCalculator),
+       даже если корутина запускается чаще (примерно раз в 5 минут).
 """
 
 from __future__ import annotations
@@ -100,7 +102,7 @@ class AutoShelfBidIncrementManager:
         Алгоритм (высокоуровнево):
             1) Валидировать single-nmid и получить total/keyword статистику из CH.
             2) Построить текущий snapshot (bid + mode + metrics).
-            3) Взять lock на bucket, чтобы избежать дублей записи.
+            3) Взять lock на 15-минутный bucket, чтобы избежать дублей записи.
             4) Применить контрактные ветки:
                - prev отсутствует -> persist prev, без interval
                - требуется resync после negative recommendations -> persist prev, без interval
@@ -454,7 +456,7 @@ class AutoShelfBidIncrementManager:
 
     @staticmethod
     def _build_lock_key(shop_id: uuid.UUID, nmid: int, bucket_start: datetime) -> str:
-        """Ключ Redis-lock на shop + nmid + 5-минутный bucket."""
+        """Ключ Redis-lock на shop + nmid + 15-минутный bucket."""
         bucket_epoch = int(bucket_start.timestamp())
         return f"lock:auto_shelf_bid:{shop_id}:{nmid}:{bucket_epoch}"
 
