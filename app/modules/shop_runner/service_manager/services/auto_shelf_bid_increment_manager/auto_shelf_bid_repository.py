@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Mapping, cast
 from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
@@ -55,6 +56,30 @@ class AutoShelfBidRepository:
         """Прочитать текст SQL-файла из каталога sql/."""
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
 
+    @staticmethod
+    def _to_int(value: object) -> int:
+        """Безопасно привести значение CH к int."""
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str):
+            return int(value)
+        raise TypeError(f"Cannot cast to int: {type(value)!r}")
+
+    @staticmethod
+    def _to_float(value: object) -> float:
+        """Безопасно привести значение CH к float."""
+        if isinstance(value, bool):
+            return float(int(value))
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            return float(value)
+        raise TypeError(f"Cannot cast to float: {type(value)!r}")
+
     async def fetch_total_auto_stat(self, auto_adv_id: int) -> AutoShelfRawStat | None:
         """Суммарная дневная статистика Auto-РК (fetch_total_auto_stat.sql)."""
         query = self._load_sql("fetch_total_auto_stat.sql")
@@ -62,15 +87,21 @@ class AutoShelfBidRepository:
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result: QueryResult = await client.query(query, parameters=params)
-        if not result.result_set:
+        if not result.result_rows:
             return None
-        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        row_values = tuple(result.result_rows[0])
+        row: dict[str, object] = dict(zip(column_names, row_values))
         return AutoShelfRawStat(
-            impressions=int(row["impressions"]),
-            clicks=int(row["clicks"]),
-            carts=int(row["carts"]),
-            orders=int(row["orders"]),
-            spend=float(row["spend"]),
+            impressions=self._to_int(row["impressions"]),
+            clicks=self._to_int(row["clicks"]),
+            carts=self._to_int(row["carts"]),
+            orders=self._to_int(row["orders"]),
+            spend=self._to_float(row["spend"]),
         )
 
     async def fetch_keyword_stat(self, auto_adv_id: int, nmid: int) -> AutoShelfRawStat | None:
@@ -84,15 +115,21 @@ class AutoShelfBidRepository:
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result: QueryResult = await client.query(query, parameters=params)
-        if not result.result_set:
+        if not result.result_rows:
             return None
-        row: dict[str, Any] = cast(dict[str, Any], result.first_item)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        row_values = tuple(result.result_rows[0])
+        row: dict[str, object] = dict(zip(column_names, row_values))
         return AutoShelfRawStat(
-            impressions=int(row["impressions"]),
-            clicks=int(row["clicks"]),
-            carts=int(row["carts"]),
-            orders=int(row["orders"]),
-            spend=float(row["spend"]),
+            impressions=self._to_int(row["impressions"]),
+            clicks=self._to_int(row["clicks"]),
+            carts=self._to_int(row["carts"]),
+            orders=self._to_int(row["orders"]),
+            spend=self._to_float(row["spend"]),
         )
 
     async def fetch_prev_auto_shelf_bid(self, nmid: int) -> AutoShelfBidSnapshot | None:
@@ -104,9 +141,13 @@ class AutoShelfBidRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return None
-        column_names = cast(tuple[str, ...], result.column_names)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = tuple(str(name) for name in raw_column_names)
         row_values = tuple(result.result_rows[0])
-        row: dict[str, Any] = dict(zip(column_names, row_values))
+        row: dict[str, object] = dict(zip(column_names, row_values))
         # bucket_start not stored in prev table; use src_ts for compatibility.
         row["bucket_start"] = row["src_ts"]
         return AutoShelfBidSnapshot.from_clickhouse(row)
@@ -163,14 +204,14 @@ class AutoShelfBidRepository:
                     select(WBCard.json).where(WBCard.nmid == nmid).limit(1)
                 )
             card_json_raw = row.scalar_one_or_none()
-            if not isinstance(card_json_raw, str):
+            payload: Mapping[str, object]
+            if isinstance(card_json_raw, str):
+                payload_obj = json.loads(card_json_raw)
+                if not isinstance(payload_obj, dict):
+                    return None
+                payload = cast(dict[str, object], payload_obj)
+            else:
                 return None
-            import json
-
-            payload_obj = json.loads(card_json_raw)
-            if not isinstance(payload_obj, dict):
-                return None
-            payload = cast(dict[str, Any], payload_obj)
             return self._extract_price_minor_from_card_json(payload)
         except Exception:
             logger.warning(
@@ -180,7 +221,7 @@ class AutoShelfBidRepository:
             )
             return None
 
-    def _extract_price_minor_from_card_json(self, payload: dict[str, Any]) -> int | None:
+    def _extract_price_minor_from_card_json(self, payload: Mapping[str, object]) -> int | None:
         """Парсинг priceU/salePriceU или рублёвых полей ×100 из JSON карточки."""
         direct_minor_keys = ("salePriceU", "priceU")
         for key in direct_minor_keys:
@@ -188,13 +229,16 @@ class AutoShelfBidRepository:
             if isinstance(value, int) and value > 0:
                 return value
 
-        sizes = payload.get("sizes")
-        if isinstance(sizes, list):
-            for size in sizes:
-                if not isinstance(size, dict):
+        sizes_obj = payload.get("sizes")
+        sizes = cast(list[object], sizes_obj) if isinstance(sizes_obj, list) else None
+        if sizes is not None:
+            for size_obj in sizes:
+                if not isinstance(size_obj, dict):
                     continue
-                price_obj = size.get("price")
-                if isinstance(price_obj, dict):
+                size = cast(dict[str, object], size_obj)
+                price_raw = size.get("price")
+                if isinstance(price_raw, dict):
+                    price_obj = cast(dict[str, object], price_raw)
                     for key in direct_minor_keys:
                         value = price_obj.get(key)
                         if isinstance(value, int) and value > 0:
@@ -211,12 +255,14 @@ class AutoShelfBidRepository:
             if isinstance(value, (int, float)) and value > 0:
                 return int(round(float(value) * 100))
 
-        if isinstance(sizes, list):
-            for size in sizes:
-                if not isinstance(size, dict):
+        if sizes is not None:
+            for size_obj in sizes:
+                if not isinstance(size_obj, dict):
                     continue
-                price_obj = size.get("price")
-                if isinstance(price_obj, dict):
+                size = cast(dict[str, object], size_obj)
+                price_raw = size.get("price")
+                if isinstance(price_raw, dict):
+                    price_obj = cast(dict[str, object], price_raw)
                     for key in direct_ruble_keys:
                         value = price_obj.get(key)
                         if isinstance(value, (int, float)) and value > 0:

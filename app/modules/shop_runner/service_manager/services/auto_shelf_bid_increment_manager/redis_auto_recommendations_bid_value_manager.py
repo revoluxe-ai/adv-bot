@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Sequence
-
-from redis.client import Pipeline
+from typing import cast, Sequence
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
 
@@ -45,18 +43,17 @@ class RedisAutoRecommendationsBidValueManager(BaseRedisManager):
             return None
         if isinstance(raw_value, bytes):
             text = raw_value.decode()
-        elif isinstance(raw_value, (str, int, float)):
-            text = str(raw_value)
         else:
-            return None
+            text = str(raw_value)
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError:
             return None
         if not isinstance(parsed, dict):
             return None
-        bid_raw = parsed.get("bid_minor")
-        updated_at_raw = parsed.get("updated_at")
+        parsed_dict = cast(dict[str, object], parsed)
+        bid_raw = parsed_dict.get("bid_minor")
+        updated_at_raw = parsed_dict.get("updated_at")
         if not isinstance(bid_raw, int):
             return None
         if not isinstance(updated_at_raw, str):
@@ -84,8 +81,7 @@ class RedisAutoRecommendationsBidValueManager(BaseRedisManager):
             return None
         ts = updated_at or datetime.now(timezone.utc)
         ttl = self._resolve_ttl()
-        pipeline: Pipeline
-        async with self._client.write_pipeline() as pipeline:  # pyright: ignore[reportUnknownMemberType]
+        async with self._client.write_pipeline() as pipeline:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             for nmid, bid_minor in bids.items():
                 if bid_minor <= 0:
                     continue
@@ -111,10 +107,13 @@ class RedisAutoRecommendationsBidValueManager(BaseRedisManager):
         """Прочитать ставки по списку nmid для одной auto-кампании."""
         if not nmids:
             return {}
-        async with self._client.read_pipeline() as pipeline:  # pyright: ignore[reportUnknownMemberType]
+        async with self._client.read_pipeline() as pipeline:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             for nmid in nmids:
                 _ = pipeline.get(self._get_key(auto_adv_id, nmid))
-            raw_values = await pipeline.execute()  # pyright: ignore[reportUnknownMemberType]
+            raw_values = cast(
+                list[str | bytes | int | float | None],
+                await pipeline.execute(),  # pyright: ignore[reportUnknownMemberType]
+            )
         result: dict[int, AutoRecommendationsBidCacheValue] = {}
         for nmid, raw in zip(nmids, raw_values):
             parsed = self._deserialize(raw)
