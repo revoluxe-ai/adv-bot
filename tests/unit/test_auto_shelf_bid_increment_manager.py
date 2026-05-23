@@ -58,7 +58,7 @@ def _build_snapshot(
     spend: float,
     *,
     bid_minor: int = 1300,
-    price_minor: int | None = 99900,
+    price_minor: int | None = None,
     price_currency: str | None = "RUB",
 ) -> AutoShelfBidSnapshot:
     now = datetime.now(ZoneInfo("Europe/Moscow")).replace(microsecond=0)
@@ -107,7 +107,6 @@ async def test_first_snapshot_persists_only_prev() -> None:
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 0, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1200)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=150000)
     state_manager.get.return_value = (None, "none")
 
     await manager.update(_build_adv([123]))
@@ -125,7 +124,6 @@ async def test_positive_delta_inserts_interval_and_persists_prev() -> None:
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
     prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
     state_manager.get.return_value = (prev, "redis")
 
@@ -154,7 +152,6 @@ async def test_zero_delta_skips_interval_but_persists_prev() -> None:
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 0, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1200)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=150000)
     prev = _build_snapshot(
         123,
         impressions=80,
@@ -202,7 +199,7 @@ async def test_missing_bid_skips_interval_and_prev() -> None:
 
 
 @pytest.mark.asyncio
-async def test_price_fetch_error_is_non_blocking_and_resyncs_context() -> None:
+async def test_price_is_not_fetched_and_non_blocking_for_interval_insert() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
@@ -216,7 +213,8 @@ async def test_price_fetch_error_is_non_blocking_and_resyncs_context() -> None:
 
     await manager.update(_build_adv([123]))
 
-    writer.insert_interval.assert_not_awaited()
+    repository.fetch_current_price_minor.assert_not_called()
+    writer.insert_interval.assert_awaited_once()
     state_manager.persist.assert_awaited_once()
 
 
@@ -229,7 +227,6 @@ async def test_negative_delta_skips_interval_and_persists_prev() -> None:
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
     prev = _build_snapshot(123, impressions=150, clicks=20, carts=7, orders=5, spend=70.0)
     state_manager.get.return_value = (prev, "redis")
 
@@ -248,7 +245,6 @@ async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=170000)
     prev = _build_snapshot(
         123,
         impressions=90,
@@ -256,7 +252,7 @@ async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
         carts=2,
         orders=0,
         spend=40.0,
-        price_minor=150000,
+        price_minor=None,
         price_currency="RUB",
     )
     prev = prev.model_copy(update={"bid_minor": 1200})
@@ -269,7 +265,7 @@ async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
 
 
 @pytest.mark.asyncio
-async def test_context_change_price_none_to_value_skips_interval_and_persists_prev() -> None:
+async def test_price_unknown_does_not_create_context_change_by_itself() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
@@ -277,7 +273,6 @@ async def test_context_change_price_none_to_value_skips_interval_and_persists_pr
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=170000)
     prev = _build_snapshot(
         123,
         impressions=90,
@@ -292,7 +287,7 @@ async def test_context_change_price_none_to_value_skips_interval_and_persists_pr
 
     await manager.update(_build_adv([123]))
 
-    writer.insert_interval.assert_not_awaited()
+    writer.insert_interval.assert_awaited_once()
     state_manager.persist.assert_awaited_once()
 
 
@@ -305,7 +300,6 @@ async def test_negative_delta_spend_with_epsilon_skips_interval_and_persists_pre
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
     prev = _build_snapshot(123, impressions=100, clicks=10, carts=4, orders=1, spend=40.0)
     state_manager.get.return_value = (prev, "redis")
 
@@ -324,7 +318,6 @@ async def test_small_negative_spend_within_epsilon_treated_as_zero_delta() -> No
     repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(20, 2, 1, 1, 10.0))
     repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
     repository.get_current_mode = AsyncMock(return_value="main")
-    repository.fetch_current_price_minor = AsyncMock(return_value=99900)
     prev = _build_snapshot(123, impressions=100, clicks=10, carts=4, orders=1, spend=40.0)
     state_manager.get.return_value = (prev, "redis")
 

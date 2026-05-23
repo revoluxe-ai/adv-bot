@@ -3,6 +3,7 @@
 Паттерн как у increment_fact_data_manager: snapshot → prev → delta → interval в CH.
 Формула метрик: recommendations_stat = total_auto_stat - keyword_stat.
 Сегментация: nmid, bid_minor (recommendations_bid_kopecks), price_minor/currency, mode.
+В текущей v1-итерации цена пишется как unknown (price_minor=None) намеренно.
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ class AutoShelfBidIncrementManager:
         """Один проход инкремента: CH stat → snapshot → lock → delta/interval/prev.
 
         Побочные эффекты: ClickHouse (intervals, prev), Redis (lock, last state).
-        При смене known-цены интервал не пишется, только persist текущего prev.
+        Цена в v1 не вычисляется из внешнего источника: snapshot пишется с price_minor=None.
         """
         nmids = complex_adv.nmids
         if not nmids:
@@ -213,29 +214,9 @@ class AutoShelfBidIncrementManager:
         if not mode:
             mode = "main"
 
-        try:
-            price_minor = await self._repository.fetch_current_price_minor(nmid)
-        except Exception:
-            self._log_contract_event(
-                "auto_shelf_bid_price_fetch_failed",
-                reason="price_fetch_failed_non_blocking",
-                nmid=nmid,
-                mode=mode,
-                bid_minor=bid_minor,
-                currency="RUB",
-                price_minor=None,
-                price_currency="RUB",
-                bucket_start=bucket_start,
-                level=logging.WARNING,
-            )
-            price_minor = None
+        # В v1 цену намеренно не тянем: пишем unknown, чтобы не блокировать поток инкрементов.
+        price_minor = None
         price_currency = "RUB"
-        if price_minor is None:
-            logger.warning(
-                "auto_shelf_bid_price_unknown nmid=%s auto_adv_id=%s",
-                nmid,
-                auto_adv_id,
-            )
 
         current_snapshot = AutoShelfBidSnapshot(
             nmid=nmid,
