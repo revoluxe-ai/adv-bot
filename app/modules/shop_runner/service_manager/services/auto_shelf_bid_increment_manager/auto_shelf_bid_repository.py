@@ -1,25 +1,32 @@
-"""Чтение статистики из ClickHouse и контекста (ставка из Redis-кэша, цена из Postgres)."""
+"""Чтение статистики из ClickHouse и контекста для auto_shelf инкрементов.
+
+Обязанности v1:
+    - total/keyword/prev статистика из ClickHouse (SQL в sql/);
+    - текущая ставка полок (`bid_minor`) из Redis-кэша минутного updater.
+
+Что намеренно НЕ входит в v1:
+    - получение цены товара (`price_minor`) из Postgres/WBCard или WB API.
+    - Цена в snapshot всегда `NULL`; задаётся в `AutoShelfBidIncrementManager.update()`.
+    - Методы fetch price удалены намеренно — не dead code regression, а упрощение
+      pipeline под контракт v1 (см. README, раздел «Для ревью»).
+"""
 
 from __future__ import annotations
 
 import logging
-import json
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, cast
+from typing import cast
 from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
-from sqlalchemy import select
 
 from app.core.di.wb_manager_hub import WBManagerHub
-from app.modules.common_slaves.wildberries.models import WBCard
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
-from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .dto import AutoShelfBidSnapshot, AutoShelfRawStat
 from .redis_auto_recommendations_bid_value_manager import (
@@ -30,7 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 class AutoShelfBidRepository:
-    """Загрузка SQL из sql/ и маппинг результатов в DTO."""
+    """Загрузка SQL из sql/ и маппинг результатов в DTO.
+
+    Граница ответственности:
+        - CH-запросы и маппинг в `AutoShelfRawStat` / `AutoShelfBidSnapshot`;
+        - Redis-кэш recommendations bid (`fetch_current_auto_common_bid`).
+
+    Не отвечает за:
+        - расчёт delta и контрактные ветки (это `AutoShelfBidIncrementManager`);
+        - цену товара в v1 (поле `price_minor` в snapshot заполняется в менеджере).
+    """
 
     def __init__(
         self,
@@ -157,7 +173,11 @@ class AutoShelfBidRepository:
         complex_adv: ComplexAdv,
         nmid: int,
     ) -> int | None:
-        """Ставка полок из Redis-кэша, заполненного минутным updater потоком."""
+        """Ставка полок из Redis-кэша, заполненного минутным updater потоком.
+
+        Цена товара здесь намеренно не читается — v1 unknown price задаётся
+        в менеджере (`price_minor=None`). См. README «Для ревью» п.2.
+        """
         cache_manager = self._auto_recommendations_bid_cache_manager
         auto_adv_id = complex_adv.auto_adv_id
         if cache_manager is None:
@@ -195,79 +215,6 @@ class AutoShelfBidRepository:
             age_sec,
         )
         return cached.bid_minor
-
-    async def fetch_current_price_minor(self, nmid: int) -> int | None:
-        """Цена в minor из WBCard.json; ошибки → None (не блокирует update)."""
-        try:
-            async with sm(read_only=True) as session:
-                row = await session.execute(
-                    select(WBCard.json).where(WBCard.nmid == nmid).limit(1)
-                )
-            card_json_raw = row.scalar_one_or_none()
-            payload: Mapping[str, object]
-            if isinstance(card_json_raw, str):
-                payload_obj = json.loads(card_json_raw)
-                if not isinstance(payload_obj, dict):
-                    return None
-                payload = cast(dict[str, object], payload_obj)
-            else:
-                return None
-            return self._extract_price_minor_from_card_json(payload)
-        except Exception:
-            logger.warning(
-                "auto_shelf_bid_price_fetch_failed nmid=%s source=wbcard_json",
-                nmid,
-                exc_info=True,
-            )
-            return None
-
-    def _extract_price_minor_from_card_json(self, payload: Mapping[str, object]) -> int | None:
-        """Парсинг priceU/salePriceU или рублёвых полей ×100 из JSON карточки."""
-        direct_minor_keys = ("salePriceU", "priceU")
-        for key in direct_minor_keys:
-            value = payload.get(key)
-            if isinstance(value, int) and value > 0:
-                return value
-
-        sizes_obj = payload.get("sizes")
-        sizes = cast(list[object], sizes_obj) if isinstance(sizes_obj, list) else None
-        if sizes is not None:
-            for size_obj in sizes:
-                if not isinstance(size_obj, dict):
-                    continue
-                size = cast(dict[str, object], size_obj)
-                price_raw = size.get("price")
-                if isinstance(price_raw, dict):
-                    price_obj = cast(dict[str, object], price_raw)
-                    for key in direct_minor_keys:
-                        value = price_obj.get(key)
-                        if isinstance(value, int) and value > 0:
-                            return value
-                for key in direct_minor_keys:
-                    value = size.get(key)
-                    if isinstance(value, int) and value > 0:
-                        return value
-
-        # Fallback to ruble-like numeric fields.
-        direct_ruble_keys = ("price", "salePrice", "discountedPrice")
-        for key in direct_ruble_keys:
-            value = payload.get(key)
-            if isinstance(value, (int, float)) and value > 0:
-                return int(round(float(value) * 100))
-
-        if sizes is not None:
-            for size_obj in sizes:
-                if not isinstance(size_obj, dict):
-                    continue
-                size = cast(dict[str, object], size_obj)
-                price_raw = size.get("price")
-                if isinstance(price_raw, dict):
-                    price_obj = cast(dict[str, object], price_raw)
-                    for key in direct_ruble_keys:
-                        value = price_obj.get(key)
-                        if isinstance(value, (int, float)) and value > 0:
-                            return int(round(float(value) * 100))
-        return None
 
     async def get_current_mode(self, nmid: int) -> str:
         """Режим размещения; v1 всегда main."""

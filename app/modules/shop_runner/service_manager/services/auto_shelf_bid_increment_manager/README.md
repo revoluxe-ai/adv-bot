@@ -69,3 +69,73 @@
   `persist_failed_after_interval` и выставляется `resync_required`.
 - Повторный тик с тем же `event_id` не должен задваивать аналитику благодаря
   write-time idempotent insert и read-time дедупу по `event_date + event_id`.
+
+## Для ревью: частые вопросы (намеренные решения, не баги)
+
+Ниже — ответы на типичные замечания code review. Если пункт совпадает с
+наблюдаемым поведением в коде/логах, это **ожидаемый контракт v1**, а не
+регрессия.
+
+### 1. «При смене bid/mode/price теряется boundary-дельта»
+
+**Ответ:** да, намеренно. При `context_changed_resync` interval не пишется,
+обновляется только `prev`. Мотивация — строгая атрибуция: дельта между двумя
+разными сегментами (например, до и после смены ставки) не должна попасть в
+интервал нового сегмента. Полнота boundary-интервалов сознательно жертвуется
+ради корректной сегментации. См. decision log п.1 и `_is_context_changed()`.
+
+### 2. «В repository нет fetch цены — dead code / недоделка?»
+
+**Ответ:** нет. В v1 `price_minor` всегда `NULL`, задаётся в
+`AutoShelfBidIncrementManager.update()` (блок «Цена (v1)»). Методы fetch price
+удалены намеренно: нет надёжного runtime-источника, сегментация по цене — v2.
+Колонки `price_*` в CH и проверки в validate SQL оставлены для forward-compat.
+
+### 3. «Корутина ~5 мин, а bucket 15 мин — рассинхрон?»
+
+**Ответ:** нет. Используется общий `BucketCalculator` (15 мин), как в
+`increment_fact_data_manager`. Частые тики попадают в один bucket; lock на
+`(shop, nmid, bucket_start)` предотвращает дубли записи внутри bucket.
+Документация и комментарии в `update()` явно фиксируют эту модель.
+
+### 4. «Сначала insert interval, потом persist prev — риск double-count?»
+
+**Ответ:** риск осознан и закрыт двумя слоями:
+- write-time: `insert_auto_shelf_bid_interval.sql` — `WHERE NOT EXISTS` по
+  `(event_date, event_id)`;
+- read-time: аналитические SQL — `GROUP BY event_date, event_id` +
+  `argMax(..., version)` (см. `sum_auto_shelf_bid_interval_deltas_dedup.sql`).
+При сбое persist после insert — `persist_failed_after_interval` +
+`resync_required`; следующий тик не должен задвоить сумму в аналитике.
+
+### 5. «Negative recommendations — почему не persist prev?»
+
+**Ответ:** отрицательный `total_auto - keyword` трактуется как шум/рассинхрон
+источников, а не валидное состояние для delta. Snapshot в prev не пишется;
+ставится только `resync_required`. Первый следующий валидный тик выполняет
+`negative_recommendations_resync` (persist без interval), затем pipeline
+продолжается в штатном режиме.
+
+### 6. «Negative delta — почему persist, но без insert?»
+
+**Ответ:** отрицательная дельта между двумя валидными snapshot считается
+аномалией метрик (сброс/лаги CH). Мы обновляем `prev` до текущего состояния,
+чтобы не тащить некорректную базу в следующий тик, но interval не пишем
+(`negative_delta_skipped`).
+
+### 7. «Все price_minor в CH NULL — баг?»
+
+**Ответ:** нет, норма v1. См. п.2 и decision log п.5.
+
+### Карта reason -> что произошло
+
+| reason | interval | prev | комментарий |
+|--------|----------|------|-------------|
+| `prev_missing_initialized` | нет | да | первый тик, база для delta |
+| `negative_recommendations_skipped` | нет | нет | только resync-маркер |
+| `negative_recommendations_resync` | нет | да | выравнивание после bad phase |
+| `context_changed_resync` | нет | да | смена сегмента, без boundary delta |
+| `negative_delta_skipped` | нет | да | аномальная delta |
+| `zero_delta_skipped` | нет | да | нет изменений метрик |
+| `insert_ok` | да | да | штатный success-path |
+| `persist_failed_after_interval` | да* | нет | *interval уже в CH; resync на след. тике |

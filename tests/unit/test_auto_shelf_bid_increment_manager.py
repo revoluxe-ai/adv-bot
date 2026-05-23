@@ -248,6 +248,8 @@ async def test_missing_bid_skips_interval_and_prev() -> None:
 
 @pytest.mark.asyncio
 async def test_price_is_not_fetched_and_non_blocking_for_interval_insert() -> None:
+    # v1: price не читается из repository (см. README «Для ревью» п.2).
+    # Мок fetch_current_price_minor — guard: даже если метод вернут, менеджер его не вызывает.
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)

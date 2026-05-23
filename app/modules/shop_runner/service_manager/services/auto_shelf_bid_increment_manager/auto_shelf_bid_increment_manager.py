@@ -63,6 +63,9 @@ class AutoShelfBidIncrementManager:
         - v1 работает только с одним nmid в кампании (single-nmid guard).
         - запись интервала выполняется только при валидной положительной дельте.
         - `prev` всегда может быть обновлен без записи интервала (resync-ветки).
+
+    Спорные для ревью решения (context change, price=NULL, insert->persist,
+    15m bucket) задокументированы в README.md, раздел «Для ревью».
     """
 
     def __init__(
@@ -154,6 +157,9 @@ class AutoShelfBidIncrementManager:
         auto_adv_id = complex_adv.auto_adv_id
 
         src_ts = datetime.now(self._tz)
+        # Общий BucketCalculator с increment_fact_data_manager: округление до 15 минут
+        # (не 5). Корутина auto_shelf может тикать чаще (~5 мин), но bucket_start/lock
+        # живут на 15-минутной сетке — как в референсном incremental-пайплайне.
         bucket_start = self._bucket_calculator.calc_bucket_start(src_ts)
         version = self._version_calculator.calc_version(src_ts)
 
@@ -219,10 +225,10 @@ class AutoShelfBidIncrementManager:
 
         recommendations_stat = total_auto_stat.minus(keyword_stat)
         if recommendations_stat.has_negative_values():
-            # Не сохраняем отрицательный snapshot в prev:
-            # это искусственный/шумный период (например, временная рассинхронизация total/keyword).
-            # Вместо этого ставим маркер, чтобы первый следующий валидный тик
-            # отработал как "resync only" без записи interval.
+            # Контракт negative recommendations (см. README п.3 и «Для ревью» п.5):
+            # - prev НЕ обновляем — отрицательный snapshot не является валидной базой;
+            # - interval НЕ пишем;
+            # - ставим resync-маркер: следующий валидный тик только выровняет prev.
             await self._last_state_manager.mark_resync_required(nmid)
             self._log_contract_event(
                 "auto_shelf_bid_negative_recommendations",
@@ -258,7 +264,13 @@ class AutoShelfBidIncrementManager:
         if not mode:
             mode = "main"
 
-        # В v1 цену намеренно не тянем: пишем unknown, чтобы не блокировать поток инкрементов.
+        # --- Цена (v1): намеренно unknown, без вызова repository ---
+        # price_minor всегда NULL в текущей итерации. Причины:
+        #   1) нет надёжного источника цены в runtime (WBCard/Content API не дают priceU);
+        #   2) сегментация по цене отложена на v2;
+        #   3) поток инкрементов не должен блокироваться на price fetch.
+        # Колонки price_* в CH остаются для forward-compat и validate SQL (unknown mode).
+        # Отсутствие fetch_current_price_minor в repository — не oversight, см. README.
         price_minor = None
         price_currency = "RUB"
 
@@ -339,9 +351,10 @@ class AutoShelfBidIncrementManager:
                 current_snapshot,
             )
             if context_changed:
-                # Важный контракт: при смене контекста (bid/mode/price) interval не считаем.
-                # Иначе дельта между разными сегментами будет неверно атрибутирована
-                # к новому контексту. Поэтому здесь только resync prev.
+                # Контракт context change (README п.1, «Для ревью» п.1):
+                # boundary-дельта между сегментами намеренно НЕ пишется в interval —
+                # только resync prev под новый bid/mode/price. Это не потеря данных
+                # по ошибке, а trade-off «строгая атрибуция > полнота интервалов».
                 await self._last_state_manager.persist(current_snapshot)
                 self._log_contract_event(
                     "auto_shelf_bid_context_changed_resync",
@@ -370,6 +383,8 @@ class AutoShelfBidIncrementManager:
 
             delta = current_snapshot.delta(prev_snapshot)
             if delta.has_negative_values():
+                # Контракт negative delta (README «Для ревью» п.6):
+                # prev обновляем (сброс базы), interval не пишем.
                 await self._last_state_manager.persist(current_snapshot)
                 self._log_contract_event(
                     "auto_shelf_bid_negative_delta_skipped",
@@ -418,9 +433,9 @@ class AutoShelfBidIncrementManager:
                 delta_orders=delta.delta_orders,
                 delta_spend=delta.delta_spend,
             )
-            # Сначала пишем interval, затем persist prev.
-            # Это intentional порядок: при partial-failure защищаемся
-            # idempotent insert + read-time dedup и resync-маркером.
+            # Порядок insert -> persist — intentional (README «Failure window»):
+            # при падении persist interval уже в CH; защита от double-count —
+            # idempotent insert + read-time dedup + resync-маркер ниже.
             await self._writer.insert_interval(row)
             try:
                 await self._last_state_manager.persist(current_snapshot)
@@ -475,7 +490,12 @@ class AutoShelfBidIncrementManager:
         prev_snapshot: AutoShelfBidSnapshot,
         current_snapshot: AutoShelfBidSnapshot,
     ) -> tuple[bool, list[str]]:
-        """Проверить смену контекста наблюдения до расчета дельты."""
+        """Проверить смену контекста наблюдения до расчета дельты.
+
+        При смене bid/mode/price вызывающий код НЕ пишет interval — только resync prev.
+        Это намеренно: boundary-дельта между сегментами не атрибутируется к новому
+        контексту (строгая атрибуция важнее полноты интервалов). См. README п.1.
+        """
         fields = (
             "bid_minor",
             "currency",
