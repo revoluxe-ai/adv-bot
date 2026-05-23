@@ -61,3 +61,11 @@
 - Отсутствие цены (`price_minor=NULL`) в v1 — нормальный сценарий.
 - При `persist_failed_after_interval` допускается окно частичного сбоя; корректность
   аналитики обеспечивается дедупом по `event_date + event_id`.
+
+## Failure window (insert -> persist)
+
+- В success-path порядок операций: `insert_interval` -> `persist(prev)`.
+- Если `insert_interval` успешен, а `persist(prev)` падает, фиксируется
+  `persist_failed_after_interval` и выставляется `resync_required`.
+- Повторный тик с тем же `event_id` не должен задваивать аналитику благодаря
+  write-time idempotent insert и read-time дедупу по `event_date + event_id`.

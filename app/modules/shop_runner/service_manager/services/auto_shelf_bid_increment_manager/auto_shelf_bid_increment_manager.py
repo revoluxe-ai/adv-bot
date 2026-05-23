@@ -113,6 +113,13 @@ class AutoShelfBidIncrementManager:
         Побочные эффекты:
             - ClickHouse: insert в `auto_shelf_bid_intervals` и/или `auto_shelf_bid_prev`
             - Redis: lock, last-state, resync-marker
+
+        Важно про надежность:
+            Порядок в success-path: сначала `insert_interval`, затем `persist(prev)`.
+            Между этими шагами есть partial-failure окно, поэтому защита от double-count
+            обеспечивается двухслойно:
+            - write-time idempotent insert по `(event_date, event_id)`;
+            - read-time дедуп в аналитических SQL (`GROUP BY event_date,event_id` + `argMax(version)`).
         """
         nmids = complex_adv.nmids
         if not nmids:
@@ -411,6 +418,9 @@ class AutoShelfBidIncrementManager:
                 delta_orders=delta.delta_orders,
                 delta_spend=delta.delta_spend,
             )
+            # Сначала пишем interval, затем persist prev.
+            # Это intentional порядок: при partial-failure защищаемся
+            # idempotent insert + read-time dedup и resync-маркером.
             await self._writer.insert_interval(row)
             try:
                 await self._last_state_manager.persist(current_snapshot)
