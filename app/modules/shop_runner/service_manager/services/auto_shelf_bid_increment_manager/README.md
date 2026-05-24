@@ -9,8 +9,9 @@
    - Выполняется только `persist(current_snapshot)` (`context_changed_resync`), чтобы не смешивать метрики разных сегментов.
 
 2. **`recommendations_stat = total_auto - keyword` — единственная формула v1**
-   - Если `keyword_stat` отсутствует (`None`), тик пропускается с ошибкой
-     `keyword_stat_missing_skip` (без insert и без persist).
+   - Если `keyword_stat` отсутствует (`None` — 0 строк в `clusters_adv_stats`),
+     для полочной Auto-РК это норма: трактуем как **нулевую keyword-стату**
+     (`keyword_stat_missing_treated_as_zero`), `recommendations = total_auto`.
    - Если результат отрицательный, интервал не пишется (`negative_recommendations_skipped`).
 
 3. **После negative-фазы используется `resync_required`**
@@ -51,7 +52,7 @@
 - `insert_ok` — успешная запись интервала.
 - `context_changed_resync` — смена контекста, только resync.
 - `negative_recommendations_skipped` — отрицательный `recommendations`, интервал пропущен.
-- `keyword_stat_missing_skip` — `keyword_stat` недоступен, тик пропущен с `ERROR`.
+- `keyword_stat_missing_treated_as_zero` — keyword-выборка пуста, shelf = total_auto.
 - `negative_recommendations_resync` — первый валидный тик после negative-фазы, только resync.
 - `negative_delta_skipped` / `zero_delta_skipped` — дельта невалидна для insert.
 - `persist_failed_after_interval` — interval вставлен, но persist prev не удался.
@@ -135,7 +136,7 @@
 |--------|----------|------|-------------|
 | `prev_missing_initialized` | нет | да | первый тик, база для delta |
 | `negative_recommendations_skipped` | нет | нет | только resync-маркер |
-| `keyword_stat_missing_skip` | нет | нет | нет данных keyword, безопасный skip |
+| `keyword_stat_missing_treated_as_zero` | да* | да* | пустой keyword = 0; *по обычным guard-веткам delta |
 | `negative_recommendations_resync` | нет | да | выравнивание после bad phase |
 | `context_changed_resync` | нет | да | смена сегмента, без boundary delta |
 | `negative_delta_skipped` | нет | да | аномальная delta |

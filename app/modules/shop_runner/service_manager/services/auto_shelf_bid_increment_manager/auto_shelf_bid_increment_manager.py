@@ -11,12 +11,14 @@
     2) Отрицательные/нулевые дельты не пишутся в intervals.
     3) После фазы отрицательных recommendations ставится resync-маркер:
        первый следующий валидный тик используется только для выравнивания prev.
-    4) В v1 цена намеренно unknown (`price_minor=None`), чтобы поток инкрементов
+    4) Пустая keyword-выборка (`clusters_adv_stats`) для полочной РК — норма:
+       трактуется как нулевая keyword-стата, shelf = total_auto.
+    5) В v1 цена намеренно unknown (`price_minor=None`), чтобы поток инкрементов
        не зависел от внешнего источника цены.
-    5) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
+    6) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
        reason `persist_failed_after_interval`, поднимается resync-маркер; итоговая
        аналитика защищается дедупом по `event_date + event_id`.
-    6) Bucket агрегации для intervals/lock — 15 минут (общий BucketCalculator),
+    7) Bucket агрегации для intervals/lock — 15 минут (общий BucketCalculator),
        даже если корутина запускается чаще (примерно раз в 5 минут).
 """
 
@@ -45,7 +47,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 
 from .auto_shelf_bid_repository import AutoShelfBidRepository
 from .clickhouse_auto_shelf_bid_writer import ClickHouseAutoShelfBidWriter
-from .dto import AutoShelfBidIntervalRow, AutoShelfBidSnapshot
+from .dto import AutoShelfBidIntervalRow, AutoShelfBidSnapshot, AutoShelfRawStat
 from .last_auto_shelf_bid_state_manager import LastAutoShelfBidStateManager
 from .redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
@@ -210,9 +212,10 @@ class AutoShelfBidIncrementManager:
             )
             return
         if keyword_stat is None:
+            keyword_stat = AutoShelfRawStat.zero()
             self._log_contract_event(
-                "auto_shelf_bid_keyword_stat_not_found_skip",
-                reason="keyword_stat_missing_skip",
+                "auto_shelf_bid_keyword_stat_empty_treated_as_zero",
+                reason="keyword_stat_missing_treated_as_zero",
                 nmid=nmid,
                 mode=None,
                 bid_minor=None,
@@ -220,12 +223,8 @@ class AutoShelfBidIncrementManager:
                 price_minor=None,
                 price_currency=None,
                 bucket_start=bucket_start,
-                level=logging.ERROR,
+                level=logging.INFO,
             )
-            # Empty keyword payload на уровне repository трактуем как "данные не готовы/
-            # неполны", а не как валидный ноль. Иначе формула total-keyword может
-            # временно переоценить shelf-трафик.
-            return
 
         recommendations_stat = total_auto_stat.minus(keyword_stat)
         if recommendations_stat.has_negative_values():

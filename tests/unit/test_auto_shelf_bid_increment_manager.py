@@ -232,18 +232,44 @@ async def test_resync_required_persists_current_snapshot_without_interval() -> N
 
 
 @pytest.mark.asyncio
-async def test_missing_keyword_stat_skips_tick_with_no_insert_or_persist() -> None:
+async def test_missing_keyword_stat_persists_first_snapshot_as_shelf_total() -> None:
+    """Полочная РК без keyword-статы: пустой keyword = ноль, shelf = total."""
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(100, 10, 3, 1, 50.0)
     )
     repository.fetch_keyword_stat = AsyncMock(return_value=None)
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1200)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    state_manager.get.return_value = (None, "none")
 
     await manager.update(_build_adv([123]))
 
     writer.insert_interval.assert_not_called()
-    state_manager.persist.assert_not_called()
+    state_manager.persist.assert_awaited_once()
     state_manager.mark_resync_required.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_missing_keyword_stat_inserts_interval_on_positive_delta() -> None:
+    """При keyword_stat=None и положительной shelf-дельте пишем interval."""
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=None)
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    state_manager.get.return_value = (prev, "redis")
+
+    await manager.update(_build_adv([123]))
+
+    writer.insert_interval.assert_awaited_once()
+    state_manager.persist.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    # shelf = total (keyword=0): 130 - 90 prev = 40
+    assert inserted_row.delta_impressions == 40
 
 
 @pytest.mark.asyncio
