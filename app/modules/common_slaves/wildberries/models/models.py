@@ -474,17 +474,27 @@ class AdvSetting(BaseTable):
     wb_bid_type: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
-        comment="Тип ставки WB из v2/adverts: unified или manual",
+        comment=(
+            "Тип ставки WB из v2/adverts: unified или manual. "
+            "Sync: apply_wb_campaign_meta_from_legacy_adv_data. "
+            "normquery minus: только manual+search (см. wb_campaign_meta)."
+        ),
     )
     wb_placement_search: Mapped[bool | None] = mapped_column(
         Boolean,
         nullable=True,
-        comment="Размещение «Поиск» из settings.placements.search (v2/adverts)",
+        comment=(
+            "Размещение «Поиск» (settings.placements.search). "
+            "True — единственный тип, для которого WB normquery get/set-minus."
+        ),
     )
     wb_placement_recommendations: Mapped[bool | None] = mapped_column(
         Boolean,
         nullable=True,
-        comment="Размещение «Рекомендации» из settings.placements.recommendations",
+        comment=(
+            "Размещение «Рекомендации» (полка). "
+            "manual+search=false+recom=true → полочная auto, skip normquery в MinusPhraseManager."
+        ),
     )
 
     hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется

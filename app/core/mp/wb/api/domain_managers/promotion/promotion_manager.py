@@ -69,6 +69,18 @@ class BudgetTopUpResult:
 
 @dataclass(slots=True, frozen=True)
 class SetMinusPhrasesFallbackResult:
+    """Результат set-minus с пошаговым отбрасыванием невалидных norm_query.
+
+    Attributes:
+        applied_phrases: Фразы, успешно отправленные в WB.
+        dropped_invalid_phrases: Отброшенные WB как невалидные для nmid.
+        attempts: Число попыток POST set-minus.
+        skipped_unsupported_campaign: True, если WB ответил 400 «manual bid,
+            search placement only» — тип/размещение РК не поддерживает normquery.
+            Вызывающий код не должен падать; для auto non-search это ожидаемо
+            при отсутствии раннего skip в ``MinusPhraseManager``.
+    """
+
     applied_phrases: list[str]
     dropped_invalid_phrases: list[str]
     attempts: int
@@ -115,7 +127,14 @@ def _extract_invalid_norm_query(detail: str | None) -> str | None:
 
 
 def _is_unsupported_campaign_for_normquery_minus(detail: str | None) -> bool:
-    """True, если WB отклонил set-minus из-за типа/размещения кампании."""
+    """True, если WB отклонил set-minus из-за типа/размещения кампании.
+
+    Текст ошибки: ``only for campaigns with manual bid, search placement``.
+    Возникает для полочной/unified auto и любой РК без manual+search.
+
+    Страховочный слой, если ``MinusPhraseManager`` не сделал ранний skip
+    (auto-ветка пропускает только ``wb_is_manual_shelf_only``, не все auto).
+    """
     if not isinstance(detail, str):
         return False
     message = detail
@@ -158,6 +177,17 @@ class PromotionManager:
         *,
         max_attempts: int | None = None,
     ) -> SetMinusPhrasesFallbackResult:
+        """POST normquery set-minus с отбрасыванием невалидных фраз по одной.
+
+        Два вида BadRequestError обрабатываются по-разному:
+
+        1. **Unsupported campaign** (не manual+search) — warning, возврат с
+           ``skipped_unsupported_campaign=True``, без raise. См. docstring
+           ``MinusPhraseManager._update_minuses_in_auto_adv`` про asymmetry skip.
+        2. **Invalid norm_query** для nmid — фраза удаляется из списка, retry.
+
+        Side effects: вызов WB API ``POST /adv/v0/normquery/set-minus``.
+        """
         active_phrases = list(dict.fromkeys(phrases))
         dropped_invalid_phrases: list[str] = []
         # Максимум одна "полезная" попытка на каждую уникальную фразу

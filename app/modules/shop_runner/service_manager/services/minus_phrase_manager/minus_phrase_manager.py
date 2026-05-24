@@ -1,3 +1,48 @@
+"""Синхронизация минус-фраз (BAD-ключи) с WB для ``ComplexAdv``.
+
+Контекст для ревью: auto vs search и normquery API
+==================================================
+
+Один ``ComplexAdv`` обновляет минус-фразы **параллельно** в двух ветках:
+
+1. **auto** — ``adv_setting`` / ``auto_adv_id`` (в бизнес-языке часто «полка»,
+   но технически сюда также относится ``unified`` auto);
+2. **search** — ``search_adv`` (аукцион, ``manual`` + search).
+
+WB ``normquery/set-minus`` и ``get-minus`` работают **только** для
+``manual + search=true`` (см. ``wb_supports_normquery_minus_phrases``).
+
+Почему skip в auto и search **разный** (намеренно)
+--------------------------------------------------
+
+**Search-ветка** (``_update_minuses_in_search_adv``):
+
+- Если после sync meta известна и кампания **не** ``manual+search`` — **skip до API**.
+- Search-РК по задумке должна быть аукционом; ранний skip убирает лишние 400.
+
+**Auto-ветка** (``_update_minuses_in_auto_adv``):
+
+- Skip **только** для ``wb_is_manual_shelf_only`` (manual, search=false, rec=true).
+- Это закрывает прод-инцидент (полочная auto, adv_id=32824944): WB отклонял
+  normquery для такой РК.
+- **Не** используем здесь общий ``not wb_supports_normquery_minus_phrases``:
+  - ``unified`` auto исторически шли через normquery; миграция на
+    ``/adv/v1/auto/set-excluded`` — отдельная задача;
+  - редкий ``manual`` без search и без rec — fallback в ``PromotionManager``
+    уже возвращает ``skipped_unsupported_campaign`` без raise.
+
+Итог для ревьюера: **ошибки на полочной auto после фикса нет**; search
+(``29734515``) продолжает обновляться через normquery. Для прочих auto-типов
+возможны warning/400 в логах, но **не** падение shop-runner.
+
+Изоляция ошибок
+---------------
+
+- Auto и search — ``asyncio.gather`` без ``return_exceptions``: падение всей
+  ветки auto/search валит ``update_minus_phrases`` для ``ComplexAdv``.
+- Внутри одной РК по nmid — ``return_exceptions=True`` в ``__update_minus_phrases``.
+"""
+
 import asyncio
 import logging
 from collections.abc import Awaitable
@@ -19,6 +64,12 @@ logger = logging.getLogger(__name__)
 
 
 class MinusPhraseManager:
+    """Обновляет минус-фразы на WB для auto и search кампаний ``ComplexAdv``.
+
+    См. module docstring: различие skip-логики auto (полочная) vs search
+    (любая РК без ``manual+search`` при известной meta).
+    """
+
     def __init__(
         self,
         wb_api_manager_hub: WBManagerHub,
@@ -43,6 +94,7 @@ class MinusPhraseManager:
             raise e
 
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
+        """Собрать BAD-ключи и параллельно обновить auto + search ветки."""
         keywords = await complex_adv.get_keywords()
         bad_keywords: list[str] = [
             kw.text for kw in keywords if kw.status == KeywordStatus.BAD
@@ -110,6 +162,12 @@ class MinusPhraseManager:
         nmid: int,
         common_bad_phrases: list[str],
     ) -> tuple[int, list[str], int] | None:
+        """get-minus / set-minus для одной пары (adv_id, nmid) через normquery API.
+
+        Перед записью сравнивает текущий список на WB с целевым. При 400
+        «unsupported campaign» fallback возвращает ``skipped_unsupported_campaign``
+        — см. ``PromotionManager.set_minus_phrases_with_fallback``.
+        """
         keywords_from_this_adv_nmid = await self._click_house.get_cluster_texts_for_adv_nmid(
             adv_id, nmid
         )
@@ -156,6 +214,20 @@ class MinusPhraseManager:
     async def _update_minuses_in_auto_adv(
         self, complex_adv: ComplexAdv, bad_keywords: list[str]
     ) -> None:
+        """Минус-фразы для auto-РК (``complex_adv.adv_setting``).
+
+        Skip до вызова WB API только для **полочной** auto
+        (``wb_is_manual_shelf_only``): ``manual``, search=false, recom=true.
+
+        Почему не ``not wb_supports_normquery_minus_phrases`` как в search:
+
+        - В домене бота «auto» ≈ полка; типичный прод-кейс — именно shelf-only.
+        - ``unified`` auto и прочие manual без search пока могут идти в normquery;
+          при 400 срабатывает fallback (без exception). Unified — отдельный
+          трек на ``/adv/v1/auto/set-excluded``.
+
+        Search-ветка для той же ``ComplexAdv`` работает независимо (parallel gather).
+        """
         adv_setting = complex_adv.adv_setting
         if wb_is_manual_shelf_only(adv_setting):
             logger.warning(
@@ -172,6 +244,15 @@ class MinusPhraseManager:
     async def _update_minuses_in_search_adv(
         self, complex_adv: ComplexAdv, bad_keywords: list[str]
     ) -> None:
+        """Минус-фразы для search/аукционной РК (``complex_adv.search_adv``).
+
+        Если meta синхронизирована и кампания **не** ``manual+search`` — skip до API.
+        Это шире, чем skip в auto-ветке: любая search-запись без search placement
+        не должна вызывать normquery (WB вернёт 400).
+
+        Легитимный кейс: ``manual`` + ``wb_placement_search=True`` — единственный
+        тип, для которого normquery get-minus/set-minus предназначен.
+        """
         search_adv = complex_adv.search_adv
         if not search_adv:
             return None
