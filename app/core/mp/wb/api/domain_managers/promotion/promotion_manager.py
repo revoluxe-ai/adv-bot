@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import json
+import logging
 import re
 from typing import Any, cast
 import datetime
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
     from app.core.mp.wb.dto.adv_info import AdvInfoDTO
 
 
+logger = logging.getLogger(__name__)
+
 @dataclass(slots=True)
 class CampaignBudgetInfo:
     total: int | None
@@ -69,7 +72,12 @@ class SetMinusPhrasesFallbackResult:
     applied_phrases: list[str]
     dropped_invalid_phrases: list[str]
     attempts: int
+    skipped_unsupported_campaign: bool = False
 
+
+_UNSUPPORTED_NORMQUERY_MINUS_MESSAGE = (
+    "only for campaigns with manual bid, search placement"
+)
 
 _INVALID_NORM_QUERY_PATTERNS = (
     re.compile(r"norm_query\s+'(.+?)'\s+is not valid for nm\s+\d+"),
@@ -104,6 +112,22 @@ def _extract_invalid_norm_query(detail: str | None) -> str | None:
         if invalid_phrase:
             return invalid_phrase
     return None
+
+
+def _is_unsupported_campaign_for_normquery_minus(detail: str | None) -> bool:
+    """True, если WB отклонил set-minus из-за типа/размещения кампании."""
+    if not isinstance(detail, str):
+        return False
+    message = detail
+    try:
+        loaded_payload = json.loads(detail)
+        if isinstance(loaded_payload, dict):
+            parsed_detail = loaded_payload.get("detail")
+            if isinstance(parsed_detail, str):
+                message = parsed_detail
+    except json.JSONDecodeError:
+        pass
+    return _UNSUPPORTED_NORMQUERY_MINUS_MESSAGE in message
 
 
 class PromotionManager:
@@ -151,6 +175,19 @@ class PromotionManager:
                     attempts=attempt,
                 )
             except BadRequestError as exc:
+                if _is_unsupported_campaign_for_normquery_minus(exc.detail):
+                    logger.warning(
+                        "normquery set-minus не поддерживается для advert_id=%s nm_id=%s: %s",
+                        advert_id,
+                        nm_id,
+                        exc.detail,
+                    )
+                    return SetMinusPhrasesFallbackResult(
+                        applied_phrases=[],
+                        dropped_invalid_phrases=[],
+                        attempts=attempt,
+                        skipped_unsupported_campaign=True,
+                    )
                 invalid_phrase = _extract_invalid_norm_query(exc.detail)
                 if invalid_phrase is None or invalid_phrase not in active_phrases:
                     raise

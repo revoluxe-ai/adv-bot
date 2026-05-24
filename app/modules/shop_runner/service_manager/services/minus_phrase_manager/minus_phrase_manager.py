@@ -8,6 +8,11 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
+from app.shared.domains.wb.utils.wb_campaign_meta import (
+    wb_campaign_meta_known,
+    wb_is_manual_shelf_only,
+    wb_supports_normquery_minus_phrases,
+)
 from .click_house_manager import ClickHouseManager
 
 logger = logging.getLogger(__name__)
@@ -132,6 +137,14 @@ class MinusPhraseManager:
             phrases=minus_phrases_to_send,
             update_redis_timestamp_manager=self._update_redis_timestamp_manager,
         )
+        if getattr(fallback_result, "skipped_unsupported_campaign", False):
+            logger.warning(
+                "Пропуск normquery set-minus: кампания не поддерживает API "
+                "adv_id=%s nmid=%s",
+                adv_id,
+                nmid,
+            )
+            return None
         if fallback_result.dropped_invalid_phrases:
             _ = await self._update_redis_timestamp_manager.add_invalid_norm_queries(
                 adv_id=adv_id,
@@ -143,8 +156,16 @@ class MinusPhraseManager:
     async def _update_minuses_in_auto_adv(
         self, complex_adv: ComplexAdv, bad_keywords: list[str]
     ) -> None:
+        adv_setting = complex_adv.adv_setting
+        if wb_is_manual_shelf_only(adv_setting):
+            logger.warning(
+                "Пропуск минус-фраз для полочной авто-РК adv_id=%s shop_id=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.shop_id,
+            )
+            return None
         adv_id = complex_adv.auto_adv_id
-        nmids = complex_adv.adv_setting.nmids
+        nmids = adv_setting.nmids
         await self.__update_minus_phrases(adv_id, nmids, bad_keywords)
         return None
 
@@ -153,6 +174,15 @@ class MinusPhraseManager:
     ) -> None:
         search_adv = complex_adv.search_adv
         if not search_adv:
+            return None
+        if wb_campaign_meta_known(search_adv) and not wb_supports_normquery_minus_phrases(
+            search_adv
+        ):
+            logger.warning(
+                "Пропуск минус-фраз для поисковой РК без search placement adv_id=%s shop_id=%s",
+                search_adv.adv_id,
+                complex_adv.shop_id,
+            )
             return None
         adv_id = search_adv.adv_id
         nmids = search_adv.nmids

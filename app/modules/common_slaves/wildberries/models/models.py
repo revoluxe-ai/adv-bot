@@ -471,6 +471,22 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
+    wb_bid_type: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        comment="Тип ставки WB из v2/adverts: unified или manual",
+    )
+    wb_placement_search: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Размещение «Поиск» из settings.placements.search (v2/adverts)",
+    )
+    wb_placement_recommendations: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Размещение «Рекомендации» из settings.placements.recommendations",
+    )
+
     hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется
         Float,
         nullable=True,

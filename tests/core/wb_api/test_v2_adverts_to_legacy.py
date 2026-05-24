@@ -67,6 +67,7 @@ def test_v2_advert_item_to_legacy_manual_maps_id_and_type(v2_item_manual: dict) 
     legacy = v2_advert_item_to_legacy(v2_item_manual)
     assert legacy["advertId"] == 12345
     assert legacy["type"] == 9
+    assert legacy["bidType"] == "manual"
     assert legacy["name"] == "Test Search Campaign"
     assert legacy["status"] == 9
     assert legacy["dailyBudget"] == 0
@@ -77,6 +78,7 @@ def test_v2_advert_item_to_legacy_unified_maps_type_8(v2_item_unified: dict) -> 
     legacy = v2_advert_item_to_legacy(v2_item_unified)
     assert legacy["advertId"] == 67890
     assert legacy["type"] == 8
+    assert legacy["bidType"] == "unified"
     assert legacy["name"] == "Test Auto Campaign"
     assert legacy["status"] == 4
 

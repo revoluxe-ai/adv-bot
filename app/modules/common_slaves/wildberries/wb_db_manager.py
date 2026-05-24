@@ -16,6 +16,9 @@ from app.modules.common_slaves.wildberries.models import (
     WBCategory,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.shared.domains.wb.utils.wb_campaign_meta import (
+    apply_wb_campaign_meta_from_legacy_adv_data,
+)
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
@@ -66,6 +69,9 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                 adv_setting.active_status = adv.status_native
                 adv_setting.type = adv.type
                 adv_setting.cpm = adv.cpm
+                apply_wb_campaign_meta_from_legacy_adv_data(
+                    adv_setting, adv.data
+                )
             else:
                 # Создаем новую запись через ORM
                 adv_setting = AdvSetting(
@@ -79,6 +85,9 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                 )
                 # Применяем дефолты через ORM
                 apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
+                apply_wb_campaign_meta_from_legacy_adv_data(
+                    adv_setting, adv.data
+                )
                 session.add(adv_setting)
 
         await session.commit()
