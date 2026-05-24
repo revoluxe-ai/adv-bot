@@ -71,7 +71,8 @@ class WBModifier:
         except Exception as e:
             logger.error("Ошибка обновления минус-фраз: %s", e, exc_info=True)
             raise e
-        await update_redis_timestamp_manager.set_one(adv_id=adv_id)
+        if not result.skipped_unsupported_campaign:
+            await update_redis_timestamp_manager.set_one(adv_id=adv_id)
         return result
 
     async def get_minus_phrases_for_adv(self, adv_id: int, nmid: int) -> list[str]:

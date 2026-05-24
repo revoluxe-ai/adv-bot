@@ -88,6 +88,7 @@ def v2_advert_item_to_legacy(item: dict[str, Any]) -> dict[str, Any]:
 
     legacy: dict[str, Any] = {
         "advertId": item.get("id", 0),
+        "bidType": bid_type,
         "type": legacy_type,
         "name": settings.get("name", ""),
         "status": status,

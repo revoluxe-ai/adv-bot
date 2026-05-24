@@ -84,6 +84,34 @@ async def test_set_minus_phrases_with_fallback_drops_several_invalid_phrases() -
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_set_minus_phrases_with_fallback_skips_unsupported_campaign_type() -> None:
+    manager = PromotionManager(promotion_client=MagicMock())
+    manager.set_minus_phrases = AsyncMock(  # type: ignore[method-assign]
+        side_effect=BadRequestError(
+            json.dumps(
+                {
+                    "detail": "only for campaigns with manual bid, search placement",
+                    "status": 400,
+                }
+            )
+        )
+    )
+
+    result = await manager.set_minus_phrases_with_fallback(
+        advert_id=32824944,
+        nm_id=100,
+        phrases=["bad_phrase"],
+    )
+
+    manager.set_minus_phrases.assert_awaited_once_with(32824944, 100, ["bad_phrase"])
+    assert result.applied_phrases == []
+    assert result.dropped_invalid_phrases == []
+    assert result.skipped_unsupported_campaign is True
+    assert result.attempts == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_set_minus_phrases_with_fallback_propagates_unrelated_bad_request() -> None:
     manager = PromotionManager(promotion_client=MagicMock())
     manager.set_minus_phrases = AsyncMock(  # type: ignore[method-assign]
