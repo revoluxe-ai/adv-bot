@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
@@ -139,11 +138,6 @@ class AutoShelfBidControlViewProvider:
             warnings.append("no_auto_adv")
 
         currency = settings_obj.currency if settings_obj is not None else "RUB"
-        cycle_start = (
-            state.current_cycle_started_at
-            if state is not None
-            else datetime.now(timezone.utc)
-        )
         stats_from_ts = report_day_start_utc()
         bid_stats = (
             await self._analytics.get_bid_stats(
