@@ -18,6 +18,7 @@ from app.modules.token_monitoring.services.cabinet_status_service import (
 )
 from app.modules.shop_runner.modules.wb_api import WBApi
 
+from app.modules.shop_runner.shop_id_filters import apply_shop_id_filters
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
@@ -127,15 +128,8 @@ async def _update_tasks(
     tasks_manager: TasksManager,
     plan_fact_reader: "PlanFactReader",
 ) -> None:
-    stmt = (
-        select(WBCabinet.shop_id)
-    )
-
-    shop_filter_list: list[str] = settings.SHOP_FILTER_LIST
-
-    stmt = stmt.where(WBCabinet.active.is_(True))
-    if shop_filter_list:
-        stmt = stmt.where(WBCabinet.shop_id.in_(shop_filter_list))
+    stmt = select(WBCabinet.shop_id).where(WBCabinet.active.is_(True))
+    stmt = apply_shop_id_filters(stmt, WBCabinet.shop_id)
 
     shop_ids: set[str] = set()
     async with sm(read_only=True) as session:
