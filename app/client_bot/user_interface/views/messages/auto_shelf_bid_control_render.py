@@ -9,6 +9,7 @@ from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlMenu,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
+    TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
     format_bid_minor_for_telegram,
     format_timestamp_for_telegram,
 )
@@ -60,71 +61,97 @@ def select_covered_bid_points_for_cycle_viewer(
     return sorted(covered, key=_bid_point_sort_ts, reverse=True)
 
 
-def clamp_bid_point_index(index: int, total: int) -> int:
-    """Безопасный индекс при навигации по списку покрытий (0..total-1)."""
-    if total <= 0:
-        return 0
-    if index < 0:
-        return 0
-    if index >= total:
-        return total - 1
-    return index
-
-
 def format_bid_point_line(point: BidPointStatsDTO) -> str:
     """Одна строка покрытой ставки — тот же формат, что в блоке на главном экране."""
+    cpa_text = _format_money(point.cart_cpa) if point.carts > 0 else "—"
     return (
         f"{format_bid(point.bid_minor, point.currency)}: показы {point.impressions}, "
         f"корзины {point.carts}, расход {_format_money(point.spend)} ₽, "
-        f"CPA корзины {_format_money(point.cart_cpa)} ₽"
+        f"CPA корзины {cpa_text} ₽"
     )
+
+
+def bid_point_viewer_page_count(
+    total_points: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
+) -> int:
+    """Число страниц просмотрщика покрытий (минимум 0)."""
+    if total_points <= 0:
+        return 0
+    return (total_points + page_size - 1) // page_size
+
+
+def clamp_bid_point_page(page: int, total_pages: int) -> int:
+    """Безопасный номер страницы просмотрщика (0..total_pages-1)."""
+    if total_pages <= 0:
+        return 0
+    if page < 0:
+        return 0
+    if page >= total_pages:
+        return total_pages - 1
+    return page
+
+
+def slice_bid_points_page(
+    points: list[BidPointStatsDTO],
+    page: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
+) -> list[BidPointStatsDTO]:
+    """Срез покрытых точек для страницы просмотрщика."""
+    start = page * page_size
+    return points[start : start + page_size]
 
 
 BID_POINT_VIEWER_HEADER = "Покрытые ставки (текущий цикл):"
 
 
 def render_bid_point_viewer_message(
-    index: int,
+    page: int,
     points: list[BidPointStatsDTO],
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
 ) -> str:
-    """Просмотр одной строки покрытия цикла (как на главном экране) с листанием."""
+    """До ``page_size`` строк покрытий цикла на одной странице просмотрщика."""
     total = len(points)
-    safe_index = clamp_bid_point_index(index, total)
-    point = points[safe_index]
-    line = format_bid_point_line(point)
+    total_pages = bid_point_viewer_page_count(total, page_size)
+    safe_page = clamp_bid_point_page(page, total_pages)
+    chunk = slice_bid_points_page(points, safe_page, page_size)
+    lines = [format_bid_point_line(point) for point in chunk]
+    body = "\n".join(lines) if lines else "Нет покрытых ставок."
     return (
         f"{BID_POINT_VIEWER_HEADER}\n"
-        f"{line}\n\n"
-        f"{safe_index + 1} / {total}"
+        f"{body}\n\n"
+        f"Страница {safe_page + 1} / {total_pages}"
     )
 
 
 def build_bid_point_viewer_keyboard(
     adv_setting_original_id: int,
-    index: int,
-    total: int,
+    page: int,
+    total_points: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура просмотрщика: ◀️ / ▶️, обновить, назад к управлению."""
+    """Клавиатура просмотрщика: ◀️ / ▶️ по страницам, обновить, назад."""
     builder = InlineKeyboardBuilder()
-    safe_index = clamp_bid_point_index(index, total)
+    total_pages = bid_point_viewer_page_count(total_points, page_size)
+    safe_page = clamp_bid_point_page(page, total_pages)
     nav_row: list[tuple[str, AutoShelfBidControlBidPoints]] = []
-    if safe_index > 0:
+    if safe_page > 0:
         nav_row.append(
             (
                 "◀️",
                 AutoShelfBidControlBidPoints(
                     adv_setting_original_id=adv_setting_original_id,
-                    index=safe_index - 1,
+                    index=safe_page - 1,
                 ),
             )
         )
-    if safe_index < total - 1:
+    if safe_page < total_pages - 1:
         nav_row.append(
             (
                 "▶️",
                 AutoShelfBidControlBidPoints(
                     adv_setting_original_id=adv_setting_original_id,
-                    index=safe_index + 1,
+                    index=safe_page + 1,
                 ),
             )
         )
@@ -134,7 +161,7 @@ def build_bid_point_viewer_keyboard(
         text="Обновить",
         callback_data=AutoShelfBidControlBidPoints(
             adv_setting_original_id=adv_setting_original_id,
-            index=safe_index,
+            index=safe_page,
         ).pack(),
     )
     builder.button(

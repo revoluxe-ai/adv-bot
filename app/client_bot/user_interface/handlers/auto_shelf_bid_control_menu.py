@@ -24,8 +24,9 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     BID_POINT_VIEWER_HEADER,
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    bid_point_viewer_page_count,
     build_bid_point_viewer_keyboard,
-    clamp_bid_point_index,
+    clamp_bid_point_page,
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
     render_bid_point_viewer_message,
@@ -58,11 +59,12 @@ async def _show_bid_point_viewer(
     points = select_covered_bid_points_for_cycle_viewer(view.cycle_bid_points)
     if not points:
         return False
-    safe_index = clamp_bid_point_index(index, len(points))
-    text = render_bid_point_viewer_message(safe_index, points)
+    total_pages = bid_point_viewer_page_count(len(points))
+    safe_page = clamp_bid_point_page(index, total_pages)
+    text = render_bid_point_viewer_message(safe_page, points)
     keyboard = build_bid_point_viewer_keyboard(
         adv_setting_original_id,
-        safe_index,
+        safe_page,
         len(points),
     )
     if callback.message is None:
