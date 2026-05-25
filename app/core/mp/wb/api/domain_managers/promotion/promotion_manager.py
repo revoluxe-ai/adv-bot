@@ -138,14 +138,17 @@ def _is_unsupported_campaign_for_normquery_minus(detail: str | None) -> bool:
     if not isinstance(detail, str):
         return False
     message = detail
+    payload: dict[str, Any] | None = None
     try:
         loaded_payload = json.loads(detail)
         if isinstance(loaded_payload, dict):
-            parsed_detail = loaded_payload.get("detail")
-            if isinstance(parsed_detail, str):
-                message = parsed_detail
+            payload = cast(dict[str, Any], loaded_payload)
     except json.JSONDecodeError:
         pass
+    if payload is not None:
+        parsed_detail = payload.get("detail")
+        if isinstance(parsed_detail, str):
+            message = parsed_detail
     return _UNSUPPORTED_NORMQUERY_MINUS_MESSAGE in message
 
 
