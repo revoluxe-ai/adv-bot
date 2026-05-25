@@ -253,6 +253,11 @@ class ComplexAdv:
         return self._adv_setting.rec_system_mode
 
     @property
+    def auto_shelf_bid_control_enabled(self) -> bool:
+        """Флаг включения control-контура общей ставки полок."""
+        return bool(self._adv_setting.auto_shelf_bid_control_enabled)
+
+    @property
     def traffic_clicks_dto(self) -> TrafficClicksDTO | None:
         if not self.rec_system_promotion_mode_active:
             return None

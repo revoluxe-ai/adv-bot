@@ -370,19 +370,28 @@ class WBShopDataManager:
         complex_advs = [adv for adv in complex_advs if adv.nmids]
         complex_advs.sort(key=lambda adv: adv.adv_setting_original_id)
         if load_extras and complex_advs:
-            try:
-                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
-            except Exception:
-                logger.exception(
-                    "Ошибка получения min_bids (cache) в get_complex_advs, "
-                    "shop_id=%s. Возвращаю базовый список без min_nmids_bids",
-                    self.shop_id,
-                )
-                min_bids = None
-            if min_bids is not None:
-                for adv in complex_advs:
-                    adv.attach_min_nmids_bids(min_bids)
+            await self.attach_min_nmids_bids(complex_advs)
         return complex_advs
+
+    async def attach_min_nmids_bids(self, complex_advs: list["ComplexAdv"]) -> None:
+        """Подтянуть min_nmids_bids для переданных кампаний (без traffic enrich).
+
+        Используется лёгкими корутинами (auto_shelf_bid_control), где load_extras=False.
+        """
+        if not complex_advs:
+            return None
+        try:
+            min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+        except Exception:
+            logger.exception(
+                "Ошибка получения min_bids (cache) в attach_min_nmids_bids, shop_id=%s",
+                self.shop_id,
+            )
+            return None
+        if min_bids is not None:
+            for adv in complex_advs:
+                adv.attach_min_nmids_bids(min_bids)
+        return None
 
     @staticmethod
     def _build_wb_adv_dto_from_parts(

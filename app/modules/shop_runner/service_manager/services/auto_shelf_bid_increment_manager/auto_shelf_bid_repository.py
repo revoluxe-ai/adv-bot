@@ -32,6 +32,9 @@ from .dto import AutoShelfBidSnapshot, AutoShelfRawStat
 from .redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
+from ..auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+    AutoShelfBidControlRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,7 @@ class AutoShelfBidRepository:
             auto_recommendations_bid_cache_manager
         )
         self._max_bid_age_sec = max(30, max_bid_age_sec)
+        self._control_repository = AutoShelfBidControlRepository()
 
     def _today_date(self) -> str:
         """Текущая дата отчёта YYYY-MM-DD в tz репозитория."""
@@ -217,7 +221,6 @@ class AutoShelfBidRepository:
         return cached.bid_minor
 
     async def get_current_mode(self, nmid: int) -> str:
-        """Режим размещения; v1 всегда main."""
-        _ = nmid
-        return "main"
+        """Вернуть mode из control state при включенном флаге, иначе main."""
+        return await self._control_repository.get_mode_for_nmid(nmid)
 

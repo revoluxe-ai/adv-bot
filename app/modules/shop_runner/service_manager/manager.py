@@ -60,6 +60,10 @@ from .services.auto_shelf_bid_increment_manager import AutoShelfBidIncrementMana
 from .services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
+from .services.auto_shelf_bid_control_manager import (
+    AutoShelfBidControlManager,
+    AutoShelfBidSetter,
+)
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -166,6 +170,10 @@ class CoroutinesManager:
             redis_client=redis_client_wrapper,
             wb_manager_hub=self._wb_manager_hub,
             auto_recommendations_bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+        )
+        self._auto_shelf_bid_control_manager = AutoShelfBidControlManager(
+            bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+            wb_bid_setter=AutoShelfBidSetter(self._wb_manager_hub.wb_modifier),
         )
         self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
             redis_client_wrapper
@@ -1367,6 +1375,39 @@ class CoroutinesManager:
                     exc_info=result,
                 )
 
+        return None
+
+    @while_coroutine_decorator(60 * 5, 60)
+    async def auto_shelf_bid_control(self) -> None:
+        """Цикл управления общей ставкой полок для single-nmid Auto-РК."""
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
+        if not complex_advs:
+            return None
+        control_candidates = [
+            adv
+            for adv in complex_advs
+            if adv.auto_shelf_bid_control_enabled and len(adv.nmids) == 1
+        ]
+        if control_candidates:
+            await self._wb_shop_data_manager.attach_min_nmids_bids(control_candidates)
+        handlers: list[Callable[[], Awaitable[None]]] = []
+        for adv in complex_advs:
+            handler = functools.partial(self._auto_shelf_bid_control_manager.update, adv)
+            handlers.append(handler)
+        max_workers = self._max_workers_for(len(handlers), 16)
+        results = await run_tasks(
+            handlers=handlers,
+            max_workers=max_workers,
+            return_exceptions=True,
+        )
+        for adv, result in zip(complex_advs, results, strict=True):
+            if isinstance(result, BaseException):
+                logger.exception(
+                    "auto_shelf_bid_control failed for adv_id=%s shop_id=%s",
+                    adv.auto_adv_id,
+                    adv.shop_id,
+                    exc_info=result,
+                )
         return None
 
     @while_coroutine_decorator(60, 60)

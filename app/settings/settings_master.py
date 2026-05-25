@@ -14,7 +14,7 @@ import dotenv
 
 # TODO: Сделать уведомлятор об исправлении ошибок в боте
 
-dotenv.load_dotenv()
+_ = dotenv.load_dotenv()
 import os
 
 
@@ -691,6 +691,24 @@ class Settings:
         if value == "true":
             return True
         return False
+
+    @property
+    def AUTO_SHELF_BID_CONTROL_DRY_RUN(self) -> bool:
+        """Dry-run для control-модуля полок.
+
+        Важно:
+            - если env-переменная отсутствует, возвращаем False (real mode fallback);
+            - явное значение `true|false` обязательно валидируется.
+        """
+        value = os.getenv("AUTO_SHELF_BID_CONTROL_DRY_RUN")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise Exception("AUTO_SHELF_BID_CONTROL_DRY_RUN env var is not bool")
 
     @property
     def PROXY(self) -> str | None:

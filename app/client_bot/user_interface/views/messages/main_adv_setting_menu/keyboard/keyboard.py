@@ -168,6 +168,15 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Управление ставкой в полках",
+            callback_data=callbacks.AutoShelfBidControlMenu(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+            ).pack(),
+        )
+    )
 
     _ = builder.row(
         InlineKeyboardButton(

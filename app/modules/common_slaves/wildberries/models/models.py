@@ -601,6 +601,13 @@ class AdvSetting(BaseTable):
     rec_system_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    auto_shelf_bid_control_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
+    )
     # TODO: Завернуть server_default в text
     hide_zero_views_keywords: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
