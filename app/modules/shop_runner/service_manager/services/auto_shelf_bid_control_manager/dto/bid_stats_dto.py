@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,6 +13,7 @@ class BidStatsDTO:
     bid_minor: int
     currency: str
     mode: str | None
+    last_interval_at: datetime | None
     impressions: int
     clicks: int
     carts: int

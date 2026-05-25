@@ -12,6 +12,7 @@ class BidPointStatsDTO:
 
     bid_minor: int  # копейки (как в CH auto_shelf_bid_intervals)
     currency: str
+    last_interval_at: datetime | None  # последний интервал по ставке (для сортировки UI)
     impressions: int
     clicks: int
     carts: int
@@ -56,6 +57,7 @@ class AutoShelfBidControlViewDTO:
     test_impressions: int | None
     main_impressions: int | None
     covered_points_count: int
+    bid_points_total: int  # всего точек за отчётный день (до лимита в рендере)
     bid_points: list[BidPointStatsDTO]
     last_reason: str | None
     warnings: list[str]

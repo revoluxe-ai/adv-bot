@@ -44,10 +44,13 @@
 4. Переходы `test <-> main` основаны на порогах показов.
 5. `best_bid` — минимальный `cart_cpa` по точкам с показами; при `carts=0` в CPA
    используется 1 корзина (`spend / greatest(carts, 1)`). Окно: отчётный день, затем
-   текущий цикл, затем fallbacks. Переход test→main: `save_state` до PATCH WB.
+   текущий цикл, затем fallbacks. Смена фазы test↔main: `save_state` до PATCH WB
+   (`_persist_state_then_set_bid`).
 6. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 7. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
+8. Telegram «Покрытые ставки»: до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT` (5) последних
+   покрытых точек по `last_interval_at`; при большем числе — строка «… ещё N».
 
 ## Conversion policy v1 (setter)
 

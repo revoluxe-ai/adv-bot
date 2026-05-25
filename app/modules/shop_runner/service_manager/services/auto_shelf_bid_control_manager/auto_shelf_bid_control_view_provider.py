@@ -104,6 +104,7 @@ class AutoShelfBidControlViewProvider:
                 test_impressions=None,
                 main_impressions=None,
                 covered_points_count=0,
+                bid_points_total=0,
                 bid_points=[],
                 last_reason="adv_setting_not_found",
                 warnings=["adv_setting_not_found"],
@@ -222,10 +223,12 @@ class AutoShelfBidControlViewProvider:
         if not bid_units_confirmed:
             warnings.append("bid_units_gate_not_confirmed")
 
+        bid_points_total = len(bid_stats)
         bid_points = [
             BidPointStatsDTO(
                 bid_minor=item.bid_minor,
                 currency=item.currency,
+                last_interval_at=item.last_interval_at,
                 impressions=item.impressions,
                 clicks=item.clicks,
                 carts=item.carts,
@@ -306,6 +309,7 @@ class AutoShelfBidControlViewProvider:
             test_impressions=test_impressions,
             main_impressions=main_impressions,
             covered_points_count=covered_points_count,
+            bid_points_total=bid_points_total,
             bid_points=bid_points,
             last_reason=(state.last_reason if state else None),
             warnings=warnings,

@@ -54,6 +54,7 @@ def _view(min_bid: int | None = None) -> AutoShelfBidControlViewDTO:
         test_impressions=0,
         main_impressions=0,
         covered_points_count=0,
+        bid_points_total=0,
         bid_points=[],
         last_reason=None,
         warnings=[],

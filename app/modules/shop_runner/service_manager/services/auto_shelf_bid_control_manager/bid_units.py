@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
 KOPECKS_PER_RUB = 100
 # Часовой пояс отображения меток цикла в Telegram (хранение в PG — UTC).
 TELEGRAM_DISPLAY_TZ = "Europe/Moscow"
+# Сколько последних тестовых точек ставки показывать в блоке «Покрытые ставки».
+TELEGRAM_BID_POINTS_DISPLAY_LIMIT = 5
 
 # WB API: ставка в копейках (200 ₽ → 20000). 500 ₽ → 50000.
 DEFAULT_MAX_BID_MINOR = 50_000

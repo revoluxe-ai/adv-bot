@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -36,10 +36,21 @@ class AutoShelfBidControlAnalyticsRepository:
         cart_cpa = spend / max(carts, 1)
         ctr = (clicks / impressions) if impressions > 0 else None
         cart_cr = (carts / clicks) if clicks > 0 else None
+        last_raw = row.get("last_interval_at")
+        last_interval_at: datetime | None
+        if last_raw is None:
+            last_interval_at = None
+        elif isinstance(last_raw, datetime):
+            last_interval_at = last_raw
+        else:
+            last_interval_at = datetime.fromisoformat(str(last_raw))
+        if last_interval_at is not None and last_interval_at.tzinfo is None:
+            last_interval_at = last_interval_at.replace(tzinfo=timezone.utc)
         return BidStatsDTO(
             bid_minor=int(row["bid_minor"]),
             currency=str(row["currency"]),
             mode=(None if row.get("mode") is None else str(row["mode"])),
+            last_interval_at=last_interval_at,
             impressions=impressions,
             clicks=clicks,
             carts=carts,

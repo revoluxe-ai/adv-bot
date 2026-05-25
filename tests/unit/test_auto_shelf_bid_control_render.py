@@ -37,6 +37,7 @@ def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
         test_impressions=None,
         main_impressions=None,
         covered_points_count=0,
+        bid_points_total=0,
         bid_points=[],
         last_reason=None,
         warnings=[],

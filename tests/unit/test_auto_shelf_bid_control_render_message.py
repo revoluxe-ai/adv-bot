@@ -47,10 +47,12 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
         test_impressions=10,
         main_impressions=0,
         covered_points_count=0,
+        bid_points_total=1,
         bid_points=[
             BidPointStatsDTO(
                 bid_minor=20_000,
                 currency="RUB",
+                last_interval_at=datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc),
                 impressions=100,
                 clicks=5,
                 carts=2,

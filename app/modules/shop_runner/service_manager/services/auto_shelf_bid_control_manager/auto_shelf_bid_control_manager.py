@@ -169,6 +169,25 @@ class AutoShelfBidControlManager:
             currency=currency,
         )
 
+    async def _persist_state_then_set_bid(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        bid_minor: int,
+    ) -> None:
+        """Сохранить фазу цикла в PG, затем PATCH WB.
+
+        Единый порядок для test↔main: при сбое PATCH increment/control на
+        следующем тике видят верный ``current_mode`` и дожимают ставку.
+        """
+        await self._repository.save_state(state)
+        await self._set_target_bid(
+            complex_adv,
+            bid_minor=bid_minor,
+            currency=state.currency,
+        )
+
     async def _choose_best_bid_with_fallback(
         self,
         *,
@@ -241,13 +260,14 @@ class AutoShelfBidControlManager:
             test_started_at=now,
             last_reason=ControlReason.INITIALIZED,
         )
+        saved = await self._repository.save_state(state)
         if actual_bid_minor != test_bid:
             await self._set_target_bid(
                 complex_adv,
                 bid_minor=test_bid,
                 currency=settings_obj.currency,
             )
-        return await self._repository.save_state(state)
+        return saved
 
     async def update(self, complex_adv: ComplexAdv) -> None:
         """Сделать один тик управления ставкой для одной кампании."""
@@ -413,12 +433,10 @@ class AutoShelfBidControlManager:
         state.current_mode = "main"
         state.main_started_at = now
         state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-        # Сначала PG: иначе при ошибке PATCH остаёмся в test с устаревшим test_waiting.
-        await self._repository.save_state(state)
-        await self._set_target_bid(
+        await self._persist_state_then_set_bid(
             complex_adv,
+            state=state,
             bid_minor=best_bid,
-            currency=state.currency,
         )
         logger.info(
             "auto_shelf_bid_control_switch_to_main auto_adv_id=%s nmid=%s main_bid=%s reason=%s",
@@ -528,12 +546,11 @@ class AutoShelfBidControlManager:
             state.test_started_at = now
             state.main_started_at = None
             state.last_reason = ControlReason.CYCLE_COMPLETED
-            await self._set_target_bid(
+            await self._persist_state_then_set_bid(
                 complex_adv,
+                state=state,
                 bid_minor=new_test_bid,
-                currency=state.currency,
             )
-            await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_cycle_completed auto_adv_id=%s nmid=%s new_test_bid=%s best_main_bid=%s reason=%s",
                 auto_adv_id,
@@ -548,12 +565,11 @@ class AutoShelfBidControlManager:
         state.current_mode = "test"
         state.test_started_at = now
         state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
-        await self._set_target_bid(
+        await self._persist_state_then_set_bid(
             complex_adv,
+            state=state,
             bid_minor=next_test_bid,
-            currency=state.currency,
         )
-        await self._repository.save_state(state)
         logger.info(
             "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
             auto_adv_id,

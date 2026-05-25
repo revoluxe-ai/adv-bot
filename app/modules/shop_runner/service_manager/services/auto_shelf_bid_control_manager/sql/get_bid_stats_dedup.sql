@@ -22,7 +22,8 @@ SELECT
     sum(dedup.delta_clicks) AS clicks,
     sum(dedup.delta_carts) AS carts,
     sum(dedup.delta_orders) AS orders,
-    sum(dedup.delta_spend) AS spend
+    sum(dedup.delta_spend) AS spend,
+    max(dedup.src_ts) AS last_interval_at
 FROM
 (
     SELECT
@@ -46,4 +47,4 @@ FROM
 WHERE (%(mode)s IS NULL OR dedup.mode = %(mode)s)
   AND (%(bid_minor)s IS NULL OR dedup.bid_minor = %(bid_minor)s)
 GROUP BY dedup.bid_minor, dedup.currency
-ORDER BY dedup.bid_minor ASC
+ORDER BY last_interval_at DESC, dedup.bid_minor ASC

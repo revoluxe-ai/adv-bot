@@ -25,6 +25,8 @@ def test_get_bid_stats_dedup_groups_by_bid_not_mode() -> None:
     sql = (_SQL_DIR / "get_bid_stats_dedup.sql").read_text(encoding="utf-8")
     assert "GROUP BY dedup.bid_minor, dedup.currency" in sql
     assert "GROUP BY dedup.bid_minor, dedup.currency, dedup.mode" not in sql
+    assert "max(dedup.src_ts) AS last_interval_at" in sql
+    assert "ORDER BY last_interval_at DESC" in sql
 
 
 def test_get_best_bid_by_cart_cpa_groups_by_bid_not_mode() -> None:
