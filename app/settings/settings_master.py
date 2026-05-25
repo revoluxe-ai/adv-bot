@@ -362,15 +362,26 @@ class Settings:
             return 100.0
         return float(value)
 
+    @staticmethod
+    def _parse_comma_separated_shop_ids(env_var: str) -> list[str]:
+        value = os.getenv(env_var)
+        if not value:
+            return []
+        return [
+            shop_id.strip()
+            for shop_id in value.split(",")
+            if shop_id.strip()
+        ]
+
     @property
     def SHOP_FILTER_LIST(self) -> list[str]:
-        value = os.getenv("SHOP_FILTER_LIST")
-        if value:
-            shops_ids = value.split(",")
-            shops_ids = [shop_id.strip() for shop_id in shops_ids]
-            return shops_ids
-        else:
-            return []
+        """Whitelist shop_id для shop-runner: только перечисленные магазины в постановке."""
+        return self._parse_comma_separated_shop_ids("SHOP_FILTER_LIST")
+
+    @property
+    def SHOP_EXCLUDE_LIST(self) -> list[str]:
+        """Blacklist shop_id для shop-runner: исключить из постановки (legacy и воркеры)."""
+        return self._parse_comma_separated_shop_ids("SHOP_EXCLUDE_LIST")
 
     @property
     def PAUSE_AFTER_PARSING(self) -> int | None:

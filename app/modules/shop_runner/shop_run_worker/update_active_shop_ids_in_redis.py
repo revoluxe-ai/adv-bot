@@ -2,24 +2,17 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .redis_manager import RedisShopManager
 from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from ...shop_id_filters import apply_shop_id_filters
 
 
 async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:
     # Получение списка магазинов с активными настройками
-    stmt = (
-        select(WBCabinet.shop_id).where(WBCabinet.active)
-    )
-
-    shop_filter_list: list[str] = settings.SHOP_FILTER_LIST
-
-    if shop_filter_list:
-        stmt = stmt.filter(WBCabinet.shop_id.in_(shop_filter_list))
+    stmt = select(WBCabinet.shop_id).where(WBCabinet.active)
+    stmt = apply_shop_id_filters(stmt, WBCabinet.shop_id)
     async with sm() as session:
         result = await session.execute(stmt)
         all_needs_for_run_shop_ids = list(result.scalars().all())
