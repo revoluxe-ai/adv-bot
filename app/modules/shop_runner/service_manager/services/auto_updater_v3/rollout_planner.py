@@ -1,4 +1,8 @@
-"""RolloutPlanner: MIN→OPT→MAX layer policy for v3 outside shelf promotion phase."""
+"""RolloutPlanner: MIN→OPT→MAX — **послойная** стратегия (по уровню для всех).
+
+Вне полочной фазы и при ``organic > shelf`` в полочной фазе: ``plan_rollout_underperform_one``
+с ``strict`` слоями по ``aggressiveness``. Поштучная стратегия — в ``shelf_promotion_policy``.
+"""
 
 from __future__ import annotations
 

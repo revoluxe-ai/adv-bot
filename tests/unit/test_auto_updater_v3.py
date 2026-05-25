@@ -9,6 +9,12 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ActivationStrategy,
+    ShelfClickMode,
+    activation_strategy_for_shelf_underperform,
+    resolve_shelf_click_mode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3ActionType,
 )
@@ -23,6 +29,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
     select_v3_actions,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    TrafficClicksDTO,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
@@ -328,6 +337,239 @@ def test_shelf_underperform_prefers_pending_shelf_keyword() -> None:
     )
     assert len(actions) == 1
     assert actions[0].keyword_setting_id == 1
+
+
+@pytest.mark.unit
+def test_resolve_shelf_click_mode_and_activation_strategy() -> None:
+    assert resolve_shelf_click_mode(None) == ShelfClickMode.UNKNOWN
+    assert (
+        resolve_shelf_click_mode(
+            TrafficClicksDTO(organic_clicks=10, shelf_clicks=5, keyword_clicks=3)
+        )
+        == ShelfClickMode.ORGANIC_DOMINANT
+    )
+    assert (
+        resolve_shelf_click_mode(
+            TrafficClicksDTO(organic_clicks=5, shelf_clicks=10, keyword_clicks=3)
+        )
+        == ShelfClickMode.SHELF_DOMINANT_OR_EQUAL
+    )
+    assert (
+        resolve_shelf_click_mode(
+            TrafficClicksDTO(organic_clicks=7, shelf_clicks=7, keyword_clicks=3)
+        )
+        == ShelfClickMode.SHELF_DOMINANT_OR_EQUAL
+    )
+    assert (
+        activation_strategy_for_shelf_underperform(ShelfClickMode.ORGANIC_DOMINANT)
+        == ActivationStrategy.LAYERED
+    )
+    assert (
+        activation_strategy_for_shelf_underperform(ShelfClickMode.SHELF_DOMINANT_OR_EQUAL)
+        == ActivationStrategy.PIECEWISE
+    )
+    assert (
+        activation_strategy_for_shelf_underperform(ShelfClickMode.UNKNOWN)
+        == ActivationStrategy.PIECEWISE
+    )
+
+
+@pytest.mark.unit
+def test_shelf_underperform_organic_dominant_uses_layered_general_pool() -> None:
+    """organic > shelf → послойная MIN, без shelf-only."""
+    prof = _sample_profile()
+    pending = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="shelf",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.03,
+            hard_status=1,
+            status=KeywordStatus.BAD,
+            reason=KeywordStatusReason.WHITE_LIST,
+        ),
+        position_profile=prof,
+    )
+    high_conv = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="other",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.9,
+            hard_status=2,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[pending, high_conv],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].keyword_setting_id == 2
+    assert actions[0].reason == "rollout_off_to_min"
+
+
+@pytest.mark.unit
+def test_shelf_underperform_shelf_dominant_ignores_aggressiveness() -> None:
+    """shelf >= organic → поштучная shelf; aggr не влияет."""
+    prof = _sample_profile()
+    pending = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="shelf",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.03,
+            hard_status=1,
+            status=KeywordStatus.BAD,
+            reason=KeywordStatusReason.WHITE_LIST,
+        ),
+        position_profile=prof,
+    )
+    high_conv = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="other",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.9,
+            hard_status=2,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[high_conv, pending],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        rollout_aggressiveness=3,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].reason == "piecewise_shelf"
+
+
+@pytest.mark.unit
+def test_shelf_underperform_piecewise_non_shelf_when_shelf_exhausted() -> None:
+    """shelf pending пуст → поштучная non-shelf, не MAX fallback."""
+    prof = _sample_profile()
+    non_shelf_low = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="low",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.02,
+            hard_status=2,
+            status=KeywordStatus.GOOD,
+        ),
+        position_profile=prof,
+    )
+    non_shelf_high = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="high",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.08,
+            hard_status=2,
+            status=KeywordStatus.GOOD,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[non_shelf_low, non_shelf_high],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        rollout_aggressiveness=3,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].keyword_setting_id == 2
+    assert actions[0].reason == "piecewise_non_shelf"
+
+
+@pytest.mark.unit
+def test_shelf_underperform_unknown_click_mode_matches_shelf_dominant() -> None:
+    """DTO None → поштучная как shelf >= organic."""
+    prof = _sample_profile()
+    pending = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="shelf",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.03,
+            hard_status=1,
+            status=KeywordStatus.BAD,
+            reason=KeywordStatusReason.WHITE_LIST,
+        ),
+        position_profile=prof,
+    )
+    other = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="other",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.9,
+            hard_status=2,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[other, pending],
+        shelf_promotion_active=True,
+    )
+    assert len(actions) == 1
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].reason == "piecewise_shelf"
+
+
+@pytest.mark.unit
+def test_shelf_underperform_piecewise_tie_break_by_keyword_setting_id() -> None:
+    prof = _sample_profile()
+    kw_a = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="b",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.05,
+            hard_status=2,
+            status=KeywordStatus.GOOD,
+        ),
+        position_profile=prof,
+    )
+    kw_b = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="a",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.05,
+            hard_status=2,
+            status=KeywordStatus.GOOD,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[kw_a, kw_b],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert len(actions) == 1
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].reason == "piecewise_non_shelf"
 
 
 @pytest.mark.unit

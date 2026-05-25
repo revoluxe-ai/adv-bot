@@ -19,6 +19,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     SalesStates,
     detect_campaign_state,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    resolve_shelf_click_mode_from_adv,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     apply_v3_actions,
 )
@@ -95,6 +98,9 @@ async def process_adv_v3(
         contexts=contexts,
         shelf_promotion_active=complex_adv.shelf_promotion_active,
         rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
+        shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
+        if complex_adv.shelf_promotion_active
+        else None,
     )
     await apply_v3_actions(actions)
 
