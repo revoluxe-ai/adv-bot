@@ -104,6 +104,10 @@ async def test_adv_settings_auto_update(
             new=get_async_session_mock,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_version_migration.sm",
+            new=get_async_session_mock,
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager._WBShopDataManager__get_adv_id_to_search_adv_map",
             new=AsyncMock(return_value={}), # Возвращаем пустой словарь AdvSetting
         ),

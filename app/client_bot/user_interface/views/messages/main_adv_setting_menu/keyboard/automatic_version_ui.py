@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.callbacks import (
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 # Версии, отображаемые в подменю (отдельная кнопка на каждую).
-AUTOMATIC_VERSION_UI_CHOICES: Final[tuple[int, ...]] = (1, 2, 3)
+AUTOMATIC_VERSION_UI_CHOICES: Final[tuple[int, ...]] = (2, 3)
 
 # FSM: главное меню РК (фото + клавиатура) при открытии подменю — для sync кнопки «сейчас V…».
 FSM_ADV_AUTO_VER_PARENT_MESSAGE_ID = "adv_auto_ver_parent_message_id"
@@ -22,8 +22,10 @@ FSM_ADV_AUTO_VER_MENU_ADV_SETTING_ID = "adv_auto_ver_menu_adv_setting_id"
 
 
 def normalize_automatic_version_ui(raw: int | None) -> int:
-    """None в БД трактуем как продуктовый дефолт (2)."""
-    return 2 if raw is None else raw
+    """None и deprecated V1 в БД отображаем как продуктовый дефолт (2)."""
+    if raw is None or raw == 1:
+        return 2
+    return raw
 
 
 def show_relevant_phrase_toggle(version: int) -> bool:

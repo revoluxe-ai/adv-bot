@@ -519,3 +519,65 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
     assert kwargs["return_exceptions"] is False
     handlers = run_tasks_mock.call_args.args[0]
     assert len(handlers) == 2
+
+
+@pytest.mark.asyncio
+async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
+    monkeypatch,
+    access_mock,
+    adv_setting_mock,
+    keywords_mocks,
+    client_session_mock,
+    fake_redis,
+):
+    monkeypatch.setenv("AUTO_SETTING_ACTIVE", "true")
+    access_mock.shop_id = "shop-contract"
+    _configure_adv_for_v2_pipeline(adv_setting_mock)
+    adv_setting_mock.automatic_version = 1
+    wb_api = WBApi(access_mock, client_session_mock)
+    adv = _make_complex_adv(wb_api, adv_setting_mock, keywords_mocks, search_adv=_search_adv_started())
+
+    execute_result = MagicMock()
+    execute_result.rowcount = 1
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=execute_result)
+    session.commit = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+
+    fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
+
+    async def _mget_entries(_shop_id: str, adv_ids: list[int]):
+        return [(aid, fresh, "hit") for aid in adv_ids]
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
+            new=AsyncMock(return_value=[adv]),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_version_migration.sm",
+            return_value=session_cm,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.manager.run_tasks",
+            new=AsyncMock(return_value=[None]),
+        ) as run_tasks_mock,
+    ):
+        manager = CoroutinesManager(
+            wb_api,
+            RedisClient(redis_client=fake_redis),
+            tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=MagicMock(spec=PlanFactReader),
+            wb_manager_hub=MagicMock(),
+        )
+        manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
+        await manager.adv_settings_auto_update.__wrapped__(manager)
+
+    assert adv.auto_updater_version == 2
+    session.execute.assert_awaited_once()
+    run_tasks_mock.assert_called_once()
+    handlers = run_tasks_mock.call_args.args[0]
+    assert len(handlers) == 1
+    assert callable(handlers[0])
