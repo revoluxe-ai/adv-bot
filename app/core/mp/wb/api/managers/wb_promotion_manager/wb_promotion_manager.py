@@ -14,6 +14,12 @@ from app.shared.domains.wb.enums import AdvType
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
 )
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    PatchApiAdvertV1BidsBody,
+    PatchApiAdvertV1BidsBodyBidsItem,
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItem,
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,13 +119,6 @@ class WBModifier:
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
         """Обновляет CPM авто-кампании через PATCH /api/advert/v1/bids (ставки в копейках)."""
-        from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
-            PatchApiAdvertV1BidsBody,
-            PatchApiAdvertV1BidsBodyBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
-        )
-
         placement = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
         nm_bids = [
             PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
@@ -141,12 +140,8 @@ class WBModifier:
 
     async def _resolve_shelf_bid_placement(
         self, adv_id: int
-    ) -> "PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement":
+    ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement:
         """Placement для ставки полок: по включённым зонам РК, иначе recommendations."""
-        from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
-        )
-
         default = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
         campaigns = await self._promotion_manager.get_adverts_v2_by_ids([int(adv_id)])
         if not campaigns:
@@ -166,13 +161,6 @@ class WBModifier:
         Placement не COMBINED: для многих Auto-РК WB отдаёт 400 «combined placement is disabled»;
         для полок используем recommendations (или search, если рекомендации выключены).
         """
-        from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
-            PatchApiAdvertV1BidsBody,
-            PatchApiAdvertV1BidsBodyBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
-        )
-
         if not nm_bid_kopecks:
             return None
         placement = await self._resolve_shelf_bid_placement(adv_id)
