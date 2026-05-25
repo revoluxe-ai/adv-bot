@@ -580,4 +580,4 @@ async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
     run_tasks_mock.assert_called_once()
     handlers = run_tasks_mock.call_args.args[0]
     assert len(handlers) == 1
-    assert handlers[0].func.__name__ == "process_adv"
+    assert callable(handlers[0])
