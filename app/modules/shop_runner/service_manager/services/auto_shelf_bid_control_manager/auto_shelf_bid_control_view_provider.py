@@ -20,6 +20,7 @@ from .settings_normalizer import compute_settings_repair, repair_state_test_bid_
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .bid_units import (
     report_day_start_utc,
+    resolve_test_segment_start_utc,
     truncate_datetime_to_seconds,
     wb_min_cpm_rub_to_bid_minor,
 )
@@ -251,9 +252,13 @@ class AutoShelfBidControlViewProvider:
 
         test_impressions: int | None = None
         if state is not None and state.current_test_bid_minor is not None:
+            test_from_ts = resolve_test_segment_start_utc(
+                test_started_at=state.test_started_at,
+                current_cycle_started_at=state.current_cycle_started_at,
+            )
             test_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
-                from_ts=stats_from_ts,
+                from_ts=test_from_ts,
                 currency=currency,
                 bid_minor=state.current_test_bid_minor,
             )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
@@ -9,6 +11,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
     format_bid_minor_for_telegram,
+    resolve_test_segment_start_utc,
     rubles_to_bid_minor,
     wb_min_cpm_rub_to_bid_minor,
 )
@@ -35,3 +38,38 @@ def test_format_bid_minor_for_telegram() -> None:
 
 def test_rubles_to_bid_minor() -> None:
     assert rubles_to_bid_minor(500) == 50_000
+
+
+def test_resolve_test_segment_start_prefers_test_started_at() -> None:
+    test_at = datetime(2026, 5, 25, 14, 0, 0, tzinfo=timezone.utc)
+    cycle_at = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
+    assert (
+        resolve_test_segment_start_utc(
+            test_started_at=test_at,
+            current_cycle_started_at=cycle_at,
+        )
+        == test_at
+    )
+
+
+def test_resolve_test_segment_start_falls_back_to_cycle() -> None:
+    cycle_at = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
+    assert (
+        resolve_test_segment_start_utc(
+            test_started_at=None,
+            current_cycle_started_at=cycle_at,
+        )
+        == cycle_at
+    )
+
+
+def test_resolve_test_segment_start_uses_fallback_now() -> None:
+    now = datetime(2026, 5, 25, 16, 0, 0, tzinfo=timezone.utc)
+    assert (
+        resolve_test_segment_start_utc(
+            test_started_at=None,
+            current_cycle_started_at=None,
+            fallback_now=now,
+        )
+        == now
+    )

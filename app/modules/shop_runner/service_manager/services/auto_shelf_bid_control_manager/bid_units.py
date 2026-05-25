@@ -39,6 +39,24 @@ def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:
     return local_start.astimezone(timezone.utc)
 
 
+def resolve_test_segment_start_utc(
+    *,
+    test_started_at: datetime | None,
+    current_cycle_started_at: datetime | None,
+    fallback_now: datetime | None = None,
+) -> datetime:
+    """Начало текущего test-сегмента в UTC (порог ``target_test_impressions``).
+
+    Аналог ``main_started_at`` для main: показы до нового test/cycle reset не
+    засчитываются в завершение фазы test.
+    """
+    if test_started_at is not None:
+        return test_started_at
+    if current_cycle_started_at is not None:
+        return current_cycle_started_at
+    return fallback_now or datetime.now(timezone.utc)
+
+
 def rubles_to_bid_minor(rubles: int) -> int:
     """Перевести рубли из Telegram-ввода в внутренние копейки."""
     return int(rubles) * KOPECKS_PER_RUB

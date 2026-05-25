@@ -17,10 +17,11 @@
 
 ### Тест vs main (семантика)
 
-- **Тест (аналитика)** — любые показы полок по точке ставки `bid_minor`, независимо от
-  метки `mode` в CH (включая пассивный прогон при выключенном control и legacy `main`).
-- **main (цикл control)** — фаза удержания лучшей ставки после обзора; прогресс main
-  считается по `mode=main` и `current_main_bid_minor`.
+- **Тест (аналитика «Покрытые ставки»)** — показы по `bid_minor` с начала отчётного дня.
+- **Тест (порог цикла)** — прогресс `target_test_impressions` с `test_started_at`
+  (fallback: `current_cycle_started_at`), как main с `main_started_at`.
+- **main (цикл control)** — прогресс main: `mode=main`, `current_main_bid_minor`,
+  `from_ts=main_started_at`.
 
 ### Legacy repair (без миграции PG)
 

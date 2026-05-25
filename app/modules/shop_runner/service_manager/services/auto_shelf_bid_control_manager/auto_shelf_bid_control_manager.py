@@ -20,7 +20,11 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
-from .bid_units import report_day_start_utc, wb_min_cpm_rub_to_bid_minor
+from .bid_units import (
+    report_day_start_utc,
+    resolve_test_segment_start_utc,
+    wb_min_cpm_rub_to_bid_minor,
+)
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
@@ -391,9 +395,14 @@ class AutoShelfBidControlManager:
             test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
             state.current_test_bid_minor = test_bid
             state.test_started_at = state.test_started_at or now
+        test_started_at = resolve_test_segment_start_utc(
+            test_started_at=state.test_started_at,
+            current_cycle_started_at=state.current_cycle_started_at,
+            fallback_now=now,
+        )
         test_impressions = await self._analytics.get_impressions(
             nmid=nmid,
-            from_ts=report_day_start_utc(),
+            from_ts=test_started_at,
             currency=state.currency,
             bid_minor=test_bid,
         )
