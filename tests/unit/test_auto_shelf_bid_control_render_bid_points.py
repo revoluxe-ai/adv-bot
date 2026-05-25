@@ -86,12 +86,7 @@ def test_render_bid_point_viewer_same_line_format_as_main_screen() -> None:
         spend=4646.77,
         cart_cpa=37.47,
     )
-    view = replace(
-        _view_with_bid_point(),
-        cycle_covered_points_count=3,
-        cycle_bid_points=[covered],
-    )
-    text = render_bid_point_viewer_message(view, 1, [covered, covered, covered])
+    text = render_bid_point_viewer_message(1, [covered, covered, covered])
     assert "Покрытые ставки (текущий цикл):" in text
     assert (
         "200 ₽: показы 23848, корзины 124, расход 4646.77 ₽, CPA корзины 37.47 ₽"

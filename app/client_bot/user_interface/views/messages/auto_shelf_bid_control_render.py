@@ -84,7 +84,6 @@ BID_POINT_VIEWER_HEADER = "Покрытые ставки (текущий цик�
 
 
 def render_bid_point_viewer_message(
-    view: AutoShelfBidControlViewDTO,
     index: int,
     points: list[BidPointStatsDTO],
 ) -> str:

@@ -59,7 +59,7 @@ async def _show_bid_point_viewer(
     if not points:
         return False
     safe_index = clamp_bid_point_index(index, len(points))
-    text = render_bid_point_viewer_message(view, safe_index, points)
+    text = render_bid_point_viewer_message(safe_index, points)
     keyboard = build_bid_point_viewer_keyboard(
         adv_setting_original_id,
         safe_index,
