@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -67,7 +68,6 @@ def _service(
 ) -> AutoShelfBidControlTelegramService:
     return AutoShelfBidControlTelegramService(
         redis_client=MagicMock(),
-        client_session=MagicMock(),
         repository=repository,
         view_provider=view_provider,
     )
@@ -87,6 +87,56 @@ async def test_enable_creates_default_settings_when_missing() -> None:
 
     repository.get_or_create_default_settings.assert_awaited_once_with(nmid=111)
     repository.set_enabled.assert_awaited_once_with(1, True)
+
+
+@pytest.mark.asyncio
+async def test_enable_does_not_shrink_repaired_max_to_actual_only() -> None:
+    """После build_view legacy repair max=50k не затирается сравнением со stale 500."""
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_adv([111]))
+    repository.get_or_create_default_settings = AsyncMock(
+        return_value=SimpleNamespace(max_bid_minor=500)
+    )
+    repository.set_enabled = AsyncMock()
+    repository.update_settings = AsyncMock()
+    view_provider = MagicMock()
+    repaired = replace(
+        _view(min_bid=12_000),
+        actual_bid_minor=31_000,
+        max_bid_minor=50_000,
+    )
+    view_provider.build_view = AsyncMock(side_effect=[repaired, repaired])
+    service = _service(repository, view_provider)
+
+    await service.enable(1)
+
+    repository.update_settings.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_enable_raises_max_when_repaired_ceiling_below_actual() -> None:
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_adv([111]))
+    repository.get_or_create_default_settings = AsyncMock(
+        return_value=SimpleNamespace(max_bid_minor=500)
+    )
+    repository.set_enabled = AsyncMock()
+    repository.update_settings = AsyncMock(return_value=SimpleNamespace())
+    view_provider = MagicMock()
+    repaired = replace(
+        _view(min_bid=12_000),
+        actual_bid_minor=55_000,
+        max_bid_minor=40_000,
+    )
+    view_provider.build_view = AsyncMock(side_effect=[repaired, repaired])
+    service = _service(repository, view_provider)
+
+    await service.enable(1)
+
+    repository.update_settings.assert_awaited_once_with(
+        nmid=111,
+        max_bid_minor=55_000,
+    )
 
 
 @pytest.mark.asyncio

@@ -47,12 +47,18 @@ class AutoShelfBidControlTelegramService:
         """Включить управление ставкой; при отсутствии settings создать default."""
         adv = await self._get_adv_or_raise(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
-        settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
+        await self._repository.get_or_create_default_settings(nmid=nmid)
         if adv.adv_id is not None:
             view_before = await self.build_view(adv_setting_original_id)
             actual = view_before.actual_bid_minor
-            if actual is not None and int(settings_obj.max_bid_minor) < int(actual):
-                settings_obj = await self._repository.update_settings(
+            max_bid = view_before.max_bid_minor
+            # build_view мог записать legacy repair в БД — берём max из view, не stale settings.
+            if (
+                actual is not None
+                and max_bid is not None
+                and int(max_bid) < int(actual)
+            ):
+                await self._repository.update_settings(
                     nmid=nmid,
                     max_bid_minor=int(actual),
                 )
