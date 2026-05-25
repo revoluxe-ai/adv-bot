@@ -272,6 +272,7 @@ class AutoShelfBidControlTelegramService:
         bid_minor: int,
         currency: str,
     ) -> None:
+        """PATCH ставки WB внутри ``DIManager.create`` (до ``shutdown_resources``)."""
         if adv.adv_id is None:
             raise AutoShelfBidControlTelegramError(
                 "Нельзя выставить ставку: у кампании отсутствует Auto РК id."
@@ -280,6 +281,7 @@ class AutoShelfBidControlTelegramService:
         from app.core.di.di_manager import DIManager
 
         shop_id = adv.wb_cabinet.shop_id
+        complex_adv_like = SimpleNamespace(auto_adv_id=int(adv.adv_id), nmids=[int(nmid)])
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
             factory = (
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
@@ -289,9 +291,8 @@ class AutoShelfBidControlTelegramService:
                 hub.wb_modifier,
                 bid_cache_manager=self._bid_cache,
             )
-        complex_adv_like = SimpleNamespace(auto_adv_id=int(adv.adv_id), nmids=[int(nmid)])
-        await setter.set_bid(
-            complex_adv_like,
-            bid_minor=int(bid_minor),
-            currency=currency,
-        )
+            await setter.set_bid(
+                complex_adv_like,
+                bid_minor=int(bid_minor),
+                currency=currency,
+            )
