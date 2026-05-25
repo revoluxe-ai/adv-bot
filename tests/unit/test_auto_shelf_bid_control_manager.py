@@ -1,13 +1,83 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
     AutoShelfBidControlManager,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
+    BidStatsDTO,
+)
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_clamp_bid_minor_within_window() -> None:
+    assert (
+        AutoShelfBidControlManager._clamp_bid_minor(
+            25_000,
+            min_bid_minor=12_000,
+            max_bid_minor=50_000,
+        )
+        == 25_000
+    )
+    assert (
+        AutoShelfBidControlManager._clamp_bid_minor(
+            99_000,
+            min_bid_minor=12_000,
+            max_bid_minor=50_000,
+        )
+        == 50_000
+    )
+    assert (
+        AutoShelfBidControlManager._clamp_bid_minor(
+            5_000,
+            min_bid_minor=12_000,
+            max_bid_minor=50_000,
+        )
+        == 12_000
+    )
+
+
+@pytest.mark.asyncio
+async def test_choose_best_bid_clamps_historical_ch_bid() -> None:
+    analytics = MagicMock()
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(
+        return_value=BidStatsDTO(
+            bid_minor=99_000,
+            currency="RUB",
+            mode=None,
+            last_interval_at=None,
+            impressions=1000,
+            clicks=10,
+            carts=5,
+            orders=0,
+            spend=100.0,
+            cart_cpa=20.0,
+            ctr=0.01,
+            cart_cr=0.5,
+        )
+    )
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        analytics_repository=analytics,
+    )
+    result = await manager._choose_best_bid_with_fallback(
+        nmid=1,
+        currency="RUB",
+        cycle_started_at=datetime.now(timezone.utc),
+        previous_cycle_started_at=None,
+        current_main_bid_minor=None,
+        actual_bid_minor=None,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+    )
+    assert result == 50_000
 
 
 def test_choose_next_test_bid_without_covered_returns_middle() -> None:

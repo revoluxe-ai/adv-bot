@@ -47,8 +47,9 @@
 5. Переходы `test <-> main` основаны на порогах показов.
 6. `best_bid` — минимальный `cart_cpa` по точкам с показами; при `carts=0` в CPA
    используется 1 корзина (`spend / greatest(carts, 1)`). Окно: отчётный день, затем
-   текущий цикл, затем fallbacks. Смена фазы test↔main: `save_state` до PATCH WB
-   (`_persist_state_then_set_bid`).
+   текущий цикл, затем fallbacks. Итоговая main-ставка ограничивается
+   `[min_bid_minor, max_bid_minor]` (`_clamp_bid_minor`). Смена фазы test↔main:
+   `save_state` до PATCH WB (`_persist_state_then_set_bid`).
 7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 8. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).

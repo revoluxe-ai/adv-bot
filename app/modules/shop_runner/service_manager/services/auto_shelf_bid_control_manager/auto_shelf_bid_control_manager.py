@@ -84,6 +84,29 @@ class AutoShelfBidControlManager:
         return int(round((min_bid + max_bid) / 2))
 
     @staticmethod
+    def _clamp_bid_minor(
+        bid_minor: int,
+        *,
+        min_bid_minor: int,
+        max_bid_minor: int,
+    ) -> int:
+        """Ограничить ставку окном [min_bid_minor, max_bid_minor] (копейки).
+
+        Исторические точки из CH и устаревший state могут быть вне текущего
+        диапазона пользователя / минимума WB.
+        """
+        lo = int(min_bid_minor)
+        hi = int(max_bid_minor)
+        if hi < lo:
+            hi = lo
+        value = int(bid_minor)
+        if value < lo:
+            return lo
+        if value > hi:
+            return hi
+        return value
+
+    @staticmethod
     def _calc_target_main_impressions(
         target_test_impressions: int,
         test_share: float,
@@ -219,6 +242,13 @@ class AutoShelfBidControlManager:
         min_bid_minor: int,
         max_bid_minor: int,
     ) -> int:
+        def _in_window(bid: int) -> int:
+            return self._clamp_bid_minor(
+                bid,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+            )
+
         report_from = report_day_start_utc()
         best = await self._analytics.get_best_bid_by_cart_cpa(
             nmid=nmid,
@@ -226,7 +256,7 @@ class AutoShelfBidControlManager:
             currency=currency,
         )
         if best is not None:
-            return best.bid_minor
+            return _in_window(best.bid_minor)
         if cycle_started_at != report_from:
             cycle_best = await self._analytics.get_best_bid_by_cart_cpa(
                 nmid=nmid,
@@ -234,7 +264,7 @@ class AutoShelfBidControlManager:
                 currency=currency,
             )
             if cycle_best is not None:
-                return cycle_best.bid_minor
+                return _in_window(cycle_best.bid_minor)
         if previous_cycle_started_at is not None:
             prev_best = await self._analytics.get_best_bid_by_cart_cpa(
                 nmid=nmid,
@@ -242,11 +272,11 @@ class AutoShelfBidControlManager:
                 currency=currency,
             )
             if prev_best is not None:
-                return prev_best.bid_minor
+                return _in_window(prev_best.bid_minor)
         if current_main_bid_minor is not None:
-            return current_main_bid_minor
+            return _in_window(current_main_bid_minor)
         if actual_bid_minor is not None:
-            return actual_bid_minor
+            return _in_window(actual_bid_minor)
         return self._middle_bid(min_bid_minor, max_bid_minor)
 
     async def _initialize_state(
@@ -499,11 +529,21 @@ class AutoShelfBidControlManager:
             )
             return None
 
+        max_bid = int(settings_obj.max_bid_minor)
         main_bid = state.current_main_bid_minor
         if main_bid is None:
-            main_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
+            main_bid = self._middle_bid(min_bid_minor, max_bid)
             state.current_main_bid_minor = main_bid
             state.main_started_at = state.main_started_at or now
+        else:
+            clamped_main = self._clamp_bid_minor(
+                main_bid,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid,
+            )
+            if clamped_main != int(main_bid):
+                main_bid = clamped_main
+                state.current_main_bid_minor = main_bid
         main_started_at = state.main_started_at or state.current_cycle_started_at
         main_impressions = await self._analytics.get_impressions(
             nmid=nmid,
