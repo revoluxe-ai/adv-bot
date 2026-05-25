@@ -76,6 +76,21 @@ def test_normalize_automatic_version_ui_none_is_two() -> None:
 
 
 @pytest.mark.unit
+def test_normalize_automatic_version_ui_v1_is_two() -> None:
+    assert normalize_automatic_version_ui(1) == 2
+
+
+@pytest.mark.unit
+def test_submenu_shows_v2_checkmark_when_db_still_v1() -> None:
+    adv = MagicMock()
+    adv.id = 99
+    adv.automatic_version = 1
+    markup = build_automatic_version_submenu_markup(adv)
+    v2_row = markup.inline_keyboard[0][0]
+    assert v2_row.text == "✓ Авто V2"
+
+
+@pytest.mark.unit
 def test_show_relevant_phrase_toggle_only_v2_for_now() -> None:
     assert show_relevant_phrase_toggle(2) is True
     assert show_relevant_phrase_toggle(1) is False

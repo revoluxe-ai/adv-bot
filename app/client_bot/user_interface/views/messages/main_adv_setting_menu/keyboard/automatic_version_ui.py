@@ -22,8 +22,10 @@ FSM_ADV_AUTO_VER_MENU_ADV_SETTING_ID = "adv_auto_ver_menu_adv_setting_id"
 
 
 def normalize_automatic_version_ui(raw: int | None) -> int:
-    """None в БД трактуем как продуктовый дефолт (2)."""
-    return 2 if raw is None else raw
+    """None и deprecated V1 в БД отображаем как продуктовый дефолт (2)."""
+    if raw is None or raw == 1:
+        return 2
+    return raw
 
 
 def show_relevant_phrase_toggle(version: int) -> bool:
