@@ -68,12 +68,15 @@ class AutoShelfBidControlAnalyticsRepository:
         currency: str,
         mode: str | None = None,
         bid_minor: int | None = None,
+        *,
+        to_ts: datetime | None = None,
     ) -> list[BidStatsDTO]:
         """Агрегаты по bid_minor (все mode на одной ставке), read-time dedup."""
         query = self._load_sql("get_bid_stats_dedup.sql")
         params = {
             "nmid": nmid,
             "from_ts": from_ts,
+            "to_ts": to_ts,
             "currency": currency,
             "mode": mode,
             "bid_minor": bid_minor,
@@ -121,13 +124,18 @@ class AutoShelfBidControlAnalyticsRepository:
         nmid: int,
         from_ts: datetime,
         currency: str,
+        *,
+        mode: str | None = None,
+        to_ts: datetime | None = None,
     ) -> BidStatsDTO | None:
-        """Лучшая ставка: минимальный cart_cpa (0 корзин → делитель 1)."""
+        """Лучшая ставка: минимальный cart_cpa среди точек с ``carts > 0``."""
         query = self._load_sql("get_best_bid_by_cart_cpa.sql")
         params = {
             "nmid": nmid,
             "from_ts": from_ts,
+            "to_ts": to_ts,
             "currency": currency,
+            "mode": mode,
         }
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:

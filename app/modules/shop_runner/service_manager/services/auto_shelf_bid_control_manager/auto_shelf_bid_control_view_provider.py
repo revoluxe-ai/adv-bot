@@ -15,6 +15,7 @@ from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
 from .auto_shelf_bid_control_manager import AutoShelfBidControlManager
+from .bid_selection import resolve_cycle_best_bids
 from .settings_normalizer import compute_settings_repair, repair_state_test_bid_minor
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .bid_units import (
@@ -126,7 +127,8 @@ class AutoShelfBidControlViewProvider:
                 max_bid_minor=None,
                 current_main_bid_minor=None,
                 current_test_bid_minor=None,
-                best_bid_minor=None,
+                cycle_best_bid_minor=None,
+                global_best_bid_minor=None,
                 next_test_bid_minor=None,
                 currency="RUB",
                 current_mode=None,
@@ -266,6 +268,7 @@ class AutoShelfBidControlViewProvider:
 
         cycle_bid_stats: list[BidStatsDTO] = []
         cycle_best: BidStatsDTO | None = None
+        global_best: BidStatsDTO | None = None
         cycle_covered_points_count = 0
         if state is not None and nmid:
             cycle_from_ts = state.current_cycle_started_at or stats_from_ts
@@ -274,10 +277,12 @@ class AutoShelfBidControlViewProvider:
                 from_ts=cycle_from_ts,
                 currency=currency,
             )
-            cycle_best = await self._analytics.get_best_bid_by_cart_cpa(
+            cycle_best, _, global_best = await resolve_cycle_best_bids(
+                self._analytics,
                 nmid=nmid,
-                from_ts=cycle_from_ts,
                 currency=currency,
+                current_cycle_started_at=cycle_from_ts,
+                previous_cycle_started_at=state.previous_cycle_started_at,
             )
             if target_test is not None:
                 cycle_covered_points_count = len(
@@ -286,7 +291,7 @@ class AutoShelfBidControlViewProvider:
         cycle_bid_points = self._map_bid_stats_to_points(
             cycle_bid_stats,
             target_test=target_test,
-            best=cycle_best,
+            best=global_best,
             state=state,
         )
 
@@ -332,7 +337,14 @@ class AutoShelfBidControlViewProvider:
             max_bid_minor=(int(settings_obj.max_bid_minor) if settings_obj else None),
             current_main_bid_minor=(state.current_main_bid_minor if state else None),
             current_test_bid_minor=(state.current_test_bid_minor if state else None),
-            best_bid_minor=(best.bid_minor if best is not None else None),
+            cycle_best_bid_minor=(
+                cycle_best.bid_minor if cycle_best is not None else None
+            ),
+            global_best_bid_minor=(
+                global_best.bid_minor
+                if global_best is not None
+                else (best.bid_minor if best is not None else None)
+            ),
             next_test_bid_minor=next_test_bid_minor,
             currency=currency,
             current_mode=(state.current_mode if state else None),

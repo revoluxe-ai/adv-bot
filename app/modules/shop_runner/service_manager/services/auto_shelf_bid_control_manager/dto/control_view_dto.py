@@ -43,7 +43,8 @@ class AutoShelfBidControlViewDTO:
     max_bid_minor: int | None  # копейки, настройка пользователя
     current_main_bid_minor: int | None  # копейки
     current_test_bid_minor: int | None  # копейки
-    best_bid_minor: int | None  # копейки
+    cycle_best_bid_minor: int | None  # копейки, лучшая CPA в текущем цикле
+    global_best_bid_minor: int | None  # копейки, min CPA текущий ∪ предыдущий цикл
     next_test_bid_minor: int | None  # копейки
     currency: str
     current_mode: str | None

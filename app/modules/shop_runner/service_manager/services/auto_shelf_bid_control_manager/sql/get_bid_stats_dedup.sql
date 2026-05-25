@@ -8,6 +8,7 @@
 -- Таблица: default_db.auto_shelf_bid_intervals
 -- Параметры:
 --   %(nmid)s, %(from_ts)s, %(currency)s
+--   %(to_ts)s (nullable) — верхняя граница ``src_ts`` (окно предыдущего цикла)
 --   %(mode)s (nullable) — опциональный фильтр до агрегации
 --   %(bid_minor)s (nullable)
 -- Вызывается:
@@ -42,6 +43,7 @@ FROM
     WHERE i.nmid = %(nmid)s
       AND i.src_ts >= %(from_ts)s
       AND i.currency = %(currency)s
+      AND (%(to_ts)s IS NULL OR i.src_ts < %(to_ts)s)
     GROUP BY event_date, event_id
 ) AS dedup
 WHERE (%(mode)s IS NULL OR dedup.mode = %(mode)s)

@@ -20,6 +20,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
+from .bid_selection import resolve_cycle_best_bids
 from .bid_units import (
     report_day_start_utc,
     resolve_test_segment_start_utc,
@@ -250,6 +251,15 @@ class AutoShelfBidControlManager:
             )
 
         report_from = report_day_start_utc()
+        _, _, global_best = await resolve_cycle_best_bids(
+            self._analytics,
+            nmid=nmid,
+            currency=currency,
+            current_cycle_started_at=cycle_started_at,
+            previous_cycle_started_at=previous_cycle_started_at,
+        )
+        if global_best is not None:
+            return _in_window(global_best.bid_minor)
         best = await self._analytics.get_best_bid_by_cart_cpa(
             nmid=nmid,
             from_ts=report_from,
@@ -257,22 +267,6 @@ class AutoShelfBidControlManager:
         )
         if best is not None:
             return _in_window(best.bid_minor)
-        if cycle_started_at != report_from:
-            cycle_best = await self._analytics.get_best_bid_by_cart_cpa(
-                nmid=nmid,
-                from_ts=cycle_started_at,
-                currency=currency,
-            )
-            if cycle_best is not None:
-                return _in_window(cycle_best.bid_minor)
-        if previous_cycle_started_at is not None:
-            prev_best = await self._analytics.get_best_bid_by_cart_cpa(
-                nmid=nmid,
-                from_ts=previous_cycle_started_at,
-                currency=currency,
-            )
-            if prev_best is not None:
-                return _in_window(prev_best.bid_minor)
         if current_main_bid_minor is not None:
             return _in_window(current_main_bid_minor)
         if actual_bid_minor is not None:
@@ -544,6 +538,20 @@ class AutoShelfBidControlManager:
             if clamped_main != int(main_bid):
                 main_bid = clamped_main
                 state.current_main_bid_minor = main_bid
+        target_main_bid = await self._choose_best_bid_with_fallback(
+            nmid=nmid,
+            currency=state.currency,
+            cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=state.previous_cycle_started_at,
+            current_main_bid_minor=state.current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid,
+        )
+        if int(main_bid) != target_main_bid:
+            main_bid = target_main_bid
+            state.current_main_bid_minor = main_bid
+            state.main_started_at = now
         main_started_at = state.main_started_at or state.current_cycle_started_at
         main_impressions = await self._analytics.get_impressions(
             nmid=nmid,

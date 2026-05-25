@@ -9,8 +9,9 @@ import pytest
 
 from app.client_bot.user_interface.views.callbacks import AutoShelfBidControlBidPoints
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
+    bid_point_viewer_page_count,
     build_bid_point_viewer_keyboard,
-    clamp_bid_point_index,
+    clamp_bid_point_page,
     render_auto_shelf_bid_control_message,
     render_bid_point_viewer_message,
     select_covered_bid_points_for_cycle_viewer,
@@ -67,35 +68,49 @@ def test_select_covered_bid_points_for_cycle_viewer_only_covered_sorted() -> Non
     assert [p.bid_minor for p in selected] == [30_000, 10_000]
 
 
-def test_clamp_bid_point_index_edges() -> None:
-    assert clamp_bid_point_index(-1, 3) == 0
-    assert clamp_bid_point_index(0, 3) == 0
-    assert clamp_bid_point_index(2, 3) == 2
-    assert clamp_bid_point_index(9, 3) == 2
-    assert clamp_bid_point_index(0, 0) == 0
+def test_bid_point_viewer_page_count() -> None:
+    assert bid_point_viewer_page_count(0) == 0
+    assert bid_point_viewer_page_count(1) == 1
+    assert bid_point_viewer_page_count(10) == 1
+    assert bid_point_viewer_page_count(11) == 2
 
 
-def test_render_bid_point_viewer_same_line_format_as_main_screen() -> None:
-    from tests.unit.test_auto_shelf_bid_control_render_message import _view_with_bid_point
+def test_clamp_bid_point_page_edges() -> None:
+    assert clamp_bid_point_page(-1, 3) == 0
+    assert clamp_bid_point_page(0, 3) == 0
+    assert clamp_bid_point_page(2, 3) == 2
+    assert clamp_bid_point_page(9, 3) == 2
+    assert clamp_bid_point_page(0, 0) == 0
 
+
+def test_render_bid_point_viewer_shows_up_to_ten_lines_per_page() -> None:
     base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    covered = _point(20_000, impressions=23848, is_covered=True, at=base)
-    covered = replace(
-        covered,
-        carts=124,
-        spend=4646.77,
-        cart_cpa=37.47,
-    )
-    text = render_bid_point_viewer_message(1, [covered, covered, covered])
-    assert "Покрытые ставки (текущий цикл):" in text
-    assert (
-        "200 ₽: показы 23848, корзины 124, расход 4646.77 ₽, CPA корзины 37.47 ₽"
-        in text
-    )
-    assert "2 / 3" in text
+    points = [
+        replace(
+            _point(20_000 + i * 100, impressions=1000 + i, is_covered=True, at=base),
+            carts=10 + i,
+            spend=100.0 + i,
+            cart_cpa=10.0,
+        )
+        for i in range(12)
+    ]
+    page0 = render_bid_point_viewer_message(0, points, page_size=10)
+    assert page0.count("₽: показы") == 10
+    assert "Страница 1 / 2" in page0
+    page1 = render_bid_point_viewer_message(1, points, page_size=10)
+    assert page1.count("₽: показы") == 2
+    assert "Страница 2 / 2" in page1
 
 
-def test_bid_point_viewer_keyboard_has_prev_and_next() -> None:
+def test_render_bid_point_viewer_zero_carts_shows_dash_cpa() -> None:
+    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
+    point = _point(35_000, impressions=2500, is_covered=True, at=base)
+    text = render_bid_point_viewer_message(0, [point], page_size=10)
+    assert "корзины 0" in text
+    assert "CPA корзины — ₽" in text
+
+
+def test_bid_point_viewer_keyboard_has_prev_and_next_pages() -> None:
     packed_prev = AutoShelfBidControlBidPoints(
         adv_setting_original_id=42,
         index=0,
@@ -104,7 +119,7 @@ def test_bid_point_viewer_keyboard_has_prev_and_next() -> None:
         adv_setting_original_id=42,
         index=2,
     ).pack()
-    keyboard = build_bid_point_viewer_keyboard(42, index=1, total=3)
+    keyboard = build_bid_point_viewer_keyboard(42, page=1, total_points=25, page_size=10)
     callbacks = [
         button.callback_data
         for row in keyboard.inline_keyboard
