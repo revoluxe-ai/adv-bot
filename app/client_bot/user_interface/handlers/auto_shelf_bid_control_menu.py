@@ -1,4 +1,8 @@
-"""Telegram UI для управления ставкой в полках (main/settings/FSM/actions)."""
+"""Telegram UI для управления ставкой в полках (main/settings/FSM/actions).
+
+CallbackQuery: ответ на кнопку даёт ``CallbackAnswerMiddleware`` в ``global_router``
+(``pre=True``). В хендлерах этого модуля ``callback.answer()`` не вызываем.
+"""
 
 from __future__ import annotations
 
@@ -148,16 +152,13 @@ async def auto_shelf_bid_control_bid_points_router(
             adv_setting_original_id=callback_data.adv_setting_original_id,
             index=callback_data.index,
         )
-        if not shown:
-            await callback.answer(
-                "В текущем цикле пока нет покрытых ставок",
-                show_alert=True,
+        if not shown and callback.message:
+            await callback.message.answer(
+                "В текущем цикле пока нет покрытых ставок."
             )
     except AutoShelfBidControlTelegramError as exc:
         if callback.message:
             await callback.message.answer(exc.message)
-    finally:
-        await callback.answer()
 
 
 @router.callback_query(callbacks.AutoShelfBidControlMenu.filter())
@@ -271,8 +272,6 @@ async def auto_shelf_bid_control_menu_router(
     except AutoShelfBidControlTelegramError as exc:
         if callback.message:
             await callback.message.answer(exc.message)
-    finally:
-        await callback.answer()
 
 
 async def _handle_fsm_update(
