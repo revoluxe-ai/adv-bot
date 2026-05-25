@@ -5,8 +5,8 @@ from sqlalchemy import select
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .redis_manager import RedisShopManager
+from ..shop_id_filters import apply_shop_id_filters
 from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from ...shop_id_filters import apply_shop_id_filters
 
 
 async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:
