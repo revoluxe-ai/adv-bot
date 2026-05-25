@@ -148,6 +148,21 @@ class AutoShelfBidControlManager:
             return None
         return bid
 
+    @classmethod
+    def is_coroutine_candidate(cls, complex_adv: ComplexAdv) -> bool:
+        """Кампании для тика ``auto_shelf_bid_control`` (без лишних skip-логов)."""
+        if not complex_adv.auto_shelf_bid_control_enabled:
+            return False
+        if len(complex_adv.nmids) != 1:
+            return False
+        if not complex_adv.bot_active:
+            return False
+        if not complex_adv.auto_adv_active_status:
+            return False
+        if complex_adv.auto_adv_id is None:
+            return False
+        return True
+
     def _is_eligible(self, complex_adv: ComplexAdv) -> tuple[bool, str]:
         if not complex_adv.bot_active:
             return False, ControlReason.DISABLED

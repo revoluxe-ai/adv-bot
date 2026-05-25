@@ -1386,12 +1386,13 @@ class CoroutinesManager:
         control_candidates = [
             adv
             for adv in complex_advs
-            if adv.auto_shelf_bid_control_enabled and len(adv.nmids) == 1
+            if self._auto_shelf_bid_control_manager.is_coroutine_candidate(adv)
         ]
-        if control_candidates:
-            await self._wb_shop_data_manager.attach_min_nmids_bids(control_candidates)
+        if not control_candidates:
+            return None
+        await self._wb_shop_data_manager.attach_min_nmids_bids(control_candidates)
         handlers: list[Callable[[], Awaitable[None]]] = []
-        for adv in complex_advs:
+        for adv in control_candidates:
             handler = functools.partial(self._auto_shelf_bid_control_manager.update, adv)
             handlers.append(handler)
         max_workers = self._max_workers_for(len(handlers), 16)
@@ -1400,7 +1401,7 @@ class CoroutinesManager:
             max_workers=max_workers,
             return_exceptions=True,
         )
-        for adv, result in zip(complex_advs, results, strict=True):
+        for adv, result in zip(control_candidates, results, strict=True):
             if isinstance(result, BaseException):
                 logger.exception(
                     "auto_shelf_bid_control failed for adv_id=%s shop_id=%s",

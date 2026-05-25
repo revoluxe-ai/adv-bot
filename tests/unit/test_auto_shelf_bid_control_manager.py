@@ -50,3 +50,25 @@ def test_calc_target_main_impressions_invalid_share_returns_none() -> None:
     assert AutoShelfBidControlManager._calc_target_main_impressions(500, 0) is None
     assert AutoShelfBidControlManager._calc_target_main_impressions(500, 0.5) is None
 
+
+def test_is_coroutine_candidate_requires_enabled_single_nmid_and_active() -> None:
+    from types import SimpleNamespace
+
+    ok = SimpleNamespace(
+        auto_shelf_bid_control_enabled=True,
+        nmids=[1],
+        bot_active=True,
+        auto_adv_active_status=True,
+        auto_adv_id=99,
+    )
+    assert AutoShelfBidControlManager.is_coroutine_candidate(ok) is True
+
+    disabled = SimpleNamespace(
+        auto_shelf_bid_control_enabled=False,
+        nmids=[1],
+        bot_active=True,
+        auto_adv_active_status=True,
+        auto_adv_id=99,
+    )
+    assert AutoShelfBidControlManager.is_coroutine_candidate(disabled) is False
+

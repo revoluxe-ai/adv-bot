@@ -32,25 +32,27 @@
 
 ## Ключевые принципы
 
-1. Кандидаты только из `ComplexAdv` с фильтрами:
+1. Корутина `auto_shelf_bid_control` вызывает `update` только для
+   `AutoShelfBidControlManager.is_coroutine_candidate` (не для всех РК магазина).
+2. Кандидаты `update` с фильтрами:
    - `bot_active == True`
    - `auto_adv_active_status == True`
    - `adv_setting.auto_shelf_bid_control_enabled == True`
    - `len(nmids) == 1`
    - задан `auto_adv_id`
-2. Фактическая ставка читается только из Redis-кэша
+3. Фактическая ставка читается только из Redis-кэша
    `RedisAutoRecommendationsBidValueManager` (`auto_adv_id + nmid`).
-3. Аналитика читается из `auto_shelf_bid_intervals` с обязательным read-time dedup:
+4. Аналитика читается из `auto_shelf_bid_intervals` с обязательным read-time dedup:
    `GROUP BY event_date,event_id + argMax(..., version)`.
-4. Переходы `test <-> main` основаны на порогах показов.
-5. `best_bid` — минимальный `cart_cpa` по точкам с показами; при `carts=0` в CPA
+5. Переходы `test <-> main` основаны на порогах показов.
+6. `best_bid` — минимальный `cart_cpa` по точкам с показами; при `carts=0` в CPA
    используется 1 корзина (`spend / greatest(carts, 1)`). Окно: отчётный день, затем
    текущий цикл, затем fallbacks. Смена фазы test↔main: `save_state` до PATCH WB
    (`_persist_state_then_set_bid`).
-6. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
+7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
-7. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
-8. Telegram «Покрытые ставки»: до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT` (5) последних
+8. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
+9. Telegram «Покрытые ставки»: до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT` (5) последних
    покрытых точек по `last_interval_at`; при большем числе — строка «… ещё N».
 
 ## Conversion policy v1 (setter)
