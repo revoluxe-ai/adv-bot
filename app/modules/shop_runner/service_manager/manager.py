@@ -418,6 +418,9 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
+        from .services.auto_updater_version_migration import migrate_v1_auto_updaters_to_v2
+
+        _ = await migrate_v1_auto_updaters_to_v2(advs)
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем

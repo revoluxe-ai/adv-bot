@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.callbacks import (
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 # Версии, отображаемые в подменю (отдельная кнопка на каждую).
-AUTOMATIC_VERSION_UI_CHOICES: Final[tuple[int, ...]] = (1, 2, 3)
+AUTOMATIC_VERSION_UI_CHOICES: Final[tuple[int, ...]] = (2, 3)
 
 # FSM: главное меню РК (фото + клавиатура) при открытии подменю — для sync кнопки «сейчас V…».
 FSM_ADV_AUTO_VER_PARENT_MESSAGE_ID = "adv_auto_ver_parent_message_id"

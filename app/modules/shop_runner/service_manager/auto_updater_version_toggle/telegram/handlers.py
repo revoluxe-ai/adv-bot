@@ -32,9 +32,9 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 router = Router()
 logger = logging.getLogger(__name__)
 
-_ALLOWED_AUTOMATIC_VERSIONS: frozenset[int] = frozenset({1, 2, 3})
+_ALLOWED_AUTOMATIC_VERSIONS: frozenset[int] = frozenset({2, 3})
 
-_VERSION_LABEL: dict[int, str] = {1: "V1", 2: "V2", 3: "V3"}
+_VERSION_LABEL: dict[int, str] = {2: "V2", 3: "V3"}
 
 _SUBMENU_TEXT = (
     "Выберите версию АвтоАпдейтера.\n"

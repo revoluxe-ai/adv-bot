@@ -35,9 +35,9 @@ def test_main_menu_entry_shows_current_version_in_label() -> None:
     adv.automatic_version = 3
     btn = automatic_version_main_menu_button(adv)
     assert "V3" in btn.text
-    adv.automatic_version = 1
-    btn_v1 = automatic_version_main_menu_button(adv)
-    assert "V1" in btn_v1.text
+    adv.automatic_version = 2
+    btn_v2 = automatic_version_main_menu_button(adv)
+    assert "V2" in btn_v2.text
 
 
 @pytest.mark.unit
@@ -54,9 +54,10 @@ def test_main_menu_button_opens_submenu_callback() -> None:
 def test_submenu_markup_version_rows_and_back() -> None:
     adv = MagicMock()
     adv.id = 99
-    adv.automatic_version = 1
+    adv.automatic_version = 2
     markup = build_automatic_version_submenu_markup(adv)
     assert len(markup.inline_keyboard) == len(AUTOMATIC_VERSION_UI_CHOICES) + 1
+    assert AUTOMATIC_VERSION_UI_CHOICES == (2, 3)
     for i, version in enumerate(AUTOMATIC_VERSION_UI_CHOICES):
         row = markup.inline_keyboard[i]
         assert len(row) == 1
