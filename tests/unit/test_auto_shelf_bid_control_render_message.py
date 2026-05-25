@@ -107,7 +107,7 @@ def test_render_cycle_timestamps_without_fractional_seconds() -> None:
 
 def test_render_shows_bid_points_in_rubles_not_raw_kopecks() -> None:
     text = render_auto_shelf_bid_control_message(_view_with_bid_point())
-    assert "200 ₽: показы 100" in text
+    assert "Покрытые ставки:" not in text
     assert "20000:" not in text
     assert "Минимальная ставка WB: 120 ₽" in text
     assert "Максимальная ставка: 500 ₽" in text

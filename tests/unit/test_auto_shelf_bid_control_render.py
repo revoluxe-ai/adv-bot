@@ -87,8 +87,8 @@ def test_main_keyboard_enabled_has_disable_reset_force_main() -> None:
     ]
 
 
-def test_main_keyboard_shows_cycle_coverage_button_when_covered_exist() -> None:
-    view = replace(_view(enabled=True, has_settings=True), cycle_covered_points_count=2)
+def test_main_keyboard_shows_cycle_coverage_button_when_state_exists() -> None:
+    view = replace(_view(enabled=True, has_settings=True), has_state=True)
     markup = build_auto_shelf_bid_control_keyboard(view, adv_setting_original_id=1)
     texts = _keyboard_texts(markup)
     assert "Покрытия цикла" in texts

@@ -17,7 +17,8 @@
 
 ### Тест vs main (семантика)
 
-- **Тест (аналитика «Покрытые ставки»)** — показы по `bid_minor` с начала отчётного дня.
+- **Покрытые ставки (Telegram)** — только просмотрщик «Покрытия цикла»: агрегаты с
+  `current_cycle_started_at`.
 - **Тест (порог цикла)** — прогресс `target_test_impressions` с `test_started_at`
   (fallback: `current_cycle_started_at`), как main с `main_started_at`.
 - **main (цикл control)** — прогресс main: `mode=main`, `current_main_bid_minor`,
@@ -53,10 +54,10 @@
 7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 8. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
-9. Telegram «Покрытые ставки» (главный экран): до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT`
-   (5) последних покрытых точек за **отчётный день**; при большем числе — «… ещё N».
-   Кнопка «Покрытия цикла» — листалка по тем же строкам (формат как в блоке выше),
-   все **покрытые** точки от `current_cycle_started_at`, навигация ◀️/▶️.
+9. Telegram: на главном экране блока «Покрытые ставки» нет (без дублирования с циклом).
+   Кнопка «Покрытия цикла» — листалка по **покрытым** точкам от `current_cycle_started_at`
+   (одна строка на экран, ◀️/▶️). `next_test_bid` / `covered_points_count` по-прежнему
+   из отчётного дня (`get_bid_stats` с `report_day_start_utc`).
 
 ## Conversion policy v1 (setter)
 

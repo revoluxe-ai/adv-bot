@@ -9,7 +9,6 @@ from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlMenu,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
-    TELEGRAM_BID_POINTS_DISPLAY_LIMIT,
     format_bid_minor_for_telegram,
     format_timestamp_for_telegram,
 )
@@ -51,17 +50,6 @@ def _bid_point_sort_ts(point: BidPointStatsDTO) -> datetime:
     if ts.tzinfo is None:
         return ts.replace(tzinfo=timezone.utc)
     return ts
-
-
-def select_bid_points_for_telegram(
-    points: list[BidPointStatsDTO],
-    limit: int = TELEGRAM_BID_POINTS_DISPLAY_LIMIT,
-) -> list[BidPointStatsDTO]:
-    """Последние ``limit`` тестовых точек: сначала покрытые, по ``last_interval_at`` DESC."""
-    if not points:
-        return []
-    pool = [p for p in points if p.is_covered] or list(points)
-    return sorted(pool, key=_bid_point_sort_ts, reverse=True)[:limit]
 
 
 def select_covered_bid_points_for_cycle_viewer(
@@ -164,29 +152,8 @@ def build_bid_point_viewer_keyboard(
     return builder.as_markup()
 
 
-def _format_bid_points_block(view: AutoShelfBidControlViewDTO) -> str:
-    """Блок «Покрытые ставки» с лимитом последних тестов."""
-    displayed = select_bid_points_for_telegram(view.bid_points)
-    lines: list[str] = []
-    for point in displayed:
-        lines.append(format_bid_point_line(point))
-    if not lines:
-        lines.append("Статистики по тестовым ставкам пока недостаточно.")
-    hidden = max(0, view.bid_points_total - len(displayed))
-    if hidden > 0:
-        lines.append(f"… ещё {hidden} (всего {view.bid_points_total})")
-    limit = TELEGRAM_BID_POINTS_DISPLAY_LIMIT
-    if view.bid_points_total > limit:
-        header = f"Покрытые ставки (последние {limit}):\n"
-    else:
-        header = "Покрытые ставки:\n"
-    return header + "\n".join(lines)
-
-
 def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> str:
     """Собрать основной экран управления ставкой в полках."""
-    bid_points_block = _format_bid_points_block(view)
-
     state_missing = (
         "Состояние управления ещё не создано. Оно будет создано на следующем цикле "
         "корутины после включения.\n"
@@ -222,7 +189,6 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Начат: {_format_cycle_timestamp(view.current_cycle_started_at)}\n"
         f"Тест начат: {_format_cycle_timestamp(view.test_started_at)}\n"
         f"Main начат: {_format_cycle_timestamp(view.main_started_at)}\n\n"
-        f"{bid_points_block}\n\n"
         "Последнее событие:\n"
         f"{view.last_reason or '—'}\n\n"
         "Предупреждения:\n"
@@ -258,7 +224,7 @@ def build_auto_shelf_bid_control_keyboard(
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
-        if view.cycle_covered_points_count > 0:
+        if view.has_state:
             builder.button(
                 text="Покрытия цикла",
                 callback_data=AutoShelfBidControlBidPoints(

@@ -1,4 +1,4 @@
-"""Unit-тесты лимита и сортировки блока «Покрытые ставки» в Telegram."""
+"""Unit-тесты просмотрщика покрытых ставок цикла в Telegram."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     clamp_bid_point_index,
     render_auto_shelf_bid_control_message,
     render_bid_point_viewer_message,
-    select_bid_points_for_telegram,
     select_covered_bid_points_for_cycle_viewer,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
@@ -49,49 +48,12 @@ def _point(
     )
 
 
-def test_select_bid_points_returns_five_most_recent_covered() -> None:
-    base = datetime(2026, 5, 25, 10, 0, 0, tzinfo=timezone.utc)
-    points = [
-        _point(10_000, impressions=600, is_covered=True, at=base),
-        _point(20_000, impressions=600, is_covered=True, at=base.replace(hour=11)),
-        _point(30_000, impressions=600, is_covered=True, at=base.replace(hour=12)),
-        _point(40_000, impressions=600, is_covered=True, at=base.replace(hour=13)),
-        _point(50_000, impressions=600, is_covered=True, at=base.replace(hour=14)),
-        _point(60_000, impressions=600, is_covered=True, at=base.replace(hour=15)),
-        _point(70_000, impressions=100, is_covered=False, at=base.replace(hour=16)),
-    ]
-    selected = select_bid_points_for_telegram(points, limit=5)
-    assert [p.bid_minor for p in selected] == [
-        60_000,
-        50_000,
-        40_000,
-        30_000,
-        20_000,
-    ]
-
-
-def test_render_shows_truncation_hint_when_more_than_five_points() -> None:
+def test_main_screen_has_no_covered_bid_points_block() -> None:
     from tests.unit.test_auto_shelf_bid_control_render_message import _view_with_bid_point
 
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    points = [
-        _point(
-            20_000 + i * 100,
-            impressions=600,
-            is_covered=True,
-            at=base.replace(minute=i),
-        )
-        for i in range(7)
-    ]
-    view = replace(
-        _view_with_bid_point(),
-        bid_points=points,
-        bid_points_total=7,
-        covered_points_count=7,
-    )
-    text = render_auto_shelf_bid_control_message(view)
-    assert "Покрытые ставки (последние 5):" in text
-    assert "… ещё 2 (всего 7)" in text
+    text = render_auto_shelf_bid_control_message(_view_with_bid_point())
+    assert "Покрытые ставки:" not in text
+    assert "… ещё" not in text
 
 
 def test_select_covered_bid_points_for_cycle_viewer_only_covered_sorted() -> None:
