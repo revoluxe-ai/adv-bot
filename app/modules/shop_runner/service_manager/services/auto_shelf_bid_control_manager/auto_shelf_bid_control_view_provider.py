@@ -23,7 +23,7 @@ from .bid_units import (
     truncate_datetime_to_seconds,
     wb_min_cpm_rub_to_bid_minor,
 )
-from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO
+from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
 from app.settings import settings
 
 
@@ -69,6 +69,42 @@ class AutoShelfBidControlViewProvider:
         """Глобальный dry-run control-модуля (env AUTO_SHELF_BID_CONTROL_DRY_RUN)."""
         return bool(settings.AUTO_SHELF_BID_CONTROL_DRY_RUN)
 
+    @staticmethod
+    def _map_bid_stats_to_points(
+        bid_stats: list[BidStatsDTO],
+        *,
+        target_test: int | None,
+        best: BidStatsDTO | None,
+        state: object | None,
+    ) -> list[BidPointStatsDTO]:
+        """Собрать DTO точек ставки для Telegram из агрегатов CH."""
+        return [
+            BidPointStatsDTO(
+                bid_minor=item.bid_minor,
+                currency=item.currency,
+                last_interval_at=item.last_interval_at,
+                impressions=item.impressions,
+                clicks=item.clicks,
+                carts=item.carts,
+                orders=item.orders,
+                spend=item.spend,
+                cart_cpa=item.cart_cpa,
+                ctr=item.ctr,
+                cart_cr=item.cart_cr,
+                is_covered=(target_test is not None and item.impressions >= target_test),
+                is_best=(best is not None and item.bid_minor == best.bid_minor),
+                is_current_main=(
+                    state is not None
+                    and getattr(state, "current_main_bid_minor", None) == item.bid_minor
+                ),
+                is_current_test=(
+                    state is not None
+                    and getattr(state, "current_test_bid_minor", None) == item.bid_minor
+                ),
+            )
+            for item in bid_stats
+        ]
+
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Собрать DTO для read-only Telegram экрана."""
         app_dry_run = self._app_dry_run()
@@ -106,6 +142,8 @@ class AutoShelfBidControlViewProvider:
                 covered_points_count=0,
                 bid_points_total=0,
                 bid_points=[],
+                cycle_covered_points_count=0,
+                cycle_bid_points=[],
                 last_reason="adv_setting_not_found",
                 warnings=["adv_setting_not_found"],
             )
@@ -219,30 +257,38 @@ class AutoShelfBidControlViewProvider:
             warnings.append("bid_units_gate_not_confirmed")
 
         bid_points_total = len(bid_stats)
-        bid_points = [
-            BidPointStatsDTO(
-                bid_minor=item.bid_minor,
-                currency=item.currency,
-                last_interval_at=item.last_interval_at,
-                impressions=item.impressions,
-                clicks=item.clicks,
-                carts=item.carts,
-                orders=item.orders,
-                spend=item.spend,
-                cart_cpa=item.cart_cpa,
-                ctr=item.ctr,
-                cart_cr=item.cart_cr,
-                is_covered=(target_test is not None and item.impressions >= target_test),
-                is_best=(best is not None and item.bid_minor == best.bid_minor),
-                is_current_main=(
-                    state is not None and state.current_main_bid_minor == item.bid_minor
-                ),
-                is_current_test=(
-                    state is not None and state.current_test_bid_minor == item.bid_minor
-                ),
+        bid_points = self._map_bid_stats_to_points(
+            bid_stats,
+            target_test=target_test,
+            best=best,
+            state=state,
+        )
+
+        cycle_bid_stats: list[BidStatsDTO] = []
+        cycle_best: BidStatsDTO | None = None
+        cycle_covered_points_count = 0
+        if state is not None and nmid:
+            cycle_from_ts = state.current_cycle_started_at or stats_from_ts
+            cycle_bid_stats = await self._analytics.get_bid_stats(
+                nmid=nmid,
+                from_ts=cycle_from_ts,
+                currency=currency,
             )
-            for item in bid_stats
-        ]
+            cycle_best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=nmid,
+                from_ts=cycle_from_ts,
+                currency=currency,
+            )
+            if target_test is not None:
+                cycle_covered_points_count = len(
+                    [item for item in cycle_bid_stats if item.impressions >= target_test]
+                )
+        cycle_bid_points = self._map_bid_stats_to_points(
+            cycle_bid_stats,
+            target_test=target_test,
+            best=cycle_best,
+            state=state,
+        )
 
         test_impressions: int | None = None
         if state is not None and state.current_test_bid_minor is not None:
@@ -310,6 +356,8 @@ class AutoShelfBidControlViewProvider:
             covered_points_count=covered_points_count,
             bid_points_total=bid_points_total,
             bid_points=bid_points,
+            cycle_covered_points_count=cycle_covered_points_count,
+            cycle_bid_points=cycle_bid_points,
             last_reason=(state.last_reason if state else None),
             warnings=warnings,
         )

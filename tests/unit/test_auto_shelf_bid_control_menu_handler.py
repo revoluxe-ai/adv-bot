@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.client_bot.user_interface.handlers import auto_shelf_bid_control_menu as handler
+from app.client_bot.user_interface.views import callbacks
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager import (
     AutoShelfBidControlTelegramError,
 )
@@ -67,6 +68,8 @@ def _view() -> AutoShelfBidControlViewDTO:
         covered_points_count=0,
         bid_points_total=0,
         bid_points=[],
+        cycle_covered_points_count=0,
+        cycle_bid_points=[],
         last_reason=None,
         warnings=[],
     )
@@ -122,3 +125,36 @@ async def test_fsm_error_keeps_state(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert state.cleared is False
     assert "error" in message.answers[-1]
+
+
+@pytest.mark.asyncio
+async def test_bid_points_empty_sends_message_not_callback_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Без покрытий — текст в чат; callback.answer не трогаем (есть middleware)."""
+    chat_message = FakeMessage(text="main")
+    callback = AsyncMock()
+    callback.message = chat_message
+    callback.answer = AsyncMock()
+
+    async def _no_points(*_: object, **__: object) -> bool:
+        return False
+
+    monkeypatch.setattr(handler, "_show_bid_point_viewer", _no_points)
+    monkeypatch.setattr(
+        handler,
+        "AutoShelfBidControlTelegramService",
+        lambda **_: object(),
+    )
+
+    await handler.auto_shelf_bid_control_bid_points_router(
+        callback=callback,
+        callback_data=callbacks.AutoShelfBidControlBidPoints(
+            adv_setting_original_id=1,
+            index=0,
+        ),
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    callback.answer.assert_not_awaited()
+    assert chat_message.answers == ["В текущем цикле пока нет покрытых ставок."]

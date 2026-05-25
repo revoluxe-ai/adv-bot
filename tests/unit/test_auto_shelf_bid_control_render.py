@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
@@ -39,6 +41,8 @@ def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
         covered_points_count=0,
         bid_points_total=0,
         bid_points=[],
+        cycle_covered_points_count=0,
+        cycle_bid_points=[],
         last_reason=None,
         warnings=[],
     )
@@ -81,6 +85,13 @@ def test_main_keyboard_enabled_has_disable_reset_force_main() -> None:
         "Вернуть main-ставку",
         "Назад",
     ]
+
+
+def test_main_keyboard_shows_cycle_coverage_button_when_state_exists() -> None:
+    view = replace(_view(enabled=True, has_settings=True), has_state=True)
+    markup = build_auto_shelf_bid_control_keyboard(view, adv_setting_original_id=1)
+    texts = _keyboard_texts(markup)
+    assert "Покрытия цикла" in texts
 
 
 def test_settings_keyboard_contains_all_actions() -> None:

@@ -272,6 +272,13 @@ class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
     adv_original_id: int
 
 
+class AutoShelfBidControlBidPoints(CallbackData, prefix="asbc_bp"):
+    """Навигация по покрытым ставкам текущего цикла (Telegram-просмотрщик)."""
+
+    adv_setting_original_id: int
+    index: int = 0
+
+
 class AutoShelfBidControlMenu(CallbackData, prefix="auto_shelf_bid_ctrl"):
     """Действия экрана управления ставкой полок Auto-РК.
 
