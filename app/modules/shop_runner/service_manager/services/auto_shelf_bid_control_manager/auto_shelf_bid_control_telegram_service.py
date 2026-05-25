@@ -9,6 +9,10 @@ from types import SimpleNamespace
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
+
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .auto_shelf_bid_control_view_provider import AutoShelfBidControlViewProvider
 from .auto_shelf_bid_setter import AutoShelfBidSetter
@@ -38,6 +42,7 @@ class AutoShelfBidControlTelegramService:
             redis_client=redis_client,
             repository=self._repository,
         )
+        self._bid_cache = RedisAutoRecommendationsBidValueManager(redis_client)
 
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Построить текущее состояние экрана управления."""
@@ -280,7 +285,10 @@ class AutoShelfBidControlTelegramService:
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            setter = AutoShelfBidSetter(hub.wb_modifier)
+            setter = AutoShelfBidSetter(
+                hub.wb_modifier,
+                bid_cache_manager=self._bid_cache,
+            )
         complex_adv_like = SimpleNamespace(auto_adv_id=int(adv.adv_id), nmids=[int(nmid)])
         await setter.set_bid(
             complex_adv_like,

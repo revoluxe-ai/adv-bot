@@ -173,7 +173,10 @@ class CoroutinesManager:
         )
         self._auto_shelf_bid_control_manager = AutoShelfBidControlManager(
             bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
-            wb_bid_setter=AutoShelfBidSetter(self._wb_manager_hub.wb_modifier),
+            wb_bid_setter=AutoShelfBidSetter(
+                self._wb_manager_hub.wb_modifier,
+                bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+            ),
         )
         self._redis_campaign_activity_reason_manager = RedisCampaignActivityReasonManager(
             redis_client_wrapper

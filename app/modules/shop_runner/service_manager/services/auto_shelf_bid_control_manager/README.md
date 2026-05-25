@@ -58,6 +58,8 @@
 ## Conversion policy v1 (setter)
 
 `bid_minor` (копейки) → WB `PATCH /api/advert/v1/bids` как `bid_kopecks` (без ×100).
+После PATCH `AutoShelfBidSetter` пишет ту же ставку в
+`RedisAutoRecommendationsBidValueManager` (control/UI читают actual bid из Redis).
 Legacy `adv/v0/bids` не используется (404 на WB).
 
 Подтверждение перед прод: `AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED` и gate в UI.

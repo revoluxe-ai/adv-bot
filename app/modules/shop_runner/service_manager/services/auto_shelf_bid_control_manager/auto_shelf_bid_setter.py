@@ -6,6 +6,9 @@ import logging
 from typing import Protocol
 
 from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager import WBModifier
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -22,6 +25,16 @@ class _AutoShelfBidPatchPort(Protocol):
     ) -> None: ...
 
 
+class _BidCachePort(Protocol):
+    """Порт записи фактической ставки в Redis после PATCH."""
+
+    async def set_bids(
+        self,
+        auto_adv_id: int,
+        bids: dict[int, int],
+    ) -> None: ...
+
+
 class AutoShelfBidSetter:
     """Сервис установки ставки полок для одного nmid через PATCH /api/advert/v1/bids.
 
@@ -29,8 +42,13 @@ class AutoShelfBidSetter:
     Legacy ``adv/v0/bids`` (WBApi.update_cpm) снят с WB — 404 path not found.
     """
 
-    def __init__(self, wb_modifier: WBModifier | _AutoShelfBidPatchPort) -> None:
+    def __init__(
+        self,
+        wb_modifier: WBModifier | _AutoShelfBidPatchPort,
+        bid_cache_manager: RedisAutoRecommendationsBidValueManager | _BidCachePort | None = None,
+    ) -> None:
         self._wb_modifier = wb_modifier
+        self._bid_cache_manager = bid_cache_manager
 
     @staticmethod
     def to_api_bid(bid_minor: int) -> int:
@@ -47,6 +65,8 @@ class AutoShelfBidSetter:
 
         В dry-run режиме реальные PATCH-запросы не выполняются.
         Источник dry-run — только глобальная настройка приложения.
+        После успешного PATCH при переданном ``bid_cache_manager`` обновляет
+        Redis (источник actual bid для control/UI).
         """
         nmids = complex_adv.nmids
         if len(nmids) != 1:
@@ -69,6 +89,11 @@ class AutoShelfBidSetter:
             int(auto_adv_id),
             {int(nmid): int(api_bid)},
         )
+        if self._bid_cache_manager is not None:
+            await self._bid_cache_manager.set_bids(
+                int(auto_adv_id),
+                {int(nmid): int(bid_minor)},
+            )
         logger.info(
             "auto_shelf_bid_control_set_bid_ok auto_adv_id=%s nmid=%s bid_minor=%s api_bid=%s currency=%s",
             auto_adv_id,
