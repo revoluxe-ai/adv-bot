@@ -144,6 +144,39 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
 
 
 @pytest.mark.asyncio
+async def test_adv_excel_import_template_v1_rejected(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """После bump шаблона до v2 файлы с версией 1 отклоняются (нужна новая выгрузка)."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+
+    row = rows[0]
+    tpl_key = column_header("RO", "excel_template_version")
+    assert tpl_key in row
+    row[tpl_key] = 1
+
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        with pytest.raises(AdvExcelImportError) as excinfo:
+            _ = await apply_adv_excel_rows(
+                telegram_user_id=int(user.user_telegram_id),
+                expected_wb_user_cabinet_id=wuc.id,
+                rows=rows,
+            )
+    assert "Версия шаблона" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
 async def test_adv_excel_import_invalid_enum_rejected(
     async_session: AsyncSession, excel_shop_bundle: dict[str, object]
 ) -> None:

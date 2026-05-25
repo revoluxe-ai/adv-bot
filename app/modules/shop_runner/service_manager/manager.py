@@ -429,13 +429,28 @@ class CoroutinesManager:
         advs, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )
-        control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
+        control_system_v2 = AdvControlSystem(max_last_period=2)
+        from .services.auto_updater_v3 import process_adv_v3
+
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
-            handlers.append(
-                lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
-            )
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 3:
+                handlers.append(
+                    functools.partial(
+                        process_adv_v3,
+                        adv,
+                        wb_shop_data_manager=self._wb_shop_data_manager,
+                    )
+                )
+            elif ver == 2:
+                handlers.append(
+                    functools.partial(control_system_v2.process_adv, adv)
+                )
+            else:
+                logger.error('Установлена не поддерживаемая версия автоапдейтера')
+                continue
 
         if not handlers:
             return None
@@ -1419,7 +1434,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def white_list_tail_trimmer(self):
-        from .services.white_list_trimmer import WhiteListTrimmer
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
@@ -1436,15 +1450,24 @@ class CoroutinesManager:
         )
         if not complex_advs:
             return None
+        from .services.white_list_trimmer import WhiteListTrimmer
+
         trimmer = WhiteListTrimmer()
         handlers: list[Callable[[], Awaitable[None]]] = []
+        non_v3_advs: list[ComplexAdv] = []
         for adv in complex_advs:
-            handler = functools.partial(trimmer.trim, adv)
-            handlers.append(handler)
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 3:
+                continue
+            non_v3_advs.append(adv)
+            handlers.append(functools.partial(trimmer.trim, adv))
+
+        if not handlers:
+            return None
 
         results = await run_tasks(handlers=handlers, max_workers=16, tasks_manager=self._tasks_manager)
 
-        for adv, result in zip(complex_advs, results):
+        for adv, result in zip(non_v3_advs, results):
             if isinstance(result, BaseException):
                 logger.exception("Ошибка срезания БС adv_id: %s:  %s", adv.adv_id,
                                  result)

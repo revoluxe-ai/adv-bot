@@ -186,7 +186,11 @@ if __name__ == "__main__":
                         dp.include_router(global_router)
                         logger.info("🔄 Запуск бота в режиме POLLING...")
                         # Запуск бота с использованием long polling
-                        await dp.start_polling(bot)
+                        await dp.start_polling(
+                            bot,
+                            drop_pending_updates=True,
+                            polling_timeout=30,
+                        )
             finally:
                 await aclose_telegram_http_session()
                 logger.info("✅ Сессия бота завершена.")

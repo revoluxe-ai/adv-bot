@@ -518,6 +518,8 @@ def adv_setting_mock():
     adv_setting_mock.plan_for_sales_for_day = None
     adv_setting_mock.target_price_for_order = None
     adv_setting_mock.max_price_for_order = None
+    adv_setting_mock.automatic_version = 2
+    adv_setting_mock.aggressiveness = 3
     return adv_setting_mock
 
 

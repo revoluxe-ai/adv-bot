@@ -3,14 +3,25 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
-from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
+    NormqueryBidDTO,
+)
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
-from app.modules.predict_keywords_target_place.di import PredictKeywordsTargetPlaceContainer
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.predict_keywords_target_place.di import (
+    PredictKeywordsTargetPlaceContainer,
+)
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+)
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
+    RedisKeywordBidderStatusManager,
+)
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisApiClusterBidsManager,
@@ -25,8 +36,11 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
-    new_bids_calculator.update_bids_command import DirectEnum, UpdateBidsCommand, NewBid
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
+    DirectEnum,
+    UpdateBidsCommand,
+    NewBid,
+)
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
 
@@ -79,8 +93,9 @@ class UpdateClusterBidsManager:
             redis_cluster_bids_timestamp_manager
         )
 
-
-    async def _get_local_data(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
+    async def _get_local_data(
+        self, advs: list[ComplexAdv]
+    ) -> set[AdvIdItemCalculateData]:
         return await self._get_maps(advs)
 
     async def _get_data_from_wb_api(
@@ -92,12 +107,12 @@ class UpdateClusterBidsManager:
 
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
         local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
-        remote_data: BidderUpdateData = await self._get_data_from_wb_api(advs, local_data)
+        remote_data: BidderUpdateData = await self._get_data_from_wb_api(
+            advs, local_data
+        )
         predict_bids_data: dict[
             int, (dict[int, dict[str, dict[int, int]]] | None)
-        ] = await self._get_predict_bids_data(
-            advs, remote_data.min_bids.search
-        )
+        ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -114,10 +129,7 @@ class UpdateClusterBidsManager:
         await self._apply_command(new_bids_command)
         if advs:
             _ = await asyncio.gather(
-                *(
-                    self._redis_cluster_bids_timestamp_manager.set(adv)
-                    for adv in advs
-                ),
+                *(self._redis_cluster_bids_timestamp_manager.set(adv) for adv in advs),
             )
 
     async def _get_bidder_update_data(
@@ -245,6 +257,7 @@ class UpdateClusterBidsManager:
         self, calculate_data: BidderCalculateData
     ) -> list[CalculationInput]:
         from .mappers import Mapper
+
         bidder_update_data = calculate_data.data_from_wb_api
         maps_data: set[AdvIdItemCalculateData] = calculate_data.data_from_local
         mapper = Mapper(bidder_update_data)
@@ -299,7 +312,7 @@ class UpdateClusterBidsManager:
                 else None
             )
             calculate_input = CalculationInput(
-                adv_id=adv_id ,
+                adv_id=adv_id,
                 nmid=nmid,
                 current_bid=current_bid,
                 current_position=current_position,
@@ -331,7 +344,7 @@ class UpdateClusterBidsManager:
         """
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
-            logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
+            logger.warning("Нет поисковой компании у комплекса: %s", adv.adv_id)
             return set()
         texts_in_this_adv = cluster_texts_from_ch
 
@@ -344,6 +357,13 @@ class UpdateClusterBidsManager:
             return set()
         keywords: list[CalculatedKeyword] = keywords_maybe
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        # V3: ключи в OFF не участвуют в торгах (страховка от гонок с hard_status).
+        if adv.auto_updater_version == 3:
+            keywords_good = [
+                kw
+                for kw in keywords_good
+                if kw.strategy_mode != KeywordStrategyMode.OFF
+            ]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
         matched_in_ch = [
             kw
@@ -389,10 +409,10 @@ class UpdateClusterBidsManager:
                 map_datas.add(map_data)
         return map_datas
 
-
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
-        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
-            .click_house_manager.click_house_manager import ClickHouseManager
+        from app.modules.shop_runner.service_manager.services.minus_phrase_manager.click_house_manager.click_house_manager import (
+            ClickHouseManager,
+        )
 
         auction_ids_unique: list[int] = []
         seen_auction: set[int] = set()
@@ -429,7 +449,9 @@ class UpdateClusterBidsManager:
         datas: set[AdvIdItemCalculateData] = set()
         for result in results:
             if isinstance(result, BaseException):
-                logger.error('Ошибка получения данных для расчета новой ставки: %s', result)
+                logger.error(
+                    "Ошибка получения данных для расчета новой ставки: %s", result
+                )
             elif result:
                 datas.update(result)
         return datas
@@ -472,6 +494,7 @@ class UpdateClusterBidsManager:
     @staticmethod
     def _get_bids_command(calculation_inputs: list[CalculationInput]):
         from .new_bids_calculator import new_bid_calculate
+
         new_bids: list[NewBid] = []
         for input_dto in calculation_inputs:
             new_bid: NewBid | None = new_bid_calculate(input_dto)
@@ -508,7 +531,6 @@ class UpdateClusterBidsManager:
                 plan_datas_map[adv.adv_id] = plan
 
         return plan_datas_map
-
 
     @staticmethod
     async def _get_predict_bids_data(
@@ -574,11 +596,11 @@ class UpdateClusterBidsManager:
             async with sem:
                 return await _fetch(item)
 
-        results: list[tuple[int, int, dict[str, dict[int, int]]] | BaseException] = (
-            await asyncio.gather(
-                *(_guarded(w) for w in work),
-                return_exceptions=True,
-            )
+        results: list[
+            tuple[int, int, dict[str, dict[int, int]]] | BaseException
+        ] = await asyncio.gather(
+            *(_guarded(w) for w in work),
+            return_exceptions=True,
         )
         for item, result in zip(work, results, strict=False):
             if isinstance(result, BaseException):
@@ -597,4 +619,3 @@ class UpdateClusterBidsManager:
                 bucket[nmid] = dict_result
 
         return adv_result
-

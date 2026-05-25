@@ -318,6 +318,14 @@ class ComplexAdv:
             return True
         return False
 
+    @property
+    def shelf_promotion_active(self) -> bool:
+        """rec_system (полки) + авто-кампания started — как во v2 для полочной фазы."""
+        return self.rec_system_promotion_mode_active and self.auto_adv_active_status
+
+    @property
+    def v3_rollout_aggressiveness(self) -> int:
+        return int(self._adv_setting.aggressiveness)
 
     @property
     def shop_id(self) -> str:

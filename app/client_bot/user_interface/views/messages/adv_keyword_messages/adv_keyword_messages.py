@@ -15,6 +15,9 @@ from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
 )
@@ -224,8 +227,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             t = f"Мин. зак. на 1000₽: {min_orders_per_1000_rub:.2f}\n"
 
         text += t
-        text +=(
-            f"Стр.: {self._page}/{total_page + 1}\n"
+        page_block = f"Стр.:{self._page}/{total_page + 1}\n"
+        text += page_block
+        text += (
             f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"

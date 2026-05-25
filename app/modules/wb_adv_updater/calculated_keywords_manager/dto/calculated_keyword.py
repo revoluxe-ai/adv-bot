@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import KeywordStat
 from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import KeywordSettingDTO
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
@@ -9,6 +10,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
 )
 from .inner_dto.keyword_cpm_sources import KeywordCpmSources
 from .inner_dto.keyword_state import KeywordState
+from .position_profile_point import PositionProfilePoint
 from .states import KeywordStatus, KeywordStatusReason
 
 # Кешируем, поэтому юзаем Pydantic
@@ -24,6 +26,7 @@ class CalculatedKeyword(BaseModel):
     target_pay_for_order: float | None
     above_rec_conversion: bool | None = None
     cpm_sources: KeywordCpmSources | None = None
+    position_profile: list[PositionProfilePoint] | None = None
 
 
     @property
@@ -144,6 +147,10 @@ class CalculatedKeyword(BaseModel):
     @property
     def hard_status(self) -> int:
         return self.keyword_setting.hard_status
+
+    @property
+    def strategy_mode(self) -> KeywordStrategyMode:
+        return self.keyword_setting.strategy_mode
 
     # TODO: Обязательно сделать кнопку-отключение добавления только релевантных, и всем ее отключить по умолчанию
     @property

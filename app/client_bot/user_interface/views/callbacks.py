@@ -467,6 +467,19 @@ class AutoUpdaterVersionMenuBack(CallbackData, prefix="auto_updater_ver_menu_bac
     pass
 
 
+class V3RolloutAggMenuOpen(CallbackData, prefix="v3_rollout_agg_menu_open"):
+    adv_setting_original_id: int
+
+
+class V3RolloutAggMenuBack(CallbackData, prefix="v3_rollout_agg_menu_back"):
+    pass
+
+
+class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
+    adv_setting_original_id: int
+    level: int
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):
