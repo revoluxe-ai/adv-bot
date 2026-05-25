@@ -140,3 +140,12 @@ class ConnectExistingAdvsStates(StatesGroup):
     waiting_auto_adv_id = State()  # ввод ID авто-кампании
     waiting_confirm_create_both = State()  # обе отсутствуют — подтверждение create_complex_advs
     waiting_confirm_continue_invalid = State()  # только авто без поиска — продолжить создание (деактивация + create)
+
+
+class AutoShelfBidControlFSM(StatesGroup):
+    """FSM ввода параметров для Telegram-управления ставкой в полках."""
+
+    waiting_for_max_bid = State()
+    waiting_for_test_share = State()
+    waiting_for_target_test_impressions = State()
+    waiting_for_min_bid_distance = State()

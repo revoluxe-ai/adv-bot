@@ -272,6 +272,21 @@ class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
     adv_original_id: int
 
 
+class AutoShelfBidControlMenu(CallbackData, prefix="auto_shelf_bid_ctrl"):
+    """Действия экрана управления ставкой полок Auto-РК.
+
+    Поддерживаемые action:
+        open, refresh,
+        enable, disable, settings,
+        set_max_bid, set_test_share, set_target_test_impressions, set_min_bid_distance,
+        reset_cycle, force_main,
+        back.
+    """
+
+    action: str
+    adv_setting_original_id: int
+
+
 class AddBlackPhrasesTemplates(CallbackData, prefix="add_black_phrases"):
     adv_setting_id: int
 
