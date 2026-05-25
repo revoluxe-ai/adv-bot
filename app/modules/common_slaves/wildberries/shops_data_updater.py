@@ -21,6 +21,9 @@ sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
+# Типы Auto/Search РК v2 (unified=8, manual=9), для которых WB отдаёт recommendations bid.
+_AUTO_RECOMMENDATIONS_BID_ADV_TYPES = frozenset({8, 9})
+
 _coroutine_parallel_run_queue = asyncio.Queue()
 
 
@@ -145,8 +148,13 @@ class ShopDataUpdater:
 
     @staticmethod
     def _extract_auto_recommendations_bids(adv: Adv) -> dict[int, int]:
-        """Извлечь recommendations bid по nmid из v2 payload, вложенного в legacy data."""
-        if int(adv.type) != 8:
+        """Извлечь recommendations bid по nmid из v2 payload, вложенного в legacy data.
+
+        WB v2 кладёт ``recommendationsBidsByNmidKopecks`` и для type=8 (unified), и для
+        type=9 (manual). Раньше учитывался только type=8 — manual Auto-РК не попадали
+        в Redis-кэш, и auto_shelf increment останавливался на ``no_bid``.
+        """
+        if int(adv.type) not in _AUTO_RECOMMENDATIONS_BID_ADV_TYPES:
             return {}
         payload = adv.data
         raw_map = payload.get("recommendationsBidsByNmidKopecks")
@@ -174,7 +182,7 @@ class ShopDataUpdater:
         for adv in advs:
             bids = self._extract_auto_recommendations_bids(adv)
             if not bids:
-                if int(adv.type) == 8:
+                if int(adv.type) in _AUTO_RECOMMENDATIONS_BID_ADV_TYPES:
                     skipped_advs += 1
                 continue
             await manager.set_bids(int(adv.advertId), bids)
