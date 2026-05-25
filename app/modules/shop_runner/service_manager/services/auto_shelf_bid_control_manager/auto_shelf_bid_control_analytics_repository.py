@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from clickhouse_connect.driver.query import QueryResult
 
@@ -25,7 +25,7 @@ class AutoShelfBidControlAnalyticsRepository:
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
 
     @staticmethod
-    def _build_bid_stats_dto(row: dict[str, object]) -> BidStatsDTO:
+    def _build_bid_stats_dto(row: dict[str, Any]) -> BidStatsDTO:
         """Собрать BidStatsDTO и вычислить производные метрики."""
         impressions = int(row["impressions"])
         clicks = int(row["clicks"])
@@ -87,7 +87,7 @@ class AutoShelfBidControlAnalyticsRepository:
         column_names = [str(name) for name in names]
         out: list[BidStatsDTO] = []
         for row_values in result.result_rows:
-            row = dict(zip(column_names, tuple(row_values)))
+            row: dict[str, Any] = dict(zip(column_names, tuple(row_values)))
             out.append(self._build_bid_stats_dto(row))
         return out
 
@@ -136,6 +136,6 @@ class AutoShelfBidControlAnalyticsRepository:
             return None
         names = cast(tuple[object, ...], result.column_names)
         column_names = [str(name) for name in names]
-        row = dict(zip(column_names, tuple(result.result_rows[0])))
+        row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
 
