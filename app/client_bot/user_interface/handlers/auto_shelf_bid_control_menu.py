@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from aiogram import Bot, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -16,10 +17,15 @@ from app.client_bot.user_interface.helpers.wb_user_cabinet import (
 )
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
+    BID_POINT_VIEWER_HEADER,
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    build_bid_point_viewer_keyboard,
+    clamp_bid_point_index,
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
+    render_bid_point_viewer_message,
+    select_covered_bid_points_for_cycle_viewer,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -31,6 +37,45 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
+
+async def _show_bid_point_viewer(
+    callback: CallbackQuery,
+    *,
+    service: AutoShelfBidControlTelegramService,
+    adv_setting_original_id: int,
+    index: int,
+) -> bool:
+    """Показать или обновить просмотрщик покрытой ставки цикла.
+
+    Returns:
+        True, если экран показан; False, если покрытий нет.
+    """
+    view = await service.build_view(adv_setting_original_id)
+    points = select_covered_bid_points_for_cycle_viewer(view.cycle_bid_points)
+    if not points:
+        return False
+    safe_index = clamp_bid_point_index(index, len(points))
+    text = render_bid_point_viewer_message(view, safe_index, points)
+    keyboard = build_bid_point_viewer_keyboard(
+        adv_setting_original_id,
+        safe_index,
+        len(points),
+    )
+    if callback.message is None:
+        return True
+    is_viewer_message = (
+        callback.message.text is not None
+        and BID_POINT_VIEWER_HEADER in callback.message.text
+    )
+    if is_viewer_message:
+        try:
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except TelegramBadRequest as exc:
+            if "message is not modified" not in str(exc).lower():
+                raise
+    else:
+        await callback.message.answer(text, reply_markup=keyboard)
+    return True
 
 
 async def _send_main_screen(
@@ -85,6 +130,34 @@ async def _reload_adv_setting_menu(
             await bot.send_message(chat_id, "Кабинет кампании не найден.")
             return
     await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
+@router.callback_query(callbacks.AutoShelfBidControlBidPoints.filter())
+@inject
+async def auto_shelf_bid_control_bid_points_router(
+    callback: CallbackQuery,
+    callback_data: callbacks.AutoShelfBidControlBidPoints,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    """Навигация по покрытым ставкам текущего цикла."""
+    service = AutoShelfBidControlTelegramService(redis_client=redis_client)
+    try:
+        shown = await _show_bid_point_viewer(
+            callback,
+            service=service,
+            adv_setting_original_id=callback_data.adv_setting_original_id,
+            index=callback_data.index,
+        )
+        if not shown:
+            await callback.answer(
+                "В текущем цикле пока нет покрытых ставок",
+                show_alert=True,
+            )
+    except AutoShelfBidControlTelegramError as exc:
+        if callback.message:
+            await callback.message.answer(exc.message)
+    finally:
+        await callback.answer()
 
 
 @router.callback_query(callbacks.AutoShelfBidControlMenu.filter())

@@ -53,8 +53,10 @@
 7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 8. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
-9. Telegram «Покрытые ставки»: до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT` (5) последних
-   покрытых точек по `last_interval_at`; при большем числе — строка «… ещё N».
+9. Telegram «Покрытые ставки» (главный экран): до `TELEGRAM_BID_POINTS_DISPLAY_LIMIT`
+   (5) последних покрытых точек за **отчётный день**; при большем числе — «… ещё N».
+   Кнопка «Покрытия цикла» — листалка по тем же строкам (формат как в блоке выше),
+   все **покрытые** точки от `current_cycle_started_at`, навигация ◀️/▶️.
 
 ## Conversion policy v1 (setter)
 

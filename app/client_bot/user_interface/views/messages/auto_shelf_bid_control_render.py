@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.client_bot.user_interface.views.callbacks import AutoShelfBidControlMenu
+from app.client_bot.user_interface.views.callbacks import (
+    AutoShelfBidControlBidPoints,
+    AutoShelfBidControlMenu,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
     TELEGRAM_BID_POINTS_DISPLAY_LIMIT,
     format_bid_minor_for_telegram,
@@ -61,16 +64,112 @@ def select_bid_points_for_telegram(
     return sorted(pool, key=_bid_point_sort_ts, reverse=True)[:limit]
 
 
+def select_covered_bid_points_for_cycle_viewer(
+    points: list[BidPointStatsDTO],
+) -> list[BidPointStatsDTO]:
+    """Покрытые точки цикла для просмотрщика, по ``last_interval_at`` DESC."""
+    covered = [p for p in points if p.is_covered]
+    return sorted(covered, key=_bid_point_sort_ts, reverse=True)
+
+
+def clamp_bid_point_index(index: int, total: int) -> int:
+    """Безопасный индекс при навигации по списку покрытий (0..total-1)."""
+    if total <= 0:
+        return 0
+    if index < 0:
+        return 0
+    if index >= total:
+        return total - 1
+    return index
+
+
+def format_bid_point_line(point: BidPointStatsDTO) -> str:
+    """Одна строка покрытой ставки — тот же формат, что в блоке на главном экране."""
+    return (
+        f"{format_bid(point.bid_minor, point.currency)}: показы {point.impressions}, "
+        f"корзины {point.carts}, расход {_format_money(point.spend)} ₽, "
+        f"CPA корзины {_format_money(point.cart_cpa)} ₽"
+    )
+
+
+BID_POINT_VIEWER_HEADER = "Покрытые ставки (текущий цикл):"
+
+
+def render_bid_point_viewer_message(
+    view: AutoShelfBidControlViewDTO,
+    index: int,
+    points: list[BidPointStatsDTO],
+) -> str:
+    """Просмотр одной строки покрытия цикла (как на главном экране) с листанием."""
+    total = len(points)
+    safe_index = clamp_bid_point_index(index, total)
+    point = points[safe_index]
+    line = format_bid_point_line(point)
+    return (
+        f"{BID_POINT_VIEWER_HEADER}\n"
+        f"{line}\n\n"
+        f"{safe_index + 1} / {total}"
+    )
+
+
+def build_bid_point_viewer_keyboard(
+    adv_setting_original_id: int,
+    index: int,
+    total: int,
+) -> InlineKeyboardMarkup:
+    """Клавиатура просмотрщика: ◀️ / ▶️, обновить, назад к управлению."""
+    builder = InlineKeyboardBuilder()
+    safe_index = clamp_bid_point_index(index, total)
+    nav_row: list[tuple[str, AutoShelfBidControlBidPoints]] = []
+    if safe_index > 0:
+        nav_row.append(
+            (
+                "◀️",
+                AutoShelfBidControlBidPoints(
+                    adv_setting_original_id=adv_setting_original_id,
+                    index=safe_index - 1,
+                ),
+            )
+        )
+    if safe_index < total - 1:
+        nav_row.append(
+            (
+                "▶️",
+                AutoShelfBidControlBidPoints(
+                    adv_setting_original_id=adv_setting_original_id,
+                    index=safe_index + 1,
+                ),
+            )
+        )
+    for text, callback_data in nav_row:
+        builder.button(text=text, callback_data=callback_data.pack())
+    builder.button(
+        text="Обновить",
+        callback_data=AutoShelfBidControlBidPoints(
+            adv_setting_original_id=adv_setting_original_id,
+            index=safe_index,
+        ).pack(),
+    )
+    builder.button(
+        text="К управлению",
+        callback_data=AutoShelfBidControlMenu(
+            action="open",
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    if nav_row:
+        builder.adjust(len(nav_row), 1, 1)
+    else:
+        builder.adjust(1, 1)
+    return builder.as_markup()
+
+
 def _format_bid_points_block(view: AutoShelfBidControlViewDTO) -> str:
     """Блок «Покрытые ставки» с лимитом последних тестов."""
     displayed = select_bid_points_for_telegram(view.bid_points)
     lines: list[str] = []
     for point in displayed:
-        lines.append(
-            f"{format_bid(point.bid_minor, point.currency)}: показы {point.impressions}, "
-            f"корзины {point.carts}, расход {_format_money(point.spend)} ₽, "
-            f"CPA корзины {_format_money(point.cart_cpa)} ₽"
-        )
+        lines.append(format_bid_point_line(point))
     if not lines:
         lines.append("Статистики по тестовым ставкам пока недостаточно.")
     hidden = max(0, view.bid_points_total - len(displayed))
@@ -159,6 +258,14 @@ def build_auto_shelf_bid_control_keyboard(
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
+        if view.cycle_covered_points_count > 0:
+            builder.button(
+                text="Покрытия цикла",
+                callback_data=AutoShelfBidControlBidPoints(
+                    adv_setting_original_id=adv_setting_original_id,
+                    index=0,
+                ).pack(),
+            )
         builder.button(
             text="Сбросить цикл",
             callback_data=AutoShelfBidControlMenu(

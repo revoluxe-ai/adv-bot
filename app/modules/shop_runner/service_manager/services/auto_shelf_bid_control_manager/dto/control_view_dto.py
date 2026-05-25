@@ -57,8 +57,10 @@ class AutoShelfBidControlViewDTO:
     test_impressions: int | None
     main_impressions: int | None
     covered_points_count: int
-    bid_points_total: int  # всего точек за отчётный день (до лимита в рендере)
-    bid_points: list[BidPointStatsDTO]
+    bid_points_total: int  # всего точек за отчётный день (главный экран)
+    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день
+    cycle_covered_points_count: int  # покрытые точки текущего цикла
+    cycle_bid_points: list[BidPointStatsDTO]  # агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
 

@@ -48,6 +48,8 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
         main_impressions=0,
         covered_points_count=0,
         bid_points_total=1,
+        cycle_covered_points_count=0,
+        cycle_bid_points=[],
         bid_points=[
             BidPointStatsDTO(
                 bid_minor=20_000,
