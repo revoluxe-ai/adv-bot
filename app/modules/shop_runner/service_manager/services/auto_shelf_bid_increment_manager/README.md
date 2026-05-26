@@ -152,3 +152,4 @@
 | `zero_delta_skipped` | нет | да | нет изменений метрик |
 | `insert_ok` | да | да | штатный success-path |
 | `persist_failed_after_interval` | да* | нет | *interval уже в CH; resync на след. тике |
+| `persist_failed_after_boundary_interval` | да* | нет | *boundary interval уже в CH; resync на след. тике |

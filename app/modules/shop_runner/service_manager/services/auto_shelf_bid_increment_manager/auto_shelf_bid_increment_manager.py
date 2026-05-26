@@ -17,7 +17,8 @@
        не зависел от внешнего источника цены.
     6) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
        reason `persist_failed_after_interval`, поднимается resync-маркер; итоговая
-       аналитика защищается дедупом по `event_date + event_id`.
+       аналитика защищается дедупом по `event_date + event_id`. То же после
+       boundary-interval при смене контекста (`persist_failed_after_boundary_interval`).
     7) Bucket агрегации для intervals/lock — 15 минут (общий BucketCalculator),
        даже если корутина запускается чаще (примерно раз в 5 минут).
 """
@@ -360,7 +361,26 @@ class AutoShelfBidIncrementManager:
                     current_snapshot=current_snapshot,
                     bucket_start=bucket_start,
                 )
-                await self._last_state_manager.persist(current_snapshot)
+                try:
+                    await self._last_state_manager.persist(current_snapshot)
+                except Exception:
+                    # Как в success-path: interval (boundary) уже мог попасть в CH,
+                    # prev не обновлён — без resync следующий тик снова увидит
+                    # context_changed и посчитает дельту от stale prev (overcount).
+                    await self._last_state_manager.mark_resync_required(nmid)
+                    self._log_contract_event(
+                        "auto_shelf_bid_persist_failed_after_boundary_interval",
+                        reason="persist_failed_after_boundary_interval",
+                        nmid=nmid,
+                        mode=current_snapshot.mode,
+                        bid_minor=current_snapshot.bid_minor,
+                        currency=current_snapshot.currency,
+                        price_minor=current_snapshot.price_minor,
+                        price_currency=current_snapshot.price_currency,
+                        bucket_start=bucket_start,
+                        level=logging.WARNING,
+                    )
+                    raise
                 self._log_contract_event(
                     "auto_shelf_bid_context_changed_resync",
                     reason="context_changed_resync",
