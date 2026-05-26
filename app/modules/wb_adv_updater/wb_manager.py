@@ -27,6 +27,9 @@ from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
 from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
+from ..shop_runner.service_manager.services.v3_status_mode_sync import (
+    sync_keyword_setting_mode_for_v3,
+)
 from ..wb_update_state_manager import KeywordStatUpdateState
 from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
@@ -358,6 +361,11 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
                 text = keyword.text
                 if not not_rel_templator.is_relevant(text):
                     keyword.hard_status = 0
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword,
+                    automatic_version=adv_setting.automatic_version,
+                    hard_status_override=int(keyword.hard_status),
+                )
                 session.add(keyword)
             await session.commit()
     except Exception as exc:

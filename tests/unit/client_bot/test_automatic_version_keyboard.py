@@ -20,6 +20,12 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
     show_relevant_phrase_toggle,
 )
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
+    V3RolloutAggMenuOpen,
+    build_v3_rollout_submenu_markup,
+    v3_aggressiveness_letter,
+    v3_rollout_aggressiveness_main_button,
+)
 
 
 @pytest.mark.unit
@@ -95,3 +101,23 @@ def test_show_relevant_phrase_toggle_only_v2_for_now() -> None:
     assert show_relevant_phrase_toggle(2) is True
     assert show_relevant_phrase_toggle(1) is False
     assert show_relevant_phrase_toggle(3) is False
+
+
+@pytest.mark.unit
+def test_v3_rollout_main_button_opens_submenu() -> None:
+    adv = MagicMock()
+    adv.id = 7
+    adv.aggressiveness = 2
+    btn = v3_rollout_aggressiveness_main_button(adv)
+    parsed = V3RolloutAggMenuOpen.unpack(btn.callback_data)
+    assert parsed.adv_setting_original_id == 7
+    assert btn.text == f"V3 агр.: {v3_aggressiveness_letter(2)}"
+
+
+@pytest.mark.unit
+def test_v3_rollout_submenu_three_levels_and_back() -> None:
+    adv = MagicMock()
+    adv.id = 5
+    adv.aggressiveness = 3
+    markup = build_v3_rollout_submenu_markup(adv)
+    assert len(markup.inline_keyboard) == 4

@@ -22,6 +22,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.auto_budget_manager import (
@@ -94,6 +95,10 @@ from .services.adv_strategy_selector import AdvStrategySelector, StrategySelecti
 from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
+from .services.v3_status_mode_sync import (
+    is_v3_campaign,
+    keyword_strategy_mode_for_adv_strategy,
+)
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -429,13 +434,28 @@ class CoroutinesManager:
         advs, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )
-        control_system_v2 = AdvControlSystem(max_last_period=2)
         # TODO: Внедрить в бот плату за оборот
+        control_system_v2 = AdvControlSystem(max_last_period=2)
+        from .services.auto_updater_v3 import process_adv_v3
+
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs:
-            handlers.append(
-                lambda complex_adv=adv: control_system_v2.process_adv(complex_adv)
-            )
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 3:
+                handlers.append(
+                    functools.partial(
+                        process_adv_v3,
+                        adv,
+                        wb_shop_data_manager=self._wb_shop_data_manager,
+                    )
+                )
+            elif ver == 2:
+                handlers.append(
+                    functools.partial(control_system_v2.process_adv, adv)
+                )
+            else:
+                logger.error('Установлена не поддерживаемая версия автоапдейтера')
+                continue
 
         if not handlers:
             return None
@@ -1077,17 +1097,29 @@ class CoroutinesManager:
 
         async with sm(read_only=False) as session:
             if demote_ids:
-                stmt_demote = (
-                    update(KeywordSetting)
-                    .where(KeywordSetting.id.in_(demote_ids))
-                    .values(hard_status=1)
+                stmt_demote = update(KeywordSetting).where(
+                    KeywordSetting.id.in_(demote_ids)
                 )
+                if is_v3_campaign(complex_adv.auto_updater_version):
+                    stmt_demote = stmt_demote.values(
+                        hard_status=1,
+                        strategy_mode=KeywordStrategyMode.OFF,
+                    )
+                else:
+                    stmt_demote = stmt_demote.values(hard_status=1)
                 _ = await session.execute(stmt_demote)
-            stmt_promote = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id == top_keyword_id)
-                .values(hard_status=2)
+            stmt_promote = update(KeywordSetting).where(
+                KeywordSetting.id == top_keyword_id
             )
+            if is_v3_campaign(complex_adv.auto_updater_version):
+                stmt_promote = stmt_promote.values(
+                    hard_status=2,
+                    strategy_mode=keyword_strategy_mode_for_adv_strategy(
+                        complex_adv.strategy
+                    ),
+                )
+            else:
+                stmt_promote = stmt_promote.values(hard_status=2)
             _ = await session.execute(stmt_promote)
             await session.commit()
 
@@ -1419,7 +1451,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def white_list_tail_trimmer(self):
-        from .services.white_list_trimmer import WhiteListTrimmer
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
@@ -1436,15 +1467,24 @@ class CoroutinesManager:
         )
         if not complex_advs:
             return None
+        from .services.white_list_trimmer import WhiteListTrimmer
+
         trimmer = WhiteListTrimmer()
         handlers: list[Callable[[], Awaitable[None]]] = []
+        non_v3_advs: list[ComplexAdv] = []
         for adv in complex_advs:
-            handler = functools.partial(trimmer.trim, adv)
-            handlers.append(handler)
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 3:
+                continue
+            non_v3_advs.append(adv)
+            handlers.append(functools.partial(trimmer.trim, adv))
+
+        if not handlers:
+            return None
 
         results = await run_tasks(handlers=handlers, max_workers=16, tasks_manager=self._tasks_manager)
 
-        for adv, result in zip(complex_advs, results):
+        for adv, result in zip(non_v3_advs, results):
             if isinstance(result, BaseException):
                 logger.exception("Ошибка срезания БС adv_id: %s:  %s", adv.adv_id,
                                  result)
@@ -1487,7 +1527,12 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def change_adv_strategy(self):
-        # AdvStrategySelector использует traffic_clicks_dto при rec_system_promotion_mode
+        """Периодически выставляет ``AdvSetting.strategy`` (MIN_CPO / MAX_CONV).
+
+        ``load_extras=True`` — обогащение ``traffic_clicks_dto`` для сравнения орг/пол.
+        Логика полок и кликов: ``AdvStrategySelector`` (модульный докстринг).
+        Не меняет V3-лестницу ключей; основной цикл ``adv_settings_auto_update`` идёт без extras.
+        """
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=True
         )

@@ -214,7 +214,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аук.: {self._adv_setting.search_adv_id}\n"
-            f"Cтат. за 2 дня:\n")
+            "Cтат. за 2 дня:\n"
+        )
 
         min_orders_per_1000_rub: float | None = self.min_orders_per_1000_rub
 
@@ -224,8 +225,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             t = f"Мин. зак. на 1000₽: {min_orders_per_1000_rub:.2f}\n"
 
         text += t
-        text +=(
-            f"Стр.: {self._page}/{total_page + 1}\n"
+        page_block = f"Стр.:{self._page}/{total_page + 1}\n"
+        text += page_block
+        text += (
             f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"

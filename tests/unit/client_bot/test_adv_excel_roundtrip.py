@@ -12,6 +12,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EXCEL_TEMPLATE_VERSION,
     column_header,
+    edit_header,
     enum_names_for_field,
     parse_edit_value,
     parse_header,
@@ -47,6 +48,15 @@ def test_deviation_none_when_plan_missing() -> None:
     assert d.orders_dev_pct is None
     assert d.cost_dev_pct == pytest.approx(0.0)
     assert d.deviation_score == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_edit_header_aggressiveness_uses_orm_field_name() -> None:
+    h = edit_header("aggressiveness")
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "aggressiveness"
+    assert s == "INT"
 
 
 @pytest.mark.unit
@@ -102,7 +112,7 @@ def test_enum_names_for_field_strategy() -> None:
 
 @pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION >= 1
+    assert EXCEL_TEMPLATE_VERSION == 2
 
 
 @pytest.mark.unit

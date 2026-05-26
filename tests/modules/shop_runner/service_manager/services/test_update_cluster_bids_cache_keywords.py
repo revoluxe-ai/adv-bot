@@ -6,14 +6,21 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
+    NormqueryBidDTO,
+)
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.mappers.adv_id_item_map import (
     AdvIdItemCalculateData,
 )
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager import (
     UpdateClusterBidsManager,
 )
-from tests.factories.keyword_pipeline import GoodKeywordFactory
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+)
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
+from tests.factories import GoodKeywordFactory
 
 
 @pytest.mark.unit
@@ -31,9 +38,7 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
     adv.adv_id = 1
     adv.get_keywords = AsyncMock(return_value=None)
 
-    result = await manager._UpdateClusterBidsManager__get_calculate_data(
-        adv, set()
-    )
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(adv, set())
     assert result == set()
     adv.get_keywords.assert_awaited_once_with(cache_only=True)
 
@@ -166,3 +171,137 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
     assert result[0].bid == 42
     wb_manager.get_current_bids.assert_awaited_once_with([adv])
     api_cache.replace_from_api.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 10
+    adv.adv_id = 1
+    adv.auto_updater_version = 3
+    adv.strategy = Strategy.MIN_CPO
+    adv.nmids = [100]
+    adv.individual_keywords_target_place_mode = False
+    adv.target_place = 5
+    adv.max_user_cpm = 500
+    adv.bid_cpm_step = 10
+
+    kw_off = MagicMock()
+    kw_off.status = KeywordStatus.GOOD
+    kw_off.strategy_mode = KeywordStrategyMode.OFF
+    kw_off.cluster_stat = MagicMock()
+    kw_off.cluster_stat.text = "q_off"
+    kw_off.text = "q_off"
+    kw_off.position = 1.0
+    kw_off.cpm = 50.0
+
+    kw_on = MagicMock()
+    kw_on.status = KeywordStatus.GOOD
+    kw_on.hard_status = 2
+    kw_on.strategy_mode = KeywordStrategyMode.MIN_CPA
+    kw_on.cluster_stat = MagicMock()
+    kw_on.cluster_stat.text = "q_on"
+    kw_on.text = "q_on"
+    kw_on.position = 2.0
+    kw_on.cpm = 60.0
+
+    kw_auto_stale = MagicMock()
+    kw_auto_stale.status = KeywordStatus.GOOD
+    kw_auto_stale.hard_status = 1
+    kw_auto_stale.strategy_mode = KeywordStrategyMode.MIN_CPA
+    kw_auto_stale.cluster_stat = MagicMock()
+    kw_auto_stale.cluster_stat.text = "q_auto"
+    kw_auto_stale.text = "q_auto"
+    kw_auto_stale.position = 3.0
+    kw_auto_stale.cpm = 70.0
+
+    adv.get_keywords = AsyncMock(return_value=[kw_off, kw_on, kw_auto_stale])
+
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(
+        adv, {"q_off", "q_on", "q_auto"}
+    )
+    assert len(result) == 1
+    only = next(iter(result))
+    assert only.cluster == "q_on"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_calculate_data_v3_excludes_auto_with_non_off_mode() -> None:
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 10
+    adv.adv_id = 1
+    adv.auto_updater_version = 3
+    adv.strategy = Strategy.MIN_CPO
+    adv.nmids = [100]
+    adv.individual_keywords_target_place_mode = False
+    adv.target_place = 5
+    adv.max_user_cpm = 500
+    adv.bid_cpm_step = 10
+
+    kw_auto = MagicMock()
+    kw_auto.status = KeywordStatus.GOOD
+    kw_auto.hard_status = 1
+    kw_auto.strategy_mode = KeywordStrategyMode.MIN_CPA
+    kw_auto.cluster_stat = MagicMock()
+    kw_auto.cluster_stat.text = "q_auto"
+    kw_auto.text = "q_auto"
+    kw_auto.position = 1.0
+    kw_auto.cpm = 50.0
+
+    adv.get_keywords = AsyncMock(return_value=[kw_auto])
+
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(
+        adv, {"q_auto"}
+    )
+    assert result == set()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_calculate_data_non_v3_includes_off_strategy_keywords() -> None:
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 10
+    adv.adv_id = 1
+    adv.auto_updater_version = 2
+    adv.nmids = [100]
+    adv.individual_keywords_target_place_mode = False
+    adv.target_place = 5
+    adv.max_user_cpm = 500
+    adv.bid_cpm_step = 10
+
+    kw_off = MagicMock()
+    kw_off.status = KeywordStatus.GOOD
+    kw_off.strategy_mode = KeywordStrategyMode.OFF
+    kw_off.cluster_stat = MagicMock()
+    kw_off.cluster_stat.text = "q_off"
+    kw_off.text = "q_off"
+    kw_off.position = 1.0
+    kw_off.cpm = 50.0
+
+    adv.get_keywords = AsyncMock(return_value=[kw_off])
+
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(adv, {"q_off"})
+    assert len(result) == 1
