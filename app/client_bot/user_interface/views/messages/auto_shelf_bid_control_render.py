@@ -32,6 +32,13 @@ def _format_money(value: float | None) -> str:
     return f"{value:.2f}"
 
 
+def _format_ctr(ctr: float | None) -> str:
+    """CTR как доля кликов к показам → проценты для Telegram."""
+    if ctr is None:
+        return "—"
+    return f"{ctr * 100:.2f}%"
+
+
 def _format_cycle_timestamp(value: datetime | str | None) -> str:
     """Дата/время цикла для Telegram без долей секунды."""
     return format_timestamp_for_telegram(value)
@@ -43,10 +50,10 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
     return "\n".join(f"- {item}" for item in view.warnings)
 
 
-def _bid_point_cpa_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
-    """Ключ сортировки: лучший CPA первым (``cart_cpa`` уже с ``max(carts, 1)``)."""
-    cpa = point.cart_cpa if point.cart_cpa is not None else float("inf")
-    return (float(cpa), point.bid_minor)
+def _bid_point_cpc_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
+    """Ключ сортировки: лучший CPC первым."""
+    cpc = point.cart_cpa if point.cart_cpa is not None else float("inf")
+    return (float(cpc), point.bid_minor)
 
 
 def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
@@ -59,24 +66,25 @@ def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
 def select_cycle_bid_points_for_viewer(
     points: list[BidPointStatsDTO],
 ) -> list[BidPointStatsDTO]:
-    """Ставки цикла с показами для просмотрщика, от лучшего CPA к худшему.
+    """Ставки цикла с показами для просмотрщика, от лучшего CPC к худшему.
 
     В списке все точки с ``impressions > 0``. ``is_covered`` — порог test показов
     достигнут (✅), иначе набор показов (⏳).
     """
     with_impressions = [p for p in points if p.impressions > 0]
-    return sorted(with_impressions, key=_bid_point_cpa_sort_key)
+    return sorted(with_impressions, key=_bid_point_cpc_sort_key)
 
 
 def format_bid_point_line(point: BidPointStatsDTO) -> str:
     """Одна строка ставки цикла: статус, метрики, опционально лучшая точка."""
     status = cycle_bid_coverage_icon(point)
     best_mark = " ⭐" if point.is_best else ""
-    cpa_text = _format_money(point.cart_cpa)
+    cpc_text = _format_money(point.cart_cpa)
     return (
         f"{status}{best_mark} {format_bid(point.bid_minor, point.currency)}: "
         f"показы {point.impressions}, корзины {point.carts}, "
-        f"расход {_format_money(point.spend)} ₽, CPA корзины {cpa_text} ₽"
+        f"клики {point.clicks}, CTR {_format_ctr(point.ctr)}, "
+        f"расход {_format_money(point.spend)} ₽, CPC {cpc_text} ₽"
     )
 
 
@@ -111,8 +119,8 @@ def slice_bid_points_page(
     return points[start : start + page_size]
 
 
-BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы):"
-BID_POINT_VIEWER_LEGEND = "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная"
+BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы, сортировка по CPC):"
+BID_POINT_VIEWER_LEGEND = "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC"
 
 
 def render_bid_point_viewer_message(

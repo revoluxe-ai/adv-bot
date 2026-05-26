@@ -1,4 +1,4 @@
-"""Unit-тесты выбора лучшей ставки между циклами."""
+"""Unit-тесты выбора лучшей ставки между циклами (score=CPC)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     pick_better_bid_by_cart_cpa,
     resolve_cycle_best_bids,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
+    cpc_from_totals,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     BidStatsDTO,
 )
@@ -21,7 +24,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 pytestmark = pytest.mark.unit
 
 
-def _stats(*, bid_minor: int, cart_cpa: float) -> BidStatsDTO:
+def _stats(*, bid_minor: int, cpc: float) -> BidStatsDTO:
     return BidStatsDTO(
         bid_minor=bid_minor,
         currency="RUB",
@@ -32,16 +35,24 @@ def _stats(*, bid_minor: int, cart_cpa: float) -> BidStatsDTO:
         carts=5,
         orders=0,
         spend=100.0,
-        cart_cpa=cart_cpa,
+        cart_cpa=cpc,
         ctr=0.01,
         cart_cr=0.5,
     )
 
 
-def test_pick_better_bid_by_cart_cpa_prefers_lower_cpa() -> None:
-    current = _stats(bid_minor=35_000, cart_cpa=50.0)
-    previous = _stats(bid_minor=20_000, cart_cpa=30.0)
+def test_pick_better_bid_by_cart_cpa_prefers_lower_cpc() -> None:
+    current = _stats(bid_minor=35_000, cpc=50.0)
+    previous = _stats(bid_minor=20_000, cpc=30.0)
     picked = pick_better_bid_by_cart_cpa(current, previous)
+    assert picked is not None
+    assert picked.bid_minor == 20_000
+
+
+def test_pick_better_bid_by_cart_cpa_handles_zero_clicks_score() -> None:
+    low_signal = _stats(bid_minor=36_000, cpc=cpc_from_totals(421.23, 0))
+    stable = _stats(bid_minor=20_000, cpc=cpc_from_totals(200.0, 10))
+    picked = pick_better_bid_by_cart_cpa(low_signal, stable)
     assert picked is not None
     assert picked.bid_minor == 20_000
 
@@ -53,8 +64,8 @@ async def test_resolve_cycle_best_bids_uses_previous_window() -> None:
     prev_started = datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc)
     analytics.get_best_bid_by_cart_cpa = AsyncMock(
         side_effect=[
-            _stats(bid_minor=35_000, cart_cpa=40.0),
-            _stats(bid_minor=20_000, cart_cpa=25.0),
+            _stats(bid_minor=35_000, cpc=40.0),
+            _stats(bid_minor=20_000, cpc=25.0),
         ]
     )
     cycle_best, prev_best, global_best = await resolve_cycle_best_bids(
@@ -82,8 +93,8 @@ async def test_choose_best_bid_prefers_global_over_current_cycle_only() -> None:
     analytics = MagicMock()
     analytics.get_best_bid_by_cart_cpa = AsyncMock(
         side_effect=[
-            _stats(bid_minor=35_000, cart_cpa=40.0),
-            _stats(bid_minor=20_000, cart_cpa=25.0),
+            _stats(bid_minor=35_000, cpc=40.0),
+            _stats(bid_minor=20_000, cpc=25.0),
             None,
         ]
     )

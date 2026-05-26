@@ -18,7 +18,7 @@ class BidPointStatsDTO:
     carts: int
     orders: int
     spend: float
-    cart_cpa: float | None
+    cart_cpa: float | None  # временно: score-слот CPC для ранжирования (v1)
     ctr: float | None
     cart_cr: float | None
     is_covered: bool
@@ -43,8 +43,8 @@ class AutoShelfBidControlViewDTO:
     max_bid_minor: int | None  # копейки, настройка пользователя
     current_main_bid_minor: int | None  # копейки
     current_test_bid_minor: int | None  # копейки
-    cycle_best_bid_minor: int | None  # копейки, лучшая CPA в текущем цикле
-    global_best_bid_minor: int | None  # копейки, min CPA текущий ∪ предыдущий цикл
+    cycle_best_bid_minor: int | None  # копейки, лучший CPC в текущем цикле
+    global_best_bid_minor: int | None  # копейки, min CPC текущий ∪ предыдущий цикл
     next_test_bid_minor: int | None  # копейки
     currency: str
     current_mode: str | None

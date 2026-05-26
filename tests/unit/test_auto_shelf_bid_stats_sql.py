@@ -30,16 +30,17 @@ def test_get_bid_stats_dedup_groups_by_bid_not_mode() -> None:
 
 
 def test_get_best_bid_by_cart_cpa_groups_by_bid_not_mode() -> None:
-    """Лучшая ставка: CPA по суммарной точке bid_minor."""
+    """Лучшая ставка: CPC по суммарной точке bid_minor."""
     sql = (_SQL_DIR / "get_best_bid_by_cart_cpa.sql").read_text(encoding="utf-8")
     assert "GROUP BY dedup.bid_minor, dedup.currency" in sql
     assert "GROUP BY dedup.bid_minor, dedup.currency, dedup.mode" not in sql
 
 
-def test_get_best_bid_by_cart_cpa_uses_greatest_carts_one() -> None:
-    """0 корзин: CPA = spend/1, точка участвует в ранжировании."""
+def test_get_best_bid_by_cart_cpa_uses_greatest_clicks_one() -> None:
+    """0 кликов: CPC = spend/1, точка участвует в ранжировании."""
     sql = (_SQL_DIR / "get_best_bid_by_cart_cpa.sql").read_text(encoding="utf-8")
-    assert "greatest(stats.carts, 1)" in sql
+    assert "greatest(stats.clicks, 1)" in sql
+    assert "greatest(stats.carts, 1)" not in sql
     assert "stats.carts > 0" not in sql
 
 

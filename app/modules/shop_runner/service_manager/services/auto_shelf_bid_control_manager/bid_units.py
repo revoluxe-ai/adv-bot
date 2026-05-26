@@ -30,8 +30,13 @@ DEFAULT_MAX_BID_MINOR = 50_000
 DEFAULT_MIN_BID_DISTANCE_MINOR = 100
 
 
+def cpc_from_totals(spend: float, clicks: int) -> float:
+    """CPC: ``spend / max(clicks, 1)`` (0 кликов → знаменатель 1)."""
+    return spend / max(int(clicks), 1)
+
+
 def cart_cpa_from_totals(spend: float, carts: int) -> float:
-    """CPA корзины: ``spend / max(carts, 1)`` (0 корзин → знаменатель 1)."""
+    """Легаси helper CPA корзины для отображения и обратной совместимости."""
     return spend / max(int(carts), 1)
 
 

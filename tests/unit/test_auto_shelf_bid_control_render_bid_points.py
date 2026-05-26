@@ -33,20 +33,25 @@ def _point(
     is_covered: bool,
     at: datetime,
     carts: int = 0,
+    clicks: int = 0,
     cart_cpa: float | None = None,
+    ctr: float | None = None,
     is_best: bool = False,
 ) -> BidPointStatsDTO:
+    resolved_ctr = ctr
+    if resolved_ctr is None and impressions > 0:
+        resolved_ctr = clicks / impressions
     return BidPointStatsDTO(
         bid_minor=bid_minor,
         currency="RUB",
         last_interval_at=at,
         impressions=impressions,
-        clicks=0,
+        clicks=clicks,
         carts=carts,
         orders=0,
         spend=1.0,
         cart_cpa=cart_cpa,
-        ctr=None,
+        ctr=resolved_ctr,
         cart_cr=None,
         is_covered=is_covered,
         is_best=is_best,
@@ -69,7 +74,7 @@ def test_cycle_bid_coverage_icon() -> None:
     assert cycle_bid_coverage_icon(_point(10_000, impressions=100, is_covered=False, at=base)) == "⏳"
 
 
-def test_select_cycle_bid_points_for_viewer_all_with_impressions_sorted_by_cpa() -> None:
+def test_select_cycle_bid_points_for_viewer_all_with_impressions_sorted_by_cpc() -> None:
     base = datetime(2026, 5, 25, 10, 0, 0, tzinfo=timezone.utc)
     points = [
         _point(10_000, impressions=600, is_covered=True, at=base, carts=2, cart_cpa=50.0),
@@ -131,7 +136,26 @@ def test_render_bid_point_viewer_status_and_best_markers() -> None:
     assert text.startswith(BID_POINT_VIEWER_HEADER)
     assert "⏳ ⭐ 350" in text or "⏳⭐" in text.replace(" ", "")
     assert "корзины 0" in text
-    assert "CPA корзины 1.00 ₽" in text
+    assert "клики 0" in text
+    assert "CTR 0.00%" in text
+    assert "CPC 1.00 ₽" in text
+
+
+def test_render_bid_point_viewer_shows_ctr_from_clicks_and_impressions() -> None:
+    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
+    point = _point(
+        20_000,
+        impressions=165,
+        clicks=9,
+        is_covered=False,
+        at=base,
+        carts=10,
+        cart_cpa=5.69,
+        is_best=True,
+    )
+    text = render_bid_point_viewer_message(0, [point], page_size=10)
+    assert "клики 9" in text
+    assert "CTR 5.45%" in text
 
 
 def test_render_bid_point_viewer_covered_shows_checkmark() -> None:

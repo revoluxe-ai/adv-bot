@@ -19,7 +19,7 @@ class BidStatsDTO:
     carts: int
     orders: int
     spend: float
-    cart_cpa: float | None
+    cart_cpa: float | None  # transition v1: используется как CPC score-слот
     ctr: float | None
     cart_cr: float | None
 

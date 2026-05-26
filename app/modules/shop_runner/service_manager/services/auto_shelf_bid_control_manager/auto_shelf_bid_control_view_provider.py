@@ -89,7 +89,7 @@ class AutoShelfBidControlViewProvider:
                 carts=item.carts,
                 orders=item.orders,
                 spend=item.spend,
-                cart_cpa=item.cart_cpa,
+                cart_cpa=item.cart_cpa,  # transition v1: CPC score-слот в DTO
                 ctr=item.ctr,
                 cart_cr=item.cart_cr,
                 is_covered=(target_test is not None and item.impressions >= target_test),
