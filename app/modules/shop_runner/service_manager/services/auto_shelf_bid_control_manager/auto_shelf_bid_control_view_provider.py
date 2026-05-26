@@ -89,7 +89,7 @@ class AutoShelfBidControlViewProvider:
                 carts=item.carts,
                 orders=item.orders,
                 spend=item.spend,
-                cart_cpa=item.cart_cpa,  # transition v1: CPC score-слот в DTO
+                cart_cpa=item.cart_cpa,
                 ctr=item.ctr,
                 cart_cr=item.cart_cr,
                 is_covered=(target_test is not None and item.impressions >= target_test),
@@ -178,6 +178,7 @@ class AutoShelfBidControlViewProvider:
             warnings.append("no_auto_adv")
 
         currency = settings_obj.currency if settings_obj is not None else "RUB"
+        target_test = int(settings_obj.target_test_impressions) if settings_obj else None
         stats_from_ts = report_day_start_utc()
         bid_stats = (
             await self._analytics.get_bid_stats(
@@ -193,12 +194,11 @@ class AutoShelfBidControlViewProvider:
                 nmid=nmid,
                 from_ts=stats_from_ts,
                 currency=currency,
+                min_impressions=target_test,
             )
-            if nmid
+            if nmid and target_test is not None
             else None
         )
-
-        target_test = int(settings_obj.target_test_impressions) if settings_obj else None
         target_main = (
             self._target_main_impressions(target_test, float(settings_obj.test_share))
             if settings_obj and target_test is not None
@@ -283,6 +283,7 @@ class AutoShelfBidControlViewProvider:
                 currency=currency,
                 current_cycle_started_at=cycle_from_ts,
                 previous_cycle_started_at=state.previous_cycle_started_at,
+                min_impressions=target_test,
             )
             if target_test is not None:
                 cycle_covered_points_count = len(

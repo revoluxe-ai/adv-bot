@@ -51,7 +51,7 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
 
 
 def _bid_point_cpc_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
-    """Ключ сортировки: лучший CPC первым."""
+    """Ключ сортировки: лучший CPC первым (``cart_cpa`` = CPC score в DTO)."""
     cpc = point.cart_cpa if point.cart_cpa is not None else float("inf")
     return (float(cpc), point.bid_minor)
 
@@ -120,7 +120,10 @@ def slice_bid_points_page(
 
 
 BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы, сортировка по CPC):"
-BID_POINT_VIEWER_LEGEND = "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC"
+BID_POINT_VIEWER_LEGEND = (
+    "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC "
+    "(только покрытые ставки с кликами)"
+)
 
 
 def render_bid_point_viewer_message(

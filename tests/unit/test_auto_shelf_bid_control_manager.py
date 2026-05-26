@@ -76,6 +76,7 @@ async def test_choose_best_bid_clamps_historical_ch_bid() -> None:
         actual_bid_minor=None,
         min_bid_minor=12_000,
         max_bid_minor=50_000,
+        min_impressions_for_best=500,
     )
     assert result == 50_000
 

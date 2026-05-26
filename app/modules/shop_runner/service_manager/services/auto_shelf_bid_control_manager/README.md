@@ -46,8 +46,9 @@
 4. Аналитика читается из `auto_shelf_bid_intervals` с обязательным read-time dedup:
    `GROUP BY event_date,event_id + argMax(..., version)`.
 5. Переходы `test <-> main` основаны на порогах показов.
-6. `best_bid` для main — **глобальная**: min CPC ``spend/greatest(clicks,1)`` среди лучших
-   цикла (`resolve_cycle_best_bids`, предыдущий — окно `[prev, current)`). Fallback:
+6. `best_bid` для main — **глобальная**: min CPC ``spend/clicks`` среди **покрытых**
+   точек (`impressions >= target_test_impressions`, `clicks > 0`) в текущем и
+   предыдущем цикле (`resolve_cycle_best_bids`, окно prev: `[prev, current)`). Fallback:
    отчётный день → текущий main → actual → middle. В main-фазе ставка
    синхронизируется с глобальной на каждом тике.
    затем fallbacks. Итоговая main-ставка ограничивается `[min_bid_minor, max_bid_minor]`
@@ -56,6 +57,7 @@
 7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 8. `get_bid_stats` / best bid по CPC: одна строка на `bid_minor` (mode в CH не дробит точку).
+   Поле DTO ``cart_cpa`` временно хранит CPC score (не CPA корзины).
 9. Telegram: на главном экране блока «Покрытые ставки» нет. Кнопка «Покрытия цикла» —
    до `TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE` (10) строк: все ставки с показами в цикле,
    сортировка по CPC (лучшие сверху), ✅ покрыта / ⏳ набор / ⭐ лучшая глобальная.

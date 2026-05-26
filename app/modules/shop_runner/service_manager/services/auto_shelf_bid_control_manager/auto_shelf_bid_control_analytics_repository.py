@@ -33,7 +33,7 @@ class AutoShelfBidControlAnalyticsRepository:
         carts = int(row["carts"])
         orders = int(row["orders"])
         spend = float(row["spend"])
-        # В итерации CPC v1 поле ``cart_cpa`` используется как score-слот для CPC.
+        # cart_cpa в DTO = CPC score (имя поля легаси, см. BidStatsDTO).
         cart_cpa = cpc_from_totals(spend, clicks)
         ctr = (clicks / impressions) if impressions > 0 else None
         cart_cr = (carts / clicks) if clicks > 0 else None
@@ -128,8 +128,15 @@ class AutoShelfBidControlAnalyticsRepository:
         *,
         mode: str | None = None,
         to_ts: datetime | None = None,
+        min_impressions: int | None = None,
     ) -> BidStatsDTO | None:
-        """Лучшая ставка: минимальный CPC ``spend / greatest(clicks, 1)``."""
+        """Лучшая ставка среди покрытых точек: min CPC ``spend/clicks``.
+
+        Args:
+            min_impressions: порог покрытия (``target_test_impressions``);
+                только ставки с ``impressions >= min`` и ``clicks > 0``.
+                ``None`` — без порога по показам (только ``clicks > 0``).
+        """
         query = self._load_sql("get_best_bid_by_cart_cpa.sql")
         params = {
             "nmid": nmid,
@@ -137,6 +144,7 @@ class AutoShelfBidControlAnalyticsRepository:
             "to_ts": to_ts,
             "currency": currency,
             "mode": mode,
+            "min_impressions": min_impressions,
         }
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:

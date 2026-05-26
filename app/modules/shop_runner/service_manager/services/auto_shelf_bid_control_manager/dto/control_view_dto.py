@@ -8,7 +8,10 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class BidPointStatsDTO:
-    """Статистика по одной точке ставки для отображения в Telegram."""
+    """Статистика по одной точке ставки для отображения в Telegram.
+
+    ``cart_cpa`` — CPC score (не CPA корзины), см. ``BidStatsDTO.cart_cpa``.
+    """
 
     bid_minor: int  # копейки (как в CH auto_shelf_bid_intervals)
     currency: str
@@ -18,7 +21,7 @@ class BidPointStatsDTO:
     carts: int
     orders: int
     spend: float
-    cart_cpa: float | None  # временно: score-слот CPC для ранжирования (v1)
+    cart_cpa: float | None
     ctr: float | None
     cart_cr: float | None
     is_covered: bool

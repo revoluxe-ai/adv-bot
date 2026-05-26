@@ -1,4 +1,8 @@
-"""Выбор лучшей ставки по CPC между циклами control."""
+"""Выбор лучшей ставки по CPC между циклами control.
+
+Сравнение кандидатов — по ``BidStatsDTO.cart_cpa`` (фактически CPC score;
+имя поля временное, см. dto/bid_stats_dto.py).
+"""
 
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ def pick_better_bid_by_cart_cpa(
     left: BidStatsDTO | None,
     right: BidStatsDTO | None,
 ) -> BidStatsDTO | None:
-    """Минимальный CPC; при равенстве — меньший ``bid_minor``.
+    """Минимальный CPC (поле ``cart_cpa``); при равенстве — меньший ``bid_minor``.
 
     Args:
         left: Кандидат слева (например текущий цикл).
@@ -27,7 +31,6 @@ def pick_better_bid_by_cart_cpa(
         return right
     if right is None:
         return left
-    # Поле ``cart_cpa`` временно используется как score-слот для CPC (итерация v1).
     left_cpc = left.cart_cpa if left.cart_cpa is not None else float("inf")
     right_cpc = right.cart_cpa if right.cart_cpa is not None else float("inf")
     if left_cpc < right_cpc:
@@ -44,11 +47,13 @@ async def resolve_cycle_best_bids(
     currency: str,
     current_cycle_started_at: datetime,
     previous_cycle_started_at: datetime | None,
+    min_impressions: int | None,
 ) -> tuple[BidStatsDTO | None, BidStatsDTO | None, BidStatsDTO | None]:
     """Лучшие ставки текущего цикла, предыдущего и глобальная (min CPC).
 
     Предыдущий цикл: ``[previous_cycle_started_at, current_cycle_started_at)``,
     чтобы не дублировать данные текущего цикла.
+    Кандидаты — только покрытые точки (``min_impressions``) с ``clicks > 0``.
 
     Returns:
         ``(cycle_best, previous_cycle_best, global_best)``.
@@ -57,6 +62,7 @@ async def resolve_cycle_best_bids(
         nmid=nmid,
         from_ts=current_cycle_started_at,
         currency=currency,
+        min_impressions=min_impressions,
     )
     previous_cycle_best: BidStatsDTO | None = None
     if previous_cycle_started_at is not None:
@@ -65,6 +71,7 @@ async def resolve_cycle_best_bids(
             from_ts=previous_cycle_started_at,
             to_ts=current_cycle_started_at,
             currency=currency,
+            min_impressions=min_impressions,
         )
     global_best = pick_better_bid_by_cart_cpa(cycle_best, previous_cycle_best)
     return cycle_best, previous_cycle_best, global_best

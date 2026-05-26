@@ -31,12 +31,20 @@ DEFAULT_MIN_BID_DISTANCE_MINOR = 100
 
 
 def cpc_from_totals(spend: float, clicks: int) -> float:
-    """CPC: ``spend / max(clicks, 1)`` (0 кликов → знаменатель 1)."""
+    """CPC для отображения в UI: ``spend / max(clicks, 1)``.
+
+    Нулевые клики дают ``spend/1`` только в строках просмотрщика.
+    Выбор ``best``/``global_best`` в SQL требует ``clicks > 0`` и
+    ``impressions >= target_test_impressions`` (см. get_best_bid_by_cart_cpa.sql).
+    """
     return spend / max(int(clicks), 1)
 
 
 def cart_cpa_from_totals(spend: float, carts: int) -> float:
-    """Легаси helper CPA корзины для отображения и обратной совместимости."""
+    """CPA корзины: ``spend / max(carts, 1)`` (справочно, не для best bid).
+
+    Не путать с полем ``BidStatsDTO.cart_cpa`` — там временно лежит **CPC score**.
+    """
     return spend / max(int(carts), 1)
 
 

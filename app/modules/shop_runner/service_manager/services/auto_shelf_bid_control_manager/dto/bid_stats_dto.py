@@ -8,7 +8,15 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class BidStatsDTO:
-    """Агрегированные метрики для пары bid+mode за выбранный период."""
+    """Агрегированные метрики для пары bid+mode за выбранный период.
+
+    ВАЖНО (CPC migration v1, переименование позже):
+        Поле ``cart_cpa`` — это **не** CPA корзины. В нём хранится CPC score
+        ``spend / max(clicks, 1)`` для сортировки и выбора best/global_best.
+        Реальный CPA корзины считайте через ``cart_cpa_from_totals(spend, carts)``.
+        Сравнение ставок в ``pick_better_bid_by_cart_cpa`` и SQL best-bid — по CPC
+        в этом поле; eligibility best — ``impressions >= target_test`` и ``clicks > 0``.
+    """
 
     bid_minor: int
     currency: str
@@ -19,7 +27,7 @@ class BidStatsDTO:
     carts: int
     orders: int
     spend: float
-    cart_cpa: float | None  # transition v1: используется как CPC score-слот
+    cart_cpa: float | None
     ctr: float | None
     cart_cr: float | None
 

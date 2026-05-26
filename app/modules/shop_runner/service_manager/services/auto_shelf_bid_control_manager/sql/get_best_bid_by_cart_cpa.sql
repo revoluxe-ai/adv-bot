@@ -2,13 +2,16 @@
 -- get_best_bid_by_cart_cpa.sql
 -- ============================================================================
 -- Назначение:
---   Лучшая ставка: минимальный CPC = spend / greatest(clicks, 1), impressions > 0.
+--   Лучшая ставка: минимальный CPC = spend / clicks среди «покрытых» точек.
+--   Участвуют только bid_minor с impressions >= min_impressions и clicks > 0
+--   (порог покрытия = target_test_impressions из настроек control).
 --   %(mode)s (nullable) — например ``test`` для лучшей тестовой ставки цикла.
 --
 -- Таблица: default_db.auto_shelf_bid_intervals
 -- Параметры:
 --   %(nmid)s, %(from_ts)s, %(currency)s
 --   %(to_ts)s (nullable) — верхняя граница ``src_ts`` (предыдущий цикл)
+--   %(min_impressions)s — минимум показов на ставку (nullable → только clicks > 0)
 --   %(mode)s (nullable)
 -- Вызывается:
 --   AutoShelfBidControlAnalyticsRepository.get_best_bid_by_cart_cpa()
@@ -58,5 +61,7 @@ FROM
     GROUP BY dedup.bid_minor, dedup.currency
 ) AS stats
 WHERE stats.impressions > 0
-ORDER BY (stats.spend / greatest(stats.clicks, 1)) ASC, stats.bid_minor ASC
+  AND (%(min_impressions)s IS NULL OR stats.impressions >= %(min_impressions)s)
+  AND stats.clicks > 0
+ORDER BY (stats.spend / stats.clicks) ASC, stats.bid_minor ASC
 LIMIT 1
