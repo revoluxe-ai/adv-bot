@@ -43,6 +43,15 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.client_bot.user_interface.views.keyword_strategy_ui import (
+    keyword_strategy_tag,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
+    v3_aggressiveness_detail,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
@@ -606,6 +615,12 @@ class KeywordSettingMessage(TextWithKeyboard):
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
             text += f"Выше конв. рек.: {rec_str}\n"
 
+        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+            text += (
+                f"Режим лестницы V3: {keyword_strategy_tag(self._calculated_keyword)}\n"
+                f"Агрессивность раскрутки РК: "
+                f"{v3_aggressiveness_detail(int(self._adv_setting.aggressiveness))}\n"
+            )
 
         pos = self.position
         if pos > 0:

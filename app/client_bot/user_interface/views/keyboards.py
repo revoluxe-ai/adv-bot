@@ -21,11 +21,13 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 
+from app.client_bot.user_interface.views.keyword_strategy_ui import (
+    keyword_strategy_letter,
+)
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
     normalize_automatic_version_ui,
 )
@@ -40,39 +42,6 @@ from app.shared.domains.wb.enums import (
 )
 
 sm = get_async_session_maker
-
-
-def keyword_strategy_tag(keyword: CalculatedKeyword) -> str:
-    """Текст режима V3 для строки ключа в списке.
-
-    Формат «буква(ENUM: пояснение)»:
-    буква — короткая метка в узкой строке кнопки; в скобках имя значения
-    ``KeywordSetting.strategy_mode`` (``KeywordStrategyMode``) и смысл.
-
-    - ``o`` + ``OFF``: лестница агрессии для ключа выключена (V3 не двигает
-      ``strategy_mode`` вверх/вниз; при индив. целевых местах позиция не
-      пересчитывается из кривой).
-    - ``M`` + ``MIN_CPA``: выбирается позиция с минимальной оплатой за корзину
-      по доступным точкам кривой (аналог «минимизировать CPA корзины»).
-    - ``O`` + ``OPTIMUM``: компромисс между конверсией в корзину и оплатой за
-      корзину (эвристика в предикторе target_place / кандидатах лестницы).
-    - ``C`` + ``MAX_CONVERSION``: позиция с максимальной конверсией показ→корзина
-      по кривой.
-    """
-    mode = keyword.strategy_mode
-    mapping: dict[KeywordStrategyMode, str] = {
-        KeywordStrategyMode.OFF: "o(OFF: лестница отключена)",
-        KeywordStrategyMode.MIN_CPA: (
-            "M(MIN_CPA: мин. оплата за корзину по позициям)"
-        ),
-        KeywordStrategyMode.OPTIMUM: (
-            "O(OPTIMUM: баланс конверсии и оплаты за корзину)"
-        ),
-        KeywordStrategyMode.MAX_CONVERSION: (
-            "C(MAX_CONVERSION: максимум конверсии в корзину)"
-        ),
-    }
-    return mapping.get(mode, f"?(неизвестный режим: {mode!r})")
 
 
 def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboardMarkup:
@@ -426,8 +395,8 @@ def get_keywords_setting_keyboard(
             f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)}"
         )
         if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
-            mode_tag = keyword_strategy_tag(keyword)
-            text += f"{status_block}[{mode_tag}] {keyword.text}"
+            mode_letter = keyword_strategy_letter(keyword)
+            text += f"{status_block}[{mode_letter}] {keyword.text}"
         else:
             text += f"{status_block} {keyword.text}"
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))

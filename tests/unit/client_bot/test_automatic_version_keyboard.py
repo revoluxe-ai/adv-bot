@@ -23,6 +23,7 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
     V3RolloutAggMenuOpen,
     build_v3_rollout_submenu_markup,
+    v3_aggressiveness_letter,
     v3_rollout_aggressiveness_main_button,
 )
 
@@ -110,7 +111,7 @@ def test_v3_rollout_main_button_opens_submenu() -> None:
     btn = v3_rollout_aggressiveness_main_button(adv)
     parsed = V3RolloutAggMenuOpen.unpack(btn.callback_data)
     assert parsed.adv_setting_original_id == 7
-    assert "2" in btn.text
+    assert btn.text == f"V3 агр.: {v3_aggressiveness_letter(2)}"
 
 
 @pytest.mark.unit

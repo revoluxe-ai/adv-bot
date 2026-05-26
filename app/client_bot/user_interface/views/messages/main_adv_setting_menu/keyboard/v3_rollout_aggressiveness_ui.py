@@ -19,15 +19,31 @@ _LEVEL_LABELS: Final[dict[int, str]] = {
     3: "Максимальная (по умолчанию)",
 }
 
+_AGGR_LETTERS: Final[dict[int, str]] = {
+    1: "М",
+    2: "С",
+    3: "В",
+}
+
+
+def v3_aggressiveness_letter(level: int) -> str:
+    """Одна буква агрессивности V3 для списка кнопок / шапки."""
+    return _AGGR_LETTERS.get(level, str(level))
+
+
+def v3_aggressiveness_detail(level: int) -> str:
+    """Буква и расшифровка агрессивности V3 (экран ключа / подменю)."""
+    label = _LEVEL_LABELS.get(level, str(level))
+    return f"{v3_aggressiveness_letter(level)} ({label})"
+
 FSM_V3_ROLLOUT_PARENT_MESSAGE_ID = "v3_rollout_parent_message_id"
 FSM_V3_ROLLOUT_MENU_ADV_SETTING_ID = "v3_rollout_menu_adv_setting_id"
 
 
 def v3_rollout_aggressiveness_main_button(adv_setting: AdvSetting) -> InlineKeyboardButton:
     cur = int(adv_setting.aggressiveness)
-    label = _LEVEL_LABELS.get(cur, str(cur))
     return InlineKeyboardButton(
-        text=f"V3: агрессивность раскрутки — {cur} ({label})",
+        text=f"V3 агр.: {v3_aggressiveness_letter(cur)}",
         callback_data=V3RolloutAggMenuOpen(
             adv_setting_original_id=adv_setting.id
         ).pack(),
