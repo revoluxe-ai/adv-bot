@@ -54,6 +54,19 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 Проверка: unit `test_select_overspend_force_off_all_keys_above_max`, shelf `test_select_overspend_shelf_force_off_above_max`.
 
+## UI: последнее V3-действие в блоке «Обновл:»
+
+Для `automatic_version == 3` в меню РК вместо строк «добавл/удал из БС» (legacy V2 Redis) показывается:
+
+`посл. V3: <ACTION> «<ключ>» <FROM>→<TO> <HH:MM:SS dd-mm-yyyy>`
+
+- **Redis:** ключ `LastV3UpdaterAction:{adv_id}`, JSON-снимок, TTL 7 суток.
+- **Запись:** после успешного `apply_v3_actions` (последнее применённое действие цикла; при пакете однотипных действий — суффикс `(+N ещё)`).
+- **Время в UI:** московское (MSK, UTC+3); в Redis — `updated_at` в UTC ISO.
+- **Нет снимка:** «Нет данных» (цикл без изменений в БД или ещё не было apply).
+
+Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
+
 ## CI
 
 ```powershell

@@ -22,6 +22,7 @@ from app.client_bot.user_interface.views.messages.strategy_display import (
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from . import keyboard
+from .keyboard.automatic_version_ui import normalize_automatic_version_ui
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -78,6 +79,7 @@ from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
 )
 
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
+from ..last_v3_action_informer import load_last_v3_action_display
 
 if TYPE_CHECKING:
     pass
@@ -143,6 +145,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_fresh: bool = True
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
+        self._v3_last_action_str: str | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -286,6 +289,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
+        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+            self._v3_last_action_str = await load_last_v3_action_display(self.adv)
+        else:
+            self._v3_last_action_str = None
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
 
         cost_metrics = await get_auto_campaign_cost_activity_metrics(
@@ -563,10 +570,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"минус аук: {self.keywords_status_last_update_search_adv}\n"
             f"став класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Н/д'}\n"
             f"общ.став аук: {self.last_common_bid_update_str}\n"
-            f"добавл в БС:"
-            f" {self._update_informer.add_to_white_list_str}\n"
-            f"удал из БС:"
-            f" {self._update_informer.delete_from_white_list_str}\n"
+        )
+        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+            text += f"посл. V3: {self._v3_last_action_str or 'Нет данных'}\n"
+        else:
+            text += (
+                f"добавл в БС:"
+                f" {self._update_informer.add_to_white_list_str}\n"
+                f"удал из БС:"
+                f" {self._update_informer.delete_from_white_list_str}\n"
+            )
+        text += (
             f"цел.поз +:"
             f" {self._update_informer.up_target_place_str}\n"
             f"цел.поз -:"

@@ -180,7 +180,7 @@ async def process_adv_v3(
         else None,
         plan_max_pay_for_order=float(plan.max_pay_for_order),
     )
-    await apply_v3_actions(actions)
+    await apply_v3_actions(actions, adv=complex_adv.adv)
 
     await cache_plan_fact_snapshot()
     for act in actions:
