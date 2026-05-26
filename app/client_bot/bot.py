@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from aiohttp import ClientTimeout
 from aiogram import Bot
 from aiogram.client.session.aiohttp import AiohttpSession
 from dotenv import load_dotenv
@@ -24,10 +25,10 @@ _bots_by_token: dict[str, Bot] = {}
 def _get_telegram_http_session() -> AiohttpSession:
     global _telegram_http_session
     if _telegram_http_session is None:
-        # Long poll + proxy: generous total timeout (seconds).
-        # AiohttpSession.timeout must be float — aiogram polling does timeout + polling_timeout.
+        # Long poll + proxy: need generous timeouts (default is too tight for slow tunnels).
         _telegram_http_session = AiohttpSession(
-            timeout=3.0,
+            proxy=settings.PROXY,
+            timeout=ClientTimeout(total=120, connect=30, sock_read=90),
         )
     return _telegram_http_session
 
