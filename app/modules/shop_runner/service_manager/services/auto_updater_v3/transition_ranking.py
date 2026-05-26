@@ -63,6 +63,7 @@ _HARD_STATUS_AUTO_MODE = 1
 _HARD_STATUS_WHITE_LIST = 2
 
 _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode, bool]
+_PreparedList = list[_PreparedEntry]
 
 
 class RecTier(str, Enum):
@@ -182,7 +183,7 @@ def _blocks_shelf_up(
 
 
 def build_worst_per_state_costs(
-    prepared: _PreparedEntry,
+    prepared: _PreparedList,
 ) -> dict[AggressionTargetMode, float]:
     """Консервативные эталоны кампании: max ``state_cost`` по data-ключам с валидной точкой."""
     worst: dict[AggressionTargetMode, float] = {}
@@ -225,7 +226,7 @@ def _resolve_state_cost(
 
 
 def collect_transition_candidates(
-    prepared: _PreparedEntry,
+    prepared: _PreparedList,
     *,
     click_mode: ShelfClickMode,
 ) -> list[TransitionCandidate]:
@@ -258,8 +259,8 @@ def collect_transition_candidates(
             if mc is None:
                 continue
 
-            # Новые ключи — только MIN_CPA; imputation не отменяет это правило.
-            if to_mode != KeywordStrategyMode.MIN_CPA and not proven:
+            # Unproven без no-data: только MIN; при provisional imputation — M/O/C с worst-cost.
+            if to_mode != KeywordStrategyMode.MIN_CPA and not proven and not use_imputation:
                 continue
 
             if mc.is_valid:
@@ -449,7 +450,7 @@ def _candidate_to_action(
 
 
 def plan_cost_first_up_one(
-    prepared: _PreparedEntry,
+    prepared: _PreparedList,
     *,
     click_mode: ShelfClickMode,
     layered: bool,
@@ -496,7 +497,7 @@ def plan_cost_first_up_one(
 
 
 def plan_shelf_rec_false_cleanup_down(
-    prepared: _PreparedEntry,
+    prepared: _PreparedList,
     *,
     click_mode: ShelfClickMode,
 ) -> list[V3Action] | None:
