@@ -130,12 +130,11 @@ class AutoShelfBidControlAnalyticsRepository:
         to_ts: datetime | None = None,
         min_impressions: int | None = None,
     ) -> BidStatsDTO | None:
-        """Лучшая ставка среди покрытых точек: min CPC ``spend/clicks``.
+        """Лучшая ставка: min CPC ``spend/clicks`` при ``impressions > 0``, ``clicks > 0``.
 
         Args:
-            min_impressions: порог покрытия (``target_test_impressions``);
-                только ставки с ``impressions >= min`` и ``clicks > 0``.
-                ``None`` — без порога по показам (только ``clicks > 0``).
+            min_impressions: не используется в control (всегда ``None``); оставлен
+                для совместимости SQL-шаблона.
         """
         query = self._load_sql("get_best_bid_by_cart_cpa.sql")
         params = {

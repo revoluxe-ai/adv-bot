@@ -46,9 +46,9 @@
 4. Аналитика читается из `auto_shelf_bid_intervals` с обязательным read-time dedup:
    `GROUP BY event_date,event_id + argMax(..., version)`.
 5. Переходы `test <-> main` основаны на порогах показов.
-6. `best_bid` для main — **глобальная**: min CPC ``spend/clicks`` среди **покрытых**
-   точек (`impressions >= target_test_impressions`, `clicks > 0`) в текущем и
-   предыдущем цикле (`resolve_cycle_best_bids`, окно prev: `[prev, current)`). Fallback:
+6. `best_bid` для main — **глобальная**: min CPC ``spend/clicks`` среди точек с
+   `clicks > 0` в текущем и предыдущем цикле (`resolve_cycle_best_bids`, окно prev:
+   `[prev, current)`; порог покрытия на best **не** влияет). Fallback:
    отчётный день → текущий main → actual → middle. В main-фазе ставка
    синхронизируется с глобальной на каждом тике.
    затем fallbacks. Итоговая main-ставка ограничивается `[min_bid_minor, max_bid_minor]`

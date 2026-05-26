@@ -36,8 +36,8 @@ def test_get_best_bid_by_cart_cpa_groups_by_bid_not_mode() -> None:
     assert "GROUP BY dedup.bid_minor, dedup.currency, dedup.mode" not in sql
 
 
-def test_get_best_bid_by_cart_cpa_requires_clicks_and_min_impressions() -> None:
-    """Best bid: только покрытые точки с кликами, CPC = spend/clicks."""
+def test_get_best_bid_by_cart_cpa_requires_clicks_only() -> None:
+    """Best bid: clicks > 0, CPC = spend/clicks; min_impressions опционален (NULL)."""
     sql = (_SQL_DIR / "get_best_bid_by_cart_cpa.sql").read_text(encoding="utf-8")
     assert "stats.clicks > 0" in sql
     assert "%(min_impressions)s IS NULL OR stats.impressions >= %(min_impressions)s" in sql

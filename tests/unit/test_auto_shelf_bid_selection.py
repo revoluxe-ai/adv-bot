@@ -75,7 +75,6 @@ async def test_resolve_cycle_best_bids_uses_previous_window() -> None:
         currency="RUB",
         current_cycle_started_at=cycle_started,
         previous_cycle_started_at=prev_started,
-        min_impressions=500,
     )
     assert cycle_best is not None and cycle_best.bid_minor == 35_000
     assert prev_best is not None and prev_best.bid_minor == 20_000
@@ -85,7 +84,6 @@ async def test_resolve_cycle_best_bids_uses_previous_window() -> None:
         from_ts=prev_started,
         to_ts=cycle_started,
         currency="RUB",
-        min_impressions=500,
     )
 
 
@@ -115,6 +113,14 @@ async def test_choose_best_bid_prefers_global_over_current_cycle_only() -> None:
         actual_bid_minor=35_000,
         min_bid_minor=12_000,
         max_bid_minor=60_000,
-        min_impressions_for_best=500,
     )
     assert result == 20_000
+
+
+def test_pick_better_bid_prefers_current_cycle_lower_cpc_over_previous() -> None:
+    """Текущий цикл: 200₽ CPC 5.69; прошлый: 360₽ CPC 17 — global = 200."""
+    current = _stats(bid_minor=20_000, cpc=5.69)
+    previous = _stats(bid_minor=36_000, cpc=17.39)
+    picked = pick_better_bid_by_cart_cpa(current, previous)
+    assert picked is not None
+    assert picked.bid_minor == 20_000

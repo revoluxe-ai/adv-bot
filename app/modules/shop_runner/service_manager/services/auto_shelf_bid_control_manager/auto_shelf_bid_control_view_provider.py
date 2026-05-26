@@ -194,9 +194,8 @@ class AutoShelfBidControlViewProvider:
                 nmid=nmid,
                 from_ts=stats_from_ts,
                 currency=currency,
-                min_impressions=target_test,
             )
-            if nmid and target_test is not None
+            if nmid
             else None
         )
         target_main = (
@@ -283,7 +282,6 @@ class AutoShelfBidControlViewProvider:
                 currency=currency,
                 current_cycle_started_at=cycle_from_ts,
                 previous_cycle_started_at=state.previous_cycle_started_at,
-                min_impressions=target_test,
             )
             if target_test is not None:
                 cycle_covered_points_count = len(

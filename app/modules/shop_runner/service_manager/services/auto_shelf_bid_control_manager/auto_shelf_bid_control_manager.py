@@ -242,7 +242,6 @@ class AutoShelfBidControlManager:
         actual_bid_minor: int | None,
         min_bid_minor: int,
         max_bid_minor: int,
-        min_impressions_for_best: int,
     ) -> int:
         def _in_window(bid: int) -> int:
             return self._clamp_bid_minor(
@@ -258,7 +257,6 @@ class AutoShelfBidControlManager:
             currency=currency,
             current_cycle_started_at=cycle_started_at,
             previous_cycle_started_at=previous_cycle_started_at,
-            min_impressions=min_impressions_for_best,
         )
         if global_best is not None:
             return _in_window(global_best.bid_minor)
@@ -266,7 +264,6 @@ class AutoShelfBidControlManager:
             nmid=nmid,
             from_ts=report_from,
             currency=currency,
-            min_impressions=min_impressions_for_best,
         )
         if best is not None:
             return _in_window(best.bid_minor)
@@ -479,7 +476,6 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             min_bid_minor=min_bid_minor,
             max_bid_minor=int(settings_obj.max_bid_minor),
-            min_impressions_for_best=int(settings_obj.target_test_impressions),
         )
         state.current_main_bid_minor = best_bid
         state.current_mode = "main"
@@ -551,7 +547,6 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             min_bid_minor=min_bid_minor,
             max_bid_minor=max_bid,
-            min_impressions_for_best=int(settings_obj.target_test_impressions),
         )
         if int(main_bid) != target_main_bid:
             main_bid = target_main_bid
@@ -613,7 +608,6 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=int(settings_obj.max_bid_minor),
-                min_impressions_for_best=int(settings_obj.target_test_impressions),
             )
             new_test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
             state.previous_cycle_started_at = state.current_cycle_started_at

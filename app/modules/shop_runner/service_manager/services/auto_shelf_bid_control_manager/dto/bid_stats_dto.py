@@ -15,7 +15,7 @@ class BidStatsDTO:
         ``spend / max(clicks, 1)`` для сортировки и выбора best/global_best.
         Реальный CPA корзины считайте через ``cart_cpa_from_totals(spend, carts)``.
         Сравнение ставок в ``pick_better_bid_by_cart_cpa`` и SQL best-bid — по CPC
-        в этом поле; eligibility best — ``impressions >= target_test`` и ``clicks > 0``.
+        в этом поле; eligibility best — ``impressions > 0`` и ``clicks > 0``.
     """
 
     bid_minor: int

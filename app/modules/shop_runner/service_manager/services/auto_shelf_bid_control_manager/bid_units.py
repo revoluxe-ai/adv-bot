@@ -34,8 +34,8 @@ def cpc_from_totals(spend: float, clicks: int) -> float:
     """CPC для отображения в UI: ``spend / max(clicks, 1)``.
 
     Нулевые клики дают ``spend/1`` только в строках просмотрщика.
-    Выбор ``best``/``global_best`` в SQL требует ``clicks > 0`` и
-    ``impressions >= target_test_impressions`` (см. get_best_bid_by_cart_cpa.sql).
+    Выбор ``best``/``global_best`` в SQL требует только ``clicks > 0``
+    (см. get_best_bid_by_cart_cpa.sql); порог покрытия — только для ✅ в UI.
     """
     return spend / max(int(clicks), 1)
 

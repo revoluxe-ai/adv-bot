@@ -47,13 +47,13 @@ async def resolve_cycle_best_bids(
     currency: str,
     current_cycle_started_at: datetime,
     previous_cycle_started_at: datetime | None,
-    min_impressions: int | None,
 ) -> tuple[BidStatsDTO | None, BidStatsDTO | None, BidStatsDTO | None]:
     """Лучшие ставки текущего цикла, предыдущего и глобальная (min CPC).
 
     Предыдущий цикл: ``[previous_cycle_started_at, current_cycle_started_at)``,
     чтобы не дублировать данные текущего цикла.
-    Кандидаты — только покрытые точки (``min_impressions``) с ``clicks > 0``.
+    Кандидаты — любые точки с ``impressions > 0`` и ``clicks > 0`` (без порога
+    покрытия по ``target_test_impressions``).
 
     Returns:
         ``(cycle_best, previous_cycle_best, global_best)``.
@@ -62,7 +62,6 @@ async def resolve_cycle_best_bids(
         nmid=nmid,
         from_ts=current_cycle_started_at,
         currency=currency,
-        min_impressions=min_impressions,
     )
     previous_cycle_best: BidStatsDTO | None = None
     if previous_cycle_started_at is not None:
@@ -71,7 +70,6 @@ async def resolve_cycle_best_bids(
             from_ts=previous_cycle_started_at,
             to_ts=current_cycle_started_at,
             currency=currency,
-            min_impressions=min_impressions,
         )
     global_best = pick_better_bid_by_cart_cpa(cycle_best, previous_cycle_best)
     return cycle_best, previous_cycle_best, global_best
