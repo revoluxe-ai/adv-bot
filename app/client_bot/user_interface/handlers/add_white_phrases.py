@@ -7,10 +7,15 @@ from sqlalchemy import select, update
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBUserCabinet,
+)
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_campaign,
+    sync_keyword_setting_mode_for_v3,
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -105,6 +110,8 @@ async def reset_white_list(
     await bot.send_message(callback.from_user.id, "Сброс белого списка...")
     adv_setting_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        assert adv is not None
         stmt = select(KeywordSetting).where(
             KeywordSetting.adv_setting_id == adv_setting_id,
             KeywordSetting.hard_status == 2,
@@ -112,6 +119,11 @@ async def reset_white_list(
         keyword_settings = (await session.execute(stmt)).scalars().all()
         for keyword_setting in keyword_settings:
             keyword_setting.hard_status = 1  # type: ignore
+            _ = sync_keyword_setting_mode_for_v3(
+                keyword_setting,
+                automatic_version=adv.automatic_version,
+                hard_status_override=1,
+            )
         await session.commit()
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
@@ -142,14 +154,19 @@ async def reset_non_relevant_phrases(
     )
     adv_setting_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        stmt = (
-            update(KeywordSetting)
-            .where(
-                KeywordSetting.adv_setting_id == adv_setting_id,
-                KeywordSetting.hard_status == 0,
-            )
-            .values(hard_status=1)
+        adv = await session.get(AdvSetting, adv_setting_id)
+        assert adv is not None
+        stmt = update(KeywordSetting).where(
+            KeywordSetting.adv_setting_id == adv_setting_id,
+            KeywordSetting.hard_status == 0,
         )
+        if is_v3_campaign(adv.automatic_version):
+            stmt = stmt.values(
+                hard_status=1,
+                strategy_mode=KeywordStrategyMode.OFF,
+            )
+        else:
+            stmt = stmt.values(hard_status=1)
         await session.execute(stmt)
         await session.commit()
     async with sm() as session:

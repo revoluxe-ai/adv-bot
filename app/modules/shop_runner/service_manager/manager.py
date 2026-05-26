@@ -22,6 +22,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.auto_budget_manager import (
@@ -94,6 +95,7 @@ from .services.adv_strategy_selector import AdvStrategySelector, StrategySelecti
 from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
+from .services.v3_status_mode_sync import is_v3_campaign
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -1092,17 +1094,27 @@ class CoroutinesManager:
 
         async with sm(read_only=False) as session:
             if demote_ids:
-                stmt_demote = (
-                    update(KeywordSetting)
-                    .where(KeywordSetting.id.in_(demote_ids))
-                    .values(hard_status=1)
+                stmt_demote = update(KeywordSetting).where(
+                    KeywordSetting.id.in_(demote_ids)
                 )
+                if is_v3_campaign(complex_adv.auto_updater_version):
+                    stmt_demote = stmt_demote.values(
+                        hard_status=1,
+                        strategy_mode=KeywordStrategyMode.OFF,
+                    )
+                else:
+                    stmt_demote = stmt_demote.values(hard_status=1)
                 _ = await session.execute(stmt_demote)
-            stmt_promote = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id == top_keyword_id)
-                .values(hard_status=2)
+            stmt_promote = update(KeywordSetting).where(
+                KeywordSetting.id == top_keyword_id
             )
+            if is_v3_campaign(complex_adv.auto_updater_version):
+                stmt_promote = stmt_promote.values(
+                    hard_status=2,
+                    strategy_mode=KeywordStrategyMode.MIN_CPA,
+                )
+            else:
+                stmt_promote = stmt_promote.values(hard_status=2)
             _ = await session.execute(stmt_promote)
             await session.commit()
 

@@ -6,6 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_campaign,
+    strategy_mode_for_hard_status_write_v3,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
@@ -83,15 +87,22 @@ class KeywordsManager:
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
         adv_setting = complex_adv.adv_setting
+        is_v3 = is_v3_campaign(adv_setting.automatic_version)
         flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
         for text in new_texts:
             hard_status, relevant = flags_for(text)
+            keyword_kwargs: dict[str, object] = {}
+            if is_v3:
+                keyword_kwargs["strategy_mode"] = strategy_mode_for_hard_status_write_v3(
+                    hard_status
+                )
             session.add(
                 KeywordSetting(
                     text=text,
                     hard_status=hard_status,
                     adv_setting_id=original_adv_id,
                     relevant=relevant,
+                    **keyword_kwargs,
                 )
             )
 

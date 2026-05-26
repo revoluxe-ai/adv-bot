@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 from app.core.di.app_container import AppContainer
@@ -596,16 +597,40 @@ async def reset_shop_non_relevant_phrases(
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        stmt = (
+        v3_adv_setting_ids_subquery = (
+            select(AdvSetting.id)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .where(AdvSetting.automatic_version == 3)
+        )
+        stmt_non_v3 = (
             update(KeywordSetting)
             .where(
                 KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
+                KeywordSetting.adv_setting_id.notin_(v3_adv_setting_ids_subquery),
                 KeywordSetting.hard_status == const.BLACK_LIST,
             )
             .values(hard_status=const.AUTO_MODE)
         )
-        update_result = cast(CursorResult[Any], await session.execute(stmt))
-        updated_count = int(update_result.rowcount or 0)
+        stmt_v3 = (
+            update(KeywordSetting)
+            .where(
+                KeywordSetting.adv_setting_id.in_(v3_adv_setting_ids_subquery),
+                KeywordSetting.hard_status == const.BLACK_LIST,
+            )
+            .values(
+                hard_status=const.AUTO_MODE,
+                strategy_mode=KeywordStrategyMode.OFF,
+            )
+        )
+        update_non_v3_result = cast(
+            CursorResult[Any], await session.execute(stmt_non_v3)
+        )
+        update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
+        updated_count = int(update_non_v3_result.rowcount or 0) + int(
+            update_v3_result.rowcount or 0
+        )
         await session.commit()
 
     await bot.send_message(

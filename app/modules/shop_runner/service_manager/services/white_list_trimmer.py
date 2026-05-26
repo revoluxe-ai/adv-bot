@@ -1,8 +1,12 @@
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_campaign,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -38,20 +42,30 @@ class WhiteListTrimmer:
                 removed_count=len(candidates_to_auto_ids),
             )
 
-        stmt_remove = (
-            update(KeywordSetting)
-            .where(KeywordSetting.id.in_(candidates_to_auto_ids))
-            .values(hard_status=1)
+        stmt_remove = update(KeywordSetting).where(
+            KeywordSetting.id.in_(candidates_to_auto_ids)
         )
+        if is_v3_campaign(complex_adv.auto_updater_version):
+            stmt_remove = stmt_remove.values(
+                hard_status=1,
+                strategy_mode=KeywordStrategyMode.OFF,
+            )
+        else:
+            stmt_remove = stmt_remove.values(hard_status=1)
         async with sm(read_only=False) as session:
-            await session.execute(stmt_remove)
+            _ = await session.execute(stmt_remove)
             if replacement_ids:
-                stmt_add = (
-                    update(KeywordSetting)
-                    .where(KeywordSetting.id.in_(replacement_ids))
-                    .values(hard_status=2)
+                stmt_add = update(KeywordSetting).where(
+                    KeywordSetting.id.in_(replacement_ids)
                 )
-                await session.execute(stmt_add)
+                if is_v3_campaign(complex_adv.auto_updater_version):
+                    stmt_add = stmt_add.values(
+                        hard_status=2,
+                        strategy_mode=KeywordStrategyMode.MIN_CPA,
+                    )
+                else:
+                    stmt_add = stmt_add.values(hard_status=2)
+                _ = await session.execute(stmt_add)
             await session.commit()
         return None
 

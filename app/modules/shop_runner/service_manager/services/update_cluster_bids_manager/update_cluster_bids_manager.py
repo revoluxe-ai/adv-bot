@@ -22,6 +22,9 @@ from .mappers.adv_id_item_map import AdvIdItemCalculateData
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
     RedisKeywordBidderStatusManager,
 )
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_status_mode_consistent,
+)
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisApiClusterBidsManager,
@@ -359,6 +362,21 @@ class UpdateClusterBidsManager:
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         # V3: ключи в OFF не участвуют в торгах (страховка от гонок с hard_status).
         if adv.auto_updater_version == 3:
+            inconsistent = [
+                kw
+                for kw in keywords_good
+                if not is_v3_status_mode_consistent(
+                    hard_status=int(kw.hard_status),
+                    strategy_mode=kw.strategy_mode,
+                )
+            ]
+            if inconsistent:
+                logger.warning(
+                    "V3 cache inconsistency detected for adv_id=%s: %s keywords "
+                    "(hard_status vs strategy_mode mismatch)",
+                    adv.adv_id,
+                    len(inconsistent),
+                )
             keywords_good = [
                 kw
                 for kw in keywords_good
