@@ -841,6 +841,7 @@ class KeywordSetting(BaseTable):
         nullable=False,
         default=KeywordStrategyMode.MIN_CPA,
         server_default=KeywordStrategyMode.MIN_CPA.name,
+        # V3: для hard_status 1/0/3 нужен OFF — выставляется в write-path и backfill при включении V3.
     )
     added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)

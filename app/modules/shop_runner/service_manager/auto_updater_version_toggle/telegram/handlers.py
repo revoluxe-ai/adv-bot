@@ -25,6 +25,9 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
+    backfill_v3_status_mode_consistency,
+)
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -182,6 +185,18 @@ async def toggle_auto_updater_version(
         )
         await session.execute(stmt)
         await session.commit()
+
+    if new_version == 3:
+        repaired = await backfill_v3_status_mode_consistency(
+            dry_run=False,
+            adv_setting_id=adv_setting_original_id,
+        )
+        if repaired:
+            logger.info(
+                "V3 enabled: repaired strategy_mode for adv_setting_id=%s keywords=%s",
+                adv_setting_original_id,
+                repaired,
+            )
 
     fsm_data = await state.get_data()
     parent_msg_id = fsm_data.get(FSM_ADV_AUTO_VER_PARENT_MESSAGE_ID)

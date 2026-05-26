@@ -362,12 +362,14 @@ class UpdateClusterBidsManager:
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         # V3: торги только у согласованных БС/фикс.фраз; авто+MIN_CPA и OFF отсекаются.
         if adv.auto_updater_version == 3:
+            adv_strategy = adv.strategy
             inconsistent = [
                 kw
                 for kw in keywords_good
                 if not is_v3_status_mode_consistent(
                     hard_status=int(kw.hard_status),
                     strategy_mode=kw.strategy_mode,
+                    adv_strategy=adv_strategy,
                 )
             ]
             if inconsistent:
@@ -383,6 +385,7 @@ class UpdateClusterBidsManager:
                 if is_v3_keyword_eligible_for_cluster_bidding(
                     hard_status=int(kw.hard_status),
                     strategy_mode=kw.strategy_mode,
+                    adv_strategy=adv_strategy,
                 )
             ]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.

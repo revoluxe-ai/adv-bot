@@ -95,7 +95,10 @@ from .services.adv_strategy_selector import AdvStrategySelector, StrategySelecti
 from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
-from .services.v3_status_mode_sync import is_v3_campaign
+from .services.v3_status_mode_sync import (
+    is_v3_campaign,
+    keyword_strategy_mode_for_adv_strategy,
+)
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -1111,7 +1114,9 @@ class CoroutinesManager:
             if is_v3_campaign(complex_adv.auto_updater_version):
                 stmt_promote = stmt_promote.values(
                     hard_status=2,
-                    strategy_mode=KeywordStrategyMode.MIN_CPA,
+                    strategy_mode=keyword_strategy_mode_for_adv_strategy(
+                        complex_adv.strategy
+                    ),
                 )
             else:
                 stmt_promote = stmt_promote.values(hard_status=2)

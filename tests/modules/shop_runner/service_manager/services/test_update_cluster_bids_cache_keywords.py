@@ -19,6 +19,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from tests.factories import GoodKeywordFactory
 
 
@@ -186,6 +187,7 @@ async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
     adv.auction_adv_id = 10
     adv.adv_id = 1
     adv.auto_updater_version = 3
+    adv.strategy = Strategy.MIN_CPO
     adv.nmids = [100]
     adv.individual_keywords_target_place_mode = False
     adv.target_place = 5
@@ -245,6 +247,7 @@ async def test_get_calculate_data_v3_excludes_auto_with_non_off_mode() -> None:
     adv.auction_adv_id = 10
     adv.adv_id = 1
     adv.auto_updater_version = 3
+    adv.strategy = Strategy.MIN_CPO
     adv.nmids = [100]
     adv.individual_keywords_target_place_mode = False
     adv.target_place = 5

@@ -6,6 +6,7 @@ from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteLi
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     is_v3_campaign,
+    keyword_strategy_mode_for_adv_strategy,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -61,7 +62,9 @@ class WhiteListTrimmer:
                 if is_v3_campaign(complex_adv.auto_updater_version):
                     stmt_add = stmt_add.values(
                         hard_status=2,
-                        strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        strategy_mode=keyword_strategy_mode_for_adv_strategy(
+                            complex_adv.strategy
+                        ),
                     )
                 else:
                     stmt_add = stmt_add.values(hard_status=2)

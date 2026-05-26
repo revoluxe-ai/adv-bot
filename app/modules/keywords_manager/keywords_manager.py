@@ -94,7 +94,8 @@ class KeywordsManager:
             keyword_kwargs: dict[str, object] = {}
             if is_v3:
                 keyword_kwargs["strategy_mode"] = strategy_mode_for_hard_status_write_v3(
-                    hard_status
+                    hard_status,
+                    adv_strategy=adv_setting.strategy,
                 )
             session.add(
                 KeywordSetting(

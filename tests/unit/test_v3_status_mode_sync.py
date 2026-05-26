@@ -5,10 +5,12 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     is_v3_campaign,
     is_v3_keyword_eligible_for_cluster_bidding,
     is_v3_status_mode_consistent,
+    keyword_strategy_mode_for_adv_strategy,
     repaired_strategy_mode_for_v3,
     strategy_mode_for_hard_status_write_v3,
     sync_keyword_setting_mode_for_v3,
@@ -17,20 +19,43 @@ from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("hard_status", "expected"),
+    ("adv_strategy", "expected"),
     [
-        (0, KeywordStrategyMode.OFF),
-        (1, KeywordStrategyMode.OFF),
-        (2, KeywordStrategyMode.MIN_CPA),
-        (3, KeywordStrategyMode.OFF),
-        (4, KeywordStrategyMode.MIN_CPA),
+        (Strategy.MIN_CPO, KeywordStrategyMode.MIN_CPA),
+        (Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
+        (None, KeywordStrategyMode.MIN_CPA),
+    ],
+)
+def test_keyword_strategy_mode_for_adv_strategy(
+    adv_strategy: Strategy | None,
+    expected: KeywordStrategyMode,
+) -> None:
+    assert keyword_strategy_mode_for_adv_strategy(adv_strategy) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("hard_status", "adv_strategy", "expected"),
+    [
+        (0, None, KeywordStrategyMode.OFF),
+        (1, Strategy.MAX_CONV, KeywordStrategyMode.OFF),
+        (2, Strategy.MIN_CPO, KeywordStrategyMode.MIN_CPA),
+        (2, Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
+        (3, None, KeywordStrategyMode.OFF),
+        (4, Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
     ],
 )
 def test_strategy_mode_for_hard_status_write_v3(
     hard_status: int,
+    adv_strategy: Strategy | None,
     expected: KeywordStrategyMode,
 ) -> None:
-    assert strategy_mode_for_hard_status_write_v3(hard_status) == expected
+    assert (
+        strategy_mode_for_hard_status_write_v3(
+            hard_status, adv_strategy=adv_strategy
+        )
+        == expected
+    )
 
 
 @pytest.mark.unit
@@ -42,28 +67,32 @@ def test_is_v3_campaign_only_for_version_three() -> None:
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("hard_status", "strategy_mode", "expected"),
+    ("hard_status", "strategy_mode", "adv_strategy", "expected"),
     [
-        (0, KeywordStrategyMode.OFF, True),
-        (1, KeywordStrategyMode.OFF, True),
-        (3, KeywordStrategyMode.OFF, True),
-        (2, KeywordStrategyMode.MIN_CPA, True),
-        (2, KeywordStrategyMode.OPTIMUM, True),
-        (2, KeywordStrategyMode.MAX_CONVERSION, True),
-        (2, KeywordStrategyMode.OFF, False),
-        (4, KeywordStrategyMode.MIN_CPA, True),
-        (4, KeywordStrategyMode.OPTIMUM, False),
+        (0, KeywordStrategyMode.OFF, None, True),
+        (1, KeywordStrategyMode.OFF, None, True),
+        (3, KeywordStrategyMode.OFF, None, True),
+        (2, KeywordStrategyMode.MIN_CPA, None, True),
+        (2, KeywordStrategyMode.OPTIMUM, None, True),
+        (2, KeywordStrategyMode.MAX_CONVERSION, None, True),
+        (2, KeywordStrategyMode.OFF, None, False),
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MIN_CPO, True),
+        (4, KeywordStrategyMode.MAX_CONVERSION, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, False),
+        (4, KeywordStrategyMode.OPTIMUM, Strategy.MAX_CONV, False),
     ],
 )
 def test_is_v3_status_mode_consistent(
     hard_status: int,
     strategy_mode: KeywordStrategyMode,
+    adv_strategy: Strategy | None,
     expected: bool,
 ) -> None:
     assert (
         is_v3_status_mode_consistent(
             hard_status=hard_status,
             strategy_mode=strategy_mode,
+            adv_strategy=adv_strategy,
         )
         is expected
     )
@@ -81,37 +110,53 @@ def test_repaired_strategy_mode_for_v3_keeps_consistent_active_white_list() -> N
 
 
 @pytest.mark.unit
-def test_repaired_strategy_mode_for_v3_fixes_white_list_off_to_min() -> None:
+def test_repaired_strategy_mode_for_v3_fixes_white_list_off_to_adv_strategy() -> None:
     assert (
         repaired_strategy_mode_for_v3(
             hard_status=2,
             strategy_mode=KeywordStrategyMode.OFF,
+            adv_strategy=Strategy.MAX_CONV,
         )
-        == KeywordStrategyMode.MIN_CPA
+        == KeywordStrategyMode.MAX_CONVERSION
+    )
+
+
+@pytest.mark.unit
+def test_repaired_strategy_mode_for_v3_fixes_fixed_to_max_conv() -> None:
+    assert (
+        repaired_strategy_mode_for_v3(
+            hard_status=4,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            adv_strategy=Strategy.MAX_CONV,
+        )
+        == KeywordStrategyMode.MAX_CONVERSION
     )
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("hard_status", "strategy_mode", "expected"),
+    ("hard_status", "strategy_mode", "adv_strategy", "expected"),
     [
-        (1, KeywordStrategyMode.OFF, False),
-        (1, KeywordStrategyMode.MIN_CPA, False),
-        (2, KeywordStrategyMode.MIN_CPA, True),
-        (2, KeywordStrategyMode.OFF, False),
-        (4, KeywordStrategyMode.MIN_CPA, True),
-        (4, KeywordStrategyMode.OPTIMUM, False),
+        (1, KeywordStrategyMode.OFF, None, False),
+        (1, KeywordStrategyMode.MIN_CPA, None, False),
+        (2, KeywordStrategyMode.MIN_CPA, None, True),
+        (2, KeywordStrategyMode.OFF, None, False),
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MIN_CPO, True),
+        (4, KeywordStrategyMode.MAX_CONVERSION, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, False),
     ],
 )
 def test_is_v3_keyword_eligible_for_cluster_bidding(
     hard_status: int,
     strategy_mode: KeywordStrategyMode,
+    adv_strategy: Strategy | None,
     expected: bool,
 ) -> None:
     assert (
         is_v3_keyword_eligible_for_cluster_bidding(
             hard_status=hard_status,
             strategy_mode=strategy_mode,
+            adv_strategy=adv_strategy,
         )
         is expected
     )
@@ -142,3 +187,19 @@ def test_sync_keyword_setting_mode_for_v3_updates_mode_for_v3_only() -> None:
     )
     assert changed_non_v3 is False
     assert keyword_setting_non_v3.strategy_mode == KeywordStrategyMode.OPTIMUM
+
+
+@pytest.mark.unit
+def test_sync_white_list_uses_adv_strategy_max_conv() -> None:
+    keyword_setting = SimpleNamespace(
+        hard_status=2,
+        strategy_mode=KeywordStrategyMode.OFF,
+        adv_setting=SimpleNamespace(strategy=Strategy.MAX_CONV),
+    )
+    changed = sync_keyword_setting_mode_for_v3(
+        keyword_setting,
+        automatic_version=3,
+        hard_status_override=2,
+    )
+    assert changed is True
+    assert keyword_setting.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
