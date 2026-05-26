@@ -282,8 +282,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
     def resolve_keyword_rating_mode(complex_adv: "ComplexAdv") -> KeywordRatingMode:
         """Режим рейтинга для сортировки ключей; V3 всегда MIN_CPO."""
         auto_ver = complex_adv.adv_setting.automatic_version
-        if auto_ver is None:
-            auto_ver = 2
         if auto_ver == 3:
             return KeywordRatingMode.BY_MIN_CPO
         if complex_adv.strategy == Strategy.MIN_CPO:

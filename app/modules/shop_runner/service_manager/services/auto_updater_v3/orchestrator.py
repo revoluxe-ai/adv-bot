@@ -1,16 +1,15 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
-Inputs: plan/fact (v2-style), ``SalesStates``, ``ComplexAdv.shelf_promotion_active``,
-``aggressiveness`` (1–3, outside shelf). For shelf phase, traffic CH enrich runs here.
+Phase 0: gap-rebalance (БС, MIN_CPO) — всегда при наличии WBAdvDTO, до plan/fact cache.
+Phase 1: plan/fact, ``SalesStates``, ``select_v3_actions``.
 
-Наблюдаемость: после цикла — ``v3_selection`` (pool, tier, state_cost, move) и
-``no_valid_up_after_rec_filter`` в ``transition_ranking``. Контроль на проде: см.
-``docks/V3_UPDATER_VALIDATION.md``.
+Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
@@ -24,6 +23,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     detect_campaign_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
     resolve_shelf_click_mode_from_adv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
@@ -32,6 +32,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
+    run_ladder_gap_rebalance_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -44,8 +47,67 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def build_keyword_v3_contexts(
+    keywords: list[CalculatedKeyword],
+    raw_profiles: dict[str, Any],
+) -> list[KeywordV3Context]:
+    """Собрать контексты ключей с position_profile из WB bid profiles."""
+    contexts: list[KeywordV3Context] = []
+    for kw in keywords:
+        bids = resolve_keyword_bid_profile(raw_profiles, kw.text)
+        profile = profile_points_from_bid_positions(bids) if bids else None
+        merged = kw.model_copy(update={"position_profile": profile})
+        contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))
+    return contexts
+
+
+async def _run_phase0_gap_rebalance(
+    complex_adv: ComplexAdv,
+    *,
+    keywords: list[CalculatedKeyword],
+    wb_shop_data_manager: WBShopDataManager,
+) -> list[CalculatedKeyword]:
+    """Gap-rebalance до plan/fact; возвращает актуальный список ключей."""
+    shelf_active = complex_adv.shelf_promotion_active
+    if shelf_active:
+        await TrafficClicksManager().enrich(complex_adv)
+
+    wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
+    if not wb_dtos:
+        logger.debug(
+            "[adv_id=%s] v3 gap rebalance: no WBAdvDTO, skip",
+            complex_adv.adv_id,
+        )
+        return keywords
+
+    dto = wb_dtos[0]
+    predictor = build_predict_keywords_target_place()
+    raw_profiles = await predictor.get_keyword_bid_profiles(
+        dto, dto.min_target_position
+    )
+    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+    click_mode = (
+        resolve_shelf_click_mode_from_adv(complex_adv)
+        if shelf_active
+        else ShelfClickMode.UNKNOWN
+    )
+    changed = await run_ladder_gap_rebalance_v3(
+        complex_adv,
+        contexts=contexts,
+        shelf_promotion_active=shelf_active,
+        shelf_click_mode=click_mode,
+        rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
+    )
+    if changed:
+        return await complex_adv.get_keywords()
+    return keywords
 
 
 async def process_adv_v3(
@@ -54,14 +116,20 @@ async def process_adv_v3(
     wb_shop_data_manager: WBShopDataManager,
     max_last_period: int = 2,
 ) -> None:
-    """Run v3 cycle for one campaign (plan/fact/state like v2, actions per keyword)."""
+    """Run v3 cycle for one campaign (gap-rebalance, then plan/fact/state)."""
     adv = complex_adv.adv_setting
+    keywords = await complex_adv.get_keywords()
+    keywords = await _run_phase0_gap_rebalance(
+        complex_adv,
+        keywords=keywords,
+        wb_shop_data_manager=wb_shop_data_manager,
+    )
+
     plan = AdvSettingAutoUpdater.get_plan_data(adv)
     if not plan:
         logger.debug("[adv_id=%s] v3: no plan, skip", complex_adv.adv_id)
         return
 
-    keywords = await complex_adv.get_keywords()
     updater = AdvSettingAutoUpdater(adv, max_last_period)
     fact = await updater.get_fact_data(keywords)
 
@@ -71,11 +139,7 @@ async def process_adv_v3(
         return
 
     async def cache_plan_fact_snapshot() -> None:
-        """Зафиксировать plan/fact после решения по метрикам (state/действия).
-
-        Не вызывать при временных сбоях (нет WBAdvDTO): иначе следующие циклы
-        пропустят v3, пока plan/fact не сдвинутся, хотя DTO уже доступен.
-        """
+        """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
         await plan_fact_change.set_new_plan_fact(plan, fact)
 
     state = detect_campaign_state(plan, fact)
@@ -88,7 +152,8 @@ async def process_adv_v3(
         await cache_plan_fact_snapshot()
         return
 
-    if complex_adv.shelf_promotion_active:
+    shelf_active = complex_adv.shelf_promotion_active
+    if shelf_active:
         await TrafficClicksManager().enrich(complex_adv)
 
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
@@ -99,24 +164,19 @@ async def process_adv_v3(
         )
         return
     dto = wb_dtos[0]
-    positions_size = dto.min_target_position
     predictor = build_predict_keywords_target_place()
-    raw_profiles = await predictor.get_keyword_bid_profiles(dto, positions_size)
-
-    contexts: list[KeywordV3Context] = []
-    for kw in keywords:
-        bids = resolve_keyword_bid_profile(raw_profiles, kw.text)
-        profile = profile_points_from_bid_positions(bids) if bids else None
-        merged = kw.model_copy(update={"position_profile": profile})
-        contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))
+    raw_profiles = await predictor.get_keyword_bid_profiles(
+        dto, dto.min_target_position
+    )
+    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
     actions = select_v3_actions(
         state=state,
         contexts=contexts,
-        shelf_promotion_active=complex_adv.shelf_promotion_active,
+        shelf_promotion_active=shelf_active,
         rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
         shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
-        if complex_adv.shelf_promotion_active
+        if shelf_active
         else None,
         plan_max_pay_for_order=float(plan.max_pay_for_order),
     )

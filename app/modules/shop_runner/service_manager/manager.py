@@ -1451,6 +1451,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def white_list_tail_trimmer(self):
+        """Срез хвоста БС для v2. V3 (``automatic_version == 3``): gap-rebalance только в ``process_adv_v3``."""
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
@@ -1475,6 +1476,7 @@ class CoroutinesManager:
         for adv in complex_advs:
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 3:
+                # V3: rebalance/trim — в adv_settings_auto_update → process_adv_v3 phase 0
                 continue
             non_v3_advs.append(adv)
             handlers.append(functools.partial(trimmer.trim, adv))

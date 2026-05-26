@@ -34,7 +34,7 @@ def _hard_status_allows_up(hard_status: object) -> bool:
 
 
 def _hard_status_allows_force_off(hard_status: object) -> bool:
-    """FORCE_OFF: активные авто/БС; не трогаем turn_off (3) и always_on (4)."""
+    """FORCE_OFF: БС; не трогаем turn_off (3) и always_on (4)."""
     h = int(cast(int, hard_status))
     return h in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 

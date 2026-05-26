@@ -87,26 +87,6 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
 
 
 @pytest.mark.unit
-def test_unproven_shelf_none_rec_only_min_cpa_transitions() -> None:
-    """above_rec=None → imputation, но без jump выше MIN для unproven."""
-    prof = sample_profile(min_pay=10.0, high_pay=15.0)
-    prepared = [
-        (
-            ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=None),
-            KeywordStrategyMode.OFF,
-            False,
-        ),
-    ]
-    candidates = collect_transition_candidates(
-        prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
-    )
-    assert candidates
-    assert all(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
-    assert all(c.move_kind == UpMoveKind.OFF_TO_MIN for c in candidates)
-
-
-@pytest.mark.unit
 def test_no_data_provisional_imputed_uses_worst() -> None:
     data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
     prepared = [
@@ -130,6 +110,33 @@ def test_no_data_provisional_imputed_uses_worst() -> None:
     imputed = [c for c in candidates if c.rec_tier == RecTier.PROVISIONAL_IMPUTED]
     assert len(imputed) >= 1
     assert any(c.imputed for c in imputed)
+
+
+@pytest.mark.unit
+def test_no_target_place_data_is_treated_as_no_data() -> None:
+    data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
+    prepared = [
+        (
+            ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=data_prof, above_rec=True),
+            KeywordStrategyMode.OFF,
+            True,
+        ),
+        (
+            ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=True),
+            KeywordStrategyMode.OFF,
+            False,
+        ),
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert any(
+        c.ctx.keyword.keyword_setting_original_id == 2
+        and c.to_mode == KeywordStrategyMode.MAX_CONVERSION
+        and c.imputed
+        for c in candidates
+    )
 
 
 @pytest.mark.unit
