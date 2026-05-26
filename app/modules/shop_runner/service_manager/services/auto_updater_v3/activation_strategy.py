@@ -3,6 +3,8 @@
 Поштучная («по одному ключу»): за цикл одно UP/DOWN на одном выбранном ключе.
 Послойная («по уровню для всех»): за цикл одно UP, но приоритет слоя OFF→MIN → MIN→OPT → OPT→MAX.
 
+Почему при organic и при полках разная логика: ``auto_updater_traffic_policy``.
+
 Не путать с ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV в ``change_adv_strategy``).
 """
 
@@ -24,11 +26,14 @@ class ActivationStrategy(str, Enum):
 
 
 class ShelfClickMode(str, Enum):
-    """Сравнение organic/shelf кликов за сегодня (полочная фаза)."""
+    """Режим влияния organic/shelf на конверсию карточки (полочная фаза V3).
 
-    ORGANIC_DOMINANT = "ORGANIC_DOMINANT"  # organic > shelf
-    SHELF_DOMINANT_OR_EQUAL = "SHELF_DOMINANT_OR_EQUAL"  # shelf >= organic
-    UNKNOWN = "UNKNOWN"  # DTO нет — трактуем как shelf >= organic
+    См. ``auto_updater_traffic_policy.ShelfTrafficInfluenceMode`` и постулаты 1–2.
+    """
+
+    ORGANIC_DOMINANT = "ORGANIC_DOMINANT"  # organic > shelf — постулат 2
+    SHELF_DOMINANT_OR_EQUAL = "SHELF_DOMINANT_OR_EQUAL"  # shelf >= organic — постулат 1
+    UNKNOWN = "UNKNOWN"  # DTO нет (в V3 underperform: piecewise, см. policy-модуль)
 
 
 def resolve_shelf_click_mode(

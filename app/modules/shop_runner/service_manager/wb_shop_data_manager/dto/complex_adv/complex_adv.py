@@ -281,15 +281,7 @@ class ComplexAdv:
 
     @property
     def is_shelf_activation_allowed(self) -> bool:
-        """Полки доминируют по кликам за сегодня: ``shelf_clicks > organic_clicks``.
-
-        Не выбирает стратегию сам — используется в отборе кандидатов в БС
-        (``KeywordsManager``, ``WhiteListTrimmer``): при True в БС не берут ключи
-        с ``above_rec_conversion is False`` (узкий полочный пул).
-
-        При ``organic_clicks >= shelf_clicks`` или без DTO → False (широкий пул кандидатов).
-        См. также ``AdvStrategySelector``: при ``organic > shelf`` стратегия **MIN_CPO**.
-        """
+        """``shelf_clicks > organic_clicks``. Смысл — ``auto_updater_traffic_policy``."""
         dto = self.traffic_clicks_dto
         if dto is None:
             return False

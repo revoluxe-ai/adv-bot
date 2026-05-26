@@ -1,11 +1,13 @@
 """Полочная фаза V3: ``rec_system_mode`` + авто ``started``.
 
-Decision matrix (UNDERPERFORM):
+Почему стратегии отличаются: ``auto_updater_traffic_policy``.
+
+Decision matrix (UNDERPERFORM), механика выбора:
 - ``organic > shelf`` → **послойная** + aggr=MIN, общий пул (без shelf-only).
 - ``shelf >= organic`` или DTO нет → **поштучная**: shelf pending, затем non-shelf;
   ``aggressiveness`` (1/2/3) в этой ветке **не используется**.
 
-Отдельно от ``AdvStrategySelector`` (``AdvSetting.strategy`` MIN_CPO/MAX_CONV).
+Отдельно от ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV).
 """
 
 from __future__ import annotations

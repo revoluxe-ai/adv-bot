@@ -382,8 +382,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
+            """conv(ключ) > rec_conversion (полки). Зачем — ``auto_updater_traffic_policy``."""
             if auto_campaign_active is False:
-                return None # None - не применяем вообще это правило
+                return None  # правило не применяем
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
