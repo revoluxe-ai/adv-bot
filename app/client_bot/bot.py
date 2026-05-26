@@ -28,7 +28,7 @@ def _get_telegram_http_session() -> AiohttpSession:
         # Long poll + proxy: need generous timeouts (default is too tight for slow tunnels).
         _telegram_http_session = AiohttpSession(
             proxy=settings.PROXY,
-            timeout=ClientTimeout(total=120, connect=30, sock_read=90),
+            timeout=120,
         )
     return _telegram_http_session
 
