@@ -65,13 +65,18 @@ async def process_adv_v3(
         logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
         return
 
+    async def cache_plan_fact_snapshot() -> None:
+        """Зафиксировать plan/fact в Redis после цикла, иначе каждый раз — ложный «изменился»."""
+        await plan_fact_change.set_new_plan_fact(plan, fact)
+
     state = detect_campaign_state(plan, fact)
     if state is None:
         logger.info("[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id)
+        await cache_plan_fact_snapshot()
         return
     if state == SalesStates.OPTIMAL:
         logger.info("[adv_id=%s] v3: OPTIMAL, no actions", complex_adv.adv_id)
-        await plan_fact_change.set_new_plan_fact(plan, fact)
+        await cache_plan_fact_snapshot()
         return
 
     if complex_adv.shelf_promotion_active:
@@ -80,6 +85,7 @@ async def process_adv_v3(
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
     if not wb_dtos:
         logger.warning("[adv_id=%s] v3: no WBAdvDTO", complex_adv.adv_id)
+        await cache_plan_fact_snapshot()
         return
     dto = wb_dtos[0]
     positions_size = dto.min_target_position
@@ -104,7 +110,7 @@ async def process_adv_v3(
     )
     await apply_v3_actions(actions)
 
-    await plan_fact_change.set_new_plan_fact(plan, fact)
+    await cache_plan_fact_snapshot()
     logger.info(
         "[adv_id=%s] v3: state=%s actions=%s",
         complex_adv.adv_id,
