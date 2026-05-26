@@ -258,7 +258,8 @@ def collect_transition_candidates(
             if mc is None:
                 continue
 
-            if to_mode != KeywordStrategyMode.MIN_CPA and not proven and not use_imputation:
+            # Новые ключи — только MIN_CPA; imputation не отменяет это правило.
+            if to_mode != KeywordStrategyMode.MIN_CPA and not proven:
                 continue
 
             if mc.is_valid:

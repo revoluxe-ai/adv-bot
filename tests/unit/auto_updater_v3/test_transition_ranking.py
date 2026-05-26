@@ -87,6 +87,26 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
 
 
 @pytest.mark.unit
+def test_unproven_shelf_none_rec_only_min_cpa_transitions() -> None:
+    """above_rec=None → imputation, но без jump выше MIN для unproven."""
+    prof = sample_profile(min_pay=10.0, high_pay=15.0)
+    prepared = [
+        (
+            ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=None),
+            KeywordStrategyMode.OFF,
+            False,
+        ),
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert candidates
+    assert all(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
+    assert all(c.move_kind == UpMoveKind.OFF_TO_MIN for c in candidates)
+
+
+@pytest.mark.unit
 def test_no_data_provisional_imputed_uses_worst() -> None:
     data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
     prepared = [
