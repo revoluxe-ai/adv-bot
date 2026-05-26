@@ -15,12 +15,6 @@ from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
-    v3_aggressiveness_letter,
-)
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
 )
@@ -220,12 +214,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аук.: {self._adv_setting.search_adv_id}\n"
+            "Cтат. за 2 дня:\n"
         )
-        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
-            text += (
-                f"Агр. V3: {v3_aggressiveness_letter(int(self._adv_setting.aggressiveness))}\n"
-            )
-        text += "Cтат. за 2 дня:\n"
 
         min_orders_per_1000_rub: float | None = self.min_orders_per_1000_rub
 

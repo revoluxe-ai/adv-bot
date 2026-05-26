@@ -19,17 +19,20 @@ _LEVEL_LABELS: Final[dict[int, str]] = {
     3: "Максимальная (по умолчанию)",
 }
 
-def v3_aggressiveness_level(level: int) -> str:
-    """Уровень агрессивности V3 (1–3) для кнопки и кратких подписей."""
-    if level in _LEVEL_LABELS:
-        return str(level)
+def v3_aggressiveness_letter(level: int) -> str:
+    """Краткий уровень агрессивности V3 (цифра 1–3) для кнопки меню настроек РК."""
     return str(level)
+
+
+def v3_aggressiveness_level(level: int) -> str:
+    """Синоним :func:`v3_aggressiveness_letter` для подписей в UI."""
+    return v3_aggressiveness_letter(level)
 
 
 def v3_aggressiveness_caption(level: int) -> str:
     """Уровень и расшифровка для страницы настроек РК."""
     label = _LEVEL_LABELS.get(level, str(level))
-    return f"{v3_aggressiveness_level(level)} — {label}"
+    return f"{v3_aggressiveness_letter(level)} — {label}"
 
 FSM_V3_ROLLOUT_PARENT_MESSAGE_ID = "v3_rollout_parent_message_id"
 FSM_V3_ROLLOUT_MENU_ADV_SETTING_ID = "v3_rollout_menu_adv_setting_id"
