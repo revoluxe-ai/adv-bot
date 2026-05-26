@@ -49,6 +49,34 @@ class AutoShelfBidSnapshot(BaseModel):
         raw = ":".join(map(str, payload)).encode("utf-8")
         return hashlib.blake2b(raw, digest_size=16).hexdigest()
 
+    @staticmethod
+    def boundary_closure_event_id(
+        prev: "AutoShelfBidSnapshot",
+        current: "AutoShelfBidSnapshot",
+    ) -> str:
+        """Idempotent ``event_id`` закрытия сегмента ``prev`` при смене контекста.
+
+        Контекст строки — ``prev`` (bid/mode/price); в хеш входят кумулятивы на
+        момент ``current.src_ts``, чтобы отличать повторные закрытия.
+        """
+        payload = (
+            "boundary",
+            prev.nmid,
+            prev.mode,
+            prev.bid_minor,
+            prev.currency,
+            prev.price_minor,
+            prev.price_currency,
+            current.src_ts.isoformat(),
+            current.impressions,
+            current.clicks,
+            current.carts,
+            current.orders,
+            current.spend,
+        )
+        raw = ":".join(map(str, payload)).encode("utf-8")
+        return hashlib.blake2b(raw, digest_size=16).hexdigest()
+
     def delta(self, prev: "AutoShelfBidSnapshot") -> AutoShelfBidDelta:
         """Дельта метрик относительно предыдущего снимка."""
         return AutoShelfBidDelta(

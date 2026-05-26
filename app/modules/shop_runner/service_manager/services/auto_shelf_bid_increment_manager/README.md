@@ -4,9 +4,11 @@
 
 ## Decision Log
 
-1. **Строгая атрибуция важнее полноты boundary-дельт**
-   - При смене контекста (`bid_minor`, `currency`, `mode`, `price_*`) интервал не пишется.
-   - Выполняется только `persist(current_snapshot)` (`context_changed_resync`), чтобы не смешивать метрики разных сегментов.
+1. **Строгая атрибуция + закрытие сегмента при смене контекста**
+   - При смене (`bid_minor`, `currency`, `mode`, `price_*`) дельта кумулятивов WB
+     пишется в interval с контекстом **предыдущего** сегмента (`context_changed_boundary_flush`),
+     затем `persist(current_snapshot)` (`context_changed_resync`).
+   - Корзины/показы, накопленные до смены ставки, не теряются на границе.
 
 2. **`recommendations_stat = total_auto - keyword` — единственная формула v1**
    - Если `keyword_stat` отсутствует (`None` — 0 строк в `clusters_adv_stats`),
@@ -56,7 +58,8 @@
 ## Основные события в логах
 
 - `insert_ok` — успешная запись интервала.
-- `context_changed_resync` — смена контекста, только resync.
+- `context_changed_boundary_flush` — закрытие сегмента prev перед resync.
+- `context_changed_resync` — смена контекста, persist нового prev.
 - `negative_recommendations_skipped` — отрицательный `recommendations`, интервал пропущен.
 - `keyword_stat_missing_treated_as_zero` — keyword-выборка пуста, shelf = total_auto.
 - `negative_recommendations_resync` — первый валидный тик после negative-фазы, только resync.
@@ -66,7 +69,7 @@
 ## Что считать корректным поведением
 
 - Возможны тики без записи интервала — это ожидаемо в resync/guard ветках.
-- Пропуск "пограничной" дельты при смене контекста — намеренное поведение для строгой атрибуции.
+- При смене контекста boundary-дельта пишется в CH под старый bid/mode (не под новый).
 - Отсутствие цены (`price_minor=NULL`) в v1 — нормальный сценарий.
 - При `persist_failed_after_interval` допускается окно частичного сбоя; корректность
   аналитики обеспечивается дедупом по `event_date + event_id`.
@@ -87,11 +90,10 @@
 
 ### 1. «При смене bid/mode/price теряется boundary-дельта»
 
-**Ответ:** да, намеренно. При `context_changed_resync` interval не пишется,
-обновляется только `prev`. Мотивация — строгая атрибуция: дельта между двумя
-разными сегментами (например, до и после смены ставки) не должна попасть в
-интервал нового сегмента. Полнота boundary-интервалов сознательно жертвуется
-ради корректной сегментации. См. decision log п.1 и `_is_context_changed()`.
+**Ответ:** нет (с исправления v1.1). Перед `context_changed_resync` вызывается
+`context_changed_boundary_flush`: interval с контекстом **старого** сегмента
+(prev bid/mode/price) и дельтой кумулятивов до смены. Новый сегмент не получает
+чужие корзины. См. `_flush_boundary_interval_on_context_change()`.
 
 ### 2. «В repository нет fetch цены — dead code / недоделка?»
 
@@ -144,8 +146,10 @@
 | `negative_recommendations_skipped` | нет | нет | только resync-маркер |
 | `keyword_stat_missing_treated_as_zero` | да* | да* | пустой keyword = 0; *по обычным guard-веткам delta |
 | `negative_recommendations_resync` | нет | да | выравнивание после bad phase |
-| `context_changed_resync` | нет | да | смена сегмента, без boundary delta |
+| `context_changed_boundary_flush` | да | нет* | закрытие prev; *затем resync |
+| `context_changed_resync` | нет | да | persist нового сегмента |
 | `negative_delta_skipped` | нет | да | аномальная delta |
 | `zero_delta_skipped` | нет | да | нет изменений метрик |
 | `insert_ok` | да | да | штатный success-path |
 | `persist_failed_after_interval` | да* | нет | *interval уже в CH; resync на след. тике |
+| `persist_failed_after_boundary_interval` | да* | нет | *boundary interval уже в CH; resync на след. тике |

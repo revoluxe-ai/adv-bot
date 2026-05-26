@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlBidPoints,
     AutoShelfBidControlMenu,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
+    TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
     format_bid_minor_for_telegram,
     format_timestamp_for_telegram,
 )
@@ -31,6 +32,13 @@ def _format_money(value: float | None) -> str:
     return f"{value:.2f}"
 
 
+def _format_ctr(ctr: float | None) -> str:
+    """CTR как доля кликов к показам → проценты для Telegram."""
+    if ctr is None:
+        return "—"
+    return f"{ctr * 100:.2f}%"
+
+
 def _format_cycle_timestamp(value: datetime | str | None) -> str:
     """Дата/время цикла для Telegram без долей секунды."""
     return format_timestamp_for_telegram(value)
@@ -42,89 +50,129 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
     return "\n".join(f"- {item}" for item in view.warnings)
 
 
-def _bid_point_sort_ts(point: BidPointStatsDTO) -> datetime:
-    """Ключ сортировки: последний интервал по ставке (UTC)."""
-    ts = point.last_interval_at
-    if ts is None:
-        return datetime.min.replace(tzinfo=timezone.utc)
-    if ts.tzinfo is None:
-        return ts.replace(tzinfo=timezone.utc)
-    return ts
+def _bid_point_cpc_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
+    """Ключ сортировки: лучший CPC первым (``cart_cpa`` = CPC score в DTO)."""
+    cpc = point.cart_cpa if point.cart_cpa is not None else float("inf")
+    return (float(cpc), point.bid_minor)
 
 
-def select_covered_bid_points_for_cycle_viewer(
+def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
+    """Значок статуса теста по ставке в текущем цикле."""
+    if point.is_covered:
+        return "✅"
+    return "⏳"
+
+
+def select_cycle_bid_points_for_viewer(
     points: list[BidPointStatsDTO],
 ) -> list[BidPointStatsDTO]:
-    """Покрытые точки цикла для просмотрщика, по ``last_interval_at`` DESC."""
-    covered = [p for p in points if p.is_covered]
-    return sorted(covered, key=_bid_point_sort_ts, reverse=True)
+    """Ставки цикла с показами для просмотрщика, от лучшего CPC к худшему.
 
-
-def clamp_bid_point_index(index: int, total: int) -> int:
-    """Безопасный индекс при навигации по списку покрытий (0..total-1)."""
-    if total <= 0:
-        return 0
-    if index < 0:
-        return 0
-    if index >= total:
-        return total - 1
-    return index
+    В списке все точки с ``impressions > 0``. ``is_covered`` — порог test показов
+    достигнут (✅), иначе набор показов (⏳).
+    """
+    with_impressions = [p for p in points if p.impressions > 0]
+    return sorted(with_impressions, key=_bid_point_cpc_sort_key)
 
 
 def format_bid_point_line(point: BidPointStatsDTO) -> str:
-    """Одна строка покрытой ставки — тот же формат, что в блоке на главном экране."""
+    """Одна строка ставки цикла: статус, метрики, опционально лучшая точка."""
+    status = cycle_bid_coverage_icon(point)
+    best_mark = " ⭐" if point.is_best else ""
+    cpc_text = _format_money(point.cart_cpa)
     return (
-        f"{format_bid(point.bid_minor, point.currency)}: показы {point.impressions}, "
-        f"корзины {point.carts}, расход {_format_money(point.spend)} ₽, "
-        f"CPA корзины {_format_money(point.cart_cpa)} ₽"
+        f"{status}{best_mark} {format_bid(point.bid_minor, point.currency)}: "
+        f"показы {point.impressions}, корзины {point.carts}, "
+        f"клики {point.clicks}, CTR {_format_ctr(point.ctr)}, "
+        f"расход {_format_money(point.spend)} ₽, CPC {cpc_text} ₽"
     )
 
 
-BID_POINT_VIEWER_HEADER = "Покрытые ставки (текущий цикл):"
+def bid_point_viewer_page_count(
+    total_points: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
+) -> int:
+    """Число страниц просмотрщика покрытий (минимум 0)."""
+    if total_points <= 0:
+        return 0
+    return (total_points + page_size - 1) // page_size
+
+
+def clamp_bid_point_page(page: int, total_pages: int) -> int:
+    """Безопасный номер страницы просмотрщика (0..total_pages-1)."""
+    if total_pages <= 0:
+        return 0
+    if page < 0:
+        return 0
+    if page >= total_pages:
+        return total_pages - 1
+    return page
+
+
+def slice_bid_points_page(
+    points: list[BidPointStatsDTO],
+    page: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
+) -> list[BidPointStatsDTO]:
+    """Срез покрытых точек для страницы просмотрщика."""
+    start = page * page_size
+    return points[start : start + page_size]
+
+
+BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы, сортировка по CPC):"
+BID_POINT_VIEWER_LEGEND = (
+    "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC (есть клики)"
+)
 
 
 def render_bid_point_viewer_message(
-    index: int,
+    page: int,
     points: list[BidPointStatsDTO],
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
 ) -> str:
-    """Просмотр одной строки покрытия цикла (как на главном экране) с листанием."""
+    """До ``page_size`` строк покрытий цикла на одной странице просмотрщика."""
     total = len(points)
-    safe_index = clamp_bid_point_index(index, total)
-    point = points[safe_index]
-    line = format_bid_point_line(point)
+    total_pages = bid_point_viewer_page_count(total, page_size)
+    safe_page = clamp_bid_point_page(page, total_pages)
+    chunk = slice_bid_points_page(points, safe_page, page_size)
+    lines = [format_bid_point_line(point) for point in chunk]
+    body = "\n".join(lines) if lines else "Нет ставок с показами в текущем цикле."
     return (
         f"{BID_POINT_VIEWER_HEADER}\n"
-        f"{line}\n\n"
-        f"{safe_index + 1} / {total}"
+        f"{BID_POINT_VIEWER_LEGEND}\n\n"
+        f"{body}\n\n"
+        f"Страница {safe_page + 1} / {total_pages}"
     )
 
 
 def build_bid_point_viewer_keyboard(
     adv_setting_original_id: int,
-    index: int,
-    total: int,
+    page: int,
+    total_points: int,
+    page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура просмотрщика: ◀️ / ▶️, обновить, назад к управлению."""
+    """Клавиатура просмотрщика: ◀️ / ▶️ по страницам, обновить, назад."""
     builder = InlineKeyboardBuilder()
-    safe_index = clamp_bid_point_index(index, total)
+    total_pages = bid_point_viewer_page_count(total_points, page_size)
+    safe_page = clamp_bid_point_page(page, total_pages)
     nav_row: list[tuple[str, AutoShelfBidControlBidPoints]] = []
-    if safe_index > 0:
+    if safe_page > 0:
         nav_row.append(
             (
                 "◀️",
                 AutoShelfBidControlBidPoints(
                     adv_setting_original_id=adv_setting_original_id,
-                    index=safe_index - 1,
+                    index=safe_page - 1,
                 ),
             )
         )
-    if safe_index < total - 1:
+    if safe_page < total_pages - 1:
         nav_row.append(
             (
                 "▶️",
                 AutoShelfBidControlBidPoints(
                     adv_setting_original_id=adv_setting_original_id,
-                    index=safe_index + 1,
+                    index=safe_page + 1,
                 ),
             )
         )
@@ -134,7 +182,7 @@ def build_bid_point_viewer_keyboard(
         text="Обновить",
         callback_data=AutoShelfBidControlBidPoints(
             adv_setting_original_id=adv_setting_original_id,
-            index=safe_index,
+            index=safe_page,
         ).pack(),
     )
     builder.button(
@@ -174,7 +222,8 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Текущая ставка WB: {format_bid(view.actual_bid_minor, view.currency)}\n"
         f"Рабочая ставка main: {format_bid(view.current_main_bid_minor, view.currency)}\n"
         f"Тестовая ставка test: {format_bid(view.current_test_bid_minor, view.currency)}\n"
-        f"Лучшая ставка цикла: {format_bid(view.best_bid_minor, view.currency)}\n"
+        f"Лучшая ставка цикла: {format_bid(view.cycle_best_bid_minor, view.currency)}\n"
+        f"Лучшая глобальная ставка: {format_bid(view.global_best_bid_minor, view.currency)}\n"
         f"Следующая тестовая ставка: {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
         "Диапазон теста:\n"
         f"Минимальная ставка WB: {format_bid(view.min_bid_minor, view.currency)}\n"

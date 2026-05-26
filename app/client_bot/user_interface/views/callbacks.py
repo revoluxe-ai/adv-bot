@@ -273,7 +273,10 @@ class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
 
 
 class AutoShelfBidControlBidPoints(CallbackData, prefix="asbc_bp"):
-    """Навигация по покрытым ставкам текущего цикла (Telegram-просмотрщик)."""
+    """Навигация по покрытым ставкам текущего цикла (Telegram-просмотрщик).
+
+    ``index`` — номер страницы (0-based), до 10 строк на странице.
+    """
 
     adv_setting_original_id: int
     index: int = 0

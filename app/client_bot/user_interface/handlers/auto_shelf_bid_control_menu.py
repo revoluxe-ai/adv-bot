@@ -24,12 +24,13 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     BID_POINT_VIEWER_HEADER,
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    bid_point_viewer_page_count,
     build_bid_point_viewer_keyboard,
-    clamp_bid_point_index,
+    clamp_bid_point_page,
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
     render_bid_point_viewer_message,
-    select_covered_bid_points_for_cycle_viewer,
+    select_cycle_bid_points_for_viewer,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -55,14 +56,15 @@ async def _show_bid_point_viewer(
         True, если экран показан; False, если покрытий нет.
     """
     view = await service.build_view(adv_setting_original_id)
-    points = select_covered_bid_points_for_cycle_viewer(view.cycle_bid_points)
+    points = select_cycle_bid_points_for_viewer(view.cycle_bid_points)
     if not points:
         return False
-    safe_index = clamp_bid_point_index(index, len(points))
-    text = render_bid_point_viewer_message(safe_index, points)
+    total_pages = bid_point_viewer_page_count(len(points))
+    safe_page = clamp_bid_point_page(index, total_pages)
+    text = render_bid_point_viewer_message(safe_page, points)
     keyboard = build_bid_point_viewer_keyboard(
         adv_setting_original_id,
-        safe_index,
+        safe_page,
         len(points),
     )
     if callback.message is None:
@@ -154,7 +156,7 @@ async def auto_shelf_bid_control_bid_points_router(
         )
         if not shown and callback.message:
             await callback.message.answer(
-                "В текущем цикле пока нет покрытых ставок."
+                "В текущем цикле пока нет ставок с показами."
             )
     except AutoShelfBidControlTelegramError as exc:
         if callback.message:

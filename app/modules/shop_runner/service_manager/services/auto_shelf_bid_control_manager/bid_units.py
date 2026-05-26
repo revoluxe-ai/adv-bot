@@ -21,11 +21,23 @@ from zoneinfo import ZoneInfo
 KOPECKS_PER_RUB = 100
 # Часовой пояс отображения меток цикла в Telegram (хранение в PG — UTC).
 TELEGRAM_DISPLAY_TZ = "Europe/Moscow"
+# Строк покрытых ставок на одной странице просмотрщика «Покрытия цикла».
+TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE = 10
 
 # WB API: ставка в копейках (200 ₽ → 20000). 500 ₽ → 50000.
 DEFAULT_MAX_BID_MINOR = 50_000
 # Минимальный шаг между тестовыми ставками: 1 ₽ → 100 копеек.
 DEFAULT_MIN_BID_DISTANCE_MINOR = 100
+
+
+def cpc_from_totals(spend: float, clicks: int) -> float:
+    """CPC для отображения в UI: ``spend / max(clicks, 1)``.
+
+    Нулевые клики дают ``spend/1`` только в строках просмотрщика.
+    Выбор ``best``/``global_best`` в SQL требует только ``clicks > 0``
+    (см. get_best_bid_by_cart_cpa.sql); порог покрытия — только для ✅ в UI.
+    """
+    return spend / max(int(clicks), 1)
 
 
 def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:

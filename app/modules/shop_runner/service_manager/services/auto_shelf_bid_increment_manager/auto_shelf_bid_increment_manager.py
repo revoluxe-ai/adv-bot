@@ -7,7 +7,7 @@
 
 Ключевые принципы data quality контракта:
     1) Строгая атрибуция по контексту (bid/currency/mode/price):
-       при смене контекста интервал не пишется, выполняется только resync prev.
+       при смене контекста пишется boundary-интервал сегмента ``prev``, затем resync.
     2) Отрицательные/нулевые дельты не пишутся в intervals.
     3) После фазы отрицательных recommendations ставится resync-маркер:
        первый следующий валидный тик используется только для выравнивания prev.
@@ -17,7 +17,8 @@
        не зависел от внешнего источника цены.
     6) При partial-failure (`insert interval` OK, `persist prev` fail) пишется
        reason `persist_failed_after_interval`, поднимается resync-маркер; итоговая
-       аналитика защищается дедупом по `event_date + event_id`.
+       аналитика защищается дедупом по `event_date + event_id`. То же после
+       boundary-interval при смене контекста (`persist_failed_after_boundary_interval`).
     7) Bucket агрегации для intervals/lock — 15 минут (общий BucketCalculator),
        даже если корутина запускается чаще (примерно раз в 5 минут).
 """
@@ -354,11 +355,32 @@ class AutoShelfBidIncrementManager:
                 current_snapshot,
             )
             if context_changed:
-                # Контракт context change (README п.1, «Для ревью» п.1):
-                # boundary-дельта между сегментами намеренно НЕ пишется в interval —
-                # только resync prev под новый bid/mode/price. Это не потеря данных
-                # по ошибке, а trade-off «строгая атрибуция > полнота интервалов».
-                await self._last_state_manager.persist(current_snapshot)
+                await self._flush_boundary_interval_on_context_change(
+                    nmid=nmid,
+                    prev_snapshot=prev_snapshot,
+                    current_snapshot=current_snapshot,
+                    bucket_start=bucket_start,
+                )
+                try:
+                    await self._last_state_manager.persist(current_snapshot)
+                except Exception:
+                    # Как в success-path: interval (boundary) уже мог попасть в CH,
+                    # prev не обновлён — без resync следующий тик снова увидит
+                    # context_changed и посчитает дельту от stale prev (overcount).
+                    await self._last_state_manager.mark_resync_required(nmid)
+                    self._log_contract_event(
+                        "auto_shelf_bid_persist_failed_after_boundary_interval",
+                        reason="persist_failed_after_boundary_interval",
+                        nmid=nmid,
+                        mode=current_snapshot.mode,
+                        bid_minor=current_snapshot.bid_minor,
+                        currency=current_snapshot.currency,
+                        price_minor=current_snapshot.price_minor,
+                        price_currency=current_snapshot.price_currency,
+                        bucket_start=bucket_start,
+                        level=logging.WARNING,
+                    )
+                    raise
                 self._log_contract_event(
                     "auto_shelf_bid_context_changed_resync",
                     reason="context_changed_resync",
@@ -482,6 +504,81 @@ class AutoShelfBidIncrementManager:
         finally:
             await self._lock_manager.release(lock_key, lock_value)
 
+    async def _flush_boundary_interval_on_context_change(
+        self,
+        *,
+        nmid: int,
+        prev_snapshot: AutoShelfBidSnapshot,
+        current_snapshot: AutoShelfBidSnapshot,
+        bucket_start: datetime,
+    ) -> None:
+        """Закрыть сегмент ``prev``: дельта кумулятивов → interval с контекстом ``prev``.
+
+        Метрики (в т.ч. корзины), накопленные до смены bid/mode/price, не теряются.
+        При отрицательной/нулевой дельте interval не пишется (как в обычном тике).
+        """
+        delta = current_snapshot.delta(prev_snapshot)
+        if delta.has_negative_values():
+            self._log_contract_event(
+                "auto_shelf_bid_boundary_negative_delta_skipped",
+                reason="boundary_negative_delta_skipped",
+                nmid=nmid,
+                mode=prev_snapshot.mode,
+                bid_minor=prev_snapshot.bid_minor,
+                currency=prev_snapshot.currency,
+                price_minor=prev_snapshot.price_minor,
+                price_currency=prev_snapshot.price_currency,
+                bucket_start=bucket_start,
+                level=logging.WARNING,
+            )
+            return
+        if delta.nonzero_count() == 0:
+            self._log_contract_event(
+                "auto_shelf_bid_boundary_zero_delta_skipped",
+                reason="boundary_zero_delta_skipped",
+                nmid=nmid,
+                mode=prev_snapshot.mode,
+                bid_minor=prev_snapshot.bid_minor,
+                currency=prev_snapshot.currency,
+                price_minor=prev_snapshot.price_minor,
+                price_currency=prev_snapshot.price_currency,
+                bucket_start=bucket_start,
+            )
+            return
+        row = AutoShelfBidIntervalRow(
+            event_date=current_snapshot.src_ts.date(),
+            event_id=AutoShelfBidSnapshot.boundary_closure_event_id(
+                prev_snapshot,
+                current_snapshot,
+            ),
+            src_ts=current_snapshot.src_ts,
+            bucket_start=current_snapshot.bucket_start,
+            version=current_snapshot.version,
+            nmid=prev_snapshot.nmid,
+            mode=prev_snapshot.mode,
+            bid_minor=prev_snapshot.bid_minor,
+            currency=prev_snapshot.currency,
+            price_minor=prev_snapshot.price_minor,
+            price_currency=prev_snapshot.price_currency,
+            delta_impressions=delta.delta_impressions,
+            delta_clicks=delta.delta_clicks,
+            delta_carts=delta.delta_carts,
+            delta_orders=delta.delta_orders,
+            delta_spend=delta.delta_spend,
+        )
+        await self._writer.insert_interval(row)
+        self._log_contract_event(
+            "auto_shelf_bid_context_changed_boundary_flush",
+            reason="context_changed_boundary_flush",
+            nmid=nmid,
+            mode=prev_snapshot.mode,
+            bid_minor=prev_snapshot.bid_minor,
+            currency=prev_snapshot.currency,
+            price_minor=prev_snapshot.price_minor,
+            price_currency=prev_snapshot.price_currency,
+            bucket_start=bucket_start,
+        )
+
     @staticmethod
     def _build_lock_key(shop_id: uuid.UUID, nmid: int, bucket_start: datetime) -> str:
         """Ключ Redis-lock на shop + nmid + 15-минутный bucket."""
@@ -495,9 +592,8 @@ class AutoShelfBidIncrementManager:
     ) -> tuple[bool, list[str]]:
         """Проверить смену контекста наблюдения до расчета дельты.
 
-        При смене bid/mode/price вызывающий код НЕ пишет interval — только resync prev.
-        Это намеренно: boundary-дельта между сегментами не атрибутируется к новому
-        контексту (строгая атрибуция важнее полноты интервалов). См. README п.1.
+        При смене bid/mode/price вызывающий код пишет boundary-interval для ``prev``,
+        затем resync prev под новый контекст. См. README п.1.
         """
         fields = (
             "bid_minor",

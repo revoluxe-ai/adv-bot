@@ -8,7 +8,10 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class BidPointStatsDTO:
-    """Статистика по одной точке ставки для отображения в Telegram."""
+    """Статистика по одной точке ставки для отображения в Telegram.
+
+    ``cart_cpa`` — CPC score (не CPA корзины), см. ``BidStatsDTO.cart_cpa``.
+    """
 
     bid_minor: int  # копейки (как в CH auto_shelf_bid_intervals)
     currency: str
@@ -43,7 +46,8 @@ class AutoShelfBidControlViewDTO:
     max_bid_minor: int | None  # копейки, настройка пользователя
     current_main_bid_minor: int | None  # копейки
     current_test_bid_minor: int | None  # копейки
-    best_bid_minor: int | None  # копейки
+    cycle_best_bid_minor: int | None  # копейки, лучший CPC в текущем цикле
+    global_best_bid_minor: int | None  # копейки, min CPC текущий ∪ предыдущий цикл
     next_test_bid_minor: int | None  # копейки
     currency: str
     current_mode: str | None

@@ -328,7 +328,7 @@ async def test_negative_delta_skips_interval_and_persists_prev() -> None:
 
 
 @pytest.mark.asyncio
-async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
+async def test_context_change_by_bid_flushes_boundary_to_prev_context() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
@@ -351,8 +351,42 @@ async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
 
     await manager.update(_build_adv([123]))
 
-    writer.insert_interval.assert_not_awaited()
+    writer.insert_interval.assert_awaited_once()
     state_manager.persist.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    assert inserted_row.bid_minor == 1200
+    assert inserted_row.mode == "main"
+    assert inserted_row.delta_impressions == 10
+    assert inserted_row.delta_carts == 1
+    assert inserted_row.delta_spend == 10.0
+
+
+@pytest.mark.asyncio
+async def test_boundary_flush_then_persist_fail_marks_resync_and_prevents_second_boundary_interval() -> None:
+    manager, repository, writer, state_manager = _build_manager()
+    repository.fetch_total_auto_stat = AsyncMock(
+        side_effect=[
+            AutoShelfRawStat(130, 13, 4, 2, 60.0),
+            AutoShelfRawStat(140, 14, 5, 2, 70.0),
+        ]
+    )
+    repository.fetch_keyword_stat = AsyncMock(return_value=AutoShelfRawStat(30, 3, 1, 1, 10.0))
+    repository.fetch_current_auto_common_bid = AsyncMock(return_value=1300)
+    repository.get_current_mode = AsyncMock(return_value="main")
+    prev = _build_snapshot(123, impressions=90, clicks=8, carts=2, orders=0, spend=40.0)
+    prev = prev.model_copy(update={"bid_minor": 1200})
+    state_manager.get.return_value = (prev, "redis")
+    state_manager.persist = AsyncMock(side_effect=[RuntimeError("persist failed"), None])
+    state_manager.is_resync_required = AsyncMock(side_effect=[False, True])
+
+    await manager.update(_build_adv([123]))
+    await manager.update(_build_adv([123]))
+
+    # 1-й тик: boundary interval вставлен, persist упал.
+    # 2-й тик: resync-only, без повторного boundary flush.
+    writer.insert_interval.assert_awaited_once()
+    state_manager.mark_resync_required.assert_awaited_once_with(123)
+    state_manager.clear_resync_required.assert_awaited_once_with(123)
 
 
 @pytest.mark.asyncio

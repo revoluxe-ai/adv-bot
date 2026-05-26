@@ -11,6 +11,7 @@ from clickhouse_connect.driver.query import QueryResult
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
+from .bid_units import cpc_from_totals
 from .dto import BidStatsDTO
 
 
@@ -32,8 +33,8 @@ class AutoShelfBidControlAnalyticsRepository:
         carts = int(row["carts"])
         orders = int(row["orders"])
         spend = float(row["spend"])
-        # 0 корзин → 1 в знаменателе (как в get_best_bid_by_cart_cpa.sql).
-        cart_cpa = spend / max(carts, 1)
+        # cart_cpa в DTO = CPC score (имя поля легаси, см. BidStatsDTO).
+        cart_cpa = cpc_from_totals(spend, clicks)
         ctr = (clicks / impressions) if impressions > 0 else None
         cart_cr = (carts / clicks) if clicks > 0 else None
         last_raw = row.get("last_interval_at")
@@ -68,12 +69,15 @@ class AutoShelfBidControlAnalyticsRepository:
         currency: str,
         mode: str | None = None,
         bid_minor: int | None = None,
+        *,
+        to_ts: datetime | None = None,
     ) -> list[BidStatsDTO]:
         """Агрегаты по bid_minor (все mode на одной ставке), read-time dedup."""
         query = self._load_sql("get_bid_stats_dedup.sql")
         params = {
             "nmid": nmid,
             "from_ts": from_ts,
+            "to_ts": to_ts,
             "currency": currency,
             "mode": mode,
             "bid_minor": bid_minor,
@@ -121,13 +125,25 @@ class AutoShelfBidControlAnalyticsRepository:
         nmid: int,
         from_ts: datetime,
         currency: str,
+        *,
+        mode: str | None = None,
+        to_ts: datetime | None = None,
+        min_impressions: int | None = None,
     ) -> BidStatsDTO | None:
-        """Лучшая ставка: минимальный cart_cpa (0 корзин → делитель 1)."""
+        """Лучшая ставка: min CPC ``spend/clicks`` при ``impressions > 0``, ``clicks > 0``.
+
+        Args:
+            min_impressions: не используется в control (всегда ``None``); оставлен
+                для совместимости SQL-шаблона.
+        """
         query = self._load_sql("get_best_bid_by_cart_cpa.sql")
         params = {
             "nmid": nmid,
             "from_ts": from_ts,
+            "to_ts": to_ts,
             "currency": currency,
+            "mode": mode,
+            "min_impressions": min_impressions,
         }
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:

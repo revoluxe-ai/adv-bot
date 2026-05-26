@@ -2,13 +2,16 @@
 -- get_best_bid_by_cart_cpa.sql
 -- ============================================================================
 -- Назначение:
---   Лучшая ставка (минимальный cart_cpa) по точке bid_minor.
---   При carts=0 в знаменателе 1 корзина: spend / greatest(carts, 1).
---   Метрики суммируются по всем mode на одной ставке.
+--   Лучшая ставка: минимальный CPC = spend / clicks.
+--   Участвуют bid_minor с impressions > 0 и clicks > 0 (без порога покрытия).
+--   %(mode)s (nullable) — например ``test`` для лучшей тестовой ставки цикла.
 --
 -- Таблица: default_db.auto_shelf_bid_intervals
 -- Параметры:
 --   %(nmid)s, %(from_ts)s, %(currency)s
+--   %(to_ts)s (nullable) — верхняя граница ``src_ts`` (предыдущий цикл)
+--   %(min_impressions)s — legacy, не передаём: NULL → без порога по показам
+--   %(mode)s (nullable)
 -- Вызывается:
 --   AutoShelfBidControlAnalyticsRepository.get_best_bid_by_cart_cpa()
 -- ============================================================================
@@ -50,10 +53,14 @@ FROM
         WHERE i.nmid = %(nmid)s
           AND i.src_ts >= %(from_ts)s
           AND i.currency = %(currency)s
+          AND (%(to_ts)s IS NULL OR i.src_ts < %(to_ts)s)
         GROUP BY event_date, event_id
     ) AS dedup
+    WHERE (%(mode)s IS NULL OR dedup.mode = %(mode)s)
     GROUP BY dedup.bid_minor, dedup.currency
 ) AS stats
 WHERE stats.impressions > 0
-ORDER BY (stats.spend / greatest(stats.carts, 1)) ASC, stats.bid_minor ASC
+  AND (%(min_impressions)s IS NULL OR stats.impressions >= %(min_impressions)s)
+  AND stats.clicks > 0
+ORDER BY (stats.spend / stats.clicks) ASC, stats.bid_minor ASC
 LIMIT 1
