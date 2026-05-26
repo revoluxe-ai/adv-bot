@@ -781,9 +781,11 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
             )
             result = await session.execute(stmt)
             keyword_setting = result.scalar()
+            created = False
             if keyword_setting:
                 keyword_setting.relevant = True
             else:
+                created = True
                 adv_keyword = AdvKeyword(
                     text=text,
                     adv_setting_id=adv_setting_id,
@@ -800,13 +802,21 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                 keyword_setting.relevant = True
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
+            # Sync mode только при смене hard_status (ЧС→авто) или для нового ключа;
+            # иначе сбрасывается лестница V3 у БС (OPTIMUM/MAX → MIN_CPA).
             if keyword_setting.hard_status == 0:
                 keyword_setting.hard_status = 1
-            _ = sync_keyword_setting_mode_for_v3(
-                keyword_setting,
-                automatic_version=adv.automatic_version,
-                hard_status_override=int(keyword_setting.hard_status),
-            )
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
+            elif created:
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
         await session.commit()
 
 
