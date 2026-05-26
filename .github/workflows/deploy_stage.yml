@@ -41,3 +41,6 @@ jobs:
             -t ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
             -t ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.LATEST_TAG }} \
             -f ${{ matrix.dockerfile }} .
+
+
+
