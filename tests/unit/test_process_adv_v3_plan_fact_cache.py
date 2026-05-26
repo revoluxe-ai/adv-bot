@@ -21,7 +21,16 @@ async def test_process_adv_v3_caches_plan_fact_when_state_unknown() -> None:
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
 
+    async def _passthrough_phase0(
+        _adv: object, *, keywords: list[object], wb_shop_data_manager: object
+    ) -> list[object]:
+        return keywords
+
     with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            new=AsyncMock(side_effect=_passthrough_phase0),
+        ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(),
@@ -40,6 +49,7 @@ async def test_process_adv_v3_caches_plan_fact_when_state_unknown() -> None:
     ):
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=MagicMock())
         complex_adv.get_keywords = AsyncMock(return_value=[])
+        complex_adv.shelf_promotion_active = False
         await process_adv_v3(
             complex_adv,
             wb_shop_data_manager=MagicMock(),
@@ -62,7 +72,16 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     wb_manager = MagicMock()
     wb_manager.get_wb_advs_dto = AsyncMock(return_value=[])
 
+    async def _passthrough_phase0(
+        _adv: object, *, keywords: list[object], wb_shop_data_manager: object
+    ) -> list[object]:
+        return keywords
+
     with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            new=AsyncMock(side_effect=_passthrough_phase0),
+        ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(),
