@@ -113,6 +113,33 @@ def test_no_data_provisional_imputed_uses_worst() -> None:
 
 
 @pytest.mark.unit
+def test_no_target_place_data_is_treated_as_no_data() -> None:
+    data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
+    prepared = [
+        (
+            ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=data_prof, above_rec=True),
+            KeywordStrategyMode.OFF,
+            True,
+        ),
+        (
+            ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=True),
+            KeywordStrategyMode.OFF,
+            False,
+        ),
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert any(
+        c.ctx.keyword.keyword_setting_original_id == 2
+        and c.to_mode == KeywordStrategyMode.MAX_CONVERSION
+        and c.imputed
+        for c in candidates
+    )
+
+
+@pytest.mark.unit
 def test_confirmed_tier_before_imputed() -> None:
     prof_cheap = sample_profile(min_pay=5.0, high_pay=6.0)
     prof_expensive = sample_profile(min_pay=100.0, high_pay=200.0)

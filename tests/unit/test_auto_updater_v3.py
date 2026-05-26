@@ -342,7 +342,7 @@ def test_rollout_underperform_up_skips_black_list_hard_status() -> None:
 
 
 @pytest.mark.unit
-def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
+def test_rollout_underperform_level2_prefers_off_min_when_off_has_no_target_data() -> None:
     cheap_opt = [
         PositionProfilePoint(
             position=1,
@@ -389,8 +389,8 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].keyword_setting_id == 2
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit

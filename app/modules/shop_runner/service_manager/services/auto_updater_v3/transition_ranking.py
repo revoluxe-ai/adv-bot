@@ -225,6 +225,13 @@ def _resolve_state_cost(
     return imputed, True
 
 
+def _has_valid_target_place_data(
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> bool:
+    """Есть ли у ключа валидный target-place профиль хотя бы для одного режима."""
+    return any(mc.is_valid for mc in catalog.values())
+
+
 def collect_transition_candidates(
     prepared: _PreparedList,
     *,
@@ -249,7 +256,11 @@ def collect_transition_candidates(
             ctx.keyword.above_rec_conversion,
             traffic_mode=traffic_mode,
         )
-        use_imputation = tier == RecTier.PROVISIONAL_IMPUTED
+        # No-data: либо нет shelf-сигнала (above_rec=None), либо нет валидных target-place данных.
+        use_imputation = (
+            tier == RecTier.PROVISIONAL_IMPUTED
+            or not _has_valid_target_place_data(catalog)
+        )
 
         for to_mode in upper_target_modes(current_mode):
             target = _mode_to_target(to_mode)
@@ -259,7 +270,7 @@ def collect_transition_candidates(
             if mc is None:
                 continue
 
-            # Unproven без no-data: только MIN; при provisional imputation — M/O/C с worst-cost.
+            # Ограничение unproven действует только при наличии данных; no-data идёт через imputation.
             if to_mode != KeywordStrategyMode.MIN_CPA and not proven and not use_imputation:
                 continue
 
