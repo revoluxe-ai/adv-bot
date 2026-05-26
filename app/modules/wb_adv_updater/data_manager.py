@@ -672,6 +672,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 keyword_setting,
                 automatic_version=adv.automatic_version,
                 hard_status_override=2,
+                adv_strategy=adv.strategy,
             )
         await session.commit()
 
@@ -713,6 +714,7 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 keyword_setting,
                 automatic_version=adv.automatic_version,
                 hard_status_override=ALWAYS_ON,
+                adv_strategy=adv.strategy,
             )
         await session.commit()
 
