@@ -151,6 +151,7 @@ async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None
     complex_adv = SimpleNamespace(
         adv_id=777,
         auto_add_only_relevant_phrase=False,
+        auto_updater_version=2,
         get_keywords=AsyncMock(return_value=keywords),
     )
 

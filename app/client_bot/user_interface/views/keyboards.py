@@ -25,6 +25,12 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 
+from app.client_bot.user_interface.views.keyword_strategy_ui import (
+    keyword_strategy_letter,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
 )
@@ -378,14 +384,21 @@ def get_keywords_setting_keyboard(
             if target_place := keyword.target_place:
                 text += f'->{target_place}'
             else:
-                text += f'->Н>'
+                text += "->Н>"
         cpm: float | None = keyword.cpm
         if cpm is not None:
             cpm_text = str(int(cpm + 0.5))
         else:
             cpm_text = "?"
         text += f"({cpm_text})"
-        text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
+        status_block = (
+            f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)}"
+        )
+        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+            mode_letter = keyword_strategy_letter(keyword)
+            text += f"{status_block}[{mode_letter}] {keyword.text}"
+        else:
+            text += f"{status_block} {keyword.text}"
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
         pay_for_order = (
             str(round(keyword.pay_for_order, 2))

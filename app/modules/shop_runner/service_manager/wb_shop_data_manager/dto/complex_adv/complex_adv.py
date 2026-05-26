@@ -33,6 +33,13 @@ class GetKeywordsProvider(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class TrafficClicksDTO:
+    """Снимок кликов за сегодня для полочного режима (см. ``TrafficClicksManager.enrich``).
+
+    * ``shelf_clicks`` — полки/рекомендации в авто (не по ключам).
+    * ``organic_clicks`` — переходы на карточку вне суммарной рекламы комплекса.
+    * ``keyword_clicks`` — клики по ключевым фразам в авто (для расчёта полок).
+    """
+
     organic_clicks: int
     shelf_clicks: int
     keyword_clicks: int
@@ -250,6 +257,7 @@ class ComplexAdv:
 
     @property
     def rec_system_promotion_mode_active(self) -> bool:
+        """Режим «Полки» в настройках РК (``AdvSetting.rec_system_mode``)."""
         return self._adv_setting.rec_system_mode
 
     @property
@@ -259,6 +267,7 @@ class ComplexAdv:
 
     @property
     def traffic_clicks_dto(self) -> TrafficClicksDTO | None:
+        """Клики орг/пол за сегодня; None если полки выкл или enrich не вызывали / упал."""
         if not self.rec_system_promotion_mode_active:
             return None
         return self._traffic_clicks_dto
@@ -272,6 +281,15 @@ class ComplexAdv:
 
     @property
     def is_shelf_activation_allowed(self) -> bool:
+        """Полки доминируют по кликам за сегодня: ``shelf_clicks > organic_clicks``.
+
+        Не выбирает стратегию сам — используется в отборе кандидатов в БС
+        (``KeywordsManager``, ``WhiteListTrimmer``): при True в БС не берут ключи
+        с ``above_rec_conversion is False`` (узкий полочный пул).
+
+        При ``organic_clicks >= shelf_clicks`` или без DTO → False (широкий пул кандидатов).
+        См. также ``AdvStrategySelector``: при ``organic > shelf`` стратегия **MIN_CPO**.
+        """
         dto = self.traffic_clicks_dto
         if dto is None:
             return False
@@ -300,6 +318,14 @@ class ComplexAdv:
             return True
         return False
 
+    @property
+    def shelf_promotion_active(self) -> bool:
+        """rec_system (полки) + авто-кампания started — как во v2 для полочной фазы."""
+        return self.rec_system_promotion_mode_active and self.auto_adv_active_status
+
+    @property
+    def v3_rollout_aggressiveness(self) -> int:
+        return int(self._adv_setting.aggressiveness)
 
     @property
     def shop_id(self) -> str:

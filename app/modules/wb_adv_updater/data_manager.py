@@ -39,6 +39,9 @@ from app.modules.common_slaves.wildberries.models import (
     WBCategory,
     WBUserCabinet,
 )
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    sync_keyword_setting_mode_for_v3,
+)
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.utils import redis_manager
@@ -635,6 +638,9 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
 
 async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -662,11 +668,20 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
+            _ = sync_keyword_setting_mode_for_v3(
+                keyword_setting,
+                automatic_version=adv.automatic_version,
+                hard_status_override=2,
+                adv_strategy=adv.strategy,
+            )
         await session.commit()
 
 
 async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -695,6 +710,12 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 session.add(keyword_setting)
             keyword_setting.hard_status = ALWAYS_ON
             keyword_setting.relevant = True
+            _ = sync_keyword_setting_mode_for_v3(
+                keyword_setting,
+                automatic_version=adv.automatic_version,
+                hard_status_override=ALWAYS_ON,
+                adv_strategy=adv.strategy,
+            )
         await session.commit()
 
 
@@ -749,6 +770,9 @@ async def reset_relevant_phrases_templates(adv_setting_id: int) -> None:
 
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -759,9 +783,11 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
             )
             result = await session.execute(stmt)
             keyword_setting = result.scalar()
+            created = False
             if keyword_setting:
                 keyword_setting.relevant = True
             else:
+                created = True
                 adv_keyword = AdvKeyword(
                     text=text,
                     adv_setting_id=adv_setting_id,
@@ -778,8 +804,21 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                 keyword_setting.relevant = True
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
+            # Sync mode только при смене hard_status (ЧС→авто) или для нового ключа;
+            # иначе сбрасывается лестница V3 у БС (OPTIMUM/MAX → MIN_CPA).
             if keyword_setting.hard_status == 0:
                 keyword_setting.hard_status = 1
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
+            elif created:
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
         await session.commit()
 
 

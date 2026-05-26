@@ -27,6 +27,9 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    sync_keyword_setting_mode_for_v3,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
@@ -675,6 +678,11 @@ async def change_keyword_hard_status(
             adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
             if new_hard_status >= 0:
                 keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv_setting.automatic_version,
+                    hard_status_override=new_hard_status,
+                )
                 if new_hard_status == 2 or new_hard_status == const.ALWAYS_ON:
                     keyword_setting.relevant = True  # type: ignore[attr-defined]
                 elif new_hard_status == 0:

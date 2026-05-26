@@ -11,4 +11,5 @@ def keyword_setting_to_keyword_setting_dto(keyword_setting: KeywordSetting) -> K
         target_place=keyword_setting.target_place,
         relevant=keyword_setting.relevant,
         added_clicks=keyword_setting.added_clicks,
+        strategy_mode=keyword_setting.strategy_mode,
     )

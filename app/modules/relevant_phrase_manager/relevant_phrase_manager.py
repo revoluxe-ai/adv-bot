@@ -3,6 +3,9 @@ from collections.abc import Callable, Sequence
 from sqlalchemy import select, update
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    sync_keyword_setting_mode_for_v3,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .not_relevante_template import NotRelevantTemplate
@@ -55,7 +58,7 @@ class RelevantPhraseManager:
     async def update_black_phrases(self, keywords: list[str]) -> None:
         adv_setting_id = self._adv.id
         async with sm(read_only=False) as session:
-            await session.execute(
+            _ = await session.execute(
                 update(AdvSetting)
                 .where(AdvSetting.id == adv_setting_id)
                 .values(black_phrases=keywords)
@@ -79,13 +82,18 @@ class RelevantPhraseManager:
                 if not templator.is_relevant(text):
                     keyword_setting.hard_status = 0
                     keyword_setting.relevant = False
+                    _ = sync_keyword_setting_mode_for_v3(
+                        keyword_setting,
+                        automatic_version=self._adv.automatic_version,
+                        hard_status_override=0,
+                    )
 
             await session.commit()
 
     async def update_relevant_phrases_templates(self, keywords: list[str]) -> None:
         adv_setting_id = self._adv.id
         async with sm(read_only=False) as session:
-            await session.execute(
+            _ = await session.execute(
                 update(AdvSetting)
                 .where(AdvSetting.id == adv_setting_id)
                 .values(relevant_phrases=keywords)

@@ -8,6 +8,7 @@ from .automatic_version_ui import (
     normalize_automatic_version_ui,
     show_relevant_phrase_toggle,
 )
+from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
     TurnBot,
@@ -321,7 +322,8 @@ def get_adv_setting_keyboard(
 
     # Версии АвтоАпдейтера: отдельное сообщение с выбором V1/V2/V3 и «Назад»
     _ = builder.row(automatic_version_main_menu_button(adv_setting))
-
+    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",

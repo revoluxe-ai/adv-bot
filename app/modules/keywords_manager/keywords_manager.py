@@ -6,6 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_campaign,
+    strategy_mode_for_hard_status_write_v3,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus, KeywordStatusReason
@@ -17,8 +21,16 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 class KeywordsManager:
     @staticmethod
     async def get_candidates_to_white_list(complex_adv: ComplexAdv):
+        """Кандидаты в белый список (авто ``hard_status=1``, не GOOD, …).
+
+        Полочный фильтр (``rec_system`` + авто started + ``is_shelf_activation_allowed``):
+        отсекаются ключи с ``above_rec_conversion is False`` — остаются более «полочные».
+        При доминировании органики (``organic > shelf``) или без DTO этот фильтр **выключен** —
+        кандидаты шире, не только полочные (остальные условия фильтра сохраняются).
+
+        Сравнение кликов на стратегию MIN_CPO/MAX_CONV — в ``AdvStrategySelector``, не здесь.
+        """
         # TODO: Централизовать отбор кандидатов в БС
-        # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if keyword.reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID:
                 return False
@@ -75,15 +87,23 @@ class KeywordsManager:
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
         adv_setting = complex_adv.adv_setting
+        is_v3 = is_v3_campaign(adv_setting.automatic_version)
         flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
         for text in new_texts:
             hard_status, relevant = flags_for(text)
+            keyword_kwargs: dict[str, object] = {}
+            if is_v3:
+                keyword_kwargs["strategy_mode"] = strategy_mode_for_hard_status_write_v3(
+                    hard_status,
+                    adv_strategy=adv_setting.strategy,
+                )
             session.add(
                 KeywordSetting(
                     text=text,
                     hard_status=hard_status,
                     adv_setting_id=original_adv_id,
                     relevant=relevant,
+                    **keyword_kwargs,
                 )
             )
 

@@ -684,6 +684,13 @@ class AdvSetting(BaseTable):
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
+    aggressiveness: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3,
+        server_default=text("3"),
+        comment="AutoUpdater v3: 1=min_cpm_first / 2=optimal_first / 3=max_conv_first (only outside shelf phase)",
+    )
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
@@ -834,6 +841,7 @@ class KeywordSetting(BaseTable):
         nullable=False,
         default=KeywordStrategyMode.MIN_CPA,
         server_default=KeywordStrategyMode.MIN_CPA.name,
+        # V3: для hard_status 1/0/3 нужен OFF — выставляется в write-path и backfill при включении V3.
     )
     added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)

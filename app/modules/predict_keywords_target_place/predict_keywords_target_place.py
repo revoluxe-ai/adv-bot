@@ -1,7 +1,11 @@
 import logging
+import math
 
 from app.modules.bids_for_positions_manager.dto import BidPositionRow
-from ..bids_for_positions_manager.bids_for_positions_manager import BidsForPositionsManager
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from ..bids_for_positions_manager.bids_for_positions_manager import (
+    BidsForPositionsManager,
+)
 
 from ..common_slaves.wildberries.models.enums.strategy import Strategy
 from ...shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
@@ -32,25 +36,38 @@ class PredictKeywordsTargetPlace:
     async def get_keywords_target_position(
         self, adv: WBAdvDTO, positions_size: int
     ) -> dict[str, int]:
+        bids_with_convs: dict[
+            str, list[BidPosition]
+        ] = await self._load_bids_with_convs(adv, positions_size)
+        strategy = adv.strategy
+        return self._get_target_positions(bids_with_convs, strategy)
+
+    async def get_keyword_bid_profiles(
+        self, adv: WBAdvDTO, positions_size: int
+    ) -> dict[str, list[BidPosition]]:
+        """Per-keyword bid+conv curves (no strategy collapse). Same contract as mapping step in get_keywords_target_position."""
+        return await self._load_bids_with_convs(adv, positions_size)
+
+    async def _load_bids_with_convs(
+        self, adv: WBAdvDTO, positions_size: int
+    ) -> dict[str, list[BidPosition]]:
         assert positions_size <= 300, "Количество позиций не может быть больше 300"
         nmid = adv.main_nmid
         try:
             min_bid = adv.search_adv_min_bids[nmid]
         except KeyError:
             raise
-        convs_carts_to_views: dict[str, list[ConvCartToViewsOnPosition]] = (
-            await self._clickhouse_manager.get_conv_cart_to_views(
-                nmid=nmid, positions_size=positions_size
-            )
+        convs_carts_to_views: dict[
+            str, list[ConvCartToViewsOnPosition]
+        ] = await self._clickhouse_manager.get_conv_cart_to_views(
+            nmid=nmid, positions_size=positions_size
         )
-        rows: dict[str, list[BidPositionRow]] = (
-            await self._bids_for_positions_manager.get_bid_positions_normalized(
-                nmid=nmid, min_bid=min_bid, positions_size=positions_size
-            )
+        rows: dict[
+            str, list[BidPositionRow]
+        ] = await self._bids_for_positions_manager.get_bid_positions_normalized(
+            nmid=nmid, min_bid=min_bid, positions_size=positions_size
         )
-        bids_with_convs = self._map_rows_to_bid_positions(rows, convs_carts_to_views)
-        strategy = adv.strategy
-        return self._get_target_positions(bids_with_convs, strategy)
+        return self._map_rows_to_bid_positions(rows, convs_carts_to_views)
 
     def _map_rows_to_bid_positions(
         self,
@@ -105,6 +122,40 @@ class PredictKeywordsTargetPlace:
                 )
             result_target_positions[keyword] = max(1, best_position.position)
         return result_target_positions
+
+    def get_target_position_for_strategy_mode(
+        self,
+        positions: list[BidPosition],
+        strategy_mode: KeywordStrategyMode,
+    ) -> int | None:
+        """Per-keyword target position for V3 strategy ladder mode."""
+        if not positions:
+            logger.error("Пустой список позиций для прогноза целевой позиции")
+            return None
+
+        if strategy_mode == KeywordStrategyMode.MIN_CPA:
+            best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
+            return max(1, best_position.position)
+
+        if strategy_mode == KeywordStrategyMode.MAX_CONVERSION:
+            best_position = max(positions, key=lambda p: p.conv_carts_to_views or 0.0)
+            return max(1, best_position.position)
+
+        if strategy_mode == KeywordStrategyMode.OPTIMUM:
+            best_position = max(positions, key=self._optimum_score)
+            return max(1, best_position.position)
+
+        raise NotImplementedError(
+            f"Неизвестная стратегия выбора целевой позиции для key-mode: {strategy_mode}"
+        )
+
+    @staticmethod
+    def _optimum_score(position: BidPosition) -> float:
+        conv = float(position.conv_carts_to_views or 0.0)
+        pay = position.pay_for_cart
+        if not math.isfinite(pay) or pay <= 0:
+            return -1.0
+        return conv / (1.0 + pay)
 
     @staticmethod
     def _fill_positions_convs(
