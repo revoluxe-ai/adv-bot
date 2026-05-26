@@ -40,14 +40,6 @@ def cpc_from_totals(spend: float, clicks: int) -> float:
     return spend / max(int(clicks), 1)
 
 
-def cart_cpa_from_totals(spend: float, carts: int) -> float:
-    """CPA корзины: ``spend / max(carts, 1)`` (справочно, не для best bid).
-
-    Не путать с полем ``BidStatsDTO.cart_cpa`` — там временно лежит **CPC score**.
-    """
-    return spend / max(int(carts), 1)
-
-
 def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:
     """Начало отчётного дня в UTC (для пассивной аналитики полок)."""
     tz = ZoneInfo(tz_name)
