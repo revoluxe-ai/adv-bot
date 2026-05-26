@@ -49,7 +49,7 @@ async def test_process_adv_v3_caches_plan_fact_when_state_unknown() -> None:
 
 
 @pytest.mark.asyncio
-async def test_process_adv_v3_caches_plan_fact_when_no_wb_dto() -> None:
+async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 2
     complex_adv.adv_setting = MagicMock()
@@ -90,4 +90,4 @@ async def test_process_adv_v3_caches_plan_fact_when_no_wb_dto() -> None:
             wb_shop_data_manager=wb_manager,
         )
 
-    plan_fact.set_new_plan_fact.assert_awaited_once()
+    plan_fact.set_new_plan_fact.assert_not_awaited()

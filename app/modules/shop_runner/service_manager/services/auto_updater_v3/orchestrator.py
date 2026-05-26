@@ -66,7 +66,11 @@ async def process_adv_v3(
         return
 
     async def cache_plan_fact_snapshot() -> None:
-        """Зафиксировать plan/fact в Redis после цикла, иначе каждый раз — ложный «изменился»."""
+        """Зафиксировать plan/fact после решения по метрикам (state/действия).
+
+        Не вызывать при временных сбоях (нет WBAdvDTO): иначе следующие циклы
+        пропустят v3, пока plan/fact не сдвинутся, хотя DTO уже доступен.
+        """
         await plan_fact_change.set_new_plan_fact(plan, fact)
 
     state = detect_campaign_state(plan, fact)
@@ -84,8 +88,10 @@ async def process_adv_v3(
 
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
     if not wb_dtos:
-        logger.warning("[adv_id=%s] v3: no WBAdvDTO", complex_adv.adv_id)
-        await cache_plan_fact_snapshot()
+        logger.warning(
+            "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated (retry next cycle)",
+            complex_adv.adv_id,
+        )
         return
     dto = wb_dtos[0]
     positions_size = dto.min_target_position
