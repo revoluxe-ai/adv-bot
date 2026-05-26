@@ -19,22 +19,17 @@ _LEVEL_LABELS: Final[dict[int, str]] = {
     3: "Максимальная (по умолчанию)",
 }
 
-_AGGR_LETTERS: Final[dict[int, str]] = {
-    1: "М",
-    2: "С",
-    3: "В",
-}
+def v3_aggressiveness_level(level: int) -> str:
+    """Уровень агрессивности V3 (1–3) для кнопки и кратких подписей."""
+    if level in _LEVEL_LABELS:
+        return str(level)
+    return str(level)
 
 
-def v3_aggressiveness_letter(level: int) -> str:
-    """Одна буква агрессивности V3 для списка кнопок / шапки."""
-    return _AGGR_LETTERS.get(level, str(level))
-
-
-def v3_aggressiveness_detail(level: int) -> str:
-    """Буква и расшифровка агрессивности V3 (экран ключа / подменю)."""
+def v3_aggressiveness_caption(level: int) -> str:
+    """Уровень и расшифровка для страницы настроек РК."""
     label = _LEVEL_LABELS.get(level, str(level))
-    return f"{v3_aggressiveness_letter(level)} ({label})"
+    return f"{v3_aggressiveness_level(level)} — {label}"
 
 FSM_V3_ROLLOUT_PARENT_MESSAGE_ID = "v3_rollout_parent_message_id"
 FSM_V3_ROLLOUT_MENU_ADV_SETTING_ID = "v3_rollout_menu_adv_setting_id"
