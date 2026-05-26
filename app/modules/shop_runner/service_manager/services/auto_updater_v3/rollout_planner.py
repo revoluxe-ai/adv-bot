@@ -1,7 +1,8 @@
-"""RolloutPlanner: MIN→OPT→MAX — **послойная** стратегия (по уровню для всех).
+"""RolloutPlanner для non-shelf: pooled выбор UP с ограничением по aggressiveness.
 
-Вне полочной фазы и при ``organic > shelf`` в полочной фазе: ``plan_rollout_underperform_one``
-с ``strict`` слоями по ``aggressiveness``. Поштучная стратегия — в ``shelf_promotion_policy``.
+Вне полочной фазы ``UNDERPERFORM`` использует единый планировщик переходов вверх:
+из всех ``to_mode > current`` выбирается самый дешевый кандидат после фильтра
+по максимальному target-состоянию (``aggressiveness`` 1/2/3).
 
 При ``SalesStates.OVERSPEND`` (факт кампании выше ``max_pay_for_order``): сначала
 ``plan_overspend_force_off_over_max`` — все активные ключи с ``pay_for_order > max`` сразу в OFF;
@@ -31,6 +32,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
+    SelectionPolicy,
+    plan_one_up_by_policy,
 )
 
 if TYPE_CHECKING:
@@ -147,21 +150,16 @@ def plan_rollout_underperform_one(
     prepared: PreparedList,
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
-    """Single UP per cycle; cost-first по upper states; слои по aggressiveness."""
+    """Single UP per cycle with pooled ranking and aggressiveness target cap."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
         ShelfClickMode,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        plan_cost_first_up_one,
-    )
 
-    return plan_cost_first_up_one(
-        prepared,
+    policy = SelectionPolicy.from_aggressiveness(
         click_mode=ShelfClickMode.ORGANIC_DOMINANT,
-        layered=True,
         aggressiveness=aggressiveness,
-        piecewise_shelf=False,
     )
+    return plan_one_up_by_policy(prepared, policy=policy)
 
 
 def _keyword_exceeds_max_pfo(

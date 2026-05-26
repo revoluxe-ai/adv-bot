@@ -305,7 +305,7 @@ def test_rollout_underperform_level1_picks_cheapest_min_cost_tie_break_pfo() -> 
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
     assert actions[0].selection_log is not None
     assert actions[0].selection_log.to_mode == "MIN_CPA"
-    assert actions[0].reason == "layered_layer1_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
 
 
 @pytest.mark.unit
@@ -392,11 +392,11 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].keyword_setting_id == 1
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
-    assert actions[0].reason == "up_imputed_missing_target_matrix"
+    assert actions[0].keyword_setting_id == 2
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert actions[0].reason == "up_cost_first_pooled"
     assert actions[0].selection_log is not None
-    assert actions[0].selection_log.imputed is True
+    assert actions[0].selection_log.imputed is False
 
 
 @pytest.mark.unit
@@ -537,12 +537,12 @@ def test_shelf_underperform_organic_dominant_uses_layered_general_pool() -> None
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].keyword_setting_id == 2
-    assert actions[0].reason == "layered_layer1_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
 
 
 @pytest.mark.unit
-def test_shelf_underperform_shelf_dominant_ignores_aggressiveness() -> None:
-    """shelf >= organic → поштучная shelf; aggr не влияет."""
+def test_shelf_underperform_shelf_dominant_uses_aggr_target_cap() -> None:
+    """shelf >= organic: pooled-рейтинг, но target фильтруется aggressiveness."""
     prof = _sample_profile()
     pending = KeywordV3Context(
         keyword=_calc_kw(
@@ -578,7 +578,45 @@ def test_shelf_underperform_shelf_dominant_ignores_aggressiveness() -> None:
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].keyword_setting_id == 2
-    assert actions[0].reason == "shelf_piecewise_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
+
+
+@pytest.mark.unit
+def test_shelf_underperform_aggr1_blocks_targets_above_min() -> None:
+    prof = _sample_profile()
+    off_kw = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=1,
+            text="off",
+            mode=KeywordStrategyMode.OFF,
+            rating=1.0,
+            conv=0.08,
+            hard_status=2,
+        ),
+        position_profile=prof,
+    )
+    min_kw = KeywordV3Context(
+        keyword=_calc_kw(
+            ks_id=2,
+            text="min",
+            mode=KeywordStrategyMode.MIN_CPA,
+            rating=1.0,
+            conv=0.2,
+            hard_status=2,
+        ),
+        position_profile=prof,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.UNDERPERFORM,
+        contexts=[off_kw, min_kw],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        rollout_aggressiveness=1,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit
@@ -619,7 +657,7 @@ def test_shelf_underperform_piecewise_non_shelf_when_shelf_exhausted() -> None:
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].keyword_setting_id == 2
-    assert actions[0].reason == "shelf_piecewise_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
 
 
 @pytest.mark.unit
@@ -657,7 +695,7 @@ def test_shelf_underperform_unknown_click_mode_matches_shelf_dominant() -> None:
     )
     assert len(actions) == 1
     assert actions[0].keyword_setting_id == 2
-    assert actions[0].reason == "shelf_piecewise_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
 
 
 @pytest.mark.unit
@@ -695,7 +733,7 @@ def test_shelf_underperform_piecewise_tie_break_by_keyword_setting_id() -> None:
     )
     assert len(actions) == 1
     assert actions[0].keyword_setting_id == 1
-    assert actions[0].reason == "shelf_piecewise_cost_first"
+    assert actions[0].reason == "up_cost_first_pooled"
 
 
 @pytest.mark.unit

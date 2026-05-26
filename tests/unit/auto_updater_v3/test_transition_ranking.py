@@ -1,4 +1,4 @@
-"""Unit-тесты ``transition_ranking``: jump UP, state_cost, missing_target_matrix / missing_above_rec."""
+"""Unit-тесты ``transition_ranking``: pooled UP, rec-gate и aggr-фильтр."""
 
 from __future__ import annotations
 
@@ -12,11 +12,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     AggressionTargetMode,
     V3ActionType,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     RecTier,
+    SelectionPolicy,
     UpMoveKind,
     build_worst_per_state_costs,
     collect_transition_candidates,
@@ -24,13 +28,22 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     missing_target_matrix,
     move_kind_for,
     pick_one_up_cost_first,
+    plan_one_up_by_policy,
     plan_shelf_rec_false_cleanup_down,
     upper_target_modes,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
-    KeywordSettingDTO,
-)
 from tests.unit.auto_updater_v3.conftest import calc_kw, ctx, sample_profile
+
+
+def _policy(
+    *,
+    click_mode: ShelfClickMode,
+    aggressiveness: V3RolloutAggressiveness = V3RolloutAggressiveness.MAX,
+) -> SelectionPolicy:
+    return SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=aggressiveness,
+    )
 
 
 @pytest.mark.unit
@@ -59,10 +72,12 @@ def test_move_kind_off_to_max() -> None:
 @pytest.mark.unit
 def test_jump_off_collects_multiple_targets() -> None:
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
-    prepared = [(ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)]
+    prepared = [
+        (ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
+    ]
     candidates = collect_transition_candidates(
         prepared,
-        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
     )
     kinds = {c.move_kind for c in candidates}
     assert UpMoveKind.OFF_TO_MIN in kinds
@@ -80,21 +95,21 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
     ]
     candidates = collect_transition_candidates(
         prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
     assert candidates == []
 
 
 @pytest.mark.unit
 def test_missing_above_rec_allows_full_jump_on_shelf() -> None:
-    """missing_above_rec → tier ниже confirmed, jump по cost без ограничения MIN-only."""
+    """missing_above_rec -> tier ниже confirmed, jump по pooled-стоимости."""
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
     kw_ctx = ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=None)
     assert missing_above_rec(kw_ctx)
     prepared = [(kw_ctx, KeywordStrategyMode.OFF)]
     candidates = collect_transition_candidates(
         prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
     assert candidates
     assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in candidates)
@@ -117,11 +132,10 @@ def test_missing_target_matrix_imputed_uses_worst() -> None:
     assert AggressionTargetMode.MIN_CPA in worst
     candidates = collect_transition_candidates(
         prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
     imputed = [c for c in candidates if c.imputed]
-    assert len(imputed) >= 1
-    assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in imputed if missing_above_rec(no_matrix))
+    assert imputed
 
 
 @pytest.mark.unit
@@ -140,9 +154,9 @@ def test_confirmed_tier_before_missing_above_rec() -> None:
     ]
     candidates = collect_transition_candidates(
         prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
-    action = pick_one_up_cost_first(candidates, reason_prefix="test")
+    action = pick_one_up_cost_first(candidates)
     assert action is not None
     assert action.keyword_setting_id == 2
 
@@ -170,27 +184,34 @@ def test_shelf_false_cleanup_down_active() -> None:
 
 
 @pytest.mark.unit
-def test_plan_cost_first_up_one_sets_selection_log() -> None:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-        V3RolloutAggressiveness,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        plan_cost_first_up_one,
-    )
-
+def test_plan_one_up_by_policy_sets_selection_log() -> None:
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
     prepared = [(ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)]
-    actions = plan_cost_first_up_one(
+    actions = plan_one_up_by_policy(
         prepared,
-        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
-        layered=False,
-        aggressiveness=V3RolloutAggressiveness.MAX,
-        piecewise_shelf=False,
+        policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     log = actions[0].selection_log
     assert log is not None
-    assert log.pool_size == 1
+    assert log.pool_size == 3
     assert log.state_cost is not None
     assert log.from_mode == "OFF"
+
+
+@pytest.mark.unit
+def test_collect_candidates_filters_by_aggr_target_cap() -> None:
+    prof = sample_profile(min_pay=10.0, high_pay=15.0)
+    prepared = [
+        (ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        policy=_policy(
+            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+            aggressiveness=V3RolloutAggressiveness.MIN,
+        ),
+    )
+    assert candidates
+    assert all(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)

@@ -6,9 +6,9 @@ Signal matrix (v3):
 - Полочная фаза: ``rec_system_mode`` + авто ``started`` → ``plan_shelf_promotion_actions``
   с ``ShelfClickMode`` (organic/shelf клики). Иначе — ``RolloutPlanner`` + ``aggressiveness``.
 
-Стратегии активации (см. ``activation_strategy``):
-- **Поштучная** — один ключ за цикл (shelf → non-shelf при shelf>=organic).
-- **Послойная** — слои OFF→MIN → MIN→OPT → OPT→MAX при organic>shelf (aggr=MIN).
+Стратегия активации:
+- Единый pooled-UP в shelf/non-shelf с фильтром target по ``aggressiveness`` (1/2/3).
+- Rec-gate включается только в shelf-dominant режиме (``shelf>=organic``/``UNKNOWN``).
 
 При **OVERSPEND** (факт > ``max_pay_for_order``): сначала массовый ``FORCE_OFF`` для всех
 активных ключей с ``pay_for_order > max``; иначе один DOWN (``plan_rollout_down_one``).
@@ -76,6 +76,8 @@ def select_v3_actions(
         mode = stored_strategy_mode(ctx.keyword)
         prepared.append((ctx, mode))
 
+    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
+
     if shelf_promotion_active:
         click_mode = (
             shelf_click_mode
@@ -86,10 +88,9 @@ def select_v3_actions(
             prepared,
             state=state,
             click_mode=click_mode,
+            rollout_aggressiveness=aggr,
             plan_max_pay_for_order=plan_max_pay_for_order,
         )
-
-    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
 
     if state == SalesStates.OPTIMAL:
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]

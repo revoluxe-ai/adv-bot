@@ -1,10 +1,15 @@
-"""Cost-first UP: jump по upper states, rec-gate, worst-per-state imputation.
+"""Unified pooled UP ranking for V3 updater.
 
-Два независимых сигнала (не путать):
-- ``missing_target_matrix`` — нет валидной матрицы целевых мест M/O/C; стоимость из worst-per-state.
-- ``missing_above_rec`` — ``above_rec_conversion is None``; на полке provisional rec-pass, tier ниже confirmed.
+Контракт выбора UP:
+- формируем общий пул кандидатов ``to_mode > current_mode``;
+- в пул попадают только target-состояния, разрешённые ``aggressiveness``:
+  ``1 -> MIN``, ``2 -> MIN/OPT``, ``3 -> MIN/OPT/C``;
+- на полке rec-gate блокирует только ``above_rec=False`` (при ``shelf>=organic``/``UNKNOWN``);
+- сортировка в пуле: ``rec_tier -> state_cost -> pay_for_order -> keyword_id``.
 
-Сортировка: rec tier → state_cost → pay_for_order → keyword_id.
+Два независимых сигнала:
+- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state;
+- ``missing_above_rec`` — ``above_rec_conversion is None``; на полке tier ниже confirmed.
 """
 
 from __future__ import annotations
@@ -87,6 +92,38 @@ class TransitionCandidate:
     imputed: bool  # state_cost из worst-per-state при missing_target_matrix
 
 
+@dataclass(frozen=True)
+class SelectionPolicy:
+    """Policy-переключатели unified ranking (rec-gate + агрессивность)."""
+
+    click_mode: ShelfClickMode
+    max_target_mode: KeywordStrategyMode
+
+    @classmethod
+    def from_aggressiveness(
+        cls,
+        *,
+        click_mode: ShelfClickMode,
+        aggressiveness: V3RolloutAggressiveness,
+    ) -> "SelectionPolicy":
+        """Создать policy из click-mode и 1..3 aggressiveness."""
+        return cls(
+            click_mode=click_mode,
+            max_target_mode=max_target_mode_for_aggressiveness(aggressiveness),
+        )
+
+
+def max_target_mode_for_aggressiveness(
+    aggressiveness: V3RolloutAggressiveness,
+) -> KeywordStrategyMode:
+    """Map aggressiveness to maximal allowed target mode."""
+    if aggressiveness == V3RolloutAggressiveness.MIN:
+        return KeywordStrategyMode.MIN_CPA
+    if aggressiveness == V3RolloutAggressiveness.MID:
+        return KeywordStrategyMode.OPTIMUM
+    return KeywordStrategyMode.MAX_CONVERSION
+
+
 def _catalog_for_ctx(ctx: "KeywordV3Context") -> dict[AggressionTargetMode, ModeCandidate]:
     return build_mode_candidates(
         profile=ctx.position_profile,
@@ -148,6 +185,14 @@ def move_kind_for(
 
 def _target_mode_for_strategy(mode: KeywordStrategyMode) -> AggressionTargetMode:
     return AggressionTargetMode[mode.name]
+
+
+def _target_allowed(
+    *,
+    to_mode: KeywordStrategyMode,
+    max_target_mode: KeywordStrategyMode,
+) -> bool:
+    return int(to_mode) <= int(max_target_mode)
 
 
 def _has_valid_target_place_data(
@@ -234,7 +279,7 @@ def build_worst_per_state_costs(
 def collect_transition_candidates(
     prepared: PreparedList,
     *,
-    click_mode: ShelfClickMode,
+    policy: SelectionPolicy,
 ) -> list[TransitionCandidate]:
     """Все допустимые UP-переходы с метриками (jump по upper states)."""
     worst_costs = build_worst_per_state_costs(prepared)
@@ -247,7 +292,7 @@ def collect_transition_candidates(
             continue
         if not passes_rec_gate_for_up(
             ctx.keyword.above_rec_conversion,
-            click_mode=click_mode,
+            click_mode=policy.click_mode,
         ):
             continue
 
@@ -259,11 +304,16 @@ def collect_transition_candidates(
         use_matrix_imputation = missing_target_matrix(ctx)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
-            click_mode=click_mode,
+            click_mode=policy.click_mode,
         )
         pfo = float(ctx.keyword.pay_for_order or 0.0)
 
         for to_mode in upper_target_modes(current_mode):
+            if not _target_allowed(
+                to_mode=to_mode,
+                max_target_mode=policy.max_target_mode,
+            ):
+                continue
             target = _target_mode_for_strategy(to_mode)
             mc = catalog.get(target)
             if mc is None:
@@ -312,64 +362,19 @@ def _candidate_sort_key(c: TransitionCandidate) -> tuple[int, float, float, int]
 def pick_one_up_cost_first(
     candidates: list[TransitionCandidate],
     *,
-    reason_prefix: str,
+    reason_prefix: str = "up_cost_first_pooled",
 ) -> V3Action | None:
     """Один UP: минимальный state_cost, tie-break pay_for_order."""
     if not candidates:
         return None
     best = min(candidates, key=_candidate_sort_key)
-    return _candidate_to_action(best, reason_prefix=reason_prefix)
-
-
-def pick_one_up_layered(
-    candidates: list[TransitionCandidate],
-    *,
-    aggressiveness: V3RolloutAggressiveness,
-    reason_prefix: str,
-) -> V3Action | None:
-    """Слои OFF→MIN → MIN→OPT → OPT→MAX; внутри слоя — cost-first."""
-    layer_order = (
-        (UpMoveKind.OFF_TO_MIN,),
-        (UpMoveKind.MIN_TO_OPT,),
-        (UpMoveKind.OPT_TO_MAX,),
-    )
-    max_layer = min(int(aggressiveness), len(layer_order))
-    for layer_idx in range(max_layer):
-        kinds = layer_order[layer_idx]
-        layer_cands = [c for c in candidates if c.move_kind in kinds]
-        if not layer_cands:
-            continue
-        action = pick_one_up_cost_first(
-            layer_cands,
-            reason_prefix=f"{reason_prefix}_layer{layer_idx + 1}",
-        )
-        if action is not None:
-            return action
-    return None
-
-
-def pick_one_up_piecewise_shelf(
-    candidates: list[TransitionCandidate],
-) -> V3Action | None:
-    """Поштучная полка: OFF→MIN, затем MIN→OPT, затем OPT→MAX."""
-    steps = (
-        UpMoveKind.OFF_TO_MIN,
-        UpMoveKind.MIN_TO_OPT,
-        UpMoveKind.OPT_TO_MAX,
-    )
-    for kind in steps:
-        step_cands = [c for c in candidates if c.move_kind == kind]
-        if not step_cands:
-            continue
-        action = pick_one_up_cost_first(step_cands, reason_prefix="shelf_piecewise")
-        if action is not None:
-            return action
-    return None
+    return _candidate_to_action(best, pool_size=len(candidates), reason_prefix=reason_prefix)
 
 
 def _candidate_to_action(
     cand: TransitionCandidate,
     *,
+    pool_size: int,
     reason_prefix: str,
 ) -> V3Action:
     if cand.imputed:
@@ -377,14 +382,15 @@ def _candidate_to_action(
     elif cand.rec_tier == RecTier.MISSING_ABOVE_REC:
         reason = "up_missing_above_rec"
     else:
-        reason = f"{reason_prefix}_cost_first"
+        reason = reason_prefix
     return V3Action(
         action=V3ActionType.UP,
         keyword_setting_id=cand.keyword_setting_id,
         target_strategy_mode=cand.to_mode,
         reason=reason,
         selection_log=V3SelectionLog(
-            pool_size=1,
+            pool_size=pool_size,
+            pool_size_after_rec=pool_size,
             rec_tier=cand.rec_tier.value,
             state_cost=cand.state_cost,
             pay_for_order=cand.pay_for_order,
@@ -438,16 +444,13 @@ def plan_shelf_rec_false_cleanup_down(
     ]
 
 
-def plan_cost_first_up_one(
+def plan_one_up_by_policy(
     prepared: PreparedList,
     *,
-    click_mode: ShelfClickMode,
-    layered: bool,
-    aggressiveness: V3RolloutAggressiveness,
-    piecewise_shelf: bool,
+    policy: SelectionPolicy,
 ) -> list[V3Action]:
-    """Один UP за цикл; выбор по transition_ranking."""
-    candidates = collect_transition_candidates(prepared, click_mode=click_mode)
+    """Unified pooled planner: один UP из общего пула кандидатов."""
+    candidates = collect_transition_candidates(prepared, policy=policy)
     if not candidates:
         return [
             V3Action(
@@ -456,22 +459,30 @@ def plan_cost_first_up_one(
             )
         ]
 
-    if piecewise_shelf:
-        action = pick_one_up_piecewise_shelf(candidates)
-    elif layered:
-        action = pick_one_up_layered(
-            candidates,
-            aggressiveness=aggressiveness,
-            reason_prefix="layered",
-        )
-    else:
-        action = pick_one_up_cost_first(candidates, reason_prefix="cost_first")
+    action = pick_one_up_cost_first(candidates, reason_prefix="up_cost_first_pooled")
 
     if action is None:
         return [
             V3Action(
                 action=V3ActionType.DO_NOTHING,
-                reason="no_valid_up_in_layers",
+                reason="no_valid_up_after_policy_filter",
             )
         ]
     return [action]
+
+
+def plan_cost_first_up_one(
+    prepared: PreparedList,
+    *,
+    click_mode: ShelfClickMode,
+    layered: bool,
+    aggressiveness: V3RolloutAggressiveness,
+    piecewise_shelf: bool,
+) -> list[V3Action]:
+    """Backward-compatible wrapper around unified pooled planner."""
+    _ = (layered, piecewise_shelf)  # deprecated knobs, kept for compatibility
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=aggressiveness,
+    )
+    return plan_one_up_by_policy(prepared, policy=policy)

@@ -8,6 +8,21 @@
 - **missing_target_matrix** — нет валидных M/O/C в профиле; `state_cost` из worst-per-state доноров.
 - **missing_above_rec** — `above_rec_conversion is None`; на полке provisional UP, tier ниже `confirmed`.
 
+## Unified pooled contract
+
+Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:
+- для каждого ключа берем все состояния строго выше текущего;
+- считаем `state_cost` для каждого допустимого target;
+- фильтруем target по `aggressiveness`:
+  - `1` -> только `MIN`,
+  - `2` -> `MIN/OPT`,
+  - `3` -> `MIN/OPT/C`;
+- выбираем один самый дешевый кандидат из общего пула.
+
+Rec-gate:
+- при `organic > shelf` — не применяется;
+- при `shelf >= organic` и `UNKNOWN` — отсекает только `above_rec=False`.
+
 Алерт: рост доли `reason=no_valid_up_after_rec_filter`.
 
 ## Shadow на 1–2 РК

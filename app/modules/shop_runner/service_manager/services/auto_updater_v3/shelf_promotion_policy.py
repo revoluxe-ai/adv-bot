@@ -1,13 +1,9 @@
-"""Полочная фаза V3: ``rec_system_mode`` + авто ``started``.
+"""Полочная фаза V3: unified pooled ranking + rec-gate policy.
 
-Почему стратегии отличаются: ``auto_updater_traffic_policy``.
-
-Decision matrix (UNDERPERFORM), механика выбора:
-- ``organic > shelf`` → **послойная** + aggr=MIN, cost-first по upper states.
-- ``shelf >= organic`` или DTO нет → **поштучная**: shelf pending, затем non-shelf;
-  ``aggressiveness`` (1/2/3) в этой ветке **не используется**.
-
-Отдельно от ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV).
+В ``UNDERPERFORM`` для полок используется то же pooled-ядро, что и вне полок.
+Различия:
+- rec-gate включается только при ``shelf>=organic``/``UNKNOWN``;
+- до ранжирования действует фильтр target-состояний по ``aggressiveness`` 1/2/3.
 """
 
 from __future__ import annotations
@@ -17,9 +13,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     SalesStates,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
-    ActivationStrategy,
     ShelfClickMode,
-    activation_strategy_for_shelf_underperform,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
@@ -34,7 +28,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
-    plan_cost_first_up_one,
+    SelectionPolicy,
+    plan_one_up_by_policy,
     plan_shelf_rec_false_cleanup_down,
 )
 
@@ -43,27 +38,17 @@ def _plan_underperform_shelf(
     prepared: PreparedList,
     *,
     click_mode: ShelfClickMode,
+    aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
     cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
     if cleanup is not None:
         return cleanup
 
-    strategy = activation_strategy_for_shelf_underperform(click_mode)
-    if strategy == ActivationStrategy.LAYERED:
-        return plan_cost_first_up_one(
-            prepared,
-            click_mode=click_mode,
-            layered=True,
-            aggressiveness=V3RolloutAggressiveness.MIN,
-            piecewise_shelf=False,
-        )
-    return plan_cost_first_up_one(
-        prepared,
+    policy = SelectionPolicy.from_aggressiveness(
         click_mode=click_mode,
-        layered=False,
-        aggressiveness=V3RolloutAggressiveness.MIN,
-        piecewise_shelf=True,
+        aggressiveness=aggressiveness,
     )
+    return plan_one_up_by_policy(prepared, policy=policy)
 
 
 def plan_shelf_promotion_actions(
@@ -71,9 +56,10 @@ def plan_shelf_promotion_actions(
     *,
     state: SalesStates,
     click_mode: ShelfClickMode,
+    rollout_aggressiveness: V3RolloutAggressiveness,
     plan_max_pay_for_order: float | None = None,
 ) -> list[V3Action]:
-    """Полочная фаза: UP/DOWN без 1–2–3 rollout; underperform по click_mode."""
+    """Полочная фаза: UP/DOWN + pooled UP с rec-gate и aggr-фильтром."""
     if state == SalesStates.OPTIMAL:
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]
 
@@ -88,6 +74,10 @@ def plan_shelf_promotion_actions(
         return plan_rollout_down_one(prepared, reason="stable")
 
     if state == SalesStates.UNDERPERFORM:
-        return _plan_underperform_shelf(prepared, click_mode=click_mode)
+        return _plan_underperform_shelf(
+            prepared,
+            click_mode=click_mode,
+            aggressiveness=rollout_aggressiveness,
+        )
 
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="unknown_state")]
