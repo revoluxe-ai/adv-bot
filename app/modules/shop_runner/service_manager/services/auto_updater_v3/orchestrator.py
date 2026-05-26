@@ -114,6 +114,7 @@ async def process_adv_v3(
         shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
         if complex_adv.shelf_promotion_active
         else None,
+        plan_max_pay_for_order=float(plan.max_pay_for_order),
     )
     await apply_v3_actions(actions)
 

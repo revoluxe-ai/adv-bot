@@ -145,6 +145,52 @@ async def test_apply_v3_actions_skips_down_when_hard_status_not_white_list(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_apply_v3_force_off_batch_sets_off_and_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    select_calls = 0
+
+    async def _execute(stmt: object) -> MagicMock:
+        nonlocal select_calls
+        sql = str(stmt)
+        if sql.startswith("SELECT"):
+            select_calls += 1
+            mode = (
+                KeywordStrategyMode.MAX_CONVERSION
+                if select_calls == 1
+                else KeywordStrategyMode.OPTIMUM
+            )
+            return _make_result((mode, 2))
+        return MagicMock()
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.applier.sm",
+        _patched_sm(session_cm),
+    )
+
+    await apply_v3_actions(
+        [
+            V3Action(action=V3ActionType.FORCE_OFF, keyword_setting_id=1, reason="t"),
+            V3Action(action=V3ActionType.FORCE_OFF, keyword_setting_id=2, reason="t"),
+        ]
+    )
+
+    update_stmts = _update_stmts_from_execute(session.execute)
+    assert len(update_stmts) == 2
+    for stmt in update_stmts:
+        params = _update_bind_params(stmt)
+        assert params["strategy_mode"] == KeywordStrategyMode.OFF
+        assert params["hard_status"] == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_apply_v3_down_to_off_sets_hard_status_auto(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

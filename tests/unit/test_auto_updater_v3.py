@@ -76,6 +76,11 @@ def _sample_profile() -> list[PositionProfilePoint]:
     ]
 
 
+def _conv_for_pay_for_order(target_pfo: float, *, cpm: int = 200) -> float:
+    """Подобрать conv при фиксированном CPM, чтобы pay_for_order ≈ target_pfo."""
+    return cpm * 1000.0 / (target_pfo * 1_000_000.0)
+
+
 def _calc_kw(
     *,
     ks_id: int,
@@ -88,6 +93,7 @@ def _calc_kw(
     status: KeywordStatus = KeywordStatus.GOOD,
     reason: KeywordStatusReason = KeywordStatusReason.WHITE_LIST,
     above_rec: bool | None = True,
+    cpm_set_bid: int = 200,
 ) -> CalculatedKeyword:
     stat = make_zero_keyword_stat(text).model_copy(
         update={"views": views, "clicks": 10, "orders": 2, "conv_views_to_orders": conv}
@@ -110,7 +116,7 @@ def _calc_kw(
         rating=rating,
         target_pay_for_order=None,
         above_rec_conversion=above_rec,
-        cpm_sources=KeywordCpmSources(cpm_set_bid=200),
+        cpm_sources=KeywordCpmSources(cpm_set_bid=cpm_set_bid),
     )
 
 
@@ -161,10 +167,104 @@ def test_select_overspend_single_down_most_expensive_first() -> None:
             KeywordV3Context(keyword=low, position_profile=prof),
         ],
         shelf_promotion_active=False,
+        plan_max_pay_for_order=10_000.0,
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].keyword_setting_id == 1
+
+
+@pytest.mark.unit
+def test_select_overspend_force_off_all_keys_above_max() -> None:
+    prof = _sample_profile()
+    over_a = _calc_kw(
+        ks_id=1,
+        text="a",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(150.0),
+    )
+    over_b = _calc_kw(
+        ks_id=2,
+        text="b",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(120.0),
+    )
+    under = _calc_kw(
+        ks_id=3,
+        text="c",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(50.0),
+    )
+    actions = select_v3_actions(
+        state=SalesStates.OVERSPEND,
+        contexts=[
+            KeywordV3Context(keyword=over_a, position_profile=prof),
+            KeywordV3Context(keyword=over_b, position_profile=prof),
+            KeywordV3Context(keyword=under, position_profile=prof),
+        ],
+        shelf_promotion_active=False,
+        plan_max_pay_for_order=100.0,
+    )
+    assert len(actions) == 2
+    assert all(a.action == V3ActionType.FORCE_OFF for a in actions)
+    assert {a.keyword_setting_id for a in actions} == {1, 2}
+    assert all(a.reason == "overspend_max_pfo" for a in actions)
+
+
+@pytest.mark.unit
+def test_select_overspend_skips_none_pay_for_order() -> None:
+    prof = _sample_profile()
+    no_pfo = _calc_kw(
+        ks_id=1,
+        text="no_pfo",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        rating=1.0,
+        conv=0.0,
+    )
+    assert no_pfo.pay_for_order is None
+    over = _calc_kw(
+        ks_id=2,
+        text="over",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(200.0),
+    )
+    actions = select_v3_actions(
+        state=SalesStates.OVERSPEND,
+        contexts=[
+            KeywordV3Context(keyword=no_pfo, position_profile=prof),
+            KeywordV3Context(keyword=over, position_profile=prof),
+        ],
+        shelf_promotion_active=False,
+        plan_max_pay_for_order=100.0,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].keyword_setting_id == 2
+
+
+@pytest.mark.unit
+def test_select_overspend_shelf_force_off_above_max() -> None:
+    prof = _sample_profile()
+    over = _calc_kw(
+        ks_id=1,
+        text="over",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(180.0),
+    )
+    actions = select_v3_actions(
+        state=SalesStates.OVERSPEND,
+        contexts=[KeywordV3Context(keyword=over, position_profile=prof)],
+        shelf_promotion_active=True,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        plan_max_pay_for_order=100.0,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
 
 
 @pytest.mark.unit
@@ -304,6 +404,7 @@ def test_rollout_down_skips_non_white_list_hard_status() -> None:
         state=SalesStates.OVERSPEND,
         contexts=[blocked, allowed],
         shelf_promotion_active=False,
+        plan_max_pay_for_order=10_000.0,
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN

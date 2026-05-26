@@ -29,6 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     V3RolloutAggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
     try_valid_rollout_up,
@@ -126,12 +127,17 @@ def plan_shelf_promotion_actions(
     *,
     state: SalesStates,
     click_mode: ShelfClickMode,
+    plan_max_pay_for_order: float | None = None,
 ) -> list[V3Action]:
     """Полочная фаза: UP/DOWN без 1–2–3 rollout; underperform по click_mode."""
     if state == SalesStates.OPTIMAL:
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]
 
     if state == SalesStates.OVERSPEND:
+        if plan_max_pay_for_order is not None:
+            return plan_overspend_actions(
+                prepared, max_pay_for_order=float(plan_max_pay_for_order)
+            )
         return plan_rollout_down_one(prepared, reason="overspend")
 
     if state == SalesStates.STABLE:
