@@ -7,6 +7,7 @@ import pytest
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     is_v3_campaign,
+    is_v3_keyword_eligible_for_cluster_bidding,
     is_v3_status_mode_consistent,
     repaired_strategy_mode_for_v3,
     strategy_mode_for_hard_status_write_v3,
@@ -87,6 +88,32 @@ def test_repaired_strategy_mode_for_v3_fixes_white_list_off_to_min() -> None:
             strategy_mode=KeywordStrategyMode.OFF,
         )
         == KeywordStrategyMode.MIN_CPA
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("hard_status", "strategy_mode", "expected"),
+    [
+        (1, KeywordStrategyMode.OFF, False),
+        (1, KeywordStrategyMode.MIN_CPA, False),
+        (2, KeywordStrategyMode.MIN_CPA, True),
+        (2, KeywordStrategyMode.OFF, False),
+        (4, KeywordStrategyMode.MIN_CPA, True),
+        (4, KeywordStrategyMode.OPTIMUM, False),
+    ],
+)
+def test_is_v3_keyword_eligible_for_cluster_bidding(
+    hard_status: int,
+    strategy_mode: KeywordStrategyMode,
+    expected: bool,
+) -> None:
+    assert (
+        is_v3_keyword_eligible_for_cluster_bidding(
+            hard_status=hard_status,
+            strategy_mode=strategy_mode,
+        )
+        is expected
     )
 
 

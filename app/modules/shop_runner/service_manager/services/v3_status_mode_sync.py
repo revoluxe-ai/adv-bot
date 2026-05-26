@@ -45,6 +45,27 @@ def strategy_mode_for_hard_status_write_v3(hard_status: int) -> KeywordStrategyM
     raise ValueError(f"Unsupported hard_status for V3 sync: {hard_status}")
 
 
+def is_v3_keyword_eligible_for_cluster_bidding(
+    *, hard_status: int, strategy_mode: KeywordStrategyMode
+) -> bool:
+    """Может ли ключ участвовать в кластерных торгах V3 (страховка по cache).
+
+    Требует согласованную пару ``hard_status`` / ``strategy_mode`` и активный режим
+    только у белого списка или фикс.фраз. Ключи в авто (1) с дефолтным MIN_CPA
+    не проходят.
+    """
+    if not is_v3_status_mode_consistent(
+        hard_status=hard_status, strategy_mode=strategy_mode
+    ):
+        return False
+    hs = int(hard_status)
+    if hs == _HARD_STATUS_WHITE_LIST:
+        return strategy_mode != KeywordStrategyMode.OFF
+    if hs == _HARD_STATUS_ALWAYS_ON:
+        return strategy_mode == KeywordStrategyMode.MIN_CPA
+    return False
+
+
 def is_v3_status_mode_consistent(
     *, hard_status: int, strategy_mode: KeywordStrategyMode
 ) -> bool:

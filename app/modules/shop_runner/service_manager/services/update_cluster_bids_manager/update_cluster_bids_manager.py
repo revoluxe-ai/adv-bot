@@ -10,7 +10,6 @@ from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.modules.predict_keywords_target_place.di import (
     PredictKeywordsTargetPlaceContainer,
 )
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -23,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     RedisKeywordBidderStatusManager,
 )
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_keyword_eligible_for_cluster_bidding,
     is_v3_status_mode_consistent,
 )
 from app.modules.cluster_bids_redis import (
@@ -360,7 +360,7 @@ class UpdateClusterBidsManager:
             return set()
         keywords: list[CalculatedKeyword] = keywords_maybe
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
-        # V3: ключи в OFF не участвуют в торгах (страховка от гонок с hard_status).
+        # V3: торги только у согласованных БС/фикс.фраз; авто+MIN_CPA и OFF отсекаются.
         if adv.auto_updater_version == 3:
             inconsistent = [
                 kw
@@ -380,7 +380,10 @@ class UpdateClusterBidsManager:
             keywords_good = [
                 kw
                 for kw in keywords_good
-                if kw.strategy_mode != KeywordStrategyMode.OFF
+                if is_v3_keyword_eligible_for_cluster_bidding(
+                    hard_status=int(kw.hard_status),
+                    strategy_mode=kw.strategy_mode,
+                )
             ]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
         matched_in_ch = [

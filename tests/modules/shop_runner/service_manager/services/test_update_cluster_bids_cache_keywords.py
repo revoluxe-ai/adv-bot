@@ -203,6 +203,7 @@ async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
 
     kw_on = MagicMock()
     kw_on.status = KeywordStatus.GOOD
+    kw_on.hard_status = 2
     kw_on.strategy_mode = KeywordStrategyMode.MIN_CPA
     kw_on.cluster_stat = MagicMock()
     kw_on.cluster_stat.text = "q_on"
@@ -210,14 +211,62 @@ async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
     kw_on.position = 2.0
     kw_on.cpm = 60.0
 
-    adv.get_keywords = AsyncMock(return_value=[kw_off, kw_on])
+    kw_auto_stale = MagicMock()
+    kw_auto_stale.status = KeywordStatus.GOOD
+    kw_auto_stale.hard_status = 1
+    kw_auto_stale.strategy_mode = KeywordStrategyMode.MIN_CPA
+    kw_auto_stale.cluster_stat = MagicMock()
+    kw_auto_stale.cluster_stat.text = "q_auto"
+    kw_auto_stale.text = "q_auto"
+    kw_auto_stale.position = 3.0
+    kw_auto_stale.cpm = 70.0
+
+    adv.get_keywords = AsyncMock(return_value=[kw_off, kw_on, kw_auto_stale])
 
     result = await manager._UpdateClusterBidsManager__get_calculate_data(
-        adv, {"q_off", "q_on"}
+        adv, {"q_off", "q_on", "q_auto"}
     )
     assert len(result) == 1
     only = next(iter(result))
     assert only.cluster == "q_on"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_calculate_data_v3_excludes_auto_with_non_off_mode() -> None:
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 10
+    adv.adv_id = 1
+    adv.auto_updater_version = 3
+    adv.nmids = [100]
+    adv.individual_keywords_target_place_mode = False
+    adv.target_place = 5
+    adv.max_user_cpm = 500
+    adv.bid_cpm_step = 10
+
+    kw_auto = MagicMock()
+    kw_auto.status = KeywordStatus.GOOD
+    kw_auto.hard_status = 1
+    kw_auto.strategy_mode = KeywordStrategyMode.MIN_CPA
+    kw_auto.cluster_stat = MagicMock()
+    kw_auto.cluster_stat.text = "q_auto"
+    kw_auto.text = "q_auto"
+    kw_auto.position = 1.0
+    kw_auto.cpm = 50.0
+
+    adv.get_keywords = AsyncMock(return_value=[kw_auto])
+
+    result = await manager._UpdateClusterBidsManager__get_calculate_data(
+        adv, {"q_auto"}
+    )
+    assert result == set()
 
 
 @pytest.mark.unit
