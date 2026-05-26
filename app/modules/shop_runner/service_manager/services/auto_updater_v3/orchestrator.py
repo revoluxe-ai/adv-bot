@@ -2,6 +2,10 @@
 
 Inputs: plan/fact (v2-style), ``SalesStates``, ``ComplexAdv.shelf_promotion_active``,
 ``aggressiveness`` (1–3, outside shelf). For shelf phase, traffic CH enrich runs here.
+
+Наблюдаемость: после цикла — ``v3_selection`` (pool, tier, state_cost, move) и
+``no_valid_up_after_rec_filter`` в ``transition_ranking``. Контроль на проде: см.
+``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
@@ -119,6 +123,25 @@ async def process_adv_v3(
     await apply_v3_actions(actions)
 
     await cache_plan_fact_snapshot()
+    for act in actions:
+        sel = act.selection_log
+        if sel is not None:
+            logger.info(
+                "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
+                "pool=%s pool_after_rec=%s tier=%s state_cost=%s %s->%s move=%s imputed=%s",
+                complex_adv.adv_id,
+                state.name,
+                act.action.value,
+                act.reason,
+                sel.pool_size,
+                sel.pool_size_after_rec,
+                sel.rec_tier,
+                sel.state_cost,
+                sel.from_mode,
+                sel.to_mode,
+                sel.move_kind,
+                sel.imputed,
+            )
     logger.info(
         "[adv_id=%s] v3: state=%s actions=%s",
         complex_adv.adv_id,

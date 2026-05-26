@@ -279,6 +279,20 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
 
     @staticmethod
+    def resolve_keyword_rating_mode(complex_adv: "ComplexAdv") -> KeywordRatingMode:
+        """Режим рейтинга для сортировки ключей; V3 всегда MIN_CPO."""
+        auto_ver = complex_adv.adv_setting.automatic_version
+        if auto_ver is None:
+            auto_ver = 2
+        if auto_ver == 3:
+            return KeywordRatingMode.BY_MIN_CPO
+        if complex_adv.strategy == Strategy.MIN_CPO:
+            return KeywordRatingMode.BY_MIN_CPO
+        if complex_adv.strategy == Strategy.MAX_CONV:
+            return KeywordRatingMode.BY_MAX_CONV
+        raise ValueError(f"Not implemented strategy: {complex_adv.strategy}")
+
+    @staticmethod
     def __create_pre_calculated_keywords(keyword_hard_statuses: list[KeywordHardStatus],
                                                stats: list[KeywordStat],
                                                complex_adv: 'ComplexAdv') \
@@ -286,12 +300,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         from .convertor import  keyword_setting_to_keyword_setting_dto
         text_to_stat = {stat.text: stat for stat in stats}
 
-        if complex_adv.strategy == Strategy.MIN_CPO:
-            rating_mode = KeywordRatingMode.BY_MIN_CPO
-        elif complex_adv.strategy == Strategy.MAX_CONV:
-            rating_mode = KeywordRatingMode.BY_MAX_CONV
-        else:
-            raise ValueError(f'Not implemented strategy: {complex_adv.strategy}')
+        rating_mode = CalculatedKeywordsManager.resolve_keyword_rating_mode(complex_adv)
 
         keywords: list[PreCalculatedKeyword] = []
         for keyword_hard_status in keyword_hard_statuses:

@@ -315,6 +315,18 @@ def get_advs_keyboard_with_paginator(
     return keyboard
 
 
+def sorting_keywords_for_v3(keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
+    """V3: дешёвые ключи сверху (``pay_for_order`` asc, tie-break ``keyword_setting_id``)."""
+
+    def _pay_sort_key(kw: CalculatedKeyword) -> tuple[float, int]:
+        pfo = kw.pay_for_order
+        pay = float("inf") if pfo is None else float(pfo)
+        ks_id = int(kw.keyword_setting_original_id or 0)
+        return (pay, ks_id)
+
+    return sorted(keywords, key=_pay_sort_key)
+
+
 def get_keywords_setting_keyboard(
     keywords: list[CalculatedKeyword],
     adv_setting: AdvSetting,
@@ -327,6 +339,7 @@ def get_keywords_setting_keyboard(
     image_mode: str = "graphic",
 ):
     from . import keyword_statuses_util as k_util
+
     def sorting_keywords(
         kws_: list[CalculatedKeyword], sort_mode_: str
     ) -> list[CalculatedKeyword]:
@@ -353,7 +366,10 @@ def get_keywords_setting_keyboard(
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
-    keywords = sorting_keywords(keywords, sort_mode)
+    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        keywords = sorting_keywords_for_v3(keywords)
+    else:
+        keywords = sorting_keywords(keywords, sort_mode)
 
     bottoms: list[list[InlineKeyboardButton]] = []
     for keyword in keywords[start_index:end_index]:

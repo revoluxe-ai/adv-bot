@@ -151,50 +151,21 @@ def plan_rollout_underperform_one(
     prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
-    """Single UP per cycle; conv order; layer policy by aggressiveness."""
-    offs = _off_entries(prepared)
-    off_actions: list[tuple[KeywordV3Context, KeywordStrategyMode, bool, V3Action]] = []
-    for ctx, mode, proven in offs:
-        act = try_valid_rollout_up(ctx, mode, proven)
-        if act is not None:
-            off_actions.append((ctx, mode, proven, act))
+    """Single UP per cycle; cost-first по upper states; слои по aggressiveness."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+        ShelfClickMode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        plan_cost_first_up_one,
+    )
 
-    actives = _active_entries(prepared)
-    active_actions: list[tuple[KeywordV3Context, KeywordStrategyMode, bool, V3Action]] = []
-    for ctx, mode, proven in actives:
-        if mode == KeywordStrategyMode.OFF:
-            continue
-        act = try_valid_rollout_up(ctx, mode, proven)
-        if act is not None:
-            active_actions.append((ctx, mode, proven, act))
-
-    off_min_count = len(off_actions)
-    strict = _strict_min_first(aggressiveness, off_min_count)
-
-    pools: list[list[tuple[KeywordV3Context, KeywordStrategyMode, bool, V3Action]]] = []
-    if strict:
-        if off_actions:
-            pools.append(off_actions)
-        else:
-            min_to_opt = [t for t in active_actions if _up_move_kind(t[1]) == "min_to_opt"]
-            if min_to_opt:
-                pools.append(min_to_opt)
-            else:
-                opt_to_max = [t for t in active_actions if _up_move_kind(t[1]) == "opt_to_max"]
-                if opt_to_max:
-                    pools.append(opt_to_max)
-    else:
-        merged = off_actions + active_actions
-        if merged:
-            pools.append(merged)
-
-    if not pools or not pools[0]:
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="underperform_no_up")]
-
-    pool = pools[0]
-    pool.sort(key=lambda t: _conv_sort_key(t[0]), reverse=True)
-    _ctx, _mode, _p, action = pool[0]
-    return [action]
+    return plan_cost_first_up_one(
+        prepared,
+        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        layered=True,
+        aggressiveness=aggressiveness,
+        piecewise_shelf=False,
+    )
 
 
 def _keyword_exceeds_max_pfo(

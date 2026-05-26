@@ -3,7 +3,7 @@
 Почему стратегии отличаются: ``auto_updater_traffic_policy``.
 
 Decision matrix (UNDERPERFORM), механика выбора:
-- ``organic > shelf`` → **послойная** + aggr=MIN, общий пул (без shelf-only).
+- ``organic > shelf`` → **послойная** + aggr=MIN, cost-first по upper states.
 - ``shelf >= organic`` или DTO нет → **поштучная**: shelf pending, затем non-shelf;
   ``aggressiveness`` (1/2/3) в этой ветке **не используется**.
 
@@ -33,12 +33,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     plan_overspend_actions,
     plan_rollout_down_one,
-    plan_rollout_underperform_one,
-    try_valid_rollout_up,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
-    KeywordStatus,
-    KeywordStatusReason,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    plan_cost_first_up_one,
+    plan_shelf_rec_false_cleanup_down,
 )
 
 if TYPE_CHECKING:
@@ -46,71 +44,7 @@ if TYPE_CHECKING:
         KeywordV3Context,
     )
 
-_HARD_STATUS_AUTO_MODE = 1
-
-_PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode, bool]
-_PreparedList = list[_PreparedEntry]
-_PoolEntry = tuple["KeywordV3Context", KeywordStrategyMode, bool, V3Action]
-
-
-def _is_shelf_pending_keyword(ctx: KeywordV3Context) -> bool:
-    kw = ctx.keyword
-    return (
-        kw.above_rec_conversion is True
-        and kw.hard_status == _HARD_STATUS_AUTO_MODE
-        and kw.status == KeywordStatus.BAD
-        and kw.reason != KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
-    )
-
-
-def _piecewise_sort_key(
-    entry: _PoolEntry,
-) -> tuple[float, int, str]:
-    ctx = entry[0]
-    conv = float(ctx.keyword.conv_views_to_orders)
-    ks_id = int(ctx.keyword.keyword_setting_original_id)
-    return (-conv, ks_id, ctx.keyword.text)
-
-
-def _collect_up_pool(
-    prepared: _PreparedList,
-    *,
-    include: bool,
-) -> list[_PoolEntry]:
-    pool: list[_PoolEntry] = []
-    for ctx, mode, proven in prepared:
-        if include != _is_shelf_pending_keyword(ctx):
-            continue
-        act = try_valid_rollout_up(ctx, mode, proven)
-        if act is not None:
-            pool.append((ctx, mode, proven, act))
-    return pool
-
-
-def _pick_one_piecewise_up(
-    pool: list[_PoolEntry],
-    *,
-    reason_prefix: str,
-) -> list[V3Action]:
-    if not pool:
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason=f"{reason_prefix}_no_up")]
-    pool.sort(key=_piecewise_sort_key)
-    action = pool[0][3]
-    return [
-        V3Action(
-            action=action.action,
-            keyword_setting_id=action.keyword_setting_id,
-            reason=reason_prefix,
-        )
-    ]
-
-
-def _plan_piecewise_shelf_then_non_shelf(prepared: _PreparedList) -> list[V3Action]:
-    shelf_pool = _collect_up_pool(prepared, include=True)
-    if shelf_pool:
-        return _pick_one_piecewise_up(shelf_pool, reason_prefix="piecewise_shelf")
-    non_shelf_pool = _collect_up_pool(prepared, include=False)
-    return _pick_one_piecewise_up(non_shelf_pool, reason_prefix="piecewise_non_shelf")
+_PreparedList = list[tuple["KeywordV3Context", KeywordStrategyMode, bool]]
 
 
 def _plan_underperform_shelf(
@@ -118,10 +52,26 @@ def _plan_underperform_shelf(
     *,
     click_mode: ShelfClickMode,
 ) -> list[V3Action]:
+    cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
+    if cleanup is not None:
+        return cleanup
+
     strategy = activation_strategy_for_shelf_underperform(click_mode)
     if strategy == ActivationStrategy.LAYERED:
-        return plan_rollout_underperform_one(prepared, V3RolloutAggressiveness.MIN)
-    return _plan_piecewise_shelf_then_non_shelf(prepared)
+        return plan_cost_first_up_one(
+            prepared,
+            click_mode=click_mode,
+            layered=True,
+            aggressiveness=V3RolloutAggressiveness.MIN,
+            piecewise_shelf=False,
+        )
+    return plan_cost_first_up_one(
+        prepared,
+        click_mode=click_mode,
+        layered=False,
+        aggressiveness=V3RolloutAggressiveness.MIN,
+        piecewise_shelf=True,
+    )
 
 
 def plan_shelf_promotion_actions(

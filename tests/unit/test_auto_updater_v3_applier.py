@@ -315,3 +315,43 @@ async def test_apply_v3_transfer_skips_when_hard_status_pair_invalid(
 
     assert sum(1 for sql in executed_sql if sql.startswith("UPDATE")) == 0
 
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_v3_jump_up_uses_target_strategy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _execute(stmt: object) -> MagicMock:
+        sql = str(stmt)
+        if sql.startswith("SELECT"):
+            return _make_result((KeywordStrategyMode.OFF, 2))
+        return MagicMock()
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.applier.sm",
+        _patched_sm(session_cm),
+    )
+
+    await apply_v3_actions(
+        [
+            V3Action(
+                action=V3ActionType.UP,
+                keyword_setting_id=1,
+                target_strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                reason="cost_first",
+            )
+        ]
+    )
+
+    update_stmts = _update_stmts_from_execute(session.execute)
+    assert len(update_stmts) == 1
+    params = _update_bind_params(update_stmts[0])
+    assert params["strategy_mode"] == KeywordStrategyMode.MAX_CONVERSION
+    assert params["hard_status"] == 2
+
