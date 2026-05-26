@@ -1,4 +1,4 @@
-"""Unit-тесты ``transition_ranking``: jump UP, state_cost, no-data imputation, rec-gate."""
+"""Unit-тесты ``transition_ranking``: jump UP, state_cost, missing_target_matrix / missing_above_rec."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     UpMoveKind,
     build_worst_per_state_costs,
     collect_transition_candidates,
+    missing_above_rec,
+    missing_target_matrix,
     move_kind_for,
     pick_one_up_cost_first,
     plan_shelf_rec_false_cleanup_down,
@@ -57,9 +59,7 @@ def test_move_kind_off_to_max() -> None:
 @pytest.mark.unit
 def test_jump_off_collects_multiple_targets() -> None:
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
-    prepared = [
-        (ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, True)
-    ]
+    prepared = [(ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)]
     candidates = collect_transition_candidates(
         prepared,
         click_mode=ShelfClickMode.ORGANIC_DOMINANT,
@@ -76,7 +76,6 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
         (
             ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=False),
             KeywordStrategyMode.OFF,
-            False,
         )
     ]
     candidates = collect_transition_candidates(
@@ -87,72 +86,56 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
 
 
 @pytest.mark.unit
-def test_no_data_provisional_imputed_uses_worst() -> None:
+def test_missing_above_rec_allows_full_jump_on_shelf() -> None:
+    """missing_above_rec → tier ниже confirmed, jump по cost без ограничения MIN-only."""
+    prof = sample_profile(min_pay=10.0, high_pay=15.0)
+    kw_ctx = ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=None)
+    assert missing_above_rec(kw_ctx)
+    prepared = [(kw_ctx, KeywordStrategyMode.OFF)]
+    candidates = collect_transition_candidates(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert candidates
+    assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in candidates)
+    assert any(c.to_mode == KeywordStrategyMode.MAX_CONVERSION for c in candidates)
+
+
+@pytest.mark.unit
+def test_missing_target_matrix_imputed_uses_worst() -> None:
     data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
+    no_matrix = ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=None)
     prepared = [
         (
             ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=data_prof, above_rec=True),
             KeywordStrategyMode.OFF,
-            False,
         ),
-        (
-            ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=None),
-            KeywordStrategyMode.OFF,
-            False,
-        ),
+        (no_matrix, KeywordStrategyMode.OFF),
     ]
+    assert missing_target_matrix(no_matrix)
     worst = build_worst_per_state_costs(prepared)
     assert AggressionTargetMode.MIN_CPA in worst
     candidates = collect_transition_candidates(
         prepared,
         click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
     )
-    imputed = [c for c in candidates if c.rec_tier == RecTier.PROVISIONAL_IMPUTED]
+    imputed = [c for c in candidates if c.imputed]
     assert len(imputed) >= 1
-    assert any(c.imputed for c in imputed)
+    assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in imputed if missing_above_rec(no_matrix))
 
 
 @pytest.mark.unit
-def test_no_target_place_data_is_treated_as_no_data() -> None:
-    data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
-    prepared = [
-        (
-            ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=data_prof, above_rec=True),
-            KeywordStrategyMode.OFF,
-            True,
-        ),
-        (
-            ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=True),
-            KeywordStrategyMode.OFF,
-            False,
-        ),
-    ]
-    candidates = collect_transition_candidates(
-        prepared,
-        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
-    )
-    assert any(
-        c.ctx.keyword.keyword_setting_original_id == 2
-        and c.to_mode == KeywordStrategyMode.MAX_CONVERSION
-        and c.imputed
-        for c in candidates
-    )
-
-
-@pytest.mark.unit
-def test_confirmed_tier_before_imputed() -> None:
+def test_confirmed_tier_before_missing_above_rec() -> None:
     prof_cheap = sample_profile(min_pay=5.0, high_pay=6.0)
     prof_expensive = sample_profile(min_pay=100.0, high_pay=200.0)
     prepared = [
         (
             ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof_expensive, above_rec=None),
             KeywordStrategyMode.OFF,
-            False,
         ),
         (
             ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=prof_cheap, above_rec=True),
             KeywordStrategyMode.OFF,
-            False,
         ),
     ]
     candidates = collect_transition_candidates(
@@ -176,9 +159,7 @@ def test_shelf_false_cleanup_down_active() -> None:
     )
     ks_dto = base.keyword_setting.model_copy(update={"hard_status": 2})
     kw = base.model_copy(update={"keyword_setting": ks_dto})
-    prepared = [
-        (KeywordV3Context(keyword=kw, position_profile=prof), KeywordStrategyMode.MIN_CPA, True)
-    ]
+    prepared = [(KeywordV3Context(keyword=kw, position_profile=prof), KeywordStrategyMode.MIN_CPA)]
     actions = plan_shelf_rec_false_cleanup_down(
         prepared,
         click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
@@ -198,9 +179,7 @@ def test_plan_cost_first_up_one_sets_selection_log() -> None:
     )
 
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
-    prepared = [
-        (ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, False)
-    ]
+    prepared = [(ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)]
     actions = plan_cost_first_up_one(
         prepared,
         click_mode=ShelfClickMode.ORGANIC_DOMINANT,

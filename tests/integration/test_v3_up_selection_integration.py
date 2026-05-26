@@ -65,8 +65,8 @@ def _ladder_profile() -> list[PositionProfilePoint]:
 def test_v3_underperform_cost_first_jump_via_selector() -> None:
     """E2E на уровне selector: один UP, target — режим с минимальным state_cost."""
     prof = _ladder_profile()
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]] = [
-        (ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, False)
+    prepared = [
+        (ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
     ]
     actions = select_v3_actions(
         state=SalesStates.UNDERPERFORM,
@@ -87,7 +87,7 @@ def test_v3_underperform_cost_first_jump_via_selector() -> None:
 def test_v3_plan_cost_first_organic_dominant() -> None:
     prof = _ladder_profile()
     prepared = [
-        (ctx(ks_id=7, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, False)
+        (ctx(ks_id=7, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
     ]
     actions = plan_cost_first_up_one(
         prepared,

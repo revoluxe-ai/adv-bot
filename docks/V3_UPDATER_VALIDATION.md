@@ -2,7 +2,11 @@
 
 ## Structured logs
 
-Строки `v3_selection` в orchestrator: `pool`, `pool_after_rec`, `tier`, `state_cost`, переход `from_mode->to_mode`, `move`, `imputed`.
+Строки `v3_selection` в orchestrator: `pool`, `tier` (`confirmed` / `missing_above_rec`), `state_cost`, переход `from_mode->to_mode`, `move`, `imputed` (worst-per-state при `missing_target_matrix`).
+
+Сигналы:
+- **missing_target_matrix** — нет валидных M/O/C в профиле; `state_cost` из worst-per-state доноров.
+- **missing_above_rec** — `above_rec_conversion is None`; на полке provisional UP, tier ниже `confirmed`.
 
 Алерт: рост доли `reason=no_valid_up_after_rec_filter`.
 

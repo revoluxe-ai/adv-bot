@@ -29,6 +29,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
     step_down,
     step_up,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
+)
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -63,16 +66,12 @@ def _down_sort_key(ctx: KeywordV3Context) -> tuple[float, float]:
     return (pay, rating)
 
 
-def _active_entries(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
-) -> list[tuple[KeywordV3Context, KeywordStrategyMode, bool]]:
-    return [(c, m, p) for c, m, p in prepared if m != KeywordStrategyMode.OFF]
+def _active_entries(prepared: PreparedList) -> PreparedList:
+    return [(c, m) for c, m in prepared if m != KeywordStrategyMode.OFF]
 
 
-def _off_entries(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
-) -> list[tuple[KeywordV3Context, KeywordStrategyMode, bool]]:
-    return [(c, m, p) for c, m, p in prepared if m == KeywordStrategyMode.OFF]
+def _off_entries(prepared: PreparedList) -> PreparedList:
+    return [(c, m) for c, m in prepared if m == KeywordStrategyMode.OFF]
 
 
 def _strict_min_first(aggr: V3RolloutAggressiveness, off_with_min_count: int) -> bool:
@@ -98,7 +97,6 @@ def _up_move_kind(
 def try_valid_rollout_up(
     ctx: KeywordV3Context,
     mode: KeywordStrategyMode,
-    proven: bool,
 ) -> V3Action | None:
     if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
         return None
@@ -117,8 +115,6 @@ def try_valid_rollout_up(
             reason="rollout_off_to_min",
         )
 
-    if not proven:
-        return None
     if mode == KeywordStrategyMode.MAX_CONVERSION:
         return None
     nxt = step_up(mode)
@@ -148,7 +144,7 @@ def try_valid_rollout_up(
 
 
 def plan_rollout_underperform_one(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    prepared: PreparedList,
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
     """Single UP per cycle; cost-first по upper states; слои по aggressiveness."""
@@ -181,7 +177,7 @@ def _keyword_exceeds_max_pfo(
 
 
 def plan_overspend_force_off_over_max(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    prepared: PreparedList,
     *,
     max_pay_for_order: float,
     reason: str = "overspend_max_pfo",
@@ -197,7 +193,7 @@ def plan_overspend_force_off_over_max(
         Список ``FORCE_OFF`` (может быть пустым).
     """
     actions: list[V3Action] = []
-    for ctx, mode, _proven in prepared:
+    for ctx, mode in prepared:
         if mode == KeywordStrategyMode.OFF:
             continue
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
@@ -218,7 +214,7 @@ def plan_overspend_force_off_over_max(
 
 
 def plan_overspend_actions(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    prepared: PreparedList,
     *,
     max_pay_for_order: float,
 ) -> list[V3Action]:
@@ -232,14 +228,14 @@ def plan_overspend_actions(
 
 
 def plan_rollout_down_one(
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    prepared: PreparedList,
     *,
     reason: str,
 ) -> list[V3Action]:
     """Single DOWN: highest pay_for_order first (expensive → cheap)."""
     actives = _active_entries(prepared)
     actives.sort(key=lambda t: _down_sort_key(t[0]), reverse=True)
-    for ctx, mode, _proven in actives:
+    for ctx, mode in actives:
         if int(ctx.keyword.hard_status) != _HARD_STATUS_WHITE_LIST:
             continue
         if mode == KeywordStrategyMode.OFF:

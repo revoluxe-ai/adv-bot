@@ -117,11 +117,5 @@ def build_mode_candidates(
         AggressionTargetMode.MAX_CONVERSION: max_conv,
     }
 
-
-def keyword_has_proven_ad_stats(kw: CalculatedKeyword, *, min_views: int = 30) -> bool:
-    """Enough traffic to treat keyword as proven for ladder promotions."""
-    return int(kw.views) >= min_views or int(kw.clicks) >= 5 or int(kw.orders) >= 1
-
-
 def stored_strategy_mode(kw: CalculatedKeyword) -> KeywordStrategyMode:
     return kw.keyword_setting.strategy_mode

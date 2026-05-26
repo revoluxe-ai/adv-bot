@@ -12,8 +12,6 @@ Decision matrix (UNDERPERFORM), механика выбора:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
@@ -35,20 +33,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     plan_rollout_down_one,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
     plan_cost_first_up_one,
     plan_shelf_rec_false_cleanup_down,
 )
 
-if TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-        KeywordV3Context,
-    )
-
-_PreparedList = list[tuple["KeywordV3Context", KeywordStrategyMode, bool]]
-
 
 def _plan_underperform_shelf(
-    prepared: _PreparedList,
+    prepared: PreparedList,
     *,
     click_mode: ShelfClickMode,
 ) -> list[V3Action]:
@@ -75,7 +67,7 @@ def _plan_underperform_shelf(
 
 
 def plan_shelf_promotion_actions(
-    prepared: _PreparedList,
+    prepared: PreparedList,
     *,
     state: SalesStates,
     click_mode: ShelfClickMode,

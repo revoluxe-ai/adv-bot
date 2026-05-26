@@ -28,8 +28,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    keyword_has_proven_ad_stats,
     stored_strategy_mode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
@@ -69,11 +71,10 @@ def select_v3_actions(
     plan_max_pay_for_order: float | None = None,
 ) -> list[V3Action]:
     """Return planned mode changes for one cycle (OVERSPEND may return several FORCE_OFF)."""
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]] = []
+    prepared: PreparedList = []
     for ctx in contexts:
         mode = stored_strategy_mode(ctx.keyword)
-        proven = keyword_has_proven_ad_stats(ctx.keyword)
-        prepared.append((ctx, mode, proven))
+        prepared.append((ctx, mode))
 
     if shelf_promotion_active:
         click_mode = (
