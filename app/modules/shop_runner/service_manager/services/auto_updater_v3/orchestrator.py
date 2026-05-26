@@ -27,6 +27,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
+    resolve_keyword_bid_profile,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -100,7 +101,7 @@ async def process_adv_v3(
 
     contexts: list[KeywordV3Context] = []
     for kw in keywords:
-        bids = raw_profiles.get(kw.text) or raw_profiles.get(kw.text.lower())
+        bids = resolve_keyword_bid_profile(raw_profiles, kw.text)
         profile = profile_points_from_bid_positions(bids) if bids else None
         merged = kw.model_copy(update={"position_profile": profile})
         contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))

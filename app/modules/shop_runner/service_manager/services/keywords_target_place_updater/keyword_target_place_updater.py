@@ -6,6 +6,9 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
+    resolve_keyword_bid_profile,
+)
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -101,7 +104,7 @@ class KeywordTargetPlaceUpdater:
                         adv.adv_id,
                     )
                     continue
-                profile = bid_profiles.get(keyword.text.lower())
+                profile = resolve_keyword_bid_profile(bid_profiles, keyword.text)
                 if not profile:
                     logger.error(
                         "No bid profile for keyword %s, adv_id=%s; clearing target_place",

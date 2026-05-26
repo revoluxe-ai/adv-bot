@@ -154,3 +154,50 @@ async def test_set_new_target_places_v3_accepts_none_from_predictor(
 
     assert min_kw.target_place is None
     predictor.get_target_position_for_strategy_mode.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_new_target_places_v3_resolves_profile_with_mixed_case_ch_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CH может вернуть ключ в исходном регистре, в БД текст ключа — lower."""
+    predictor = AsyncMock()
+    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=4)
+    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
+
+    min_kw = SimpleNamespace(
+        text="kw_min",
+        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        target_place=None,
+    )
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.all.return_value = [min_kw]
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=fake_result)
+    session.commit = AsyncMock()
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        _patched_sm(session_cm),
+    )
+
+    ts = datetime.now()
+    bid_profiles = {
+        "Kw_Min": [BidPosition("Kw_Min", 1, 100, ts)],
+    }
+    adv = MagicMock()
+    adv.adv_setting_original_id = 1
+    adv.adv_id = 123
+
+    await updater._set_new_target_places_v3(  # pyright: ignore[reportPrivateUsage]
+        adv=adv,
+        bid_profiles=bid_profiles,
+    )
+
+    assert min_kw.target_place == 4
+    predictor.get_target_position_for_strategy_mode.assert_called_once()

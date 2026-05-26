@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from datetime import datetime
 
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto.bid_position import (
@@ -11,6 +12,24 @@ from app.modules.predict_keywords_target_place.clickhouse_manager.dto.bid_positi
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
 )
+
+
+def resolve_keyword_bid_profile(
+    profiles: Mapping[str, list[BidPosition]],
+    keyword_text: str,
+) -> list[BidPosition] | None:
+    """Найти профиль ставок по тексту ключа (как в ``process_adv_v3``).
+
+    Сначала точное совпадение, затем ``lower()``, затем case-insensitive по ключам CH.
+    """
+    direct = profiles.get(keyword_text) or profiles.get(keyword_text.lower())
+    if direct:
+        return direct
+    lower_text = keyword_text.lower()
+    for key, profile in profiles.items():
+        if key.lower() == lower_text:
+            return profile
+    return None
 
 
 def profile_points_from_bid_positions(rows: list[BidPosition]) -> list[PositionProfilePoint]:
