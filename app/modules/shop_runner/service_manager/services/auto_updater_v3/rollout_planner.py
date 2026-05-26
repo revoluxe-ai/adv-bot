@@ -2,6 +2,10 @@
 
 Вне полочной фазы и при ``organic > shelf`` в полочной фазе: ``plan_rollout_underperform_one``
 с ``strict`` слоями по ``aggressiveness``. Поштучная стратегия — в ``shelf_promotion_policy``.
+
+При ``SalesStates.OVERSPEND`` (факт кампании выше ``max_pay_for_order``): сначала
+``plan_overspend_force_off_over_max`` — все активные ключи с ``pay_for_order > max`` сразу в OFF;
+если таких нет — один шаг ``plan_rollout_down_one``.
 """
 
 from __future__ import annotations
@@ -191,6 +195,69 @@ def plan_rollout_underperform_one(
     pool.sort(key=lambda t: _conv_sort_key(t[0]), reverse=True)
     _ctx, _mode, _p, action = pool[0]
     return [action]
+
+
+def _keyword_exceeds_max_pfo(
+    ctx: KeywordV3Context,
+    *,
+    max_pay_for_order: float,
+) -> bool:
+    """True, если у ключа известен pay_for_order и он строго выше максимального порога."""
+    pfo = ctx.keyword.pay_for_order
+    if pfo is None:
+        return False
+    return float(pfo) > float(max_pay_for_order)
+
+
+def plan_overspend_force_off_over_max(
+    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    *,
+    max_pay_for_order: float,
+    reason: str = "overspend_max_pfo",
+) -> list[V3Action]:
+    """Массовый сброс в OFF: активные ключи с себестоимостью выше ``max_pay_for_order``.
+
+    Args:
+        prepared: Контексты ключей с текущим ``strategy_mode``.
+        max_pay_for_order: Плановый максимальный себес заказа (руб.).
+        reason: Код причины в логах/applier.
+
+    Returns:
+        Список ``FORCE_OFF`` (может быть пустым).
+    """
+    actions: list[V3Action] = []
+    for ctx, mode, _proven in prepared:
+        if mode == KeywordStrategyMode.OFF:
+            continue
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        if not _keyword_exceeds_max_pfo(ctx, max_pay_for_order=max_pay_for_order):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        actions.append(
+            V3Action(
+                action=V3ActionType.FORCE_OFF,
+                keyword_setting_id=ks_id,
+                reason=reason,
+            )
+        )
+    return actions
+
+
+def plan_overspend_actions(
+    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]],
+    *,
+    max_pay_for_order: float,
+) -> list[V3Action]:
+    """OVERSPEND: массовый OFF по ключам выше max, иначе один DOWN."""
+    forced = plan_overspend_force_off_over_max(
+        prepared, max_pay_for_order=max_pay_for_order
+    )
+    if forced:
+        return forced
+    return plan_rollout_down_one(prepared, reason="overspend")
 
 
 def plan_rollout_down_one(

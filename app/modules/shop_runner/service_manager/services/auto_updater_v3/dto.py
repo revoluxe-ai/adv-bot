@@ -38,6 +38,7 @@ class ModeCandidate(BaseModel):
 class V3ActionType(str, Enum):
     UP = "UP"
     DOWN = "DOWN"
+    FORCE_OFF = "FORCE_OFF"
     REBALANCE_TRANSFER = "REBALANCE_TRANSFER"
     DO_NOTHING = "DO_NOTHING"
 

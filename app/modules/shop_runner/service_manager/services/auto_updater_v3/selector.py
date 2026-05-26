@@ -10,6 +10,9 @@ Signal matrix (v3):
 - **Поштучная** — один ключ за цикл (shelf → non-shelf при shelf>=organic).
 - **Послойная** — слои OFF→MIN → MIN→OPT → OPT→MAX при organic>shelf (aggr=MIN).
 
+При **OVERSPEND** (факт > ``max_pay_for_order``): сначала массовый ``FORCE_OFF`` для всех
+активных ключей с ``pay_for_order > max``; иначе один DOWN (``plan_rollout_down_one``).
+
 ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV) — отдельный контур ``change_adv_strategy``.
 """
 
@@ -36,6 +39,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
 )
@@ -62,8 +66,9 @@ def select_v3_actions(
     shelf_promotion_active: bool,
     rollout_aggressiveness: int | None = None,
     shelf_click_mode: ShelfClickMode | None = None,
+    plan_max_pay_for_order: float | None = None,
 ) -> list[V3Action]:
-    """Return at most one mode change per cycle (see plan: single switch)."""
+    """Return planned mode changes for one cycle (OVERSPEND may return several FORCE_OFF)."""
     prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]] = []
     for ctx in contexts:
         mode = stored_strategy_mode(ctx.keyword)
@@ -77,7 +82,10 @@ def select_v3_actions(
             else ShelfClickMode.UNKNOWN
         )
         return plan_shelf_promotion_actions(
-            prepared, state=state, click_mode=click_mode
+            prepared,
+            state=state,
+            click_mode=click_mode,
+            plan_max_pay_for_order=plan_max_pay_for_order,
         )
 
     aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
@@ -86,6 +94,10 @@ def select_v3_actions(
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]
 
     if state == SalesStates.OVERSPEND:
+        if plan_max_pay_for_order is not None:
+            return plan_overspend_actions(
+                prepared, max_pay_for_order=float(plan_max_pay_for_order)
+            )
         return plan_rollout_down_one(prepared, reason="overspend")
 
     if state == SalesStates.UNDERPERFORM:

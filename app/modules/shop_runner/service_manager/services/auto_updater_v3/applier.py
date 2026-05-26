@@ -32,6 +32,12 @@ def _hard_status_allows_up(hard_status: object) -> bool:
     return h in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 
+def _hard_status_allows_force_off(hard_status: object) -> bool:
+    """FORCE_OFF: активные авто/БС; не трогаем turn_off (3) и always_on (4)."""
+    h = int(cast(int, hard_status))
+    return h in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
+
+
 def _hard_status_for_strategy_mode(mode: KeywordStrategyMode) -> int:
     """V3: OFF -> авто (1), любой активный режим -> белый список (2)."""
     return (
@@ -42,7 +48,7 @@ def _hard_status_for_strategy_mode(mode: KeywordStrategyMode) -> int:
 
 
 async def apply_v3_actions(actions: list[V3Action]) -> None:
-    """Apply UP/DOWN/REBALANCE to ``KeywordSetting.strategy_mode`` + ``hard_status``."""
+    """Apply UP/DOWN/FORCE_OFF/REBALANCE to ``KeywordSetting.strategy_mode`` + ``hard_status``."""
     if not actions:
         return
     async with sm(read_only=False) as session:
@@ -102,6 +108,25 @@ async def apply_v3_actions(actions: list[V3Action]) -> None:
                     update(KeywordSetting)
                     .where(KeywordSetting.id == action.keyword_setting_id)
                     .values(strategy_mode=nxt, hard_status=hs)
+                )
+            elif action.action == V3ActionType.FORCE_OFF:
+                if current == KeywordStrategyMode.OFF:
+                    continue
+                if not _hard_status_allows_force_off(hard_status):
+                    logger.debug(
+                        "v3 apply skip FORCE_OFF: hard_status_mismatch id=%s hard_status=%s",
+                        action.keyword_setting_id,
+                        hard_status,
+                    )
+                    continue
+                hs = _hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+                _ = await session.execute(
+                    update(KeywordSetting)
+                    .where(KeywordSetting.id == action.keyword_setting_id)
+                    .values(
+                        strategy_mode=KeywordStrategyMode.OFF,
+                        hard_status=hs,
+                    )
                 )
         await session.commit()
 
