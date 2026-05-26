@@ -30,6 +30,11 @@ DEFAULT_MAX_BID_MINOR = 50_000
 DEFAULT_MIN_BID_DISTANCE_MINOR = 100
 
 
+def cart_cpa_from_totals(spend: float, carts: int) -> float:
+    """CPA корзины: ``spend / max(carts, 1)`` (0 корзин → знаменатель 1)."""
+    return spend / max(int(carts), 1)
+
+
 def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:
     """Начало отчётного дня в UTC (для пассивной аналитики полок)."""
     tz = ZoneInfo(tz_name)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlBidPoints,
@@ -43,31 +43,40 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
     return "\n".join(f"- {item}" for item in view.warnings)
 
 
-def _bid_point_sort_ts(point: BidPointStatsDTO) -> datetime:
-    """Ключ сортировки: последний интервал по ставке (UTC)."""
-    ts = point.last_interval_at
-    if ts is None:
-        return datetime.min.replace(tzinfo=timezone.utc)
-    if ts.tzinfo is None:
-        return ts.replace(tzinfo=timezone.utc)
-    return ts
+def _bid_point_cpa_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
+    """Ключ сортировки: лучший CPA первым (``cart_cpa`` уже с ``max(carts, 1)``)."""
+    cpa = point.cart_cpa if point.cart_cpa is not None else float("inf")
+    return (float(cpa), point.bid_minor)
 
 
-def select_covered_bid_points_for_cycle_viewer(
+def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
+    """Значок статуса теста по ставке в текущем цикле."""
+    if point.is_covered:
+        return "✅"
+    return "⏳"
+
+
+def select_cycle_bid_points_for_viewer(
     points: list[BidPointStatsDTO],
 ) -> list[BidPointStatsDTO]:
-    """Покрытые точки цикла для просмотрщика, по ``last_interval_at`` DESC."""
-    covered = [p for p in points if p.is_covered]
-    return sorted(covered, key=_bid_point_sort_ts, reverse=True)
+    """Ставки цикла с показами для просмотрщика, от лучшего CPA к худшему.
+
+    В списке все точки с ``impressions > 0``. ``is_covered`` — порог test показов
+    достигнут (✅), иначе набор показов (⏳).
+    """
+    with_impressions = [p for p in points if p.impressions > 0]
+    return sorted(with_impressions, key=_bid_point_cpa_sort_key)
 
 
 def format_bid_point_line(point: BidPointStatsDTO) -> str:
-    """Одна строка покрытой ставки — тот же формат, что в блоке на главном экране."""
-    cpa_text = _format_money(point.cart_cpa) if point.carts > 0 else "—"
+    """Одна строка ставки цикла: статус, метрики, опционально лучшая точка."""
+    status = cycle_bid_coverage_icon(point)
+    best_mark = " ⭐" if point.is_best else ""
+    cpa_text = _format_money(point.cart_cpa)
     return (
-        f"{format_bid(point.bid_minor, point.currency)}: показы {point.impressions}, "
-        f"корзины {point.carts}, расход {_format_money(point.spend)} ₽, "
-        f"CPA корзины {cpa_text} ₽"
+        f"{status}{best_mark} {format_bid(point.bid_minor, point.currency)}: "
+        f"показы {point.impressions}, корзины {point.carts}, "
+        f"расход {_format_money(point.spend)} ₽, CPA корзины {cpa_text} ₽"
     )
 
 
@@ -102,7 +111,8 @@ def slice_bid_points_page(
     return points[start : start + page_size]
 
 
-BID_POINT_VIEWER_HEADER = "Покрытые ставки (текущий цикл):"
+BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы):"
+BID_POINT_VIEWER_LEGEND = "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная"
 
 
 def render_bid_point_viewer_message(
@@ -116,9 +126,10 @@ def render_bid_point_viewer_message(
     safe_page = clamp_bid_point_page(page, total_pages)
     chunk = slice_bid_points_page(points, safe_page, page_size)
     lines = [format_bid_point_line(point) for point in chunk]
-    body = "\n".join(lines) if lines else "Нет покрытых ставок."
+    body = "\n".join(lines) if lines else "Нет ставок с показами в текущем цикле."
     return (
         f"{BID_POINT_VIEWER_HEADER}\n"
+        f"{BID_POINT_VIEWER_LEGEND}\n\n"
         f"{body}\n\n"
         f"Страница {safe_page + 1} / {total_pages}"
     )

@@ -30,7 +30,7 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
     render_bid_point_viewer_message,
-    select_covered_bid_points_for_cycle_viewer,
+    select_cycle_bid_points_for_viewer,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -56,7 +56,7 @@ async def _show_bid_point_viewer(
         True, если экран показан; False, если покрытий нет.
     """
     view = await service.build_view(adv_setting_original_id)
-    points = select_covered_bid_points_for_cycle_viewer(view.cycle_bid_points)
+    points = select_cycle_bid_points_for_viewer(view.cycle_bid_points)
     if not points:
         return False
     total_pages = bid_point_viewer_page_count(len(points))
@@ -156,7 +156,7 @@ async def auto_shelf_bid_control_bid_points_router(
         )
         if not shown and callback.message:
             await callback.message.answer(
-                "В текущем цикле пока нет покрытых ставок."
+                "В текущем цикле пока нет ставок с показами."
             )
     except AutoShelfBidControlTelegramError as exc:
         if callback.message:

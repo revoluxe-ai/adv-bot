@@ -328,7 +328,7 @@ async def test_negative_delta_skips_interval_and_persists_prev() -> None:
 
 
 @pytest.mark.asyncio
-async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
+async def test_context_change_by_bid_flushes_boundary_to_prev_context() -> None:
     manager, repository, writer, state_manager = _build_manager()
     repository.fetch_total_auto_stat = AsyncMock(
         return_value=AutoShelfRawStat(130, 13, 4, 2, 60.0)
@@ -351,8 +351,14 @@ async def test_context_change_by_bid_skips_interval_and_persists_prev() -> None:
 
     await manager.update(_build_adv([123]))
 
-    writer.insert_interval.assert_not_awaited()
+    writer.insert_interval.assert_awaited_once()
     state_manager.persist.assert_awaited_once()
+    inserted_row = writer.insert_interval.await_args.args[0]
+    assert inserted_row.bid_minor == 1200
+    assert inserted_row.mode == "main"
+    assert inserted_row.delta_impressions == 10
+    assert inserted_row.delta_carts == 1
+    assert inserted_row.delta_spend == 10.0
 
 
 @pytest.mark.asyncio

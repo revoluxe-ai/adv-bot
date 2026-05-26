@@ -46,7 +46,7 @@
 4. Аналитика читается из `auto_shelf_bid_intervals` с обязательным read-time dedup:
    `GROUP BY event_date,event_id + argMax(..., version)`.
 5. Переходы `test <-> main` основаны на порогах показов.
-6. `best_bid` для main — **глобальная**: min CPA среди лучших текущего и предыдущего
+6. `best_bid` для main — **глобальная**: min CPA ``spend/greatest(carts,1)`` среди лучших
    цикла (`resolve_cycle_best_bids`, предыдущий — окно `[prev, current)`). Fallback:
    отчётный день → текущий main → actual → middle. В main-фазе ставка
    синхронизируется с глобальной на каждом тике.
@@ -57,8 +57,9 @@
    `[min_bid_minor, max_bid_minor]` (оба в копейках).
 8. `get_bid_stats` / best bid по CPA: одна строка на `bid_minor` (mode в CH не дробит точку).
 9. Telegram: на главном экране блока «Покрытые ставки» нет. Кнопка «Покрытия цикла» —
-   до `TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE` (10) строк на странице, агрегаты по
-   `bid_minor` от `current_cycle_started_at`, ◀️/▶️ по страницам. «Лучшая ставка цикла»
+   до `TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE` (10) строк: все ставки с показами в цикле,
+   сортировка по CPA (лучшие сверху), ✅ покрыта / ⏳ набор / ⭐ лучшая глобальная.
+   Агрегаты по `bid_minor` от `current_cycle_started_at`, ◀️/▶️. «Лучшая ставка цикла»
    в UI — «Лучшая ставка цикла» (`cycle_best`) и «Лучшая глобальная ставка»
    (`global_best` = min CPA текущий ∪ предыдущий цикл). `next_test_bid` /
    `covered_points_count` — отчётный день.

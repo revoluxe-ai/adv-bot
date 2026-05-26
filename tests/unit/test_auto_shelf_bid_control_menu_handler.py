@@ -158,4 +158,4 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
     )
 
     callback.answer.assert_not_awaited()
-    assert chat_message.answers == ["В текущем цикле пока нет покрытых ставок."]
+    assert chat_message.answers == ["В текущем цикле пока нет ставок с показами."]
