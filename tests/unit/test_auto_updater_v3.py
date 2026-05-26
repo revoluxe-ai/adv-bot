@@ -175,6 +175,7 @@ def test_select_overspend_single_down_most_expensive_first() -> None:
 
 
 @pytest.mark.unit
+def test_rollout_underperform_level1_picks_cheapest_min_cost_tie_break_id() -> None:
 def test_select_overspend_force_off_all_keys_above_max() -> None:
     prof = _sample_profile()
     over_a = _calc_kw(
