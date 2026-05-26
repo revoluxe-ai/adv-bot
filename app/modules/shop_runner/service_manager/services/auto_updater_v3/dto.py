@@ -43,6 +43,19 @@ class V3ActionType(str, Enum):
     DO_NOTHING = "DO_NOTHING"
 
 
+class V3SelectionLog(BaseModel):
+    """Structured metadata for observability (orchestrator logs, не влияет на apply)."""
+
+    pool_size: int | None = None
+    pool_size_after_rec: int | None = None
+    rec_tier: str | None = None
+    state_cost: float | None = None
+    from_mode: str | None = None
+    to_mode: str | None = None
+    move_kind: str | None = None
+    imputed: bool | None = None
+
+
 class V3Action(BaseModel):
     """Single planned change for one cycle."""
 
@@ -50,7 +63,9 @@ class V3Action(BaseModel):
     keyword_setting_id: int | None = None
     from_keyword_setting_id: int | None = None
     to_keyword_setting_id: int | None = None
+    target_strategy_mode: KeywordStrategyMode | None = None
     reason: str = ""
+    selection_log: V3SelectionLog | None = None
 
     model_config = {"extra": "forbid"}
 

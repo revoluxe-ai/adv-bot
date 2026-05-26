@@ -268,7 +268,7 @@ def test_select_overspend_shelf_force_off_above_max() -> None:
 
 
 @pytest.mark.unit
-def test_rollout_underperform_level1_prefers_higher_conv_off() -> None:
+def test_rollout_underperform_level1_picks_cheapest_min_cost_tie_break_id() -> None:
     prof = _sample_profile()
     low_c = KeywordV3Context(
         keyword=_calc_kw(
@@ -300,7 +300,9 @@ def test_rollout_underperform_level1_prefers_higher_conv_off() -> None:
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].keyword_setting_id == 2
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason == "layered_cost_first"
 
 
 @pytest.mark.unit
@@ -341,7 +343,22 @@ def test_rollout_underperform_up_skips_black_list_hard_status() -> None:
 
 @pytest.mark.unit
 def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
-    prof = _sample_profile()
+    cheap_opt = [
+        PositionProfilePoint(
+            position=1,
+            bid=500,
+            predicted_conversion=0.40,
+            pay_for_cart=200.0,
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        PositionProfilePoint(
+            position=2,
+            bid=80,
+            predicted_conversion=0.02,
+            pay_for_cart=5.0,
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+    ]
     off_ctx = KeywordV3Context(
         keyword=_calc_kw(
             ks_id=1,
@@ -351,7 +368,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
             conv=0.01,
             hard_status=1,
         ),
-        position_profile=prof,
+        position_profile=None,
     )
     min_ctx = KeywordV3Context(
         keyword=_calc_kw(
@@ -362,7 +379,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
             conv=0.5,
             hard_status=1,
         ),
-        position_profile=prof,
+        position_profile=cheap_opt,
     )
     actions = select_v3_actions(
         state=SalesStates.UNDERPERFORM,
@@ -373,6 +390,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].keyword_setting_id == 2
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit
@@ -511,8 +529,8 @@ def test_shelf_underperform_organic_dominant_uses_layered_general_pool() -> None
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].keyword_setting_id == 2
-    assert actions[0].reason == "rollout_off_to_min"
+    assert actions[0].keyword_setting_id == 1
+    assert actions[0].reason == "layered_cost_first"
 
 
 @pytest.mark.unit
@@ -593,7 +611,7 @@ def test_shelf_underperform_piecewise_non_shelf_when_shelf_exhausted() -> None:
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].keyword_setting_id == 2
+    assert actions[0].keyword_setting_id == 1
     assert actions[0].reason == "piecewise_non_shelf"
 
 

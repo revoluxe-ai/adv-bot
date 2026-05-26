@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
+    mode_level,
     step_down,
     step_up,
 )
@@ -81,11 +82,20 @@ async def apply_v3_actions(actions: list[V3Action]) -> None:
                         hard_status,
                     )
                     continue
-                nxt = step_up(current)
-                if nxt is None:
-                    continue
-                if current == KeywordStrategyMode.OFF and nxt != KeywordStrategyMode.MIN_CPA:
-                    continue
+                if action.target_strategy_mode is not None:
+                    nxt = action.target_strategy_mode
+                    if mode_level(nxt) <= mode_level(current):
+                        logger.debug(
+                            "v3 apply skip UP: target not above current id=%s %s->%s",
+                            action.keyword_setting_id,
+                            current,
+                            nxt,
+                        )
+                        continue
+                else:
+                    nxt = step_up(current)
+                    if nxt is None:
+                        continue
                 hs = _hard_status_for_strategy_mode(nxt)
                 _ = await session.execute(
                     update(KeywordSetting)

@@ -83,6 +83,7 @@ def build_mode_candidates(
         bid=float(best_conv.bid),
         position=best_conv.position,
         predicted_conversion=best_conv.predicted_conversion,
+        predicted_cpa=_finite_pay(best_conv),
         conversion_score=float(best_conv.predicted_conversion or 0.0),
         is_valid=True,
     )
