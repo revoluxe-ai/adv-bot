@@ -137,7 +137,8 @@ async def process_adv_v3(
     fact = await updater.get_fact_data(keywords)
 
     plan_fact_change = ChangePlanFact(adv)
-    if await plan_fact_change.check_equal_in_cache(plan, fact):
+    plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
+    if plan_fact_equal:
         logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
         return
 

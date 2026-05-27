@@ -128,6 +128,7 @@ def _catalog_for_ctx(ctx: "KeywordV3Context") -> dict[AggressionTargetMode, Mode
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
+        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
     )
 
 
@@ -251,6 +252,7 @@ def _resolve_state_cost(
     worst_costs: dict[AggressionTargetMode, float],
     *,
     use_imputation: bool,
+    keyword_pay_for_order: float | None = None,
 ) -> tuple[float, bool]:
     if mc.is_valid and mc.predicted_cpa is not None:
         return float(mc.predicted_cpa), False
@@ -258,6 +260,8 @@ def _resolve_state_cost(
         w = worst_costs.get(target)
         if w is not None:
             return w, True
+    if keyword_pay_for_order is not None:
+        return float(keyword_pay_for_order), False
     return float("inf"), False
 
 
@@ -334,6 +338,7 @@ def collect_transition_candidates(
                 target,
                 worst_costs,
                 use_imputation=use_matrix_imputation,
+                keyword_pay_for_order=ctx.keyword.pay_for_order,
             )
             if cost == float("inf"):
                 continue

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
+    resolve_effective_state_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
@@ -38,6 +39,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     SelectionPolicy,
     build_worst_per_state_costs,
     collect_transition_candidates,
+    missing_target_matrix,
     passes_rec_gate_for_up,
     plan_one_up_by_policy,
 )
@@ -118,6 +120,7 @@ def try_valid_rollout_up(
         cand = build_mode_candidates(
             profile=ctx.position_profile,
             keyword_text=ctx.keyword.text,
+            conv_views_to_orders=ctx.keyword.conv_views_to_orders,
         )
         min_c = cand.get(AggressionTargetMode.MIN_CPA)
         if min_c is None or not min_c.is_valid:
@@ -136,6 +139,7 @@ def try_valid_rollout_up(
     cand = build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
+        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
     )
     try:
         target = AggressionTargetMode[nxt.name]
@@ -254,6 +258,7 @@ def plan_rollout_down_one(
         cand = build_mode_candidates(
             profile=ctx.position_profile,
             keyword_text=ctx.keyword.text,
+            conv_views_to_orders=ctx.keyword.conv_views_to_orders,
         )
         if nxt != KeywordStrategyMode.OFF:
             try:
@@ -308,18 +313,23 @@ def _resolve_state_cost_for_mode(
     to_mode: KeywordStrategyMode,
     worst_costs: dict[AggressionTargetMode, float],
 ) -> tuple[float, bool]:
+    """Себестоимость режима: V2-прогноз по профилю + факт ключа, worst — только если оба NaN."""
     catalog = build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
+        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
     )
     target = AggressionTargetMode[to_mode.name]
     mc = catalog.get(target)
+    profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
-        return float(mc.predicted_cpa), False
-    worst = worst_costs.get(target)
-    if worst is not None:
-        return float(worst), True
-    return float("inf"), False
+        profile_cost = float(mc.predicted_cpa)
+    return resolve_effective_state_cost(
+        profile_cost=profile_cost,
+        keyword_pay_for_order=ctx.keyword.pay_for_order,
+        worst_cost=worst_costs.get(target),
+        allow_worst_imputation=missing_target_matrix(ctx),
+    )
 
 
 def _iter_upper_modes(current: KeywordStrategyMode) -> list[KeywordStrategyMode]:

@@ -69,8 +69,9 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 ## Новый state-first контракт (M1/M2/M3)
 
-В V3 решения принимаются по `state_cost = predicted_cpa(state)` относительно
-`resolve_cost_threshold`:
+В V3 решения принимаются по `state_cost` — прогноз **себестоимости заказа** для режима
+(как `CalculatedKeyword.pay_for_order` в V2: `calc_pay_for_order(calc_orders_per_1000_rub(conv, CPM))`
+по точке профиля M/O/C), относительно `resolve_cost_threshold`:
 
 - `resolve = target_pay_for_order`, если `fact.predict_orders >= plan.orders`;
 - иначе `resolve = max_pay_for_order`.
