@@ -259,5 +259,5 @@ async def run_ladder_gap_rebalance_v3(
         force_count,
         up_count,
     )
-    await apply_v3_actions(actions)
+    await apply_v3_actions(actions, complex_adv=complex_adv)
     return True

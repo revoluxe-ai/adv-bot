@@ -46,6 +46,12 @@ def _update_bind_params(stmt: Any) -> dict[str, Any]:
     return dict(stmt.compile(dialect=postgresql.dialect()).params)
 
 
+def _complex_adv_stub() -> MagicMock:
+    adv = MagicMock()
+    adv.adv_setting = None
+    return adv
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_apply_v3_actions_skips_up_when_hard_status_not_auto_or_white_list(
@@ -72,7 +78,8 @@ async def test_apply_v3_actions_skips_up_when_hard_status_not_auto_or_white_list
     )
 
     await apply_v3_actions(
-        [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")]
+        [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")],
+        complex_adv=_complex_adv_stub(),
     )
 
     assert sum(1 for sql in executed_sql if sql.startswith("UPDATE")) == 0
@@ -101,7 +108,8 @@ async def test_apply_v3_actions_allows_up_when_hard_status_white_list(
     )
 
     await apply_v3_actions(
-        [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")]
+        [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)
@@ -137,7 +145,8 @@ async def test_apply_v3_actions_skips_down_when_hard_status_not_white_list(
     )
 
     await apply_v3_actions(
-        [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1, reason="test")]
+        [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1, reason="test")],
+        complex_adv=_complex_adv_stub(),
     )
 
     assert sum(1 for sql in executed_sql if sql.startswith("UPDATE")) == 0
@@ -178,7 +187,8 @@ async def test_apply_v3_force_off_batch_sets_off_and_auto(
         [
             V3Action(action=V3ActionType.FORCE_OFF, keyword_setting_id=1, reason="t"),
             V3Action(action=V3ActionType.FORCE_OFF, keyword_setting_id=2, reason="t"),
-        ]
+        ],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)
@@ -213,7 +223,8 @@ async def test_apply_v3_down_to_off_sets_hard_status_auto(
     )
 
     await apply_v3_actions(
-        [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1, reason="test")]
+        [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1, reason="test")],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)
@@ -254,7 +265,8 @@ async def test_apply_v3_down_uses_target_strategy_mode(
                 target_strategy_mode=KeywordStrategyMode.MIN_CPA,
                 reason="test_target_down",
             )
-        ]
+        ],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)
@@ -300,7 +312,8 @@ async def test_apply_v3_transfer_sets_hard_status_on_both(
                 to_keyword_setting_id=20,
                 reason="test",
             )
-        ]
+        ],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)
@@ -351,7 +364,8 @@ async def test_apply_v3_transfer_skips_when_hard_status_pair_invalid(
                 to_keyword_setting_id=20,
                 reason="test",
             )
-        ]
+        ],
+        complex_adv=_complex_adv_stub(),
     )
 
     assert sum(1 for sql in executed_sql if sql.startswith("UPDATE")) == 0
@@ -387,7 +401,8 @@ async def test_apply_v3_jump_up_uses_target_strategy_mode(
                 target_strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
                 reason="cost_first",
             )
-        ]
+        ],
+        complex_adv=_complex_adv_stub(),
     )
 
     update_stmts = _update_stmts_from_execute(session.execute)

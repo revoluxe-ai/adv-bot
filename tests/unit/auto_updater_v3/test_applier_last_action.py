@@ -62,9 +62,11 @@ async def test_apply_writes_redis_on_successful_up(
 
     adv = MagicMock()
     adv.adv_id = 100
+    complex_adv = MagicMock()
+    complex_adv.adv_setting = adv
     await apply_v3_actions(
         [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")],
-        adv=cast(MagicMock, adv),
+        complex_adv=cast(MagicMock, complex_adv),
     )
     redis_set.assert_awaited_once()
     snapshot = redis_set.call_args[0][0]
@@ -102,9 +104,11 @@ async def test_apply_skipped_up_does_not_write_redis(
     )
 
     adv = MagicMock()
+    complex_adv = MagicMock()
+    complex_adv.adv_setting = adv
     await apply_v3_actions(
         [V3Action(action=V3ActionType.UP, keyword_setting_id=1, reason="test")],
-        adv=cast(MagicMock, adv),
+        complex_adv=cast(MagicMock, complex_adv),
     )
     redis_set.assert_not_awaited()
 
@@ -120,8 +124,10 @@ async def test_apply_do_nothing_does_not_write_redis(
         redis_set,
     )
     adv = MagicMock()
+    complex_adv = MagicMock()
+    complex_adv.adv_setting = adv
     await apply_v3_actions(
         [V3Action(action=V3ActionType.DO_NOTHING, reason="idle")],
-        adv=cast(MagicMock, adv),
+        complex_adv=cast(MagicMock, complex_adv),
     )
     redis_set.assert_not_awaited()

@@ -131,14 +131,14 @@ async def _persist_last_applied(
 
 async def apply_v3_actions(
     actions: list[V3Action],
-     *,
-     complex_adv:ComplexAdv,
+    *,
+    complex_adv: ComplexAdv,
 ) -> None:
     """Apply UP/DOWN/FORCE_OFF/REBALANCE to ``KeywordSetting.strategy_mode`` + ``hard_status``.
 
     Args:
         actions: Запланированные действия цикла.
-        complex_adv: РК для записи последнего действия в Redis (UI); если ``None`` — не пишем.
+        complex_adv: Полный контекст РК; используется для записи last action в Redis.
     """
     if not actions:
         return
@@ -281,8 +281,8 @@ async def apply_v3_actions(
                 )
         await session.commit()
 
-    if  complex_adv is not None and applied:
-        adv = complex_adv.adv_setting
+    adv = getattr(complex_adv, "adv_setting", None)
+    if adv is not None and applied:
         await _persist_last_applied(adv, applied)
 
 
