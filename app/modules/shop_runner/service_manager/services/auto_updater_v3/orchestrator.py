@@ -19,6 +19,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.se
     AdvSettingAutoUpdater,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+    SalesStates,
     detect_campaign_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
@@ -144,9 +145,10 @@ async def process_adv_v3(
         """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
         await plan_fact_change.set_new_plan_fact(plan, fact)
 
-    state = detect_campaign_state(plan, fact)
+    state: SalesStates | None = detect_campaign_state(plan, fact)
     if state is None:
         logger.warning("[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id)
+        await cache_plan_fact_snapshot()
         return
 
     shelf_active = complex_adv.shelf_promotion_active
