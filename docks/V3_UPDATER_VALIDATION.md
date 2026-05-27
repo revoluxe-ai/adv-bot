@@ -85,6 +85,14 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 3. `M3 (headroom_plus_one)` — если `fact.pay_for_order < 0.9 * resolve`, выполняет
    один `UP` на самый дешёвый потенциальный state.
 
+**Shelf cleanup (параллельно с M1/M2/M3):** при активной полочной фазе
+(`shelf_promotion_active` и `shelf>=organic` или `UNKNOWN`) на том же тике планируется
+массовый сброс всех активных ключей с `above_rec=False` (не проходят rec-gate на UP):
+БС — один шаг `DOWN`, авто (`hard_status=1`) — `FORCE_OFF` (applier не делает `DOWN`
+для авто). Действия cleanup сливаются с M1/M2/M3; при конфликте по `keyword_setting_id`
+побеждает cleanup. Legacy shelf-путь (`UNDERPERFORM` без plan/fact) по-прежнему может
+отдать только cleanup, если список непустой.
+
 Общие guard-правила:
 
 - `hard_status in {3, 4}` — не изменяем;

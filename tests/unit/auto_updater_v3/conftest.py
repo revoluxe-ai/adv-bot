@@ -96,6 +96,7 @@ def ctx(
     mode: KeywordStrategyMode,
     profile: list[PositionProfilePoint] | None,
     above_rec: bool | None = True,
+    hard_status: int = 2,
 ) -> KeywordV3Context:
     return KeywordV3Context(
         keyword=calc_kw(
@@ -103,6 +104,7 @@ def ctx(
             text=f"kw{ks_id}",
             mode=mode,
             above_rec=above_rec,
+            hard_status=hard_status,
         ),
         position_profile=profile,
     )

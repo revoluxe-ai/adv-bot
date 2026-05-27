@@ -206,7 +206,7 @@ def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
 
     Единый триггер для:
     - rec-gate на UP (``passes_rec_gate_for_up``): разрешены только ``above_rec`` True/None;
-    - cleanup DOWN (``plan_shelf_rec_false_cleanup_down``): сброс активных с ``above_rec=False``.
+    - cleanup (``plan_shelf_rec_false_cleanup_down``): массовый сброс активных с ``above_rec=False``.
 
     Args:
         click_mode: Режим organic/shelf из ``resolve_shelf_click_mode`` (полочная фаза).
@@ -417,42 +417,54 @@ def plan_shelf_rec_false_cleanup_down(
     prepared: PreparedList,
     *,
     click_mode: ShelfClickMode,
-) -> list[V3Action] | None:
-    """Полка: above_rec=False → один DOWN по самому дорогому активному."""
-    if not shelf_rec_conversion_policy_active(click_mode):
-        return None
+) -> list[V3Action]:
+    """Полка: массовый сброс всех активных ключей с ``above_rec=False``.
 
-    actives: list[tuple["KeywordV3Context", KeywordStrategyMode]] = []
+    Ключи с ``above_rec=False`` не проходят rec-gate на UP и «висят» в минусе полки;
+    за один тик планируется действие на каждый такой активный ключ.
+
+    - ``hard_status=2`` (БС): один шаг ``DOWN`` по лестнице (``target_strategy_mode``).
+    - ``hard_status=1`` (авто): ``FORCE_OFF`` — applier не применяет ``DOWN`` для авто.
+
+    ``hard_status`` 3/4 не трогаем. При ``ORGANIC_DOMINANT`` возвращает пустой список.
+    """
+    if not shelf_rec_conversion_policy_active(click_mode):
+        return []
+
+    actions: list[V3Action] = []
     for ctx, mode in prepared:
         if mode == KeywordStrategyMode.OFF:
             continue
         if ctx.keyword.above_rec_conversion is not False:
             continue
-        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+        hard_status = int(ctx.keyword.hard_status)
+        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
             continue
-        actives.append((ctx, mode))
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
 
-    if not actives:
-        return None
-
-    def sort_key(t: tuple["KeywordV3Context", KeywordStrategyMode]) -> float:
-        return float(t[0].keyword.pay_for_order or 0.0)
-
-    actives.sort(key=sort_key, reverse=True)
-    ctx, mode = actives[0]
-    nxt = step_down(mode)
-    if nxt is None:
-        return None
-    ks_id = ctx.keyword.keyword_setting_original_id
-    if ks_id is None:
-        return None
-    return [
-        V3Action(
-            action=V3ActionType.DOWN,
-            keyword_setting_id=ks_id,
-            reason="shelf_rec_false_cleanup",
-        )
-    ]
+        if hard_status == _HARD_STATUS_WHITE_LIST:
+            nxt = step_down(mode)
+            if nxt is None:
+                continue
+            actions.append(
+                V3Action(
+                    action=V3ActionType.DOWN,
+                    keyword_setting_id=ks_id,
+                    target_strategy_mode=nxt,
+                    reason="shelf_rec_false_cleanup",
+                )
+            )
+        else:
+            actions.append(
+                V3Action(
+                    action=V3ActionType.FORCE_OFF,
+                    keyword_setting_id=ks_id,
+                    reason="shelf_rec_false_cleanup",
+                )
+            )
+    return actions
 
 
 def plan_one_up_by_policy(

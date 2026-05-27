@@ -610,13 +610,14 @@ def plan_headroom_plus_one(
 
 
 def merge_and_dedup_actions(
+    cleanup_actions: list[V3Action],
     m1_actions: list[V3Action],
     m2_actions: list[V3Action],
     m3_actions: list[V3Action],
 ) -> list[V3Action]:
-    """Слить действия с приоритетом M2 > M1 > M3 по keyword_setting_id."""
+    """Слить действия с приоритетом cleanup > M2 > M1 > M3 по keyword_setting_id."""
     merged: dict[int, V3Action] = {}
-    for action in m3_actions + m1_actions + m2_actions:
+    for action in m3_actions + m1_actions + m2_actions + cleanup_actions:
         if action.action == V3ActionType.DO_NOTHING:
             continue
         if action.keyword_setting_id is None:

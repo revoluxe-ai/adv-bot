@@ -104,11 +104,11 @@ def select_v3_actions(
             aggressiveness=aggr,
         )
 
-        # Pre-cycle cleanup для shelf-потока.
+        cleanup_actions: list[V3Action] = []
         if shelf_promotion_active:
-            cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
-            if cleanup is not None:
-                return cleanup
+            cleanup_actions = plan_shelf_rec_false_cleanup_down(
+                prepared, click_mode=click_mode
+            )
 
         worst_costs = build_worst_costs(prepared)
         m1_actions = plan_mass_cheap_promotion(
@@ -131,7 +131,9 @@ def select_v3_actions(
             ),
             policy=policy,
         )
-        merged = merge_and_dedup_actions(m1_actions, m2_actions, m3_actions)
+        merged = merge_and_dedup_actions(
+            cleanup_actions, m1_actions, m2_actions, m3_actions
+        )
         if merged:
             return merged
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]

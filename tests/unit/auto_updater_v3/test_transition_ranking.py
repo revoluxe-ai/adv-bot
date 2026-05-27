@@ -178,9 +178,10 @@ def test_shelf_false_cleanup_down_active() -> None:
         prepared,
         click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
     )
-    assert actions is not None
+    assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].reason == "shelf_rec_false_cleanup"
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit
@@ -201,8 +202,78 @@ def test_shelf_false_cleanup_down_active_when_traffic_unknown() -> None:
         prepared,
         click_mode=ShelfClickMode.UNKNOWN,
     )
-    assert actions is not None
+    assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
+
+
+@pytest.mark.unit
+def test_shelf_false_cleanup_mass_all_above_rec_false() -> None:
+    """За один тик — действие на каждый активный ключ с above_rec=False."""
+    prof = sample_profile()
+    prepared = [
+        (
+            ctx(
+                ks_id=1,
+                mode=KeywordStrategyMode.MIN_CPA,
+                profile=prof,
+                above_rec=False,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+        (
+            ctx(
+                ks_id=2,
+                mode=KeywordStrategyMode.OPTIMUM,
+                profile=prof,
+                above_rec=False,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.OPTIMUM,
+        ),
+        (
+            ctx(
+                ks_id=3,
+                mode=KeywordStrategyMode.MIN_CPA,
+                profile=prof,
+                above_rec=True,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+    ]
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+    )
+    assert len(actions) == 2
+    ids = {a.keyword_setting_id for a in actions}
+    assert ids == {1, 2}
+
+
+@pytest.mark.unit
+def test_shelf_false_cleanup_auto_uses_force_off() -> None:
+    """Авто (hard_status=1): FORCE_OFF, т.к. applier не применяет DOWN для авто."""
+    prof = sample_profile()
+    prepared = [
+        (
+            ctx(
+                ks_id=10,
+                mode=KeywordStrategyMode.MIN_CPA,
+                profile=prof,
+                above_rec=False,
+                hard_status=1,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+    ]
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.UNKNOWN,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].keyword_setting_id == 10
 
 
 @pytest.mark.unit
@@ -219,7 +290,7 @@ def test_shelf_false_cleanup_skipped_on_organic_dominant() -> None:
             prepared,
             click_mode=ShelfClickMode.ORGANIC_DOMINANT,
         )
-        is None
+        == []
     )
 
 

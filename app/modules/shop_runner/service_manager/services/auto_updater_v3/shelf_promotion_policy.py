@@ -41,7 +41,7 @@ def _plan_underperform_shelf(
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
     cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
-    if cleanup is not None:
+    if cleanup:
         return cleanup
 
     policy = SelectionPolicy.from_aggressiveness(
