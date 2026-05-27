@@ -30,9 +30,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     stored_strategy_mode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
     V3ActionType,
@@ -41,12 +38,28 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    build_worst_costs,
+    compute_resolve_cost_threshold,
+    is_resolve_valid,
+    merge_and_dedup_actions,
+    plan_headroom_plus_one,
+    plan_mass_cheap_promotion,
     plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
+    plan_state_rebalance,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.shelf_promotion_policy import (
-    plan_shelf_promotion_actions,
+    plan_shelf_promotion_actions,  # legacy wrapper
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
+    SelectionPolicy,
+    plan_shelf_rec_false_cleanup_down,
+)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
@@ -69,6 +82,8 @@ def select_v3_actions(
     rollout_aggressiveness: int | None = None,
     shelf_click_mode: ShelfClickMode | None = None,
     plan_max_pay_for_order: float | None = None,
+    plan: PlanData | None = None,
+    fact: FactData | None = None,
 ) -> list[V3Action]:
     """Return planned mode changes for one cycle (OVERSPEND may return several FORCE_OFF)."""
     prepared: PreparedList = []
@@ -77,6 +92,49 @@ def select_v3_actions(
         prepared.append((ctx, mode))
 
     aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
+
+    if plan is not None and fact is not None:
+        resolve = compute_resolve_cost_threshold(plan, fact)
+        if not is_resolve_valid(plan, resolve):
+            return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
+
+        click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+        policy = SelectionPolicy.from_aggressiveness(
+            click_mode=click_mode,
+            aggressiveness=aggr,
+        )
+
+        # Pre-cycle cleanup для shelf-потока.
+        if shelf_promotion_active:
+            cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
+            if cleanup is not None:
+                return cleanup
+
+        worst_costs = build_worst_costs(prepared)
+        m1_actions = plan_mass_cheap_promotion(
+            prepared,
+            resolve=resolve,
+            policy=policy,
+            worst_costs=worst_costs,
+        )
+        m2_actions = plan_state_rebalance(
+            prepared,
+            resolve=resolve,
+            policy=policy,
+            worst_costs=worst_costs,
+        )
+        m3_actions = plan_headroom_plus_one(
+            prepared,
+            resolve=resolve,
+            fact_pay_for_order=(
+                float(fact.pay_for_order) if fact.pay_for_order is not None else None
+            ),
+            policy=policy,
+        )
+        merged = merge_and_dedup_actions(m1_actions, m2_actions, m3_actions)
+        if merged:
+            return merged
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
 
     if shelf_promotion_active:
         click_mode = (

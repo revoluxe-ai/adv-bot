@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache import (
     AdvSettingRedisCache,
@@ -37,6 +37,7 @@ class LastV3UpdaterActionSnapshot(BaseModel):
     to_mode: str
     reason: str = ""
     batch_extra_count: int = 0
+    cycle_aggregate: dict[str, Any] | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -51,6 +52,7 @@ class LastV3UpdaterActionSnapshot(BaseModel):
             "to_mode": self.to_mode,
             "reason": self.reason,
             "batch_extra_count": self.batch_extra_count,
+            "cycle_aggregate": self.cycle_aggregate,
         }
         return json.dumps(payload, ensure_ascii=False)
 
@@ -77,6 +79,11 @@ class LastV3UpdaterActionSnapshot(BaseModel):
                 to_mode=str(data.get("to_mode") or ""),
                 reason=str(data.get("reason") or ""),
                 batch_extra_count=int(data.get("batch_extra_count") or 0),
+                cycle_aggregate=(
+                    data.get("cycle_aggregate")
+                    if isinstance(data.get("cycle_aggregate"), dict)
+                    else None
+                ),
             )
         except (json.JSONDecodeError, ValueError, KeyError, TypeError):
             return None
@@ -99,6 +106,7 @@ def build_snapshot_from_applied(
     to_mode: KeywordStrategyMode,
     reason: str,
     batch_extra_count: int,
+    cycle_aggregate: dict[str, Any] | None = None,
     updated_at: datetime | None = None,
 ) -> LastV3UpdaterActionSnapshot:
     """Собрать snapshot для записи в Redis после успешного apply."""
@@ -111,6 +119,7 @@ def build_snapshot_from_applied(
         to_mode=to_mode.name,
         reason=reason[:30] if reason else "",
         batch_extra_count=max(0, batch_extra_count),
+        cycle_aggregate=cycle_aggregate,
     )
 
 

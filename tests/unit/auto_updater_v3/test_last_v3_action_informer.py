@@ -51,3 +51,21 @@ def test_format_full_line_with_batch() -> None:
     assert line.startswith("UP «футболка синяя» MIN_CPA→OPTIMUM 18:32:06 26-05-2026")
     assert "(+4 ещё)" in line
     assert "(up_cost_first)" in line
+
+
+@pytest.mark.unit
+def test_format_full_line_with_cycle_aggregate() -> None:
+    snap = LastV3UpdaterActionSnapshot(
+        updated_at=datetime(2026, 5, 26, 15, 32, 6, tzinfo=timezone.utc),
+        action=V3ActionType.DOWN,
+        keyword_text="футболка синяя",
+        keyword_setting_id=1,
+        from_mode="OPTIMUM",
+        to_mode="MIN_CPA",
+        reason="m2_rebalance_down",
+        cycle_aggregate={"up": 3, "down": 2, "force_off": 1},
+    )
+    line = format_last_v3_action_str(snap)
+    assert line.startswith(
+        "+3↑ -2↓ off:1 DOWN «футболка синяя» OPTIMUM→MIN_CPA 18:32:06 26-05-2026"
+    )

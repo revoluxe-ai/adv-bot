@@ -25,12 +25,23 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.last_actio
     LastV3UpdaterActionRedisCache,
     build_snapshot_from_applied,
 )
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
 _HARD_STATUS_AUTO_MODE = 1
 _HARD_STATUS_WHITE_LIST = 2
+
+# Порядок применения в одном цикле: сначала выключаем/понижаем, затем поднимаем,
+# чтобы UP не опирался на устаревший strategy_mode до DOWN/FORCE_OFF того же тика.
+_V3_ACTION_APPLY_ORDER: dict[V3ActionType, int] = {
+    V3ActionType.FORCE_OFF: 0,
+    V3ActionType.DOWN: 1,
+    V3ActionType.UP: 2,
+    V3ActionType.REBALANCE_TRANSFER: 3,
+    V3ActionType.DO_NOTHING: 4,
+}
 
 
 @dataclass(frozen=True)
@@ -87,8 +98,19 @@ async def _persist_last_applied(
     if not applied:
         return
     last = applied[-1]
-    same_action_count = sum(1 for a in applied if a.action == last.action)
-    batch_extra = max(0, same_action_count - 1)
+    up_count = sum(1 for a in applied if a.action == V3ActionType.UP)
+    down_count = sum(1 for a in applied if a.action == V3ActionType.DOWN)
+    off_count = sum(1 for a in applied if a.action == V3ActionType.FORCE_OFF)
+    mechanism: dict[str, int] = {"m1": 0, "m2": 0, "m3": 0, "other": 0}
+    for item in applied:
+        if item.reason.startswith("m1_"):
+            mechanism["m1"] += 1
+        elif item.reason.startswith("m2_"):
+            mechanism["m2"] += 1
+        elif item.reason.startswith("m3_"):
+            mechanism["m3"] += 1
+        else:
+            mechanism["other"] += 1
     snapshot = build_snapshot_from_applied(
         action=last.action,
         keyword_text=last.keyword_text,
@@ -96,28 +118,37 @@ async def _persist_last_applied(
         from_mode=last.from_mode,
         to_mode=last.to_mode,
         reason=last.reason,
-        batch_extra_count=batch_extra,
+        batch_extra_count=0,
+        cycle_aggregate={
+            "up": up_count,
+            "down": down_count,
+            "force_off": off_count,
+            "mechanism": mechanism,
+        },
     )
     await LastV3UpdaterActionRedisCache(adv).set(snapshot)
 
 
 async def apply_v3_actions(
     actions: list[V3Action],
-    *,
-    adv: AdvSetting | None = None,
+     *,
+     complex_adv:ComplexAdv,
 ) -> None:
     """Apply UP/DOWN/FORCE_OFF/REBALANCE to ``KeywordSetting.strategy_mode`` + ``hard_status``.
 
     Args:
         actions: Запланированные действия цикла.
-        adv: РК для записи последнего действия в Redis (UI); если ``None`` — не пишем.
+        complex_adv: РК для записи последнего действия в Redis (UI); если ``None`` — не пишем.
     """
     if not actions:
         return
     applied: list[_AppliedV3Action] = []
+    ordered_actions = sorted(
+        actions, key=lambda a: _V3_ACTION_APPLY_ORDER.get(a.action, 99)
+    )
     async with sm(read_only=False) as session:
         text_cache: dict[int, str] = {}
-        for action in actions:
+        for action in ordered_actions:
             if action.action == V3ActionType.DO_NOTHING:
                 continue
             if action.action == V3ActionType.REBALANCE_TRANSFER:
@@ -187,9 +218,20 @@ async def apply_v3_actions(
                         hard_status,
                     )
                     continue
-                nxt = step_down(current)
-                if nxt is None:
-                    continue
+                if action.target_strategy_mode is not None:
+                    nxt = action.target_strategy_mode
+                    if mode_level(nxt) >= mode_level(current):
+                        logger.debug(
+                            "v3 apply skip DOWN: target not below current id=%s %s->%s",
+                            ks_id,
+                            current,
+                            nxt,
+                        )
+                        continue
+                else:
+                    nxt = step_down(current)
+                    if nxt is None:
+                        continue
                 hs = _hard_status_for_strategy_mode(nxt)
                 _ = await session.execute(
                     update(KeywordSetting)
@@ -239,7 +281,8 @@ async def apply_v3_actions(
                 )
         await session.commit()
 
-    if adv is not None and applied:
+    if  complex_adv is not None and applied:
+        adv = complex_adv.adv_setting
         await _persist_last_applied(adv, applied)
 
 

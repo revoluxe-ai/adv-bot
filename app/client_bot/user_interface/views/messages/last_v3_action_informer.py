@@ -33,8 +33,15 @@ def format_last_v3_action_str(snapshot: LastV3UpdaterActionSnapshot | None) -> s
     time_str = format_snapshot_time_msk(snapshot.updated_at)
     kw_part = f" «{snapshot.keyword_text}»" if snapshot.keyword_text else ""
     mode_part = f"{snapshot.from_mode}→{snapshot.to_mode}"
-    line = f"{snapshot.action.value}{kw_part} {mode_part} {time_str}"
-    if snapshot.batch_extra_count > 0:
+    agg = snapshot.cycle_aggregate if isinstance(snapshot.cycle_aggregate, dict) else None
+    prefix = ""
+    if agg is not None:
+        up = int(agg.get("up") or 0)
+        down = int(agg.get("down") or 0)
+        off = int(agg.get("force_off") or 0)
+        prefix = f"+{up}↑ -{down}↓ off:{off} "
+    line = f"{prefix}{snapshot.action.value}{kw_part} {mode_part} {time_str}"
+    if snapshot.batch_extra_count > 0 and agg is None:
         line += f" (+{snapshot.batch_extra_count} ещё)"
     if snapshot.reason:
         line += f" ({snapshot.reason})"

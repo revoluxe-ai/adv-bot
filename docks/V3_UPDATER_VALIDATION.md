@@ -67,6 +67,38 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
 
+## Новый state-first контракт (M1/M2/M3)
+
+В V3 решения принимаются по `state_cost = predicted_cpa(state)` относительно
+`resolve_cost_threshold`:
+
+- `resolve = target_pay_for_order`, если `fact.predict_orders >= plan.orders`;
+- иначе `resolve = max_pay_for_order`.
+
+Три механизма запускаются на каждом тике:
+
+1. `M1 (mass_cheap_promotion)` — для каждого ключа UP до наивысшего состояния с
+   `state_cost <= resolve` (только UP, без DOWN/OFF).
+2. `M2 (state_rebalance)` — работает только со `state_cost > resolve`,
+   итеративно выполняет 1:1 `DOWN` худшего активного и `UP` лучшего потенциального
+   до устранения разрыва `max(active_B) > min(potential_B)`.
+3. `M3 (headroom_plus_one)` — если `fact.pay_for_order < 0.9 * resolve`, выполняет
+   один `UP` на самый дешёвый потенциальный state.
+
+Общие guard-правила:
+
+- `hard_status in {3, 4}` — не изменяем;
+- `aggressiveness` ограничивает верхний target mode;
+- shelf-gate (при `shelf>=organic`/`UNKNOWN`) фильтрует `above_rec=False` на UP;
+- при `resolve <= 0` тик пропускается (`DO_NOTHING + warning`);
+- при `detect_campaign_state() is None` тик пропускается (`warning`, без обновления cache plan/fact).
+
+Наблюдаемость:
+
+- в `v3_cycle` логируются `resolve`, `fact_cpa`, counts (`up/down/off`) и breakdown
+  по механизмам (`m1/m2/m3`);
+- в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
+
 ## CI
 
 ```powershell

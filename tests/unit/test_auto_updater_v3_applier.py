@@ -225,6 +225,47 @@ async def test_apply_v3_down_to_off_sets_hard_status_auto(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_apply_v3_down_uses_target_strategy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = AsyncMock()
+
+    async def _execute(stmt: object) -> MagicMock:
+        sql = str(stmt)
+        if sql.startswith("SELECT"):
+            return _make_result((KeywordStrategyMode.MAX_CONVERSION, 2))
+        return MagicMock()
+
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.applier.sm",
+        _patched_sm(session_cm),
+    )
+
+    await apply_v3_actions(
+        [
+            V3Action(
+                action=V3ActionType.DOWN,
+                keyword_setting_id=1,
+                target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                reason="test_target_down",
+            )
+        ]
+    )
+
+    update_stmts = _update_stmts_from_execute(session.execute)
+    assert len(update_stmts) == 1
+    params = _update_bind_params(update_stmts[0])
+    assert params["strategy_mode"] == KeywordStrategyMode.MIN_CPA
+    assert params["hard_status"] == 2
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_apply_v3_transfer_sets_hard_status_on_both(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

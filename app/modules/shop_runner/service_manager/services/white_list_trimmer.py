@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 
 class WhiteListTrimmer:
     async def  trim(self, complex_adv: ComplexAdv) -> None:
+        if is_v3_campaign(complex_adv.auto_updater_version):
+            logger.debug(
+                "[adv_id=%s] white_list_trimmer skip for v3 campaign",
+                complex_adv.adv_id,
+            )
+            return None
         # TODO: Централизовать добавление, удаление ключей из БС
         keywords = await complex_adv.get_keywords()
         if complex_adv.auto_add_only_relevant_phrase:
