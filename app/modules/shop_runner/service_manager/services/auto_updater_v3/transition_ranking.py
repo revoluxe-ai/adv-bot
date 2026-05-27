@@ -201,8 +201,19 @@ def _has_valid_target_place_data(
     return any(mc.is_valid for mc in catalog.values())
 
 
-def _shelf_rec_filter_applies(click_mode: ShelfClickMode) -> bool:
-    """Барьер «лучше полок» только при shelf >= organic (см. auto_updater_traffic_policy)."""
+def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
+    """Активно ли полочное правило по ``above_rec`` (shelf >= organic или нет traffic DTO).
+
+    Единый триггер для:
+    - rec-gate на UP (``passes_rec_gate_for_up``): разрешены только ``above_rec`` True/None;
+    - cleanup DOWN (``plan_shelf_rec_false_cleanup_down``): сброс активных с ``above_rec=False``.
+
+    Args:
+        click_mode: Режим organic/shelf из ``resolve_shelf_click_mode`` (полочная фаза).
+
+    Returns:
+        True, если применяем полочный фильтр и cleanup (не ``ORGANIC_DOMINANT``).
+    """
     return click_mode in (
         ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
         ShelfClickMode.UNKNOWN,
@@ -215,7 +226,7 @@ def passes_rec_gate_for_up(
     click_mode: ShelfClickMode,
 ) -> bool:
     """UP разрешён: organic — без rec-барьера; на полке — не ``above_rec=False``."""
-    if not _shelf_rec_filter_applies(click_mode):
+    if not shelf_rec_conversion_policy_active(click_mode):
         return True
     return above_rec is not False
 
@@ -225,7 +236,7 @@ def _rec_tier_for_keyword(
     *,
     click_mode: ShelfClickMode,
 ) -> RecTier:
-    if not _shelf_rec_filter_applies(click_mode):
+    if not shelf_rec_conversion_policy_active(click_mode):
         return RecTier.NOT_APPLICABLE
     if above_rec is True:
         return RecTier.CONFIRMED
@@ -408,7 +419,7 @@ def plan_shelf_rec_false_cleanup_down(
     click_mode: ShelfClickMode,
 ) -> list[V3Action] | None:
     """Полка: above_rec=False → один DOWN по самому дорогому активному."""
-    if click_mode is not ShelfClickMode.SHELF_DOMINANT_OR_EQUAL:
+    if not shelf_rec_conversion_policy_active(click_mode):
         return None
 
     actives: list[tuple["KeywordV3Context", KeywordStrategyMode]] = []

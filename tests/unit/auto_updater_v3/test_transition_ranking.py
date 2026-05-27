@@ -184,6 +184,46 @@ def test_shelf_false_cleanup_down_active() -> None:
 
 
 @pytest.mark.unit
+def test_shelf_false_cleanup_down_active_when_traffic_unknown() -> None:
+    """UNKNOWN (нет traffic DTO) — тот же триггер полочного правила, что и rec-gate на UP."""
+    prof = sample_profile()
+    base = calc_kw(
+        ks_id=1,
+        text="bad",
+        mode=KeywordStrategyMode.MIN_CPA,
+        hard_status=2,
+        above_rec=False,
+    )
+    ks_dto = base.keyword_setting.model_copy(update={"hard_status": 2})
+    kw = base.model_copy(update={"keyword_setting": ks_dto})
+    prepared = [(KeywordV3Context(keyword=kw, position_profile=prof), KeywordStrategyMode.MIN_CPA)]
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.UNKNOWN,
+    )
+    assert actions is not None
+    assert actions[0].action == V3ActionType.DOWN
+
+
+@pytest.mark.unit
+def test_shelf_false_cleanup_skipped_on_organic_dominant() -> None:
+    prof = sample_profile()
+    prepared = [
+        (
+            ctx(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, profile=prof, above_rec=False),
+            KeywordStrategyMode.MIN_CPA,
+        )
+    ]
+    assert (
+        plan_shelf_rec_false_cleanup_down(
+            prepared,
+            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        )
+        is None
+    )
+
+
+@pytest.mark.unit
 def test_plan_one_up_by_policy_sets_selection_log() -> None:
     prof = sample_profile(min_pay=10.0, high_pay=15.0)
     prepared = [(ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)]
