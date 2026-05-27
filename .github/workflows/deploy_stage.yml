@@ -24,7 +24,8 @@ jobs:
       LATEST_TAG: stage
       GHCR_REGISTRY: ghcr.io
       HARBOR_REGISTRY: harbor.skyline360.ru
-      HARBOR_PROJECT: revoluxe-ai
+      HARBOR_PROJECT: git-registry-cache
+      HARBOR_REPOSITORY: revoluxe-ai/adv-bot
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,7 +64,7 @@ jobs:
         run: |
           set +e
           set -u
-          HARBOR_IMAGE="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.CR_REPOSITORY }}"
+          HARBOR_IMAGE="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.HARBOR_REPOSITORY }}"
           GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
 
           harbor_push() {
