@@ -480,7 +480,10 @@ class CoroutinesManager:
         )
         advs = [adv for adv in advs if adv.bot_active]
         advs_with_whitelist = [
-            adv for adv in advs if adv.auto_update_white_list
+            adv
+            for adv in advs
+            if adv.auto_update_white_list
+            and not is_v3_campaign(adv.auto_updater_version)
         ]
 
         handlers: list[Callable[[], Awaitable[Any]]] = []

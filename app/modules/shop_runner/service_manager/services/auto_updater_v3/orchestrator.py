@@ -36,6 +36,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_ut
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
     run_ladder_gap_rebalance_v3,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    compute_resolve_cost_threshold,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
     select_v3_actions,
@@ -142,13 +145,9 @@ async def process_adv_v3(
         """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
         await plan_fact_change.set_new_plan_fact(plan, fact)
 
-    state = detect_campaign_state(plan, fact)
+    state: SalesStates | None = detect_campaign_state(plan, fact)
     if state is None:
-        logger.info("[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id)
-        await cache_plan_fact_snapshot()
-        return
-    if state == SalesStates.OPTIMAL:
-        logger.info("[adv_id=%s] v3: OPTIMAL, no actions", complex_adv.adv_id)
+        logger.warning("[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id)
         await cache_plan_fact_snapshot()
         return
 
@@ -179,10 +178,31 @@ async def process_adv_v3(
         if shelf_active
         else None,
         plan_max_pay_for_order=float(plan.max_pay_for_order),
+        plan=plan,
+        fact=fact,
     )
-    await apply_v3_actions(actions)
+    await apply_v3_actions(actions, complex_adv=complex_adv)
 
     await cache_plan_fact_snapshot()
+    up_count = sum(1 for a in actions if a.action.value == "UP")
+    down_count = sum(1 for a in actions if a.action.value == "DOWN")
+    force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
+    m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
+    m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
+    m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
+    logger.info(
+        "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s up=%s down=%s off=%s m1=%s m2=%s m3=%s",
+        complex_adv.adv_id,
+        state.name,
+        compute_resolve_cost_threshold(plan, fact),
+        fact.pay_for_order,
+        up_count,
+        down_count,
+        force_off_count,
+        m1_count,
+        m2_count,
+        m3_count,
+    )
     for act in actions:
         sel = act.selection_log
         if sel is not None:

@@ -39,7 +39,6 @@ def test_plan_ladder_gap_rebalance_stops_up_loop_on_do_nothing() -> None:
                 position_profile=prof,
             ),
             KeywordStrategyMode.MIN_CPA,
-            True,
         ),
         (
             KeywordV3Context(
@@ -52,7 +51,6 @@ def test_plan_ladder_gap_rebalance_stops_up_loop_on_do_nothing() -> None:
                 position_profile=prof,
             ),
             KeywordStrategyMode.OFF,
-            True,
         ),
         (
             KeywordV3Context(
@@ -65,7 +63,6 @@ def test_plan_ladder_gap_rebalance_stops_up_loop_on_do_nothing() -> None:
                 position_profile=prof,
             ),
             KeywordStrategyMode.MAX_CONVERSION,
-            True,
         ),
     ]
     up_calls = 0

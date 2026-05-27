@@ -2,7 +2,26 @@
 
 ## Structured logs
 
-Строки `v3_selection` в orchestrator: `pool`, `pool_after_rec`, `tier`, `state_cost`, переход `from_mode->to_mode`, `move`, `imputed`.
+Строки `v3_selection` в orchestrator: `pool`, `tier` (`confirmed` / `missing_above_rec`), `state_cost`, переход `from_mode->to_mode`, `move`, `imputed` (worst-per-state при `missing_target_matrix`).
+
+Сигналы:
+- **missing_target_matrix** — нет валидных M/O/C в профиле; `state_cost` из worst-per-state доноров.
+- **missing_above_rec** — `above_rec_conversion is None`; на полке provisional UP, tier ниже `confirmed`.
+
+## Unified pooled contract
+
+Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:
+- для каждого ключа берем все состояния строго выше текущего;
+- считаем `state_cost` для каждого допустимого target;
+- фильтруем target по `aggressiveness`:
+  - `1` -> только `MIN`,
+  - `2` -> `MIN/OPT`,
+  - `3` -> `MIN/OPT/C`;
+- выбираем один самый дешевый кандидат из общего пула.
+
+Rec-gate:
+- при `organic > shelf` — не применяется;
+- при `shelf >= organic` и `UNKNOWN` — отсекает только `above_rec=False`.
 
 Алерт: рост доли `reason=no_valid_up_after_rec_filter`.
 
@@ -34,6 +53,59 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - если ни один ключ не выше max — один обычный DOWN (как раньше).
 
 Проверка: unit `test_select_overspend_force_off_all_keys_above_max`, shelf `test_select_overspend_shelf_force_off_above_max`.
+
+## UI: последнее V3-действие в блоке «Обновл:»
+
+Для `automatic_version == 3` в меню РК вместо строк «добавл/удал из БС» (legacy V2 Redis) показывается:
+
+`посл. V3: <ACTION> «<ключ>» <FROM>→<TO> <HH:MM:SS dd-mm-yyyy>`
+
+- **Redis:** ключ `LastV3UpdaterAction:{adv_id}`, JSON-снимок, TTL 7 суток.
+- **Запись:** после успешного `apply_v3_actions` (последнее применённое действие цикла; при пакете однотипных действий — суффикс `(+N ещё)`).
+- **Время в UI:** московское (MSK, UTC+3); в Redis — `updated_at` в UTC ISO.
+- **Нет снимка:** «Нет данных» (цикл без изменений в БД или ещё не было apply).
+
+Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
+
+## Новый state-first контракт (M1/M2/M3)
+
+В V3 решения принимаются по `state_cost = predicted_cpa(state)` относительно
+`resolve_cost_threshold`:
+
+- `resolve = target_pay_for_order`, если `fact.predict_orders >= plan.orders`;
+- иначе `resolve = max_pay_for_order`.
+
+Три механизма запускаются на каждом тике:
+
+1. `M1 (mass_cheap_promotion)` — для каждого ключа UP до наивысшего состояния с
+   `state_cost <= resolve` (только UP, без DOWN/OFF).
+2. `M2 (state_rebalance)` — работает только со `state_cost > resolve`,
+   итеративно выполняет 1:1 `DOWN` худшего активного и `UP` лучшего потенциального
+   до устранения разрыва `max(active_B) > min(potential_B)`.
+3. `M3 (headroom_plus_one)` — если `fact.pay_for_order < 0.9 * resolve`, выполняет
+   один `UP` на самый дешёвый потенциальный state.
+
+**Shelf cleanup (параллельно с M1/M2/M3):** при активной полочной фазе
+(`shelf_promotion_active` и `shelf>=organic` или `UNKNOWN`) на том же тике планируется
+массовый сброс всех активных ключей с `above_rec=False` (не проходят rec-gate на UP):
+БС — один шаг `DOWN`, авто (`hard_status=1`) — `FORCE_OFF` (applier не делает `DOWN`
+для авто). Действия cleanup сливаются с M1/M2/M3; при конфликте по `keyword_setting_id`
+побеждает cleanup. Legacy shelf-путь (`UNDERPERFORM` без plan/fact) по-прежнему может
+отдать только cleanup, если список непустой.
+
+Общие guard-правила:
+
+- `hard_status in {3, 4}` — не изменяем;
+- `aggressiveness` ограничивает верхний target mode;
+- shelf-gate (при `shelf>=organic`/`UNKNOWN`) фильтрует `above_rec=False` на UP;
+- при `resolve <= 0` тик пропускается (`DO_NOTHING + warning`);
+- при `detect_campaign_state() is None` тик пропускается (`warning`, без обновления cache plan/fact).
+
+Наблюдаемость:
+
+- в `v3_cycle` логируются `resolve`, `fact_cpa`, counts (`up/down/off`) и breakdown
+  по механизмам (`m1/m2/m3`);
+- в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
 ## CI
 

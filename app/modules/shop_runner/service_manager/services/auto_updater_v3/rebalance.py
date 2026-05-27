@@ -19,7 +19,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
     apply_v3_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    keyword_has_proven_ad_stats,
     stored_strategy_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -52,7 +51,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode, bool]
+_PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
 _PreparedList = list[_PreparedEntry]
 
 
@@ -80,8 +79,7 @@ def _build_prepared(contexts: list[KeywordV3Context]) -> _PreparedList:
     prepared: _PreparedList = []
     for ctx in contexts:
         mode = stored_strategy_mode(ctx.keyword)
-        proven = keyword_has_proven_ad_stats(ctx.keyword)
-        prepared.append((ctx, mode, proven))
+        prepared.append((ctx, mode))
     return prepared
 
 
@@ -123,7 +121,7 @@ def _mutate_prepared_after_up(prepared: _PreparedList, action: V3Action) -> None
     """Обновить mode в prepared после запланированного UP (следующая итерация цикла)."""
     if action.keyword_setting_id is None:
         return
-    for idx, (ctx, mode, proven) in enumerate(prepared):
+    for idx, (ctx, mode) in enumerate(prepared):
         if ctx.keyword.keyword_setting_original_id != action.keyword_setting_id:
             continue
         if action.target_strategy_mode is not None:
@@ -132,7 +130,7 @@ def _mutate_prepared_after_up(prepared: _PreparedList, action: V3Action) -> None
             nxt = step_up(mode)
         if nxt is None:
             return
-        prepared[idx] = (ctx, nxt, proven)
+        prepared[idx] = (ctx, nxt)
         return
 
 
@@ -154,7 +152,7 @@ def plan_ladder_gap_rebalance(
     Returns:
         Список действий: сначала FORCE_OFF, затем UP.
     """
-    keywords = [ctx.keyword for ctx, _m, _p in prepared]
+    keywords = [ctx.keyword for ctx, _m in prepared]
     sorted_wl = sort_white_list_by_min_cpo(keywords)
     gap_idx = find_first_ladder_gap_index(sorted_wl)
     if gap_idx is None:
@@ -186,12 +184,12 @@ def plan_ladder_gap_rebalance(
     # In-memory prepared: reflect tail OFF before UP planning
     wl_off_ids = {kw.keyword_setting_original_id for kw in tail}
     working: _PreparedList = []
-    for ctx, mode, proven in prepared:
+    for ctx, mode in prepared:
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id in wl_off_ids:
-            working.append((ctx, KeywordStrategyMode.OFF, proven))
+            working.append((ctx, KeywordStrategyMode.OFF))
         else:
-            working.append((ctx, mode, proven))
+            working.append((ctx, mode))
 
     applied_ups = 0
     for _ in range(budget):
@@ -259,5 +257,5 @@ async def run_ladder_gap_rebalance_v3(
         force_count,
         up_count,
     )
-    await apply_v3_actions(actions)
+    await apply_v3_actions(actions, complex_adv=complex_adv)
     return True

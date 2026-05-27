@@ -24,7 +24,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
     select_v3_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    plan_cost_first_up_one,
+    SelectionPolicy,
+    plan_one_up_by_policy,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
@@ -65,8 +66,8 @@ def _ladder_profile() -> list[PositionProfilePoint]:
 def test_v3_underperform_cost_first_jump_via_selector() -> None:
     """E2E на уровне selector: один UP, target — режим с минимальным state_cost."""
     prof = _ladder_profile()
-    prepared: list[tuple[KeywordV3Context, KeywordStrategyMode, bool]] = [
-        (ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, False)
+    prepared = [
+        (ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
     ]
     actions = select_v3_actions(
         state=SalesStates.UNDERPERFORM,
@@ -87,14 +88,14 @@ def test_v3_underperform_cost_first_jump_via_selector() -> None:
 def test_v3_plan_cost_first_organic_dominant() -> None:
     prof = _ladder_profile()
     prepared = [
-        (ctx(ks_id=7, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF, False)
+        (ctx(ks_id=7, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
     ]
-    actions = plan_cost_first_up_one(
+    actions = plan_one_up_by_policy(
         prepared,
-        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
-        layered=False,
-        aggressiveness=V3RolloutAggressiveness.MAX,
-        piecewise_shelf=False,
+        policy=SelectionPolicy.from_aggressiveness(
+            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+            aggressiveness=V3RolloutAggressiveness.MAX,
+        ),
     )
     assert actions[0].action == V3ActionType.UP
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA

@@ -82,7 +82,6 @@ def _prepared_from_keywords(keywords: list[CalculatedKeyword]) -> list:
         (
             KeywordV3Context(keyword=kw, position_profile=prof),
             kw.keyword_setting.strategy_mode,
-            True,
         )
         for kw in keywords
     ]

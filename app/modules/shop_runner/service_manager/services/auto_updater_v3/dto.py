@@ -50,10 +50,12 @@ class V3SelectionLog(BaseModel):
     pool_size_after_rec: int | None = None
     rec_tier: str | None = None
     state_cost: float | None = None
+    pay_for_order: float | None = None
     from_mode: str | None = None
     to_mode: str | None = None
     move_kind: str | None = None
     imputed: bool | None = None
+    mechanism: str | None = None
 
 
 class V3Action(BaseModel):
