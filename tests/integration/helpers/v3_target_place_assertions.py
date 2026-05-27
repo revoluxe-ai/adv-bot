@@ -60,7 +60,7 @@ def assert_profile_resolves_like_orchestrator(
     profiles: dict[str, list[BidPosition]],
     keyword_text: str,
 ) -> list[BidPosition]:
-    """Профиль найден тем же резолвером, что orchestrator и KeywordTargetPlaceUpdater."""
+    """Профиль найден тем же резолвером, что orchestrator и sync_keyword_target_places_v3."""
     resolved = resolve_keyword_bid_profile(profiles, keyword_text)
     assert resolved is not None, (
         f"профиль не найден для {keyword_text!r}, keys={list(profiles.keys())[:5]}"

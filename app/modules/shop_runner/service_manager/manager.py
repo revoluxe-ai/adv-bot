@@ -1508,8 +1508,23 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        complex_advs: list[ComplexAdv] = [adv for adv in complex_advs if adv.individual_keywords_target_place_mode]
-        wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(complex_advs)
+        complex_advs = [
+            adv for adv in complex_advs if adv.individual_keywords_target_place_mode
+        ]
+        from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+            is_v3_campaign,
+        )
+
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if not is_v3_campaign(adv.auto_updater_version)
+        ]
+        if not complex_advs:
+            return None
+        wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
+            complex_advs
+        )
 
         predict_keyword_target_place: PredictKeywordsTargetPlace = build_predict_keywords_target_place()
 

@@ -3,12 +3,7 @@ from collections.abc import Mapping
 from sqlalchemy import select, Result
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.predict_keywords_target_place import PredictKeywordsTargetPlace
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
-    resolve_keyword_bid_profile,
-)
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -27,13 +22,10 @@ class KeywordTargetPlaceUpdater:
             else 2
         )
         if ver == 3:
-            bid_profiles = (
-                await self._predict_keyword_target_place.get_keyword_bid_profiles(
-                    adv=adv,
-                    positions_size=adv.min_target_position,
-                )
+            logger.debug(
+                "V3 target_place handled in process_adv_v3, adv_id=%s",
+                adv.adv_id,
             )
-            await self._set_new_target_places_v3(adv, bid_profiles)
             return None
 
         target_places = (
@@ -78,43 +70,3 @@ class KeywordTargetPlaceUpdater:
             await session.commit()
 
         return None
-
-    async def _set_new_target_places_v3(
-        self,
-        adv: WBAdvDTO,
-        bid_profiles: dict[str, list[BidPosition]],
-    ) -> None:
-        """Пересчёт target_place по профилю для каждого кроме OFF.
-
-        Для OFF не трогаем сохранённый target_place: при переходе в OFF торги
-        отрезаются в ``UpdateClusterBidsManager`` (исключение из map_datas), поэтому
-        устаревшее значение не ведёт к активным ставкам.
-        """
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv.adv_setting_original_id
-        )
-        async with sm(read_only=False) as session:
-            result: Result[tuple[KeywordSetting]] = await session.execute(stmt)
-            keywords = result.scalars().all()
-            for keyword in keywords:
-                if keyword.strategy_mode == KeywordStrategyMode.OFF:
-                    logger.debug(
-                        "Skip target_place update for OFF keyword=%s adv_id=%s",
-                        keyword.text,
-                        adv.adv_id,
-                    )
-                    continue
-                profile = resolve_keyword_bid_profile(bid_profiles, keyword.text)
-                if not profile:
-                    logger.error(
-                        "No bid profile for keyword %s, adv_id=%s; clearing target_place",
-                        keyword.text,
-                        adv.adv_id,
-                    )
-                    keyword.target_place = None
-                    continue
-                keyword.target_place = self._predict_keyword_target_place.get_target_position_for_strategy_mode(
-                    profile,
-                    keyword.strategy_mode,
-                )
-            await session.commit()

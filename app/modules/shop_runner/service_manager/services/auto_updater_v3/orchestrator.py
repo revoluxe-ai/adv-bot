@@ -3,15 +3,16 @@
 Phase 0: gap-rebalance (БС, MIN_CPO) — всегда при наличии WBAdvDTO, до plan/fact cache.
 Phase 1: plan/fact, ``SalesStates``, ``select_v3_actions``.
 
+Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — после apply в этом же цикле.
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
+from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -43,6 +44,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
     KeywordV3Context,
     select_v3_actions,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
+    sync_keyword_target_places_v3,
+)
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
 )
@@ -53,13 +57,14 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_m
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
 
 
 def build_keyword_v3_contexts(
     keywords: list[CalculatedKeyword],
-    raw_profiles: dict[str, Any],
+    raw_profiles: dict[str, list[BidPosition]],
 ) -> list[KeywordV3Context]:
     """Собрать контексты ключей с position_profile из WB bid profiles."""
     contexts: list[KeywordV3Context] = []
@@ -71,31 +76,50 @@ def build_keyword_v3_contexts(
     return contexts
 
 
-async def _run_phase0_gap_rebalance(
+async def _load_v3_wb_context(
     complex_adv: ComplexAdv,
     *,
-    keywords: list[CalculatedKeyword],
     wb_shop_data_manager: WBShopDataManager,
-) -> list[CalculatedKeyword]:
-    """Gap-rebalance до plan/fact; возвращает актуальный список ключей."""
+) -> tuple[WBAdvDTO | None, dict[str, list[BidPosition]]]:
+    """Один запрос WBAdvDTO + bid profiles на цикл V3 (CH)."""
     shelf_active = complex_adv.shelf_promotion_active
     if shelf_active:
         await TrafficClicksManager().enrich(complex_adv)
 
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
     if not wb_dtos:
-        logger.debug(
-            "[adv_id=%s] v3 gap rebalance: no WBAdvDTO, skip",
-            complex_adv.adv_id,
-        )
-        return keywords
+        return None, {}
 
     dto = wb_dtos[0]
     predictor = build_predict_keywords_target_place()
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
     )
-    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+    return dto, raw_profiles
+
+
+async def _maybe_sync_target_places(
+    complex_adv: ComplexAdv,
+    dto: WBAdvDTO | None,
+    raw_profiles: dict[str, list[BidPosition]],
+) -> None:
+    if dto is None or not complex_adv.individual_keywords_target_place_mode:
+        return
+    await sync_keyword_target_places_v3(dto, raw_profiles)
+
+
+async def _run_phase0_gap_rebalance(
+    complex_adv: ComplexAdv,
+    *,
+    keywords: list[CalculatedKeyword],
+    contexts: list[KeywordV3Context],
+    dto: WBAdvDTO | None,
+) -> tuple[list[CalculatedKeyword], bool]:
+    """Gap-rebalance до plan/fact; возвращает актуальный список ключей и флаг apply."""
+    if dto is None:
+        return keywords, False
+
+    shelf_active = complex_adv.shelf_promotion_active
     click_mode = (
         resolve_shelf_click_mode_from_adv(complex_adv)
         if shelf_active
@@ -109,8 +133,8 @@ async def _run_phase0_gap_rebalance(
         rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
     )
     if changed:
-        return await complex_adv.get_keywords()
-    return keywords
+        return await complex_adv.get_keywords(), True
+    return keywords, False
 
 
 async def process_adv_v3(
@@ -122,11 +146,20 @@ async def process_adv_v3(
     """Run v3 cycle for one campaign (gap-rebalance, then plan/fact/state)."""
     adv = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
-    keywords = await _run_phase0_gap_rebalance(
+
+    dto, raw_profiles = await _load_v3_wb_context(
+        complex_adv, wb_shop_data_manager=wb_shop_data_manager
+    )
+    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+
+    keywords, phase0_changed = await _run_phase0_gap_rebalance(
         complex_adv,
         keywords=keywords,
-        wb_shop_data_manager=wb_shop_data_manager,
+        contexts=contexts,
+        dto=dto,
     )
+    if phase0_changed:
+        contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
     plan = AdvSettingAutoUpdater.get_plan_data(adv)
     if not plan:
@@ -140,6 +173,8 @@ async def process_adv_v3(
     plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
     if plan_fact_equal:
         logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
+        if phase0_changed:
+            await _maybe_sync_target_places(complex_adv, dto, raw_profiles)
         return
 
     async def cache_plan_fact_snapshot() -> None:
@@ -152,23 +187,14 @@ async def process_adv_v3(
         await cache_plan_fact_snapshot()
         return
 
-    shelf_active = complex_adv.shelf_promotion_active
-    if shelf_active:
-        await TrafficClicksManager().enrich(complex_adv)
-
-    wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
-    if not wb_dtos:
+    if dto is None:
         logger.warning(
             "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated (retry next cycle)",
             complex_adv.adv_id,
         )
         return
-    dto = wb_dtos[0]
-    predictor = build_predict_keywords_target_place()
-    raw_profiles = await predictor.get_keyword_bid_profiles(
-        dto, dto.min_target_position
-    )
-    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+
+    shelf_active = complex_adv.shelf_promotion_active
 
     actions = select_v3_actions(
         state=state,
@@ -183,6 +209,7 @@ async def process_adv_v3(
         fact=fact,
     )
     await apply_v3_actions(actions, complex_adv=complex_adv)
+    await _maybe_sync_target_places(complex_adv, dto, raw_profiles)
 
     await cache_plan_fact_snapshot()
     up_count = sum(1 for a in actions if a.action.value == "UP")

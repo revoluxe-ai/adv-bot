@@ -19,8 +19,8 @@ from app.modules.predict_keywords_target_place.clickhouse_manager.dto import Bid
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     resolve_keyword_bid_profile,
 )
-from app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater import (
-    KeywordTargetPlaceUpdater,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
+    sync_keyword_target_places_v3,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from tests.integration.helpers.v3_target_place_assertions import (
@@ -108,16 +108,15 @@ async def test_v3_resolve_profile_matches_orchestrator_for_mixed_case_key() -> N
 
 
 @pytest.mark.asyncio
-async def test_v3_keyword_target_place_updater_applies_modes_from_profile(
+async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """KeywordTargetPlaceUpdater: non-OFF ключи получают target_place по strategy_mode."""
+    """sync_keyword_target_places_v3: non-OFF ключи получают target_place по strategy_mode."""
     from unittest.mock import AsyncMock, MagicMock
 
     from tests.unit.test_keyword_target_place_updater_v3 import _patched_sm
 
     predictor = build_predict_keywords_target_place()
-    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
     ts = datetime.now()
     profiles = _profiles_for_db_keyword("updater_kw", ts)
 
@@ -151,7 +150,7 @@ async def test_v3_keyword_target_place_updater_applies_modes_from_profile(
     session_cm.__aenter__ = AsyncMock(return_value=session)
     session_cm.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
         _patched_sm(session_cm),
     )
 
@@ -159,7 +158,7 @@ async def test_v3_keyword_target_place_updater_applies_modes_from_profile(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await updater._set_new_target_places_v3(adv=adv, bid_profiles=profiles)  # pyright: ignore[reportPrivateUsage]
+    await sync_keyword_target_places_v3(adv=adv, bid_profiles=profiles)
 
     assert off_kw.target_place == 99
     assert_ladder_positions_distinct_and_ordered(
