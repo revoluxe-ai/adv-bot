@@ -111,11 +111,10 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
-- **`sync_keyword_target_places_v3`** (`auto_updater_v3/target_place_sync.py`) вызывается из оркестратора при `individual_keywords_target_place_mode`:
-  - после `apply_v3_actions` (phase 1), когда plan/fact изменился;
-  - при раннем выходе «plan/fact unchanged», если в том же тике сработал gap-rebalance (`phase0_changed`).
-- Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2** (`is_v3_campaign` отфильтрован в `manager`); `KeywordTargetPlaceUpdater` для `ver == 3` — early return.
-- OFF: `target_place` в БД не перезаписывается (торги OFF отрезаются в `UpdateClusterBidsManager`).
+- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot).
+- Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
+- Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
+- NDJSON-трейс длительного прогона: `debug-2e87c7.log` (`auto_updater_v3/debug_trace.py`).
 
 Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_updater_v3\test_orchestrator_profiles.py`.
 

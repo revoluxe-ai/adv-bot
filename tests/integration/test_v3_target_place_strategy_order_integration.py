@@ -111,7 +111,7 @@ async def test_v3_resolve_profile_matches_orchestrator_for_mixed_case_key() -> N
 async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """sync_keyword_target_places_v3: non-OFF ключи получают target_place по strategy_mode."""
+    """sync_keyword_target_places_v3: все ключи, OFF — позиция MIN_CPA из профиля."""
     from unittest.mock import AsyncMock, MagicMock
 
     from tests.unit.test_keyword_target_place_updater_v3 import _patched_sm
@@ -160,7 +160,8 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
 
     await sync_keyword_target_places_v3(adv=adv, bid_profiles=profiles)
 
-    assert off_kw.target_place == 99
+    # OFF: свежая позиция из профиля (как MIN_CPA), не сохранённое 99
+    assert off_kw.target_place == 3
     assert_ladder_positions_distinct_and_ordered(
         min_kw.target_place,
         opt_kw.target_place,

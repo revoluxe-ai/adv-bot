@@ -39,7 +39,7 @@ def _patch_predictor(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_sync_keyword_target_places_v3_keeps_off_target_place(
+async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     predictor = MagicMock()
@@ -47,7 +47,7 @@ async def test_sync_keyword_target_places_v3_keeps_off_target_place(
     _patch_predictor(monkeypatch, predictor)
 
     off_kw = SimpleNamespace(
-        text="kw_off",
+        text="kw_min",
         strategy_mode=KeywordStrategyMode.OFF,
         target_place=7,
     )
@@ -80,9 +80,15 @@ async def test_sync_keyword_target_places_v3_keeps_off_target_place(
         bid_profiles=_minimal_bid_profiles(),
     )
 
-    assert off_kw.target_place == 7
+    assert off_kw.target_place == 3
     assert min_kw.target_place == 3
-    predictor.get_target_position_for_strategy_mode.assert_called_once()
+    assert predictor.get_target_position_for_strategy_mode.call_count >= 1
+    off_calls = [
+        c
+        for c in predictor.get_target_position_for_strategy_mode.call_args_list
+        if c[0][1] == KeywordStrategyMode.MIN_CPA
+    ]
+    assert off_calls
 
 
 @pytest.mark.unit

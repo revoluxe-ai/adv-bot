@@ -1515,11 +1515,27 @@ class CoroutinesManager:
             is_v3_campaign,
         )
 
+        v3_skipped = sum(
+            1 for adv in complex_advs if is_v3_campaign(adv.auto_updater_version)
+        )
         complex_advs = [
             adv
             for adv in complex_advs
             if not is_v3_campaign(adv.auto_updater_version)
         ]
+        if v3_skipped:
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.debug_trace import (
+                v3_debug,
+            )
+
+            # region agent log
+            v3_debug(
+                hypothesis_id="CORO-V2",
+                location="manager.py:update_individual_keyword_target_places",
+                message="v3 campaigns skipped in 5min coroutine",
+                data={"v3_skipped": v3_skipped, "v2_remaining": len(complex_advs)},
+            )
+            # endregion
         if not complex_advs:
             return None
         wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(

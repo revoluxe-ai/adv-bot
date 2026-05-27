@@ -3,7 +3,7 @@
 Phase 0: gap-rebalance (БС, MIN_CPO) — всегда при наличии WBAdvDTO, до plan/fact cache.
 Phase 1: plan/fact, ``SalesStates``, ``select_v3_actions``.
 
-Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — после apply в этом же цикле.
+Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — на каждом тике (``finally``).
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
@@ -29,6 +29,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     apply_v3_actions,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.debug_trace import (
+    v3_debug,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -95,17 +98,19 @@ async def _load_v3_wb_context(
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
     )
+    # region agent log
+    v3_debug(
+        hypothesis_id="CH-ONCE",
+        location="orchestrator.py:_load_v3_wb_context",
+        message="bid profiles loaded",
+        data={
+            "adv_id": complex_adv.adv_id,
+            "profile_count": len(raw_profiles),
+            "shelf_active": shelf_active,
+        },
+    )
+    # endregion
     return dto, raw_profiles
-
-
-async def _maybe_sync_target_places(
-    complex_adv: ComplexAdv,
-    dto: WBAdvDTO | None,
-    raw_profiles: dict[str, list[BidPosition]],
-) -> None:
-    if dto is None or not complex_adv.individual_keywords_target_place_mode:
-        return
-    await sync_keyword_target_places_v3(dto, raw_profiles)
 
 
 async def _run_phase0_gap_rebalance(
@@ -132,6 +137,14 @@ async def _run_phase0_gap_rebalance(
         shelf_click_mode=click_mode,
         rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
     )
+    # region agent log
+    v3_debug(
+        hypothesis_id="P0",
+        location="orchestrator.py:_run_phase0_gap_rebalance",
+        message="phase0 gap-rebalance done",
+        data={"adv_id": complex_adv.adv_id, "changed": changed},
+    )
+    # endregion
     if changed:
         return await complex_adv.get_keywords(), True
     return keywords, False
@@ -150,109 +163,162 @@ async def process_adv_v3(
     dto, raw_profiles = await _load_v3_wb_context(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
-    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
-
-    keywords, phase0_changed = await _run_phase0_gap_rebalance(
-        complex_adv,
-        keywords=keywords,
-        contexts=contexts,
-        dto=dto,
+    # region agent log
+    v3_debug(
+        hypothesis_id="CYCLE",
+        location="orchestrator.py:process_adv_v3",
+        message="v3 cycle start",
+        data={
+            "adv_id": complex_adv.adv_id,
+            "keyword_count": len(keywords),
+            "has_dto": dto is not None,
+            "individual_tp_mode": complex_adv.individual_keywords_target_place_mode,
+        },
     )
-    if phase0_changed:
+    # endregion
+    try:
         contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
-    plan = AdvSettingAutoUpdater.get_plan_data(adv)
-    if not plan:
-        logger.debug("[adv_id=%s] v3: no plan, skip", complex_adv.adv_id)
-        return
-
-    updater = AdvSettingAutoUpdater(adv, max_last_period)
-    fact = await updater.get_fact_data(keywords)
-
-    plan_fact_change = ChangePlanFact(adv)
-    plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
-    if plan_fact_equal:
-        logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
-        if phase0_changed:
-            await _maybe_sync_target_places(complex_adv, dto, raw_profiles)
-        return
-
-    async def cache_plan_fact_snapshot() -> None:
-        """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
-        await plan_fact_change.set_new_plan_fact(plan, fact)
-
-    state: SalesStates | None = detect_campaign_state(plan, fact)
-    if state is None:
-        logger.warning("[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id)
-        await cache_plan_fact_snapshot()
-        return
-
-    if dto is None:
-        logger.warning(
-            "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated (retry next cycle)",
-            complex_adv.adv_id,
+        keywords, phase0_changed = await _run_phase0_gap_rebalance(
+            complex_adv,
+            keywords=keywords,
+            contexts=contexts,
+            dto=dto,
         )
-        return
+        if phase0_changed:
+            contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
-    shelf_active = complex_adv.shelf_promotion_active
+        plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        if not plan:
+            logger.debug("[adv_id=%s] v3: no plan, skip", complex_adv.adv_id)
+            return
 
-    actions = select_v3_actions(
-        state=state,
-        contexts=contexts,
-        shelf_promotion_active=shelf_active,
-        rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
-        shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
-        if shelf_active
-        else None,
-        plan_max_pay_for_order=float(plan.max_pay_for_order),
-        plan=plan,
-        fact=fact,
-    )
-    await apply_v3_actions(actions, complex_adv=complex_adv)
-    await _maybe_sync_target_places(complex_adv, dto, raw_profiles)
+        updater = AdvSettingAutoUpdater(adv, max_last_period)
+        fact = await updater.get_fact_data(keywords)
 
-    await cache_plan_fact_snapshot()
-    up_count = sum(1 for a in actions if a.action.value == "UP")
-    down_count = sum(1 for a in actions if a.action.value == "DOWN")
-    force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
-    m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
-    m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
-    m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
-    logger.info(
-        "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s up=%s down=%s off=%s m1=%s m2=%s m3=%s",
-        complex_adv.adv_id,
-        state.name,
-        compute_resolve_cost_threshold(plan, fact),
-        fact.pay_for_order,
-        up_count,
-        down_count,
-        force_off_count,
-        m1_count,
-        m2_count,
-        m3_count,
-    )
-    for act in actions:
-        sel = act.selection_log
-        if sel is not None:
-            logger.info(
-                "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
-                "pool=%s pool_after_rec=%s tier=%s state_cost=%s %s->%s move=%s imputed=%s",
-                complex_adv.adv_id,
-                state.name,
-                act.action.value,
-                act.reason,
-                sel.pool_size,
-                sel.pool_size_after_rec,
-                sel.rec_tier,
-                sel.state_cost,
-                sel.from_mode,
-                sel.to_mode,
-                sel.move_kind,
-                sel.imputed,
+        plan_fact_change = ChangePlanFact(adv)
+        plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
+        if plan_fact_equal:
+            logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
+            # region agent log
+            v3_debug(
+                hypothesis_id="PF",
+                location="orchestrator.py:process_adv_v3",
+                message="plan/fact unchanged early exit",
+                data={
+                    "adv_id": complex_adv.adv_id,
+                    "phase0_changed": phase0_changed,
+                },
             )
-    logger.info(
-        "[adv_id=%s] v3: state=%s actions=%s",
-        complex_adv.adv_id,
-        state.name,
-        [a.model_dump() for a in actions],
-    )
+            # endregion
+            return
+
+        async def cache_plan_fact_snapshot() -> None:
+            """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
+            await plan_fact_change.set_new_plan_fact(plan, fact)
+
+        state: SalesStates | None = detect_campaign_state(plan, fact)
+        if state is None:
+            logger.warning(
+                "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
+            )
+            await cache_plan_fact_snapshot()
+            return
+
+        if dto is None:
+            logger.warning(
+                "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated (retry next cycle)",
+                complex_adv.adv_id,
+            )
+            return
+
+        shelf_active = complex_adv.shelf_promotion_active
+
+        actions = select_v3_actions(
+            state=state,
+            contexts=contexts,
+            shelf_promotion_active=shelf_active,
+            rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
+            shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
+            if shelf_active
+            else None,
+            plan_max_pay_for_order=float(plan.max_pay_for_order),
+            plan=plan,
+            fact=fact,
+        )
+        await apply_v3_actions(actions, complex_adv=complex_adv)
+        # region agent log
+        v3_debug(
+            hypothesis_id="P1",
+            location="orchestrator.py:process_adv_v3",
+            message="phase1 apply done",
+            data={
+                "adv_id": complex_adv.adv_id,
+                "state": state.name,
+                "actions": len(actions),
+                "up": sum(1 for a in actions if a.action.value == "UP"),
+                "down": sum(1 for a in actions if a.action.value == "DOWN"),
+                "force_off": sum(1 for a in actions if a.action.value == "FORCE_OFF"),
+            },
+        )
+        # endregion
+
+        await cache_plan_fact_snapshot()
+        up_count = sum(1 for a in actions if a.action.value == "UP")
+        down_count = sum(1 for a in actions if a.action.value == "DOWN")
+        force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
+        m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
+        m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
+        m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
+        logger.info(
+            "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s up=%s down=%s off=%s m1=%s m2=%s m3=%s",
+            complex_adv.adv_id,
+            state.name,
+            compute_resolve_cost_threshold(plan, fact),
+            fact.pay_for_order,
+            up_count,
+            down_count,
+            force_off_count,
+            m1_count,
+            m2_count,
+            m3_count,
+        )
+        for act in actions:
+            sel = act.selection_log
+            if sel is not None:
+                logger.info(
+                    "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
+                    "pool=%s pool_after_rec=%s tier=%s state_cost=%s %s->%s move=%s imputed=%s",
+                    complex_adv.adv_id,
+                    state.name,
+                    act.action.value,
+                    act.reason,
+                    sel.pool_size,
+                    sel.pool_size_after_rec,
+                    sel.rec_tier,
+                    sel.state_cost,
+                    sel.from_mode,
+                    sel.to_mode,
+                    sel.move_kind,
+                    sel.imputed,
+                )
+        logger.info(
+            "[adv_id=%s] v3: state=%s actions=%s",
+            complex_adv.adv_id,
+            state.name,
+            [a.model_dump() for a in actions],
+        )
+    finally:
+        if (
+            dto is not None
+            and complex_adv.individual_keywords_target_place_mode
+        ):
+            await sync_keyword_target_places_v3(dto, raw_profiles)
+            # region agent log
+            v3_debug(
+                hypothesis_id="TP-EVERY-TICK",
+                location="orchestrator.py:process_adv_v3:finally",
+                message="target_place sync every tick",
+                data={"adv_id": complex_adv.adv_id},
+            )
+            # endregion
