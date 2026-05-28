@@ -53,10 +53,15 @@ class PredictKeywordsTargetPlace:
     ) -> dict[str, list[BidPosition]]:
         assert positions_size <= 300, "Количество позиций не может быть больше 300"
         nmid = adv.main_nmid
-        try:
-            min_bid = adv.search_adv_min_bids[nmid]
-        except KeyError:
-            raise
+        min_bid = adv.search_adv_min_bids.get(nmid)
+        if min_bid is None:
+            logger.error(
+                "Нет min_bid для nmid=%s в search_adv_min_bids (adv_id=%s); "
+                "профили ставок не загружаются",
+                nmid,
+                adv.adv_id,
+            )
+            return {}
         convs_carts_to_views: dict[
             str, list[ConvCartToViewsOnPosition]
         ] = await self._clickhouse_manager.get_conv_cart_to_views(

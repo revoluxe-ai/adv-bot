@@ -374,6 +374,97 @@ class WBShopDataManager:
             await self.attach_min_nmids_bids(complex_advs)
         return complex_advs
 
+    async def backfill_min_bids_for_adv(self, complex_adv: ComplexAdv) -> bool:
+        """Догрузить min_bids в Redis для РК (как ``preload_min_bids_cache_miss``).
+
+        Сначала ``refresh_min_bids_cache_miss_cells`` по cache-miss ячейкам;
+        если ``main_nmid`` всё ещё нет — запрос к WB API и запись v2-кэша
+        (``refresh_min_bids_cache``).
+
+        Returns:
+            True, если после догрузки ``main_nmid`` есть в ``min_bids.search``.
+        """
+        if self._wb_manager is None:
+            logger.error(
+                "backfill_min_bids_for_adv: WBManager недоступен shop_id=%s adv_id=%s",
+                self.shop_id,
+                complex_adv.adv_id,
+            )
+            return False
+
+        nmid = complex_adv.main_nmid
+        wb_manager = self._wb_manager
+
+        async def _main_nmid_cached() -> bool:
+            cached = await wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="v3_min_bids_check",
+            )
+            return nmid in cached.search
+
+        if await _main_nmid_cached():
+            return True
+
+        miss_cells = await wb_manager.find_min_bids_cache_miss_cells(
+            [complex_adv],
+            emit_app_log=True,
+            log_label="v3_min_bids_backfill",
+        )
+        if miss_cells:
+            try:
+                written = await wb_manager.refresh_min_bids_cache_miss_cells(
+                    miss_cells
+                )
+                logger.info(
+                    "v3_min_bids_backfill: refresh miss shop_id=%s adv_id=%s "
+                    "cells=%s written=%s",
+                    self.shop_id,
+                    complex_adv.adv_id,
+                    len(miss_cells),
+                    written,
+                )
+            except Exception:
+                logger.error(
+                    "v3_min_bids_backfill: refresh_min_bids_cache_miss_cells failed "
+                    "shop_id=%s adv_id=%s",
+                    self.shop_id,
+                    complex_adv.adv_id,
+                    exc_info=True,
+                )
+
+        if await _main_nmid_cached():
+            return True
+
+        logger.warning(
+            "v3_min_bids_backfill: cache miss for main_nmid, WB API fallback "
+            "shop_id=%s adv_id=%s nmid=%s",
+            self.shop_id,
+            complex_adv.adv_id,
+            nmid,
+        )
+        try:
+            await wb_manager.refresh_min_bids_cache([complex_adv])
+        except Exception:
+            logger.error(
+                "v3_min_bids_backfill: refresh_min_bids_cache failed shop_id=%s adv_id=%s",
+                self.shop_id,
+                complex_adv.adv_id,
+                exc_info=True,
+            )
+            return False
+
+        if await _main_nmid_cached():
+            return True
+
+        logger.error(
+            "v3_min_bids_backfill: main_nmid still missing after WB refresh "
+            "shop_id=%s adv_id=%s nmid=%s",
+            self.shop_id,
+            complex_adv.adv_id,
+            nmid,
+        )
+        return False
+
     async def attach_min_nmids_bids(self, complex_advs: list["ComplexAdv"]) -> None:
         """Подтянуть min_nmids_bids для переданных кампаний (без traffic enrich).
 

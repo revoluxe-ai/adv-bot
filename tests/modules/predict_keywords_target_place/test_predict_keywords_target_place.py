@@ -31,6 +31,23 @@ def _make_adv(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_load_bids_with_convs_returns_empty_when_min_bid_missing() -> None:
+    """Нет min_bid для main_nmid — без KeyError, пустой профиль (V3 цикл не падает)."""
+    mock_ch = AsyncMock()
+    mock_bids_manager = AsyncMock()
+    predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
+    adv = _make_adv(main_nmid=10749810, min_bid=50)
+    adv.search_adv_min_bids = {}
+
+    result = await predictor.get_keyword_bid_profiles(adv=adv, positions_size=10)
+
+    assert result == {}
+    mock_ch.get_conv_cart_to_views.assert_not_called()
+    mock_bids_manager.get_bid_positions_normalized.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_get_keywords_target_position_calls_ch_and_bids_manager():
     """Проверяем, что get_conv_cart_to_views и get_bid_positions_normalized вызываются."""
     mock_ch = AsyncMock()

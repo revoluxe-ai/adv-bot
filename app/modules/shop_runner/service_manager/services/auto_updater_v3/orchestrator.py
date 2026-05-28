@@ -91,6 +91,24 @@ async def _load_v3_wb_context(
         return None, {}
 
     dto = wb_dtos[0]
+    nmid = dto.main_nmid
+    if dto.search_adv_min_bids.get(nmid) is None:
+        logger.warning(
+            "[adv_id=%s] v3: min_bid cache miss for nmid=%s, backfill Redis/WB",
+            complex_adv.adv_id,
+            nmid,
+        )
+        if await wb_shop_data_manager.backfill_min_bids_for_adv(complex_adv):
+            wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
+            if wb_dtos:
+                dto = wb_dtos[0]
+        else:
+            logger.error(
+                "[adv_id=%s] v3: min_bid backfill failed for nmid=%s",
+                complex_adv.adv_id,
+                nmid,
+            )
+
     predictor = build_predict_keywords_target_place()
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
