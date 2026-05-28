@@ -144,10 +144,7 @@ def diagnose_keyword_v3_data(
 
 
 def _hard_status_allows_up(hard_status: int) -> bool:
-    return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
-
-
-def _hard_status_allows_force_off(hard_status: int) -> bool:
+    """Авто (1) или белый список (2): можно UP/DOWN в N-state preamble."""
     return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 
@@ -307,7 +304,7 @@ def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
                         reason=_NO_DATA_REASON,
                     )
                 )
-            elif _hard_status_allows_force_off(hard_status):
+            elif hard_status == _HARD_STATUS_AUTO_MODE:
                 _append_force_off_then_min_cpa(actions, ks_id=ks_id)
         elif mode == KeywordStrategyMode.MIN_CPA:
             if hard_status == _HARD_STATUS_AUTO_MODE:
