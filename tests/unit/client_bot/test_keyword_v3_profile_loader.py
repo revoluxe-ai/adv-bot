@@ -166,13 +166,13 @@ async def test_load_keyword_v3_profile_data_success() -> None:
 
         predictor = MagicMock()
         predictor.load_bid_profiles_for_nmid = AsyncMock(return_value={"test kw": bids})
-        predictor.get_target_position_for_strategy_mode.return_value = 1
         build_predictor.return_value = predictor
 
         result = await load_keyword_v3_profile_data(adv, _calculated_keyword())
 
     assert result is not None
     assert result.current_mode == KeywordStrategyMode.MIN_CPA
+    assert result.candidates[AggressionTargetMode.MIN_CPA].position == 1
     predictor.load_bid_profiles_for_nmid.assert_awaited_once_with(
         nmid=10749810,
         min_bid=50,

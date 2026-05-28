@@ -27,18 +27,32 @@ def _patched_sm(session_cm: AsyncMock) -> Callable[..., AsyncMock]:
     return _open
 
 
-def _minimal_bid_profiles() -> dict[str, list[BidPosition]]:
+def _ladder_bid_profiles(keyword: str = "kw_min") -> dict[str, list[BidPosition]]:
+    """Три позиции: MAX=1, OPT=2, MIN=3 при conv=0.01 (CPO min на pos 3)."""
     ts = datetime.now()
-    return {"kw_min": [BidPosition("kw_min", 1, 100, ts)]}
+    positions = [
+        (1, 500, 0.40),
+        (2, 80, 0.25),
+        (3, 60, 0.22),
+    ]
+    rows: list[BidPosition] = []
+    for pos, bid, conv in positions:
+        bp = BidPosition(keyword, pos, bid, ts)
+        bp.conv_carts_to_views = conv
+        rows.append(bp)
+    return {keyword: rows}
 
 
-def _patch_predictor(
-    monkeypatch: pytest.MonkeyPatch, predictor: MagicMock
-) -> None:
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.build_predict_keywords_target_place",
-        lambda: predictor,
-    )
+def _calc_map(text: str, *, conv: float = 0.01) -> dict[str, CalculatedKeyword]:
+    return {
+        text.lower(): _calculated_kw_fixture(
+            ks_id=1,
+            text=text,
+            mode=KeywordStrategyMode.MIN_CPA,
+            conv=conv,
+            cpm_set_bid=200,
+        )
+    }
 
 
 @pytest.mark.unit
@@ -46,10 +60,6 @@ def _patch_predictor(
 async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = MagicMock()
-    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=3)
-    _patch_predictor(monkeypatch, predictor)
-
     off_kw = SimpleNamespace(
         text="kw_min",
         strategy_mode=KeywordStrategyMode.OFF,
@@ -81,18 +91,12 @@ async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
 
     await sync_keyword_target_places_v3(
         adv=adv,
-        bid_profiles=_minimal_bid_profiles(),
+        bid_profiles=_ladder_bid_profiles(),
+        calculated_by_text=_calc_map("kw_min"),
     )
 
     assert off_kw.target_place == 3
     assert min_kw.target_place == 3
-    assert predictor.get_target_position_for_strategy_mode.call_count >= 1
-    off_calls = [
-        c
-        for c in predictor.get_target_position_for_strategy_mode.call_args_list
-        if c[0][1] == KeywordStrategyMode.MIN_CPA
-    ]
-    assert off_calls
 
 
 @pytest.mark.unit
@@ -100,9 +104,6 @@ async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
 async def test_sync_keyword_target_places_v3_sets_zero_when_no_profile_active_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = MagicMock()
-    _patch_predictor(monkeypatch, predictor)
-
     min_kw = SimpleNamespace(
         text="kw_min",
         strategy_mode=KeywordStrategyMode.MIN_CPA,
@@ -127,28 +128,28 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_profile_active_mo
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await sync_keyword_target_places_v3(adv=adv, bid_profiles={})
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles={},
+        calculated_by_text=_calc_map("kw_min"),
+    )
 
     assert min_kw.target_place == 0
-    predictor.get_target_position_for_strategy_mode.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_sync_keyword_target_places_v3_accepts_none_from_predictor(
+async def test_sync_keyword_target_places_v3_sets_zero_when_candidate_invalid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = MagicMock()
-    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=None)
-    _patch_predictor(monkeypatch, predictor)
-
-    min_kw = SimpleNamespace(
+    """Invalid кандидат активного режима → target_place=0 (min bid), не None."""
+    opt_kw = SimpleNamespace(
         text="kw_min",
-        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        strategy_mode=KeywordStrategyMode.OPTIMUM,
         target_place=5,
     )
     fake_result = MagicMock()
-    fake_result.scalars.return_value.all.return_value = [min_kw]
+    fake_result.scalars.return_value.all.return_value = [opt_kw]
 
     session = AsyncMock()
     session.execute = AsyncMock(return_value=fake_result)
@@ -162,17 +163,21 @@ async def test_sync_keyword_target_places_v3_accepts_none_from_predictor(
         _patched_sm(session_cm),
     )
 
+    ts = datetime.now()
+    bp = BidPosition("kw_min", 1, 100, ts)
+    bid_profiles = {"kw_min": [bp]}
+
     adv = MagicMock()
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
     await sync_keyword_target_places_v3(
         adv=adv,
-        bid_profiles=_minimal_bid_profiles(),
+        bid_profiles=bid_profiles,
+        calculated_by_text=_calc_map("kw_min"),
     )
 
-    assert min_kw.target_place is None
-    predictor.get_target_position_for_strategy_mode.assert_called_once()
+    assert opt_kw.target_place == 0
 
 
 @pytest.mark.unit
@@ -181,10 +186,6 @@ async def test_sync_keyword_target_places_v3_resolves_profile_with_mixed_case_ch
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """CH может вернуть ключ в исходном регистре, в БД текст ключа — lower."""
-    predictor = MagicMock()
-    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=4)
-    _patch_predictor(monkeypatch, predictor)
-
     min_kw = SimpleNamespace(
         text="kw_min",
         strategy_mode=KeywordStrategyMode.MIN_CPA,
@@ -206,17 +207,18 @@ async def test_sync_keyword_target_places_v3_resolves_profile_with_mixed_case_ch
     )
 
     ts = datetime.now()
-    bid_profiles = {
-        "Kw_Min": [BidPosition("Kw_Min", 1, 100, ts)],
-    }
+    bid_profiles = _ladder_bid_profiles("Kw_Min")
     adv = MagicMock()
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await sync_keyword_target_places_v3(adv=adv, bid_profiles=bid_profiles)
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles=bid_profiles,
+        calculated_by_text=_calc_map("kw_min"),
+    )
 
-    assert min_kw.target_place == 4
-    predictor.get_target_position_for_strategy_mode.assert_called_once()
+    assert min_kw.target_place == 3
 
 
 @pytest.mark.unit
@@ -225,9 +227,6 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_v2_cpo_with_profi
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Есть CH-профиль, но нет V2 CPO — target_place=0 (min bid)."""
-    predictor = MagicMock()
-    _patch_predictor(monkeypatch, predictor)
-
     min_kw = SimpleNamespace(
         text="kw_min",
         strategy_mode=KeywordStrategyMode.MIN_CPA,
@@ -260,11 +259,11 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_v2_cpo_with_profi
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
+    ts = datetime.now()
     await sync_keyword_target_places_v3(
         adv=adv,
-        bid_profiles=_minimal_bid_profiles(),
+        bid_profiles={"kw_min": [BidPosition("kw_min", 1, 100, ts)]},
         calculated_by_text={"kw_min": calc_kw},
     )
 
     assert min_kw.target_place == 0
-    predictor.get_target_position_for_strategy_mode.assert_not_called()

@@ -40,11 +40,6 @@ def test_profile_off_first_and_star_on_current() -> None:
                 AggressionTargetMode.MAX_CONVERSION, 3, 380.0, 145.0
             ),
         },
-        target_positions_by_mode={
-            KeywordStrategyMode.MIN_CPA: 12,
-            KeywordStrategyMode.OPTIMUM: 8,
-            KeywordStrategyMode.MAX_CONVERSION: 3,
-        },
     )
     text = format_keyword_v3_profile_block(data)
     lines = [ln for ln in text.strip().split("\n") if ln.strip()]
@@ -69,7 +64,6 @@ def test_profile_star_on_off() -> None:
     data = KeywordV3ProfileData(
         current_mode=KeywordStrategyMode.OFF,
         candidates={},
-        target_positions_by_mode={},
     )
     text = format_keyword_v3_profile_block(data)
     assert "🌟 o OFF — отключен" in text
@@ -100,7 +94,6 @@ def test_profile_invalid_candidate_shows_reason() -> None:
                 invalid_reason="no_conversion_points",
             ),
         },
-        target_positions_by_mode={},
     )
     text = format_keyword_v3_profile_block(data)
     assert "нет conv показ→заказ" in text
@@ -124,7 +117,6 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
                 AggressionTargetMode.MAX_CONVERSION, 3, 380.0, 145.0
             ),
         },
-        target_positions_by_mode={KeywordStrategyMode.MIN_CPA: 12},
     )
     text = format_keyword_v3_profile_block(data)
     assert "\\(" not in text
@@ -132,4 +124,5 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\|" not in text
     assert "поз\\. " not in text
     assert "поз. 12 | CPM" in text
+    assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text

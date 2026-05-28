@@ -52,11 +52,10 @@ _INVALID_REASON_SHORT: dict[str, str] = {
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3ProfileData:
-    """Срез профиля для одного ключа: кандидаты M/O/C и целевые позиции по режимам."""
+    """Срез профиля для одного ключа: кандидаты M/O/C лестницы V3."""
 
     current_mode: KeywordStrategyMode
     candidates: dict[AggressionTargetMode, ModeCandidate]
-    target_positions_by_mode: dict[KeywordStrategyMode, int | None]
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
@@ -93,15 +92,7 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     pos = int(cand.position) if cand.position is not None else "—"
     cpm = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
-    target = data.target_positions_by_mode.get(mode)
-    if target == 0:
-        target_str = "0 (мин.)"
-    elif target is not None:
-        target_str = str(target)
-    else:
-        target_str = "—"
     return (
-        f"{star}{letter} {label} — поз. {pos} | CPM {cpm} "
-        f"| CPO {cpo} ₽ | цель {target_str}"
+        f"{star}{letter} {label} — поз. {pos} | CPM {cpm} | CPO {cpo} ₽"
     )
 
