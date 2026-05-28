@@ -53,10 +53,10 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
     if fact.pay_for_order > plan.max_pay_for_order:
         return SalesStates.OVERSPEND
 
-    # UNDERPERFORM: недопродажи — продаж меньше плана
+    # UNDERPERFORM: недопродажи — продаж меньше плана (в т.ч. pay уже у max, но не > max)
     if (
         fact.predict_orders < plan.orders
-        and fact.pay_for_order < plan.max_pay_for_order
+        and fact.pay_for_order <= plan.max_pay_for_order
     ):
         return SalesStates.UNDERPERFORM
 
@@ -68,4 +68,4 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
         # OPTIMAL: всё в норме
         return SalesStates.OPTIMAL
 
-    return SalesStates.NO_DATA
+    return None
