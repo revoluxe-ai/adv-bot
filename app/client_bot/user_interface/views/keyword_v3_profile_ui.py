@@ -6,9 +6,6 @@ from dataclasses import dataclass
 
 from app.client_bot.user_interface.views.keyword_strategy_ui import strategy_mode_letter
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.predict_keywords_target_place.clickhouse_manager.dto.bid_position import (
-    BidPosition,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
@@ -40,11 +37,10 @@ _INVALID_REASON_SHORT: dict[str, str] = {
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3ProfileData:
-    """Срез профиля для одного ключа: кандидаты по stage и сырые точки CH."""
+    """Срез профиля для одного ключа: кандидаты M/O/C и целевые позиции по режимам."""
 
     current_mode: KeywordStrategyMode
     candidates: dict[AggressionTargetMode, ModeCandidate]
-    raw_bid_positions: list[BidPosition] | None
     target_positions_by_mode: dict[KeywordStrategyMode, int | None]
 
 

@@ -13,22 +13,16 @@ from app.core.di.di_manager import DIManager
 from app.core.di.wb_manager_hub import WBManagerHubFactory
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
-    load_v3_bid_profiles,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
-    WBShopDataManager,
-)
-from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -36,8 +30,18 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_POSITIONS_SIZE = 300
 
-async def _build_complex_adv(adv_setting: AdvSetting) -> ComplexAdv:
+
+async def _load_wb_cabinet(wb_cabinet_id: int) -> WBCabinet | None:
+    """Кабинет по id без lazy-load от detached ``AdvSetting``."""
+    stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
+    async with sm(read_only=True) as session:
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAdv:
     """Собрать ``ComplexAdv`` для одной кампании (как в ``get_keywords_for_keyboard``)."""
     search_adv = None
     search_adv_id = adv_setting.search_adv_id
@@ -49,8 +53,14 @@ async def _build_complex_adv(adv_setting: AdvSetting) -> ComplexAdv:
     return ComplexAdv(
         adv_setting=adv_setting,
         search_adv=search_adv,
-        shop_id=adv_setting.wb_cabinet.shop_id,
+        shop_id=shop_id,
     )
+
+
+def _positions_size_for_adv(adv_setting: AdvSetting) -> int:
+    if adv_setting.min_target_position is None:
+        return _DEFAULT_POSITIONS_SIZE
+    return adv_setting.min_target_position
 
 
 async def load_keyword_v3_profile_data(
@@ -62,8 +72,23 @@ async def load_keyword_v3_profile_data(
     Returns:
         Данные для UI или ``None``, если WB/CH контекст недоступен.
     """
-    complex_adv = await _build_complex_adv(adv_setting)
-    shop_id = adv_setting.wb_cabinet.shop_id
+    wb_cabinet = await _load_wb_cabinet(adv_setting.wb_cabinet_id)
+    if wb_cabinet is None:
+        logger.warning(
+            "v3 keyword profile: wb_cabinet not found id=%s adv_id=%s",
+            adv_setting.wb_cabinet_id,
+            adv_setting.adv_id,
+        )
+        return None
+
+    shop_id = wb_cabinet.shop_id
+    complex_adv = await _build_complex_adv(adv_setting, shop_id)
+    nmids = list(adv_setting.nmids) if adv_setting.nmids else []
+    if not nmids:
+        return None
+    nmid = nmids[0]
+    positions_size = _positions_size_for_adv(adv_setting)
+
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
             factory = cast(
@@ -71,19 +96,37 @@ async def load_keyword_v3_profile_data(
                 container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory(),  # pyright: ignore
             )
             hub = factory.get_wb_manager_hub(shop_id)
-            wb_shop_data_manager = WBShopDataManager(
-                wb_cabinet=adv_setting.wb_cabinet,
-                tasks_manager=TasksManager(max_workers=1),
-                wb_api_data_manager=hub.wb_data_manager,
-                wb_manager=hub.wb_manager,
-            )
-            _dto, raw_profiles = await load_v3_bid_profiles(
-                complex_adv,
-                wb_shop_data_manager=wb_shop_data_manager,
+            min_bids = await hub.wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="v3_keyword_profile_ui",
             )
     except Exception:
         logger.exception(
-            "v3 keyword profile load failed adv_id=%s keyword=%s",
+            "v3 keyword profile: min_bids load failed adv_id=%s keyword=%s",
+            adv_setting.adv_id,
+            calculated_keyword.text,
+        )
+        return None
+
+    min_bid = min_bids.search.get(nmid)
+    if min_bid is None:
+        logger.warning(
+            "v3 keyword profile: no min_bid in cache nmid=%s adv_id=%s",
+            nmid,
+            adv_setting.adv_id,
+        )
+        return None
+
+    try:
+        predictor = build_predict_keywords_target_place()
+        raw_profiles = await predictor.load_bid_profiles_for_nmid(
+            nmid=nmid,
+            min_bid=min_bid,
+            positions_size=positions_size,
+        )
+    except Exception:
+        logger.exception(
+            "v3 keyword profile: CH load failed adv_id=%s keyword=%s",
             adv_setting.adv_id,
             calculated_keyword.text,
         )
@@ -100,7 +143,6 @@ async def load_keyword_v3_profile_data(
         conv_views_to_orders=calculated_keyword.conv_views_to_orders,
     )
 
-    predictor = build_predict_keywords_target_place()
     target_by_mode: dict[KeywordStrategyMode, int | None] = {}
     for mode in (
         KeywordStrategyMode.MIN_CPA,
@@ -117,6 +159,5 @@ async def load_keyword_v3_profile_data(
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
-        raw_bid_positions=bids,
         target_positions_by_mode=target_by_mode,
     )

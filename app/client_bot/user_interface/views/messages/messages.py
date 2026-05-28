@@ -46,9 +46,6 @@ from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
     load_keyword_v3_profile_data,
 )
-from app.client_bot.user_interface.views.keyword_strategy_ui import (
-    keyword_strategy_tag,
-)
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     format_keyword_v3_profile_block,
 )
@@ -634,7 +631,6 @@ class KeywordSettingMessage(TextWithKeyboard):
             text += f"Выше конв. рек.: {rec_str}\n"
 
         if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
-            text += f"Режим лестницы V3: {keyword_strategy_tag(self._calculated_keyword)}\n"
             if self._v3_profile_block:
                 text += self._v3_profile_block
 

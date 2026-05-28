@@ -123,6 +123,16 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_updater_v3\test_orchestrator_profiles.py`.
 
+## Telegram: профиль ключа (V3)
+
+- Карточка одного ключа (`KeywordSettingMessage`) при `automatic_version == 3`.
+- Блок «Профиль ключа (V3)»: ступени OFF → MIN_CPA → OPTIMUM → MAX_CONVERSION; `🌟` на текущем `strategy_mode`.
+- Метрики M/O/C — `build_mode_candidates` (позиция, CPM, CPO, цель по режиму) на том же CH-профиле, что updater (`load_bid_profiles_for_nmid` + `resolve_keyword_bid_profile`).
+- Загрузка: `min_bid` из Redis (`get_min_bids_cache_only`), без полного `get_wb_advs_dto` на клик.
+- Нет CH / min_bid в кеше — «недоступен», экран ключа не падает.
+
+Unit: `tests\unit\client_bot\test_keyword_v3_profile_ui.py`, `tests\unit\client_bot\test_keyword_v3_profile_loader.py`.
+
 ## CI
 
 ```powershell

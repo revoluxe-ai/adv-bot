@@ -40,7 +40,6 @@ def test_profile_off_first_and_star_on_current() -> None:
                 AggressionTargetMode.MAX_CONVERSION, 3, 380.0, 145.0
             ),
         },
-        raw_bid_positions=None,
         target_positions_by_mode={
             KeywordStrategyMode.MIN_CPA: 12,
             KeywordStrategyMode.OPTIMUM: 8,
@@ -67,7 +66,6 @@ def test_profile_star_on_off() -> None:
     data = KeywordV3ProfileData(
         current_mode=KeywordStrategyMode.OFF,
         candidates={},
-        raw_bid_positions=None,
         target_positions_by_mode={},
     )
     text = format_keyword_v3_profile_block(data)
@@ -78,3 +76,30 @@ def test_profile_star_on_off() -> None:
 def test_profile_unavailable_when_none() -> None:
     text = format_keyword_v3_profile_block(None)
     assert "недоступен" in text
+
+
+@pytest.mark.unit
+def test_profile_invalid_candidate_shows_reason() -> None:
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.OPTIMUM,
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                is_valid=False,
+                invalid_reason="no_keyword_conv_views_to_orders",
+            ),
+            AggressionTargetMode.OPTIMUM: _valid_candidate(
+                AggressionTargetMode.OPTIMUM, 5, 200.0, 90.0
+            ),
+            AggressionTargetMode.MAX_CONVERSION: ModeCandidate(
+                mode=AggressionTargetMode.MAX_CONVERSION,
+                is_valid=False,
+                invalid_reason="no_conversion_points",
+            ),
+        },
+        target_positions_by_mode={},
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "нет conv показ→заказ" in text
+    assert "нет конверсий" in text
+    assert "🌟" in text and "OPTIMUM" in text
