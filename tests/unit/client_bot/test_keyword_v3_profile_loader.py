@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
+    _positions_size_for_adv,
     load_keyword_v3_profile_data,
 )
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -58,6 +59,22 @@ def _calculated_keyword() -> CalculatedKeyword:
         target_pay_for_order=None,
         rating=1.0,
     )
+
+
+@pytest.mark.unit
+def test_positions_size_for_adv_clamps_above_predictor_limit() -> None:
+    adv = MagicMock()
+    adv.adv_id = 99
+    adv.min_target_position = 500
+    assert _positions_size_for_adv(adv) == 300
+
+
+@pytest.mark.unit
+def test_positions_size_for_adv_uses_default_when_none() -> None:
+    adv = MagicMock()
+    adv.adv_id = 1
+    adv.min_target_position = None
+    assert _positions_size_for_adv(adv) == 300
 
 
 @pytest.mark.unit

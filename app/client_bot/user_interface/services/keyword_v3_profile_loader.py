@@ -31,6 +31,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 logger = logging.getLogger(__name__)
 
 _DEFAULT_POSITIONS_SIZE = 300
+_MAX_POSITIONS_SIZE = 300  # как в ``PredictKeywordsTargetPlace.load_bid_profiles_for_nmid``
 
 
 async def _load_wb_cabinet(wb_cabinet_id: int) -> WBCabinet | None:
@@ -58,9 +59,26 @@ async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAd
 
 
 def _positions_size_for_adv(adv_setting: AdvSetting) -> int:
+    """Размер профиля позиций для CH; не больше лимита предиктора (300)."""
     if adv_setting.min_target_position is None:
         return _DEFAULT_POSITIONS_SIZE
-    return adv_setting.min_target_position
+    size = int(adv_setting.min_target_position)
+    if size > _MAX_POSITIONS_SIZE:
+        logger.warning(
+            "v3 keyword profile: min_target_position=%s > %s for adv_id=%s, clamping",
+            size,
+            _MAX_POSITIONS_SIZE,
+            adv_setting.adv_id,
+        )
+        return _MAX_POSITIONS_SIZE
+    if size < 1:
+        logger.warning(
+            "v3 keyword profile: min_target_position=%s < 1 for adv_id=%s, using 1",
+            size,
+            adv_setting.adv_id,
+        )
+        return 1
+    return size
 
 
 async def load_keyword_v3_profile_data(
