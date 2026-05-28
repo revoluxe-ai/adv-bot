@@ -76,6 +76,22 @@ class Settings:
         raise Exception("Не верное значение в TEST_MODE")
 
     @property
+    def run_local(self) -> bool:
+        """Локальная разработка: kubectl port-forward к PG/CH в k8s (см. app.dev_local.k8s_tunnels).
+
+        По умолчанию False. Включить: RUN_LOCAL=true
+        """
+        value = os.environ.get("RUN_LOCAL")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "false":
+            return False
+        if value == "true":
+            return True
+        raise ValueError("Не верное значение в RUN_LOCAL")
+
+    @property
     def polling_mode(self) -> bool:
         value = os.environ.get("POLLING_MODE")
         if value is None:
@@ -772,4 +788,15 @@ class Settings:
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
+
+
+def _bootstrap_dev_local() -> None:
+    """При RUN_LOCAL=true поднимает kubectl port-forward до импорта БД-клиентов."""
+    if os.environ.get("RUN_LOCAL", "").strip().lower() == "true":
+        from app.dev_local.k8s_tunnels import start_dev_tunnels_monitor
+
+        start_dev_tunnels_monitor()
+
+
+_bootstrap_dev_local()
 settings = Settings()
