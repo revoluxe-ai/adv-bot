@@ -12,6 +12,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
+    mode_level,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     apply_v3_actions,
 )
@@ -87,6 +90,16 @@ def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
 def keyword_lacks_v3_decision_data(ctx: "KeywordV3Context") -> bool:
     """Ключ без данных для V3: нет V2 CPO (не матрица CH)."""
     return keyword_v2_pay_for_order_unavailable(ctx.keyword)
+
+
+def rebalance_ladder_points(
+    keyword: CalculatedKeyword,
+    mode: KeywordStrategyMode,
+) -> int:
+    """Баллы gap-rebalance при снятии/включении: ключ без V2 CPO = 1, иначе ``mode_level``."""
+    if keyword_v2_pay_for_order_unavailable(keyword):
+        return 1
+    return mode_level(mode)
 
 
 def split_prepared_by_v2_cpo(

@@ -123,6 +123,7 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - **Ключ «нет данных»:** нет V2 CPO — та же цепочка, что рейтинг V2: `conv_views_to_orders` + CPM каскад → `orders_per_1000_rub` → `pay_for_order` (`keyword_v2_pay_for_order_unavailable`). Отсутствие только матрицы CH **не** считается no-data для активации.
 - **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
 - **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
+- **Gap-rebalance:** `rebalance_ladder_points` — нет V2 CPO = **1 балл** (снятие хвоста и UP), как MIN_CPA.
 - **UI:** `SalesStates` в меню РК (`sales_state_short_label`); в списке ключей `target_place=0` → `->0` (мин. ставка WB), `None` → `->Н>`.
 - **`target_place`:** `0` = min bid WB (`NO_DATA_TARGET_PLACE_FALLBACK`); в sync передаётся `calculated_by_text` из orchestrator для проверки V2 CPO.
 

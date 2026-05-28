@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     keyword_lacks_v3_decision_data,
     keyword_v2_pay_for_order_unavailable,
     plan_no_data_min_up_actions,
+    rebalance_ladder_points,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -149,3 +150,17 @@ def test_plan_no_data_skips_when_v2_cpo_available() -> None:
 @pytest.mark.unit
 def test_no_data_target_place_fallback_is_min_bid_sentinel() -> None:
     assert NO_DATA_TARGET_PLACE_FALLBACK == 0
+
+
+@pytest.mark.unit
+def test_rebalance_ladder_points_no_data_off_counts_one() -> None:
+    off = _kw(ks_id=10, text="nd", mode=KeywordStrategyMode.OFF, conv=0.0)
+    assert rebalance_ladder_points(off, KeywordStrategyMode.OFF) == 1
+
+
+@pytest.mark.unit
+def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
+    min_kw = _kw(ks_id=11, text="ok", mode=KeywordStrategyMode.MIN_CPA, conv=0.08, cpm_set_bid=200)
+    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.MIN_CPA) == 1
+    opt = _kw(ks_id=12, text="ok2", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    assert rebalance_ladder_points(opt, KeywordStrategyMode.OPTIMUM) == 2

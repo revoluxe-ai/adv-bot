@@ -18,9 +18,10 @@ class SalesStateMeta:
     goal_ru: str
 
 
+# Буквы только для состояния кампании в меню РК. «П-» у ключа в списке — полка (rec), не OVERSPEND.
 SALES_STATE_META: dict[SalesStates, SalesStateMeta] = {
     SalesStates.OVERSPEND: SalesStateMeta(
-        letter="П",
+        letter="Пр",
         title_ru="Перерасход",
         goal_ru="снизить расход",
     ),
@@ -64,8 +65,8 @@ def sales_state_short_label(state: SalesStates) -> str:
 def format_keyword_list_target_place_suffix(target_place: int | None) -> str:
     """Суффикс целевой позиции в списке ключей.
 
-    - ``None`` — нет индивидуальной цели (OFF / не задано): ``->Н>``.
-    - ``0`` — мин. ставка WB (V3 NO_DATA): ``->0``.
+    - ``None`` — нет индивидуальной цели (OFF / не задано): ``->Н>`` (не состояние кампании).
+    - ``0`` — мин. ставка WB (нет V2 CPO / sentinel): ``->0``.
     - ``>0`` — позиция из CH: ``->N``.
     """
     if target_place is None:
