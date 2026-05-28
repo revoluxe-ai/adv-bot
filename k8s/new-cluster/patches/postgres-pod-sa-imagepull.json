@@ -1,0 +1,10 @@
+[
+  {
+    "op": "add",
+    "path": "/imagePullSecrets",
+    "value": [
+      {"name": "harbor-skyline360-login-secret"},
+      {"name": "git-registry-login-secret"}
+    ]
+  }
+]

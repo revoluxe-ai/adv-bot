@@ -22,14 +22,19 @@ _STRATEGY_MODE_DETAIL: dict[KeywordStrategyMode, str] = {
 }
 
 
+def strategy_mode_letter(mode: KeywordStrategyMode) -> str:
+    """Буква режима V3 по ``KeywordStrategyMode``."""
+    return _STRATEGY_MODE_LETTER.get(mode, "?")
+
+
 def keyword_strategy_letter(keyword: CalculatedKeyword) -> str:
     """Одна буква режима V3 для строки ключа в списке кнопок."""
-    return _STRATEGY_MODE_LETTER.get(keyword.strategy_mode, "?")
+    return strategy_mode_letter(keyword.strategy_mode)
 
 
 def keyword_strategy_tag(keyword: CalculatedKeyword) -> str:
     """Полное описание режима V3: буква и расшифровка (экран одного ключа)."""
     mode = keyword.strategy_mode
-    letter = keyword_strategy_letter(keyword)
+    letter = strategy_mode_letter(mode)
     detail = _STRATEGY_MODE_DETAIL.get(mode, f"неизвестный режим: {mode!r}")
     return f"{letter}({detail})"

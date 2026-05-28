@@ -76,6 +76,17 @@ def build_keyword_v3_contexts(
     return contexts
 
 
+async def load_v3_bid_profiles(
+    complex_adv: ComplexAdv,
+    *,
+    wb_shop_data_manager: WBShopDataManager,
+) -> tuple[WBAdvDTO | None, dict[str, list[BidPosition]]]:
+    """WBAdvDTO и профили ставок CH для V3 (updater, UI карточки ключа)."""
+    return await _load_v3_wb_context(
+        complex_adv, wb_shop_data_manager=wb_shop_data_manager
+    )
+
+
 async def _load_v3_wb_context(
     complex_adv: ComplexAdv,
     *,

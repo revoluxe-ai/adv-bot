@@ -1,0 +1,5 @@
+{
+  "spec": {
+    "dockerImage": "harbor.skyline360.ru/git-registry-cache/zalando/spilo-17:4.0-p3"
+  }
+}
