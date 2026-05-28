@@ -3,7 +3,8 @@
 Phase 0: gap-rebalance (БС, MIN_CPO) — всегда при наличии WBAdvDTO, до plan/fact cache.
 Phase 1: plan/fact, ``SalesStates``, ``select_v3_actions``.
 
-Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — на каждом тике (``finally``).
+Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — на каждом тике
+(после apply и в ``finally`` при раннем выходе). OVERSPEND не режется short-circuit plan/fact.
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
@@ -184,6 +185,17 @@ async def process_adv_v3(
     dto, raw_profiles = await _load_v3_wb_context(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
+    target_place_synced = False
+
+    async def _sync_target_places_once() -> None:
+        """Один раз за тик: после apply (если был) или в finally при раннем return."""
+        nonlocal target_place_synced
+        if target_place_synced:
+            return
+        if dto is not None and complex_adv.individual_keywords_target_place_mode:
+            await _safe_sync_target_places_v3(complex_adv, dto, raw_profiles)
+            target_place_synced = True
+
     try:
         contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
@@ -205,8 +217,9 @@ async def process_adv_v3(
         fact = await updater.get_fact_data(keywords)
 
         plan_fact_change = ChangePlanFact(adv)
+        state: SalesStates | None = detect_campaign_state(plan, fact)
         plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
-        if plan_fact_equal:
+        if plan_fact_equal and state != SalesStates.OVERSPEND:
             logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
             return
 
@@ -214,7 +227,6 @@ async def process_adv_v3(
             """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
             await plan_fact_change.set_new_plan_fact(plan, fact)
 
-        state: SalesStates | None = detect_campaign_state(plan, fact)
         if state is None:
             logger.warning(
                 "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
@@ -244,6 +256,7 @@ async def process_adv_v3(
             fact=fact,
         )
         await apply_v3_actions(actions, complex_adv=complex_adv)
+        await _sync_target_places_once()
 
         await cache_plan_fact_snapshot()
         up_count = sum(1 for a in actions if a.action.value == "UP")
@@ -291,6 +304,5 @@ async def process_adv_v3(
             [a.model_dump() for a in actions],
         )
     finally:
-        # Best-effort target_place; сбой sync не маскирует исключение из try (см. _safe_sync_*).
-        if dto is not None and complex_adv.individual_keywords_target_place_mode:
-            await _safe_sync_target_places_v3(complex_adv, dto, raw_profiles)
+        # target_place на каждом тике; при успешном apply уже синхронизировали выше.
+        await _sync_target_places_once()

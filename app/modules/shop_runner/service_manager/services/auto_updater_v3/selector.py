@@ -98,6 +98,16 @@ def select_v3_actions(
         if not is_resolve_valid(plan, resolve):
             return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
 
+        # Главный путь orchestrator всегда передаёт plan/fact; OVERSPEND обрабатываем
+        # до M1/M2/M3 (массовый FORCE_OFF по ключам выше max).
+        if state == SalesStates.OVERSPEND:
+            max_pfo = plan_max_pay_for_order
+            if max_pfo is None:
+                max_pfo = float(plan.max_pay_for_order)
+            return plan_overspend_actions(
+                prepared, max_pay_for_order=float(max_pfo)
+            )
+
         click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
         policy = SelectionPolicy.from_aggressiveness(
             click_mode=click_mode,

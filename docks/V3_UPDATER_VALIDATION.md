@@ -57,7 +57,11 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - ключи с `pay_for_order is None` не трогаются;
 - если ни один ключ не выше max — один обычный DOWN (как раньше).
 
-Проверка: unit `test_select_overspend_force_off_all_keys_above_max`, shelf `test_select_overspend_shelf_force_off_above_max`.
+Проверка: unit `test_select_overspend_force_off_all_keys_above_max`,
+`test_select_overspend_force_off_with_plan_and_fact`, shelf `test_select_overspend_shelf_force_off_above_max`.
+
+При неизменном plan/fact в Redis цикл обычно пропускается, **кроме OVERSPEND** — пока факт
+кампании `> max`, селектор и apply выполняются каждый тик (`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
 
 ## UI: последнее V3-действие в блоке «Обновл:»
 
@@ -117,7 +121,7 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot). Вызов через `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
+- **`sync_keyword_target_places_v3`** — на каждом тике при `individual_keywords_target_place_mode` (один CH snapshot): после `apply_v3_actions`, при раннем return — в `finally` (`_sync_target_places_once`, без двойного вызова). `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
 - Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
 
