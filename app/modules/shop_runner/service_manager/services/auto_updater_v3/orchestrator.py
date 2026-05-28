@@ -98,6 +98,32 @@ async def _load_v3_wb_context(
     return dto, raw_profiles
 
 
+async def _safe_sync_target_places_v3(
+    complex_adv: ComplexAdv,
+    dto: WBAdvDTO,
+    raw_profiles: dict[str, list[BidPosition]],
+) -> None:
+    """Best-effort sync ``target_place`` в ``finally`` без подмены ошибки из ``try``.
+
+    Зачем отдельная обёртка, а не прямой вызов ``sync_keyword_target_places_v3`` в
+    ``finally``: блок ``finally`` выполняется всегда (успех, ранний return, сбой
+    phase0/apply). Нам нужно на каждом тике попытаться записать свежие
+    ``target_place`` в БД. Если sync падает (БД, сеть), исключение **нельзя**
+    пробрасывать из ``finally`` — иначе Python подменит исходную ошибку из ``try``
+    (PEP 409) и в логах/алертах будет не та причина. Поэтому здесь только ERROR-лог
+    и подавление ошибки sync; основной сбой цикла по-прежнему уходит наверх.
+    """
+    try:
+        await sync_keyword_target_places_v3(dto, raw_profiles)
+    except Exception:
+        logger.error(
+            "[adv_id=%s] v3: target_place sync failed in finally "
+            "(original try exception preserved, not re-raised)",
+            complex_adv.adv_id,
+            exc_info=True,
+        )
+
+
 async def _run_phase0_gap_rebalance(
     complex_adv: ComplexAdv,
     *,
@@ -247,5 +273,6 @@ async def process_adv_v3(
             [a.model_dump() for a in actions],
         )
     finally:
+        # Best-effort target_place; сбой sync не маскирует исключение из try (см. _safe_sync_*).
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
-            await sync_keyword_target_places_v3(dto, raw_profiles)
+            await _safe_sync_target_places_v3(complex_adv, dto, raw_profiles)

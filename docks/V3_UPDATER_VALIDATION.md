@@ -116,7 +116,7 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
-- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot).
+- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot). Вызов через `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
 - Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
 
