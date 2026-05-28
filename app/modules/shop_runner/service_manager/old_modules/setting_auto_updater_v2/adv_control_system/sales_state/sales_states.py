@@ -4,7 +4,8 @@ OVERSPEND	снизить расход	отключаем ключи, пониж�
 UNDERPERFORM	нарастить продажи	повышаем ставки, добавляем ключи
 STABLE	снизить себестоимость без потери заказов	плавное уменьшение ставок
 OPTIMAL	удерживать результат	ничего не делаем
-None	пауза или нет данных	ждём обновлений
+NO_DATA (Н)	нет данных plan/fact	ключи: target_place=0, MIN_CPA
+None	пауза (битый план)	ждём обновлений
 
 
 
@@ -23,6 +24,12 @@ class SalesStates(Enum):
     UNDERPERFORM = auto()  # Нарастить продажи
     STABLE = auto()  # Снизить себестоимость без потери заказов
     OPTIMAL = auto()  # Удерживать результат
+    NO_DATA = auto()  # Н — нет данных для plan/fact (V3: MIN_CPA + target_place 0)
+
+
+# При недовыполнении плана: pay в [90%; max] — стабилизация (OPTIMAL), не рост ключей.
+# Совпадает с порогом M3 headroom в V3 (``plan_headroom_plus_one``).
+MAX_PAY_STABILIZATION_RATIO = 0.9
 
 
 def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
@@ -45,17 +52,19 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
         return None
 
     if fact.pay_for_order is None:
-        return None
+        return SalesStates.NO_DATA
 
     # OVERSPEND: перерасход — расходы выше максимума
     if fact.pay_for_order > plan.max_pay_for_order:
         return SalesStates.OVERSPEND
 
-    # UNDERPERFORM: недопродажи — продаж меньше плана
-    if (
-        fact.predict_orders < plan.orders
-        and fact.pay_for_order < plan.max_pay_for_order
-    ):
+    if fact.predict_orders < plan.orders:
+        max_pfo = float(plan.max_pay_for_order)
+        pay = float(fact.pay_for_order)
+        stabilization_floor = MAX_PAY_STABILIZATION_RATIO * max_pfo
+        # 90–100% от max при недопродажах: удержание, без добавления/снятия ключей (OPTIMAL)
+        if pay >= stabilization_floor:
+            return SalesStates.OPTIMAL
         return SalesStates.UNDERPERFORM
 
     # План выполнен
@@ -66,5 +75,4 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
         # OPTIMAL: всё в норме
         return SalesStates.OPTIMAL
 
-    # Если данных недостаточно
     return None

@@ -48,6 +48,37 @@ class PredictKeywordsTargetPlace:
         """Per-keyword bid+conv curves (no strategy collapse). Same contract as mapping step in get_keywords_target_position."""
         return await self._load_bids_with_convs(adv, positions_size)
 
+    async def load_bid_profiles_for_nmid(
+        self,
+        *,
+        nmid: int,
+        min_bid: int,
+        positions_size: int,
+    ) -> dict[str, list[BidPosition]]:
+        """Профили ставок по всем ключам NMID (только CH, без WBAdvDTO).
+
+        Используется UI карточки ключа V3; контракт ключей — как у ``get_keyword_bid_profiles``.
+        """
+        assert positions_size <= 300, "Количество позиций не может быть больше 300"
+        if min_bid <= 0:
+            logger.error(
+                "load_bid_profiles_for_nmid: min_bid=%s для nmid=%s — профили не загружаются",
+                min_bid,
+                nmid,
+            )
+            return {}
+        convs_carts_to_views: dict[
+            str, list[ConvCartToViewsOnPosition]
+        ] = await self._clickhouse_manager.get_conv_cart_to_views(
+            nmid=nmid, positions_size=positions_size
+        )
+        rows: dict[
+            str, list[BidPositionRow]
+        ] = await self._bids_for_positions_manager.get_bid_positions_normalized(
+            nmid=nmid, min_bid=min_bid, positions_size=positions_size
+        )
+        return self._map_rows_to_bid_positions(rows, convs_carts_to_views)
+
     async def _load_bids_with_convs(
         self, adv: WBAdvDTO, positions_size: int
     ) -> dict[str, list[BidPosition]]:
@@ -62,17 +93,11 @@ class PredictKeywordsTargetPlace:
                 adv.adv_id,
             )
             return {}
-        convs_carts_to_views: dict[
-            str, list[ConvCartToViewsOnPosition]
-        ] = await self._clickhouse_manager.get_conv_cart_to_views(
-            nmid=nmid, positions_size=positions_size
+        return await self.load_bid_profiles_for_nmid(
+            nmid=nmid,
+            min_bid=min_bid,
+            positions_size=positions_size,
         )
-        rows: dict[
-            str, list[BidPositionRow]
-        ] = await self._bids_for_positions_manager.get_bid_positions_normalized(
-            nmid=nmid, min_bid=min_bid, positions_size=positions_size
-        )
-        return self._map_rows_to_bid_positions(rows, convs_carts_to_views)
 
     def _map_rows_to_bid_positions(
         self,

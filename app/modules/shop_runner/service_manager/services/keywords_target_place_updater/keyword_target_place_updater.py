@@ -51,7 +51,7 @@ class KeywordTargetPlaceUpdater:
                 text = keyword.text
                 resolved = target_places.get(text.lower())
                 if resolved is None:
-                    logger.error(
+                    logger.warning(
                         "No target place data for keyword %s, adv_id=%s; leaving target_place unset",
                         text,
                         adv.adv_id,

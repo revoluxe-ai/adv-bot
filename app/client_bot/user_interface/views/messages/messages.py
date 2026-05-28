@@ -43,8 +43,11 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
-from app.client_bot.user_interface.views.keyword_strategy_ui import (
-    keyword_strategy_tag,
+from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
+    load_keyword_v3_profile_data,
+)
+from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
+    format_keyword_v3_profile_block,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
     normalize_automatic_version_ui,
@@ -496,6 +499,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
         self._chat_id = chat_id
+        self._v3_profile_block: str | None = None
 
     @staticmethod
     async def _get_calculated_keyword(
@@ -542,6 +546,20 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.fact_ctr = keyword.ctr
 
         self.spend = keyword.spend
+
+        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+            try:
+                profile_data = await load_keyword_v3_profile_data(
+                    adv_setting, calculated_keyword
+                )
+                self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
+            except Exception:
+                logger.exception(
+                    "Failed to load v3 keyword profile for keyword_setting_id=%s",
+                    self._keyword_original_id,
+                )
+                self._v3_profile_block = format_keyword_v3_profile_block(None)
+
         return await super().__call__()
 
     @property
@@ -613,7 +631,8 @@ class KeywordSettingMessage(TextWithKeyboard):
             text += f"Выше конв. рек.: {rec_str}\n"
 
         if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
-            text += f"Режим лестницы V3: {keyword_strategy_tag(self._calculated_keyword)}\n"
+            if self._v3_profile_block:
+                text += self._v3_profile_block
 
         pos = self.position
         if pos > 0:

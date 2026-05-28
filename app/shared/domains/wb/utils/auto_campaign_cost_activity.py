@@ -6,8 +6,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
+    SalesStates,
+    detect_campaign_state,
+)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
+    fact_data_from_plan_fact_summary,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.utils.cost_resolver import (
@@ -26,6 +31,7 @@ class AutoCampaignCostActivityMetrics:
     plan_set: bool  # True if plan (orders/target/max) is present for this adv
     plan_fact_ch_ts_msk: str | None
     cost_threshold_kind: Literal["target", "max"] | None
+    campaign_sales_state: SalesStates | None = None
 
 
 async def get_auto_campaign_cost_activity_metrics(
@@ -75,6 +81,12 @@ async def get_auto_campaign_cost_activity_metrics(
         else None
     )
 
+    campaign_sales_state: SalesStates | None = None
+    if plan is not None:
+        fact = fact_data_from_plan_fact_summary(plan_fact_summary, adv_setting)
+        if fact is not None:
+            campaign_sales_state = detect_campaign_state(plan, fact)
+
     return AutoCampaignCostActivityMetrics(
         target_cost=target_cost,
         avg_cost=avg_cost,
@@ -82,6 +94,7 @@ async def get_auto_campaign_cost_activity_metrics(
         plan_set=plan is not None,
         plan_fact_ch_ts_msk=ch_ts,
         cost_threshold_kind=cost_threshold_kind,
+        campaign_sales_state=campaign_sales_state,
     )
 
 

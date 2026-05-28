@@ -57,7 +57,11 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - ключи с `pay_for_order is None` не трогаются;
 - если ни один ключ не выше max — один обычный DOWN (как раньше).
 
-Проверка: unit `test_select_overspend_force_off_all_keys_above_max`, shelf `test_select_overspend_shelf_force_off_above_max`.
+Проверка: unit `test_select_overspend_force_off_all_keys_above_max`,
+`test_select_overspend_force_off_with_plan_and_fact`, shelf `test_select_overspend_shelf_force_off_above_max`.
+
+При неизменном plan/fact в Redis цикл обычно пропускается, **кроме OVERSPEND** — пока факт
+кампании `> max`, селектор и apply выполняются каждый тик (`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
 
 ## UI: последнее V3-действие в блоке «Обновл:»
 
@@ -113,15 +117,41 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
   по механизмам (`m1/m2/m3`);
 - в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
+## NO_DATA (Н) и ключи без V2 CPO
+
+- **Кампания:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
+- **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL (стабилизация); иначе UNDERPERFORM (порог `MAX_PAY_STABILIZATION_RATIO`, как M3 headroom).
+- **Ключ «нет данных»:** нет V2 CPO — та же цепочка, что рейтинг V2: `conv_views_to_orders` + CPM каскад → `orders_per_1000_rub` → `pay_for_order` (`keyword_v2_pay_for_order_unavailable`). Отсутствие только матрицы CH **не** считается no-data для активации.
+- **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
+- **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
+- **Gap-rebalance:** `rebalance_ladder_points` — нет V2 CPO = **1 балл** (снятие хвоста и UP), как MIN_CPA.
+- **UI:** `SalesStates` в меню РК (`sales_state_short_label`); в списке ключей `target_place=0` → `->0` (мин. ставка WB), `None` → `->Н>`.
+- **`target_place`:** `0` = min bid WB (`NO_DATA_TARGET_PLACE_FALLBACK`); в sync передаётся `calculated_by_text` из orchestrator для проверки V2 CPO.
+
+Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\test_sales_states.py`.
+
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot). Вызов через `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
+- **Порядок тика:** CH profiles → **gap-rebalance (phase0)** → при `phase0_changed` пересбор `contexts` → **no-data activation** → plan/fact Redis gate (только selector) → `target_place` один раз после всех смен режимов (`_sync_target_places_once` + dedupe в `finally`).
+- **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
+
+Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
 - Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
 
 Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_updater_v3\test_orchestrator_profiles.py`.
+
+## Telegram: профиль ключа (V3)
+
+- Карточка одного ключа (`KeywordSettingMessage`) при `automatic_version == 3`.
+- Блок «Профиль ключа (V3)»: ступени OFF → MIN_CPA → OPTIMUM → MAX_CONVERSION; `🌟` на текущем `strategy_mode`.
+- Метрики M/O/C — `build_mode_candidates` (позиция, CPM, CPO, цель по режиму) на том же CH-профиле, что updater (`load_bid_profiles_for_nmid` + `resolve_keyword_bid_profile`).
+- Загрузка: `min_bid` из Redis (`get_min_bids_cache_only`), без полного `get_wb_advs_dto` на клик.
+- Нет CH / min_bid в кеше — «недоступен», экран ключа не падает.
+
+Unit: `tests\unit\client_bot\test_keyword_v3_profile_ui.py`, `tests\unit\client_bot\test_keyword_v3_profile_loader.py`.
 
 ## CI
 

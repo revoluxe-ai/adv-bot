@@ -6,6 +6,13 @@ from datetime import UTC, datetime
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import (
+    FactMethods,
+)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
@@ -212,6 +219,37 @@ def test_select_overspend_force_off_all_keys_above_max() -> None:
     assert all(a.action == V3ActionType.FORCE_OFF for a in actions)
     assert {a.keyword_setting_id for a in actions} == {1, 2}
     assert all(a.reason == "overspend_max_pfo" for a in actions)
+
+
+@pytest.mark.unit
+def test_select_overspend_force_off_with_plan_and_fact() -> None:
+    """Orchestrator передаёт plan/fact — OVERSPEND должен идти до M1/M2/M3."""
+    prof = _sample_profile()
+    over = _calc_kw(
+        ks_id=1,
+        text="over",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(150.0),
+    )
+    plan = PlanData(orders=10, target_pay_for_order=80, max_pay_for_order=100)
+    fact = FactData(
+        predict_orders=5.0,
+        original_orders=5.0,
+        pay_for_order=120.0,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    actions = select_v3_actions(
+        state=SalesStates.OVERSPEND,
+        contexts=[KeywordV3Context(keyword=over, position_profile=prof)],
+        shelf_promotion_active=False,
+        plan_max_pay_for_order=float(plan.max_pay_for_order),
+        plan=plan,
+        fact=fact,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].reason == "overspend_max_pfo"
 
 
 @pytest.mark.unit

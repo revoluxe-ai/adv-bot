@@ -72,9 +72,11 @@ class AdvControlSystem:
         # 4. Определяем состояние
         state = detect_campaign_state(plan, fact)
 
-        if state is None:
+        if state is None or state == SalesStates.NO_DATA:
             logger.info(
-                "[adv_id=%s] Недостаточно данных для определения состояния", adv.adv_id
+                "[adv_id=%s] Недостаточно данных для определения состояния (state=%s)",
+                adv.adv_id,
+                state.name if state is not None else "None",
             )
             return
 

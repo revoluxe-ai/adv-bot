@@ -1,7 +1,8 @@
 """Gap-rebalance V3: срез хвоста БС ниже первой «дыры» OFF в сортировке MIN_CPO.
 
 Вызывается в начале ``process_adv_v3`` (не из ``white_list_tail_trimmer``).
-Алгоритм: первая OFF с активными ниже → хвост в OFF → N×UP (N = сумма mode_level хвоста).
+Алгоритм: первая OFF с активными ниже → хвост в OFF → N×UP
+(N = сумма баллов хвоста: ``mode_level``, для NO_DATA без V2 CPO — 1).
 """
 
 from __future__ import annotations
@@ -26,8 +27,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    mode_level,
     step_up,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_no_data_min_up_actions,
+    rebalance_ladder_points,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -56,7 +60,7 @@ _PreparedList = list[_PreparedEntry]
 
 
 def find_first_ladder_gap_index(sorted_wl: list[CalculatedKeyword]) -> int | None:
-    """Индекс первой OFF, под которой есть активные (mode_level > 0) ключи БС.
+    """Индекс первой OFF, под которой есть активные ключи БС (mode_level > 0 или NO_DATA).
 
     Args:
         sorted_wl: БС, уже отсортированные по MIN_CPO (дешёвые сверху).
@@ -68,7 +72,7 @@ def find_first_ladder_gap_index(sorted_wl: list[CalculatedKeyword]) -> int | Non
         if stored_strategy_mode(kw) != KeywordStrategyMode.OFF:
             continue
         if any(
-            mode_level(stored_strategy_mode(below)) > 0
+            rebalance_ladder_points(below, stored_strategy_mode(below)) > 0
             for below in sorted_wl[i + 1 :]
         ):
             return i
@@ -90,7 +94,11 @@ def _plan_rebalance_up_once(
     shelf_click_mode: ShelfClickMode,
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
-    """Один UP по политике текущей ветки (shelf / non-shelf), без DOWN/cleanup."""
+    """Один UP: сначала OFF без данных → MIN_CPA, иначе pooled cost-first."""
+    no_data = plan_no_data_min_up_actions(prepared)
+    if no_data:
+        return no_data[:1]
+
     if shelf_promotion_active:
         strategy = activation_strategy_for_shelf_underperform(shelf_click_mode)
         if strategy == ActivationStrategy.LAYERED:
@@ -141,7 +149,7 @@ def plan_ladder_gap_rebalance(
     shelf_click_mode: ShelfClickMode,
     rollout_aggressiveness: int | None,
 ) -> list[V3Action]:
-    """Спланировать FORCE_OFF хвоста и N×UP (N = сумма mode_level хвоста).
+    """Спланировать FORCE_OFF хвоста и N×UP (N = сумма баллов хвоста, NO_DATA = 1).
 
     Args:
         prepared: Контексты всех ключей кампании с профилями.
@@ -166,7 +174,8 @@ def plan_ladder_gap_rebalance(
     actions: list[V3Action] = []
     budget = 0
     for kw in tail:
-        budget += mode_level(stored_strategy_mode(kw))
+        mode = stored_strategy_mode(kw)
+        budget += rebalance_ladder_points(kw, mode)
         ks_id = kw.keyword_setting_original_id
         if ks_id is None:
             continue

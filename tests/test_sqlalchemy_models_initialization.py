@@ -137,8 +137,8 @@ class TestSQLAlchemyModelsInitialization:
         except Exception as e:
             pytest.fail(f"Failed to instantiate models: {e}")
 
-    def test_keyword_setting_target_place_rejects_zero_and_negative(self) -> None:
-        """KeywordSetting.target_place must be None or integer > 0; 0 and negative raise ValueError."""
+    def test_keyword_setting_target_place_allows_zero_min_bid_sentinel(self) -> None:
+        """target_place: None, 0 (min bid WB), or > 0; negative rejected."""
         from app.modules.common_slaves.wildberries.models.models import (
             KeywordSetting,
         )
@@ -147,13 +147,13 @@ class TestSQLAlchemyModelsInitialization:
         keyword.target_place = None
         assert keyword.target_place is None
 
+        keyword.target_place = 0
+        assert keyword.target_place == 0
+
         keyword.target_place = 1
         assert keyword.target_place == 1
 
-        with pytest.raises(ValueError, match="target_place must be None or an integer > 0"):
-            keyword.target_place = 0
-
-        with pytest.raises(ValueError, match="target_place must be None or an integer > 0"):
+        with pytest.raises(ValueError, match="target_place must be None"):
             keyword.target_place = -1
 
     def test_no_circular_import_issues(self) -> None:

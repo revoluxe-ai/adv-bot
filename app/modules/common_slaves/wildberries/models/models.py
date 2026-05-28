@@ -858,8 +858,11 @@ class KeywordSetting(BaseTable):
     def _validate_target_place(self, _key: str, value: int | None) -> int | None:
         if value is None:
             return None
-        if not isinstance(value, int) or value < 1:
-            raise ValueError("target_place must be None or an integer > 0")
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(
+                "target_place must be None or a non-negative integer "
+                "(0 = минимальная ставка WB)"
+            )
         return value
 
     __table_args__ = (

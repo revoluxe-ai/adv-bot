@@ -1,0 +1,38 @@
+# ============================================================================
+# postgres-db-basic-restore.yaml
+# ============================================================================
+# Назначение: CR Zalando Postgres для восстановления prod-adv-bot (PG 17, Spilo).
+# Образ: Harbor git-registry-cache (mirror recovery registry zalando/spilo-17).
+#
+# Перед apply: ServiceAccount postgres-pod должен иметь imagePullSecrets
+#   harbor-skyline360-login-secret, git-registry-login-secret.
+#
+# Apply (PowerShell):
+#   kubectl apply -f .\k8s\postgres-db-basic-restore.yaml
+# ============================================================================
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: postgres-db
+  namespace: prod-adv-bot
+spec:
+  teamId: adv-bot
+  numberOfInstances: 1
+  dockerImage: harbor.skyline360.ru/git-registry-cache/zalando/spilo-17:4.0-p3
+  volume:
+    size: 30Gi
+    storageClass: nvme.network-drives.csi.timeweb.cloud
+  users:
+    advupdater:
+      - superuser
+      - createdb
+  databases:
+    adv_updater: advupdater
+  postgresql:
+    version: "17"
+    parameters:
+      ssl: "on"
+      log_statement: none
+      shared_buffers: 128MB
+      max_connections: "50"
+  enableConnectionPooler: false

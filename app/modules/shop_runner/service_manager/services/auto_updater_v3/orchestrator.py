@@ -1,9 +1,11 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
-Phase 0: gap-rebalance (БС, MIN_CPO) — всегда при наличии WBAdvDTO, до plan/fact cache.
-Phase 1: plan/fact, ``SalesStates``, ``select_v3_actions``.
+Порядок на **каждом** тике (до Redis gate plan/fact):
+  1. CH bid profiles + gap-rebalance (phase0); при изменениях — пересбор contexts;
+     no-data OFF→MIN_CPA.
+  2. plan/fact; ``NO_DATA`` (Н) / ``OVERSPEND`` не режутся cache gate; иначе M1/M2/M3.
+  3. ``target_place`` — один раз после всех смен ``strategy_mode`` (rebalance + apply).
 
-Один fetch ``get_keyword_bid_profiles`` на цикл; ``target_place`` — на каждом тике (``finally``).
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
@@ -33,6 +35,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    run_no_data_activation_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
     run_ladder_gap_rebalance_v3,
@@ -116,26 +121,30 @@ async def _load_v3_wb_context(
     return dto, raw_profiles
 
 
+def _calculated_keywords_by_text(
+    keywords: list[CalculatedKeyword],
+) -> dict[str, CalculatedKeyword]:
+    """Индекс ключей для V2 CPO в ``sync_keyword_target_places_v3``."""
+    return {kw.text.lower(): kw for kw in keywords}
+
+
 async def _safe_sync_target_places_v3(
     complex_adv: ComplexAdv,
     dto: WBAdvDTO,
     raw_profiles: dict[str, list[BidPosition]],
+    *,
+    keywords: list[CalculatedKeyword],
 ) -> None:
-    """Best-effort sync ``target_place`` в ``finally`` без подмены ошибки из ``try``.
-
-    Зачем отдельная обёртка, а не прямой вызов ``sync_keyword_target_places_v3`` в
-    ``finally``: блок ``finally`` выполняется всегда (успех, ранний return, сбой
-    phase0/apply). Нам нужно на каждом тике попытаться записать свежие
-    ``target_place`` в БД. Если sync падает (БД, сеть), исключение **нельзя**
-    пробрасывать из ``finally`` — иначе Python подменит исходную ошибку из ``try``
-    (PEP 409) и в логах/алертах будет не та причина. Поэтому здесь только ERROR-лог
-    и подавление ошибки sync; основной сбой цикла по-прежнему уходит наверх.
-    """
+    """Best-effort sync ``target_place`` без подмены ошибки из ``try`` (PEP 409)."""
     try:
-        await sync_keyword_target_places_v3(dto, raw_profiles)
+        await sync_keyword_target_places_v3(
+            dto,
+            raw_profiles,
+            calculated_by_text=_calculated_keywords_by_text(keywords),
+        )
     except Exception:
         logger.error(
-            "[adv_id=%s] v3: target_place sync failed in finally "
+            "[adv_id=%s] v3: target_place sync failed "
             "(original try exception preserved, not re-raised)",
             complex_adv.adv_id,
             exc_info=True,
@@ -149,7 +158,7 @@ async def _run_phase0_gap_rebalance(
     contexts: list[KeywordV3Context],
     dto: WBAdvDTO | None,
 ) -> tuple[list[CalculatedKeyword], bool]:
-    """Gap-rebalance до plan/fact; возвращает актуальный список ключей и флаг apply."""
+    """Gap-rebalance до plan/fact gate; возвращает актуальный список ключей и флаг apply."""
     if dto is None:
         return keywords, False
 
@@ -177,16 +186,29 @@ async def process_adv_v3(
     wb_shop_data_manager: WBShopDataManager,
     max_last_period: int = 2,
 ) -> None:
-    """Run v3 cycle for one campaign (gap-rebalance, then plan/fact/state)."""
+    """Один тик V3: preamble (rebalance) → plan/fact gate → selector → target_place."""
     adv = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
 
     dto, raw_profiles = await _load_v3_wb_context(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
-    try:
-        contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+    target_place_synced = False
 
+    async def _sync_target_places_once() -> None:
+        """После rebalance и apply; в finally — если тик оборвался раньше."""
+        nonlocal target_place_synced
+        if target_place_synced:
+            return
+        if dto is not None and complex_adv.individual_keywords_target_place_mode:
+            await _safe_sync_target_places_v3(
+                complex_adv, dto, raw_profiles, keywords=keywords
+            )
+            target_place_synced = True
+
+    try:
+        # --- Preamble: каждый тик, до Redis plan/fact ---
+        contexts = build_keyword_v3_contexts(keywords, raw_profiles)
         keywords, phase0_changed = await _run_phase0_gap_rebalance(
             complex_adv,
             keywords=keywords,
@@ -195,102 +217,110 @@ async def process_adv_v3(
         )
         if phase0_changed:
             contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+        no_data_changed = await run_no_data_activation_v3(
+            complex_adv, contexts=contexts
+        )
+        if no_data_changed:
+            keywords = await complex_adv.get_keywords()
+            contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
+        # --- Plan/fact: short-circuit только selector (M1/M2/M3 / OVERSPEND / NO_DATA) ---
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
-        if not plan:
-            logger.debug("[adv_id=%s] v3: no plan, skip", complex_adv.adv_id)
-            return
+        if plan is None:
+            logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
+        else:
+            updater = AdvSettingAutoUpdater(adv, max_last_period)
+            fact = await updater.get_fact_data(keywords)
 
-        updater = AdvSettingAutoUpdater(adv, max_last_period)
-        fact = await updater.get_fact_data(keywords)
+            plan_fact_change = ChangePlanFact(adv)
+            state: SalesStates | None = detect_campaign_state(plan, fact)
+            plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
 
-        plan_fact_change = ChangePlanFact(adv)
-        plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
-        if plan_fact_equal:
-            logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
-            return
+            async def cache_plan_fact_snapshot() -> None:
+                await plan_fact_change.set_new_plan_fact(plan, fact)
 
-        async def cache_plan_fact_snapshot() -> None:
-            """Зафиксировать plan/fact после решения по метрикам (state/действия)."""
-            await plan_fact_change.set_new_plan_fact(plan, fact)
-
-        state: SalesStates | None = detect_campaign_state(plan, fact)
-        if state is None:
-            logger.warning(
-                "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
-            )
-            await cache_plan_fact_snapshot()
-            return
-
-        if dto is None:
-            logger.warning(
-                "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated (retry next cycle)",
-                complex_adv.adv_id,
-            )
-            return
-
-        shelf_active = complex_adv.shelf_promotion_active
-
-        actions = select_v3_actions(
-            state=state,
-            contexts=contexts,
-            shelf_promotion_active=shelf_active,
-            rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
-            shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
-            if shelf_active
-            else None,
-            plan_max_pay_for_order=float(plan.max_pay_for_order),
-            plan=plan,
-            fact=fact,
-        )
-        await apply_v3_actions(actions, complex_adv=complex_adv)
-
-        await cache_plan_fact_snapshot()
-        up_count = sum(1 for a in actions if a.action.value == "UP")
-        down_count = sum(1 for a in actions if a.action.value == "DOWN")
-        force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
-        m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
-        m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
-        m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
-        logger.info(
-            "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s up=%s down=%s off=%s m1=%s m2=%s m3=%s",
-            complex_adv.adv_id,
-            state.name,
-            compute_resolve_cost_threshold(plan, fact),
-            fact.pay_for_order,
-            up_count,
-            down_count,
-            force_off_count,
-            m1_count,
-            m2_count,
-            m3_count,
-        )
-        for act in actions:
-            sel = act.selection_log
-            if sel is not None:
+            if state is None:
+                logger.warning(
+                    "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
+                )
+                await cache_plan_fact_snapshot()
+            elif plan_fact_equal and state not in (
+                SalesStates.OVERSPEND,
+                SalesStates.NO_DATA,
+            ):
+                logger.debug(
+                    "[adv_id=%s] v3: plan/fact unchanged, skip ladder",
+                    complex_adv.adv_id,
+                )
+            elif dto is None:
+                logger.warning(
+                    "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated "
+                    "(retry next cycle)",
+                    complex_adv.adv_id,
+                )
+            else:
+                shelf_active = complex_adv.shelf_promotion_active
+                actions = select_v3_actions(
+                    state=state,
+                    contexts=contexts,
+                    shelf_promotion_active=shelf_active,
+                    rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
+                    shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
+                    if shelf_active
+                    else None,
+                    plan_max_pay_for_order=float(plan.max_pay_for_order),
+                    plan=plan,
+                    fact=fact,
+                )
+                await apply_v3_actions(actions, complex_adv=complex_adv)
+                await cache_plan_fact_snapshot()
+                up_count = sum(1 for a in actions if a.action.value == "UP")
+                down_count = sum(1 for a in actions if a.action.value == "DOWN")
+                force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
+                m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
+                m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
+                m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
                 logger.info(
-                    "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
-                    "pool=%s pool_after_rec=%s tier=%s state_cost=%s %s->%s move=%s imputed=%s",
+                    "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
+                    "up=%s down=%s off=%s m1=%s m2=%s m3=%s",
                     complex_adv.adv_id,
                     state.name,
-                    act.action.value,
-                    act.reason,
-                    sel.pool_size,
-                    sel.pool_size_after_rec,
-                    sel.rec_tier,
-                    sel.state_cost,
-                    sel.from_mode,
-                    sel.to_mode,
-                    sel.move_kind,
-                    sel.imputed,
+                    compute_resolve_cost_threshold(plan, fact),
+                    fact.pay_for_order,
+                    up_count,
+                    down_count,
+                    force_off_count,
+                    m1_count,
+                    m2_count,
+                    m3_count,
                 )
-        logger.info(
-            "[adv_id=%s] v3: state=%s actions=%s",
-            complex_adv.adv_id,
-            state.name,
-            [a.model_dump() for a in actions],
-        )
+                for act in actions:
+                    sel = act.selection_log
+                    if sel is not None:
+                        logger.info(
+                            "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
+                            "pool=%s pool_after_rec=%s tier=%s state_cost=%s "
+                            "%s->%s move=%s imputed=%s",
+                            complex_adv.adv_id,
+                            state.name,
+                            act.action.value,
+                            act.reason,
+                            sel.pool_size,
+                            sel.pool_size_after_rec,
+                            sel.rec_tier,
+                            sel.state_cost,
+                            sel.from_mode,
+                            sel.to_mode,
+                            sel.move_kind,
+                            sel.imputed,
+                        )
+                logger.info(
+                    "[adv_id=%s] v3: state=%s actions=%s",
+                    complex_adv.adv_id,
+                    state.name,
+                    [a.model_dump() for a in actions],
+                )
+
+        await _sync_target_places_once()
     finally:
-        # Best-effort target_place; сбой sync не маскирует исключение из try (см. _safe_sync_*).
-        if dto is not None and complex_adv.individual_keywords_target_place_mode:
-            await _safe_sync_target_places_v3(complex_adv, dto, raw_profiles)
+        await _sync_target_places_once()

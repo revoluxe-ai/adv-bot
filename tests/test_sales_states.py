@@ -66,8 +66,8 @@ def test_detect_campaign_state(plan, fact, expected_state):
     assert state == expected_state
 
 
-def test_detect_campaign_state_returns_none_when_fact_pay_for_order_is_none():
-    """When fact has no pay_for_order data, state is undefined (None)."""
+def test_detect_campaign_state_returns_no_data_when_fact_pay_for_order_is_none():
+    """When fact has no pay_for_order data, state is NO_DATA (Н)."""
     plan = PlanData(orders=10, target_pay_for_order=200, max_pay_for_order=400)
     fact = FactData(
         predict_orders=15.0,
@@ -75,11 +75,11 @@ def test_detect_campaign_state_returns_none_when_fact_pay_for_order_is_none():
         original_orders=15,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    assert detect_campaign_state(plan, fact) is None
+    assert detect_campaign_state(plan, fact) == SalesStates.NO_DATA
 
 
-def test_detect_campaign_state_pay_equals_max_not_overspend_underperform_unavailable():
-    """pay == max is not OVERSPEND (> max only); with predict < orders it hits None branch."""
+def test_detect_campaign_state_pay_equals_max_returns_optimal_when_under_orders():
+    """pay == max: 90–100% зона стабилизации, не OVERSPEND и не UNDERPERFORM."""
     plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
     fact = FactData(
         predict_orders=5.0,
@@ -87,7 +87,7 @@ def test_detect_campaign_state_pay_equals_max_not_overspend_underperform_unavail
         original_orders=5,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    assert detect_campaign_state(plan, fact) is None
+    assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL
 
 
 def test_detect_campaign_state_predict_orders_equals_plan_orders_stable_when_pay_above_target():
@@ -147,8 +147,8 @@ def test_detect_campaign_state_when_plan_orders_zero_treats_as_plan_met():
     assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL
 
 
-def test_detect_campaign_state_returns_none_when_orders_met_but_ambiguous_gap():
-    """predict_orders below plan but pay already at max — not OVERSPEND (> max only)."""
+def test_detect_campaign_state_optimal_when_below_plan_at_max_pay():
+    """predict < plan и pay на потолке max — стабилизация (OPTIMAL), не NO_DATA."""
     plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
     fact = FactData(
         predict_orders=8.0,
@@ -156,4 +156,28 @@ def test_detect_campaign_state_returns_none_when_orders_met_but_ambiguous_gap():
         original_orders=8,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    assert detect_campaign_state(plan, fact) is None
+    assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL
+
+
+def test_detect_campaign_state_underperform_when_below_plan_and_pay_below_90pct_max():
+    """predict < plan и pay < 90% max — наращивание (UNDERPERFORM)."""
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=250.0,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.UNDERPERFORM
+
+
+def test_detect_campaign_state_optimal_when_below_plan_in_90pct_band():
+    """predict < plan, pay в [90%; max) — стабилизация."""
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=285.0,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.OPTIMAL

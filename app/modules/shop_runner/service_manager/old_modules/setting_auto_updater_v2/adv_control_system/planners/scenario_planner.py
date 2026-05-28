@@ -49,6 +49,7 @@ class ScenarioPlanner:
         3. → Повысить экспоненту (+1, макс 20)
 
     - OPTIMAL: ничего не делаем
+    - NO_DATA (Н): V3 — MIN_CPA + target_place=0; V2 — без исполнителей
     """
 
     def __init__(self):
@@ -67,6 +68,7 @@ class ScenarioPlanner:
                 WhiteListRemoveExecutor(),
             ],
             SalesStates.OPTIMAL: [],
+            SalesStates.NO_DATA: [],
         }
 
     async def run_for_state(self, ctx: PipelineContext) -> None:
