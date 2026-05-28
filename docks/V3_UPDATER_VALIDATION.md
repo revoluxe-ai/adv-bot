@@ -8,6 +8,11 @@
 - **missing_target_matrix** — нет валидных M/O/C в профиле; `state_cost` из worst-per-state доноров.
 - **missing_above_rec** — `above_rec_conversion is None`; на полке provisional UP, tier ниже `confirmed`.
 
+Контракт `state_cost`:
+- источник `state_cost` — только профильные ставки мест из CH (target M/O/C) + `conv_views_to_orders`;
+- fallback на `keyword.pay_for_order` (текущий CPM ключа) **не используется**;
+- если профильный расчёт недоступен и imputation невозможен — `state_cost = inf`, переход не планируется.
+
 ## Unified pooled contract
 
 Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:
@@ -69,8 +74,9 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 ## Новый state-first контракт (M1/M2/M3)
 
-В V3 решения принимаются по `state_cost = predicted_cpa(state)` относительно
-`resolve_cost_threshold`:
+В V3 решения принимаются по `state_cost` — прогноз **себестоимости заказа** для режима
+(как `CalculatedKeyword.pay_for_order` в V2: `calc_pay_for_order(calc_orders_per_1000_rub(conv, CPM))`
+по точке профиля M/O/C), относительно `resolve_cost_threshold`:
 
 - `resolve = target_pay_for_order`, если `fact.predict_orders >= plan.orders`;
 - иначе `resolve = max_pay_for_order`.
@@ -107,9 +113,19 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
   по механизмам (`m1/m2/m3`);
 - в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
+## target_place и ClickHouse bid profiles
+
+- **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
+- При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
+- **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot). Вызов через `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
+- Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
+- Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
+
+Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_updater_v3\test_orchestrator_profiles.py`.
+
 ## CI
 
 ```powershell
-poetry run pytest -m unit tests\unit\auto_updater_v3\ tests\unit\test_auto_updater_v3.py tests\unit\test_auto_updater_v3_applier.py tests\unit\test_process_adv_v3_plan_fact_cache.py tests\unit\test_v3_ui_sort.py -q
+poetry run pytest -m unit tests\unit\auto_updater_v3\ tests\unit\test_auto_updater_v3.py tests\unit\test_auto_updater_v3_applier.py tests\unit\test_process_adv_v3_plan_fact_cache.py tests\unit\test_keyword_target_place_updater_v3.py tests\unit\test_v3_ui_sort.py -q
 poetry run pytest -m integration tests\integration\test_v3_up_selection_integration.py tests\integration\test_v3_target_place_strategy_order_integration.py -q
 ```

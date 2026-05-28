@@ -8,7 +8,8 @@
 - сортировка в пуле: ``rec_tier -> state_cost -> pay_for_order -> keyword_id``.
 
 Два независимых сигнала:
-- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state;
+- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state
+  (без fallback на ``keyword.pay_for_order``);
 - ``missing_above_rec`` — ``above_rec_conversion is None``; на полке tier ниже confirmed.
 """
 
@@ -128,12 +129,20 @@ def _catalog_for_ctx(ctx: "KeywordV3Context") -> dict[AggressionTargetMode, Mode
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
+        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
     )
+
+
+def missing_target_matrix_from_catalog(
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> bool:
+    """Нет ни одного валидного M/O/C в уже построенном каталоге кандидатов."""
+    return not any(mc.is_valid for mc in catalog.values())
 
 
 def missing_target_matrix(ctx: "KeywordV3Context") -> bool:
     """Нет ни одного валидного целевого места M/O/C в матрице профиля."""
-    return not any(mc.is_valid for mc in _catalog_for_ctx(ctx).values())
+    return missing_target_matrix_from_catalog(_catalog_for_ctx(ctx))
 
 
 def missing_above_rec(ctx: "KeywordV3Context") -> bool:
@@ -252,6 +261,7 @@ def _resolve_state_cost(
     *,
     use_imputation: bool,
 ) -> tuple[float, bool]:
+    """Вернуть state_cost только из профиля CH или worst-imputation."""
     if mc.is_valid and mc.predicted_cpa is not None:
         return float(mc.predicted_cpa), False
     if use_imputation:
@@ -267,9 +277,9 @@ def build_worst_per_state_costs(
     """Worst (max) predicted CPA per M/O/C среди ключей с валидной матрицей."""
     worst: dict[AggressionTargetMode, float] = {}
     for ctx, _mode in prepared:
-        if missing_target_matrix(ctx):
-            continue
         catalog = _catalog_for_ctx(ctx)
+        if missing_target_matrix_from_catalog(catalog):
+            continue
         if not _has_valid_target_place_data(catalog):
             continue
         for target in (
@@ -312,7 +322,7 @@ def collect_transition_candidates(
             continue
 
         catalog = _catalog_for_ctx(ctx)
-        use_matrix_imputation = missing_target_matrix(ctx)
+        use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
             click_mode=policy.click_mode,

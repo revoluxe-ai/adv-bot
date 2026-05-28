@@ -8,6 +8,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+    build_mode_candidates,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     V3ActionType,
@@ -26,6 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     collect_transition_candidates,
     missing_above_rec,
     missing_target_matrix,
+    missing_target_matrix_from_catalog,
     move_kind_for,
     pick_one_up_cost_first,
     plan_one_up_by_policy,
@@ -128,6 +132,12 @@ def test_missing_target_matrix_imputed_uses_worst() -> None:
         (no_matrix, KeywordStrategyMode.OFF),
     ]
     assert missing_target_matrix(no_matrix)
+    empty_catalog = build_mode_candidates(
+        profile=None,
+        keyword_text=no_matrix.keyword.text,
+        conv_views_to_orders=no_matrix.keyword.conv_views_to_orders,
+    )
+    assert missing_target_matrix_from_catalog(empty_catalog)
     worst = build_worst_per_state_costs(prepared)
     assert AggressionTargetMode.MIN_CPA in worst
     candidates = collect_transition_candidates(
@@ -326,3 +336,18 @@ def test_collect_candidates_filters_by_aggr_target_cap() -> None:
     )
     assert candidates
     assert all(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
+
+
+@pytest.mark.unit
+def test_collect_candidates_skips_invalid_target_without_keyword_fallback() -> None:
+    """Если target-state invalid в непустой матрице, кандидат не создаётся из pay_for_order."""
+    prof = [p.model_copy(update={"pay_for_cart": None}) for p in sample_profile()]
+    prepared = [
+        (ctx(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, profile=prof), KeywordStrategyMode.MIN_CPA)
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
+    )
+    assert candidates
+    assert all(c.to_mode != KeywordStrategyMode.OPTIMUM for c in candidates)

@@ -11,8 +11,8 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto.bid_position import (
     BidPosition,
 )
-from app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater import (
-    KeywordTargetPlaceUpdater,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
+    sync_keyword_target_places_v3,
 )
 
 
@@ -28,16 +28,26 @@ def _minimal_bid_profiles() -> dict[str, list[BidPosition]]:
     return {"kw_min": [BidPosition("kw_min", 1, 100, ts)]}
 
 
+def _patch_predictor(
+    monkeypatch: pytest.MonkeyPatch, predictor: MagicMock
+) -> None:
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.build_predict_keywords_target_place",
+        lambda: predictor,
+    )
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_set_new_target_places_v3_keeps_off_target_place(
+async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = AsyncMock()
-    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
+    predictor = MagicMock()
+    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=3)
+    _patch_predictor(monkeypatch, predictor)
 
     off_kw = SimpleNamespace(
-        text="kw_off",
+        text="kw_min",
         strategy_mode=KeywordStrategyMode.OFF,
         target_place=7,
     )
@@ -57,32 +67,37 @@ async def test_set_new_target_places_v3_keeps_off_target_place(
     session_cm.__aenter__.return_value = session
     session_cm.__aexit__.return_value = None
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
         _patched_sm(session_cm),
     )
 
-    predictor.get_target_position_for_strategy_mode = MagicMock(return_value=3)
     adv = MagicMock()
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await updater._set_new_target_places_v3(  # pyright: ignore[reportPrivateUsage]
+    await sync_keyword_target_places_v3(
         adv=adv,
         bid_profiles=_minimal_bid_profiles(),
     )
 
-    assert off_kw.target_place == 7
+    assert off_kw.target_place == 3
     assert min_kw.target_place == 3
-    predictor.get_target_position_for_strategy_mode.assert_called_once()
+    assert predictor.get_target_position_for_strategy_mode.call_count >= 1
+    off_calls = [
+        c
+        for c in predictor.get_target_position_for_strategy_mode.call_args_list
+        if c[0][1] == KeywordStrategyMode.MIN_CPA
+    ]
+    assert off_calls
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_set_new_target_places_v3_clears_target_place_when_no_profile(
+async def test_sync_keyword_target_places_v3_clears_target_place_when_no_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = AsyncMock()
-    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
+    predictor = MagicMock()
+    _patch_predictor(monkeypatch, predictor)
 
     min_kw = SimpleNamespace(
         text="kw_min",
@@ -100,7 +115,7 @@ async def test_set_new_target_places_v3_clears_target_place_when_no_profile(
     session_cm.__aenter__.return_value = session
     session_cm.__aexit__.return_value = None
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
         _patched_sm(session_cm),
     )
 
@@ -108,7 +123,7 @@ async def test_set_new_target_places_v3_clears_target_place_when_no_profile(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await updater._set_new_target_places_v3(adv=adv, bid_profiles={})  # pyright: ignore[reportPrivateUsage]
+    await sync_keyword_target_places_v3(adv=adv, bid_profiles={})
 
     assert min_kw.target_place is None
     predictor.get_target_position_for_strategy_mode.assert_not_called()
@@ -116,12 +131,12 @@ async def test_set_new_target_places_v3_clears_target_place_when_no_profile(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_set_new_target_places_v3_accepts_none_from_predictor(
+async def test_sync_keyword_target_places_v3_accepts_none_from_predictor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    predictor = AsyncMock()
+    predictor = MagicMock()
     predictor.get_target_position_for_strategy_mode = MagicMock(return_value=None)
-    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
+    _patch_predictor(monkeypatch, predictor)
 
     min_kw = SimpleNamespace(
         text="kw_min",
@@ -139,7 +154,7 @@ async def test_set_new_target_places_v3_accepts_none_from_predictor(
     session_cm.__aenter__.return_value = session
     session_cm.__aexit__.return_value = None
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
         _patched_sm(session_cm),
     )
 
@@ -147,7 +162,7 @@ async def test_set_new_target_places_v3_accepts_none_from_predictor(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await updater._set_new_target_places_v3(  # pyright: ignore[reportPrivateUsage]
+    await sync_keyword_target_places_v3(
         adv=adv,
         bid_profiles=_minimal_bid_profiles(),
     )
@@ -158,13 +173,13 @@ async def test_set_new_target_places_v3_accepts_none_from_predictor(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_set_new_target_places_v3_resolves_profile_with_mixed_case_ch_key(
+async def test_sync_keyword_target_places_v3_resolves_profile_with_mixed_case_ch_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """CH может вернуть ключ в исходном регистре, в БД текст ключа — lower."""
-    predictor = AsyncMock()
+    predictor = MagicMock()
     predictor.get_target_position_for_strategy_mode = MagicMock(return_value=4)
-    updater = KeywordTargetPlaceUpdater(predict_keyword_target_place=predictor)
+    _patch_predictor(monkeypatch, predictor)
 
     min_kw = SimpleNamespace(
         text="kw_min",
@@ -182,7 +197,7 @@ async def test_set_new_target_places_v3_resolves_profile_with_mixed_case_ch_key(
     session_cm.__aenter__.return_value = session
     session_cm.__aexit__.return_value = None
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.keywords_target_place_updater.keyword_target_place_updater.sm",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
         _patched_sm(session_cm),
     )
 
@@ -194,10 +209,7 @@ async def test_set_new_target_places_v3_resolves_profile_with_mixed_case_ch_key(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await updater._set_new_target_places_v3(  # pyright: ignore[reportPrivateUsage]
-        adv=adv,
-        bid_profiles=bid_profiles,
-    )
+    await sync_keyword_target_places_v3(adv=adv, bid_profiles=bid_profiles)
 
     assert min_kw.target_place == 4
     predictor.get_target_position_for_strategy_mode.assert_called_once()
