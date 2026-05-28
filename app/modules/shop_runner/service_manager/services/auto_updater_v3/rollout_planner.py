@@ -313,7 +313,7 @@ def _resolve_state_cost_for_mode(
     to_mode: KeywordStrategyMode,
     worst_costs: dict[AggressionTargetMode, float],
 ) -> tuple[float, bool]:
-    """Себестоимость режима: V2-прогноз по профилю + факт ключа, worst — только если оба NaN."""
+    """Себестоимость режима: профиль CH, при отсутствии — worst-imputation."""
     catalog = build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
@@ -326,7 +326,6 @@ def _resolve_state_cost_for_mode(
         profile_cost = float(mc.predicted_cpa)
     return resolve_effective_state_cost(
         profile_cost=profile_cost,
-        keyword_pay_for_order=ctx.keyword.pay_for_order,
         worst_cost=worst_costs.get(target),
         allow_worst_imputation=missing_target_matrix(ctx),
     )

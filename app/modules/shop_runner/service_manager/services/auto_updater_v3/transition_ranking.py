@@ -8,7 +8,8 @@
 - сортировка в пуле: ``rec_tier -> state_cost -> pay_for_order -> keyword_id``.
 
 Два независимых сигнала:
-- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state;
+- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state
+  (без fallback на ``keyword.pay_for_order``);
 - ``missing_above_rec`` — ``above_rec_conversion is None``; на полке tier ниже confirmed.
 """
 
@@ -252,16 +253,14 @@ def _resolve_state_cost(
     worst_costs: dict[AggressionTargetMode, float],
     *,
     use_imputation: bool,
-    keyword_pay_for_order: float | None = None,
 ) -> tuple[float, bool]:
+    """Вернуть state_cost только из профиля CH или worst-imputation."""
     if mc.is_valid and mc.predicted_cpa is not None:
         return float(mc.predicted_cpa), False
     if use_imputation:
         w = worst_costs.get(target)
         if w is not None:
             return w, True
-    if keyword_pay_for_order is not None:
-        return float(keyword_pay_for_order), False
     return float("inf"), False
 
 
@@ -338,7 +337,6 @@ def collect_transition_candidates(
                 target,
                 worst_costs,
                 use_imputation=use_matrix_imputation,
-                keyword_pay_for_order=ctx.keyword.pay_for_order,
             )
             if cost == float("inf"):
                 continue

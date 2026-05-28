@@ -44,19 +44,18 @@ def _finite_pay(row: PositionProfilePoint) -> float | None:
 def resolve_effective_state_cost(
     *,
     profile_cost: float | None,
-    keyword_pay_for_order: float | None,
     worst_cost: float | None,
     allow_worst_imputation: bool,
 ) -> tuple[float, bool]:
-    """Единая логика state_cost: прогноз профиля → факт ключа → worst-imputation.
+    """Единая логика state_cost: профиль CH → worst-imputation.
 
-    Прогноз профиля уже учитывает ``conv_views_to_orders`` ключа, поэтому возвращаем его
-    напрямую. ``pay_for_order`` ключа — fallback, когда профиля нет (нет точки M/O/C).
+    ``state_cost`` должен отражать только экономику target-состояния по ставкам мест из
+    профиля CH (``profile_cost``). Если профильного расчёта нет, допускается только
+    worst-imputation для ``missing_target_matrix``; fallback на ``keyword.pay_for_order``
+    намеренно не используется, чтобы не смешивать метрики.
     """
     if profile_cost is not None:
         return float(profile_cost), False
-    if keyword_pay_for_order is not None:
-        return float(keyword_pay_for_order), False
     if allow_worst_imputation and worst_cost is not None:
         return float(worst_cost), True
     return float("inf"), False

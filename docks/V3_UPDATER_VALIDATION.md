@@ -8,6 +8,11 @@
 - **missing_target_matrix** — нет валидных M/O/C в профиле; `state_cost` из worst-per-state доноров.
 - **missing_above_rec** — `above_rec_conversion is None`; на полке provisional UP, tier ниже `confirmed`.
 
+Контракт `state_cost`:
+- источник `state_cost` — только профильные ставки мест из CH (target M/O/C) + `conv_views_to_orders`;
+- fallback на `keyword.pay_for_order` (текущий CPM ключа) **не используется**;
+- если профильный расчёт недоступен и imputation невозможен — `state_cost = inf`, переход не планируется.
+
 ## Unified pooled contract
 
 Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:

@@ -326,3 +326,18 @@ def test_collect_candidates_filters_by_aggr_target_cap() -> None:
     )
     assert candidates
     assert all(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
+
+
+@pytest.mark.unit
+def test_collect_candidates_skips_invalid_target_without_keyword_fallback() -> None:
+    """Если target-state invalid в непустой матрице, кандидат не создаётся из pay_for_order."""
+    prof = [p.model_copy(update={"pay_for_cart": None}) for p in sample_profile()]
+    prepared = [
+        (ctx(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, profile=prof), KeywordStrategyMode.MIN_CPA)
+    ]
+    candidates = collect_transition_candidates(
+        prepared,
+        policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
+    )
+    assert candidates
+    assert all(c.to_mode != KeywordStrategyMode.OPTIMUM for c in candidates)

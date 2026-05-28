@@ -10,6 +10,7 @@ import pytest
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
     predicted_pay_for_order_from_point,
+    resolve_effective_state_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
@@ -59,3 +60,15 @@ def test_predicted_pay_for_order_from_point_v2_scale() -> None:
     val = predicted_pay_for_order_from_point(pt, conv_views_to_orders=0.02)
     assert val is not None
     assert val == calc_pay_for_order(calc_orders_per_1000_rub(0.02, float(pt.bid)))  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+def test_resolve_effective_state_cost_does_not_fallback_to_keyword_pfo() -> None:
+    """При отсутствии профильного CPO используем только worst-imputation или inf."""
+    cost, imputed = resolve_effective_state_cost(
+        profile_cost=None,
+        worst_cost=None,
+        allow_worst_imputation=False,
+    )
+    assert cost == float("inf")
+    assert not imputed
