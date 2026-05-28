@@ -139,9 +139,10 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_profile_active_mo
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_sync_keyword_target_places_v3_sets_none_when_candidate_invalid(
+async def test_sync_keyword_target_places_v3_sets_zero_when_candidate_invalid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Invalid кандидат активного режима → target_place=0 (min bid), не None."""
     opt_kw = SimpleNamespace(
         text="kw_min",
         strategy_mode=KeywordStrategyMode.OPTIMUM,
@@ -176,7 +177,7 @@ async def test_sync_keyword_target_places_v3_sets_none_when_candidate_invalid(
         calculated_by_text=_calc_map("kw_min"),
     )
 
-    assert opt_kw.target_place is None
+    assert opt_kw.target_place == 0
 
 
 @pytest.mark.unit

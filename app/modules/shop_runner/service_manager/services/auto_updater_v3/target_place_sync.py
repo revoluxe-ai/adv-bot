@@ -101,8 +101,20 @@ async def sync_keyword_target_places_v3(
                 conv_views_to_orders=calc_kw.conv_views_to_orders,
             )
             calc_mode = _mode_for_target_place(keyword.strategy_mode)
-            keyword.target_place = target_place_for_v3_strategy_mode(
-                calc_mode,
-                candidates,
-            )
+            resolved = target_place_for_v3_strategy_mode(calc_mode, candidates)
+            if resolved is None:
+                if keyword.strategy_mode == KeywordStrategyMode.OFF:
+                    keyword.target_place = None
+                else:
+                    logger.warning(
+                        "Invalid V3 candidate for keyword %s mode=%s, adv_id=%s; "
+                        "target_place=%s (min bid)",
+                        keyword.text,
+                        keyword.strategy_mode.name,
+                        adv.adv_id,
+                        NO_DATA_TARGET_PLACE_FALLBACK,
+                    )
+                    keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+            else:
+                keyword.target_place = resolved
         await session.commit()
