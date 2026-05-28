@@ -29,18 +29,20 @@ Write-Host "KUBECONFIG=$kubeconfig"
 kubectl config current-context
 
 Write-Host ""
-Write-Host "Starting Postgres tunnel: localhost:15432 -> postgres-db:5432"
+# svc/postgres-db без selector — используем pooler (или pod/postgres-db-0)
+$pgResource = if ($env:DEV_TUNNEL_PG_RESOURCE) { $env:DEV_TUNNEL_PG_RESOURCE } else { "pod/postgres-db-0" }
+Write-Host "Starting Postgres tunnel: localhost:15432 -> ${pgResource}:5432"
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-adv-bot svc/postgres-db 15432:5432"
+    "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-adv-bot $pgResource 15432:5432"
 )
 
-Write-Host "Starting ClickHouse tunnel: localhost:18123/19000 -> ClickHouse"
+Write-Host "Starting ClickHouse tunnel: localhost:18123 -> ClickHouse HTTP"
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-analytics svc/chi-clickhouse-main-0-0 18123:8123 19000:9000"
+    "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-analytics svc/chi-clickhouse-main-0-0 18123:8123"
 )
 
 Write-Host ""

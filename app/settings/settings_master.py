@@ -16,6 +16,7 @@ import dotenv
 
 _ = dotenv.load_dotenv()
 import os
+import sys
 
 
 class Settings:
@@ -791,11 +792,19 @@ class Settings:
 
 
 def _bootstrap_dev_local() -> None:
-    """При RUN_LOCAL=true поднимает kubectl port-forward до импорта БД-клиентов."""
-    if os.environ.get("RUN_LOCAL", "").strip().lower() == "true":
-        from app.dev_local.k8s_tunnels import start_dev_tunnels_monitor
+    """При RUN_LOCAL=true поднимает kubectl port-forward до импорта БД-клиентов.
 
-        start_dev_tunnels_monitor()
+    Блокирует до готовности TCP на localhost (PG/CH), чтобы приложение
+    не стартовало раньше port-forward.
+    """
+    if os.environ.get("RUN_LOCAL", "").strip().lower() != "true":
+        return
+    # pytest импортирует settings через conftest — туннели не поднимаем
+    if "pytest" in sys.modules:
+        return
+    from app.dev_local.k8s_tunnels import start_dev_tunnels_monitor
+
+    start_dev_tunnels_monitor()  # внутри — wait_for_dev_tunnels_ready()
 
 
 _bootstrap_dev_local()

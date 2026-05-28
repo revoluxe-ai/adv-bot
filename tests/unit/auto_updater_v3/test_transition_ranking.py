@@ -8,6 +8,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+    build_mode_candidates,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     V3ActionType,
@@ -26,6 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     collect_transition_candidates,
     missing_above_rec,
     missing_target_matrix,
+    missing_target_matrix_from_catalog,
     move_kind_for,
     pick_one_up_cost_first,
     plan_one_up_by_policy,
@@ -128,6 +132,12 @@ def test_missing_target_matrix_imputed_uses_worst() -> None:
         (no_matrix, KeywordStrategyMode.OFF),
     ]
     assert missing_target_matrix(no_matrix)
+    empty_catalog = build_mode_candidates(
+        profile=None,
+        keyword_text=no_matrix.keyword.text,
+        conv_views_to_orders=no_matrix.keyword.conv_views_to_orders,
+    )
+    assert missing_target_matrix_from_catalog(empty_catalog)
     worst = build_worst_per_state_costs(prepared)
     assert AggressionTargetMode.MIN_CPA in worst
     candidates = collect_transition_candidates(

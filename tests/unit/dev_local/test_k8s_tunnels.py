@@ -14,11 +14,11 @@ from app.settings.settings_master import Settings
 def _reset_monitor_state() -> None:
     """Сбрасывает глобальное состояние между тестами."""
     k8s_tunnels._monitor_started = False
-    k8s_tunnels._active_processes = []
+    k8s_tunnels._processes_by_name = {}
     yield
     k8s_tunnels._stop_all_tunnels()
     k8s_tunnels._monitor_started = False
-    k8s_tunnels._active_processes = []
+    k8s_tunnels._processes_by_name = {}
 
 
 def test_tcp_port_open_success() -> None:
@@ -46,19 +46,25 @@ def test_start_dev_tunnels_monitor_idempotent() -> None:
         patch.object(k8s_tunnels, "atexit") as mock_atexit,
     ):
         k8s_tunnels._monitor_started = False
-        k8s_tunnels.start_dev_tunnels_monitor()
-        k8s_tunnels.start_dev_tunnels_monitor()
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
 
     mock_thread_cls.assert_called_once()
     mock_thread_instance.start.assert_called_once()
     mock_atexit.register.assert_called_once()
 
 
-def test_tunnel_healthy_dead_process() -> None:
+def test_tunnel_port_ready_dead_process() -> None:
     proc = MagicMock()
     proc.poll.return_value = 1
     spec = k8s_tunnels._tunnel_specs()[0]
-    assert k8s_tunnels._tunnel_healthy(proc, spec) is False
+    with patch.object(k8s_tunnels, "_tcp_port_open", return_value=False):
+        assert k8s_tunnels._tunnel_port_ready(proc, spec) is False
+
+
+def test_postgres_tunnel_uses_pod_by_default() -> None:
+    spec = k8s_tunnels._tunnel_specs()[0]
+    assert spec.resource == "pod/postgres-db-0"
 
 
 def test_settings_run_local_default_false(monkeypatch: pytest.MonkeyPatch) -> None:

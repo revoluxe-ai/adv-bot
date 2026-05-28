@@ -144,6 +144,11 @@ ssl_ctx = get_ssl_context(
     getattr(settings, "ssl_mode", None),
 )
 
+# asyncpg при ssl=None может пытаться SSL-handshake; при disable не передаём ключ.
+_pg_connect_args: dict[str, ssl.SSLContext] = {}
+if ssl_ctx is not None:
+    _pg_connect_args["ssl"] = ssl_ctx
+
 read_only_engine = create_async_engine(
     read_only_db_connector,
     echo=False,
@@ -151,7 +156,7 @@ read_only_engine = create_async_engine(
     max_overflow=max_overflow,
     pool_recycle=180,
     pool_pre_ping=True,
-    connect_args={"ssl": ssl_ctx},
+    connect_args=_pg_connect_args,
 )
 
 read_write_engine = create_async_engine(
@@ -161,7 +166,7 @@ read_write_engine = create_async_engine(
     max_overflow=max_overflow,
     pool_recycle=180,
     pool_pre_ping=True,
-    connect_args={"ssl": ssl_ctx},
+    connect_args=_pg_connect_args,
 )
 
 # Фабрики сессий

@@ -22,10 +22,13 @@ logger = logging.getLogger(__name__)
 
 _MONITOR_INTERVAL_SEC = 1.0
 _TCP_PROBE_TIMEOUT_SEC = 0.5
+_STARTUP_WAIT_SEC = 2.0
+_READY_POLL_INTERVAL_SEC = 0.5
+_DEFAULT_READY_TIMEOUT_SEC = 90.0
 
 _monitor_started = False
 _monitor_lock = threading.Lock()
-_active_processes: list[subprocess.Popen[bytes]] = []
+_processes_by_name: dict[str, subprocess.Popen[bytes] | None] = {}
 
 
 @dataclass(frozen=True)
@@ -58,15 +61,28 @@ def _int_env(name: str, default: int) -> int:
     return int(raw)
 
 
+def _str_env(name: str, default: str) -> str:
+    raw = os.environ.get(name, "").strip()
+    return raw if raw else default
+
+
 def _tunnel_specs() -> list[_TunnelSpec]:
     pg_port = _int_env("DEV_TUNNEL_PG_LOCAL_PORT", 15432)
     ch_http = _int_env("DEV_TUNNEL_CH_HTTP_PORT", 18123)
     ch_native = _int_env("DEV_TUNNEL_CH_NATIVE_PORT", 19000)
+    forward_ch_native = _str_env("DEV_TUNNEL_CH_FORWARD_NATIVE", "false").lower() == "true"
+    # svc/postgres-db — headless без selector; port-forward только к pooler или pod.
+    pg_resource = _str_env("DEV_TUNNEL_PG_RESOURCE", "pod/postgres-db-0")
+    ch_local_ports: tuple[int, ...] = (ch_http,)
+    ch_remote_ports: tuple[int, ...] = (8123,)
+    if forward_ch_native:
+        ch_local_ports = (ch_http, ch_native)
+        ch_remote_ports = (8123, 9000)
     return [
         _TunnelSpec(
             name="postgres",
             namespace="prod-adv-bot",
-            resource="svc/postgres-db",
+            resource=pg_resource,
             local_ports=(pg_port,),
             remote_ports=(5432,),
             probe_port=pg_port,
@@ -75,8 +91,8 @@ def _tunnel_specs() -> list[_TunnelSpec]:
             name="clickhouse",
             namespace="prod-analytics",
             resource="svc/chi-clickhouse-main-0-0",
-            local_ports=(ch_http, ch_native),
-            remote_ports=(8123, 9000),
+            local_ports=ch_local_ports,
+            remote_ports=ch_remote_ports,
             probe_port=ch_http,
         ),
     ]
@@ -104,6 +120,29 @@ def _build_port_forward_args(spec: _TunnelSpec) -> list[str]:
         spec.resource,
         *mappings,
     ]
+
+
+def _read_kubectl_stderr(proc: subprocess.Popen[bytes]) -> str:
+    """Читает stderr kubectl после завершения процесса."""
+    if proc.stderr is None:
+        return ""
+    try:
+        raw = proc.stderr.read()
+    except Exception:
+        return ""
+    return raw.decode("utf-8", errors="replace").strip()
+
+
+def _log_tunnel_exit(spec: _TunnelSpec, proc: subprocess.Popen[bytes]) -> None:
+    err = _read_kubectl_stderr(proc)
+    if err:
+        logger.error("Tunnel %s kubectl exited: %s", spec.name, err)
+    else:
+        logger.error(
+            "Tunnel %s kubectl exited with code %s",
+            spec.name,
+            proc.returncode,
+        )
 
 
 def _start_port_forward(
@@ -143,56 +182,127 @@ def _terminate_process(proc: subprocess.Popen[bytes]) -> None:
 
 
 def _stop_all_tunnels() -> None:
-    global _active_processes
-    for proc in _active_processes:
+    global _processes_by_name
+    for proc in _processes_by_name.values():
+        if proc is not None:
+            _terminate_process(proc)
+    _processes_by_name = {}
+
+
+def _stop_tunnel(name: str) -> None:
+    global _processes_by_name
+    proc = _processes_by_name.pop(name, None)
+    if proc is not None:
         _terminate_process(proc)
-    _active_processes = []
 
 
-def _start_all_tunnels(kubeconfig: str, specs: list[_TunnelSpec]) -> list[subprocess.Popen[bytes]]:
-    _stop_all_tunnels()
-    procs: list[subprocess.Popen[bytes]] = []
+def _start_tunnel(
+    spec: _TunnelSpec, kubeconfig: str
+) -> subprocess.Popen[bytes] | None:
+    """Перезапускает один туннель (остальные не трогает).
+
+    Если порт уже слушает (ручной port-forward) — kubectl не запускаем.
+    """
+    global _processes_by_name
+    if _tcp_port_open("127.0.0.1", spec.probe_port):
+        logger.info(
+            "Tunnel %s: port %s already listening, using existing forward",
+            spec.name,
+            spec.probe_port,
+        )
+        _stop_tunnel(spec.name)
+        _processes_by_name[spec.name] = None
+        return None
+    _stop_tunnel(spec.name)
+    proc = _start_port_forward(spec, kubeconfig)
+    _processes_by_name[spec.name] = proc
+    return proc
+
+
+def _start_all_tunnels(kubeconfig: str, specs: list[_TunnelSpec]) -> None:
     for spec in specs:
-        procs.append(_start_port_forward(spec, kubeconfig))
-    _active_processes.extend(procs)
-    return procs
+        _start_tunnel(spec, kubeconfig)
 
 
-def _tunnel_healthy(
-    proc: subprocess.Popen[bytes], spec: _TunnelSpec
+def _tunnel_port_ready(
+    proc: subprocess.Popen[bytes] | None, spec: _TunnelSpec
 ) -> bool:
+    if _tcp_port_open("127.0.0.1", spec.probe_port):
+        return True
+    if proc is None:
+        return False
     if proc.poll() is not None:
         return False
-    return _tcp_port_open("127.0.0.1", spec.probe_port)
+    return False
+
+
+def _all_tunnels_ready(specs: list[_TunnelSpec]) -> bool:
+    for spec in specs:
+        if spec.name not in _processes_by_name:
+            return False
+        proc = _processes_by_name[spec.name]
+        if not _tunnel_port_ready(proc, spec):
+            return False
+    return True
+
+
+def wait_for_dev_tunnels_ready(
+    timeout_sec: float | None = None,
+    specs: list[_TunnelSpec] | None = None,
+) -> None:
+    """Блокирует до готовности всех туннелей (TCP на localhost).
+
+    Raises:
+        TimeoutError: туннели не поднялись за timeout_sec.
+    """
+    tunnel_specs = specs if specs is not None else _tunnel_specs()
+    if timeout_sec is None:
+        raw = os.environ.get("DEV_TUNNEL_READY_TIMEOUT_SEC", "").strip()
+        timeout_sec = float(raw) if raw else _DEFAULT_READY_TIMEOUT_SEC
+
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if _all_tunnels_ready(tunnel_specs):
+            logger.info("Dev k8s tunnels are ready")
+            return
+        time.sleep(_READY_POLL_INTERVAL_SEC)
+
+    raise TimeoutError(
+        "Dev k8s tunnels not ready within "
+        f"{timeout_sec}s. Check kubectl access and DEV_TUNNEL_PG_RESOURCE "
+        "(default pod/postgres-db-0)."
+    )
 
 
 def _monitor_loop(kubeconfig: str, specs: list[_TunnelSpec]) -> None:
     """Watchdog: раз в секунду проверяет процессы и порты, перезапускает при сбое."""
-    procs = _start_all_tunnels(kubeconfig, specs)
-    # Даём kubectl время поднять listen
-    time.sleep(2.0)
+    _start_all_tunnels(kubeconfig, specs)
+    time.sleep(_STARTUP_WAIT_SEC)
 
     while True:
         time.sleep(_MONITOR_INTERVAL_SEC)
-        need_restart = False
-        for proc, spec in zip(procs, specs, strict=True):
-            if not _tunnel_healthy(proc, spec):
-                logger.warning(
-                    "Tunnel %s unhealthy (pid=%s, poll=%s), will restart",
-                    spec.name,
-                    proc.pid,
-                    proc.poll(),
-                )
-                need_restart = True
-                break
+        for spec in specs:
+            proc = _processes_by_name.get(spec.name)
+            if _tunnel_port_ready(proc, spec):
+                continue
+            if proc is not None and proc.poll() is not None:
+                _log_tunnel_exit(spec, proc)
+            logger.warning(
+                "Tunnel %s unhealthy, restarting (pid=%s, poll=%s)",
+                spec.name,
+                proc.pid if proc else None,
+                proc.poll() if proc else None,
+            )
+            _start_tunnel(spec, kubeconfig)
+            time.sleep(_STARTUP_WAIT_SEC)
 
-        if need_restart:
-            procs = _start_all_tunnels(kubeconfig, specs)
-            time.sleep(2.0)
 
+def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
+    """Идемпотентно запускает фоновый монитор port-forward (только один поток на процесс).
 
-def start_dev_tunnels_monitor() -> None:
-    """Идемпотентно запускает фоновый монитор port-forward (только один поток на процесс)."""
+    Args:
+        wait_ready: дождаться TCP на localhost перед возвратом (для bootstrap приложения).
+    """
     global _monitor_started
 
     with _monitor_lock:
@@ -215,8 +325,11 @@ def start_dev_tunnels_monitor() -> None:
     )
     thread.start()
     logger.info(
-        "Dev k8s tunnels monitor started (kubeconfig=%s, PG=%s, CH HTTP=%s)",
+        "Dev k8s tunnels monitor started (kubeconfig=%s, PG=%s via %s, CH HTTP=%s)",
         kubeconfig,
         specs[0].probe_port,
+        specs[0].resource,
         specs[1].probe_port,
     )
+    if wait_ready:
+        wait_for_dev_tunnels_ready(specs=specs)

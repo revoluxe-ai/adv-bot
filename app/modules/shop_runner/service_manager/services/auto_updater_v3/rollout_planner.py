@@ -39,7 +39,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     SelectionPolicy,
     build_worst_per_state_costs,
     collect_transition_candidates,
-    missing_target_matrix,
+    missing_target_matrix_from_catalog,
     passes_rec_gate_for_up,
     plan_one_up_by_policy,
 )
@@ -327,7 +327,7 @@ def _resolve_state_cost_for_mode(
     return resolve_effective_state_cost(
         profile_cost=profile_cost,
         worst_cost=worst_costs.get(target),
-        allow_worst_imputation=missing_target_matrix(ctx),
+        allow_worst_imputation=missing_target_matrix_from_catalog(catalog),
     )
 
 
