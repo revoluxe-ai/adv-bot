@@ -98,9 +98,10 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
-        lines.append(
-            "   _MIN_CPA + target 0 → min bid WB, белый список (апдейтер)_"
+        footer = _escape_markdown_v1(
+            "MIN_CPA + target 0 → min bid WB, белый список (апдейтер)"
         )
+        lines.append(f"   _{footer}_")
     return "\n".join(lines) + "\n"
 
 

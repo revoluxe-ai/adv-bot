@@ -127,6 +127,7 @@ def test_profile_n_state_when_no_ch_matrix() -> None:
     assert "V2 CPO" in text and "CH матрица" in text
     assert "нет матрицы CH" in text
     assert "min bid WB" in text
+    assert "MIN\\_CPA + target 0" in text
 
 
 @pytest.mark.unit

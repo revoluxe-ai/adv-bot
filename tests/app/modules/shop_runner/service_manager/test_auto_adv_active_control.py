@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
 )
@@ -53,6 +54,7 @@ class _FakeAdvSetting:
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
+        self.sales_predict_method = FactMethods.DIRECT_SALES
 
 
 class _FakeSearchAdv:
