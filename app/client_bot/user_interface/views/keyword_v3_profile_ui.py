@@ -1,7 +1,12 @@
-"""Форматирование профиля ключа V3 (лестница stage) для карточки Telegram."""
+"""Форматирование профиля ключа V3 (лестница stage) для карточки Telegram.
+
+Текст вставляется в ``KeywordSettingMessage`` с ``ParseMode.MARKDOWN`` (legacy V1):
+экранируем только ``_``, ``*``, ``[``, ````` — не синтаксис MarkdownV2.
+"""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from app.client_bot.user_interface.views.keyword_strategy_ui import strategy_mode_letter
@@ -11,7 +16,17 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     ModeCandidate,
 )
 
-_PROFILE_UNAVAILABLE = "📊 *Профиль ключа \\(V3\\):* недоступен \\(нет данных CH/WB\\)\n"
+_PROFILE_UNAVAILABLE = (
+    "📊 *Профиль ключа (V3):* недоступен (нет данных CH/WB)\n"
+)
+
+# Telegram legacy Markdown: _, *, `, [ вне разметки
+_MARKDOWN_V1_ESCAPE = re.compile(r"([_*`\[])")
+
+
+def _escape_markdown_v1(text: str) -> str:
+    """Экранирование для ``ParseMode.MARKDOWN`` (не MarkdownV2)."""
+    return _MARKDOWN_V1_ESCAPE.sub(r"\\\1", text)
 
 _LADDER_ORDER: tuple[KeywordStrategyMode, ...] = (
     KeywordStrategyMode.OFF,
@@ -49,7 +64,7 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     if data is None:
         return _PROFILE_UNAVAILABLE
 
-    lines = ["📊 *Профиль ключа \\(V3\\):*"]
+    lines = ["📊 *Профиль ключа (V3):*"]
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     return "\n".join(lines) + "\n"
@@ -65,14 +80,14 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     agg = _MODE_TO_AGG.get(mode)
     assert agg is not None
     cand = data.candidates.get(agg)
-    label = mode.name
+    label = _escape_markdown_v1(mode.name)
     if cand is None or not cand.is_valid:
         reason = ""
         if cand is not None and cand.invalid_reason:
-            reason = _INVALID_REASON_SHORT.get(
+            raw = _INVALID_REASON_SHORT.get(
                 cand.invalid_reason, cand.invalid_reason
             )
-            reason = f" \\({reason}\\)"
+            reason = f" ({_escape_markdown_v1(raw)})"
         return f"{star}{letter} {label} — —{reason}"
 
     pos = int(cand.position) if cand.position is not None else "—"
@@ -81,7 +96,7 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     target = data.target_positions_by_mode.get(mode)
     target_str = str(target) if target is not None else "—"
     return (
-        f"{star}{letter} {label} — поз\\. {pos} \\| CPM {cpm} "
-        f"\\| CPO {cpo} ₽ \\| цель {target_str}"
+        f"{star}{letter} {label} — поз. {pos} | CPM {cpm} "
+        f"| CPO {cpo} ₽ | цель {target_str}"
     )
 

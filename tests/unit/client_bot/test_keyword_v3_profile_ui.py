@@ -52,12 +52,15 @@ def test_profile_off_first_and_star_on_current() -> None:
     assert "OFF — отключен" in lines[1]
     assert "лестница отключена" not in text
     assert lines[1].startswith("   ")
-    assert "🌟" in lines[2] and "MIN_CPA" in lines[2]
+    assert "🌟" in lines[2] and "MIN\\_CPA" in lines[2]
     assert "OPTIMUM" in lines[3]
     assert "MAX_CONVERSION" in lines[4]
     joined = "\n".join(lines)
-    assert joined.index("OFF") < joined.index("MIN_CPA") < joined.index("OPTIMUM") < joined.index(
-        "MAX_CONVERSION"
+    assert (
+        joined.index("OFF")
+        < joined.index("MIN\\_CPA")
+        < joined.index("OPTIMUM")
+        < joined.index("MAX\\_CONVERSION")
     )
 
 
@@ -103,3 +106,30 @@ def test_profile_invalid_candidate_shows_reason() -> None:
     assert "нет conv показ→заказ" in text
     assert "нет конверсий" in text
     assert "🌟" in text and "OPTIMUM" in text
+
+
+@pytest.mark.unit
+def test_profile_legacy_markdown_not_v2_escapes() -> None:
+    """ParseMode.MARKDOWN: без \\( \\) \\| \\. из MarkdownV2."""
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.MIN_CPA,
+        candidates={
+            AggressionTargetMode.MIN_CPA: _valid_candidate(
+                AggressionTargetMode.MIN_CPA, 12, 145.0, 89.5
+            ),
+            AggressionTargetMode.OPTIMUM: _valid_candidate(
+                AggressionTargetMode.OPTIMUM, 8, 210.0, 102.0
+            ),
+            AggressionTargetMode.MAX_CONVERSION: _valid_candidate(
+                AggressionTargetMode.MAX_CONVERSION, 3, 380.0, 145.0
+            ),
+        },
+        target_positions_by_mode={KeywordStrategyMode.MIN_CPA: 12},
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "\\(" not in text
+    assert "\\)" not in text
+    assert "\\|" not in text
+    assert "поз\\. " not in text
+    assert "поз. 12 | CPM" in text
+    assert "*Профиль ключа (V3):*" in text
