@@ -230,7 +230,7 @@ async def process_adv_v3(
             no_data_actions = plan_no_data_activation_v3(contexts)
             if no_data_actions:
                 logger.info(
-                    "[adv_id=%s] v3 no_data activation planned: up=%s",
+                    "[adv_id=%s] v3 no_data activation planned: actions=%s",
                     complex_adv.adv_id,
                     len(no_data_actions),
                 )
