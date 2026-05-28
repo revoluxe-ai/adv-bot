@@ -28,7 +28,7 @@ async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None
     dto = MagicMock()
     dto.min_target_position = 5
 
-    phase0 = AsyncMock(return_value=([], False))
+    phase0 = AsyncMock(return_value=[])
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
     plan_fact.set_new_plan_fact = AsyncMock()
@@ -43,7 +43,7 @@ async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
             phase0,
         ),
         patch(
@@ -65,9 +65,9 @@ async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_actions",
         ) as select_mock,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.apply_v3_actions",
-            new=AsyncMock(),
-        ) as apply_mock,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ) as flush_mock,
     ):
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
@@ -76,7 +76,7 @@ async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None
 
     phase0.assert_awaited_once()
     select_mock.assert_not_called()
-    apply_mock.assert_not_awaited()
+    flush_mock.assert_awaited_once()
     plan_fact.check_equal_in_cache.assert_awaited_once()
 
 
@@ -105,8 +105,8 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
-            new=AsyncMock(return_value=([], False)),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
+            new=AsyncMock(return_value=[]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
@@ -141,14 +141,22 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() -> None:
-    """После gap-rebalance контексты пересобираются до no_data_activation."""
+    """После gap-rebalance in-memory контексты пересобираются до no_data."""
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+        V3Action,
+        V3ActionType,
+    )
+    from tests.unit.auto_updater_v3.test_tick_ledger import _kw
+
+    kw = _kw(ks_id=1, mode=KeywordStrategyMode.OFF, hard_status=1)
     complex_adv = MagicMock()
     complex_adv.adv_id = 13
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.v3_rollout_aggressiveness = 2
-    complex_adv.get_keywords = AsyncMock(return_value=[])
+    complex_adv.get_keywords = AsyncMock(return_value=[kw])
 
     dto = MagicMock()
     dto.min_target_position = 5
@@ -158,7 +166,12 @@ async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() ->
         build_calls.append(len(build_calls))
         return []
 
-    no_data_mock = AsyncMock(return_value=False)
+    phase0_action = V3Action(
+        action=V3ActionType.UP,
+        keyword_setting_id=1,
+        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+        reason="ladder_gap_rebalance_up",
+    )
 
     with (
         patch(
@@ -170,12 +183,16 @@ async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() ->
             side_effect=_build_contexts,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
-            new=AsyncMock(return_value=([], True)),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
+            new=AsyncMock(return_value=[phase0_action]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_no_data_activation_v3",
-            no_data_mock,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
@@ -185,6 +202,4 @@ async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() ->
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     assert build_calls == [0, 1]
-    no_data_mock.assert_awaited_once()
-    # phase0 уже возвращает свежий список из get_keywords — повторного fetch нет
     assert complex_adv.get_keywords.await_count == 1

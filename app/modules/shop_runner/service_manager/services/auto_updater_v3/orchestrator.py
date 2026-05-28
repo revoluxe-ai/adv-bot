@@ -1,10 +1,10 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
 Порядок на **каждом** тике (до Redis gate plan/fact):
-  1. CH bid profiles + gap-rebalance (phase0); при изменениях — пересбор contexts;
-     no-data OFF→MIN_CPA.
+  1. CH bid profiles; phase0 / no_data / selector — in-memory ledger;
+     один нетто-flush ``strategy_mode`` + ``hard_status`` в конце тика.
   2. plan/fact; ``NO_DATA`` (Н) / ``OVERSPEND`` не режутся cache gate; иначе M1/M2/M3.
-  3. ``target_place`` — один раз после всех смен ``strategy_mode`` (rebalance + apply).
+  3. ``target_place`` — один раз после flush (rebalance + ladder).
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
@@ -29,15 +29,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
     resolve_shelf_click_mode_from_adv,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
-    apply_v3_actions,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-    run_no_data_activation_v3,
+    plan_no_data_activation_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
     run_ladder_gap_rebalance_v3,
@@ -51,6 +51,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
     sync_keyword_target_places_v3,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (
+    V3TickKeywordLedger,
 )
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
@@ -151,78 +154,63 @@ async def _safe_sync_target_places_v3(
         )
 
 
-async def _run_phase0_gap_rebalance(
-    complex_adv: ComplexAdv,
-    *,
-    keywords: list[CalculatedKeyword],
-    contexts: list[KeywordV3Context],
-    dto: WBAdvDTO | None,
-) -> tuple[list[CalculatedKeyword], bool]:
-    """Gap-rebalance до plan/fact gate; возвращает актуальный список ключей и флаг apply."""
-    if dto is None:
-        return keywords, False
-
-    shelf_active = complex_adv.shelf_promotion_active
-    click_mode = (
-        resolve_shelf_click_mode_from_adv(complex_adv)
-        if shelf_active
-        else ShelfClickMode.UNKNOWN
-    )
-    changed = await run_ladder_gap_rebalance_v3(
-        complex_adv,
-        contexts=contexts,
-        shelf_promotion_active=shelf_active,
-        shelf_click_mode=click_mode,
-        rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
-    )
-    if changed:
-        return await complex_adv.get_keywords(), True
-    return keywords, False
-
-
 async def process_adv_v3(
     complex_adv: ComplexAdv,
     *,
     wb_shop_data_manager: WBShopDataManager,
     max_last_period: int = 2,
 ) -> None:
-    """Один тик V3: preamble (rebalance) → plan/fact gate → selector → target_place."""
+    """Один тик V3: in-memory ledger → нетто-flush → target_place."""
     adv = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
+    ledger = V3TickKeywordLedger.from_keywords(keywords)
 
     dto, raw_profiles = await _load_v3_wb_context(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
     target_place_synced = False
+    selector_actions_logged: list[V3Action] = []
 
     async def _sync_target_places_once() -> None:
-        """После rebalance и apply; в finally — если тик оборвался раньше."""
+        """После flush; в finally — если тик оборвался раньше."""
         nonlocal target_place_synced
         if target_place_synced:
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await _safe_sync_target_places_v3(
-                complex_adv, dto, raw_profiles, keywords=keywords
+                complex_adv, dto, raw_profiles, keywords=ledger.keywords
             )
             target_place_synced = True
 
     try:
-        # --- Preamble: каждый тик, до Redis plan/fact ---
-        contexts = build_keyword_v3_contexts(keywords, raw_profiles)
-        keywords, phase0_changed = await _run_phase0_gap_rebalance(
-            complex_adv,
-            keywords=keywords,
-            contexts=contexts,
-            dto=dto,
-        )
-        if phase0_changed:
-            contexts = build_keyword_v3_contexts(keywords, raw_profiles)
-        no_data_changed = await run_no_data_activation_v3(
-            complex_adv, contexts=contexts
-        )
-        if no_data_changed:
-            keywords = await complex_adv.get_keywords()
-            contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+        # --- Preamble: in-memory, до Redis plan/fact ---
+        contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+
+        if dto is not None:
+            phase0_actions = await run_ladder_gap_rebalance_v3(
+                complex_adv,
+                contexts=contexts,
+                shelf_promotion_active=complex_adv.shelf_promotion_active,
+                shelf_click_mode=(
+                    resolve_shelf_click_mode_from_adv(complex_adv)
+                    if complex_adv.shelf_promotion_active
+                    else ShelfClickMode.UNKNOWN
+                ),
+                rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
+            )
+            if phase0_actions:
+                _ = ledger.apply_in_memory(phase0_actions)
+                contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+
+        no_data_actions = plan_no_data_activation_v3(contexts)
+        if no_data_actions:
+            logger.info(
+                "[adv_id=%s] v3 no_data activation planned: up=%s",
+                complex_adv.adv_id,
+                len(no_data_actions),
+            )
+            _ = ledger.apply_in_memory(no_data_actions)
+            contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
         # --- Plan/fact: short-circuit только selector (M1/M2/M3 / OVERSPEND / NO_DATA) ---
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
@@ -230,7 +218,7 @@ async def process_adv_v3(
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
         else:
             updater = AdvSettingAutoUpdater(adv, max_last_period)
-            fact = await updater.get_fact_data(keywords)
+            fact = await updater.get_fact_data(ledger.keywords)
 
             plan_fact_change = ChangePlanFact(adv)
             state: SalesStates | None = detect_campaign_state(plan, fact)
@@ -260,7 +248,7 @@ async def process_adv_v3(
                 )
             else:
                 shelf_active = complex_adv.shelf_promotion_active
-                actions = select_v3_actions(
+                selector_actions_logged = select_v3_actions(
                     state=state,
                     contexts=contexts,
                     shelf_promotion_active=shelf_active,
@@ -272,14 +260,26 @@ async def process_adv_v3(
                     plan=plan,
                     fact=fact,
                 )
-                await apply_v3_actions(actions, complex_adv=complex_adv)
+                _ = ledger.apply_in_memory(selector_actions_logged)
                 await cache_plan_fact_snapshot()
-                up_count = sum(1 for a in actions if a.action.value == "UP")
-                down_count = sum(1 for a in actions if a.action.value == "DOWN")
-                force_off_count = sum(1 for a in actions if a.action.value == "FORCE_OFF")
-                m1_count = sum(1 for a in actions if a.reason.startswith("m1_"))
-                m2_count = sum(1 for a in actions if a.reason.startswith("m2_"))
-                m3_count = sum(1 for a in actions if a.reason.startswith("m3_"))
+                up_count = sum(
+                    1 for a in selector_actions_logged if a.action.value == "UP"
+                )
+                down_count = sum(
+                    1 for a in selector_actions_logged if a.action.value == "DOWN"
+                )
+                force_off_count = sum(
+                    1 for a in selector_actions_logged if a.action.value == "FORCE_OFF"
+                )
+                m1_count = sum(
+                    1 for a in selector_actions_logged if a.reason.startswith("m1_")
+                )
+                m2_count = sum(
+                    1 for a in selector_actions_logged if a.reason.startswith("m2_")
+                )
+                m3_count = sum(
+                    1 for a in selector_actions_logged if a.reason.startswith("m3_")
+                )
                 logger.info(
                     "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
                     "up=%s down=%s off=%s m1=%s m2=%s m3=%s",
@@ -294,7 +294,7 @@ async def process_adv_v3(
                     m2_count,
                     m3_count,
                 )
-                for act in actions:
+                for act in selector_actions_logged:
                     sel = act.selection_log
                     if sel is not None:
                         logger.info(
@@ -318,8 +318,15 @@ async def process_adv_v3(
                     "[adv_id=%s] v3: state=%s actions=%s",
                     complex_adv.adv_id,
                     state.name,
-                    [a.model_dump() for a in actions],
+                    [a.model_dump() for a in selector_actions_logged],
                 )
+
+        flushed = await ledger.flush_to_db(complex_adv)
+        if flushed:
+            logger.info(
+                "[adv_id=%s] v3: netto flush committed",
+                complex_adv.adv_id,
+            )
 
         await _sync_target_places_once()
     finally:

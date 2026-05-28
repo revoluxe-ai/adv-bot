@@ -24,11 +24,12 @@ async def test_process_adv_v3_caches_plan_fact_when_state_unknown() -> None:
     async def _passthrough_phase0(
         _adv: object,
         *,
-        keywords: list[object],
         contexts: list[object],
-        dto: object,
-    ) -> tuple[list[object], bool]:
-        return keywords, False
+        shelf_promotion_active: bool,
+        shelf_click_mode: object,
+        rollout_aggressiveness: int | None,
+    ) -> list[object]:
+        return []
 
     with (
         patch(
@@ -36,7 +37,7 @@ async def test_process_adv_v3_caches_plan_fact_when_state_unknown() -> None:
             new=AsyncMock(return_value=(MagicMock(), {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
             new=AsyncMock(side_effect=_passthrough_phase0),
         ),
         patch(
@@ -84,15 +85,16 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     async def _passthrough_phase0(
         _adv: object,
         *,
-        keywords: list[object],
         contexts: list[object],
-        dto: object,
-    ) -> tuple[list[object], bool]:
-        return keywords, False
+        shelf_promotion_active: bool,
+        shelf_click_mode: object,
+        rollout_aggressiveness: int | None,
+    ) -> list[object]:
+        return []
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
             new=AsyncMock(side_effect=_passthrough_phase0),
         ),
         patch(
