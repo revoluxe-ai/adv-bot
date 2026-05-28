@@ -1,10 +1,11 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
-Порядок на **каждом** тике (до Redis gate plan/fact):
-  1. CH bid profiles; phase0 / no_data / selector — in-memory ledger;
-     один нетто-flush ``strategy_mode`` + ``hard_status`` в конце тика.
-  2. plan/fact; ``NO_DATA`` (Н) / ``OVERSPEND`` не режутся cache gate; иначе M1/M2/M3.
-  3. ``target_place`` — один раз после flush (rebalance + ladder).
+Порядок на **каждом** тике:
+  1. CH bid profiles; plan/fact → ``detect_campaign_state``.
+  2. Кампания ``NO_DATA`` (Н) или ``state is None`` — полный стоп лестницы (как V2):
+     без phase0, preamble no_data, selector, ``target_place`` sync; Redis plan/fact не пишем.
+  3. Иначе: phase0 → preamble no_data (N-state **ключей**) → selector (``OVERSPEND`` не режет gate).
+  4. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
@@ -68,6 +69,11 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
+
+
+def _v3_campaign_ladder_blocked(state: SalesStates | None) -> bool:
+    """Как ``AdvControlSystem``: без агрегата fact CPO по РК сценарий не крутим."""
+    return state is None or state == SalesStates.NO_DATA
 
 
 def build_keyword_v3_contexts(
@@ -171,10 +177,12 @@ async def process_adv_v3(
     target_place_synced = False
     selector_actions_logged: list[V3Action] = []
 
+    campaign_ladder_blocked = False
+
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
         nonlocal target_place_synced
-        if target_place_synced:
+        if target_place_synced or campaign_ladder_blocked:
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await _safe_sync_target_places_v3(
@@ -183,10 +191,27 @@ async def process_adv_v3(
             target_place_synced = True
 
     try:
-        # --- Preamble: in-memory, до Redis plan/fact ---
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
-        if dto is not None:
+        # --- Plan/fact: раньше лестницы; Н/None = стоп как V2 ---
+        plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        state: SalesStates | None = None
+        if plan is None:
+            logger.debug("[adv_id=%s] v3: no plan, skip selector", complex_adv.adv_id)
+        else:
+            updater = AdvSettingAutoUpdater(adv, max_last_period)
+            fact = await updater.get_fact_data(ledger.keywords)
+
+            state = detect_campaign_state(plan, fact)
+            campaign_ladder_blocked = _v3_campaign_ladder_blocked(state)
+            if campaign_ladder_blocked:
+                logger.info(
+                    "[adv_id=%s] v3: campaign state=%s — ladder wait (align V2)",
+                    complex_adv.adv_id,
+                    state.name if state is not None else "None",
+                )
+
+        if not campaign_ladder_blocked and dto is not None:
             phase0_actions = await run_ladder_gap_rebalance_v3(
                 complex_adv,
                 contexts=contexts,
@@ -202,42 +227,26 @@ async def process_adv_v3(
                 _ = ledger.apply_in_memory(phase0_actions)
                 contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
-        no_data_actions = plan_no_data_activation_v3(contexts)
-        if no_data_actions:
-            logger.info(
-                "[adv_id=%s] v3 no_data activation planned: up=%s",
-                complex_adv.adv_id,
-                len(no_data_actions),
-            )
-            _ = ledger.apply_in_memory(no_data_actions)
-            contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+            no_data_actions = plan_no_data_activation_v3(contexts)
+            if no_data_actions:
+                logger.info(
+                    "[adv_id=%s] v3 no_data activation planned: up=%s",
+                    complex_adv.adv_id,
+                    len(no_data_actions),
+                )
+                _ = ledger.apply_in_memory(no_data_actions)
+                contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
-        # --- Plan/fact: short-circuit только selector (M1/M2/M3 / OVERSPEND / NO_DATA) ---
-        plan = AdvSettingAutoUpdater.get_plan_data(adv)
-        if plan is None:
-            logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
-        else:
-            updater = AdvSettingAutoUpdater(adv, max_last_period)
-            fact = await updater.get_fact_data(ledger.keywords)
-
+        if plan is not None and not campaign_ladder_blocked:
             plan_fact_change = ChangePlanFact(adv)
-            state: SalesStates | None = detect_campaign_state(plan, fact)
             plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
 
             async def cache_plan_fact_snapshot() -> None:
                 await plan_fact_change.set_new_plan_fact(plan, fact)
 
-            if state is None:
-                logger.warning(
-                    "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
-                )
-                await cache_plan_fact_snapshot()
-            elif plan_fact_equal and state not in (
-                SalesStates.OVERSPEND,
-                SalesStates.NO_DATA,
-            ):
+            if plan_fact_equal and state != SalesStates.OVERSPEND:
                 logger.debug(
-                    "[adv_id=%s] v3: plan/fact unchanged, skip ladder",
+                    "[adv_id=%s] v3: plan/fact unchanged, skip selector",
                     complex_adv.adv_id,
                 )
             elif dto is None:

@@ -624,12 +624,37 @@ def merge_and_dedup_actions(
     m2_actions: list[V3Action],
     m3_actions: list[V3Action],
 ) -> list[V3Action]:
-    """Слить действия с приоритетом cleanup > M2 > M1 > M3 по keyword_setting_id."""
-    merged: dict[int, V3Action] = {}
-    for action in m3_actions + m1_actions + m2_actions + cleanup_actions:
-        if action.action == V3ActionType.DO_NOTHING:
-            continue
-        if action.keyword_setting_id is None:
-            continue
-        merged[action.keyword_setting_id] = action
-    return list(merged.values())
+    """Слить действия с приоритетом cleanup > M2 > M1 > M3 по ``keyword_setting_id``.
+
+    Внутри одного входного списка все действия для одного ключа сохраняются
+    (например N-state: FORCE_OFF → UP). Между списками для ключа побеждает bucket
+    более высокого приоритета целиком — все его действия по этому ключу.
+    """
+    buckets: list[list[V3Action]] = [
+        m3_actions,
+        m1_actions,
+        m2_actions,
+        cleanup_actions,
+    ]
+    winner_bucket: dict[int, int] = {}
+    for bidx, bucket in enumerate(buckets):
+        for action in bucket:
+            if action.action == V3ActionType.DO_NOTHING:
+                continue
+            ks_id = action.keyword_setting_id
+            if ks_id is None:
+                continue
+            winner_bucket[int(ks_id)] = bidx
+
+    result: list[V3Action] = []
+    for bidx, bucket in enumerate(buckets):
+        for action in bucket:
+            if action.action == V3ActionType.DO_NOTHING:
+                continue
+            ks_id = action.keyword_setting_id
+            if ks_id is None:
+                result.append(action)
+                continue
+            if winner_bucket.get(int(ks_id)) == bidx:
+                result.append(action)
+    return result

@@ -8,6 +8,7 @@ import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
@@ -18,6 +19,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
     rebalance_ladder_points,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    merge_and_dedup_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -219,6 +223,55 @@ def test_diagnose_v2_cpo_gap_no_cpm() -> None:
 @pytest.mark.unit
 def test_no_data_target_place_fallback_is_min_bid_sentinel() -> None:
     assert NO_DATA_TARGET_PLACE_FALLBACK == 0
+
+
+@pytest.mark.unit
+def test_merge_and_dedup_preserves_force_off_then_up_in_same_bucket() -> None:
+    """N-state: FORCE_OFF+UP для одного ключа не схлопываются в один UP."""
+    no_data = plan_no_data_keyword_actions(
+        [
+            (
+                KeywordV3Context(
+                    keyword=_kw(
+                        ks_id=30,
+                        text="auto_min",
+                        mode=KeywordStrategyMode.MIN_CPA,
+                        hard_status=1,
+                        conv=0.0,
+                    ),
+                    position_profile=None,
+                ),
+                KeywordStrategyMode.MIN_CPA,
+            )
+        ]
+    )
+    assert len(no_data) == 2
+    assert no_data[0].action == V3ActionType.FORCE_OFF
+    assert no_data[1].action == V3ActionType.UP
+
+    merged = merge_and_dedup_actions(no_data, [], [], [])
+    assert len(merged) == 2
+    assert {a.action for a in merged} == {V3ActionType.FORCE_OFF, V3ActionType.UP}
+
+
+@pytest.mark.unit
+def test_merge_and_dedup_higher_priority_bucket_wins_across_lists() -> None:
+    """Между bucket'ами побеждает cleanup, не смешивая действия разных bucket."""
+    m1_up = V3Action(
+        action=V3ActionType.UP,
+        keyword_setting_id=1,
+        target_strategy_mode=KeywordStrategyMode.OPTIMUM,
+        reason="m1",
+    )
+    cleanup_down = V3Action(
+        action=V3ActionType.DOWN,
+        keyword_setting_id=1,
+        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+        reason="cleanup",
+    )
+    merged = merge_and_dedup_actions([cleanup_down], [m1_up], [], [])
+    assert len(merged) == 1
+    assert merged[0].action == V3ActionType.DOWN
 
 
 @pytest.mark.unit

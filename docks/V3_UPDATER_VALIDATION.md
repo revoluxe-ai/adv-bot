@@ -117,27 +117,22 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
   по механизмам (`m1/m2/m3`);
 - в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
-## NO_DATA (Н) и ключи без V2 CPO
+## NO_DATA (Н) кампании vs N-state ключа
 
-- **Кампания:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
-- **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL (стабилизация); иначе UNDERPERFORM (порог `MAX_PAY_STABILIZATION_RATIO`, как M3 headroom).
-- **Ключ «нет данных»:** нет V2 CPO **или** нет матрицы CH (``position_profile``) — N-state:
-  ``no_data_min_bid`` → MIN_CPA, ``target_place=0``, белый список (``hard_status=2``).
-  Цепочка V2 CPO: ``conv_views_to_orders`` + CPM → ``pay_for_order``
-  (``keyword_v2_pay_for_order_unavailable``).
-- **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
-- **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
-- **Gap-rebalance:** `rebalance_ladder_points` — нет V2 CPO = **1 балл** (снятие хвоста и UP), как MIN_CPA.
-- **UI:** `SalesStates` в меню РК (`sales_state_short_label`); в списке ключей `target_place=0` → `->0` (мин. ставка WB), `None` → `->Н>`.
-- **`target_place`:** `0` = min bid WB (`NO_DATA_TARGET_PLACE_FALLBACK`); в sync передаётся `calculated_by_text` из orchestrator для проверки V2 CPO.
+- **Кампания «Н»:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` по агрегату РК (`detect_campaign_state`). Причины: нет заказов в окне, нет ключей со статистикой, и т.п. **V3 = V2:** лестница не крутится (нет phase0, preamble no_data, selector, `target_place` sync); Redis plan/fact не пишем; ждём данных.
+- **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL; иначе UNDERPERFORM.
+- **N-state ключа** (кампания **не** «Н»): нет V2 CPO **или** нет CH `position_profile` — preamble `plan_no_data_activation_v3` (`no_data_min_bid`, `FORCE_OFF`+UP и т.д.); лестница V3 опирается на CH + `conv_views_to_orders`, не на «старый» расчёт кампании.
+- **Gap-rebalance:** нет V2 CPO = **1 балл** (как MIN_CPA); **не** выполняется при кампании «Н».
+- **UI:** «Н» в меню РК — только кампания; N-state в карточке ключа — диагностика CH/V2 CPO.
+- **`target_place`:** `0` = min bid WB; sync только если кампания не «Н»/None.
 
-Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\test_sales_states.py`.
+Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\unit\test_process_adv_v3_plan_fact_cache.py`, `tests\test_sales_states.py`.
 
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **Порядок тика:** CH profiles → **gap-rebalance (phase0)** → при `phase0_changed` пересбор `contexts` → **no-data activation** → plan/fact Redis gate (только selector) → `target_place` один раз после всех смен режимов (`_sync_target_places_once` + dedupe в `finally`).
+- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **gap-rebalance (phase0)** → **no-data activation (ключи)** → selector (Redis gate) → flush → `target_place` (`_sync_target_places_once` + `finally`).
 - **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO и `conv_views_to_orders`. **`target_place` = `ModeCandidate.position`** из `build_mode_candidates` (MIN — min CPO заказа), не legacy `get_target_position_for_strategy_mode`. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
 
 Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.
