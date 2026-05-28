@@ -27,6 +27,11 @@ class SalesStates(Enum):
     NO_DATA = auto()  # Н — нет данных для plan/fact (V3: MIN_CPA + target_place 0)
 
 
+# При недовыполнении плана: pay в [90%; max] — стабилизация (OPTIMAL), не рост ключей.
+# Совпадает с порогом M3 headroom в V3 (``plan_headroom_plus_one``).
+MAX_PAY_STABILIZATION_RATIO = 0.9
+
+
 def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
     """Определяет состояние кампании adv по плану и факту.
 
@@ -53,11 +58,13 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
     if fact.pay_for_order > plan.max_pay_for_order:
         return SalesStates.OVERSPEND
 
-    # UNDERPERFORM: недопродажи — продаж меньше плана (в т.ч. pay уже у max, но не > max)
-    if (
-        fact.predict_orders < plan.orders
-        and fact.pay_for_order <= plan.max_pay_for_order
-    ):
+    if fact.predict_orders < plan.orders:
+        max_pfo = float(plan.max_pay_for_order)
+        pay = float(fact.pay_for_order)
+        stabilization_floor = MAX_PAY_STABILIZATION_RATIO * max_pfo
+        # 90–100% от max при недопродажах: удержание, без добавления/снятия ключей (OPTIMAL)
+        if pay >= stabilization_floor:
+            return SalesStates.OPTIMAL
         return SalesStates.UNDERPERFORM
 
     # План выполнен

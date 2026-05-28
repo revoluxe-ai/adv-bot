@@ -119,7 +119,8 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 ## NO_DATA (Н) и ключи без V2 CPO
 
-- **Кампания:** `SalesStates.NO_DATA` — `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
+- **Кампания:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
+- **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL (стабилизация); иначе UNDERPERFORM (порог `MAX_PAY_STABILIZATION_RATIO`, как M3 headroom).
 - **Ключ «нет данных»:** нет V2 CPO — та же цепочка, что рейтинг V2: `conv_views_to_orders` + CPM каскад → `orders_per_1000_rub` → `pay_for_order` (`keyword_v2_pay_for_order_unavailable`). Отсутствие только матрицы CH **не** считается no-data для активации.
 - **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
 - **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
