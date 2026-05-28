@@ -23,7 +23,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     V3RolloutAggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-    plan_no_data_min_up_actions,
+    plan_no_data_keyword_actions,
     split_prepared_by_v2_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
@@ -87,7 +87,7 @@ def plan_shelf_promotion_actions(
 
     if state == SalesStates.NO_DATA:
         with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
-        no_data_actions = plan_no_data_min_up_actions(without_cpo)
+        no_data_actions = plan_no_data_keyword_actions(without_cpo)
         if with_cpo:
             shelf_rollout = _plan_underperform_shelf(
                 with_cpo,

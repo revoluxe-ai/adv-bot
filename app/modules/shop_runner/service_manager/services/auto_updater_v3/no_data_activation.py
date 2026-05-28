@@ -262,8 +262,25 @@ def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
     return actions
 
 
-# Обратная совместимость имён в тестах и selector.
-plan_no_data_min_up_actions = plan_no_data_keyword_actions
+def plan_no_data_min_up_actions(prepared: PreparedList) -> list[V3Action]:
+    """OFF без V2 CPO/CH → UP MIN_CPA.
+
+    Только ``V3ActionType.UP`` — для gap-rebalance (``_plan_rebalance_up_once`` ждёт UP).
+    Полный N-state (DOWN / FORCE_OFF) — ``plan_no_data_keyword_actions``.
+    """
+    actions: list[V3Action] = []
+    for ctx, mode in prepared:
+        if mode != KeywordStrategyMode.OFF:
+            continue
+        if not keyword_lacks_v3_decision_data(ctx):
+            continue
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        _append_min_cpa_up(actions, ks_id=ks_id)
+    return actions
 
 
 def _build_prepared(

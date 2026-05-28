@@ -178,6 +178,20 @@ def test_plan_no_data_skips_when_v2_cpo_and_ch_profile() -> None:
 
 
 @pytest.mark.unit
+def test_plan_no_data_min_up_only_off_returns_up_not_down() -> None:
+    """gap-rebalance: min_up — только UP для OFF, не DOWN для O/C."""
+    opt = _kw(ks_id=5, text="e", mode=KeywordStrategyMode.OPTIMUM, conv=0.0)
+    ctx_opt = KeywordV3Context(keyword=opt, position_profile=None)
+    assert plan_no_data_min_up_actions([(ctx_opt, KeywordStrategyMode.OPTIMUM)]) == []
+
+    off = _kw(ks_id=6, text="f", mode=KeywordStrategyMode.OFF, conv=0.0)
+    ctx_off = KeywordV3Context(keyword=off, position_profile=None)
+    up_only = plan_no_data_min_up_actions([(ctx_off, KeywordStrategyMode.OFF)])
+    assert len(up_only) == 1
+    assert up_only[0].action == V3ActionType.UP
+
+
+@pytest.mark.unit
 def test_diagnose_keyword_v3_data_cpo_without_ch_profile() -> None:
     """V2 CPO и CH-матрица независимы: может быть CPO без bid profile."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
