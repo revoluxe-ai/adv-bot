@@ -35,7 +35,7 @@ _HARD_STATUS_WHITE_LIST = 2
 
 # Порядок применения в одном цикле: сначала выключаем/понижаем, затем поднимаем,
 # чтобы UP не опирался на устаревший strategy_mode до DOWN/FORCE_OFF того же тика.
-_V3_ACTION_APPLY_ORDER: dict[V3ActionType, int] = {
+V3_ACTION_APPLY_ORDER: dict[V3ActionType, int] = {
     V3ActionType.FORCE_OFF: 0,
     V3ActionType.DOWN: 1,
     V3ActionType.UP: 2,
@@ -45,8 +45,8 @@ _V3_ACTION_APPLY_ORDER: dict[V3ActionType, int] = {
 
 
 @dataclass(frozen=True)
-class _AppliedV3Action:
-    """Факт успешного изменения в БД за один цикл apply."""
+class AppliedV3Action:
+    """Факт успешного изменения ``strategy_mode`` за цикл V3."""
 
     action: V3ActionType
     keyword_setting_id: int | None
@@ -56,24 +56,66 @@ class _AppliedV3Action:
     reason: str
 
 
-def _hard_status_allows_up(hard_status: object) -> bool:
+def hard_status_allows_up(hard_status: object) -> bool:
     h = int(cast(int, hard_status))
     return h in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 
-def _hard_status_allows_force_off(hard_status: object) -> bool:
+def hard_status_allows_force_off(hard_status: object) -> bool:
     """FORCE_OFF: БС; не трогаем turn_off (3) и always_on (4)."""
     h = int(cast(int, hard_status))
     return h in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 
-def _hard_status_for_strategy_mode(mode: KeywordStrategyMode) -> int:
+def hard_status_for_strategy_mode(mode: KeywordStrategyMode) -> int:
     """V3: OFF -> авто (1), любой активный режим -> белый список (2)."""
     return (
         _HARD_STATUS_AUTO_MODE
         if mode == KeywordStrategyMode.OFF
         else _HARD_STATUS_WHITE_LIST
     )
+
+
+def resolve_v3_action_target_mode(
+    action: V3Action,
+    current: KeywordStrategyMode,
+) -> KeywordStrategyMode | None:
+    """Целевой режим для UP/DOWN или None, если действие неприменимо."""
+    if action.action == V3ActionType.UP:
+        if action.target_strategy_mode is not None:
+            nxt = action.target_strategy_mode
+            if mode_level(nxt) <= mode_level(current):
+                return None
+            return nxt
+        return step_up(current)
+    if action.action == V3ActionType.DOWN:
+        if action.target_strategy_mode is not None:
+            nxt = action.target_strategy_mode
+            if mode_level(nxt) >= mode_level(current):
+                return None
+            return nxt
+        return step_down(current)
+    return None
+
+
+def can_persist_netto_mode_change(
+    db_current: KeywordStrategyMode,
+    desired: KeywordStrategyMode,
+    hard_status: object,
+) -> bool:
+    """Можно ли записать нетто-режим при свежем ``hard_status`` из БД."""
+    if db_current == desired:
+        return False
+    h = int(cast(int, hard_status))
+    if h not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+        return False
+    if mode_level(desired) < mode_level(db_current):
+        if desired == KeywordStrategyMode.OFF:
+            return db_current != KeywordStrategyMode.OFF
+        return h == _HARD_STATUS_WHITE_LIST
+    if mode_level(desired) > mode_level(db_current):
+        return True
+    return False
 
 
 async def _keyword_text_by_id(
@@ -91,9 +133,9 @@ async def _keyword_text_by_id(
     return text
 
 
-async def _persist_last_applied(
+async def persist_last_applied_v3(
     adv: AdvSetting,
-    applied: list[_AppliedV3Action],
+    applied: list[AppliedV3Action],
 ) -> None:
     if not applied:
         return
@@ -134,17 +176,15 @@ async def apply_v3_actions(
     *,
     complex_adv: ComplexAdv,
 ) -> None:
-    """Apply UP/DOWN/FORCE_OFF/REBALANCE to ``KeywordSetting.strategy_mode`` + ``hard_status``.
+    """Немедленно применить UP/DOWN/FORCE_OFF/REBALANCE (legacy / unit tests).
 
-    Args:
-        actions: Запланированные действия цикла.
-        complex_adv: Полный контекст РК; используется для записи last action в Redis.
+    Оркестратор V3 использует ``V3TickKeywordLedger`` + ``flush_to_db`` в конце тика.
     """
     if not actions:
         return
-    applied: list[_AppliedV3Action] = []
+    applied: list[AppliedV3Action] = []
     ordered_actions = sorted(
-        actions, key=lambda a: _V3_ACTION_APPLY_ORDER.get(a.action, 99)
+        actions, key=lambda a: V3_ACTION_APPLY_ORDER.get(a.action, 99)
     )
     async with sm(read_only=False) as session:
         text_cache: dict[int, str] = {}
@@ -172,28 +212,17 @@ async def apply_v3_actions(
                 continue
             current, hard_status = row
             if action.action == V3ActionType.UP:
-                if not _hard_status_allows_up(hard_status):
+                if not hard_status_allows_up(hard_status):
                     logger.debug(
                         "v3 apply skip UP: hard_status_mismatch_up id=%s hard_status=%s",
                         ks_id,
                         hard_status,
                     )
                     continue
-                if action.target_strategy_mode is not None:
-                    nxt = action.target_strategy_mode
-                    if mode_level(nxt) <= mode_level(current):
-                        logger.debug(
-                            "v3 apply skip UP: target not above current id=%s %s->%s",
-                            ks_id,
-                            current,
-                            nxt,
-                        )
-                        continue
-                else:
-                    nxt = step_up(current)
-                    if nxt is None:
-                        continue
-                hs = _hard_status_for_strategy_mode(nxt)
+                nxt = resolve_v3_action_target_mode(action, current)
+                if nxt is None:
+                    continue
+                hs = hard_status_for_strategy_mode(nxt)
                 _ = await session.execute(
                     update(KeywordSetting)
                     .where(KeywordSetting.id == ks_id)
@@ -201,7 +230,7 @@ async def apply_v3_actions(
                 )
                 kw_text = await _keyword_text_by_id(session, text_cache, ks_id)
                 applied.append(
-                    _AppliedV3Action(
+                    AppliedV3Action(
                         action=V3ActionType.UP,
                         keyword_setting_id=ks_id,
                         keyword_text=kw_text,
@@ -218,21 +247,10 @@ async def apply_v3_actions(
                         hard_status,
                     )
                     continue
-                if action.target_strategy_mode is not None:
-                    nxt = action.target_strategy_mode
-                    if mode_level(nxt) >= mode_level(current):
-                        logger.debug(
-                            "v3 apply skip DOWN: target not below current id=%s %s->%s",
-                            ks_id,
-                            current,
-                            nxt,
-                        )
-                        continue
-                else:
-                    nxt = step_down(current)
-                    if nxt is None:
-                        continue
-                hs = _hard_status_for_strategy_mode(nxt)
+                nxt = resolve_v3_action_target_mode(action, current)
+                if nxt is None:
+                    continue
+                hs = hard_status_for_strategy_mode(nxt)
                 _ = await session.execute(
                     update(KeywordSetting)
                     .where(KeywordSetting.id == ks_id)
@@ -240,7 +258,7 @@ async def apply_v3_actions(
                 )
                 kw_text = await _keyword_text_by_id(session, text_cache, ks_id)
                 applied.append(
-                    _AppliedV3Action(
+                    AppliedV3Action(
                         action=V3ActionType.DOWN,
                         keyword_setting_id=ks_id,
                         keyword_text=kw_text,
@@ -252,14 +270,14 @@ async def apply_v3_actions(
             elif action.action == V3ActionType.FORCE_OFF:
                 if current == KeywordStrategyMode.OFF:
                     continue
-                if not _hard_status_allows_force_off(hard_status):
+                if not hard_status_allows_force_off(hard_status):
                     logger.debug(
                         "v3 apply skip FORCE_OFF: hard_status_mismatch id=%s hard_status=%s",
                         ks_id,
                         hard_status,
                     )
                     continue
-                hs = _hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+                hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
                 _ = await session.execute(
                     update(KeywordSetting)
                     .where(KeywordSetting.id == ks_id)
@@ -270,7 +288,7 @@ async def apply_v3_actions(
                 )
                 kw_text = await _keyword_text_by_id(session, text_cache, ks_id)
                 applied.append(
-                    _AppliedV3Action(
+                    AppliedV3Action(
                         action=V3ActionType.FORCE_OFF,
                         keyword_setting_id=ks_id,
                         keyword_text=kw_text,
@@ -283,14 +301,14 @@ async def apply_v3_actions(
 
     adv = getattr(complex_adv, "adv_setting", None)
     if adv is not None and applied:
-        await _persist_last_applied(adv, applied)
+        await persist_last_applied_v3(adv, applied)
 
 
 async def _apply_transfer(
     session: AsyncSession,
     action: V3Action,
     text_cache: dict[int, str],
-) -> list[_AppliedV3Action]:
+) -> list[AppliedV3Action]:
     """REBALANCE: down source + up target; snapshot — по целевому ключу (up)."""
     if action.from_keyword_setting_id is None or action.to_keyword_setting_id is None:
         return []
@@ -319,7 +337,7 @@ async def _apply_transfer(
             hard_status_from,
         )
         return []
-    if not _hard_status_allows_up(hard_status_to):
+    if not hard_status_allows_up(hard_status_to):
         logger.debug(
             "v3 transfer skip: hard_status_mismatch_up id=%s hard_status=%s",
             to_id,
@@ -341,7 +359,7 @@ async def _apply_transfer(
         .where(KeywordSetting.id == from_id)
         .values(
             strategy_mode=down,
-            hard_status=_hard_status_for_strategy_mode(down),
+            hard_status=hard_status_for_strategy_mode(down),
         )
     )
     _ = await session.execute(
@@ -349,12 +367,12 @@ async def _apply_transfer(
         .where(KeywordSetting.id == to_id)
         .values(
             strategy_mode=up,
-            hard_status=_hard_status_for_strategy_mode(up),
+            hard_status=hard_status_for_strategy_mode(up),
         )
     )
     to_text = await _keyword_text_by_id(session, text_cache, to_id)
     return [
-        _AppliedV3Action(
+        AppliedV3Action(
             action=V3ActionType.REBALANCE_TRANSFER,
             keyword_setting_id=to_id,
             keyword_text=to_text,

@@ -15,9 +15,6 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
-    apply_v3_actions,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     stored_strategy_mode,
 )
@@ -158,24 +155,25 @@ def _build_prepared(
     return prepared
 
 
+def plan_no_data_activation_v3(
+    contexts: list["KeywordV3Context"],
+) -> list[V3Action]:
+    """Спланировать OFF→MIN_CPA для ключей без V2 CPO (без записи в БД)."""
+    prepared = _build_prepared(contexts)
+    return plan_no_data_min_up_actions(prepared)
+
+
 async def run_no_data_activation_v3(
     complex_adv: "ComplexAdv",
     *,
     contexts: list["KeywordV3Context"],
-) -> bool:
-    """Применить массовый OFF→MIN_CPA для ключей без V2 CPO (каждый тик preamble).
-
-    Returns:
-        True, если были изменения в БД.
-    """
-    prepared = _build_prepared(contexts)
-    actions = plan_no_data_min_up_actions(prepared)
-    if not actions:
-        return False
-    logger.info(
-        "[adv_id=%s] v3 no_data activation: up=%s",
-        complex_adv.adv_id,
-        len(actions),
-    )
-    await apply_v3_actions(actions, complex_adv=complex_adv)
-    return True
+) -> list[V3Action]:
+    """Legacy: спланировать no-data activation (flush — в orchestrator)."""
+    actions = plan_no_data_activation_v3(contexts)
+    if actions:
+        logger.info(
+            "[adv_id=%s] v3 no_data activation planned: up=%s",
+            complex_adv.adv_id,
+            len(actions),
+        )
+    return actions

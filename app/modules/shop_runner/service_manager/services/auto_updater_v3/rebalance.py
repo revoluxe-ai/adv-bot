@@ -16,9 +16,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
     activation_strategy_for_shelf_underperform,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
-    apply_v3_actions,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     stored_strategy_mode,
 )
@@ -241,11 +238,11 @@ async def run_ladder_gap_rebalance_v3(
     shelf_promotion_active: bool,
     shelf_click_mode: ShelfClickMode,
     rollout_aggressiveness: int | None,
-) -> bool:
-    """Применить gap-rebalance, если есть действия.
+) -> list[V3Action]:
+    """Спланировать gap-rebalance (без записи в БД; flush — в orchestrator).
 
     Returns:
-        True, если были применены изменения.
+        Список действий или пустой список.
     """
     prepared = _build_prepared(contexts)
     actions = plan_ladder_gap_rebalance(
@@ -256,7 +253,7 @@ async def run_ladder_gap_rebalance_v3(
     )
     if not actions:
         logger.debug("[adv_id=%s] v3 gap rebalance: no actions", complex_adv.adv_id)
-        return False
+        return []
 
     force_count = sum(1 for a in actions if a.action == V3ActionType.FORCE_OFF)
     up_count = sum(1 for a in actions if a.action == V3ActionType.UP)
@@ -266,5 +263,4 @@ async def run_ladder_gap_rebalance_v3(
         force_count,
         up_count,
     )
-    await apply_v3_actions(actions, complex_adv=complex_adv)
-    return True
+    return actions

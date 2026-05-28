@@ -43,11 +43,12 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
     async def _phase0_noop(
         _adv: object,
         *,
-        keywords: list[object],
         contexts: list[object],
-        dto: object,
-    ) -> tuple[list[object], bool]:
-        return keywords, False
+        shelf_promotion_active: bool,
+        shelf_click_mode: object,
+        rollout_aggressiveness: int | None,
+    ) -> list[object]:
+        return []
 
     with (
         patch(
@@ -55,7 +56,7 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=predictor,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
             new=AsyncMock(side_effect=_phase0_noop),
         ),
         patch(
@@ -78,8 +79,8 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             select_mock,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.apply_v3_actions",
-            new=AsyncMock(),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
         ),
     ):
         updater_cls.return_value.get_fact_data = AsyncMock(

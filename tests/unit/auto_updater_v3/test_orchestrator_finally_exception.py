@@ -30,10 +30,11 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
     async def _phase0_raise(
         _adv: object,
         *,
-        keywords: list[object],
         contexts: list[object],
-        dto: object,
-    ) -> tuple[list[object], bool]:
+        shelf_promotion_active: bool,
+        shelf_click_mode: object,
+        rollout_aggressiveness: int | None,
+    ) -> list[object]:
         raise _ROOT_ERROR
 
     with (
@@ -46,7 +47,7 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
             new=AsyncMock(side_effect=_phase0_raise),
         ),
         patch(
