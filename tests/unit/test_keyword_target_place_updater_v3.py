@@ -267,3 +267,42 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_v2_cpo_with_profi
     )
 
     assert min_kw.target_place == 0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_sync_keyword_target_places_v3_uses_calculated_keyword_strategy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DB ``strategy_mode`` может отставать; target_place — по режиму из ``calculated_by_text``."""
+    kw_row = SimpleNamespace(
+        text="kw_min",
+        strategy_mode=KeywordStrategyMode.OPTIMUM,
+        target_place=1,
+    )
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.all.return_value = [kw_row]
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=fake_result)
+    session.commit = AsyncMock()
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
+        _patched_sm(session_cm),
+    )
+
+    adv = MagicMock()
+    adv.adv_setting_original_id = 1
+    adv.adv_id = 123
+
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles=_ladder_bid_profiles(),
+        calculated_by_text=_calc_map("kw_min"),
+    )
+
+    assert kw_row.target_place == 3
