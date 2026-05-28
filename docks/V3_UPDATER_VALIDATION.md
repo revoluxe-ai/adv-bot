@@ -121,7 +121,10 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **`sync_keyword_target_places_v3`** — на каждом тике при `individual_keywords_target_place_mode` (один CH snapshot): после `apply_v3_actions`, при раннем return — в `finally` (`_sync_target_places_once`, без двойного вызова). `_safe_sync_target_places_v3`: при падении sync — `logger.error(..., exc_info=True)`, исключение из `try` не подменяется.
+- **Порядок тика:** CH profiles → **gap-rebalance (phase0)** → plan/fact Redis gate (только selector) → `target_place` один раз после всех смен режимов (`_sync_target_places_once` + dedupe в `finally`).
+- **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact. `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
+
+Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
 - Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
 
