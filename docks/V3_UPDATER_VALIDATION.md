@@ -119,7 +119,6 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - **`sync_keyword_target_places_v3`** — в `finally` каждого `process_adv_v3` при `individual_keywords_target_place_mode` (каждый тик, один CH snapshot).
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).
 - Корутина **`update_individual_keyword_target_places`** (каждые 5 мин) — **только V2**; V3 — early return в updater.
-- NDJSON-трейс длительного прогона: `debug-2e87c7.log` (`auto_updater_v3/debug_trace.py`).
 
 Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_updater_v3\test_orchestrator_profiles.py`.
 

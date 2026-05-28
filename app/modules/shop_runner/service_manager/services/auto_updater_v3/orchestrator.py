@@ -30,9 +30,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     apply_v3_actions,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.debug_trace import (
-    v3_debug,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
@@ -98,18 +95,6 @@ async def _load_v3_wb_context(
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
     )
-    # region agent log
-    v3_debug(
-        hypothesis_id="CH-ONCE",
-        location="orchestrator.py:_load_v3_wb_context",
-        message="bid profiles loaded",
-        data={
-            "adv_id": complex_adv.adv_id,
-            "profile_count": len(raw_profiles),
-            "shelf_active": shelf_active,
-        },
-    )
-    # endregion
     return dto, raw_profiles
 
 
@@ -137,14 +122,6 @@ async def _run_phase0_gap_rebalance(
         shelf_click_mode=click_mode,
         rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
     )
-    # region agent log
-    v3_debug(
-        hypothesis_id="P0",
-        location="orchestrator.py:_run_phase0_gap_rebalance",
-        message="phase0 gap-rebalance done",
-        data={"adv_id": complex_adv.adv_id, "changed": changed},
-    )
-    # endregion
     if changed:
         return await complex_adv.get_keywords(), True
     return keywords, False
@@ -163,19 +140,6 @@ async def process_adv_v3(
     dto, raw_profiles = await _load_v3_wb_context(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
-    # region agent log
-    v3_debug(
-        hypothesis_id="CYCLE",
-        location="orchestrator.py:process_adv_v3",
-        message="v3 cycle start",
-        data={
-            "adv_id": complex_adv.adv_id,
-            "keyword_count": len(keywords),
-            "has_dto": dto is not None,
-            "individual_tp_mode": complex_adv.individual_keywords_target_place_mode,
-        },
-    )
-    # endregion
     try:
         contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
@@ -200,17 +164,6 @@ async def process_adv_v3(
         plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
         if plan_fact_equal:
             logger.debug("[adv_id=%s] v3: plan/fact unchanged, skip", complex_adv.adv_id)
-            # region agent log
-            v3_debug(
-                hypothesis_id="PF",
-                location="orchestrator.py:process_adv_v3",
-                message="plan/fact unchanged early exit",
-                data={
-                    "adv_id": complex_adv.adv_id,
-                    "phase0_changed": phase0_changed,
-                },
-            )
-            # endregion
             return
 
         async def cache_plan_fact_snapshot() -> None:
@@ -247,21 +200,6 @@ async def process_adv_v3(
             fact=fact,
         )
         await apply_v3_actions(actions, complex_adv=complex_adv)
-        # region agent log
-        v3_debug(
-            hypothesis_id="P1",
-            location="orchestrator.py:process_adv_v3",
-            message="phase1 apply done",
-            data={
-                "adv_id": complex_adv.adv_id,
-                "state": state.name,
-                "actions": len(actions),
-                "up": sum(1 for a in actions if a.action.value == "UP"),
-                "down": sum(1 for a in actions if a.action.value == "DOWN"),
-                "force_off": sum(1 for a in actions if a.action.value == "FORCE_OFF"),
-            },
-        )
-        # endregion
 
         await cache_plan_fact_snapshot()
         up_count = sum(1 for a in actions if a.action.value == "UP")
@@ -309,16 +247,5 @@ async def process_adv_v3(
             [a.model_dump() for a in actions],
         )
     finally:
-        if (
-            dto is not None
-            and complex_adv.individual_keywords_target_place_mode
-        ):
+        if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await sync_keyword_target_places_v3(dto, raw_profiles)
-            # region agent log
-            v3_debug(
-                hypothesis_id="TP-EVERY-TICK",
-                location="orchestrator.py:process_adv_v3:finally",
-                message="target_place sync every tick",
-                data={"adv_id": complex_adv.adv_id},
-            )
-            # endregion
