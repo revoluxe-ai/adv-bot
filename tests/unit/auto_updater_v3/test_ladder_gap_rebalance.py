@@ -93,7 +93,7 @@ def test_find_first_ladder_gap_index_none_when_no_hole() -> None:
         _wl_kw(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, target_pfo=50),
         _wl_kw(ks_id=2, mode=KeywordStrategyMode.OPTIMUM, target_pfo=80),
     ]
-    assert find_first_ladder_gap_index(sorted_wl) is None
+    assert find_first_ladder_gap_index(sorted_wl, contexts=[]) is None
 
 
 @pytest.mark.unit
@@ -104,7 +104,7 @@ def test_find_first_ladder_gap_index_detects_off_with_active_below() -> None:
         _wl_kw(ks_id=3, mode=KeywordStrategyMode.OPTIMUM, target_pfo=120),
         _wl_kw(ks_id=4, mode=KeywordStrategyMode.MAX_CONVERSION, target_pfo=200),
     ]
-    assert find_first_ladder_gap_index(sorted_wl) == 1
+    assert find_first_ladder_gap_index(sorted_wl, contexts=[]) == 1
 
 
 @pytest.mark.unit

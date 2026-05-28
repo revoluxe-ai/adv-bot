@@ -34,6 +34,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
     step_down,
     step_up,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    effective_conv_for_v3,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
@@ -68,6 +71,18 @@ def _hard_status_allows_up(hard_status: int) -> bool:
 _LEVEL2_OFF_STRICT_ABOVE = 3
 # Level 3: allow mixed pool unless this many OFF→MIN remain.
 _LEVEL3_OFF_STRICT_ABOVE = 8
+
+
+def _conv_for_ctx(
+    ctx: "KeywordV3Context",
+    prepared: PreparedList | None = None,
+) -> float:
+    """Conv для кандидатов M/O/C: своя или импутация РК (см. ``keyword_v3_decision_data``)."""
+    peer = [c for c, _ in prepared] if prepared else [ctx]
+    eff = effective_conv_for_v3(ctx, peer)
+    if eff is not None:
+        return eff
+    return float(ctx.keyword.conv_views_to_orders)
 
 
 def _conv_sort_key(ctx: KeywordV3Context) -> float:
@@ -112,15 +127,18 @@ def _up_move_kind(
 def try_valid_rollout_up(
     ctx: KeywordV3Context,
     mode: KeywordStrategyMode,
+    *,
+    prepared: PreparedList | None = None,
 ) -> V3Action | None:
     if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
         return None
 
+    conv = _conv_for_ctx(ctx, prepared)
     if mode == KeywordStrategyMode.OFF:
         cand = build_mode_candidates(
             profile=ctx.position_profile,
             keyword_text=ctx.keyword.text,
-            conv_views_to_orders=ctx.keyword.conv_views_to_orders,
+            conv_views_to_orders=conv,
         )
         min_c = cand.get(AggressionTargetMode.MIN_CPA)
         if min_c is None or not min_c.is_valid:
@@ -139,7 +157,7 @@ def try_valid_rollout_up(
     cand = build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
-        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
+        conv_views_to_orders=conv,
     )
     try:
         target = AggressionTargetMode[nxt.name]
@@ -258,7 +276,7 @@ def plan_rollout_down_one(
         cand = build_mode_candidates(
             profile=ctx.position_profile,
             keyword_text=ctx.keyword.text,
-            conv_views_to_orders=ctx.keyword.conv_views_to_orders,
+            conv_views_to_orders=_conv_for_ctx(ctx, prepared),
         )
         if nxt != KeywordStrategyMode.OFF:
             try:
@@ -312,12 +330,13 @@ def _resolve_state_cost_for_mode(
     ctx: KeywordV3Context,
     to_mode: KeywordStrategyMode,
     worst_costs: dict[AggressionTargetMode, float],
+    prepared: PreparedList | None = None,
 ) -> tuple[float, bool]:
     """Себестоимость режима: профиль CH, при отсутствии — worst-imputation."""
     catalog = build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
-        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
+        conv_views_to_orders=_conv_for_ctx(ctx, prepared),
     )
     target = AggressionTargetMode[to_mode.name]
     mc = catalog.get(target)
@@ -382,6 +401,7 @@ def plan_mass_cheap_promotion(
                 ctx=ctx,
                 to_mode=to_mode,
                 worst_costs=worst_costs,
+                prepared=prepared,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -441,6 +461,7 @@ def _collect_active_expensive(
             ctx=ctx,
             to_mode=current,
             worst_costs=worst_costs,
+            prepared=prepared,
         )
         if cost == float("inf") or cost <= resolve:
             continue
@@ -487,6 +508,7 @@ def _collect_potential_expensive(
                 ctx=ctx,
                 to_mode=to_mode,
                 worst_costs=worst_costs,
+                prepared=prepared,
             )
             if cost == float("inf") or cost <= resolve:
                 continue

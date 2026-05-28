@@ -121,7 +121,7 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 - **Кампания «Н»:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` по агрегату РК (`detect_campaign_state`). Причины: нет заказов в окне, нет ключей со статистикой, и т.п. **V3 = V2:** лестница не крутится (нет phase0, preamble no_data, selector, `target_place` sync); Redis plan/fact не пишем; ждём данных.
 - **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL; иначе UNDERPERFORM.
-- **N-state ключа** (кампания **не** «Н»): нет V2 CPO **или** нет CH `position_profile` — preamble `plan_no_data_activation_v3` (`no_data_min_bid`, `FORCE_OFF`+UP и т.д.); лестница V3 опирается на CH + `conv_views_to_orders`, не на «старый» расчёт кампании.
+- **N-state ключа** (кампания **не** «Н»): только нет CH `position_profile` **или** нельзя импутировать conv (см. ``keyword_v3_decision_data``). Нет своих показов, но есть CH → **не** N-state: ``RK_AGGREGATE`` (средневзвешенная conv по ключам с показами) → ``PEER_MAX`` (max conv по другим ключам) → M1/M2/M3 с ``imputed``; preamble MIN_CPA только при ``NO_CH_MATRIX``.
 - **Gap-rebalance:** нет V2 CPO = **1 балл** (как MIN_CPA); **не** выполняется при кампании «Н».
 - **UI:** «Н» в меню РК — только кампания; N-state в карточке ключа — диагностика CH/V2 CPO.
 - **`target_place`:** `0` = min bid WB; sync только если кампания не «Н»/None.
