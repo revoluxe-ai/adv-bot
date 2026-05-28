@@ -87,8 +87,14 @@ def _plan_m1_m2_m3_with_plan_fact(
     shelf_promotion_active: bool,
     shelf_click_mode: ShelfClickMode | None,
     aggr: V3RolloutAggressiveness,
+    include_m3_headroom: bool = True,
 ) -> list[V3Action]:
-    """M1/M2/M3 (+ shelf cleanup) для ключей с валидным resolve."""
+    """M1/M2/M3 (+ shelf cleanup) для ключей с валидным resolve.
+
+    Args:
+        include_m3_headroom: False для ``SalesStates.NO_DATA`` — нет campaign fact CPO,
+            M3 (headroom vs ``0.9 * resolve``) не применяется.
+    """
     resolve = compute_resolve_cost_threshold(plan, fact)
     if not is_resolve_valid(plan, resolve):
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
@@ -116,14 +122,14 @@ def _plan_m1_m2_m3_with_plan_fact(
         policy=policy,
         worst_costs=worst_costs,
     )
-    m3_actions = plan_headroom_plus_one(
-        prepared,
-        resolve=resolve,
-        fact_pay_for_order=(
-            float(fact.pay_for_order) if fact.pay_for_order is not None else None
-        ),
-        policy=policy,
-    )
+    m3_actions: list[V3Action] = []
+    if include_m3_headroom and fact.pay_for_order is not None:
+        m3_actions = plan_headroom_plus_one(
+            prepared,
+            resolve=resolve,
+            fact_pay_for_order=float(fact.pay_for_order),
+            policy=policy,
+        )
     merged = merge_and_dedup_actions(
         cleanup_actions, m1_actions, m2_actions, m3_actions
     )
@@ -173,6 +179,7 @@ def select_v3_actions(
                     shelf_promotion_active=shelf_promotion_active,
                     shelf_click_mode=shelf_click_mode,
                     aggr=aggr,
+                    include_m3_headroom=False,
                 )
                 merged = merge_and_dedup_actions(no_data_actions, rollout, [], [])
                 if merged:

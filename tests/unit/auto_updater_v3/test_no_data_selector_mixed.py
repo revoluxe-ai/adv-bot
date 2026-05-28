@@ -34,6 +34,58 @@ from tests.unit.auto_updater_v3.test_no_data_activation import (
 
 
 @pytest.mark.unit
+def test_no_data_campaign_skips_m3_when_campaign_pay_for_order_is_none() -> None:
+    """NO_DATA: M1/M2 по ключам с V2 CPO; M3 не вызывается (нет campaign fact CPO)."""
+    off_no_cpo = _calculated_kw_fixture(
+        ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0
+    )
+    min_with_cpo = _calculated_kw_fixture(
+        ks_id=2,
+        text="b",
+        mode=KeywordStrategyMode.MIN_CPA,
+        conv=0.08,
+        cpm_set_bid=200,
+    )
+    profile = _sample_profile()
+    contexts = [
+        KeywordV3Context(keyword=off_no_cpo, position_profile=profile),
+        KeywordV3Context(keyword=min_with_cpo, position_profile=profile),
+    ]
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=None,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_mass_cheap_promotion",
+            return_value=[],
+        ) as m1_mock,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_state_rebalance",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_headroom_plus_one",
+        ) as m3_mock,
+    ):
+        actions = select_v3_actions(
+            state=SalesStates.NO_DATA,
+            contexts=contexts,
+            shelf_promotion_active=False,
+            plan=plan,
+            fact=fact,
+        )
+
+    m1_mock.assert_called_once()
+    m3_mock.assert_not_called()
+    assert any(a.reason == "no_data_min_bid" for a in actions)
+
+
+@pytest.mark.unit
 def test_no_data_campaign_merges_min_up_and_rollout_for_keys_with_cpo() -> None:
     """Кампания NO_DATA: OFF без CPO → UP; ключ с CPO участвует в M1."""
     off_no_cpo = _calculated_kw_fixture(
