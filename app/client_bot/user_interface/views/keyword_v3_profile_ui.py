@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     AggressionTargetMode,
     ModeCandidate,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    KeywordV3DataDiagnostic,
+)
 
 _PROFILE_UNAVAILABLE = (
     "📊 *Профиль ключа (V3):* недоступен (нет данных CH/WB)\n"
@@ -52,20 +55,52 @@ _INVALID_REASON_SHORT: dict[str, str] = {
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3ProfileData:
-    """Срез профиля для одного ключа: кандидаты M/O/C лестницы V3."""
+    """Срез профиля для одного ключа: кандидаты M/O/C, N-state или тех. сбой загрузки."""
 
     current_mode: KeywordStrategyMode
     candidates: dict[AggressionTargetMode, ModeCandidate]
+    n_state: bool = False
+    diagnostic: KeywordV3DataDiagnostic | None = None
+    load_failure: str | None = None
+
+
+def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
+    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы."""
+    v2 = "✓" if diagnostic.has_v2_cpo else "✗"
+    ch = "✓" if diagnostic.has_ch_position_profile else "✗"
+    parts = [
+        f"V2 CPO {_escape_markdown_v1(v2)}",
+        f"CH матрица {_escape_markdown_v1(ch)}",
+    ]
+    line = "   _Данные: " + " | ".join(parts) + "_"
+    missing = diagnostic.missing_labels_ru()
+    if missing:
+        gaps = "; ".join(_escape_markdown_v1(m) for m in missing)
+        line += f"\n   _Нет: {gaps}_"
+    return line
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
-    """Текст блока профиля; ``None`` — сообщение о недоступности данных."""
+    """Текст блока профиля; ``None`` — legacy «недоступен» без детализации."""
     if data is None:
         return _PROFILE_UNAVAILABLE
 
-    lines = ["📊 *Профиль ключа (V3):*"]
+    if data.load_failure:
+        reason = _escape_markdown_v1(data.load_failure)
+        return f"📊 *Профиль ключа (V3):* недоступен — {reason}\n"
+
+    header = "📊 *Профиль ключа (V3):*"
+    if data.n_state:
+        header = "📊 *Профиль ключа (V3):* N-state"
+    lines = [header]
+    if data.diagnostic is not None:
+        lines.append(_format_diagnostic_line(data.diagnostic))
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
+    if data.n_state:
+        lines.append(
+            "   _MIN_CPA + target 0 → min bid WB, белый список (апдейтер)_"
+        )
     return "\n".join(lines) + "\n"
 
 

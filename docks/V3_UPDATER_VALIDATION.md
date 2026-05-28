@@ -121,7 +121,10 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 - **Кампания:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
 - **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL (стабилизация); иначе UNDERPERFORM (порог `MAX_PAY_STABILIZATION_RATIO`, как M3 headroom).
-- **Ключ «нет данных»:** нет V2 CPO — та же цепочка, что рейтинг V2: `conv_views_to_orders` + CPM каскад → `orders_per_1000_rub` → `pay_for_order` (`keyword_v2_pay_for_order_unavailable`). Отсутствие только матрицы CH **не** считается no-data для активации.
+- **Ключ «нет данных»:** нет V2 CPO **или** нет матрицы CH (``position_profile``) — N-state:
+  ``no_data_min_bid`` → MIN_CPA, ``target_place=0``, белый список (``hard_status=2``).
+  Цепочка V2 CPO: ``conv_views_to_orders`` + CPM → ``pay_for_order``
+  (``keyword_v2_pay_for_order_unavailable``).
 - **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
 - **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
 - **Gap-rebalance:** `rebalance_ladder_points` — нет V2 CPO = **1 балл** (снятие хвоста и UP), как MIN_CPA.
@@ -149,7 +152,7 @@ Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_upd
 - Блок «Профиль ключа (V3)»: ступени OFF → MIN_CPA → OPTIMUM → MAX_CONVERSION; `🌟` на текущем `strategy_mode`.
 - Метрики M/O/C — `build_mode_candidates` (позиция, CPM, CPO, цель по режиму) на том же CH-профиле, что updater (`load_bid_profiles_for_nmid` + `resolve_keyword_bid_profile`).
 - Загрузка: `min_bid` из Redis (`get_min_bids_cache_only`), без полного `get_wb_advs_dto` на клик.
-- Нет CH / min_bid в кеше — «недоступен», экран ключа не падает.
+- Нет CH / min_bid в кеше — «недоступен» (техн.); нет строки ключа в CH при загруженном профиле nmid — **N-state** (нет матрицы CH).
 
 Unit: `tests\unit\client_bot\test_keyword_v3_profile_ui.py`, `tests\unit\client_bot\test_keyword_v3_profile_loader.py`.
 

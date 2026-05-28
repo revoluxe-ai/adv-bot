@@ -13,7 +13,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     NO_DATA_TARGET_PLACE_FALLBACK,
     keyword_lacks_v3_decision_data,
+    keyword_missing_ch_position_profile,
     keyword_v2_pay_for_order_unavailable,
+    plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
     rebalance_ladder_points,
 )
@@ -139,12 +141,65 @@ def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
 
 
 @pytest.mark.unit
-def test_plan_no_data_skips_when_v2_cpo_available() -> None:
+def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
+    """N-state: есть V2 CPO, но нет CH — OFF → MIN_CPA."""
+    off = _kw(ks_id=3, text="c", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    assert keyword_lacks_v3_decision_data(ctx)
+    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_plan_no_data_down_optimum_without_ch_profile() -> None:
+    opt = _kw(ks_id=4, text="d", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    ctx = KeywordV3Context(keyword=opt, position_profile=None)
+    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OPTIMUM)])
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_keyword_missing_ch_position_profile() -> None:
+    assert keyword_missing_ch_position_profile(None)
+    assert keyword_missing_ch_position_profile([])
+
+
+@pytest.mark.unit
+def test_plan_no_data_skips_when_v2_cpo_and_ch_profile() -> None:
     off = _kw(ks_id=2, text="b", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
     assert not keyword_lacks_v3_decision_data(ctx)
     actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
     assert actions == []
+
+
+@pytest.mark.unit
+def test_diagnose_keyword_v3_data_cpo_without_ch_profile() -> None:
+    """V2 CPO и CH-матрица независимы: может быть CPO без bid profile."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        diagnose_keyword_v3_data,
+    )
+
+    kw = _kw(ks_id=20, text="x", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
+    diag = diagnose_keyword_v3_data(kw, None)
+    assert diag.has_v2_cpo
+    assert not diag.has_ch_position_profile
+    assert diag.n_state
+    assert diag.missing_labels_ru() == ("нет матрицы CH (bid profile по ключу)",)
+
+
+@pytest.mark.unit
+def test_diagnose_v2_cpo_gap_no_cpm() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        diagnose_v2_cpo_gap,
+    )
+
+    kw = _kw(ks_id=21, text="y", mode=KeywordStrategyMode.OFF, conv=0.05, cpm_set_bid=0)
+    assert diagnose_v2_cpo_gap(kw) == "нет CPM (каскад ставок ключа)"
 
 
 @pytest.mark.unit
@@ -160,7 +215,16 @@ def test_rebalance_ladder_points_no_data_off_counts_one() -> None:
 
 @pytest.mark.unit
 def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
+    prof = _sample_profile()
     min_kw = _kw(ks_id=11, text="ok", mode=KeywordStrategyMode.MIN_CPA, conv=0.08, cpm_set_bid=200)
+    min_kw = min_kw.model_copy(update={"position_profile": prof})
     assert rebalance_ladder_points(min_kw, KeywordStrategyMode.MIN_CPA) == 1
     opt = _kw(ks_id=12, text="ok2", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    opt = opt.model_copy(update={"position_profile": prof})
     assert rebalance_ladder_points(opt, KeywordStrategyMode.OPTIMUM) == 2
+
+
+@pytest.mark.unit
+def test_rebalance_ladder_points_missing_ch_counts_one() -> None:
+    min_kw = _kw(ks_id=13, text="noch", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.OPTIMUM) == 1

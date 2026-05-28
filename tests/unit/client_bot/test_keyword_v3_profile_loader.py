@@ -79,7 +79,7 @@ def test_positions_size_for_adv_uses_default_when_none() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_load_keyword_v3_profile_data_returns_none_without_cabinet() -> None:
+async def test_load_keyword_v3_profile_data_returns_failure_without_cabinet() -> None:
     adv = MagicMock()
     adv.wb_cabinet_id = 99
     adv.adv_id = 1
@@ -89,7 +89,8 @@ async def test_load_keyword_v3_profile_data_returns_none_without_cabinet() -> No
         return_value=None,
     ):
         result = await load_keyword_v3_profile_data(adv, _calculated_keyword())
-    assert result is None
+    assert result is not None
+    assert result.load_failure == "нет кабинета WB"
 
 
 @pytest.mark.unit

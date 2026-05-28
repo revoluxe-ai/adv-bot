@@ -102,6 +102,34 @@ def test_profile_invalid_candidate_shows_reason() -> None:
 
 
 @pytest.mark.unit
+def test_profile_n_state_when_no_ch_matrix() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        KeywordV3DataDiagnostic,
+    )
+
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.MIN_CPA,
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                is_valid=False,
+                invalid_reason="no_position_profile",
+            ),
+        },
+        n_state=True,
+        diagnostic=KeywordV3DataDiagnostic(
+            has_v2_cpo=True,
+            has_ch_position_profile=False,
+        ),
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "N-state" in text
+    assert "V2 CPO" in text and "CH матрица" in text
+    assert "нет матрицы CH" in text
+    assert "min bid WB" in text
+
+
+@pytest.mark.unit
 def test_profile_legacy_markdown_not_v2_escapes() -> None:
     """ParseMode.MARKDOWN: без \\( \\) \\| \\. из MarkdownV2."""
     data = KeywordV3ProfileData(
