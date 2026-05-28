@@ -179,3 +179,88 @@ async def test_load_keyword_v3_profile_data_success() -> None:
         min_bid=50,
         positions_size=50,
     )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_load_keyword_v3_profile_data_n_state_when_ch_ok_but_no_v2_cpo() -> None:
+    """Есть bid profile, нет V2 CPO — ``n_state=True`` на success path."""
+    adv = MagicMock()
+    adv.wb_cabinet_id = 1
+    adv.adv_id = 32824944
+    adv.nmids = [10749810]
+    adv.min_target_position = 50
+    adv.search_adv_id = None
+
+    cabinet = MagicMock()
+    cabinet.shop_id = "shop-1"
+
+    ts = datetime.now()
+    bids = [BidPosition("test kw", 1, 100, ts)]
+
+    stat = make_zero_keyword_stat("test kw").model_copy(
+        update={"conv_views_to_orders": 0.0}
+    )
+    kw_no_cpo = CalculatedKeyword(
+        adv_id=1,
+        keyword_setting=KeywordSettingDTO(
+            text="test kw",
+            relevant=True,
+            hard_status=1,
+            id=1,
+            strategy_mode=KeywordStrategyMode.OFF,
+        ),
+        cluster_stat=stat,
+        state=KeywordState(
+            status=KeywordStatus.BAD,
+            reason=KeywordStatusReason.BIDDER_BAD_STATUS,
+            best_keyword_status=False,
+        ),
+        target_pay_for_order=None,
+        rating=1.0,
+    )
+
+    with (
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader._load_wb_cabinet",
+            new_callable=AsyncMock,
+            return_value=cabinet,
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader._build_complex_adv",
+            new_callable=AsyncMock,
+            return_value=MagicMock(),
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.DIManager.create",
+        ) as di_create,
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.build_predict_keywords_target_place",
+        ) as build_predictor,
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.resolve_keyword_bid_profile",
+            return_value=bids,
+        ),
+    ):
+        container = MagicMock()
+        hub = MagicMock()
+        hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+            return_value=MagicMock(search={10749810: 50})
+        )
+        factory = MagicMock()
+        factory.get_wb_manager_hub.return_value = hub
+        container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
+        di_create.return_value.__aenter__ = AsyncMock(return_value=container)
+        di_create.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        predictor = MagicMock()
+        predictor.load_bid_profiles_for_nmid = AsyncMock(return_value={"test kw": bids})
+        build_predictor.return_value = predictor
+
+        result = await load_keyword_v3_profile_data(adv, kw_no_cpo)
+
+    assert result is not None
+    assert result.n_state is True
+    assert result.diagnostic is not None
+    assert result.diagnostic.has_ch_position_profile
+    assert not result.diagnostic.has_v2_cpo

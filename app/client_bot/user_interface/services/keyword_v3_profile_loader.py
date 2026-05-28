@@ -204,7 +204,7 @@ async def load_keyword_v3_profile_data(
         return KeywordV3ProfileData(
             current_mode=calculated_keyword.strategy_mode,
             candidates=_empty_n_state_candidates(),
-            n_state=True,
+            n_state=diagnostic.n_state,
             diagnostic=diagnostic,
         )
 
@@ -217,5 +217,6 @@ async def load_keyword_v3_profile_data(
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
+        n_state=diagnostic.n_state,
         diagnostic=diagnostic,
     )
