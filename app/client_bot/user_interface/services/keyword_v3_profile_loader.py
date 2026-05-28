@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
+    target_place_for_v3_strategy_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -161,18 +162,14 @@ async def load_keyword_v3_profile_data(
         conv_views_to_orders=calculated_keyword.conv_views_to_orders,
     )
 
-    target_by_mode: dict[KeywordStrategyMode, int | None] = {}
-    for mode in (
-        KeywordStrategyMode.MIN_CPA,
-        KeywordStrategyMode.OPTIMUM,
-        KeywordStrategyMode.MAX_CONVERSION,
-    ):
-        try:
-            target_by_mode[mode] = predictor.get_target_position_for_strategy_mode(
-                bids, mode
-            )
-        except NotImplementedError:
-            target_by_mode[mode] = None
+    target_by_mode = {
+        mode: target_place_for_v3_strategy_mode(mode, candidates)
+        for mode in (
+            KeywordStrategyMode.MIN_CPA,
+            KeywordStrategyMode.OPTIMUM,
+            KeywordStrategyMode.MAX_CONVERSION,
+        )
+    }
 
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,

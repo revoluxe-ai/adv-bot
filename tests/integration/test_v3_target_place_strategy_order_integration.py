@@ -43,8 +43,8 @@ pytestmark = pytest.mark.integration
 def _synthetic_ladder_profile(keyword: str, ts: datetime) -> list[BidPosition]:
     """Профиль, где MAX→pos1, OPT→pos2, MIN→pos3 (разные и упорядочены).
 
-    Подобраны bid/conv так, что MIN_CPA=min(pay_for_cart) на глубокой позиции,
-    MAX_CONVERSION=max(conv) на верхней, OPTIMUM=max(conv/(1+pay)) в середине.
+    MIN_CPA (V3): min CPO заказа при conv=0.01 → pos 3; MAX — max conv на pos 1;
+    OPTIMUM — max conv/(1+pay) на pos 2.
     """
     positions = [
         (1, 500, 0.40),
@@ -78,11 +78,10 @@ async def v3_db_keyword_samples(async_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_v3_strategy_target_positions_ordered_on_synthetic_profile() -> None:
-    """Предиктор на фиксированном профиле: MAX <= OPT <= MIN и все разные."""
-    predictor = build_predict_keywords_target_place()
+    """Лестница V3 на фиксированном профиле: MAX <= OPT <= MIN и все разные."""
     ts = datetime.now()
     profile = _synthetic_ladder_profile("ladder_kw", ts)
-    places = target_places_for_v3_modes(predictor, profile)
+    places = target_places_for_v3_modes(profile)
     assert_ladder_positions_distinct_and_ordered(
         places[KeywordStrategyMode.MIN_CPA],
         places[KeywordStrategyMode.OPTIMUM],
@@ -97,8 +96,7 @@ async def test_v3_resolve_profile_matches_orchestrator_for_mixed_case_key() -> N
     ts = datetime.now()
     profiles = _profiles_for_db_keyword("kw_min", ts, ch_key="Kw_Min")
     resolved = assert_profile_resolves_like_orchestrator(profiles, "kw_min")
-    predictor = build_predict_keywords_target_place()
-    places = target_places_for_v3_modes(predictor, resolved)
+    places = target_places_for_v3_modes(resolved)
     assert_ladder_positions_distinct_and_ordered(
         places[KeywordStrategyMode.MIN_CPA],
         places[KeywordStrategyMode.OPTIMUM],
@@ -116,7 +114,8 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
 
     from tests.unit.test_keyword_target_place_updater_v3 import _patched_sm
 
-    predictor = build_predict_keywords_target_place()
+    from tests.unit.auto_updater_v3.test_no_data_activation import _kw as _calc_kw
+
     ts = datetime.now()
     profiles = _profiles_for_db_keyword("updater_kw", ts)
 
@@ -158,7 +157,19 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
-    await sync_keyword_target_places_v3(adv=adv, bid_profiles=profiles)
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles=profiles,
+        calculated_by_text={
+            "updater_kw": _calc_kw(
+                ks_id=1,
+                text="updater_kw",
+                mode=KeywordStrategyMode.MIN_CPA,
+                conv=0.01,
+                cpm_set_bid=200,
+            )
+        },
+    )
 
     # OFF: свежая позиция из профиля (как MIN_CPA), не сохранённое 99
     assert off_kw.target_place == 3
@@ -172,8 +183,7 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
 
 @pytest.mark.asyncio
 async def test_v3_strategy_order_for_db_keyword_texts(v3_db_keyword_samples) -> None:
-    """Для текстов ключей из Postgres резолвер + предиктор дают упорядоченную лестницу."""
-    predictor = build_predict_keywords_target_place()
+    """Для текстов ключей из Postgres резолвер + лестница V3 дают упорядоченную лестницу."""
     ts = datetime.now()
     checked = 0
     for sample in v3_db_keyword_samples[:10]:
@@ -181,7 +191,7 @@ async def test_v3_strategy_order_for_db_keyword_texts(v3_db_keyword_samples) -> 
         profile = resolve_keyword_bid_profile(profiles, sample.keyword_text)
         if profile is None:
             continue
-        places = target_places_for_v3_modes(predictor, profile)
+        places = target_places_for_v3_modes(profile)
         if any(v is None for v in places.values()):
             continue
         pos_min = places[KeywordStrategyMode.MIN_CPA]
@@ -268,7 +278,7 @@ async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
     assert norm_query in profiles or norm_query.lower() in {k.lower() for k in profiles}
     profile = resolve_keyword_bid_profile(profiles, norm_query)
     assert profile is not None
-    places = target_places_for_v3_modes(predictor, profile)
+    places = target_places_for_v3_modes(profile)
     assert_ladder_positions_distinct_and_ordered(
         places[KeywordStrategyMode.MIN_CPA],
         places[KeywordStrategyMode.OPTIMUM],

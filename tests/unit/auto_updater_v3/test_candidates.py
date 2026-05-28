@@ -41,6 +41,25 @@ def test_predicted_cpa_uses_keyword_conv_views_to_orders_v2_formula() -> None:
 
 
 @pytest.mark.unit
+def test_target_place_for_v3_strategy_mode_matches_candidate_position() -> None:
+    """``target_place`` совпадает с ``ModeCandidate.position`` для режима."""
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+        target_place_for_v3_strategy_mode,
+    )
+
+    prof = sample_profile(min_pay=25.0, high_pay=40.0)
+    cand = build_mode_candidates(
+        profile=prof,
+        keyword_text="kw",
+        conv_views_to_orders=0.01,
+    )
+    assert target_place_for_v3_strategy_mode(
+        KeywordStrategyMode.MIN_CPA, cand
+    ) == cand[AggressionTargetMode.MIN_CPA].position
+
+
+@pytest.mark.unit
 def test_predicted_cpa_invalid_without_keyword_conv() -> None:
     prof = sample_profile()
     cand = build_mode_candidates(profile=prof, keyword_text="kw", conv_views_to_orders=None)

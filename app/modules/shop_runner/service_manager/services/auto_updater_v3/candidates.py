@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
+    aggression_target_for_stored_mode,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_orders_per_1000_rub,
@@ -189,6 +190,23 @@ def build_mode_candidates(
         AggressionTargetMode.OPTIMUM: optimum,
         AggressionTargetMode.MAX_CONVERSION: max_conv,
     }
+
+def target_place_for_v3_strategy_mode(
+    mode: KeywordStrategyMode,
+    candidates: dict[AggressionTargetMode, ModeCandidate],
+) -> int | None:
+    """``target_place`` для биддера: позиция режима из ``build_mode_candidates``.
+
+    Для OFF вызывающий код должен подставить прокси ``MIN_CPA`` (как в sync).
+    """
+    agg = aggression_target_for_stored_mode(mode)
+    if agg is None:
+        return None
+    cand = candidates.get(agg)
+    if cand is None or not cand.is_valid or cand.position is None:
+        return None
+    return max(1, int(cand.position))
+
 
 def stored_strategy_mode(kw: CalculatedKeyword) -> KeywordStrategyMode:
     return kw.keyword_setting.strategy_mode

@@ -1,24 +1,33 @@
-"""Проверки порядка целевых позиций V3 (M / O / C)."""
+"""Проверки порядка целевых позиций V3 (M / O / C) через ``build_mode_candidates``."""
 
 from __future__ import annotations
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
-from app.modules.predict_keywords_target_place.predict_keywords_target_place import (
-    PredictKeywordsTargetPlace,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+    build_mode_candidates,
+    target_place_for_v3_strategy_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
+    profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
 )
 
 
 def target_places_for_v3_modes(
-    predictor: PredictKeywordsTargetPlace,
     profile: list[BidPosition],
+    *,
+    conv_views_to_orders: float = 0.01,
 ) -> dict[KeywordStrategyMode, int | None]:
-    """Целевые позиции для MIN_CPA / OPTIMUM / MAX_CONVERSION на одном профиле."""
+    """Целевые позиции M/O/C на одном профиле (лестница V3, не legacy-предиктор)."""
+    points = profile_points_from_bid_positions(profile)
+    candidates = build_mode_candidates(
+        profile=points,
+        keyword_text="",
+        conv_views_to_orders=conv_views_to_orders,
+    )
     return {
-        mode: predictor.get_target_position_for_strategy_mode(profile, mode)
+        mode: target_place_for_v3_strategy_mode(mode, candidates)
         for mode in (
             KeywordStrategyMode.MIN_CPA,
             KeywordStrategyMode.OPTIMUM,
