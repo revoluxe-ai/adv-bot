@@ -54,7 +54,7 @@ def test_profile_off_first_and_star_on_current() -> None:
     assert lines[1].startswith("   ")
     assert "🌟" in lines[2] and "MIN\\_CPA" in lines[2]
     assert "OPTIMUM" in lines[3]
-    assert "MAX_CONVERSION" in lines[4]
+    assert "MAX\\_CONVERSION" in lines[4]
     joined = "\n".join(lines)
     assert (
         joined.index("OFF")
