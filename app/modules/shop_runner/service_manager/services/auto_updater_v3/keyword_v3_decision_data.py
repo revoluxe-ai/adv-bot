@@ -190,10 +190,6 @@ def keyword_v2_pay_for_order_unavailable_with_conv(
     """Нет CPO при заданной conv (своя или импутированная)."""
     if conv_views_to_orders is None or conv_views_to_orders <= 0:
         return True
-    if keyword.pay_for_order is not None:
-        orders = calc_orders_per_1000_rub(conv_views_to_orders, keyword.cpm)
-        if orders is not None and calc_pay_for_order(orders) is not None:
-            return False
     orders = calc_orders_per_1000_rub(conv_views_to_orders, keyword.cpm)
     if orders is None:
         return True
