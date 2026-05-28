@@ -100,7 +100,6 @@ def _empty_n_state_candidates() -> dict[AggressionTargetMode, ModeCandidate]:
 
 
 def _profile_load_failure(
-    adv_setting: AdvSetting,
     calculated_keyword: CalculatedKeyword,
     *,
     reason: str,
@@ -132,17 +131,13 @@ async def load_keyword_v3_profile_data(
             adv_setting.wb_cabinet_id,
             adv_setting.adv_id,
         )
-        return _profile_load_failure(
-            adv_setting, calculated_keyword, reason="нет кабинета WB"
-        )
+        return _profile_load_failure(calculated_keyword, reason="нет кабинета WB")
 
     shop_id = wb_cabinet.shop_id
     complex_adv = await _build_complex_adv(adv_setting, shop_id)
     nmids = list(adv_setting.nmids) if adv_setting.nmids else []
     if not nmids:
-        return _profile_load_failure(
-            adv_setting, calculated_keyword, reason="нет nmid у кампании"
-        )
+        return _profile_load_failure(calculated_keyword, reason="нет nmid у кампании")
     nmid = nmids[0]
     positions_size = _positions_size_for_adv(adv_setting)
 
@@ -164,7 +159,7 @@ async def load_keyword_v3_profile_data(
             calculated_keyword.text,
         )
         return _profile_load_failure(
-            adv_setting, calculated_keyword, reason="ошибка загрузки min bid WB"
+            calculated_keyword, reason="ошибка загрузки min bid WB"
         )
 
     min_bid = min_bids.search.get(nmid)
@@ -174,9 +169,7 @@ async def load_keyword_v3_profile_data(
             nmid,
             adv_setting.adv_id,
         )
-        return _profile_load_failure(
-            adv_setting, calculated_keyword, reason="min bid не в кеше WB"
-        )
+        return _profile_load_failure(calculated_keyword, reason="min bid не в кеше WB")
 
     try:
         predictor = build_predict_keywords_target_place()
@@ -191,9 +184,7 @@ async def load_keyword_v3_profile_data(
             adv_setting.adv_id,
             calculated_keyword.text,
         )
-        return _profile_load_failure(
-            adv_setting, calculated_keyword, reason="ошибка запроса CH"
-        )
+        return _profile_load_failure(calculated_keyword, reason="ошибка запроса CH")
 
     bids = resolve_keyword_bid_profile(raw_profiles, calculated_keyword.text)
     profile_points = (
