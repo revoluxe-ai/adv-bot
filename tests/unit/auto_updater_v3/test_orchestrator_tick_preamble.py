@@ -136,3 +136,54 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     sync_mock.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() -> None:
+    """После gap-rebalance контексты пересобираются до no_data_activation."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 13
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    dto.min_target_position = 5
+    build_calls: list[int] = []
+
+    def _build_contexts(_keywords: object, _profiles: object) -> list[object]:
+        build_calls.append(len(build_calls))
+        return []
+
+    no_data_mock = AsyncMock(return_value=False)
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
+            side_effect=_build_contexts,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._run_phase0_gap_rebalance",
+            new=AsyncMock(return_value=([], True)),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_no_data_activation_v3",
+            no_data_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            return_value=None,
+        ),
+    ):
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    assert build_calls == [0, 1]
+    no_data_mock.assert_awaited_once()
+    assert complex_adv.get_keywords.await_count >= 1

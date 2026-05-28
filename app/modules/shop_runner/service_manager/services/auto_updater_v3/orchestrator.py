@@ -1,7 +1,8 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
 Порядок на **каждом** тике (до Redis gate plan/fact):
-  1. CH bid profiles + gap-rebalance (phase0) + no-data OFF→MIN_CPA.
+  1. CH bid profiles + gap-rebalance (phase0); при изменениях — пересбор contexts;
+     no-data OFF→MIN_CPA.
   2. plan/fact; ``NO_DATA`` (Н) / ``OVERSPEND`` не режутся cache gate; иначе M1/M2/M3.
   3. ``target_place`` — один раз после всех смен ``strategy_mode`` (rebalance + apply).
 
@@ -214,10 +215,13 @@ async def process_adv_v3(
             contexts=contexts,
             dto=dto,
         )
+        if phase0_changed:
+            keywords = await complex_adv.get_keywords()
+            contexts = build_keyword_v3_contexts(keywords, raw_profiles)
         no_data_changed = await run_no_data_activation_v3(
             complex_adv, contexts=contexts
         )
-        if phase0_changed or no_data_changed:
+        if no_data_changed:
             keywords = await complex_adv.get_keywords()
             contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
