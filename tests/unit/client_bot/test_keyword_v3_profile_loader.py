@@ -172,8 +172,7 @@ async def test_load_keyword_v3_profile_data_success() -> None:
 
     assert result is not None
     assert result.current_mode == KeywordStrategyMode.MIN_CPA
-    assert result.target_positions_by_mode[KeywordStrategyMode.MIN_CPA] == 1
-    assert result.target_positions_by_mode[KeywordStrategyMode.OPTIMUM] == 1
+    assert result.candidates[AggressionTargetMode.MIN_CPA].position == 1
     predictor.load_bid_profiles_for_nmid.assert_awaited_once_with(
         nmid=10749810,
         min_bid=50,
