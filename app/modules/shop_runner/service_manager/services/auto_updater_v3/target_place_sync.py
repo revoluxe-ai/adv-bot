@@ -50,7 +50,7 @@ async def sync_keyword_target_places_v3(
         for keyword in keywords:
             profile = resolve_keyword_bid_profile(bid_profiles, keyword.text)
             if not profile:
-                logger.error(
+                logger.warning(
                     "No bid profile for keyword %s, adv_id=%s; clearing target_place",
                     keyword.text,
                     adv.adv_id,
