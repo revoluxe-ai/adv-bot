@@ -1,7 +1,8 @@
-"""Активация ключей без данных V3: OFF → MIN_CPA, ``target_place=0`` (мин. ставка WB).
+"""Активация ключей без данных V3: MIN_CPA, ``target_place=0`` (мин. ставка WB), белый список.
 
-«Нет данных» на уровне **ключа** — как в V2: нельзя посчитать себестоимость заказа
-(``orders_per_1000_rub`` / ``pay_for_order`` из ``conv_views_to_orders`` и CPM каскада).
+N-state (preamble) — нет CH-матрицы **или** нельзя импутировать conv (см.
+``keyword_v3_decision_data``). Недостаток только своей conv при наличии CH → агрегат РК /
+max по соседним ключам, лестница M1/M2/M3.
 
 На уровне **кампании** — ``SalesStates.NO_DATA`` (``detect_campaign_state``).
 """
@@ -9,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -22,11 +24,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3Action,
     V3ActionType,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    KeywordV3DecisionTier,
+    keyword_lacks_v3_decision_data as _keyword_lacks_v3_decision_data,
+    keyword_v2_pay_for_order_unavailable_with_conv,
+    resolve_keyword_v3_decision,
+    tier_label_ru,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_orders_per_1000_rub,
@@ -47,9 +59,100 @@ NO_DATA_TARGET_PLACE_FALLBACK: int = 0
 _HARD_STATUS_AUTO_MODE = 1
 _HARD_STATUS_WHITE_LIST = 2
 
+_NO_DATA_REASON = "no_data_min_bid"
+
+
+@dataclass(frozen=True, slots=True)
+class KeywordV3DataDiagnostic:
+    """Что есть/нет для V3 по ключу (уровень данных + CH-матрица)."""
+
+    has_v2_cpo: bool
+    has_ch_position_profile: bool
+    v2_cpo_gap: str | None = None
+    decision_tier: KeywordV3DecisionTier | None = None
+    imputed_conv: bool = False
+
+    @property
+    def n_state(self) -> bool:
+        """N-state: только preamble MIN_CPA (нет CH или нет conv даже с импутацией)."""
+        if not self.has_ch_position_profile:
+            return True
+        if self.decision_tier in (
+            KeywordV3DecisionTier.NO_CH_MATRIX,
+            KeywordV3DecisionTier.NO_CONV,
+        ):
+            return True
+        return not self.has_v2_cpo
+
+    def missing_labels_ru(self) -> tuple[str, ...]:
+        """Человекочитаемый список пробелов для UI и логов."""
+        labels: list[str] = []
+        if self.decision_tier is not None and self.imputed_conv:
+            labels.append(f"conv: {tier_label_ru(self.decision_tier)} (импутация)")
+        elif not self.has_v2_cpo:
+            labels.append(self.v2_cpo_gap or "нет V2 CPO (себес. заказа)")
+        if not self.has_ch_position_profile:
+            labels.append("нет матрицы CH (bid profile по ключу)")
+        return tuple(labels)
+
+
+def diagnose_v2_cpo_gap(keyword: CalculatedKeyword) -> str | None:
+    """Причина отсутствия V2 CPO или ``None``, если CPO считается."""
+    if not keyword_v2_pay_for_order_unavailable(keyword):
+        return None
+    cpm = keyword.cpm
+    if cpm is None or cpm <= 0:
+        return "нет CPM (каскад ставок ключа)"
+    conv = keyword.conv_views_to_orders
+    if conv is None or conv <= 0:
+        return "нет conv показ→заказ"
+    return "нет заказов на 1000₽ (CPO не считается)"
+
+
+def diagnose_keyword_v3_data(
+    keyword: CalculatedKeyword,
+    position_profile: list[PositionProfilePoint] | None,
+    *,
+    peer_contexts: list["KeywordV3Context"] | None = None,
+) -> KeywordV3DataDiagnostic:
+    """Сводка: уровень данных V3, CH-матрица, CPO с учётом импутации conv."""
+    has_ch = not keyword_missing_ch_position_profile(position_profile)
+    if peer_contexts is not None and has_ch:
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+            KeywordV3Context,
+        )
+
+        ctx = KeywordV3Context(keyword=keyword, position_profile=position_profile)
+        decision = resolve_keyword_v3_decision(ctx, peer_contexts)
+        eff = decision.effective_conv_views_to_orders
+        has_v2 = not keyword_v2_pay_for_order_unavailable_with_conv(
+            keyword, conv_views_to_orders=eff
+        )
+        return KeywordV3DataDiagnostic(
+            has_v2_cpo=has_v2,
+            has_ch_position_profile=True,
+            v2_cpo_gap=diagnose_v2_cpo_gap(keyword) if not has_v2 else None,
+            decision_tier=decision.tier,
+            imputed_conv=decision.imputed,
+        )
+    has_v2 = not keyword_v2_pay_for_order_unavailable(keyword)
+    return KeywordV3DataDiagnostic(
+        has_v2_cpo=has_v2,
+        has_ch_position_profile=has_ch,
+        v2_cpo_gap=diagnose_v2_cpo_gap(keyword) if not has_v2 else None,
+    )
+
 
 def _hard_status_allows_up(hard_status: int) -> bool:
+    """Авто (1) или белый список (2): можно UP/DOWN в N-state preamble."""
     return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
+
+
+def keyword_missing_ch_position_profile(
+    position_profile: list[PositionProfilePoint] | None,
+) -> bool:
+    """Нет матрицы ставок/позиций из CH для ключа."""
+    return not position_profile
 
 
 def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
@@ -84,17 +187,39 @@ def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
     return calc_pay_for_order(orders) is None
 
 
-def keyword_lacks_v3_decision_data(ctx: "KeywordV3Context") -> bool:
-    """Ключ без данных для V3: нет V2 CPO (не матрица CH)."""
-    return keyword_v2_pay_for_order_unavailable(ctx.keyword)
+def keyword_lacks_v3_decision_data(
+    ctx: "KeywordV3Context",
+    contexts: list["KeywordV3Context"],
+) -> bool:
+    """Ключ в N-state preamble: нет CH или нет conv даже после импутации РК."""
+    return _keyword_lacks_v3_decision_data(ctx, contexts)
 
 
 def rebalance_ladder_points(
     keyword: CalculatedKeyword,
     mode: KeywordStrategyMode,
+    *,
+    position_profile: list[PositionProfilePoint] | None = None,
+    contexts: list["KeywordV3Context"] | None = None,
 ) -> int:
-    """Баллы gap-rebalance при снятии/включении: ключ без V2 CPO = 1, иначе ``mode_level``."""
+    """Баллы gap-rebalance: N-state = 1; без своего V2 CPO = 1; иначе ``mode_level``."""
+    profile = (
+        keyword.position_profile if position_profile is None else position_profile
+    )
+    if contexts is not None:
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+            KeywordV3Context,
+        )
+
+        ctx = KeywordV3Context(keyword=keyword, position_profile=profile)
+        if keyword_lacks_v3_decision_data(ctx, contexts):
+            return 1
+        if keyword_v2_pay_for_order_unavailable(keyword):
+            return 1
+        return mode_level(mode)
     if keyword_v2_pay_for_order_unavailable(keyword):
+        return 1
+    if keyword_missing_ch_position_profile(profile):
         return 1
     return mode_level(mode)
 
@@ -102,47 +227,112 @@ def rebalance_ladder_points(
 def split_prepared_by_v2_cpo(
     prepared: PreparedList,
 ) -> tuple[PreparedList, PreparedList]:
-    """Разделить prepared на ключи с V2 CPO и без (для ``SalesStates.NO_DATA``).
+    """Разделить prepared на ключи с полными данными V3 и без (N-state).
 
     Returns:
-        (with_v2_cpo, without_v2_cpo) — оба списка в формате PreparedList.
+        (with_v3_data, without_v3_data) — оба списка в формате PreparedList.
     """
-    with_cpo: PreparedList = []
-    without_cpo: PreparedList = []
+    peer_contexts = [ctx for ctx, _ in prepared]
+    with_data: PreparedList = []
+    without_data: PreparedList = []
     for entry in prepared:
         ctx, _mode = entry
-        if keyword_v2_pay_for_order_unavailable(ctx.keyword):
-            without_cpo.append(entry)
+        if keyword_lacks_v3_decision_data(ctx, peer_contexts):
+            without_data.append(entry)
         else:
-            with_cpo.append(entry)
-    return with_cpo, without_cpo
+            with_data.append(entry)
+    return with_data, without_data
+
+
+def _append_min_cpa_up(actions: list[V3Action], *, ks_id: int) -> None:
+    actions.append(
+        V3Action(
+            action=V3ActionType.UP,
+            keyword_setting_id=ks_id,
+            target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+            reason=_NO_DATA_REASON,
+        )
+    )
+
+
+def _append_force_off_then_min_cpa(
+    actions: list[V3Action],
+    *,
+    ks_id: int,
+) -> None:
+    """Сброс в OFF и UP на MIN_CPA: ``hard_status`` → белый список (2)."""
+    actions.append(
+        V3Action(
+            action=V3ActionType.FORCE_OFF,
+            keyword_setting_id=ks_id,
+            reason=_NO_DATA_REASON,
+        )
+    )
+    _append_min_cpa_up(actions, ks_id=ks_id)
+
+
+def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
+    """N-state: MIN_CPA + min bid + белый список для ключей без V2 CPO / CH.
+
+    - OFF (авто/БС) → UP MIN_CPA;
+    - O/C на БС → DOWN MIN_CPA;
+    - MIN_CPA/O/C на авто → FORCE_OFF + UP MIN_CPA (hard_status → БС).
+    """
+    actions: list[V3Action] = []
+    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
+
+    peer_contexts = [ctx for ctx, _ in prepared]
+    for ctx, mode in prepared:
+        if not keyword_lacks_v3_decision_data(ctx, peer_contexts):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+
+        if mode == KeywordStrategyMode.OFF:
+            if not _hard_status_allows_up(hard_status):
+                continue
+            _append_min_cpa_up(actions, ks_id=ks_id)
+        elif mode_level(mode) > min_level:
+            if hard_status == _HARD_STATUS_WHITE_LIST:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.DOWN,
+                        keyword_setting_id=ks_id,
+                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        reason=_NO_DATA_REASON,
+                    )
+                )
+            elif hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id)
+        elif mode == KeywordStrategyMode.MIN_CPA:
+            if hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id)
+            # MIN_CPA + БС: режим уже верный, target_place=0 в sync
+
+    return actions
 
 
 def plan_no_data_min_up_actions(prepared: PreparedList) -> list[V3Action]:
-    """Включить на MIN_CPA все OFF-ключи без V2 CPO (минимальная ставка по режиму).
+    """OFF без V2 CPO/CH → UP MIN_CPA.
 
-    Returns:
-        Список UP (может быть пустым).
+    Только ``V3ActionType.UP`` — для gap-rebalance (``_plan_rebalance_up_once`` ждёт UP).
+    Полный N-state (DOWN / FORCE_OFF) — ``plan_no_data_keyword_actions``.
     """
     actions: list[V3Action] = []
+    peer_contexts = [ctx for ctx, _ in prepared]
     for ctx, mode in prepared:
         if mode != KeywordStrategyMode.OFF:
             continue
-        if not keyword_lacks_v3_decision_data(ctx):
+        if not keyword_lacks_v3_decision_data(ctx, peer_contexts):
             continue
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
-        actions.append(
-            V3Action(
-                action=V3ActionType.UP,
-                keyword_setting_id=ks_id,
-                target_strategy_mode=KeywordStrategyMode.MIN_CPA,
-                reason="no_data_min_bid",
-            )
-        )
+        _append_min_cpa_up(actions, ks_id=ks_id)
     return actions
 
 
@@ -158,9 +348,9 @@ def _build_prepared(
 def plan_no_data_activation_v3(
     contexts: list["KeywordV3Context"],
 ) -> list[V3Action]:
-    """Спланировать OFF→MIN_CPA для ключей без V2 CPO (без записи в БД)."""
+    """Спланировать N-state для ключей без V2 CPO / CH (без записи в БД)."""
     prepared = _build_prepared(contexts)
-    return plan_no_data_min_up_actions(prepared)
+    return plan_no_data_keyword_actions(prepared)
 
 
 async def run_no_data_activation_v3(
@@ -172,7 +362,7 @@ async def run_no_data_activation_v3(
     actions = plan_no_data_activation_v3(contexts)
     if actions:
         logger.info(
-            "[adv_id=%s] v3 no_data activation planned: up=%s",
+            "[adv_id=%s] v3 no_data activation planned: actions=%s",
             complex_adv.adv_id,
             len(actions),
         )

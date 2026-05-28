@@ -38,10 +38,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     V3RolloutAggressiveness,
     normalize_v3_rollout_aggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-    plan_no_data_min_up_actions,
-    split_prepared_by_v2_cpo,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     build_worst_costs,
     compute_resolve_cost_threshold,
@@ -169,24 +165,13 @@ def select_v3_actions(
             )
 
         if state == SalesStates.NO_DATA:
-            with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
-            no_data_actions = plan_no_data_min_up_actions(without_cpo)
-            if with_cpo:
-                rollout = _plan_m1_m2_m3_with_plan_fact(
-                    with_cpo,
-                    plan=plan,
-                    fact=fact,
-                    shelf_promotion_active=shelf_promotion_active,
-                    shelf_click_mode=shelf_click_mode,
-                    aggr=aggr,
-                    include_m3_headroom=False,
+            # Оркестратор не вызывает selector при кампании «Н»; страховка для прямых вызовов.
+            return [
+                V3Action(
+                    action=V3ActionType.DO_NOTHING,
+                    reason="campaign_no_data_wait",
                 )
-                merged = merge_and_dedup_actions(no_data_actions, rollout, [], [])
-                if merged:
-                    return merged
-            if no_data_actions:
-                return no_data_actions
-            return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_data_no_off_keys")]
+            ]
 
         return _plan_m1_m2_m3_with_plan_fact(
             prepared,
@@ -215,16 +200,12 @@ def select_v3_actions(
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]
 
     if state == SalesStates.NO_DATA:
-        with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
-        no_data_actions = plan_no_data_min_up_actions(without_cpo)
-        if with_cpo:
-            rollout = plan_rollout_underperform_one(with_cpo, aggr)
-            merged = merge_and_dedup_actions(no_data_actions, rollout, [], [])
-            if merged:
-                return merged
-        if no_data_actions:
-            return no_data_actions
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_data_no_off_keys")]
+        return [
+            V3Action(
+                action=V3ActionType.DO_NOTHING,
+                reason="campaign_no_data_wait",
+            )
+        ]
 
     if state == SalesStates.OVERSPEND:
         if plan_max_pay_for_order is not None:

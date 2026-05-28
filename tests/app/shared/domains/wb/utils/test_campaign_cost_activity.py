@@ -3,10 +3,29 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
     is_auto_campaign_active,
 )
+
+
+def _plan_fact_summary(
+    *,
+    fact_predict_orders: float,
+    plan_fact_ch_ts_msk: str = "01.01.2025 00:00",
+    fact_original_orders: float | None = None,
+    fact_pay_for_order: float | None = None,
+    fact_method: str | None = None,
+) -> SimpleNamespace:
+    """Минимальный снимок plan/fact для unit-тестов cost activity."""
+    return SimpleNamespace(
+        fact_predict_orders=fact_predict_orders,
+        fact_original_orders=fact_original_orders,
+        fact_pay_for_order=fact_pay_for_order,
+        fact_method=fact_method,
+        plan_fact_ch_ts_msk=plan_fact_ch_ts_msk,
+    )
 
 
 class _FakeAdvSetting:
@@ -22,6 +41,7 @@ class _FakeAdvSetting:
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
+        self.sales_predict_method = FactMethods.DIRECT_SALES
 
 
 @pytest.mark.asyncio
@@ -34,7 +54,7 @@ async def test_is_auto_campaign_active_returns_true_when_avg_cost_below_target()
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(
+            return_value=_plan_fact_summary(
                 fact_predict_orders=12.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
@@ -60,7 +80,7 @@ async def test_is_auto_campaign_active_returns_false_when_avg_cost_above_target(
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(
+            return_value=_plan_fact_summary(
                 fact_predict_orders=15.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
@@ -105,7 +125,7 @@ async def test_get_auto_campaign_cost_activity_metrics_returns_none_when_avg_mis
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(
+            return_value=_plan_fact_summary(
                 fact_predict_orders=12.0,
                 plan_fact_ch_ts_msk="07.06.2025 08:09",
             )
@@ -138,10 +158,7 @@ async def test_get_auto_campaign_cost_activity_metrics_threshold_kind_target() -
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(
-                fact_predict_orders=15.0,
-                plan_fact_ch_ts_msk="01.01.2025 00:00",
-            )
+            return_value=_plan_fact_summary(fact_predict_orders=15.0)
         )
     )
     with patch(
@@ -166,10 +183,7 @@ async def test_get_auto_campaign_cost_activity_metrics_threshold_kind_max() -> N
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
-            return_value=SimpleNamespace(
-                fact_predict_orders=5.0,
-                plan_fact_ch_ts_msk="01.01.2025 00:00",
-            )
+            return_value=_plan_fact_summary(fact_predict_orders=5.0)
         )
     )
     with patch(

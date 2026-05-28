@@ -17,6 +17,13 @@ from app.modules.predict_keywords_target_place import build_predict_keywords_tar
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+    ModeCandidate,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    diagnose_keyword_v3_data,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
@@ -80,6 +87,34 @@ def _positions_size_for_adv(adv_setting: AdvSetting) -> int:
     return size
 
 
+def _empty_n_state_candidates() -> dict[AggressionTargetMode, ModeCandidate]:
+    """Пустая лестница для N-state (нет матрицы CH)."""
+    return {
+        m: ModeCandidate(
+            mode=m,
+            is_valid=False,
+            invalid_reason="no_position_profile",
+        )
+        for m in AggressionTargetMode
+    }
+
+
+def _profile_load_failure(
+    calculated_keyword: CalculatedKeyword,
+    *,
+    reason: str,
+) -> KeywordV3ProfileData:
+    """Технический сбой загрузки WB/CH с диагностикой V2/CH по статистике ключа."""
+    diagnostic = diagnose_keyword_v3_data(calculated_keyword, None)
+    return KeywordV3ProfileData(
+        current_mode=calculated_keyword.strategy_mode,
+        candidates=_empty_n_state_candidates(),
+        n_state=diagnostic.n_state,
+        diagnostic=diagnostic,
+        load_failure=reason,
+    )
+
+
 async def load_keyword_v3_profile_data(
     adv_setting: AdvSetting,
     calculated_keyword: CalculatedKeyword,
@@ -96,13 +131,13 @@ async def load_keyword_v3_profile_data(
             adv_setting.wb_cabinet_id,
             adv_setting.adv_id,
         )
-        return None
+        return _profile_load_failure(calculated_keyword, reason="нет кабинета WB")
 
     shop_id = wb_cabinet.shop_id
     complex_adv = await _build_complex_adv(adv_setting, shop_id)
     nmids = list(adv_setting.nmids) if adv_setting.nmids else []
     if not nmids:
-        return None
+        return _profile_load_failure(calculated_keyword, reason="нет nmid у кампании")
     nmid = nmids[0]
     positions_size = _positions_size_for_adv(adv_setting)
 
@@ -123,7 +158,9 @@ async def load_keyword_v3_profile_data(
             adv_setting.adv_id,
             calculated_keyword.text,
         )
-        return None
+        return _profile_load_failure(
+            calculated_keyword, reason="ошибка загрузки min bid WB"
+        )
 
     min_bid = min_bids.search.get(nmid)
     if min_bid is None:
@@ -132,7 +169,7 @@ async def load_keyword_v3_profile_data(
             nmid,
             adv_setting.adv_id,
         )
-        return None
+        return _profile_load_failure(calculated_keyword, reason="min bid не в кеше WB")
 
     try:
         predictor = build_predict_keywords_target_place()
@@ -147,13 +184,21 @@ async def load_keyword_v3_profile_data(
             adv_setting.adv_id,
             calculated_keyword.text,
         )
-        return None
+        return _profile_load_failure(calculated_keyword, reason="ошибка запроса CH")
 
     bids = resolve_keyword_bid_profile(raw_profiles, calculated_keyword.text)
+    profile_points = (
+        profile_points_from_bid_positions(bids) if bids else None
+    )
+    diagnostic = diagnose_keyword_v3_data(calculated_keyword, profile_points)
     if not bids:
-        return None
+        return KeywordV3ProfileData(
+            current_mode=calculated_keyword.strategy_mode,
+            candidates=_empty_n_state_candidates(),
+            n_state=diagnostic.n_state,
+            diagnostic=diagnostic,
+        )
 
-    profile_points = profile_points_from_bid_positions(bids)
     candidates = build_mode_candidates(
         profile=profile_points,
         keyword_text=calculated_keyword.text,
@@ -163,4 +208,6 @@ async def load_keyword_v3_profile_data(
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
+        n_state=diagnostic.n_state,
+        diagnostic=diagnostic,
     )

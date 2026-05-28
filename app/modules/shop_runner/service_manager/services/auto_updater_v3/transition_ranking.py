@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    effective_conv_for_v3,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
@@ -125,11 +128,18 @@ def max_target_mode_for_aggressiveness(
     return KeywordStrategyMode.MAX_CONVERSION
 
 
-def _catalog_for_ctx(ctx: "KeywordV3Context") -> dict[AggressionTargetMode, ModeCandidate]:
+def _catalog_for_ctx(
+    ctx: "KeywordV3Context",
+    contexts: PreparedList | None = None,
+) -> dict[AggressionTargetMode, ModeCandidate]:
+    peer = [c for c, _ in contexts] if contexts else [ctx]
+    conv = effective_conv_for_v3(ctx, peer)
+    if conv is None:
+        conv = ctx.keyword.conv_views_to_orders
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
-        conv_views_to_orders=ctx.keyword.conv_views_to_orders,
+        conv_views_to_orders=conv,
     )
 
 
@@ -140,9 +150,12 @@ def missing_target_matrix_from_catalog(
     return not any(mc.is_valid for mc in catalog.values())
 
 
-def missing_target_matrix(ctx: "KeywordV3Context") -> bool:
+def missing_target_matrix(
+    ctx: "KeywordV3Context",
+    contexts: PreparedList | None = None,
+) -> bool:
     """Нет ни одного валидного целевого места M/O/C в матрице профиля."""
-    return missing_target_matrix_from_catalog(_catalog_for_ctx(ctx))
+    return missing_target_matrix_from_catalog(_catalog_for_ctx(ctx, contexts))
 
 
 def missing_above_rec(ctx: "KeywordV3Context") -> bool:
@@ -277,7 +290,7 @@ def build_worst_per_state_costs(
     """Worst (max) predicted CPA per M/O/C среди ключей с валидной матрицей."""
     worst: dict[AggressionTargetMode, float] = {}
     for ctx, _mode in prepared:
-        catalog = _catalog_for_ctx(ctx)
+        catalog = _catalog_for_ctx(ctx, prepared)
         if missing_target_matrix_from_catalog(catalog):
             continue
         if not _has_valid_target_place_data(catalog):
@@ -321,7 +334,7 @@ def collect_transition_candidates(
         if ks_id is None:
             continue
 
-        catalog = _catalog_for_ctx(ctx)
+        catalog = _catalog_for_ctx(ctx, prepared)
         use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,

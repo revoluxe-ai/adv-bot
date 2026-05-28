@@ -1,4 +1,4 @@
-"""Unit: preamble (phase0 + target_place) до plan/fact gate, без пропусков."""
+"""Unit: preamble (phase0 + target_place) и стоп при кампании «Н»."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrat
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None:
+async def test_process_adv_v3_runs_phase0_when_selector_skipped_by_cache() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 11
     complex_adv.adv_setting = MagicMock()
@@ -78,6 +78,57 @@ async def test_process_adv_v3_runs_phase0_before_plan_fact_cache_check() -> None
     select_mock.assert_not_called()
     flush_mock.assert_awaited_once()
     plan_fact.check_equal_in_cache.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_adv_v3_skips_phase0_when_campaign_no_data() -> None:
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 14
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    phase0 = AsyncMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
+            phase0,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
+        ) as no_data_mock,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            return_value=SalesStates.NO_DATA,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        updater_cls.return_value.get_fact_data = AsyncMock(
+            return_value=MagicMock(pay_for_order=None, predict_orders=3.0)
+        )
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    phase0.assert_not_awaited()
+    no_data_mock.assert_not_called()
 
 
 @pytest.mark.unit

@@ -8,14 +8,20 @@ import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     NO_DATA_TARGET_PLACE_FALLBACK,
     keyword_lacks_v3_decision_data,
+    keyword_missing_ch_position_profile,
     keyword_v2_pay_for_order_unavailable,
+    plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
     rebalance_ladder_points,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    merge_and_dedup_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -130,7 +136,7 @@ def test_keyword_v2_pay_for_order_available_with_conv_and_cpm() -> None:
 def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
     off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0)
     ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
-    assert keyword_lacks_v3_decision_data(ctx)
+    assert keyword_lacks_v3_decision_data(ctx, [ctx])
     actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
@@ -139,17 +145,133 @@ def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
 
 
 @pytest.mark.unit
-def test_plan_no_data_skips_when_v2_cpo_available() -> None:
+def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
+    """N-state: есть V2 CPO, но нет CH — OFF → MIN_CPA."""
+    off = _kw(ks_id=3, text="c", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    assert keyword_lacks_v3_decision_data(ctx, [ctx])
+    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_plan_no_data_down_optimum_without_ch_profile() -> None:
+    opt = _kw(ks_id=4, text="d", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    ctx = KeywordV3Context(keyword=opt, position_profile=None)
+    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OPTIMUM)])
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_keyword_missing_ch_position_profile() -> None:
+    assert keyword_missing_ch_position_profile(None)
+    assert keyword_missing_ch_position_profile([])
+
+
+@pytest.mark.unit
+def test_plan_no_data_skips_when_v2_cpo_and_ch_profile() -> None:
     off = _kw(ks_id=2, text="b", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
-    assert not keyword_lacks_v3_decision_data(ctx)
+    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
     actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
     assert actions == []
 
 
 @pytest.mark.unit
+def test_plan_no_data_min_up_only_off_returns_up_not_down() -> None:
+    """gap-rebalance: min_up — только UP для OFF, не DOWN для O/C."""
+    opt = _kw(ks_id=5, text="e", mode=KeywordStrategyMode.OPTIMUM, conv=0.0)
+    ctx_opt = KeywordV3Context(keyword=opt, position_profile=None)
+    assert plan_no_data_min_up_actions([(ctx_opt, KeywordStrategyMode.OPTIMUM)]) == []
+
+    off = _kw(ks_id=6, text="f", mode=KeywordStrategyMode.OFF, conv=0.0)
+    ctx_off = KeywordV3Context(keyword=off, position_profile=None)
+    up_only = plan_no_data_min_up_actions([(ctx_off, KeywordStrategyMode.OFF)])
+    assert len(up_only) == 1
+    assert up_only[0].action == V3ActionType.UP
+
+
+@pytest.mark.unit
+def test_diagnose_keyword_v3_data_cpo_without_ch_profile() -> None:
+    """V2 CPO и CH-матрица независимы: может быть CPO без bid profile."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        diagnose_keyword_v3_data,
+    )
+
+    kw = _kw(ks_id=20, text="x", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
+    diag = diagnose_keyword_v3_data(kw, None)
+    assert diag.has_v2_cpo
+    assert not diag.has_ch_position_profile
+    assert diag.n_state
+    assert diag.missing_labels_ru() == ("нет матрицы CH (bid profile по ключу)",)
+
+
+@pytest.mark.unit
+def test_diagnose_v2_cpo_gap_no_cpm() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        diagnose_v2_cpo_gap,
+    )
+
+    kw = _kw(ks_id=21, text="y", mode=KeywordStrategyMode.OFF, conv=0.05, cpm_set_bid=0)
+    assert diagnose_v2_cpo_gap(kw) == "нет CPM (каскад ставок ключа)"
+
+
+@pytest.mark.unit
 def test_no_data_target_place_fallback_is_min_bid_sentinel() -> None:
     assert NO_DATA_TARGET_PLACE_FALLBACK == 0
+
+
+@pytest.mark.unit
+def test_merge_and_dedup_preserves_force_off_then_up_in_same_bucket() -> None:
+    """N-state: FORCE_OFF+UP для одного ключа не схлопываются в один UP."""
+    no_data = plan_no_data_keyword_actions(
+        [
+            (
+                KeywordV3Context(
+                    keyword=_kw(
+                        ks_id=30,
+                        text="auto_min",
+                        mode=KeywordStrategyMode.MIN_CPA,
+                        hard_status=1,
+                        conv=0.0,
+                    ),
+                    position_profile=None,
+                ),
+                KeywordStrategyMode.MIN_CPA,
+            )
+        ]
+    )
+    assert len(no_data) == 2
+    assert no_data[0].action == V3ActionType.FORCE_OFF
+    assert no_data[1].action == V3ActionType.UP
+
+    merged = merge_and_dedup_actions(no_data, [], [], [])
+    assert len(merged) == 2
+    assert {a.action for a in merged} == {V3ActionType.FORCE_OFF, V3ActionType.UP}
+
+
+@pytest.mark.unit
+def test_merge_and_dedup_higher_priority_bucket_wins_across_lists() -> None:
+    """Между bucket'ами побеждает cleanup, не смешивая действия разных bucket."""
+    m1_up = V3Action(
+        action=V3ActionType.UP,
+        keyword_setting_id=1,
+        target_strategy_mode=KeywordStrategyMode.OPTIMUM,
+        reason="m1",
+    )
+    cleanup_down = V3Action(
+        action=V3ActionType.DOWN,
+        keyword_setting_id=1,
+        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+        reason="cleanup",
+    )
+    merged = merge_and_dedup_actions([cleanup_down], [m1_up], [], [])
+    assert len(merged) == 1
+    assert merged[0].action == V3ActionType.DOWN
 
 
 @pytest.mark.unit
@@ -160,7 +282,16 @@ def test_rebalance_ladder_points_no_data_off_counts_one() -> None:
 
 @pytest.mark.unit
 def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
+    prof = _sample_profile()
     min_kw = _kw(ks_id=11, text="ok", mode=KeywordStrategyMode.MIN_CPA, conv=0.08, cpm_set_bid=200)
+    min_kw = min_kw.model_copy(update={"position_profile": prof})
     assert rebalance_ladder_points(min_kw, KeywordStrategyMode.MIN_CPA) == 1
     opt = _kw(ks_id=12, text="ok2", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    opt = opt.model_copy(update={"position_profile": prof})
     assert rebalance_ladder_points(opt, KeywordStrategyMode.OPTIMUM) == 2
+
+
+@pytest.mark.unit
+def test_rebalance_ladder_points_missing_ch_counts_one() -> None:
+    min_kw = _kw(ks_id=13, text="noch", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
+    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.OPTIMUM) == 1

@@ -1,8 +1,7 @@
-"""Unit: NO_DATA — ключи без V2 CPO → MIN_CPA; с V2 CPO → M1/M2/M3."""
+"""Unit: кампания NO_DATA — selector не двигает лестницу (оркестратор не вызывает)."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -34,60 +33,8 @@ from tests.unit.auto_updater_v3.test_no_data_activation import (
 
 
 @pytest.mark.unit
-def test_no_data_campaign_skips_m3_when_campaign_pay_for_order_is_none() -> None:
-    """NO_DATA: M1/M2 по ключам с V2 CPO; M3 не вызывается (нет campaign fact CPO)."""
-    off_no_cpo = _calculated_kw_fixture(
-        ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0
-    )
-    min_with_cpo = _calculated_kw_fixture(
-        ks_id=2,
-        text="b",
-        mode=KeywordStrategyMode.MIN_CPA,
-        conv=0.08,
-        cpm_set_bid=200,
-    )
-    profile = _sample_profile()
-    contexts = [
-        KeywordV3Context(keyword=off_no_cpo, position_profile=profile),
-        KeywordV3Context(keyword=min_with_cpo, position_profile=profile),
-    ]
-    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
-    fact = FactData(
-        predict_orders=5.0,
-        pay_for_order=None,
-        original_orders=5,
-        fact_method=FactMethods.DIRECT_SALES,
-    )
-
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_mass_cheap_promotion",
-            return_value=[],
-        ) as m1_mock,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_state_rebalance",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_headroom_plus_one",
-        ) as m3_mock,
-    ):
-        actions = select_v3_actions(
-            state=SalesStates.NO_DATA,
-            contexts=contexts,
-            shelf_promotion_active=False,
-            plan=plan,
-            fact=fact,
-        )
-
-    m1_mock.assert_called_once()
-    m3_mock.assert_not_called()
-    assert any(a.reason == "no_data_min_bid" for a in actions)
-
-
-@pytest.mark.unit
-def test_no_data_campaign_merges_min_up_and_rollout_for_keys_with_cpo() -> None:
-    """Кампания NO_DATA: OFF без CPO → UP; ключ с CPO участвует в M1."""
+def test_no_data_campaign_selector_waits() -> None:
+    """Кампания NO_DATA: только DO_NOTHING (align V2 / orchestrator skip)."""
     off_no_cpo = _calculated_kw_fixture(
         ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0
     )
@@ -113,7 +60,6 @@ def test_no_data_campaign_merges_min_up_and_rollout_for_keys_with_cpo() -> None:
 
     with patch(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_mass_cheap_promotion",
-        return_value=[],
     ) as m1_mock:
         actions = select_v3_actions(
             state=SalesStates.NO_DATA,
@@ -123,13 +69,7 @@ def test_no_data_campaign_merges_min_up_and_rollout_for_keys_with_cpo() -> None:
             fact=fact,
         )
 
-    assert any(
-        a.action == V3ActionType.UP
-        and a.keyword_setting_id == 1
-        and a.reason == "no_data_min_bid"
-        for a in actions
-    )
-    m1_mock.assert_called_once()
-    prepared_arg = m1_mock.call_args[0][0]
-    assert len(prepared_arg) == 1
-    assert prepared_arg[0][0].keyword.text == "b"
+    m1_mock.assert_not_called()
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DO_NOTHING
+    assert actions[0].reason == "campaign_no_data_wait"

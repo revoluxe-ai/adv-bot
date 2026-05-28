@@ -56,24 +56,48 @@ _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
 _PreparedList = list[_PreparedEntry]
 
 
-def find_first_ladder_gap_index(sorted_wl: list[CalculatedKeyword]) -> int | None:
+def find_first_ladder_gap_index(
+    sorted_wl: list[CalculatedKeyword],
+    *,
+    contexts: list["KeywordV3Context"],
+) -> int | None:
     """Индекс первой OFF, под которой есть активные ключи БС (mode_level > 0 или NO_DATA).
 
     Args:
         sorted_wl: БС, уже отсортированные по MIN_CPO (дешёвые сверху).
+        contexts: Все контексты кампании (импутация conv для баллов).
 
     Returns:
         Индекс якоря OFF или None, если дыры нет.
     """
+    by_text = {c.keyword.text.lower(): c for c in contexts}
     for i, kw in enumerate(sorted_wl):
         if stored_strategy_mode(kw) != KeywordStrategyMode.OFF:
             continue
         if any(
-            rebalance_ladder_points(below, stored_strategy_mode(below)) > 0
+            _rebalance_points_for_keyword(below, contexts=contexts, by_text=by_text) > 0
             for below in sorted_wl[i + 1 :]
         ):
             return i
     return None
+
+
+def _rebalance_points_for_keyword(
+    kw: CalculatedKeyword,
+    *,
+    contexts: list["KeywordV3Context"],
+    by_text: dict[str, "KeywordV3Context"],
+) -> int:
+    mode = stored_strategy_mode(kw)
+    ctx = by_text.get(kw.text.lower())
+    if ctx is None:
+        return rebalance_ladder_points(kw, mode)
+    return rebalance_ladder_points(
+        kw,
+        mode,
+        position_profile=ctx.position_profile,
+        contexts=contexts,
+    )
 
 
 def _build_prepared(contexts: list[KeywordV3Context]) -> _PreparedList:
@@ -157,9 +181,11 @@ def plan_ladder_gap_rebalance(
     Returns:
         Список действий: сначала FORCE_OFF, затем UP.
     """
+    contexts = [ctx for ctx, _m in prepared]
     keywords = [ctx.keyword for ctx, _m in prepared]
     sorted_wl = sort_white_list_by_min_cpo(keywords)
-    gap_idx = find_first_ladder_gap_index(sorted_wl)
+    by_text = {c.keyword.text.lower(): c for c in contexts}
+    gap_idx = find_first_ladder_gap_index(sorted_wl, contexts=contexts)
     if gap_idx is None:
         return []
 
@@ -171,8 +197,7 @@ def plan_ladder_gap_rebalance(
     actions: list[V3Action] = []
     budget = 0
     for kw in tail:
-        mode = stored_strategy_mode(kw)
-        budget += rebalance_ladder_points(kw, mode)
+        budget += _rebalance_points_for_keyword(kw, contexts=contexts, by_text=by_text)
         ks_id = kw.keyword_setting_original_id
         if ks_id is None:
             continue
