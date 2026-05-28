@@ -928,7 +928,7 @@ async def keyword_target_place_value(
     display_value = (
         str(target_place)
         if target_place > 0
-        else "0 (используется позиция кампании)"
+        else "0 (мин. ставка WB)"
     )
     await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
 

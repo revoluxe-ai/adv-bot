@@ -1,8 +1,8 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
 Порядок на **каждом** тике (до Redis gate plan/fact):
-  1. CH bid profiles + gap-rebalance (phase0).
-  2. plan/fact, state, short-circuit только для M1/M2/M3/OVERSPEND selector.
+  1. CH bid profiles + gap-rebalance (phase0) + no-data OFF→MIN_CPA.
+  2. plan/fact; ``NO_DATA`` (Н) / ``OVERSPEND`` не режутся cache gate; иначе M1/M2/M3.
   3. ``target_place`` — один раз после всех смен ``strategy_mode`` (rebalance + apply).
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
@@ -34,6 +34,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    run_no_data_activation_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
     run_ladder_gap_rebalance_v3,
@@ -117,14 +120,27 @@ async def _load_v3_wb_context(
     return dto, raw_profiles
 
 
+def _calculated_keywords_by_text(
+    keywords: list[CalculatedKeyword],
+) -> dict[str, CalculatedKeyword]:
+    """Индекс ключей для V2 CPO в ``sync_keyword_target_places_v3``."""
+    return {kw.text.lower(): kw for kw in keywords}
+
+
 async def _safe_sync_target_places_v3(
     complex_adv: ComplexAdv,
     dto: WBAdvDTO,
     raw_profiles: dict[str, list[BidPosition]],
+    *,
+    keywords: list[CalculatedKeyword],
 ) -> None:
     """Best-effort sync ``target_place`` без подмены ошибки из ``try`` (PEP 409)."""
     try:
-        await sync_keyword_target_places_v3(dto, raw_profiles)
+        await sync_keyword_target_places_v3(
+            dto,
+            raw_profiles,
+            calculated_by_text=_calculated_keywords_by_text(keywords),
+        )
     except Exception:
         logger.error(
             "[adv_id=%s] v3: target_place sync failed "
@@ -184,7 +200,9 @@ async def process_adv_v3(
         if target_place_synced:
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
-            await _safe_sync_target_places_v3(complex_adv, dto, raw_profiles)
+            await _safe_sync_target_places_v3(
+                complex_adv, dto, raw_profiles, keywords=keywords
+            )
             target_place_synced = True
 
     try:
@@ -196,10 +214,14 @@ async def process_adv_v3(
             contexts=contexts,
             dto=dto,
         )
-        if phase0_changed:
+        no_data_changed = await run_no_data_activation_v3(
+            complex_adv, contexts=contexts
+        )
+        if phase0_changed or no_data_changed:
+            keywords = await complex_adv.get_keywords()
             contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
-        # --- Plan/fact: short-circuit только selector (M1/M2/M3 / OVERSPEND) ---
+        # --- Plan/fact: short-circuit только selector (M1/M2/M3 / OVERSPEND / NO_DATA) ---
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         if plan is None:
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
@@ -219,7 +241,10 @@ async def process_adv_v3(
                     "[adv_id=%s] v3: insufficient data for state", complex_adv.adv_id
                 )
                 await cache_plan_fact_snapshot()
-            elif plan_fact_equal and state != SalesStates.OVERSPEND:
+            elif plan_fact_equal and state not in (
+                SalesStates.OVERSPEND,
+                SalesStates.NO_DATA,
+            ):
                 logger.debug(
                     "[adv_id=%s] v3: plan/fact unchanged, skip ladder",
                     complex_adv.adv_id,

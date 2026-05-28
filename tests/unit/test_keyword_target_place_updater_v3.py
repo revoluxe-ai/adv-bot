@@ -14,6 +14,10 @@ from app.modules.predict_keywords_target_place.clickhouse_manager.dto.bid_positi
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
     sync_keyword_target_places_v3,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from tests.unit.auto_updater_v3.test_no_data_activation import _kw as _calculated_kw_fixture
 
 
 def _patched_sm(session_cm: AsyncMock) -> Callable[..., AsyncMock]:
@@ -93,7 +97,7 @@ async def test_sync_keyword_target_places_v3_updates_off_via_min_cpa_proxy(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_sync_keyword_target_places_v3_clears_target_place_when_no_profile(
+async def test_sync_keyword_target_places_v3_sets_zero_when_no_profile_active_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     predictor = MagicMock()
@@ -125,7 +129,7 @@ async def test_sync_keyword_target_places_v3_clears_target_place_when_no_profile
 
     await sync_keyword_target_places_v3(adv=adv, bid_profiles={})
 
-    assert min_kw.target_place is None
+    assert min_kw.target_place == 0
     predictor.get_target_position_for_strategy_mode.assert_not_called()
 
 
@@ -213,3 +217,54 @@ async def test_sync_keyword_target_places_v3_resolves_profile_with_mixed_case_ch
 
     assert min_kw.target_place == 4
     predictor.get_target_position_for_strategy_mode.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_sync_keyword_target_places_v3_sets_zero_when_no_v2_cpo_with_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Есть CH-профиль, но нет V2 CPO — target_place=0 (min bid)."""
+    predictor = MagicMock()
+    _patch_predictor(monkeypatch, predictor)
+
+    min_kw = SimpleNamespace(
+        text="kw_min",
+        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        target_place=5,
+    )
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.all.return_value = [min_kw]
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=fake_result)
+    session.commit = AsyncMock()
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
+        _patched_sm(session_cm),
+    )
+
+    calc_kw: CalculatedKeyword = _calculated_kw_fixture(
+        ks_id=1,
+        text="kw_min",
+        mode=KeywordStrategyMode.MIN_CPA,
+        conv=0.0,
+        cpm_set_bid=0,
+    )
+
+    adv = MagicMock()
+    adv.adv_setting_original_id = 1
+    adv.adv_id = 123
+
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles=_minimal_bid_profiles(),
+        calculated_by_text={"kw_min": calc_kw},
+    )
+
+    assert min_kw.target_place == 0
+    predictor.get_target_position_for_strategy_mode.assert_not_called()

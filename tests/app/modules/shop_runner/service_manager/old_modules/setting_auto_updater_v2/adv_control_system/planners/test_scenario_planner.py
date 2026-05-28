@@ -51,3 +51,4 @@ def test_scenario_planner_stable_chain_order() -> None:
 def test_scenario_planner_optimal_empty_chain() -> None:
     planner = ScenarioPlanner()
     assert planner.scenarios[SalesStates.OPTIMAL] == []
+    assert planner.scenarios[SalesStates.NO_DATA] == []

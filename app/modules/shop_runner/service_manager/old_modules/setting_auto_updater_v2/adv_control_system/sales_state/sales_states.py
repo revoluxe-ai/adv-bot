@@ -4,7 +4,8 @@ OVERSPEND	снизить расход	отключаем ключи, пониж�
 UNDERPERFORM	нарастить продажи	повышаем ставки, добавляем ключи
 STABLE	снизить себестоимость без потери заказов	плавное уменьшение ставок
 OPTIMAL	удерживать результат	ничего не делаем
-None	пауза или нет данных	ждём обновлений
+NO_DATA (Н)	нет данных plan/fact	ключи: target_place=0, MIN_CPA
+None	пауза (битый план)	ждём обновлений
 
 
 
@@ -23,6 +24,7 @@ class SalesStates(Enum):
     UNDERPERFORM = auto()  # Нарастить продажи
     STABLE = auto()  # Снизить себестоимость без потери заказов
     OPTIMAL = auto()  # Удерживать результат
+    NO_DATA = auto()  # Н — нет данных для plan/fact (V3: MIN_CPA + target_place 0)
 
 
 def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
@@ -45,7 +47,7 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
         return None
 
     if fact.pay_for_order is None:
-        return None
+        return SalesStates.NO_DATA
 
     # OVERSPEND: перерасход — расходы выше максимума
     if fact.pay_for_order > plan.max_pay_for_order:
@@ -66,5 +68,4 @@ def detect_campaign_state(plan: PlanData, fact: FactData) -> SalesStates | None:
         # OPTIMAL: всё в норме
         return SalesStates.OPTIMAL
 
-    # Если данных недостаточно
-    return None
+    return SalesStates.NO_DATA

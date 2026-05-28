@@ -117,12 +117,23 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
   по механизмам (`m1/m2/m3`);
 - в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
+## NO_DATA (Н) и ключи без V2 CPO
+
+- **Кампания:** `SalesStates.NO_DATA` — `fact.pay_for_order is None` (`detect_campaign_state`); short-circuit plan/fact **не** режет тик (как `OVERSPEND`).
+- **Ключ «нет данных»:** нет V2 CPO — та же цепочка, что рейтинг V2: `conv_views_to_orders` + CPM каскад → `orders_per_1000_rub` → `pay_for_order` (`keyword_v2_pay_for_order_unavailable`). Отсутствие только матрицы CH **не** считается no-data для активации.
+- **Ключ с V2 CPO при кампании NO_DATA:** те же M1/M2/M3 (и shelf), что в UNDERPERFORM/STABLE — `split_prepared_by_v2_cpo` + merge с `no_data_min_bid`.
+- **Действие:** OFF без CPO → MIN_CPA (`no_data_min_bid`); preamble, phase0, selector, shelf.
+- **UI:** `SalesStates` в меню РК (`sales_state_short_label`); в списке ключей `target_place=0` → `->0` (мин. ставка WB), `None` → `->Н>`.
+- **`target_place`:** `0` = min bid WB (`NO_DATA_TARGET_PLACE_FALLBACK`); в sync передаётся `calculated_by_text` из orchestrator для проверки V2 CPO.
+
+Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\test_sales_states.py`.
+
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
 - **Порядок тика:** CH profiles → **gap-rebalance (phase0)** → plan/fact Redis gate (только selector) → `target_place` один раз после всех смен режимов (`_sync_target_places_once` + dedupe в `finally`).
-- **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact. `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
+- **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
 
 Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).

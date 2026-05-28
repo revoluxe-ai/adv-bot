@@ -1,0 +1,151 @@
+"""Unit: активация ключей без V2 CPO (OFF → MIN_CPA, target_place=0)."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+import pytest
+
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3ActionType,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    NO_DATA_TARGET_PLACE_FALLBACK,
+    keyword_lacks_v3_decision_data,
+    keyword_v2_pay_for_order_unavailable,
+    plan_no_data_min_up_actions,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+    KeywordV3Context,
+)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+    SalesStates,
+    detect_campaign_state,
+)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
+)
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import (
+    FactMethods,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import (
+    KeywordCpmSources,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import (
+    KeywordState,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+    KeywordStatusReason,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
+    KeywordSettingDTO,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
+    make_zero_keyword_stat,
+)
+
+
+def _kw(
+    *,
+    ks_id: int,
+    text: str,
+    mode: KeywordStrategyMode,
+    hard_status: int = 2,
+    conv: float = 0.0,
+    cpm_set_bid: int = 200,
+) -> CalculatedKeyword:
+    stat = make_zero_keyword_stat(text).model_copy(
+        update={"conv_views_to_orders": conv, "views": 10, "clicks": 1}
+    )
+    return CalculatedKeyword(
+        adv_id=1,
+        keyword_setting=KeywordSettingDTO(
+            text=text,
+            relevant=True,
+            hard_status=hard_status,
+            id=ks_id,
+            strategy_mode=mode,
+        ),
+        cluster_stat=stat,
+        state=KeywordState(
+            status=KeywordStatus.GOOD,
+            reason=KeywordStatusReason.WHITE_LIST,
+            best_keyword_status=False,
+        ),
+        rating=1.0,
+        target_pay_for_order=None,
+        cpm_sources=KeywordCpmSources(cpm_set_bid=cpm_set_bid),
+    )
+
+
+def _sample_profile() -> list[PositionProfilePoint]:
+    return [
+        PositionProfilePoint(
+            position=1,
+            bid=100,
+            predicted_conversion=0.05,
+            pay_for_cart=40.0,
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+    ]
+
+
+@pytest.mark.unit
+def test_detect_campaign_state_no_pay_returns_no_data() -> None:
+    plan = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=300)
+    fact = FactData(
+        predict_orders=5.0,
+        pay_for_order=None,
+        original_orders=5,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    assert detect_campaign_state(plan, fact) == SalesStates.NO_DATA
+
+
+@pytest.mark.unit
+def test_keyword_v2_pay_for_order_unavailable_when_no_cpm() -> None:
+    kw = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.05, cpm_set_bid=0)
+    assert keyword_v2_pay_for_order_unavailable(kw)
+    assert kw.pay_for_order is None
+
+
+@pytest.mark.unit
+def test_keyword_v2_pay_for_order_available_with_conv_and_cpm() -> None:
+    kw = _kw(ks_id=2, text="b", mode=KeywordStrategyMode.MIN_CPA, conv=0.05, cpm_set_bid=200)
+    assert not keyword_v2_pay_for_order_unavailable(kw)
+    assert kw.pay_for_order is not None
+
+
+@pytest.mark.unit
+def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
+    off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0)
+    ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
+    assert keyword_lacks_v3_decision_data(ctx)
+    actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason == "no_data_min_bid"
+
+
+@pytest.mark.unit
+def test_plan_no_data_skips_when_v2_cpo_available() -> None:
+    off = _kw(ks_id=2, text="b", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
+    ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
+    assert not keyword_lacks_v3_decision_data(ctx)
+    actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert actions == []
+
+
+@pytest.mark.unit
+def test_no_data_target_place_fallback_is_min_bid_sentinel() -> None:
+    assert NO_DATA_TARGET_PLACE_FALLBACK == 0

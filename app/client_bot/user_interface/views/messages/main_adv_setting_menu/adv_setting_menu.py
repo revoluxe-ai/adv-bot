@@ -74,6 +74,10 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
     TrafficClicksManager,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
+    SalesStates,
+    sales_state_short_label,
+)
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
 )
@@ -138,6 +142,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._cost_threshold_kind: str | None = None
         self._plan_set: bool = False
         self._plan_fact_ch_max_ts_str: str | None = None
+        self._campaign_sales_state: SalesStates | None = None
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
         self._emergency_mode_active: bool = False
@@ -304,6 +309,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._cost_threshold_kind = cost_metrics.cost_threshold_kind
         self._plan_set = cost_metrics.plan_set
         self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
+        self._campaign_sales_state = cost_metrics.campaign_sales_state
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -493,6 +499,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     else ""
                 )
                 text += f"Себес зак: план {target_str}, факт {avg_str}{ch_suffix}\n"
+                if self._campaign_sales_state is not None:
+                    text += (
+                        f"Состояние: {sales_state_short_label(self._campaign_sales_state)}\n"
+                    )
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)

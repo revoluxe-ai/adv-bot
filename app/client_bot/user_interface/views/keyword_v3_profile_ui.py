@@ -94,7 +94,12 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     cpm = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     target = data.target_positions_by_mode.get(mode)
-    target_str = str(target) if target is not None else "—"
+    if target == 0:
+        target_str = "0 (мин.)"
+    elif target is not None:
+        target_str = str(target)
+    else:
+        target_str = "—"
     return (
         f"{star}{letter} {label} — поз. {pos} | CPM {cpm} "
         f"| CPO {cpo} ₽ | цель {target_str}"

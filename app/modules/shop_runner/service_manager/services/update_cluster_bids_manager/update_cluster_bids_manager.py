@@ -403,19 +403,16 @@ class UpdateClusterBidsManager:
                 cluster_for_wb = kw.cluster_stat.text or kw.text
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
-                # snap_to_min: при индивидуальных целях по фразам, но без target_place у
-                # ключевого слова — торгуем «на минимум WB»; max_cpm на эту ветку в
-                # калькуляторе не клампит (см. new_bids_calculator / CalculationInput).
-                if adv.individual_keywords_target_place_mode and (
-                    keyword_target_place := kw.target_place
-                ):
-                    target_position = keyword_target_place
-                    snap_to_min = False
-                elif adv.individual_keywords_target_place_mode:
-                    # Минимальная ставка WB — через snap_to_min + new_bid_calculate, не через
-                    # target_position; цель РК (adv.target_place) в карту не кладём.
-                    target_position = None
-                    snap_to_min = True
+                # snap_to_min: target_place is None или 0 — торг на минимум WB.
+                # target_place > 0 — индивидуальная позиция из CH/V3.
+                if adv.individual_keywords_target_place_mode:
+                    keyword_target_place = kw.target_place
+                    if keyword_target_place is not None and keyword_target_place > 0:
+                        target_position = keyword_target_place
+                        snap_to_min = False
+                    else:
+                        target_position = None
+                        snap_to_min = True
                 else:
                     target_position = adv.target_place
                     snap_to_min = False

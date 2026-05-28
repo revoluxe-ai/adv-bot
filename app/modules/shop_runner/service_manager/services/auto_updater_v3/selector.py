@@ -35,7 +35,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
     normalize_v3_rollout_aggressiveness,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_no_data_min_up_actions,
+    split_prepared_by_v2_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     build_worst_costs,
@@ -74,6 +79,59 @@ class KeywordV3Context:
     position_profile: list[PositionProfilePoint] | None
 
 
+def _plan_m1_m2_m3_with_plan_fact(
+    prepared: PreparedList,
+    *,
+    plan: PlanData,
+    fact: FactData,
+    shelf_promotion_active: bool,
+    shelf_click_mode: ShelfClickMode | None,
+    aggr: V3RolloutAggressiveness,
+) -> list[V3Action]:
+    """M1/M2/M3 (+ shelf cleanup) для ключей с валидным resolve."""
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    if not is_resolve_valid(plan, resolve):
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
+
+    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=aggr,
+    )
+    cleanup_actions: list[V3Action] = []
+    if shelf_promotion_active:
+        cleanup_actions = plan_shelf_rec_false_cleanup_down(
+            prepared, click_mode=click_mode
+        )
+    worst_costs = build_worst_costs(prepared)
+    m1_actions = plan_mass_cheap_promotion(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        worst_costs=worst_costs,
+    )
+    m2_actions = plan_state_rebalance(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        worst_costs=worst_costs,
+    )
+    m3_actions = plan_headroom_plus_one(
+        prepared,
+        resolve=resolve,
+        fact_pay_for_order=(
+            float(fact.pay_for_order) if fact.pay_for_order is not None else None
+        ),
+        policy=policy,
+    )
+    merged = merge_and_dedup_actions(
+        cleanup_actions, m1_actions, m2_actions, m3_actions
+    )
+    if merged:
+        return merged
+    return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
+
+
 def select_v3_actions(
     *,
     state: SalesStates,
@@ -94,10 +152,6 @@ def select_v3_actions(
     aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
 
     if plan is not None and fact is not None:
-        resolve = compute_resolve_cost_threshold(plan, fact)
-        if not is_resolve_valid(plan, resolve):
-            return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
-
         # Главный путь orchestrator всегда передаёт plan/fact; OVERSPEND обрабатываем
         # до M1/M2/M3 (массовый FORCE_OFF по ключам выше max).
         if state == SalesStates.OVERSPEND:
@@ -108,45 +162,33 @@ def select_v3_actions(
                 prepared, max_pay_for_order=float(max_pfo)
             )
 
-        click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-        policy = SelectionPolicy.from_aggressiveness(
-            click_mode=click_mode,
-            aggressiveness=aggr,
-        )
+        if state == SalesStates.NO_DATA:
+            with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
+            no_data_actions = plan_no_data_min_up_actions(without_cpo)
+            if with_cpo:
+                rollout = _plan_m1_m2_m3_with_plan_fact(
+                    with_cpo,
+                    plan=plan,
+                    fact=fact,
+                    shelf_promotion_active=shelf_promotion_active,
+                    shelf_click_mode=shelf_click_mode,
+                    aggr=aggr,
+                )
+                merged = merge_and_dedup_actions(no_data_actions, rollout, [], [])
+                if merged:
+                    return merged
+            if no_data_actions:
+                return no_data_actions
+            return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_data_no_off_keys")]
 
-        cleanup_actions: list[V3Action] = []
-        if shelf_promotion_active:
-            cleanup_actions = plan_shelf_rec_false_cleanup_down(
-                prepared, click_mode=click_mode
-            )
-
-        worst_costs = build_worst_costs(prepared)
-        m1_actions = plan_mass_cheap_promotion(
+        return _plan_m1_m2_m3_with_plan_fact(
             prepared,
-            resolve=resolve,
-            policy=policy,
-            worst_costs=worst_costs,
+            plan=plan,
+            fact=fact,
+            shelf_promotion_active=shelf_promotion_active,
+            shelf_click_mode=shelf_click_mode,
+            aggr=aggr,
         )
-        m2_actions = plan_state_rebalance(
-            prepared,
-            resolve=resolve,
-            policy=policy,
-            worst_costs=worst_costs,
-        )
-        m3_actions = plan_headroom_plus_one(
-            prepared,
-            resolve=resolve,
-            fact_pay_for_order=(
-                float(fact.pay_for_order) if fact.pay_for_order is not None else None
-            ),
-            policy=policy,
-        )
-        merged = merge_and_dedup_actions(
-            cleanup_actions, m1_actions, m2_actions, m3_actions
-        )
-        if merged:
-            return merged
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
 
     if shelf_promotion_active:
         click_mode = (
@@ -164,6 +206,18 @@ def select_v3_actions(
 
     if state == SalesStates.OPTIMAL:
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="optimal")]
+
+    if state == SalesStates.NO_DATA:
+        with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
+        no_data_actions = plan_no_data_min_up_actions(without_cpo)
+        if with_cpo:
+            rollout = plan_rollout_underperform_one(with_cpo, aggr)
+            merged = merge_and_dedup_actions(no_data_actions, rollout, [], [])
+            if merged:
+                return merged
+        if no_data_actions:
+            return no_data_actions
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_data_no_off_keys")]
 
     if state == SalesStates.OVERSPEND:
         if plan_max_pay_for_order is not None:

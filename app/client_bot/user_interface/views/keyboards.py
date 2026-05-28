@@ -34,6 +34,9 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
 )
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
+    format_keyword_list_target_place_suffix,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
@@ -397,10 +400,7 @@ def get_keywords_setting_keyboard(
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
 
         if adv_setting.individual_keywords_target_place_mode:
-            if target_place := keyword.target_place:
-                text += f'->{target_place}'
-            else:
-                text += "->Н>"
+            text += format_keyword_list_target_place_suffix(keyword.target_place)
         cpm: float | None = keyword.cpm
         if cpm is not None:
             cpm_text = str(int(cpm + 0.5))

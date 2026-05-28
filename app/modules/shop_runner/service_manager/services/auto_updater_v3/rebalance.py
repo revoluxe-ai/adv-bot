@@ -29,6 +29,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
     mode_level,
     step_up,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_no_data_min_up_actions,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
     normalize_v3_rollout_aggressiveness,
@@ -90,7 +93,11 @@ def _plan_rebalance_up_once(
     shelf_click_mode: ShelfClickMode,
     aggressiveness: V3RolloutAggressiveness,
 ) -> list[V3Action]:
-    """Один UP по политике текущей ветки (shelf / non-shelf), без DOWN/cleanup."""
+    """Один UP: сначала OFF без данных → MIN_CPA, иначе pooled cost-first."""
+    no_data = plan_no_data_min_up_actions(prepared)
+    if no_data:
+        return no_data[:1]
+
     if shelf_promotion_active:
         strategy = activation_strategy_for_shelf_underperform(shelf_click_mode)
         if strategy == ActivationStrategy.LAYERED:

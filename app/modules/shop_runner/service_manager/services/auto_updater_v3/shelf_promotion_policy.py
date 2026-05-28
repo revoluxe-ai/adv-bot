@@ -22,7 +22,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_no_data_min_up_actions,
+    split_prepared_by_v2_cpo,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    merge_and_dedup_actions,
     plan_overspend_actions,
     plan_rollout_down_one,
 )
@@ -79,5 +84,21 @@ def plan_shelf_promotion_actions(
             click_mode=click_mode,
             aggressiveness=rollout_aggressiveness,
         )
+
+    if state == SalesStates.NO_DATA:
+        with_cpo, without_cpo = split_prepared_by_v2_cpo(prepared)
+        no_data_actions = plan_no_data_min_up_actions(without_cpo)
+        if with_cpo:
+            shelf_rollout = _plan_underperform_shelf(
+                with_cpo,
+                click_mode=click_mode,
+                aggressiveness=rollout_aggressiveness,
+            )
+            merged = merge_and_dedup_actions(no_data_actions, shelf_rollout, [], [])
+            if merged:
+                return merged
+        if no_data_actions:
+            return no_data_actions
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_data_no_off_keys")]
 
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="unknown_state")]
