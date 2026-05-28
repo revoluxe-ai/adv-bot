@@ -208,5 +208,23 @@ def target_place_for_v3_strategy_mode(
     return max(1, int(cand.position))
 
 
+def mode_for_v3_target_place(mode: KeywordStrategyMode) -> KeywordStrategyMode:
+    """Режим для расчёта ``target_place``: OFF → MIN_CPA (нет кандидата OFF)."""
+    if mode == KeywordStrategyMode.OFF:
+        return KeywordStrategyMode.MIN_CPA
+    return mode
+
+
+def resolve_v3_target_place(
+    strategy_mode: KeywordStrategyMode,
+    candidates: dict[AggressionTargetMode, ModeCandidate],
+) -> int | None:
+    """``target_place`` ключа по ``strategy_mode`` и лестнице V3."""
+    return target_place_for_v3_strategy_mode(
+        mode_for_v3_target_place(strategy_mode),
+        candidates,
+    )
+
+
 def stored_strategy_mode(kw: CalculatedKeyword) -> KeywordStrategyMode:
     return kw.keyword_setting.strategy_mode

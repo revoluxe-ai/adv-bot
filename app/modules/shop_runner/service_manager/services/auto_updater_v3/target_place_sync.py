@@ -19,7 +19,7 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
-    target_place_for_v3_strategy_mode,
+    resolve_v3_target_place,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     NO_DATA_TARGET_PLACE_FALLBACK,
@@ -38,11 +38,14 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 logger = logging.getLogger(__name__)
 
 
-def _mode_for_target_place(strategy_mode: KeywordStrategyMode) -> KeywordStrategyMode:
-    """Режим для расчёта позиции: OFF → MIN_CPA (нет кандидата OFF)."""
-    if strategy_mode == KeywordStrategyMode.OFF:
-        return KeywordStrategyMode.MIN_CPA
-    return strategy_mode
+def _effective_strategy_mode(
+    keyword: KeywordSetting,
+    calc_kw: CalculatedKeyword | None,
+) -> KeywordStrategyMode:
+    """Режим для target_place: из ``CalculatedKeyword`` тика (как UI), иначе из БД."""
+    if calc_kw is not None:
+        return calc_kw.keyword_setting.strategy_mode
+    return keyword.strategy_mode
 
 
 def _calculated_keyword_lookup(
@@ -64,9 +67,8 @@ async def sync_keyword_target_places_v3(
 ) -> None:
     """Пересчёт ``target_place`` для всех ключей РК по профилю и ``strategy_mode``.
 
-    Обновляются все ключи, включая OFF (для OFF позиция из профиля как для MIN_CPA).
-    Нет CH-профиля, нет ``calculated_by_text`` / V2 CPO или invalid кандидат: для активных
-    режимов — ``target_place=0`` (min bid WB); OFF — ``None``.
+    ``strategy_mode`` берётся из ``calculated_by_text`` (ledger/Redis тика), не из устаревшей
+    строки ``KeywordSetting``, чтобы ``target_place`` совпадал с профилем V3 в UI.
     """
     stmt = select(KeywordSetting).where(
         KeywordSetting.adv_setting_id == adv.adv_setting_original_id
@@ -77,12 +79,13 @@ async def sync_keyword_target_places_v3(
         for keyword in keywords:
             profile = resolve_keyword_bid_profile(bid_profiles, keyword.text)
             calc_kw = _calculated_keyword_lookup(calculated_by_text, keyword.text)
+            strategy_mode = _effective_strategy_mode(keyword, calc_kw)
             no_v2_cpo = (
                 calc_kw is None
                 or keyword_v2_pay_for_order_unavailable(calc_kw)
             )
             if not profile or no_v2_cpo:
-                if keyword.strategy_mode == KeywordStrategyMode.OFF:
+                if strategy_mode == KeywordStrategyMode.OFF:
                     keyword.target_place = None
                 else:
                     logger.warning(
@@ -100,17 +103,16 @@ async def sync_keyword_target_places_v3(
                 keyword_text=keyword.text,
                 conv_views_to_orders=calc_kw.conv_views_to_orders,
             )
-            calc_mode = _mode_for_target_place(keyword.strategy_mode)
-            resolved = target_place_for_v3_strategy_mode(calc_mode, candidates)
+            resolved = resolve_v3_target_place(strategy_mode, candidates)
             if resolved is None:
-                if keyword.strategy_mode == KeywordStrategyMode.OFF:
+                if strategy_mode == KeywordStrategyMode.OFF:
                     keyword.target_place = None
                 else:
                     logger.warning(
                         "Invalid V3 candidate for keyword %s mode=%s, adv_id=%s; "
                         "target_place=%s (min bid)",
                         keyword.text,
-                        keyword.strategy_mode.name,
+                        strategy_mode.name,
                         adv.adv_id,
                         NO_DATA_TARGET_PLACE_FALLBACK,
                     )
