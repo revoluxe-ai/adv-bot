@@ -216,7 +216,6 @@ async def process_adv_v3(
             dto=dto,
         )
         if phase0_changed:
-            keywords = await complex_adv.get_keywords()
             contexts = build_keyword_v3_contexts(keywords, raw_profiles)
         no_data_changed = await run_no_data_activation_v3(
             complex_adv, contexts=contexts

@@ -186,4 +186,5 @@ async def test_process_adv_v3_rebuilds_contexts_after_phase0_before_no_data() ->
 
     assert build_calls == [0, 1]
     no_data_mock.assert_awaited_once()
-    assert complex_adv.get_keywords.await_count >= 1
+    # phase0 уже возвращает свежий список из get_keywords — повторного fetch нет
+    assert complex_adv.get_keywords.await_count == 1
