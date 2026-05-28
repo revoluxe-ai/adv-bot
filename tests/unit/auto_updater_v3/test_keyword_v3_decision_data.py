@@ -73,6 +73,22 @@ def test_peer_max_when_no_views_anywhere_but_conv_in_stat() -> None:
 
 
 @pytest.mark.unit
+def test_no_conv_tier_when_ch_but_no_imputation() -> None:
+    """CH есть, conv нельзя импутировать — отдельный tier, не NO_CH_MATRIX."""
+    kw = _calculated_kw_fixture(
+        ks_id=1, text="solo", mode=KeywordStrategyMode.OFF, conv=0.0
+    )
+    stat = kw.cluster_stat.model_copy(update={"views": 0, "conv_views_to_orders": 0.0})
+    kw = kw.model_copy(update={"cluster_stat": stat})
+    profile = _sample_profile()
+    ctx = KeywordV3Context(keyword=kw, position_profile=profile)
+    decision = resolve_keyword_v3_decision(ctx, [ctx])
+    assert decision.tier == KeywordV3DecisionTier.NO_CONV
+    assert decision.has_ch_position_profile
+    assert keyword_lacks_v3_decision_data(ctx, [ctx])
+
+
+@pytest.mark.unit
 def test_no_ch_matrix_triggers_n_state() -> None:
     kw = _calculated_kw_fixture(
         ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.08

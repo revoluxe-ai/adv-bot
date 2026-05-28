@@ -77,7 +77,10 @@ class KeywordV3DataDiagnostic:
         """N-state: только preamble MIN_CPA (нет CH или нет conv даже с импутацией)."""
         if not self.has_ch_position_profile:
             return True
-        if self.decision_tier == KeywordV3DecisionTier.NO_CH_MATRIX:
+        if self.decision_tier in (
+            KeywordV3DecisionTier.NO_CH_MATRIX,
+            KeywordV3DecisionTier.NO_CONV,
+        ):
             return True
         return not self.has_v2_cpo
 

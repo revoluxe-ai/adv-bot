@@ -1,8 +1,8 @@
 """Уровни данных V3 по ключу: свои CH+conv → агрегат РК → max среди ключей → N-state.
 
-N-state (``NO_CH_MATRIX``) — только нет матрицы CH bid profile. Недостаток своей conv/CPO
-не отправляет ключ в ``plan_no_data_keyword_actions``: подставляется ``effective_conv``
-для ``build_mode_candidates`` / M1/M2/M3 с отдельным ``KeywordV3DecisionTier``.
+``NO_CH_MATRIX`` — нет CH bid profile. ``NO_CONV`` — матрица есть, conv нельзя импутировать.
+Недостаток своей conv/CPO не отправляет ключ в ``plan_no_data_keyword_actions``: подставляется
+``effective_conv`` для ``build_mode_candidates`` / M1/M2/M3 с отдельным ``KeywordV3DecisionTier``.
 """
 
 from __future__ import annotations
@@ -43,6 +43,17 @@ class KeywordV3DecisionTier(str, Enum):
     NO_CH_MATRIX = "no_ch_matrix"
     """Нет CH bid profile — только N-state activation (MIN_CPA / target_place=0)."""
 
+    NO_CONV = "no_conv"
+    """CH bid profile есть, conv нельзя импутировать ни из одного источника."""
+
+
+_N_STATE_TIERS: frozenset[KeywordV3DecisionTier] = frozenset(
+    {
+        KeywordV3DecisionTier.NO_CH_MATRIX,
+        KeywordV3DecisionTier.NO_CONV,
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3Decision:
@@ -58,7 +69,7 @@ class KeywordV3Decision:
         """Участвует в M1/M2/M3 / gap-rebalance с CH (не N-state preamble)."""
         return (
             self.has_ch_position_profile
-            and self.tier != KeywordV3DecisionTier.NO_CH_MATRIX
+            and self.tier not in _N_STATE_TIERS
             and self.effective_conv_views_to_orders is not None
             and self.effective_conv_views_to_orders > 0
         )
@@ -110,7 +121,7 @@ def resolve_keyword_v3_decision(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> KeywordV3Decision:
-    """Цепочка: свои данные → агрегат РК → max по соседним ключам → N-state (нет CH)."""
+    """Цепочка: свои данные → агрегат РК → max по соседям → N-state (нет CH или conv)."""
     profile = ctx.position_profile
     has_ch = bool(profile)
     if not has_ch:
@@ -148,7 +159,7 @@ def resolve_keyword_v3_decision(
         )
 
     return KeywordV3Decision(
-        tier=KeywordV3DecisionTier.NO_CH_MATRIX,
+        tier=KeywordV3DecisionTier.NO_CONV,
         effective_conv_views_to_orders=None,
         imputed=False,
         has_ch_position_profile=True,
@@ -196,4 +207,5 @@ def tier_label_ru(tier: KeywordV3DecisionTier) -> str:
         KeywordV3DecisionTier.RK_AGGREGATE: "агрегат РК",
         KeywordV3DecisionTier.PEER_MAX: "max conv по РК",
         KeywordV3DecisionTier.NO_CH_MATRIX: "нет матрицы CH",
+        KeywordV3DecisionTier.NO_CONV: "нет conv (импутация невозможна)",
     }[tier]
