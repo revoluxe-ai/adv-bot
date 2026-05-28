@@ -47,15 +47,15 @@ def test_profile_off_first_and_star_on_current() -> None:
     assert "OFF — отключен" in lines[1]
     assert "лестница отключена" not in text
     assert lines[1].startswith("   ")
-    assert "🌟" in lines[2] and "MIN\\_CPA" in lines[2]
-    assert "OPTIMUM" in lines[3]
-    assert "MAX\\_CONVERSION" in lines[4]
+    assert "🌟" in lines[2] and "M — поз. 12" in lines[2]
+    assert "O — поз. 8" in lines[3]
+    assert "C — поз. 3" in lines[4]
     joined = "\n".join(lines)
     assert (
         joined.index("OFF")
-        < joined.index("MIN\\_CPA")
-        < joined.index("OPTIMUM")
-        < joined.index("MAX\\_CONVERSION")
+        < joined.index("M —")
+        < joined.index("O —")
+        < joined.index("C —")
     )
 
 
@@ -98,7 +98,7 @@ def test_profile_invalid_candidate_shows_reason() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "нет conv показ→заказ" in text
     assert "нет конверсий" in text
-    assert "🌟" in text and "OPTIMUM" in text
+    assert "🌟" in text and "O — поз. 5" in text
 
 
 @pytest.mark.unit

@@ -79,7 +79,6 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     agg = _MODE_TO_AGG.get(mode)
     assert agg is not None
     cand = data.candidates.get(agg)
-    label = _escape_markdown_v1(mode.name)
     if cand is None or not cand.is_valid:
         reason = ""
         if cand is not None and cand.invalid_reason:
@@ -87,12 +86,12 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
                 cand.invalid_reason, cand.invalid_reason
             )
             reason = f" ({_escape_markdown_v1(raw)})"
-        return f"{star}{letter} {label} — —{reason}"
+        return f"{star}{letter} — —{reason}"
 
     pos = int(cand.position) if cand.position is not None else "—"
     cpm = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     return (
-        f"{star}{letter} {label} — поз. {pos} | CPM {cpm} | CPO {cpo} ₽"
+        f"{star}{letter} — поз. {pos} | CPM {cpm} | CPO {cpo} ₽"
     )
 
