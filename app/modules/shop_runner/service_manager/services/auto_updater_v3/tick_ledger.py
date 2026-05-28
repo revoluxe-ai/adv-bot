@@ -55,6 +55,7 @@ class V3TickKeywordLedger:
     _by_id: dict[int, CalculatedKeyword] = field(default_factory=dict)
     _baseline_mode: dict[int, KeywordStrategyMode] = field(default_factory=dict)
     _last_reason: dict[int, str] = field(default_factory=dict)
+    _netto_action_type: dict[int, V3ActionType] = field(default_factory=dict)
     _tick_applied: list[AppliedV3Action] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -115,6 +116,7 @@ class V3TickKeywordLedger:
         reason: str,
     ) -> None:
         self._last_reason[ks_id] = reason
+        self._netto_action_type[ks_id] = action
         self._tick_applied.append(
             AppliedV3Action(
                 action=action,
@@ -225,6 +227,13 @@ class V3TickKeywordLedger:
         if up != KeywordStrategyMode.MIN_CPA:
             return False
         self._set_keyword_mode(from_id, down)
+        self._record_applied(
+            action=V3ActionType.DOWN,
+            ks_id=from_id,
+            from_mode=mode_from,
+            to_mode=down,
+            reason=action.reason,
+        )
         self._set_keyword_mode(to_id, up)
         self._record_applied(
             action=V3ActionType.REBALANCE_TRANSFER,
@@ -293,9 +302,13 @@ class V3TickKeywordLedger:
                     .values(strategy_mode=desired, hard_status=hs)
                 )
                 reason = self._last_reason.get(ks_id, "v3_tick_flush")
+                action_type = self._netto_action_type.get(
+                    ks_id,
+                    self._action_type_for_netto(db_mode, desired),
+                )
                 db_applied.append(
                     AppliedV3Action(
-                        action=self._action_type_for_netto(db_mode, desired),
+                        action=action_type,
                         keyword_setting_id=ks_id,
                         keyword_text=self._keyword_text(ks_id),
                         from_mode=db_mode,
@@ -304,6 +317,14 @@ class V3TickKeywordLedger:
                     )
                 )
             if db_applied:
+                tick_order = {
+                    item.keyword_setting_id: idx
+                    for idx, item in enumerate(self._tick_applied)
+                    if item.keyword_setting_id is not None
+                }
+                db_applied.sort(
+                    key=lambda a: tick_order.get(a.keyword_setting_id, 10**9)
+                )
                 await session.commit()
             else:
                 await session.rollback()

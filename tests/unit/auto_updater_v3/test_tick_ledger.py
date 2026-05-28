@@ -198,3 +198,88 @@ async def test_flush_updates_only_strategy_mode_and_hard_status(
     assert params["hard_status"] == 2
     session.commit.assert_awaited_once()
     persist.assert_awaited_once()
+
+
+@pytest.mark.unit
+def test_transfer_in_memory_records_reason_for_source_and_target() -> None:
+    """REBALANCE_TRANSFER: reason и action type для from_id и to_id."""
+    from_kw = _kw(ks_id=10, mode=KeywordStrategyMode.MIN_CPA, hard_status=2)
+    to_kw = _kw(ks_id=20, mode=KeywordStrategyMode.OFF, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([from_kw, to_kw])
+    ledger.apply_in_memory(
+        [
+            V3Action(
+                action=V3ActionType.REBALANCE_TRANSFER,
+                from_keyword_setting_id=10,
+                to_keyword_setting_id=20,
+                reason="m2_state_rebalance",
+            )
+        ]
+    )
+    assert ledger._last_reason[10] == "m2_state_rebalance"
+    assert ledger._last_reason[20] == "m2_state_rebalance"
+    assert ledger._netto_action_type[10] == V3ActionType.DOWN
+    assert ledger._netto_action_type[20] == V3ActionType.REBALANCE_TRANSFER
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_flush_transfer_redis_snapshot_uses_rebalance_on_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """После flush последний snapshot — REBALANCE_TRANSFER по целевому ключу."""
+    from_kw = _kw(ks_id=10, mode=KeywordStrategyMode.MIN_CPA, hard_status=2)
+    to_kw = _kw(ks_id=20, mode=KeywordStrategyMode.OFF, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([from_kw, to_kw])
+    ledger.apply_in_memory(
+        [
+            V3Action(
+                action=V3ActionType.REBALANCE_TRANSFER,
+                from_keyword_setting_id=10,
+                to_keyword_setting_id=20,
+                reason="m2_state_rebalance",
+            )
+        ]
+    )
+
+    async def _execute(stmt: object) -> MagicMock:
+        sql = str(stmt)
+        result = MagicMock()
+        if sql.startswith("SELECT"):
+            result.all.return_value = [
+                (10, KeywordStrategyMode.MIN_CPA, 2, "k10"),
+                (20, KeywordStrategyMode.OFF, 1, "k20"),
+            ]
+        return result
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.sm",
+        _patched_sm(session_cm),
+    )
+    captured: list[list[AppliedV3Action]] = []
+
+    async def _capture_persist(
+        _adv: object, applied: list[AppliedV3Action]
+    ) -> None:
+        captured.append(applied)
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.persist_last_applied_v3",
+        _capture_persist,
+    )
+
+    await ledger.flush_to_db(MagicMock(adv_setting=MagicMock()))
+    assert len(captured) == 1
+    applied = captured[0]
+    assert applied[-1].keyword_setting_id == 20
+    assert applied[-1].action == V3ActionType.REBALANCE_TRANSFER
+    assert applied[-1].reason == "m2_state_rebalance"
+    assert applied[0].keyword_setting_id == 10
+    assert applied[0].reason == "m2_state_rebalance"
