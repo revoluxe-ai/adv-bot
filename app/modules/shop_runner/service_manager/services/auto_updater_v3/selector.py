@@ -18,9 +18,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    stored_strategy_mode,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
     V3ActionType,
@@ -37,7 +34,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.shelf_prom
     plan_shelf_promotion_actions,  # legacy wrapper
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
+    build_prepared_from_contexts,
     plan_shelf_rec_false_cleanup_down,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -55,16 +52,6 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
 class KeywordV3Context:
     keyword: CalculatedKeyword
     position_profile: list[PositionProfilePoint] | None
-
-
-def build_prepared_from_contexts(
-    contexts: list[KeywordV3Context],
-) -> PreparedList:
-    """Собрать ``PreparedList`` для preamble planners и selector."""
-    prepared: PreparedList = []
-    for ctx in contexts:
-        prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
-    return prepared
 
 
 def select_v3_post_gate_actions(

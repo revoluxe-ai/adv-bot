@@ -17,9 +17,6 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    stored_strategy_mode,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
     V3ActionType,
@@ -34,6 +31,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
+    build_prepared_from_contexts,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
@@ -300,7 +298,7 @@ def plan_campaign_no_data_bootstrap_safe(
 
     Fixed/manual/protected (``hard_status`` 3/4+) не трогаем.
     """
-    prepared = _build_prepared(contexts)
+    prepared = build_prepared_from_contexts(contexts)
     actions: list[V3Action] = []
     min_level = mode_level(KeywordStrategyMode.MIN_CPA)
     reason = _DATA_BOOTSTRAP_REASON
@@ -388,7 +386,7 @@ def plan_data_bootstrap_v3(
     include_no_ch_min_bootstrap: bool = True,
 ) -> list[V3Action]:
     """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID + опционально NO_CH MIN-only) + caps."""
-    prepared = _build_prepared(contexts)
+    prepared = build_prepared_from_contexts(contexts)
     peer_contexts = [ctx for ctx, _ in prepared]
     actions = plan_no_data_keyword_actions(prepared)
     if include_no_ch_min_bootstrap:
@@ -511,15 +509,6 @@ def plan_no_data_min_up_actions(prepared: PreparedList) -> list[V3Action]:
             continue
         _append_min_cpa_up(actions, ks_id=ks_id)
     return actions
-
-
-def _build_prepared(
-    contexts: list["KeywordV3Context"],
-) -> PreparedList:
-    prepared: PreparedList = []
-    for ctx in contexts:
-        prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
-    return prepared
 
 
 def plan_no_data_activation_v3(
