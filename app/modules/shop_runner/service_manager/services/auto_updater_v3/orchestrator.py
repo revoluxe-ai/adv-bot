@@ -359,11 +359,13 @@ async def process_adv_v3(
                     and float(fact.pay_for_order) > float(plan.max_pay_for_order)
                 ):
                     prepared = build_prepared_from_contexts(contexts)
+                    eligibility = build_eligibility_map(contexts)
                     guard_actions = plan_max_cpa_guard(
                         prepared,
                         max_pay_for_order=float(plan.max_pay_for_order),
                         shelf_click_mode=click_mode,
                         aggressiveness=aggr,
+                        eligibility_by_ks_id=eligibility,
                     )
                     if guard_actions:
                         preamble_guard_count = len(guard_actions)

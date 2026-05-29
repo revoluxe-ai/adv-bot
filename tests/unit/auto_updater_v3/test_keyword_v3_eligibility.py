@@ -5,6 +5,9 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    keyword_has_v2_cpo,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
     can_target_mode,
@@ -44,6 +47,21 @@ def test_eligibility_no_ch_own_conv_allowed_modes_min_only() -> None:
     assert elig.target_place_fallback_zero is True
     assert can_target_mode(elig, KeywordStrategyMode.MIN_CPA)
     assert not can_target_mode(elig, KeywordStrategyMode.OPTIMUM)
+
+
+@pytest.mark.unit
+def test_keyword_has_v2_cpo_from_pay_for_order_without_views() -> None:
+    """V2 CPO через pay_for_order/conv+cpm, даже без показов в окне."""
+    kw = _calculated_kw_fixture(
+        ks_id=2, text="b", mode=KeywordStrategyMode.OFF, conv=0.05, cpm_set_bid=200
+    )
+    stat = kw.cluster_stat.model_copy(update={"views": 0, "conv_views_to_orders": 0.05})
+    kw = kw.model_copy(update={"cluster_stat": stat})
+    assert keyword_has_v2_cpo(kw)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
+    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+    assert elig.fallback_kind == "v2_cpo"
 
 
 @pytest.mark.unit

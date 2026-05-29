@@ -80,6 +80,32 @@ def _keyword_has_own_conv(keyword: CalculatedKeyword) -> bool:
     return stat.views > 0 and keyword.conv_views_to_orders > 0
 
 
+def keyword_has_v2_cpo(keyword: CalculatedKeyword) -> bool:
+    """Есть V2 CPO: ``pay_for_order`` или расчёт из conv+CPM (не только ``conv_views_to_orders``)."""
+    if keyword.pay_for_order is not None:
+        return True
+    conv = keyword.conv_views_to_orders
+    return not keyword_v2_pay_for_order_unavailable_with_conv(
+        keyword,
+        conv_views_to_orders=float(conv) if conv is not None and conv > 0 else None,
+    )
+
+
+def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float | None:
+    """Себестоимость заказа V2 для no-CH MIN-only ``state_cost``."""
+    pfo = keyword.pay_for_order
+    if pfo is not None:
+        return float(pfo)
+    conv = keyword.conv_views_to_orders
+    if conv is None or conv <= 0:
+        return None
+    orders = calc_orders_per_1000_rub(float(conv), keyword.cpm)
+    if orders is None:
+        return None
+    result = calc_pay_for_order(orders)
+    return None if result is None else float(result)
+
+
 def _weighted_campaign_conv(contexts: list["KeywordV3Context"]) -> float | None:
     """Средневзвешенная conv показ→заказ по ключам РК с показами в окне."""
     num = 0.0
@@ -125,25 +151,9 @@ def resolve_keyword_v3_decision(
     profile = ctx.position_profile
     has_ch = bool(profile)
     if not has_ch:
-        if _keyword_has_own_conv(ctx.keyword):
-            return KeywordV3Decision(
-                tier=KeywordV3DecisionTier.NO_CH_MATRIX,
-                effective_conv_views_to_orders=float(
-                    ctx.keyword.conv_views_to_orders
-                ),
-                imputed=False,
-                has_ch_position_profile=False,
-            )
-        eff_conv: float | None = None
-        if ctx.keyword.conv_views_to_orders > 0:
-            eff_conv = float(ctx.keyword.conv_views_to_orders)
-        elif not keyword_v2_pay_for_order_unavailable_with_conv(
-            ctx.keyword,
-            conv_views_to_orders=ctx.keyword.conv_views_to_orders or None,
-        ):
-            if ctx.keyword.conv_views_to_orders > 0:
-                eff_conv = float(ctx.keyword.conv_views_to_orders)
-        if eff_conv is not None and eff_conv > 0:
+        if keyword_has_v2_cpo(ctx.keyword):
+            conv = ctx.keyword.conv_views_to_orders
+            eff_conv = float(conv) if conv is not None and conv > 0 else None
             return KeywordV3Decision(
                 tier=KeywordV3DecisionTier.NO_CH_MATRIX,
                 effective_conv_views_to_orders=eff_conv,

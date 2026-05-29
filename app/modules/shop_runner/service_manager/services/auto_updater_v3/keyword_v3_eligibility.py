@@ -14,7 +14,7 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
     _keyword_has_own_conv,
-    keyword_v2_pay_for_order_unavailable_with_conv,
+    keyword_has_v2_cpo,
     resolve_keyword_v3_decision,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
@@ -99,7 +99,7 @@ def resolve_keyword_v3_eligibility(
     keyword = ctx.keyword
 
     if not has_ch:
-        if _keyword_has_own_conv(keyword):
+        if keyword_has_v2_cpo(keyword):
             return KeywordV3Eligibility(
                 data_tier=KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV,
                 allowed_modes=_MIN_ONLY_TARGET_MODES,
@@ -107,20 +107,7 @@ def resolve_keyword_v3_eligibility(
                 participates_in_ladder=True,
                 target_place_fallback_zero=True,
                 imputed=False,
-                fallback_kind="none",
-                decision_tier=decision.tier,
-            )
-        if not keyword_v2_pay_for_order_unavailable_with_conv(
-            keyword, conv_views_to_orders=eff
-        ):
-            return KeywordV3Eligibility(
-                data_tier=KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV,
-                allowed_modes=_MIN_ONLY_TARGET_MODES,
-                max_allowed_mode=KeywordStrategyMode.MIN_CPA,
-                participates_in_ladder=True,
-                target_place_fallback_zero=True,
-                imputed=False,
-                fallback_kind="v2_cpo",
+                fallback_kind="none" if _keyword_has_own_conv(keyword) else "v2_cpo",
                 decision_tier=decision.tier,
             )
         return _invalid_eligibility(decision)
