@@ -235,6 +235,7 @@ def _start_tunnel(
     global _processes_by_name
 
     if _tcp_port_open("127.0.0.1", spec.probe_port):
+        _stop_tunnel(spec.name)
         _adopt_external_forward(spec)
         return None
 

@@ -94,6 +94,27 @@ def test_start_skips_monitor_when_ports_already_open() -> None:
     assert adopt.call_count == len(specs)
 
 
+@pytest.mark.unit
+def test_start_tunnel_stops_owned_kubectl_before_external_adopt() -> None:
+    """Порт уже слушает другой forward — свой kubectl завершаем, не оставляем зомби."""
+    spec = k8s_tunnels._tunnel_specs()[0]
+    proc = MagicMock()
+    k8s_tunnels._processes_by_name[spec.name] = k8s_tunnels._TunnelRuntime(
+        proc=proc,
+        external=False,
+    )
+    with (
+        patch.object(k8s_tunnels, "_tcp_port_open", return_value=True),
+        patch.object(k8s_tunnels, "_terminate_process") as terminate,
+    ):
+        k8s_tunnels._start_tunnel(spec, "kubeconfig.yaml")
+
+    terminate.assert_called_once_with(proc)
+    runtime = k8s_tunnels._processes_by_name[spec.name]
+    assert runtime.external is True
+    assert runtime.proc is None
+
+
 def test_postgres_tunnel_uses_pod_by_default() -> None:
     spec = k8s_tunnels._tunnel_specs()[0]
     assert spec.resource == "pod/postgres-db-0"
