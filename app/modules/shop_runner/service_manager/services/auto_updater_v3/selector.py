@@ -33,13 +33,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     build_worst_costs,
     compute_resolve_cost_threshold,
     is_resolve_valid,
-    merge_and_dedup_actions,
-    plan_headroom_plus_one,
     plan_mass_cheap_promotion,
     plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
-    plan_state_rebalance,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.shelf_promotion_policy import (
     plan_shelf_promotion_actions,  # legacy wrapper
@@ -104,52 +101,6 @@ def plan_m1_mass_cheap_promotion_with_plan_fact(
         policy=policy,
         worst_costs=worst_costs,
     )
-
-
-def _plan_m2_m3_with_plan_fact(
-    prepared: PreparedList,
-    *,
-    plan: PlanData,
-    fact: FactData,
-    shelf_promotion_active: bool,
-    shelf_click_mode: ShelfClickMode | None,
-    aggr: V3RolloutAggressiveness,
-    include_m3_headroom: bool = True,
-) -> list[V3Action]:
-    """M2/M3 (+ shelf cleanup); M1 выполняется в orchestrator."""
-    resolve = compute_resolve_cost_threshold(plan, fact)
-    if not is_resolve_valid(plan, resolve):
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
-
-    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    policy = SelectionPolicy.from_aggressiveness(
-        click_mode=click_mode,
-        aggressiveness=aggr,
-    )
-    cleanup_actions: list[V3Action] = []
-    if shelf_promotion_active:
-        cleanup_actions = plan_shelf_rec_false_cleanup_down(
-            prepared, click_mode=click_mode
-        )
-    worst_costs = build_worst_costs(prepared)
-    m2_actions = plan_state_rebalance(
-        prepared,
-        resolve=resolve,
-        policy=policy,
-        worst_costs=worst_costs,
-    )
-    m3_actions: list[V3Action] = []
-    if include_m3_headroom and fact.pay_for_order is not None:
-        m3_actions = plan_headroom_plus_one(
-            prepared,
-            resolve=resolve,
-            fact_pay_for_order=float(fact.pay_for_order),
-            policy=policy,
-        )
-    merged = merge_and_dedup_actions(cleanup_actions, [], m2_actions, m3_actions)
-    if merged:
-        return merged
-    return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
 
 
 def select_v3_post_gate_actions(
