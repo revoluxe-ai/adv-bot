@@ -95,7 +95,9 @@ Selector после gate: **только shelf cleanup** (rec-false DOWN / FORCE
 При `SalesStates.OVERSPEND` селектор по-прежнему **не** режется cache gate
 (`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
 
-Legacy `select_v3_actions` с plan/fact делегирует в post-gate; при `NO_DATA` возвращает `DO_NOTHING`.
+Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_plan_fact``
+(post-gate only; ``plan_max_pay_for_order`` игнорируется). OVERSPEND trim — в preamble
+(``plan_max_cpa_guard``). Без plan/fact: ``plan_overspend_actions`` по ``plan_max_pay_for_order``.
 
 ## UI: последнее V3-действие в блоке «Обновл:»
 

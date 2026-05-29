@@ -1,14 +1,29 @@
 """Select UP/DOWN actions from campaign state and per-keyword v3 context.
 
-Signal matrix (v3):
-- Preamble (bootstrap → realloc → expansion → guard) — в orchestrator до cache gate.
-- Post-gate selector: **только shelf cleanup** (FINAL_TUNING / M3 disabled на MVP).
+Контракт V3 (два входа):
+
+1. **Production (orchestrator):** preamble (bootstrap, realloc, expansion,
+   ``plan_max_cpa_guard`` при OVERSPEND) → ``select_v3_post_gate_actions`` (только полка).
+   ``select_v3_actions`` с ``plan``/``fact`` **не** выполняет ladder/OVERSPEND.
+
+2. **Legacy / тесты без plan/fact:** полный ``select_v3_actions`` — OVERSPEND через
+   ``plan_overspend_actions``, UNDERPERFORM/STABLE через rollout planner.
+
+При ``plan is not None and fact is not None``:
+
+- ``NO_DATA`` → ``DO_NOTHING`` (``campaign_no_data_wait``);
+- иначе → только ``select_v3_post_gate_actions`` (shelf cleanup).
+
+``plan_max_pay_for_order`` на этом пути **игнорируется** (guard в orchestrator).
+Для OVERSPEND вне orchestrator: ``plan=None``, ``fact=None``, задать
+``plan_max_pay_for_order``.
 
 ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV) — отдельный контур ``change_adv_strategy``.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -48,6 +63,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
     PositionProfilePoint,
 )
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class KeywordV3Context:
     keyword: CalculatedKeyword
@@ -71,6 +89,38 @@ def select_v3_post_gate_actions(
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_actions")]
 
 
+def _select_v3_actions_with_plan_fact(
+    *,
+    state: SalesStates,
+    contexts: list[KeywordV3Context],
+    shelf_promotion_active: bool,
+    shelf_click_mode: ShelfClickMode | None,
+) -> list[V3Action]:
+    """Ветка orchestrator post-gate: не ladder, не ``plan_overspend_actions``.
+
+    OVERSPEND/UNDERPERFORM/STABLE/OPTIMAL с plan/fact обрабатываются в ``process_adv_v3``
+    до вызова селектора (``plan_max_cpa_guard``, realloc, expansion, …).
+    """
+    if state == SalesStates.NO_DATA:
+        return [
+            V3Action(
+                action=V3ActionType.DO_NOTHING,
+                reason="campaign_no_data_wait",
+            )
+        ]
+    if state != SalesStates.OPTIMAL:
+        logger.debug(
+            "select_v3_actions: state=%s with plan/fact — preamble в orchestrator, "
+            "post-gate shelf only",
+            state.name,
+        )
+    return select_v3_post_gate_actions(
+        contexts=contexts,
+        shelf_promotion_active=shelf_promotion_active,
+        shelf_click_mode=shelf_click_mode,
+    )
+
+
 def select_v3_actions(
     *,
     state: SalesStates,
@@ -82,16 +132,26 @@ def select_v3_actions(
     plan: PlanData | None = None,
     fact: FactData | None = None,
 ) -> list[V3Action]:
-    """Legacy selector; при plan/fact делегирует в post-gate (shelf only)."""
+    """Legacy selector: ladder/OVERSPEND только **без** ``plan``/``fact``.
+
+    Args:
+        state: ``SalesStates`` кампании.
+        contexts: ключи с CH-профилем.
+        shelf_promotion_active: полка включена.
+        rollout_aggressiveness: 1–3 для UNDERPERFORM (только без plan/fact).
+        shelf_click_mode: режим кликов полки.
+        plan_max_pay_for_order: max себес для ``plan_overspend_actions`` (только если
+            ``plan`` и ``fact`` не переданы).
+        plan: если задан вместе с ``fact`` — post-gate контур orchestrator (см. module
+            docstring); ``plan_max_pay_for_order`` не используется.
+        fact: см. ``plan``.
+
+    Returns:
+        Список ``V3Action`` для применения к ledger.
+    """
     if plan is not None and fact is not None:
-        if state == SalesStates.NO_DATA:
-            return [
-                V3Action(
-                    action=V3ActionType.DO_NOTHING,
-                    reason="campaign_no_data_wait",
-                )
-            ]
-        return select_v3_post_gate_actions(
+        return _select_v3_actions_with_plan_fact(
+            state=state,
             contexts=contexts,
             shelf_promotion_active=shelf_promotion_active,
             shelf_click_mode=shelf_click_mode,
@@ -126,6 +186,7 @@ def select_v3_actions(
         ]
 
     if state == SalesStates.OVERSPEND:
+        # Только без plan/fact; с plan/fact — MAX_CPA_GUARD в orchestrator.
         if plan_max_pay_for_order is not None:
             return plan_overspend_actions(
                 prepared, max_pay_for_order=float(plan_max_pay_for_order)
