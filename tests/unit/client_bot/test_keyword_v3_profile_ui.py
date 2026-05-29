@@ -155,6 +155,6 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\)" not in text
     assert "\\|" not in text
     assert "поз\\. " not in text
-    assert "поз. 12 | CPM" in text
+    assert "поз. 12 | ставка 145" in text
     assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text

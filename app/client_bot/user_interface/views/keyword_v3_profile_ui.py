@@ -121,9 +121,9 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
         return f"{star}{letter} — —{reason}"
 
     pos = int(cand.position) if cand.position is not None else "—"
-    cpm = int(cand.bid + 0.5) if cand.bid is not None else "—"
+    bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     return (
-        f"{star}{letter} — поз. {pos} | CPM {cpm} | CPO {cpo} ₽"
+        f"{star}{letter} — поз. {pos} | ставка {bid} | CPO {cpo} ₽"
     )
 
