@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
 )
 
 if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        CampaignV3DecisionCache,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
     )
@@ -100,13 +103,18 @@ def clamp_target_mode(
 def resolve_keyword_v3_eligibility(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_cache: "CampaignV3DecisionCache | None" = None,
 ) -> KeywordV3Eligibility:
     """Свести conv/CH decision к продуктовому ``KeywordDataTier``.
 
     NO CH + ``keyword_has_v2_cpo`` → MIN-only, ``target_place_fallback_zero=True``.
     CH + imputed conv → полная лестница с ``fallback_kind="pessimistic"`` (не V2 CPO path).
+
+    Args:
+        campaign_cache: предрасчёт агрегата РК (см. ``CampaignV3DecisionCache``).
     """
-    decision = resolve_keyword_v3_decision(ctx, contexts)
+    decision = resolve_keyword_v3_decision(ctx, contexts, campaign_cache=campaign_cache)
     has_ch = decision.has_ch_position_profile
     eff = decision.effective_conv_views_to_orders
     keyword = ctx.keyword
@@ -178,13 +186,20 @@ def _invalid_eligibility(decision: object) -> KeywordV3Eligibility:
 def build_eligibility_map(
     contexts: list["KeywordV3Context"],
 ) -> dict[int, KeywordV3Eligibility]:
-    """Индекс eligibility по ``keyword_setting_original_id``."""
+    """Индекс eligibility по ``keyword_setting_original_id`` (один агрегат РК на тик)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        CampaignV3DecisionCache,
+    )
+
+    campaign_cache = CampaignV3DecisionCache.from_contexts(contexts)
     result: dict[int, KeywordV3Eligibility] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
-        result[int(ks_id)] = resolve_keyword_v3_eligibility(ctx, contexts)
+        result[int(ks_id)] = resolve_keyword_v3_eligibility(
+            ctx, contexts, campaign_cache=campaign_cache
+        )
     return result
 
 

@@ -73,6 +73,18 @@ _N_STATE_TIERS: frozenset[KeywordV3DecisionTier] = frozenset(
 
 
 @dataclass(frozen=True, slots=True)
+class CampaignV3DecisionCache:
+    """Предрасчёт на список contexts: один проход по РК вместо O(n) повторов."""
+
+    weighted_conv: float | None
+
+    @classmethod
+    def from_contexts(cls, contexts: list["KeywordV3Context"]) -> CampaignV3DecisionCache:
+        """Средневзвешенная conv по ключам с показами (для ``RK_AGGREGATE``)."""
+        return cls(weighted_conv=_weighted_campaign_conv(contexts))
+
+
+@dataclass(frozen=True, slots=True)
 class KeywordV3Decision:
     """Решение по данным ключа для одного тика V3."""
 
@@ -215,8 +227,14 @@ def _peer_max_conv(
 def resolve_keyword_v3_decision(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_cache: CampaignV3DecisionCache | None = None,
 ) -> KeywordV3Decision:
-    """Цепочка: свои данные → агрегат РК → max по соседям → N-state (нет CH или conv)."""
+    """Цепочка: свои данные → агрегат РК → max по соседям → N-state (нет CH или conv).
+
+    Args:
+        campaign_cache: если задан, ``weighted_conv`` не пересчитывается на каждый ключ.
+    """
     profile = ctx.position_profile
     has_ch = bool(profile)
     if not has_ch:
@@ -244,7 +262,11 @@ def resolve_keyword_v3_decision(
             has_ch_position_profile=True,
         )
 
-    agg = _weighted_campaign_conv(contexts)
+    agg = (
+        campaign_cache.weighted_conv
+        if campaign_cache is not None
+        else _weighted_campaign_conv(contexts)
+    )
     if agg is not None and agg > 0:
         return KeywordV3Decision(
             tier=KeywordV3DecisionTier.RK_AGGREGATE,
@@ -273,9 +295,13 @@ def resolve_keyword_v3_decision(
 def effective_conv_for_v3(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_cache: CampaignV3DecisionCache | None = None,
 ) -> float | None:
     """Conv для ``build_mode_candidates`` с учётом импутации."""
-    return resolve_keyword_v3_decision(ctx, contexts).effective_conv_views_to_orders
+    return resolve_keyword_v3_decision(
+        ctx, contexts, campaign_cache=campaign_cache
+    ).effective_conv_views_to_orders
 
 
 def keyword_lacks_v3_decision_data(

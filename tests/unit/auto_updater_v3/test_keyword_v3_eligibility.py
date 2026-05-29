@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     keyword_has_v2_cpo,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    _weighted_campaign_conv,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
+    build_eligibility_map,
     can_target_mode,
     resolve_keyword_v3_eligibility,
 )
@@ -76,3 +82,26 @@ def test_eligibility_invalid_empty_allowed_modes() -> None:
     assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID
     assert elig.allowed_modes == frozenset()
     assert not elig.participates_in_ladder
+
+
+@pytest.mark.unit
+def test_build_eligibility_map_computes_weighted_conv_once() -> None:
+    """Один агрегат РК на ``build_eligibility_map``, не на каждый ключ без своей conv."""
+    kw_a = _calculated_kw_fixture(
+        ks_id=10, text="a", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
+    )
+    kw_b = _calculated_kw_fixture(
+        ks_id=11, text="b", mode=KeywordStrategyMode.MIN_CPA, conv=0.04
+    )
+    contexts = [
+        KeywordV3Context(keyword=kw_a, position_profile=_sample_profile()),
+        KeywordV3Context(keyword=kw_b, position_profile=_sample_profile()),
+    ]
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data._weighted_campaign_conv",
+        wraps=_weighted_campaign_conv,
+    ) as weighted_mock:
+        result = build_eligibility_map(contexts)
+
+    assert weighted_mock.call_count == 1
+    assert len(result) == 2

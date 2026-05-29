@@ -441,15 +441,18 @@ def plan_data_bootstrap_v3(
     contexts: list["KeywordV3Context"],
 ) -> list[V3Action]:
     """CAMPAIGN_NORMAL: INVALID bootstrap + опускание O/C/M до MIN (без NO_CH OFF→MIN)."""
-    prepared = build_prepared_from_contexts(contexts)
-    peer_contexts = [ctx for ctx, _ in prepared]
-    actions = plan_no_data_keyword_actions(prepared)
-
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
+        build_eligibility_map,
         can_target_mode,
         clamp_target_mode,
-        resolve_keyword_v3_eligibility,
+    )
+
+    prepared = build_prepared_from_contexts(contexts)
+    peer_contexts = [ctx for ctx, _ in prepared]
+    eligibility_by_ks_id = build_eligibility_map(peer_contexts)
+    actions = plan_no_data_keyword_actions(
+        prepared, eligibility_by_ks_id=eligibility_by_ks_id
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
         mode_level,
@@ -468,8 +471,8 @@ def plan_data_bootstrap_v3(
             continue
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        elig = resolve_keyword_v3_eligibility(ctx, peer_contexts)
-        if elig.data_tier == KeywordDataTier.KEYWORD_INVALID:
+        elig = eligibility_by_ks_id.get(int(ks_id))
+        if elig is None or elig.data_tier == KeywordDataTier.KEYWORD_INVALID:
             continue
         if mode_level(mode) <= min_level:
             continue
@@ -499,21 +502,38 @@ def plan_data_bootstrap_v3(
     return actions
 
 
-def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
+def plan_no_data_keyword_actions(
+    prepared: PreparedList,
+    *,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> list[V3Action]:
     """N-state: MIN_CPA + min bid + белый список для ключей без V2 CPO / CH.
 
     - OFF (авто/БС) → UP MIN_CPA;
     - O/C на БС → DOWN MIN_CPA;
     - MIN_CPA/O/C на авто → FORCE_OFF + UP MIN_CPA (hard_status → БС).
+
+    Args:
+        eligibility_by_ks_id: если передан, INVALID tier без повторного resolve.
     """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+    )
+
     actions: list[V3Action] = []
     min_level = mode_level(KeywordStrategyMode.MIN_CPA)
 
     peer_contexts = [ctx for ctx, _ in prepared]
     for ctx, mode in prepared:
-        if not keyword_lacks_v3_decision_data(ctx, peer_contexts):
-            continue
         ks_id = ctx.keyword.keyword_setting_original_id
+        if eligibility_by_ks_id is not None:
+            if ks_id is None:
+                continue
+            elig = eligibility_by_ks_id.get(int(ks_id))
+            if elig is None or elig.data_tier != KeywordDataTier.KEYWORD_INVALID:
+                continue
+        elif not keyword_lacks_v3_decision_data(ctx, peer_contexts):
+            continue
         if ks_id is None:
             continue
         hard_status = int(ctx.keyword.hard_status)
