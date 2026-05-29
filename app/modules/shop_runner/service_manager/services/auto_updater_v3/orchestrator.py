@@ -265,6 +265,9 @@ async def process_adv_v3(
             )
             return
 
+        # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
+        # NO_DATA  → только plan_campaign_no_data_bootstrap_safe + sync_force_zero
+        # NORMAL   → plan_data_bootstrap_v3 + realloc / expansion / guard
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
             if bootstrap_actions:
@@ -281,6 +284,7 @@ async def process_adv_v3(
 
         elif campaign_mode == CampaignMode.NORMAL and dto is not None:
             assert plan is not None and fact is not None
+            # NORMAL-only: не вызывать для NO_DATA / NOT_READY
             keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
             if keyword_bootstrap_actions:
                 preamble_bootstrap_count += len(keyword_bootstrap_actions)
@@ -444,13 +448,14 @@ async def process_adv_v3(
                     force_off_count,
                 )
 
-        flushed = await ledger.flush_to_db(complex_adv)
-        if flushed:
-            logger.info(
-                "[adv_id=%s] v3: netto flush committed",
-                complex_adv.adv_id,
-            )
-        await _sync_target_places_once()
+        if not is_campaign_full_stop(campaign_mode):
+            flushed = await ledger.flush_to_db(complex_adv)
+            if flushed:
+                logger.info(
+                    "[adv_id=%s] v3: netto flush committed",
+                    complex_adv.adv_id,
+                )
+            await _sync_target_places_once()
     finally:
         if not is_campaign_full_stop(campaign_mode):
             await _sync_target_places_once()
