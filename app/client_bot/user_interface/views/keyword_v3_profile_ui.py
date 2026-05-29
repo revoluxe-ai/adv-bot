@@ -63,6 +63,40 @@ class KeywordV3ProfileData:
     n_state: bool = False
     diagnostic: KeywordV3DataDiagnostic | None = None
     load_failure: str | None = None
+    keyword_ctr: float | None = None
+    conv_views_to_orders: float | None = None
+
+
+def _format_pct(value: float | None, *, decimals: int = 2) -> str:
+    """Доля → проценты для Telegram (``0.0123`` → ``1.23%``)."""
+    if value is None:
+        return "—"
+    return f"{value * 100:.{decimals}f}%"
+
+
+def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
+    """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
+    for mode in (
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MAX_CONVERSION,
+    ):
+        agg = _MODE_TO_AGG.get(mode)
+        if agg is None:
+            continue
+        cand = data.candidates.get(agg)
+        if cand is not None and cand.is_valid:
+            return True
+    return False
+
+
+def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
+    """Легенда метрик: общая к→з и пояснение CTR / к→к для строк M/O/C."""
+    conv_order = _format_pct(data.conv_views_to_orders)
+    return [
+        "   CTR — факт ключа | к→к — показ→корз (CH)",
+        f"   к→з {conv_order} — показ→заказ (V2, общая)",
+    ]
 
 
 def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
@@ -92,6 +126,8 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     lines = [header]
     if data.diagnostic is not None:
         lines.append(_format_diagnostic_line(data.diagnostic))
+    if _ladder_has_valid_candidate(data):
+        lines.extend(_format_metrics_legend_lines(data))
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
@@ -102,6 +138,7 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
 
 
 def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) -> str:
+    """Одна строка ступени лестницы с метриками профиля."""
     star = "🌟 " if data.current_mode == mode else "   "
     letter = strategy_mode_letter(mode)
 
@@ -123,7 +160,10 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     pos = int(cand.position) if cand.position is not None else "—"
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
+    ctr = _format_pct(data.keyword_ctr)
+    conv_cart = _format_pct(cand.predicted_conversion)
     return (
-        f"{star}{letter} — поз. {pos} | ставка {bid} | CPO {cpo} ₽"
+        f"{star}{letter} — поз. {pos} | ставка {bid} | CPO {cpo} ₽ | "
+        f"CTR {ctr} | к→к {conv_cart}"
     )
 
