@@ -1,7 +1,8 @@
 """Форматирование профиля ключа V3 (лестница stage) для карточки Telegram.
 
-Текст вставляется в ``KeywordSettingMessage`` с ``ParseMode.MARKDOWN`` (legacy V1):
-экранируем только ``_``, ``*``, ``[``, ````` — не синтаксис MarkdownV2.
+``KeywordSettingMessage`` использует ``ParseMode.MARKDOWN`` (legacy V1). Курсив ``_…_``
+здесь не применяем: клиент часто показывает ``\\_`` буквально. Заголовок — ``*bold*``;
+остальной текст — plain, без ``_`` в разметке.
 """
 
 from __future__ import annotations
@@ -62,21 +63,55 @@ class KeywordV3ProfileData:
     n_state: bool = False
     diagnostic: KeywordV3DataDiagnostic | None = None
     load_failure: str | None = None
+    keyword_ctr: float | None = None
+    conv_views_to_orders: float | None = None
+
+
+def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
+    """Доля → компактные проценты для Telegram (``0`` → ``0%``, ``0.07`` → ``0.07%``)."""
+    if value is None:
+        return "—"
+    pct = value * 100
+    if abs(pct) < 10 ** (-decimals):
+        return "0%"
+    text = f"{pct:.{decimals}f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
+def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
+    """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
+    for mode in (
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MAX_CONVERSION,
+    ):
+        agg = _MODE_TO_AGG.get(mode)
+        if agg is None:
+            continue
+        cand = data.candidates.get(agg)
+        if cand is not None and cand.is_valid:
+            return True
+    return False
+
+
+def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
+    """Легенда: сокращения строк M/O/C и общая к→з ключа."""
+    conv_order = _format_pct_compact(data.conv_views_to_orders)
+    return [
+        "   п|с|CTR|CPO — поз|ставка|факт|…",
+        f"   к→з {conv_order} — заказ V2 (общ)",
+    ]
 
 
 def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
-    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы."""
+    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы (plain text)."""
     v2 = "✓" if diagnostic.has_v2_cpo else "✗"
     ch = "✓" if diagnostic.has_ch_position_profile else "✗"
-    parts = [
-        f"V2 CPO {_escape_markdown_v1(v2)}",
-        f"CH матрица {_escape_markdown_v1(ch)}",
-    ]
-    line = "   _Данные: " + " | ".join(parts) + "_"
+    line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
     missing = diagnostic.missing_labels_ru()
     if missing:
-        gaps = "; ".join(_escape_markdown_v1(m) for m in missing)
-        line += f"\n   _Нет: {gaps}_"
+        gaps = "; ".join(missing)
+        line += f"\n   Нет: {gaps}"
     return line
 
 
@@ -95,17 +130,19 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     lines = [header]
     if data.diagnostic is not None:
         lines.append(_format_diagnostic_line(data.diagnostic))
+    if _ladder_has_valid_candidate(data):
+        lines.extend(_format_metrics_legend_lines(data))
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
-        footer = _escape_markdown_v1(
-            "MIN_CPA + target 0 → min bid WB, белый список (апдейтер)"
+        lines.append(
+            "   M + target 0 → min bid WB, белый список (апдейтер)"
         )
-        lines.append(f"   _{footer}_")
     return "\n".join(lines) + "\n"
 
 
 def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) -> str:
+    """Одна строка ступени лестницы с метриками профиля."""
     star = "🌟 " if data.current_mode == mode else "   "
     letter = strategy_mode_letter(mode)
 
@@ -125,9 +162,8 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
         return f"{star}{letter} — —{reason}"
 
     pos = int(cand.position) if cand.position is not None else "—"
-    cpm = int(cand.bid + 0.5) if cand.bid is not None else "—"
+    bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
-    return (
-        f"{star}{letter} — поз. {pos} | CPM {cpm} | CPO {cpo} ₽"
-    )
+    ctr = _format_pct_compact(data.keyword_ctr)
+    return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"
 

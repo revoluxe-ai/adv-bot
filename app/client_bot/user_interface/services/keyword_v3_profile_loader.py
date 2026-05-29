@@ -99,6 +99,18 @@ def _empty_n_state_candidates() -> dict[AggressionTargetMode, ModeCandidate]:
     }
 
 
+def _keyword_profile_metrics(
+    calculated_keyword: CalculatedKeyword,
+) -> tuple[float | None, float | None]:
+    """CTR факт ключа и показ→заказ V2 для блока профиля лестницы."""
+    stat = calculated_keyword.cluster_stat
+    ctr = calculated_keyword.ctr if stat.views > 0 else None
+    conv_order = calculated_keyword.conv_views_to_orders
+    if conv_order <= 0:
+        return ctr, None
+    return ctr, float(conv_order)
+
+
 def _profile_load_failure(
     calculated_keyword: CalculatedKeyword,
     *,
@@ -192,11 +204,14 @@ async def load_keyword_v3_profile_data(
     )
     diagnostic = diagnose_keyword_v3_data(calculated_keyword, profile_points)
     if not bids:
+        keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
         return KeywordV3ProfileData(
             current_mode=calculated_keyword.strategy_mode,
             candidates=_empty_n_state_candidates(),
             n_state=diagnostic.n_state,
             diagnostic=diagnostic,
+            keyword_ctr=keyword_ctr,
+            conv_views_to_orders=conv_views_to_orders,
         )
 
     candidates = build_mode_candidates(
@@ -204,10 +219,13 @@ async def load_keyword_v3_profile_data(
         keyword_text=calculated_keyword.text,
         conv_views_to_orders=calculated_keyword.conv_views_to_orders,
     )
+    keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
 
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
         n_state=diagnostic.n_state,
         diagnostic=diagnostic,
+        keyword_ctr=keyword_ctr,
+        conv_views_to_orders=conv_views_to_orders,
     )

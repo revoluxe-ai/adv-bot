@@ -15,20 +15,38 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 
 
-def _valid_candidate(mode: AggressionTargetMode, position: int, bid: float, cpa: float) -> ModeCandidate:
+def _valid_candidate(
+    mode: AggressionTargetMode,
+    position: int,
+    bid: float,
+    cpa: float,
+    *,
+    conv_cart: float = 0.021,
+) -> ModeCandidate:
     return ModeCandidate(
         mode=mode,
         bid=bid,
         position=position,
         predicted_cpa=cpa,
+        predicted_conversion=conv_cart,
         is_valid=True,
     )
 
 
+def _profile_data(**kwargs: object) -> KeywordV3ProfileData:
+    defaults = {
+        "current_mode": KeywordStrategyMode.MIN_CPA,
+        "candidates": {},
+        "keyword_ctr": 0.0094,
+        "conv_views_to_orders": 0.01,
+    }
+    defaults.update(kwargs)
+    return KeywordV3ProfileData(**defaults)  # type: ignore[arg-type]
+
+
 @pytest.mark.unit
 def test_profile_off_first_and_star_on_current() -> None:
-    data = KeywordV3ProfileData(
-        current_mode=KeywordStrategyMode.MIN_CPA,
+    data = _profile_data(
         candidates={
             AggressionTargetMode.MIN_CPA: _valid_candidate(
                 AggressionTargetMode.MIN_CPA, 12, 145.0, 89.5
@@ -44,18 +62,24 @@ def test_profile_off_first_and_star_on_current() -> None:
     text = format_keyword_v3_profile_block(data)
     lines = [ln for ln in text.strip().split("\n") if ln.strip()]
     assert lines[0].startswith("📊")
-    assert "OFF — отключен" in lines[1]
+    assert "п|с|CTR|CPO" in lines[1]
+    assert "к→з 1%" in lines[2]
+    assert "общ" in lines[2]
+    assert "OFF — отключен" in lines[3]
     assert "лестница отключена" not in text
-    assert lines[1].startswith("   ")
-    assert "🌟" in lines[2] and "M — поз. 12" in lines[2]
-    assert "O — поз. 8" in lines[3]
-    assert "C — поз. 3" in lines[4]
+    assert "🌟" in lines[4] and "M п12|с145" in lines[4]
+    assert "CTR0.94%" in lines[4]
+    assert "CPO89.50" in lines[4]
+    assert lines[4].endswith("CPO89.50")
+    assert "кк" not in text
+    assert "к→з" not in lines[4]
+    assert "O п8|с210" in lines[5]
     joined = "\n".join(lines)
     assert (
         joined.index("OFF")
-        < joined.index("M —")
-        < joined.index("O —")
-        < joined.index("C —")
+        < joined.index("M п")
+        < joined.index("O п")
+        < joined.index("C п")
     )
 
 
@@ -67,6 +91,7 @@ def test_profile_star_on_off() -> None:
     )
     text = format_keyword_v3_profile_block(data)
     assert "🌟 o OFF — отключен" in text
+    assert "п|с|CPO" not in text
 
 
 @pytest.mark.unit
@@ -77,7 +102,7 @@ def test_profile_unavailable_when_none() -> None:
 
 @pytest.mark.unit
 def test_profile_invalid_candidate_shows_reason() -> None:
-    data = KeywordV3ProfileData(
+    data = _profile_data(
         current_mode=KeywordStrategyMode.OPTIMUM,
         candidates={
             AggressionTargetMode.MIN_CPA: ModeCandidate(
@@ -98,7 +123,9 @@ def test_profile_invalid_candidate_shows_reason() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "нет conv показ→заказ" in text
     assert "нет конверсий" in text
-    assert "🌟" in text and "O — поз. 5" in text
+    assert "🌟" in text and "O п5|с200" in text
+    assert "CTR0.94%" in text
+    assert "к→з 1%" in text
 
 
 @pytest.mark.unit
@@ -127,14 +154,17 @@ def test_profile_n_state_when_no_ch_matrix() -> None:
     assert "V2 CPO" in text and "CH матрица" in text
     assert "нет матрицы CH" in text
     assert "min bid WB" in text
-    assert "MIN\\_CPA + target 0" in text
+    assert "M + target 0" in text
+    assert "\\_" not in text
+    assert "_Данные:" not in text
+    assert "_Нет:" not in text
+    assert "п|с|CPO" not in text
 
 
 @pytest.mark.unit
 def test_profile_legacy_markdown_not_v2_escapes() -> None:
     """ParseMode.MARKDOWN: без \\( \\) \\| \\. из MarkdownV2."""
-    data = KeywordV3ProfileData(
-        current_mode=KeywordStrategyMode.MIN_CPA,
+    data = _profile_data(
         candidates={
             AggressionTargetMode.MIN_CPA: _valid_candidate(
                 AggressionTargetMode.MIN_CPA, 12, 145.0, 89.5
@@ -152,6 +182,6 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\)" not in text
     assert "\\|" not in text
     assert "поз\\. " not in text
-    assert "поз. 12 | CPM" in text
+    assert "M п12|с145|CTR0.94%|CPO89.50" in text
     assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text
