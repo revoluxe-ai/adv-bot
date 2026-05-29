@@ -59,8 +59,8 @@ def test_no_data_campaign_selector_waits() -> None:
     )
 
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.plan_mass_cheap_promotion",
-    ) as m1_mock:
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.selector.select_v3_post_gate_actions",
+    ) as post_gate_mock:
         actions = select_v3_actions(
             state=SalesStates.NO_DATA,
             contexts=contexts,
@@ -69,7 +69,7 @@ def test_no_data_campaign_selector_waits() -> None:
             fact=fact,
         )
 
-    m1_mock.assert_not_called()
+    post_gate_mock.assert_not_called()
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DO_NOTHING
     assert actions[0].reason == "campaign_no_data_wait"
