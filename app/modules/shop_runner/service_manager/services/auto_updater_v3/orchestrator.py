@@ -245,11 +245,11 @@ async def process_adv_v3(
                 contexts, include_no_ch_min_bootstrap=False
             )
             if keyword_bootstrap_actions:
-                preamble_bootstrap_count = len(keyword_bootstrap_actions)
+                preamble_bootstrap_count += len(keyword_bootstrap_actions)
                 logger.info(
                     "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
                     complex_adv.adv_id,
-                    preamble_bootstrap_count,
+                    len(keyword_bootstrap_actions),
                 )
                 contexts = _apply_v3_phase(
                     ledger, keyword_bootstrap_actions, raw_profiles
@@ -278,11 +278,11 @@ async def process_adv_v3(
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
             if bootstrap_actions:
-                preamble_bootstrap_count = len(bootstrap_actions)
+                preamble_bootstrap_count += len(bootstrap_actions)
                 logger.info(
                     "[adv_id=%s] v3 DATA_BOOTSTRAP (NO_DATA): actions=%s",
                     complex_adv.adv_id,
-                    preamble_bootstrap_count,
+                    len(bootstrap_actions),
                 )
                 contexts = _apply_v3_phase(
                     ledger, bootstrap_actions, raw_profiles
