@@ -167,7 +167,7 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
                 if data.v2_pay_for_order is not None
                 else "—"
             )
-            return f"{star}{letter} CPO{cpo} (V2) | target 0 — min bid WB"
+            return f"{star}{letter} CPO={cpo} (V2) | target 0 — min bid WB"
         reason = ""
         if cand is not None and cand.invalid_reason:
             raw = _INVALID_REASON_SHORT.get(

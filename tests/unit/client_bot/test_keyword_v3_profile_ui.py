@@ -187,7 +187,7 @@ def test_profile_no_ch_min_only_not_n_state() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "NO CH (только MIN)" in text
     assert "N-state" not in text
-    assert "CPO367.13 (V2)" in text
+    assert "CPO=367.13 (V2)" in text
     assert "NO CH bootstrap" in text
     assert "нет матрицы CH" in text
 
