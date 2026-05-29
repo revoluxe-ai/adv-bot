@@ -204,6 +204,10 @@ def cost_for_mode(
                     imputed = cpm is None or cpm <= 0
                     return float(v2_cost), imputed
             return float("inf"), False
+        if not eligibility.participates_in_ladder or not can_target_mode(
+            eligibility, to_mode
+        ):
+            return float("inf"), False
 
     if not _keyword_has_ch_profile(ctx):
         worst_stage = _stage_from_campaign_worst(
@@ -211,12 +215,6 @@ def cost_for_mode(
         )
         if worst_stage is not None:
             return float(worst_stage.cost), True
-
-    if eligibility is not None:
-        if to_mode != KeywordStrategyMode.OFF and not can_target_mode(
-            eligibility, to_mode
-        ):
-            return float("inf"), False
 
     catalog = _catalog_for_ctx(ctx, ladder_inputs)
     mc = catalog.get(target)
@@ -272,16 +270,9 @@ def _resolve_stage(
                 reason="no_ch_min_only",
                 candidate=mc,
             )
-
-    if not _keyword_has_ch_profile(ctx):
-        worst_only = _stage_from_campaign_worst(
-            target, ladder_inputs, candidate=mc, conv_imputed=conv_imputed
-        )
-        if worst_only is not None:
-            return worst_only
-
-    if eligibility is not None:
-        if not can_target_mode(eligibility, to_mode):
+        if not eligibility.participates_in_ladder or not can_target_mode(
+            eligibility, to_mode
+        ):
             return LadderStageResult(
                 mode=target,
                 is_valid=False,
@@ -291,6 +282,13 @@ def _resolve_stage(
                 reason="not_allowed_mode",
                 candidate=mc,
             )
+
+    if not _keyword_has_ch_profile(ctx):
+        worst_only = _stage_from_campaign_worst(
+            target, ladder_inputs, candidate=mc, conv_imputed=conv_imputed
+        )
+        if worst_only is not None:
+            return worst_only
 
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
