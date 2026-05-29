@@ -253,13 +253,14 @@ def _append_min_cpa_up(
     )
 
 
-def _append_force_off_then_min_cpa(
+def _append_force_off_then_up(
     actions: list[V3Action],
     *,
     ks_id: int,
+    target_strategy_mode: KeywordStrategyMode,
     reason: str = _NO_DATA_REASON,
 ) -> None:
-    """Сброс в OFF и UP на MIN_CPA: ``hard_status`` → белый список (2)."""
+    """Сброс в OFF и UP на ``target_strategy_mode``: ``hard_status`` → белый список (2)."""
     actions.append(
         V3Action(
             action=V3ActionType.FORCE_OFF,
@@ -267,7 +268,29 @@ def _append_force_off_then_min_cpa(
             reason=reason,
         )
     )
-    _append_min_cpa_up(actions, ks_id=ks_id, reason=reason)
+    actions.append(
+        V3Action(
+            action=V3ActionType.UP,
+            keyword_setting_id=ks_id,
+            target_strategy_mode=target_strategy_mode,
+            reason=reason,
+        )
+    )
+
+
+def _append_force_off_then_min_cpa(
+    actions: list[V3Action],
+    *,
+    ks_id: int,
+    reason: str = _NO_DATA_REASON,
+) -> None:
+    """Сброс в OFF и UP на MIN_CPA: ``hard_status`` → белый список (2)."""
+    _append_force_off_then_up(
+        actions,
+        ks_id=ks_id,
+        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+        reason=reason,
+    )
 
 
 def plan_campaign_no_data_bootstrap_safe(
@@ -415,8 +438,11 @@ def plan_data_bootstrap_v3(
                 )
             )
         elif hard_status == _HARD_STATUS_AUTO_MODE:
-            _append_force_off_then_min_cpa(
-                actions, ks_id=ks_id, reason="data_bootstrap_down"
+            _append_force_off_then_up(
+                actions,
+                ks_id=ks_id,
+                target_strategy_mode=cap,
+                reason="data_bootstrap_down",
             )
 
     return actions

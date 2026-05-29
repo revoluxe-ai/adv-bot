@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 
@@ -325,6 +326,35 @@ def test_plan_no_ch_min_bootstrap_off_auto_up_to_min() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.unit
+def test_plan_data_bootstrap_auto_uses_eligibility_cap() -> None:
+    """Auto-mode bootstrap: UP после FORCE_OFF на вычисленный cap, не всегда MIN_CPA."""
+    kw = _kw(
+        ks_id=92,
+        text="cap_test",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=200,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    elig_patch = (
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3"
+        ".keyword_v3_eligibility"
+    )
+    with (
+        patch(f"{elig_patch}.clamp_target_mode", return_value=KeywordStrategyMode.OPTIMUM),
+        patch(f"{elig_patch}.can_target_mode", return_value=True),
+    ):
+        actions = plan_data_bootstrap_v3([ctx], include_no_ch_min_bootstrap=False)
+
+    bootstrap = [a for a in actions if a.reason == "data_bootstrap_down"]
+    assert any(a.action == V3ActionType.FORCE_OFF for a in bootstrap)
+    up = [a for a in bootstrap if a.action == V3ActionType.UP]
+    assert len(up) == 1
+    assert up[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+
+
 def test_plan_data_bootstrap_includes_no_ch_off() -> None:
     off = _kw(
         ks_id=91,
