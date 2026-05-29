@@ -34,28 +34,14 @@ Rec-gate:
 
 Сравнить за 7 дней: jump vs M→O, средний `state_cost`, `pay_for_order`, доля shelf/organic.
 
-## Gap-rebalance (phase 0 в `process_adv_v3`)
-
-Перед plan/fact и `select_v3_actions`, **всегда** (даже если plan/fact в cache не менялся):
-
-1. БС (`hard_status == 2`), сортировка `pay_for_order` asc (MIN_CPO).
-2. Первая «дыра»: `OFF` с активными ключами ниже по списку.
-3. Хвост (строго ниже якоря OFF) → `FORCE_OFF`, сумма `mode_level` = N.
-4. N× UP по ветке shelf/non-shelf (`plan_cost_first_up_one`).
-
-V3 **не** обслуживается в `white_list_tail_trimmer` (только v2 trim). Не зависит от `white_list_mode`.
-
-Логи: `v3 gap rebalance: force_off=… up=…`, при обрыве UP — `v3_gap_rebalance: UP stopped early`.
-
-Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
-
 ## OVERSPEND: массовый OFF по max себесу
 
 При `SalesStates.OVERSPEND` (факт кампании `> plan.max_pay_for_order`) за один цикл:
 
 - все активные ключи (не OFF) с известным `pay_for_order > max` → `FORCE_OFF` (сразу OFF, без пошагового DOWN);
 - ключи с `pay_for_order is None` не трогаются;
-- если ни один ключ не выше max — один обычный DOWN (как раньше).
+- **M1** (`mass_cheap_promotion`): UP ключей с `state_cost <= resolve` (в т.ч. OFF → MIN), параллельно с OFF выше max;
+- если ни FORCE_OFF, ни M1 — один обычный DOWN (как раньше).
 
 Проверка: unit `test_select_overspend_force_off_all_keys_above_max`,
 `test_select_overspend_force_off_with_plan_and_fact`, shelf `test_select_overspend_shelf_force_off_above_max`.
@@ -122,7 +108,6 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - **Кампания «Н»:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` по агрегату РК (`detect_campaign_state`). Причины: нет заказов в окне, нет ключей со статистикой, и т.п. **V3 = V2:** лестница не крутится (нет phase0, preamble no_data, selector, `target_place` sync); Redis plan/fact не пишем; ждём данных.
 - **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL; иначе UNDERPERFORM.
 - **N-state ключа** (кампания **не** «Н»): только нет CH `position_profile` **или** нельзя импутировать conv (см. ``keyword_v3_decision_data``). Нет своих показов, но есть CH → **не** N-state: ``RK_AGGREGATE`` (средневзвешенная conv по ключам с показами) → ``PEER_MAX`` (max conv по другим ключам) → M1/M2/M3 с ``imputed``; preamble MIN_CPA только при ``NO_CH_MATRIX``.
-- **Gap-rebalance:** нет V2 CPO = **1 балл** (как MIN_CPA); **не** выполняется при кампании «Н».
 - **UI:** «Н» в меню РК — только кампания; N-state в карточке ключа — диагностика CH/V2 CPO.
 - **`target_place`:** `0` = min bid WB; sync только если кампания не «Н»/None.
 
@@ -132,7 +117,7 @@ Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\unit\test_
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **gap-rebalance (phase0)** → **no-data activation (ключи)** → selector (Redis gate) → flush → `target_place` (`_sync_target_places_once` + `finally`).
+- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **no-data activation (ключи)** → selector (Redis gate) → flush → `target_place` (`_sync_target_places_once` + `finally`).
 - **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO и `conv_views_to_orders`. **`target_place` = `ModeCandidate.position`** из `build_mode_candidates` (MIN — min CPO заказа), не legacy `get_target_position_for_strategy_mode`. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
 
 Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.

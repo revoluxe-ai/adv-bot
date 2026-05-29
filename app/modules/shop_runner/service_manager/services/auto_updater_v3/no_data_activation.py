@@ -317,8 +317,8 @@ def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
 def plan_no_data_min_up_actions(prepared: PreparedList) -> list[V3Action]:
     """OFF без V2 CPO/CH → UP MIN_CPA.
 
-    Только ``V3ActionType.UP`` — для gap-rebalance (``_plan_rebalance_up_once`` ждёт UP).
-    Полный N-state (DOWN / FORCE_OFF) — ``plan_no_data_keyword_actions``.
+    Только ``V3ActionType.UP`` (OFF → MIN_CPA). Полный N-state (DOWN / FORCE_OFF) —
+    ``plan_no_data_keyword_actions``.
     """
     actions: list[V3Action] = []
     peer_contexts = [ctx for ctx, _ in prepared]

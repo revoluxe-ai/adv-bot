@@ -30,16 +30,6 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
     dto = MagicMock()
     dto.min_target_position = 5
 
-    async def _phase0_raise(
-        _adv: object,
-        *,
-        contexts: list[object],
-        shelf_promotion_active: bool,
-        shelf_click_mode: object,
-        rollout_aggressiveness: int | None,
-    ) -> list[object]:
-        raise _ROOT_ERROR
-
     with (
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
@@ -62,8 +52,8 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            new=AsyncMock(side_effect=_phase0_raise),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
+            side_effect=_ROOT_ERROR,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",

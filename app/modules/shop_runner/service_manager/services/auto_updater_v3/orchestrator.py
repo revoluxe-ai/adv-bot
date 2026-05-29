@@ -3,8 +3,8 @@
 Порядок на **каждом** тике:
   1. CH bid profiles; plan/fact → ``detect_campaign_state``.
   2. Кампания ``NO_DATA`` (Н) или ``state is None`` — полный стоп лестницы (как V2):
-     без phase0, preamble no_data, selector, ``target_place`` sync; Redis plan/fact не пишем.
-  3. Иначе: phase0 → preamble no_data (N-state **ключей**) → selector (``OVERSPEND`` не режет gate).
+     без preamble no_data, selector, ``target_place`` sync; Redis plan/fact не пишем.
+  3. Иначе: preamble no_data (N-state **ключей**) → selector (``OVERSPEND`` не режет gate).
   4. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
@@ -27,7 +27,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     detect_campaign_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
-    ShelfClickMode,
     resolve_shelf_click_mode_from_adv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -39,9 +38,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_ut
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     plan_no_data_activation_v3,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rebalance import (
-    run_ladder_gap_rebalance_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     compute_resolve_cost_threshold,
@@ -212,21 +208,6 @@ async def process_adv_v3(
                 )
 
         if not campaign_ladder_blocked and dto is not None:
-            phase0_actions = await run_ladder_gap_rebalance_v3(
-                complex_adv,
-                contexts=contexts,
-                shelf_promotion_active=complex_adv.shelf_promotion_active,
-                shelf_click_mode=(
-                    resolve_shelf_click_mode_from_adv(complex_adv)
-                    if complex_adv.shelf_promotion_active
-                    else ShelfClickMode.UNKNOWN
-                ),
-                rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
-            )
-            if phase0_actions:
-                _ = ledger.apply_in_memory(phase0_actions)
-                contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-
             no_data_actions = plan_no_data_activation_v3(contexts)
             if no_data_actions:
                 logger.info(

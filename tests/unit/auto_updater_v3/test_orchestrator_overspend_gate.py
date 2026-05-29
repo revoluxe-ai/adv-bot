@@ -40,24 +40,10 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
 
     select_mock = MagicMock(return_value=[])
 
-    async def _phase0_noop(
-        _adv: object,
-        *,
-        contexts: list[object],
-        shelf_promotion_active: bool,
-        shelf_click_mode: object,
-        rollout_aggressiveness: int | None,
-    ) -> list[object]:
-        return []
-
     with (
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_predict_keywords_target_place",
             return_value=predictor,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            new=AsyncMock(side_effect=_phase0_noop),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
