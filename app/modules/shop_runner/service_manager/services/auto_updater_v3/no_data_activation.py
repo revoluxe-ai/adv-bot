@@ -10,6 +10,7 @@ max по соседним ключам, лестница M1/M2/M3.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -291,19 +292,25 @@ def _append_force_off_then_min_cpa(
     )
 
 
-def plan_campaign_no_data_bootstrap_safe(
-    contexts: list["KeywordV3Context"],
+def _plan_min_cpa_bootstrap_for_prepared(
+    prepared: PreparedList,
+    *,
+    reason: str,
+    include_entry: Callable[["KeywordV3Context", KeywordStrategyMode], bool],
 ) -> list[V3Action]:
-    """CAMPAIGN_NO_DATA: управляемые ключи (auto/БС) строго → MIN_CPA, без O/C/M.
+    """Общий цикл bootstrap → MIN_CPA: OFF→UP; WL DOWN; auto FORCE_OFF+UP MIN.
 
-    Fixed/manual/protected (``hard_status`` 3/4+) не трогаем.
+    Args:
+        prepared: контексты с текущим ``strategy_mode``.
+        reason: код причины в ``V3Action``.
+        include_entry: фильтр строк prepared (tier / campaign gate).
     """
-    prepared = build_prepared_from_contexts(contexts)
     actions: list[V3Action] = []
     min_level = mode_level(KeywordStrategyMode.MIN_CPA)
-    reason = _DATA_BOOTSTRAP_REASON
 
     for ctx, mode in prepared:
+        if not include_entry(ctx, mode):
+            continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
@@ -330,6 +337,21 @@ def plan_campaign_no_data_bootstrap_safe(
                 _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
 
     return actions
+
+
+def plan_campaign_no_data_bootstrap_safe(
+    contexts: list["KeywordV3Context"],
+) -> list[V3Action]:
+    """CAMPAIGN_NO_DATA: управляемые ключи (auto/БС) строго → MIN_CPA, без O/C/M.
+
+    Fixed/manual/protected (``hard_status`` 3/4+) не трогаем.
+    """
+    prepared = build_prepared_from_contexts(contexts)
+    return _plan_min_cpa_bootstrap_for_prepared(
+        prepared,
+        reason=_DATA_BOOTSTRAP_REASON,
+        include_entry=lambda _ctx, _mode: True,
+    )
 
 
 def _no_ch_bootstrap_allowed_by_pay_for_order(
@@ -361,45 +383,24 @@ def plan_no_ch_min_bootstrap_actions(
         resolve_keyword_v3_eligibility,
     )
 
-    actions: list[V3Action] = []
-    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
-    reason = _NO_CH_MIN_BOOTSTRAP_REASON
     peer_contexts = [ctx for ctx, _ in prepared]
 
-    for ctx, mode in prepared:
+    def _include_no_ch_entry(
+        ctx: "KeywordV3Context",
+        _mode: KeywordStrategyMode,
+    ) -> bool:
         elig = resolve_keyword_v3_eligibility(ctx, peer_contexts)
         if elig.data_tier != KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
-            continue
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        hard_status = int(ctx.keyword.hard_status)
-        if not _hard_status_allows_up(hard_status):
-            continue
-        if not _no_ch_bootstrap_allowed_by_pay_for_order(
+            return False
+        return _no_ch_bootstrap_allowed_by_pay_for_order(
             ctx, max_pay_for_order=max_pay_for_order
-        ):
-            continue
+        )
 
-        if mode == KeywordStrategyMode.OFF:
-            _append_min_cpa_up(actions, ks_id=ks_id, reason=reason)
-        elif mode_level(mode) > min_level:
-            if hard_status == _HARD_STATUS_WHITE_LIST:
-                actions.append(
-                    V3Action(
-                        action=V3ActionType.DOWN,
-                        keyword_setting_id=ks_id,
-                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
-                        reason=reason,
-                    )
-                )
-            elif hard_status == _HARD_STATUS_AUTO_MODE:
-                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
-        elif mode == KeywordStrategyMode.MIN_CPA:
-            if hard_status == _HARD_STATUS_AUTO_MODE:
-                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
-
-    return actions
+    return _plan_min_cpa_bootstrap_for_prepared(
+        prepared,
+        reason=_NO_CH_MIN_BOOTSTRAP_REASON,
+        include_entry=_include_no_ch_entry,
+    )
 
 
 def plan_data_bootstrap_v3(

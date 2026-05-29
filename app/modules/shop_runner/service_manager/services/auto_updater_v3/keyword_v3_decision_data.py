@@ -17,6 +17,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_orders_per_1000_rub,
     calc_pay_for_order,
@@ -81,16 +84,15 @@ def _keyword_has_own_conv(keyword: CalculatedKeyword) -> bool:
 
 
 def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
-    """CPM как в рейтинге/карточке: set_bid → stats из CH, без bid_log/api.
+    """CPM как в рейтинге/карточке: set_bid → stats → cluster_stat, без bid_log/api.
 
-    ``KeywordCpmSources.resolved_cpm()`` идёт set_bid → api → bid_log → stats;
-    для экономики NO_CH bid_log часто завышает CPO относительно UI (510₽).
+    Нулевые значения пропускаются (не блокируют fall-through), как для ``cluster_stat.cpm``.
     """
     sources = keyword.cpm_sources
     if sources is not None:
-        if sources.cpm_set_bid is not None:
+        if sources.cpm_set_bid is not None and int(sources.cpm_set_bid) > 0:
             return float(sources.cpm_set_bid)
-        if sources.cpm_from_stats is not None:
+        if sources.cpm_from_stats is not None and float(sources.cpm_from_stats) > 0:
             return float(sources.cpm_from_stats)
     stat_cpm = getattr(keyword.cluster_stat, "cpm", None)
     if stat_cpm is not None and float(stat_cpm) > 0:
@@ -98,29 +100,51 @@ def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
     return None
 
 
-def keyword_has_v2_cpo(keyword: CalculatedKeyword) -> bool:
-    """Есть V2 CPO по conv из CH и CPM рейтинга (set_bid/stats)."""
-    return resolve_keyword_v2_pay_for_order_cost(keyword) is not None
+def pessimistic_min_cpa_cost(
+    worst_costs: dict[AggressionTargetMode, float] | None,
+) -> float | None:
+    """Worst (max) predicted CPA по MIN_CPA среди ключей РК с CH-матрицей."""
+    if worst_costs is None:
+        return None
+    cost = worst_costs.get(AggressionTargetMode.MIN_CPA)
+    if cost is None or cost <= 0:
+        return None
+    return float(cost)
 
 
-def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float | None:
-    """Себестоимость заказа V2 для NO-CH: conv из CH + CPM set_bid/stats (как rating).
+def keyword_has_v2_cpo(
+    keyword: CalculatedKeyword,
+    *,
+    worst_costs: dict[AggressionTargetMode, float] | None = None,
+) -> bool:
+    """Есть V2 CPO: rating CPM + conv или pessimistic MIN с других ключей."""
+    return (
+        resolve_keyword_v2_pay_for_order_cost(keyword, worst_costs=worst_costs)
+        is not None
+    )
 
-    Не использует ``keyword.pay_for_order`` первым — там полный каскад с bid_log.
-    Формула та же: ``orders_per_1000_rub = conv × 1_000_000 / CPM``, CPO = 1000 / orders.
+
+def resolve_keyword_v2_pay_for_order_cost(
+    keyword: CalculatedKeyword,
+    *,
+    worst_costs: dict[AggressionTargetMode, float] | None = None,
+) -> float | None:
+    """Себестоимость для NO-CH MIN: conv + rating CPM; иначе pessimistic MIN с РК.
+
+    Не использует ``keyword.pay_for_order`` (каскад с bid_log). При отсутствии CPM
+    возвращает ``worst_costs[MIN_CPA]`` — worst predicted CPA по ключам с CH-матрицей.
     """
     conv = keyword.conv_views_to_orders
     if conv is None or conv <= 0:
         return None
     cpm = rating_aligned_cpm(keyword)
-    if cpm is None or cpm <= 0:
-        pfo = keyword.pay_for_order
-        return None if pfo is None else float(pfo)
-    orders = calc_orders_per_1000_rub(float(conv), cpm)
-    if orders is None:
-        return None
-    result = calc_pay_for_order(orders)
-    return None if result is None else float(result)
+    if cpm is not None and cpm > 0:
+        orders = calc_orders_per_1000_rub(float(conv), cpm)
+        if orders is None:
+            return None
+        result = calc_pay_for_order(orders)
+        return None if result is None else float(result)
+    return pessimistic_min_cpa_cost(worst_costs)
 
 
 def _weighted_campaign_conv(contexts: list["KeywordV3Context"]) -> float | None:
@@ -246,19 +270,17 @@ def keyword_v2_pay_for_order_unavailable_with_conv(
     keyword: CalculatedKeyword,
     *,
     conv_views_to_orders: float | None,
+    worst_costs: dict[AggressionTargetMode, float] | None = None,
 ) -> bool:
-    """Нет CPO при заданной conv: CPM set_bid/stats (как rating), не bid_log."""
+    """Нет CPO: rating CPM + conv или pessimistic MIN; без каскада bid_log."""
     if conv_views_to_orders is None or conv_views_to_orders <= 0:
         return True
-    cpm = rating_aligned_cpm(keyword)
-    if cpm is None or cpm <= 0:
-        cpm = keyword.cpm
-    if cpm is None or cpm <= 0:
-        return True
-    orders = calc_orders_per_1000_rub(conv_views_to_orders, cpm)
-    if orders is None:
-        return True
-    return calc_pay_for_order(orders) is None
+    return (
+        resolve_keyword_v2_pay_for_order_cost(
+            keyword, worst_costs=worst_costs
+        )
+        is None
+    )
 
 
 def tier_label_ru(tier: KeywordV3DecisionTier) -> str:

@@ -519,6 +519,7 @@ def _resolve_state_cost_for_mode(
 ) -> tuple[float, bool]:
     """Себестоимость режима: eligibility no-CH → V2 CPO; иначе CH / worst-imputation."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        rating_aligned_cpm,
         resolve_keyword_v2_pay_for_order_cost,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
@@ -529,9 +530,13 @@ def _resolve_state_cost_for_mode(
     if eligibility is not None:
         if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
             if to_mode == KeywordStrategyMode.MIN_CPA:
-                v2_cost = resolve_keyword_v2_pay_for_order_cost(ctx.keyword)
+                cpm = rating_aligned_cpm(ctx.keyword)
+                v2_cost = resolve_keyword_v2_pay_for_order_cost(
+                    ctx.keyword, worst_costs=worst_costs
+                )
                 if v2_cost is not None:
-                    return float(v2_cost), False
+                    imputed = cpm is None or cpm <= 0
+                    return float(v2_cost), imputed
             return float("inf"), False
         if to_mode != KeywordStrategyMode.OFF and not can_target_mode(eligibility, to_mode):
             return float("inf"), False

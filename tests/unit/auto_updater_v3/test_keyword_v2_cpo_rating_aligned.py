@@ -5,6 +5,9 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     rating_aligned_cpm,
     resolve_keyword_v2_pay_for_order_cost,
@@ -34,6 +37,59 @@ def test_rating_aligned_cpm_prefers_set_bid_over_bid_log() -> None:
     )
     assert rating_aligned_cpm(kw) == 510.0
     assert kw.cpm == 510.0
+
+
+@pytest.mark.unit
+def test_rating_aligned_cpm_skips_zero_set_bid_uses_stats() -> None:
+    """``cpm_set_bid == 0`` не блокирует ``cpm_from_stats``."""
+    conv = 0.00139
+    kw = _kw(
+        ks_id=4,
+        text="zero_set_bid",
+        mode=KeywordStrategyMode.OFF,
+        conv=conv,
+        cpm_set_bid=0,
+    )
+    sources = kw.cpm_sources
+    assert sources is not None
+    kw = kw.model_copy(
+        update={
+            "cpm_sources": sources.model_copy(
+                update={"cpm_from_stats": 510.0, "cpm_from_bid_log": 3990.0}
+            ),
+        }
+    )
+    assert rating_aligned_cpm(kw) == 510.0
+
+
+@pytest.mark.unit
+def test_resolve_v2_cpo_uses_worst_min_when_no_rating_cpm() -> None:
+    """Нет rating CPM → pessimistic MIN CPA с других ключей, не ``pay_for_order``/bid_log."""
+    kw = _kw(
+        ks_id=5,
+        text="no_cpm",
+        mode=KeywordStrategyMode.OFF,
+        conv=0.05,
+        cpm_set_bid=0,
+    )
+    sources = kw.cpm_sources
+    assert sources is not None
+    kw = kw.model_copy(
+        update={
+            "cpm_sources": sources.model_copy(
+                update={
+                    "cpm_set_bid": 0,
+                    "cpm_from_stats": 0.0,
+                    "cpm_from_bid_log": 3990.0,
+                }
+            ),
+        }
+    )
+    assert rating_aligned_cpm(kw) is None
+    worst = {AggressionTargetMode.MIN_CPA: 120.0}
+    cost = resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=worst)
+    assert cost == 120.0
+    assert resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=None) is None
 
 
 @pytest.mark.unit
