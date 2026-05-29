@@ -34,20 +34,22 @@ Rec-gate:
 
 Сравнить за 7 дней: jump vs M→O, средний `state_cost`, `pay_for_order`, доля shelf/organic.
 
-## OVERSPEND: массовый OFF по max себесу
+## Preamble: M1 и trim (до Redis plan/fact gate)
 
-При `SalesStates.OVERSPEND` (факт кампании `> plan.max_pay_for_order`) за один цикл:
+На каждом тике (кроме кампании «Н»/``state is None``), **до** `check_equal_in_cache`:
 
-- все активные ключи (не OFF) с известным `pay_for_order > max` → `FORCE_OFF` (сразу OFF, без пошагового DOWN);
-- ключи с `pay_for_order is None` не трогаются;
-- **M1** (`mass_cheap_promotion`): UP ключей с `state_cost <= resolve` (в т.ч. OFF → MIN), параллельно с OFF выше max;
-- если ни FORCE_OFF, ни M1 — один обычный DOWN (как раньше).
+1. **M1** — для каждого ключа UP до наивысшего M/O/C с `state_cost <= resolve` (не только MIN_CPA).
+2. **Trim** — только если `fact.pay_for_order > plan.max_pay_for_order`: по каждому ключу снизить режим
+   до ближайшего, где `state_cost <= plan.max_pay_for_order` (не resolve); иначе OFF.
+   WL — `DOWN`; авто — `FORCE_OFF` (+ `UP` до целевого режима).
+3. **no_data** (N-state ключей) — после M1/trim.
 
-Проверка: unit `test_select_overspend_force_off_all_keys_above_max`,
-`test_select_overspend_force_off_with_plan_and_fact`, shelf `test_select_overspend_shelf_force_off_above_max`.
+Selector после gate: только **M2/M3** (+ shelf cleanup), без повторного M1.
 
-При неизменном plan/fact в Redis цикл обычно пропускается, **кроме OVERSPEND** — пока факт
-кампании `> max`, селектор и apply выполняются каждый тик (`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
+При `SalesStates.OVERSPEND` селектор по-прежнему **не** режется cache gate
+(`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
+
+Legacy без plan/fact: OVERSPEND в selector — `plan_overspend_actions` по `keyword.pay_for_order`.
 
 ## UI: последнее V3-действие в блоке «Обновл:»
 
@@ -73,9 +75,8 @@ Rec-gate:
 
 Три механизма запускаются на каждом тике:
 
-1. `M1 (mass_cheap_promotion)` — для каждого ключа UP до наивысшего состояния с
-   `state_cost <= resolve` (только UP, без DOWN/OFF).
-2. `M2 (state_rebalance)` — работает только со `state_cost > resolve`,
+1. `M1 (mass_cheap_promotion)` — в **orchestrator preamble** (см. выше).
+2. `M2 (state_rebalance)` — в selector; только со `state_cost > resolve`,
    итеративно выполняет 1:1 `DOWN` худшего активного и `UP` лучшего потенциального
    до устранения разрыва `max(active_B) > min(potential_B)`.
 3. `M3 (headroom_plus_one)` — если `fact.pay_for_order < 0.9 * resolve`, выполняет
@@ -117,7 +118,7 @@ Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\unit\test_
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **no-data activation (ключи)** → selector (Redis gate) → flush → `target_place` (`_sync_target_places_once` + `finally`).
+- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **M1 → trim (если fact>max) → no-data** → selector M2/M3 (Redis gate) → flush → `target_place`.
 - **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO и `conv_views_to_orders`. **`target_place` = `ModeCandidate.position`** из `build_mode_candidates` (MIN — min CPO заказа), не legacy `get_target_position_for_strategy_mode`. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
 
 Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.

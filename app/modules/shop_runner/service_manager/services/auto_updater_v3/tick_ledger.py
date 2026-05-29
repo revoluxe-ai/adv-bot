@@ -1,6 +1,6 @@
 """In-memory ladder state за один тик V3 и нетто-flush в БД.
 
-Фазы (phase0, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
+Фазы (M1, trim, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
 in-memory; в конце тика — один commit только ``strategy_mode`` + ``hard_status`` для
 ключей, у которых нетто-режим отличается от baseline, с bulk-проверкой свежего
 ``hard_status`` в БД (отбрасываем ``hard_status`` не in {1, 2}).

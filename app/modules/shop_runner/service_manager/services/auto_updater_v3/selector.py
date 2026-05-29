@@ -1,17 +1,9 @@
 """Select UP/DOWN actions from campaign state and per-keyword v3 context.
 
 Signal matrix (v3):
-- Plan/fact unchanged short-circuit in orchestrator.
-- ``SalesStates`` from ``detect_campaign_state`` — global economy (OPTIMAL / UNDERPERFORM / …).
-- Полочная фаза: ``rec_system_mode`` + авто ``started`` → ``plan_shelf_promotion_actions``
-  с ``ShelfClickMode`` (organic/shelf клики). Иначе — ``RolloutPlanner`` + ``aggressiveness``.
-
-Стратегия активации:
-- Единый pooled-UP в shelf/non-shelf с фильтром target по ``aggressiveness`` (1/2/3).
-- Rec-gate включается только в shelf-dominant режиме (``shelf>=organic``/``UNKNOWN``).
-
-При **OVERSPEND** (факт > ``max_pay_for_order``): сначала массовый ``FORCE_OFF`` для всех
-активных ключей с ``pay_for_order > max``; иначе один DOWN (``plan_rollout_down_one``).
+- Plan/fact unchanged short-circuit in orchestrator (кроме OVERSPEND).
+- M1 (mass cheap) и trim по ``plan.max_pay_for_order`` — в orchestrator до cache gate.
+- Selector после gate: только M2/M3 (+ shelf cleanup), без повторного M1.
 
 ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV) — отдельный контур ``change_adv_strategy``.
 """
@@ -75,7 +67,47 @@ class KeywordV3Context:
     position_profile: list[PositionProfilePoint] | None
 
 
-def _plan_m1_m2_m3_with_plan_fact(
+def build_prepared_from_contexts(
+    contexts: list[KeywordV3Context],
+) -> PreparedList:
+    """Собрать ``PreparedList`` для preamble (M1/trim) и selector."""
+    prepared: PreparedList = []
+    for ctx in contexts:
+        prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
+    return prepared
+
+
+def plan_m1_mass_cheap_promotion_with_plan_fact(
+    contexts: list[KeywordV3Context],
+    *,
+    plan: PlanData,
+    fact: FactData,
+    shelf_promotion_active: bool,
+    shelf_click_mode: ShelfClickMode | None,
+    aggr: V3RolloutAggressiveness | int | None = None,
+) -> list[V3Action]:
+    """M1: UP каждого ключа до наивысшего M/O/C с ``state_cost <= resolve``."""
+    _ = shelf_promotion_active
+    prepared = build_prepared_from_contexts(contexts)
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    if not is_resolve_valid(plan, resolve):
+        return []
+
+    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=normalize_v3_rollout_aggressiveness(aggr),
+    )
+    worst_costs = build_worst_costs(prepared)
+    return plan_mass_cheap_promotion(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        worst_costs=worst_costs,
+    )
+
+
+def _plan_m2_m3_with_plan_fact(
     prepared: PreparedList,
     *,
     plan: PlanData,
@@ -85,12 +117,7 @@ def _plan_m1_m2_m3_with_plan_fact(
     aggr: V3RolloutAggressiveness,
     include_m3_headroom: bool = True,
 ) -> list[V3Action]:
-    """M1/M2/M3 (+ shelf cleanup) для ключей с валидным resolve.
-
-    Args:
-        include_m3_headroom: False для ``SalesStates.NO_DATA`` — нет campaign fact CPO,
-            M3 (headroom vs ``0.9 * resolve``) не применяется.
-    """
+    """M2/M3 (+ shelf cleanup); M1 выполняется в orchestrator."""
     resolve = compute_resolve_cost_threshold(plan, fact)
     if not is_resolve_valid(plan, resolve):
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
@@ -106,12 +133,6 @@ def _plan_m1_m2_m3_with_plan_fact(
             prepared, click_mode=click_mode
         )
     worst_costs = build_worst_costs(prepared)
-    m1_actions = plan_mass_cheap_promotion(
-        prepared,
-        resolve=resolve,
-        policy=policy,
-        worst_costs=worst_costs,
-    )
     m2_actions = plan_state_rebalance(
         prepared,
         resolve=resolve,
@@ -126,9 +147,7 @@ def _plan_m1_m2_m3_with_plan_fact(
             fact_pay_for_order=float(fact.pay_for_order),
             policy=policy,
         )
-    merged = merge_and_dedup_actions(
-        cleanup_actions, m1_actions, m2_actions, m3_actions
-    )
+    merged = merge_and_dedup_actions(cleanup_actions, [], m2_actions, m3_actions)
     if merged:
         return merged
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
@@ -145,27 +164,12 @@ def select_v3_actions(
     plan: PlanData | None = None,
     fact: FactData | None = None,
 ) -> list[V3Action]:
-    """Return planned mode changes for one cycle (OVERSPEND may return several FORCE_OFF)."""
-    prepared: PreparedList = []
-    for ctx in contexts:
-        mode = stored_strategy_mode(ctx.keyword)
-        prepared.append((ctx, mode))
-
+    """План M2/M3 после preamble (M1 и trim — в orchestrator)."""
+    prepared = build_prepared_from_contexts(contexts)
     aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
 
     if plan is not None and fact is not None:
-        # Главный путь orchestrator всегда передаёт plan/fact; OVERSPEND обрабатываем
-        # до M1/M2/M3 (массовый FORCE_OFF по ключам выше max).
-        if state == SalesStates.OVERSPEND:
-            max_pfo = plan_max_pay_for_order
-            if max_pfo is None:
-                max_pfo = float(plan.max_pay_for_order)
-            return plan_overspend_actions(
-                prepared, max_pay_for_order=float(max_pfo)
-            )
-
         if state == SalesStates.NO_DATA:
-            # Оркестратор не вызывает selector при кампании «Н»; страховка для прямых вызовов.
             return [
                 V3Action(
                     action=V3ActionType.DO_NOTHING,
@@ -173,7 +177,7 @@ def select_v3_actions(
                 )
             ]
 
-        return _plan_m1_m2_m3_with_plan_fact(
+        return _plan_m2_m3_with_plan_fact(
             prepared,
             plan=plan,
             fact=fact,

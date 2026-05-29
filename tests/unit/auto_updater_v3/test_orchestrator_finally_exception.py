@@ -25,6 +25,7 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
+    complex_adv.v3_rollout_aggressiveness = 2
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()

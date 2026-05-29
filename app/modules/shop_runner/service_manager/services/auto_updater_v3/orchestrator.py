@@ -2,9 +2,9 @@
 
 Порядок на **каждом** тике:
   1. CH bid profiles; plan/fact → ``detect_campaign_state``.
-  2. Кампания ``NO_DATA`` (Н) или ``state is None`` — полный стоп лестницы (как V2):
-     без preamble no_data, selector, ``target_place`` sync; Redis plan/fact не пишем.
-  3. Иначе: preamble no_data (N-state **ключей**) → selector (``OVERSPEND`` не режет gate).
+  2. Кампания ``NO_DATA`` (Н) или ``state is None`` — полный стоп (как V2).
+  3. Иначе preamble: **M1** → **trim** (если ``fact.pay_for_order > plan.max``) →
+     no_data (N-state ключей) → selector **M2/M3** (``OVERSPEND`` не режет gate).
   4. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
@@ -27,7 +27,11 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     detect_campaign_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
     resolve_shelf_click_mode_from_adv,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
@@ -41,9 +45,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     compute_resolve_cost_threshold,
+    plan_campaign_trim_by_max_state_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
+    build_prepared_from_contexts,
+    plan_m1_mass_cheap_promotion_with_plan_fact,
     select_v3_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
@@ -192,6 +199,7 @@ async def process_adv_v3(
         # --- Plan/fact: раньше лестницы; Н/None = стоп как V2 ---
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
+        fact = None
         if plan is None:
             logger.debug("[adv_id=%s] v3: no plan, skip selector", complex_adv.adv_id)
         else:
@@ -207,7 +215,63 @@ async def process_adv_v3(
                     state.name if state is not None else "None",
                 )
 
+        preamble_m1_count = 0
+        preamble_trim_count = 0
+
         if not campaign_ladder_blocked and dto is not None:
+            if plan is not None and fact is not None:
+                shelf_active = complex_adv.shelf_promotion_active
+                shelf_click_mode = (
+                    resolve_shelf_click_mode_from_adv(complex_adv)
+                    if shelf_active
+                    else None
+                )
+                aggr = normalize_v3_rollout_aggressiveness(
+                    complex_adv.v3_rollout_aggressiveness
+                )
+
+                m1_actions = plan_m1_mass_cheap_promotion_with_plan_fact(
+                    contexts,
+                    plan=plan,
+                    fact=fact,
+                    shelf_promotion_active=shelf_active,
+                    shelf_click_mode=shelf_click_mode,
+                    aggr=aggr,
+                )
+                if m1_actions:
+                    preamble_m1_count = len(m1_actions)
+                    logger.info(
+                        "[adv_id=%s] v3 preamble M1: actions=%s",
+                        complex_adv.adv_id,
+                        preamble_m1_count,
+                    )
+                    _ = ledger.apply_in_memory(m1_actions)
+                    contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+
+                if (
+                    fact.pay_for_order is not None
+                    and float(fact.pay_for_order) > float(plan.max_pay_for_order)
+                ):
+                    trim_click = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+                    trim_actions = plan_campaign_trim_by_max_state_cost(
+                        build_prepared_from_contexts(contexts),
+                        max_pay_for_order=float(plan.max_pay_for_order),
+                        shelf_click_mode=trim_click,
+                        aggressiveness=aggr,
+                    )
+                    if trim_actions:
+                        preamble_trim_count = len(trim_actions)
+                        logger.info(
+                            "[adv_id=%s] v3 preamble trim (max=%s): actions=%s",
+                            complex_adv.adv_id,
+                            plan.max_pay_for_order,
+                            preamble_trim_count,
+                        )
+                        _ = ledger.apply_in_memory(trim_actions)
+                        contexts = build_keyword_v3_contexts(
+                            ledger.keywords, raw_profiles
+                        )
+
             no_data_actions = plan_no_data_activation_v3(contexts)
             if no_data_actions:
                 logger.info(
@@ -261,9 +325,6 @@ async def process_adv_v3(
                 force_off_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "FORCE_OFF"
                 )
-                m1_count = sum(
-                    1 for a in selector_actions_logged if a.reason.startswith("m1_")
-                )
                 m2_count = sum(
                     1 for a in selector_actions_logged if a.reason.startswith("m2_")
                 )
@@ -272,15 +333,17 @@ async def process_adv_v3(
                 )
                 logger.info(
                     "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
-                    "up=%s down=%s off=%s m1=%s m2=%s m3=%s",
+                    "preamble_m1=%s preamble_trim=%s "
+                    "up=%s down=%s off=%s m2=%s m3=%s",
                     complex_adv.adv_id,
                     state.name,
                     compute_resolve_cost_threshold(plan, fact),
                     fact.pay_for_order,
+                    preamble_m1_count,
+                    preamble_trim_count,
                     up_count,
                     down_count,
                     force_off_count,
-                    m1_count,
                     m2_count,
                     m3_count,
                 )

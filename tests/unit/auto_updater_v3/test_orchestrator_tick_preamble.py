@@ -1,4 +1,4 @@
-"""Unit: preamble (no_data + target_place) и стоп при кампании «Н»."""
+"""Unit: preamble (M1, trim, no_data, target_place) и стоп при кампании «Н»."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrat
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_runs_no_data_when_selector_skipped_by_cache() -> None:
+async def test_process_adv_v3_runs_m1_when_selector_skipped_by_cache() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 11
     complex_adv.adv_setting = MagicMock()
@@ -28,6 +28,7 @@ async def test_process_adv_v3_runs_no_data_when_selector_skipped_by_cache() -> N
     dto = MagicMock()
     dto.min_target_position = 5
 
+    m1 = MagicMock(return_value=[])
     no_data = MagicMock(return_value=[])
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
@@ -41,6 +42,10 @@ async def test_process_adv_v3_runs_no_data_when_selector_skipped_by_cache() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
             return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_m1_mass_cheap_promotion_with_plan_fact",
+            m1,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
@@ -74,6 +79,7 @@ async def test_process_adv_v3_runs_no_data_when_selector_skipped_by_cache() -> N
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
+    m1.assert_called_once()
     no_data.assert_called_once()
     select_mock.assert_not_called()
     flush_mock.assert_awaited_once()

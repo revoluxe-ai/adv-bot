@@ -257,6 +257,132 @@ def plan_overspend_actions(
     return plan_rollout_down_one(prepared, reason="overspend")
 
 
+def _find_trim_target_mode(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    max_pay_for_order: float,
+    worst_costs: dict[AggressionTargetMode, float],
+    prepared: PreparedList | None,
+    policy: SelectionPolicy,
+) -> KeywordStrategyMode:
+    """Ближайший режим ≤ current, где ``state_cost <= max_pay_for_order``; иначе OFF."""
+    mode = current
+    while True:
+        if mode == KeywordStrategyMode.OFF:
+            return KeywordStrategyMode.OFF
+        if mode_level(mode) > mode_level(policy.max_target_mode):
+            down = step_down(mode)
+            if down is None:
+                return KeywordStrategyMode.OFF
+            mode = down
+            continue
+        cost, _ = _resolve_state_cost_for_mode(
+            ctx=ctx,
+            to_mode=mode,
+            worst_costs=worst_costs,
+            prepared=prepared,
+        )
+        if cost != float("inf") and cost <= max_pay_for_order:
+            return mode
+        down = step_down(mode)
+        if down is None:
+            return KeywordStrategyMode.OFF
+        mode = down
+
+
+def _append_trim_to_mode(
+    actions: list[V3Action],
+    *,
+    ks_id: int,
+    current: KeywordStrategyMode,
+    target: KeywordStrategyMode,
+    hard_status: int,
+) -> None:
+    """WL: DOWN; авто: FORCE_OFF (+ UP до целевого режима, если не OFF)."""
+    reason = "trim_max_state_cost"
+    if target == KeywordStrategyMode.OFF:
+        actions.append(
+            V3Action(
+                action=V3ActionType.FORCE_OFF,
+                keyword_setting_id=ks_id,
+                reason=reason,
+            )
+        )
+        return
+    if int(hard_status) == _HARD_STATUS_WHITE_LIST:
+        actions.append(
+            V3Action(
+                action=V3ActionType.DOWN,
+                keyword_setting_id=ks_id,
+                target_strategy_mode=target,
+                reason=reason,
+            )
+        )
+        return
+    actions.append(
+        V3Action(
+            action=V3ActionType.FORCE_OFF,
+            keyword_setting_id=ks_id,
+            reason=reason,
+        )
+    )
+    actions.append(
+        V3Action(
+            action=V3ActionType.UP,
+            keyword_setting_id=ks_id,
+            target_strategy_mode=target,
+            reason=reason,
+        )
+    )
+
+
+def plan_campaign_trim_by_max_state_cost(
+    prepared: PreparedList,
+    *,
+    max_pay_for_order: float,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+) -> list[V3Action]:
+    """Снизить режим до ближайшего с ``state_cost <= plan.max_pay_for_order`` (не resolve).
+
+    Вызывается из orchestrator, когда ``fact.pay_for_order > plan.max_pay_for_order``.
+    """
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+    )
+    worst_costs = build_worst_costs(prepared)
+    actions: list[V3Action] = []
+    for ctx, current in prepared:
+        if current == KeywordStrategyMode.OFF:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        target = _find_trim_target_mode(
+            ctx,
+            current,
+            max_pay_for_order=float(max_pay_for_order),
+            worst_costs=worst_costs,
+            prepared=prepared,
+            policy=policy,
+        )
+        if target == current:
+            continue
+        _append_trim_to_mode(
+            actions,
+            ks_id=ks_id,
+            current=current,
+            target=target,
+            hard_status=hard_status,
+        )
+    return actions
+
+
 def plan_rollout_down_one(
     prepared: PreparedList,
     *,

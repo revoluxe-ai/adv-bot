@@ -222,8 +222,8 @@ def test_select_overspend_force_off_all_keys_above_max() -> None:
 
 
 @pytest.mark.unit
-def test_select_overspend_force_off_with_plan_and_fact() -> None:
-    """Orchestrator передаёт plan/fact — OVERSPEND должен идти до M1/M2/M3."""
+def test_select_overspend_with_plan_fact_uses_m2_m3_not_legacy_off() -> None:
+    """С plan/fact OVERSPEND в selector — только M2/M3 (trim/M1 в orchestrator)."""
     prof = _sample_profile()
     over = _calc_kw(
         ks_id=1,
@@ -247,9 +247,8 @@ def test_select_overspend_force_off_with_plan_and_fact() -> None:
         plan=plan,
         fact=fact,
     )
-    assert len(actions) == 1
-    assert actions[0].action == V3ActionType.FORCE_OFF
-    assert actions[0].reason == "overspend_max_pfo"
+    assert not any(a.reason == "overspend_max_pfo" for a in actions)
+    assert not any(a.reason.startswith("m1_") for a in actions)
 
 
 @pytest.mark.unit
