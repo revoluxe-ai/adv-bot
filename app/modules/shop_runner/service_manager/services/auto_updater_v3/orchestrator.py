@@ -4,7 +4,8 @@
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
   2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — keyword bootstrap (без NO_CH OFF→MIN) → realloc → expansion → guard → gate.
+  4. ``NORMAL`` — keyword bootstrap → [resolve valid: realloc + expansion] → MAX_CPA_GUARD
+     (по ``plan.max``, вне ``is_resolve_valid``) → gate.
   5. NO_CH OFF→MIN только через ``PROFITABLE_EXPANSION`` (V2 CPO ≤ resolve).
   6. Нетто-flush + ``target_place`` только если режим не ``NOT_READY``.
 
@@ -367,29 +368,29 @@ async def process_adv_v3(
                         build_target_place_fallback_zero_by_keyword_id(contexts)
                     )
 
-                if (
-                    fact.pay_for_order is not None
-                    and float(fact.pay_for_order) > float(plan.max_pay_for_order)
-                ):
-                    prepared = build_prepared_from_contexts(contexts)
-                    eligibility = build_eligibility_map(contexts)
-                    guard_actions = plan_max_cpa_guard(
-                        prepared,
-                        max_pay_for_order=float(plan.max_pay_for_order),
-                        shelf_click_mode=click_mode,
-                        aggressiveness=aggr,
-                        eligibility_by_ks_id=eligibility,
+            if (
+                fact.pay_for_order is not None
+                and float(fact.pay_for_order) > float(plan.max_pay_for_order)
+            ):
+                guard_eligibility = build_eligibility_map(contexts)
+                guard_prepared = build_prepared_from_contexts(contexts)
+                guard_actions = plan_max_cpa_guard(
+                    guard_prepared,
+                    max_pay_for_order=float(plan.max_pay_for_order),
+                    shelf_click_mode=click_mode,
+                    aggressiveness=aggr,
+                    eligibility_by_ks_id=guard_eligibility,
+                )
+                if guard_actions:
+                    preamble_guard_count = len(guard_actions)
+                    logger.info(
+                        "[adv_id=%s] v3 MAX_CPA_GUARD: actions=%s",
+                        complex_adv.adv_id,
+                        preamble_guard_count,
                     )
-                    if guard_actions:
-                        preamble_guard_count = len(guard_actions)
-                        logger.info(
-                            "[adv_id=%s] v3 MAX_CPA_GUARD: actions=%s",
-                            complex_adv.adv_id,
-                            preamble_guard_count,
-                        )
-                        contexts = _apply_v3_phase(
-                            ledger, guard_actions, raw_profiles
-                        )
+                    contexts = _apply_v3_phase(
+                        ledger, guard_actions, raw_profiles
+                    )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
             plan_fact_change = ChangePlanFact(adv)

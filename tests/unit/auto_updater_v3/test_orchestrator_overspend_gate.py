@@ -9,8 +9,20 @@ import pytest
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
     process_adv_v3,
+)
+from app.modules.plan_fact.provider import PlanFactProvider
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    compute_resolve_cost_threshold,
+    is_resolve_valid,
+)
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import (
+    FactMethods,
 )
 
 
@@ -88,3 +100,106 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
 
     select_mock.assert_called_once()
     plan_fact.set_new_plan_fact.assert_awaited_once()
+
+
+@pytest.mark.unit
+def test_resolve_zero_invalid_when_target_pay_is_zero() -> None:
+    """target=0 и predict_orders >= plan.orders → resolve=0, is_resolve_valid False."""
+    plan = PlanData(orders=10, target_pay_for_order=0.0, max_pay_for_order=100.0)
+    fact = FactData(
+        predict_orders=10.0,
+        pay_for_order=150.0,
+        original_orders=10,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    assert resolve == 0.0
+    assert not is_resolve_valid(plan, resolve)
+    assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
+    """OVERSPEND trim по plan.max, даже если realloc/expansion пропущены (resolve=0)."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 20
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    plan = PlanData(orders=10, target_pay_for_order=0.0, max_pay_for_order=100.0)
+    fact = FactData(
+        predict_orders=10.0,
+        pay_for_order=150.0,
+        original_orders=10,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+
+    realloc = MagicMock(return_value=[])
+    expansion = MagicMock(return_value=[])
+    guard = MagicMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            return_value=[],
+        ),
+        patch.object(PlanFactProvider, "get_plan_data", return_value=plan),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.is_resolve_valid",
+            return_value=False,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            return_value=SalesStates.OVERSPEND,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            realloc,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            expansion,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard",
+            guard,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.set_new_plan_fact = AsyncMock()
+        pfc_cls.return_value = plan_fact
+        updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    realloc.assert_not_called()
+    expansion.assert_not_called()
+    guard.assert_called_once()
+    assert "max_pay_for_order" in guard.call_args.kwargs
