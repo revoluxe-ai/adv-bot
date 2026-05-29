@@ -34,11 +34,6 @@ def resolve_campaign_mode(state: SalesStates | None) -> CampaignMode:
     return CampaignMode.NORMAL
 
 
-def allows_data_bootstrap(mode: CampaignMode) -> bool:
-    """DATA_BOOTSTRAP: safe-only при NO_DATA, caps при NORMAL."""
-    return mode in (CampaignMode.NO_DATA, CampaignMode.NORMAL)
-
-
 def allows_ladder_phases(mode: CampaignMode) -> bool:
     """COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD / selector."""
     return mode == CampaignMode.NORMAL

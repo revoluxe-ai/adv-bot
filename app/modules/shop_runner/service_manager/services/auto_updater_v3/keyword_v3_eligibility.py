@@ -187,13 +187,3 @@ def build_target_place_fallback_zero_by_keyword_id(
         elig = resolve_keyword_v3_eligibility(ctx, contexts)
         out[int(ks_id)] = elig.target_place_fallback_zero
     return out
-
-
-def data_tier_label_ru(tier: KeywordDataTier) -> str:
-    """Короткая подпись keyword tier для UI и логов."""
-    return {
-        KeywordDataTier.KEYWORD_FULL: "полные CH+conv",
-        KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV: "нет CH, своя conv/V2 CPO",
-        KeywordDataTier.KEYWORD_PESSIMISTIC_FALLBACK: "imputed conv (pessimistic)",
-        KeywordDataTier.KEYWORD_INVALID: "нет данных для ladder",
-    }[tier]
