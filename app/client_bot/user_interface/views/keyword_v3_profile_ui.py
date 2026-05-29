@@ -74,6 +74,17 @@ def _format_pct(value: float | None, *, decimals: int = 2) -> str:
     return f"{value * 100:.{decimals}f}%"
 
 
+def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
+    """Компактные проценты: ``0`` → ``0%``, ``0.07`` → ``0.07%``."""
+    if value is None:
+        return "—"
+    pct = value * 100
+    if abs(pct) < 10 ** (-decimals):
+        return "0%"
+    text = f"{pct:.{decimals}f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
 def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
     """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
     for mode in (
@@ -91,11 +102,11 @@ def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
 
 
 def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
-    """Легенда метрик: общая к→з и пояснение CTR / к→к для строк M/O/C."""
-    conv_order = _format_pct(data.conv_views_to_orders)
+    """Легенда: сокращения строк M/O/C и общая к→з ключа."""
+    conv_order = _format_pct_compact(data.conv_views_to_orders)
     return [
-        "   CTR — факт ключа | к→к — показ→корз (CH)",
-        f"   к→з {conv_order} — показ→заказ (V2, общая)",
+        "   п|с|CTR|CPO — поз|ставка|факт|…",
+        f"   к→з {conv_order} — заказ V2 (общ)",
     ]
 
 
@@ -160,10 +171,6 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     pos = int(cand.position) if cand.position is not None else "—"
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
-    ctr = _format_pct(data.keyword_ctr)
-    conv_cart = _format_pct(cand.predicted_conversion)
-    return (
-        f"{star}{letter} — поз. {pos} | ставка {bid} | CPO {cpo} ₽ | "
-        f"CTR {ctr} | к→к {conv_cart}"
-    )
+    ctr = _format_pct_compact(data.keyword_ctr)
+    return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"
 

@@ -62,22 +62,24 @@ def test_profile_off_first_and_star_on_current() -> None:
     text = format_keyword_v3_profile_block(data)
     lines = [ln for ln in text.strip().split("\n") if ln.strip()]
     assert lines[0].startswith("📊")
-    assert "CTR — факт ключа" in lines[1]
-    assert "к→з 1.00%" in lines[2]
-    assert "общая" in lines[2]
+    assert "п|с|CTR|CPO" in lines[1]
+    assert "к→з 1%" in lines[2]
+    assert "общ" in lines[2]
     assert "OFF — отключен" in lines[3]
     assert "лестница отключена" not in text
-    assert "🌟" in lines[4] and "M — поз. 12" in lines[4]
-    assert "CTR 0.94%" in lines[4]
-    assert "к→к 2.10%" in lines[4]
+    assert "🌟" in lines[4] and "M п12|с145" in lines[4]
+    assert "CTR0.94%" in lines[4]
+    assert "CPO89.50" in lines[4]
+    assert lines[4].endswith("CPO89.50")
+    assert "кк" not in text
     assert "к→з" not in lines[4]
-    assert "O — поз. 8" in lines[5]
+    assert "O п8|с210" in lines[5]
     joined = "\n".join(lines)
     assert (
         joined.index("OFF")
-        < joined.index("M —")
-        < joined.index("O —")
-        < joined.index("C —")
+        < joined.index("M п")
+        < joined.index("O п")
+        < joined.index("C п")
     )
 
 
@@ -89,7 +91,7 @@ def test_profile_star_on_off() -> None:
     )
     text = format_keyword_v3_profile_block(data)
     assert "🌟 o OFF — отключен" in text
-    assert "CTR — факт ключа" not in text
+    assert "п|с|CPO" not in text
 
 
 @pytest.mark.unit
@@ -121,9 +123,9 @@ def test_profile_invalid_candidate_shows_reason() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "нет conv показ→заказ" in text
     assert "нет конверсий" in text
-    assert "🌟" in text and "O — поз. 5" in text
-    assert "CTR 0.94%" in text
-    assert "к→з 1.00%" in text
+    assert "🌟" in text and "O п5|с200" in text
+    assert "CTR0.94%" in text
+    assert "к→з 1%" in text
 
 
 @pytest.mark.unit
@@ -156,7 +158,7 @@ def test_profile_n_state_when_no_ch_matrix() -> None:
     assert "\\_" not in text
     assert "_Данные:" not in text
     assert "_Нет:" not in text
-    assert "CTR — факт ключа" not in text
+    assert "п|с|CPO" not in text
 
 
 @pytest.mark.unit
@@ -180,6 +182,6 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\)" not in text
     assert "\\|" not in text
     assert "поз\\. " not in text
-    assert "поз. 12 | ставка 145" in text
+    assert "M п12|с145|CTR0.94%|CPO89.50" in text
     assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text
