@@ -140,6 +140,8 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         header = "📊 *Профиль ключа (V3):* N-state"
     elif data.no_ch_min_only:
         header = "📊 *Профиль ключа (V3):* NO CH (только MIN)"
+    elif data.campaign_worst_only:
+        header = "📊 *Профиль ключа (V3):* max CPO по РК (нет CH на ключе)"
     elif data.diagnostic is not None and data.diagnostic.has_ch_position_profile:
         if data.diagnostic.imputed_conv:
             if data.diagnostic.decision_tier == KeywordV3DecisionTier.RK_AGGREGATE:
@@ -148,8 +150,9 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
                 header = "📊 *Профиль ключа (V3):* CH + имп. conv (max ключ)"
             else:
                 header = "📊 *Профиль ключа (V3):* CH + имп. conv"
-        elif _ladder_has_valid_candidate(data):
-            header = "📊 *Профиль ключа (V3):* CH + имп. max CPO (РК)"
+        elif data.diagnostic.decision_tier == KeywordV3DecisionTier.NO_CONV:
+            header = "📊 *Профиль ключа (V3):* CH + max CPO по РК (нет conv)"
+        # FULL и прочие — обычный заголовок без «импутации»
     lines = [header]
     if data.diagnostic is not None:
         lines.append(_format_diagnostic_line(data.diagnostic))
