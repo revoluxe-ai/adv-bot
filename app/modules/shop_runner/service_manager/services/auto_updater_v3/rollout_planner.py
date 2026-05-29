@@ -889,13 +889,7 @@ def plan_max_cpa_guard(
     )
     return [
         act.model_copy(
-            update={
-                "reason": (
-                    "max_cpa_guard"
-                    if act.reason == "trim"
-                    else act.reason.replace("trim_", "max_cpa_guard_")
-                )
-            }
+            update={"reason": act.reason.replace("trim_", "max_cpa_guard_")}
         )
         for act in actions
     ]
