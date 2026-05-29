@@ -1,7 +1,10 @@
+"""Корневой aiogram Router клиентского бота: middleware и подключение всех handlers."""
+
 from aiogram import Router
 from aiogram.fsm.scene import SceneRegistry
 from aiogram.utils import callback_answer
 
+from .callback_helpers import CallbackTimingMiddleware
 from ..modules.admin_user_balance.scene import (
     UserBalanceScene,
     register_user_balance_scene,
@@ -17,10 +20,12 @@ from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 _ = global_router.message.middleware(GateMiddleware())
-_ = global_router.callback_query.middleware(GateMiddleware())
+# Порядок критичен: answer на callback — до GateMiddleware (Postgres) и handler.
+_ = global_router.callback_query.middleware(CallbackTimingMiddleware())
 _ = global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )
+_ = global_router.callback_query.middleware(GateMiddleware())
 
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.

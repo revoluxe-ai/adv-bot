@@ -18,6 +18,8 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_bot.callback_helpers import safe_callback_answer
+
 from .callbacks import TS
 from .logic import (
     apply_preset,
@@ -190,23 +192,33 @@ async def _apply_db_patch(
         )
 
 
-async def _redraw(callback: CallbackQuery, only_markup: bool, alert: str | None = None) -> None:
+async def _redraw(
+    callback: CallbackQuery,
+    only_markup: bool,
+    alert: str | None = None,
+    *,
+    answer: bool = True,
+) -> None:
     if callback.message is None:
-        await callback.answer()
+        if answer:
+            await safe_callback_answer(callback)
         return
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        if answer:
+            await safe_callback_answer(callback, "Откройте актуальное меню", show_alert=False)
         return
     text, keyboard = render_screen(session)
     if only_markup:
         changed = await _safe_edit_reply_markup(callback, keyboard=keyboard)
     else:
         changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
+    if not answer:
+        return
     if changed:
-        await callback.answer(alert or "")
+        await safe_callback_answer(callback, alert or "")
     else:
-        await callback.answer(alert or "Без изменений", show_alert=False)
+        await safe_callback_answer(callback, alert or "Без изменений", show_alert=False)
 
 
 @router.message(Command("time_settings"))
@@ -235,7 +247,7 @@ async def time_settings_callback(
     callback_data: TS,
 ) -> None:
     if callback.from_user is None or callback.message is None:
-        await callback.answer()
+        await safe_callback_answer(callback)
         return
 
     action = callback_data.a
@@ -245,7 +257,10 @@ async def time_settings_callback(
             adv_setting_id=callback_data.adv,
             message_id=callback.message.message_id,
         )
+        callback_already_answered = False
         if callback_data.adv is not None:
+            await safe_callback_answer(callback)
+            callback_already_answered = True
             lock = get_adv_lock(callback_data.adv)
             async with lock:
                 async with sm(read_only=False) as db_session:
@@ -260,18 +275,19 @@ async def time_settings_callback(
         session.state.current_screen = "A"
         text, keyboard = render_screen(session)
         changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
-        if changed:
-            await callback.answer()
-        else:
-            await callback.answer("Без изменений", show_alert=False)
+        if not callback_already_answered:
+            if changed:
+                await safe_callback_answer(callback)
+            else:
+                await safe_callback_answer(callback, "Без изменений", show_alert=False)
         return
 
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        await safe_callback_answer(callback, "Откройте актуальное меню", show_alert=False)
         return
     if callback_data.sid and callback_data.sid != session.session_id:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        await safe_callback_answer(callback, "Откройте актуальное меню", show_alert=False)
         return
 
     state = session.state
@@ -279,7 +295,7 @@ async def time_settings_callback(
     alert: str | None = None
 
     if action == "noop":
-        await callback.answer()
+        await safe_callback_answer(callback)
         return
     if action == "to_week":
         state.current_screen = "B"
@@ -450,7 +466,7 @@ async def time_settings_callback(
             clear_date_value(state, mode)
         state.current_screen = "D"
     elif action == "done":
-        await callback.answer("Настройки применены (демо)", show_alert=False)
+        await safe_callback_answer(callback, "Настройки применены (демо)", show_alert=False)
         return
 
     mutating_actions = {
@@ -468,7 +484,10 @@ async def time_settings_callback(
         "pick_apply",
         "clear_date",
     }
+    callback_already_answered = False
     if state.adv_setting_id is not None and action in mutating_actions:
+        await safe_callback_answer(callback, alert or "")
+        callback_already_answered = True
         lock = get_adv_lock(state.adv_setting_id)
         async with lock:
             async with sm(read_only=False) as db_session:
@@ -490,8 +509,16 @@ async def time_settings_callback(
                     await _redraw(
                         callback,
                         only_markup=False,
-                        alert="Не удалось сохранить, попробуйте ещё раз",
+                        answer=False,
+                    )
+                    await callback.message.answer(
+                        "Не удалось сохранить, попробуйте ещё раз",
                     )
                     return
 
-    await _redraw(callback, only_markup=only_markup, alert=alert)
+    await _redraw(
+        callback,
+        only_markup=only_markup,
+        alert=alert,
+        answer=not callback_already_answered,
+    )
