@@ -21,6 +21,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_data_bootstrap_v3,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     collect_potential_passing_states,
     plan_cost_reallocation,
@@ -52,7 +55,7 @@ def _policy() -> SelectionPolicy:
 
 @pytest.mark.unit
 def test_plan_cost_reallocation_emits_down_only() -> None:
-    """COST_REALLOCATION: только DOWN/FORCE_OFF, без UP."""
+    """COST_REALLOCATION (WL): одно итоговое DOWN/FORCE_OFF на ключ, без UP."""
     prof = _sample_profile()
     expensive = _calc_kw(
         ks_id=1,
@@ -340,6 +343,34 @@ def test_plan_profitable_expansion_no_ch_off_to_min() -> None:
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_profitable_expansion_no_ch_off_no_up_when_v2_cpo_above_resolve() -> None:
+    """NORMAL NO_CH: V2 CPO=1000, resolve=100, OFF — без UP (только expansion)."""
+    no_ch_kw = _calc_kw(
+        ks_id=72,
+        text="no_ch_expensive",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(1000.0),
+    )
+    assert no_ch_kw.pay_for_order is not None
+    assert float(no_ch_kw.pay_for_order) > 100.0
+    no_ch_ctx = KeywordV3Context(keyword=no_ch_kw, position_profile=None)
+    prepared = build_prepared_from_contexts([no_ch_ctx])
+    elig_map = {72: resolve_keyword_v3_eligibility(no_ch_ctx, [no_ch_ctx])}
+    worst_costs = build_worst_per_state_costs(prepared)
+    actions = plan_profitable_expansion(
+        prepared,
+        resolve=100.0,
+        policy=_policy(),
+        worst_costs=worst_costs,
+        eligibility_by_ks_id=elig_map,
+    )
+    assert not actions
+    bootstrap_actions = plan_data_bootstrap_v3([no_ch_ctx])
+    assert not any(a.action == V3ActionType.UP for a in bootstrap_actions)
 
 
 @pytest.mark.unit

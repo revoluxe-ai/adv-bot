@@ -2,10 +2,11 @@
 
 Порядок на **каждом** тике (``CampaignMode``):
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
-  2. ``NOT_READY`` — без realloc/expansion/guard/selector; keyword bootstrap + sync всё равно.
+  2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — preamble: bootstrap → realloc → expansion → max guard → gate → shelf cleanup.
-  5. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
+  4. ``NORMAL`` — keyword bootstrap (без NO_CH OFF→MIN) → realloc → expansion → guard → gate.
+  5. NO_CH OFF→MIN только через ``PROFITABLE_EXPANSION`` (V2 CPO ≤ resolve).
+  6. Нетто-flush + ``target_place`` только если режим не ``NOT_READY``.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
@@ -40,7 +41,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     plan_campaign_no_data_bootstrap_safe,
     plan_data_bootstrap_v3,
-    plan_no_ch_min_bootstrap_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -240,24 +240,6 @@ async def process_adv_v3(
             contexts
         )
 
-        if dto is not None:
-            keyword_bootstrap_actions = plan_data_bootstrap_v3(
-                contexts, include_no_ch_min_bootstrap=False
-            )
-            if keyword_bootstrap_actions:
-                preamble_bootstrap_count += len(keyword_bootstrap_actions)
-                logger.info(
-                    "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
-                    complex_adv.adv_id,
-                    len(keyword_bootstrap_actions),
-                )
-                contexts = _apply_v3_phase(
-                    ledger, keyword_bootstrap_actions, raw_profiles
-                )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
-                )
-
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
@@ -274,6 +256,22 @@ async def process_adv_v3(
                 campaign_mode.value,
                 state.name if state is not None else "None",
             )
+
+        if campaign_mode != CampaignMode.NOT_READY and dto is not None:
+            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            if keyword_bootstrap_actions:
+                preamble_bootstrap_count += len(keyword_bootstrap_actions)
+                logger.info(
+                    "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
+                    complex_adv.adv_id,
+                    len(keyword_bootstrap_actions),
+                )
+                contexts = _apply_v3_phase(
+                    ledger, keyword_bootstrap_actions, raw_profiles
+                )
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
+                )
 
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
@@ -382,31 +380,6 @@ async def process_adv_v3(
                             ledger, guard_actions, raw_profiles
                         )
 
-        if dto is not None and campaign_mode in (
-            CampaignMode.NORMAL,
-            CampaignMode.NOT_READY,
-        ):
-            max_pfo = (
-                float(plan.max_pay_for_order)
-                if plan is not None and plan.max_pay_for_order is not None
-                else None
-            )
-            no_ch_post = plan_no_ch_min_bootstrap_actions(
-                build_prepared_from_contexts(contexts),
-                max_pay_for_order=max_pfo,
-            )
-            if no_ch_post:
-                preamble_bootstrap_count += len(no_ch_post)
-                logger.info(
-                    "[adv_id=%s] v3 NO_CH_POST_BOOTSTRAP: actions=%s",
-                    complex_adv.adv_id,
-                    len(no_ch_post),
-                )
-                contexts = _apply_v3_phase(ledger, no_ch_post, raw_profiles)
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
-                )
-
         if plan is not None and allows_ladder_phases(campaign_mode):
             plan_fact_change = ChangePlanFact(adv)
             plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
@@ -464,13 +437,19 @@ async def process_adv_v3(
                     force_off_count,
                 )
 
-        flushed = await ledger.flush_to_db(complex_adv)
-        if flushed:
+        if campaign_mode != CampaignMode.NOT_READY:
+            flushed = await ledger.flush_to_db(complex_adv)
+            if flushed:
+                logger.info(
+                    "[adv_id=%s] v3: netto flush committed",
+                    complex_adv.adv_id,
+                )
+            await _sync_target_places_once()
+        else:
             logger.info(
-                "[adv_id=%s] v3: netto flush committed",
+                "[adv_id=%s] v3 NOT_READY: full stop (no actions, flush, sync)",
                 complex_adv.adv_id,
             )
-
-        await _sync_target_places_once()
     finally:
-        await _sync_target_places_once()
+        if campaign_mode != CampaignMode.NOT_READY:
+            await _sync_target_places_once()

@@ -401,10 +401,10 @@ def plan_no_ch_min_bootstrap_actions(
     *,
     max_pay_for_order: float | None = None,
 ) -> list[V3Action]:
-    """NO_CH + V2 CPO: MIN + target 0 + БС для auto (нет CH-лестницы O/C/M).
+    """Safe-start helper: NO_CH + V2 CPO OFF → UP MIN (не вызывается из NORMAL orchestrator).
 
-    Аналог N-state bootstrap, но только для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``.
-    OFF → UP MIN, если ``pay_for_order`` ≤ ``max_pay_for_order``; иначе без UP.
+    В ``CAMPAIGN_NORMAL`` OFF→MIN для NO_CH — только ``plan_profitable_expansion``
+    (V2 CPO ≤ resolve). Здесь — для ``CAMPAIGN_NO_DATA``-подобных сценариев и unit-тестов.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
@@ -433,17 +433,11 @@ def plan_no_ch_min_bootstrap_actions(
 
 def plan_data_bootstrap_v3(
     contexts: list["KeywordV3Context"],
-    *,
-    include_no_ch_min_bootstrap: bool = True,
 ) -> list[V3Action]:
-    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID + опционально NO_CH MIN-only) + caps."""
+    """CAMPAIGN_NORMAL: INVALID bootstrap + опускание O/C/M до MIN (без NO_CH OFF→MIN)."""
     prepared = build_prepared_from_contexts(contexts)
     peer_contexts = [ctx for ctx, _ in prepared]
     actions = plan_no_data_keyword_actions(prepared)
-    if include_no_ch_min_bootstrap:
-        actions.extend(
-            plan_no_ch_min_bootstrap_actions(prepared, max_pay_for_order=None)
-        )
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,

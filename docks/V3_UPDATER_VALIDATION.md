@@ -30,9 +30,9 @@
 ```
 load CH profiles → plan/fact → resolve_campaign_mode
 
-NOT_READY → flush (stop)
+NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → DATA_BOOTSTRAP → COST_REALLOCATION → PROFITABLE_EXPANSION
+NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → COST_REALLOCATION → PROFITABLE_EXPANSION
             → MAX_CPA_GUARD (если fact > plan.max) → plan/fact gate
             → shelf cleanup (post-gate) → flush → target_place
 ```
@@ -42,8 +42,8 @@ NORMAL    → DATA_BOOTSTRAP → COST_REALLOCATION → PROFITABLE_EXPANSION
 Фазы NORMAL (только `allows_ladder_phases`):
 
 1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
-2. **COST_REALLOCATION** (`plan_cost_reallocation`) — только DOWN/FORCE_OFF при разрыве active/potential.
-3. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode с учётом eligibility.
+2. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
+3. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
 4. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order`.
 5. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
 

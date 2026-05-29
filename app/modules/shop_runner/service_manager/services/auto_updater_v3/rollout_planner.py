@@ -673,6 +673,53 @@ def collect_potential_passing_states(
     return out
 
 
+def _append_cost_reallocation_final(
+    actions: list[V3Action],
+    *,
+    ks_id: int,
+    hard_status: int,
+    stored_mode: KeywordStrategyMode,
+    final_mode: KeywordStrategyMode,
+) -> None:
+    """Одно итоговое действие на ключ после итераций realloc (без пошаговых DOWN)."""
+    if final_mode == stored_mode:
+        return
+    if final_mode == KeywordStrategyMode.OFF:
+        actions.append(
+            V3Action(
+                action=V3ActionType.FORCE_OFF,
+                keyword_setting_id=ks_id,
+                reason="cost_reallocation_force_off",
+            )
+        )
+        return
+    if int(hard_status) == _HARD_STATUS_WHITE_LIST:
+        actions.append(
+            V3Action(
+                action=V3ActionType.DOWN,
+                keyword_setting_id=ks_id,
+                target_strategy_mode=final_mode,
+                reason="cost_reallocation_down",
+            )
+        )
+        return
+    actions.append(
+        V3Action(
+            action=V3ActionType.FORCE_OFF,
+            keyword_setting_id=ks_id,
+            reason="cost_reallocation_force_off",
+        )
+    )
+    actions.append(
+        V3Action(
+            action=V3ActionType.UP,
+            keyword_setting_id=ks_id,
+            target_strategy_mode=final_mode,
+            reason="cost_reallocation_down",
+        )
+    )
+
+
 def plan_cost_reallocation(
     prepared: PreparedList,
     *,
@@ -681,12 +728,18 @@ def plan_cost_reallocation(
     worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> list[V3Action]:
-    """COST_REALLOCATION: только DOWN/FORCE_OFF (без UP).
+    """COST_REALLOCATION: схлопнутое итоговое действие на ключ.
 
-    Активные дороже ``min(potential passing cost)``, не ``resolve``.
+    WL: один DOWN до ``final_target``; авто: FORCE_OFF (+ технический UP до
+    ``final_target``, если не OFF). Активные дороже ``min(potential passing cost)``.
     """
+    stored_by_ks: dict[int, tuple[KeywordStrategyMode, int]] = {}
+    for ctx, mode in prepared:
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is not None:
+            stored_by_ks[int(ks_id)] = (mode, int(ctx.keyword.hard_status))
+
     overrides: dict[int, KeywordStrategyMode] = {}
-    down_actions: list[V3Action] = []
     for _ in range(50):
         potential_passing = collect_potential_passing_states(
             prepared,
@@ -720,23 +773,20 @@ def plan_cost_reallocation(
         if nxt is None:
             break
         overrides[worst_active.ks_id] = nxt
-        if nxt == KeywordStrategyMode.OFF:
-            down_actions.append(
-                V3Action(
-                    action=V3ActionType.FORCE_OFF,
-                    keyword_setting_id=worst_active.ks_id,
-                    reason="cost_reallocation_force_off",
-                )
-            )
-        else:
-            down_actions.append(
-                V3Action(
-                    action=V3ActionType.DOWN,
-                    keyword_setting_id=worst_active.ks_id,
-                    target_strategy_mode=nxt,
-                    reason="cost_reallocation_down",
-                )
-            )
+
+    down_actions: list[V3Action] = []
+    for ks_id, final_mode in overrides.items():
+        stored = stored_by_ks.get(ks_id)
+        if stored is None:
+            continue
+        stored_mode, hard_status = stored
+        _append_cost_reallocation_final(
+            down_actions,
+            ks_id=ks_id,
+            hard_status=hard_status,
+            stored_mode=stored_mode,
+            final_mode=final_mode,
+        )
     return down_actions
 
 

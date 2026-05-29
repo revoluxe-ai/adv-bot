@@ -29,6 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
+    build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
@@ -366,7 +367,7 @@ def test_plan_data_bootstrap_auto_uses_eligibility_cap() -> None:
         patch(f"{elig_patch}.clamp_target_mode", return_value=KeywordStrategyMode.OPTIMUM),
         patch(f"{elig_patch}.can_target_mode", return_value=True),
     ):
-        actions = plan_data_bootstrap_v3([ctx], include_no_ch_min_bootstrap=False)
+        actions = plan_data_bootstrap_v3([ctx])
 
     bootstrap = [a for a in actions if a.reason == "data_bootstrap_down"]
     assert any(a.action == V3ActionType.FORCE_OFF for a in bootstrap)
@@ -375,7 +376,8 @@ def test_plan_data_bootstrap_auto_uses_eligibility_cap() -> None:
     assert up[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
 
 
-def test_plan_data_bootstrap_includes_no_ch_off() -> None:
+def test_plan_data_bootstrap_does_not_include_no_ch_off_to_min() -> None:
+    """plan_data_bootstrap_v3 не поднимает NO_CH OFF→MIN (только safe-start helper)."""
     off = _kw(
         ks_id=91,
         text="no_ch",
@@ -385,6 +387,8 @@ def test_plan_data_bootstrap_includes_no_ch_off() -> None:
         cpm_set_bid=510,
     )
     ctx = KeywordV3Context(keyword=off, position_profile=None)
-    actions = plan_data_bootstrap_v3([ctx])
-    up_actions = [a for a in actions if a.action == V3ActionType.UP]
-    assert any(a.reason == "no_ch_min_bootstrap" for a in up_actions)
+    prepared = build_prepared_from_contexts([ctx])
+    bootstrap_actions = plan_data_bootstrap_v3([ctx])
+    assert not any(a.reason == "no_ch_min_bootstrap" for a in bootstrap_actions)
+    safe_start = plan_no_ch_min_bootstrap_actions(prepared, max_pay_for_order=10_000.0)
+    assert any(a.reason == "no_ch_min_bootstrap" for a in safe_start)

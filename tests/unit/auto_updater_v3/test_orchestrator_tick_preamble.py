@@ -152,8 +152,8 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_not_ready_still_syncs_after_keyword_bootstrap() -> None:
-    """NOT_READY: realloc/selector нет, но keyword bootstrap + target_place sync — да."""
+async def test_process_adv_v3_not_ready_full_stop() -> None:
+    """NOT_READY: без bootstrap, realloc, selector, flush и target_place sync."""
     complex_adv = MagicMock()
     complex_adv.adv_id = 15
     complex_adv.adv_setting = MagicMock()
@@ -201,16 +201,17 @@ async def test_process_adv_v3_not_ready_still_syncs_after_keyword_bootstrap() ->
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
-        ),
+        ) as flush_mock,
     ):
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=5.0)
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    keyword_bootstrap.assert_called_once()
+    keyword_bootstrap.assert_not_called()
     bootstrap.assert_not_called()
-    sync_mock.assert_awaited_once()
+    sync_mock.assert_not_awaited()
+    flush_mock.assert_not_awaited()
 
 
 @pytest.mark.unit
