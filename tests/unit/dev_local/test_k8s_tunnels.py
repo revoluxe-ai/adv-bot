@@ -14,10 +14,12 @@ from app.settings.settings_master import Settings
 def _reset_monitor_state() -> None:
     """Сбрасывает глобальное состояние между тестами."""
     k8s_tunnels._monitor_started = False
+    k8s_tunnels._atexit_registered = False
     k8s_tunnels._processes_by_name = {}
     yield
     k8s_tunnels._stop_all_tunnels()
     k8s_tunnels._monitor_started = False
+    k8s_tunnels._atexit_registered = False
     k8s_tunnels._processes_by_name = {}
 
 
@@ -42,6 +44,7 @@ def test_start_dev_tunnels_monitor_idempotent() -> None:
 
     with (
         patch.object(k8s_tunnels.Path, "is_file", return_value=True),
+        patch.object(k8s_tunnels, "_ports_ready", return_value=False),
         patch.object(k8s_tunnels.threading, "Thread", return_value=mock_thread_instance) as mock_thread_cls,
         patch.object(k8s_tunnels, "atexit") as mock_atexit,
     ):

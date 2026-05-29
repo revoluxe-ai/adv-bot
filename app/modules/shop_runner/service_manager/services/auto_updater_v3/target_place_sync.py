@@ -119,9 +119,12 @@ async def sync_keyword_target_places_v3(
                 calc_kw is None or keyword_v2_pay_for_order_unavailable(calc_kw)
             )
             if not profile or no_v2_cpo:
-                if strategy_mode == KeywordStrategyMode.OFF:
+                if (
+                    strategy_mode == KeywordStrategyMode.OFF
+                    and no_v2_cpo
+                ):
                     keyword.target_place = None
-                else:
+                elif _hard_status_is_managed(hard_status):
                     logger.warning(
                         "No bid profile or no V2 CPO for keyword %s, adv_id=%s; "
                         "target_place=%s (min bid)",
@@ -130,6 +133,8 @@ async def sync_keyword_target_places_v3(
                         NO_DATA_TARGET_PLACE_FALLBACK,
                     )
                     keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+                else:
+                    keyword.target_place = None
                 continue
             assert calc_kw is not None
             profile_points = profile_points_from_bid_positions(profile)

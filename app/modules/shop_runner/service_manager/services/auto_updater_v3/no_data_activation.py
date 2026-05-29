@@ -61,6 +61,7 @@ _HARD_STATUS_WHITE_LIST = 2
 
 _DATA_BOOTSTRAP_REASON = "data_bootstrap_safe"
 _NO_DATA_REASON = "no_data_min_bid"
+_NO_CH_MIN_BOOTSTRAP_REASON = "no_ch_min_bootstrap"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +88,11 @@ class KeywordV3DataDiagnostic:
         ):
             return True
         return not self.has_v2_cpo
+
+    @property
+    def no_ch_min_only(self) -> bool:
+        """NO CH + V2 CPO: только MIN, target 0, bootstrap в БС (не полный N-state)."""
+        return not self.has_ch_position_profile and self.has_v2_cpo
 
     def missing_labels_ru(self) -> tuple[str, ...]:
         """Человекочитаемый список пробелов для UI и логов."""
@@ -140,10 +146,14 @@ def diagnose_keyword_v3_data(
             imputed_conv=decision.imputed,
         )
     has_v2 = not keyword_v2_pay_for_order_unavailable(keyword)
+    decision_tier: KeywordV3DecisionTier | None = None
+    if not has_ch and has_v2:
+        decision_tier = KeywordV3DecisionTier.NO_CH_MATRIX
     return KeywordV3DataDiagnostic(
         has_v2_cpo=has_v2,
         has_ch_position_profile=has_ch,
         v2_cpo_gap=diagnose_v2_cpo_gap(keyword) if not has_v2 else None,
+        decision_tier=decision_tier,
     )
 
 
@@ -322,13 +332,62 @@ def plan_campaign_no_data_bootstrap_safe(
     return actions
 
 
+def plan_no_ch_min_bootstrap_actions(prepared: PreparedList) -> list[V3Action]:
+    """NO_CH + V2 CPO: MIN + target 0 + БС для auto (нет CH-лестницы O/C/M).
+
+    Аналог N-state bootstrap, но только для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``.
+    OFF → UP MIN; auto на MIN/O/C → FORCE_OFF + UP MIN (``hard_status`` → БС).
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+        resolve_keyword_v3_eligibility,
+    )
+
+    actions: list[V3Action] = []
+    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
+    reason = _NO_CH_MIN_BOOTSTRAP_REASON
+    peer_contexts = [ctx for ctx, _ in prepared]
+
+    for ctx, mode in prepared:
+        elig = resolve_keyword_v3_eligibility(ctx, peer_contexts)
+        if elig.data_tier != KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+        if not _hard_status_allows_up(hard_status):
+            continue
+
+        if mode == KeywordStrategyMode.OFF:
+            _append_min_cpa_up(actions, ks_id=ks_id, reason=reason)
+        elif mode_level(mode) > min_level:
+            if hard_status == _HARD_STATUS_WHITE_LIST:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.DOWN,
+                        keyword_setting_id=ks_id,
+                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        reason=reason,
+                    )
+                )
+            elif hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
+        elif mode == KeywordStrategyMode.MIN_CPA:
+            if hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
+
+    return actions
+
+
 def plan_data_bootstrap_v3(
     contexts: list["KeywordV3Context"],
 ) -> list[V3Action]:
-    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID) + caps по tier."""
+    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID + NO_CH MIN-only) + caps по tier."""
     prepared = _build_prepared(contexts)
     peer_contexts = [ctx for ctx, _ in prepared]
     actions = plan_no_data_keyword_actions(prepared)
+    actions.extend(plan_no_ch_min_bootstrap_actions(prepared))
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,

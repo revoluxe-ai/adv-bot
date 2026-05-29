@@ -24,6 +24,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     diagnose_keyword_v3_data,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    resolve_keyword_v2_pay_for_order_cost,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
@@ -111,6 +114,29 @@ def _keyword_profile_metrics(
     return ctr, float(conv_order)
 
 
+def _profile_fields_from_diagnostic(
+    calculated_keyword: CalculatedKeyword,
+    diagnostic: object,
+    *,
+    keyword_ctr: float | None = None,
+    conv_views_to_orders: float | None = None,
+) -> dict[str, object]:
+    """Общие поля ``KeywordV3ProfileData`` из диагностики ключа."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        KeywordV3DataDiagnostic,
+    )
+
+    assert isinstance(diagnostic, KeywordV3DataDiagnostic)
+    return {
+        "n_state": diagnostic.n_state,
+        "no_ch_min_only": diagnostic.no_ch_min_only,
+        "diagnostic": diagnostic,
+        "keyword_ctr": keyword_ctr,
+        "conv_views_to_orders": conv_views_to_orders,
+        "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(calculated_keyword),
+    }
+
+
 def _profile_load_failure(
     calculated_keyword: CalculatedKeyword,
     *,
@@ -121,9 +147,8 @@ def _profile_load_failure(
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=_empty_n_state_candidates(),
-        n_state=diagnostic.n_state,
-        diagnostic=diagnostic,
         load_failure=reason,
+        **_profile_fields_from_diagnostic(calculated_keyword, diagnostic),
     )
 
 
@@ -208,10 +233,12 @@ async def load_keyword_v3_profile_data(
         return KeywordV3ProfileData(
             current_mode=calculated_keyword.strategy_mode,
             candidates=_empty_n_state_candidates(),
-            n_state=diagnostic.n_state,
-            diagnostic=diagnostic,
-            keyword_ctr=keyword_ctr,
-            conv_views_to_orders=conv_views_to_orders,
+            **_profile_fields_from_diagnostic(
+                calculated_keyword,
+                diagnostic,
+                keyword_ctr=keyword_ctr,
+                conv_views_to_orders=conv_views_to_orders,
+            ),
         )
 
     candidates = build_mode_candidates(
@@ -224,8 +251,10 @@ async def load_keyword_v3_profile_data(
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
-        n_state=diagnostic.n_state,
-        diagnostic=diagnostic,
-        keyword_ctr=keyword_ctr,
-        conv_views_to_orders=conv_views_to_orders,
+        **_profile_fields_from_diagnostic(
+            calculated_keyword,
+            diagnostic,
+            keyword_ctr=keyword_ctr,
+            conv_views_to_orders=conv_views_to_orders,
+        ),
     )

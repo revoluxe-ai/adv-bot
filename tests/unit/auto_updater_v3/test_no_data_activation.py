@@ -17,6 +17,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     keyword_missing_ch_position_profile,
     keyword_v2_pay_for_order_unavailable,
     plan_campaign_no_data_bootstrap_safe,
+    plan_data_bootstrap_v3,
+    plan_no_ch_min_bootstrap_actions,
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
     rebalance_ladder_points,
@@ -300,3 +302,39 @@ def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
 def test_rebalance_ladder_points_missing_ch_counts_one() -> None:
     min_kw = _kw(ks_id=13, text="noch", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
     assert rebalance_ladder_points(min_kw, KeywordStrategyMode.OPTIMUM) == 1
+
+
+@pytest.mark.unit
+def test_plan_no_ch_min_bootstrap_off_auto_up_to_min() -> None:
+    """NO CH + V2 CPO + OFF + auto → UP MIN (без gate resolve)."""
+    off = _kw(
+        ks_id=90,
+        text="крем для лица с блеском",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    prepared = [(ctx, KeywordStrategyMode.OFF)]
+    actions = plan_no_ch_min_bootstrap_actions(prepared)
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason == "no_ch_min_bootstrap"
+
+
+@pytest.mark.unit
+def test_plan_data_bootstrap_includes_no_ch_off() -> None:
+    off = _kw(
+        ks_id=91,
+        text="no_ch",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    actions = plan_data_bootstrap_v3([ctx])
+    up_actions = [a for a in actions if a.action == V3ActionType.UP]
+    assert any(a.reason == "no_ch_min_bootstrap" for a in up_actions)
