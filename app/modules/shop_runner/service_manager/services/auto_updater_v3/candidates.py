@@ -46,14 +46,16 @@ def resolve_effective_state_cost(
     *,
     profile_cost: float | None,
     worst_cost: float | None,
-    allow_worst_imputation: bool,
+    allow_worst_imputation: bool = True,
 ) -> tuple[float, bool]:
-    """Единая логика state_cost: профиль CH → worst-imputation.
+    """Единая логика state_cost CH-tier: профиль → per-mode worst → ``inf``.
 
-    ``state_cost`` должен отражать только экономику target-состояния по ставкам мест из
-    профиля CH (``profile_cost``). Если профильного расчёта нет, допускается только
-    worst-imputation для ``missing_target_matrix``; fallback на ``keyword.pay_for_order``
-    намеренно не используется, чтобы не смешивать метрики.
+    ``profile_cost`` — CPO из CH-матрицы для конкретного режима M/O/C. Если его нет,
+    подставляется ``worst_cost`` по этому же режиму (пессимистичный CPA РК), без gate
+    «вся матрица invalid». Fallback на ``keyword.pay_for_order`` не используется.
+
+    Args:
+        allow_worst_imputation: если ``False``, worst не подставляется (legacy call sites).
     """
     if profile_cost is not None:
         return float(profile_cost), False

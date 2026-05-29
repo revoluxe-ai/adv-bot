@@ -19,6 +19,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     AggressionTargetMode,
     ModeCandidate,
 )
+from tests.unit.test_auto_updater_v3 import _sample_profile
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -109,14 +110,6 @@ async def test_load_keyword_v3_profile_data_success() -> None:
     ts = datetime.now()
     bids = [BidPosition("test kw", 1, 100, ts)]
 
-    min_cpa = ModeCandidate(
-        mode=AggressionTargetMode.MIN_CPA,
-        bid=100.0,
-        position=1,
-        predicted_cpa=50.0,
-        is_valid=True,
-    )
-
     with (
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader._load_wb_cabinet",
@@ -134,22 +127,37 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.build_predict_keywords_target_place",
         ) as build_predictor,
         patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.build_mode_candidates",
-            return_value={
-                AggressionTargetMode.MIN_CPA: min_cpa,
-                AggressionTargetMode.OPTIMUM: min_cpa,
-                AggressionTargetMode.MAX_CONVERSION: min_cpa,
-            },
-        ),
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts",
+            new_callable=AsyncMock,
+        ) as load_contexts,
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.resolve_keyword_bid_profile",
             return_value=bids,
         ),
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.profile_points_from_bid_positions",
-            return_value=[],
+            return_value=_sample_profile(),
         ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.cache_worst_costs_for_adv",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
+        ) as worst_cache_cls,
     ):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+            KeywordV3Context,
+        )
+
+        worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)
+        kw = _calculated_keyword()
+        stat = kw.cluster_stat.model_copy(update={"views": 100})
+        kw = kw.model_copy(update={"cluster_stat": stat})
+        prof = _sample_profile()
+        load_contexts.return_value = [
+            KeywordV3Context(keyword=kw, position_profile=prof)
+        ]
         complex_adv = MagicMock()
         build_adv.return_value = complex_adv
 
@@ -169,11 +177,13 @@ async def test_load_keyword_v3_profile_data_success() -> None:
         predictor.load_bid_profiles_for_nmid = AsyncMock(return_value={"test kw": bids})
         build_predictor.return_value = predictor
 
-        result = await load_keyword_v3_profile_data(adv, _calculated_keyword())
+        result = await load_keyword_v3_profile_data(adv, kw)
 
     assert result is not None
     assert result.current_mode == KeywordStrategyMode.MIN_CPA
-    assert result.candidates[AggressionTargetMode.MIN_CPA].position == 1
+    min_cand = result.candidates[AggressionTargetMode.MIN_CPA]
+    assert min_cand.is_valid
+    assert min_cand.position is not None
     predictor.load_bid_profiles_for_nmid.assert_awaited_once_with(
         nmid=10749810,
         min_bid=50,
@@ -183,8 +193,8 @@ async def test_load_keyword_v3_profile_data_success() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_load_keyword_v3_profile_data_n_state_when_ch_ok_but_no_v2_cpo() -> None:
-    """Есть bid profile, нет V2 CPO — ``n_state=True`` на success path."""
+async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
+    """CH есть, нет V2 CPO — не N-state (лестница через worst/imputed conv)."""
     adv = MagicMock()
     adv.wb_cabinet_id = 1
     adv.adv_id = 32824944
@@ -241,7 +251,20 @@ async def test_load_keyword_v3_profile_data_n_state_when_ch_ok_but_no_v2_cpo() -
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.resolve_keyword_bid_profile",
             return_value=bids,
         ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.cache_worst_costs_for_adv",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
+        ) as worst_cache_cls,
     ):
+        worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)
         container = MagicMock()
         hub = MagicMock()
         hub.wb_manager.get_min_bids_cache_only = AsyncMock(
@@ -260,7 +283,7 @@ async def test_load_keyword_v3_profile_data_n_state_when_ch_ok_but_no_v2_cpo() -
         result = await load_keyword_v3_profile_data(adv, kw_no_cpo)
 
     assert result is not None
-    assert result.n_state is True
+    assert not result.n_state
     assert result.diagnostic is not None
     assert result.diagnostic.has_ch_position_profile
     assert not result.diagnostic.has_v2_cpo

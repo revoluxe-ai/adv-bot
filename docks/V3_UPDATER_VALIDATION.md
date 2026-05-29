@@ -60,6 +60,31 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → [resolve valid: reallo
 - fallback на `keyword.pay_for_order` (текущий CPM ключа) **не используется**;
 - если профильный расчёт недоступен и imputation невозможен — `state_cost = inf`, переход не планируется.
 
+## SSOT лестницы M/O/C (`keyword_v3_ladder_view.py`)
+
+UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
+
+| Модуль | Роль |
+|--------|------|
+| `keyword_v3_contexts.py` | `build_keyword_v3_contexts`, `load_campaign_v3_contexts` |
+| `keyword_v3_ladder_view.py` | `LadderInputs`, `cost_for_mode`, `resolve_ladder_stage_display` |
+| `rollout_planner.py` | фазы делегируют в `cost_for_mode` через `ladder_inputs` |
+
+**Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` не вызывает `build_worst_per_state_costs` повторно.
+
+**Правило cost (per-mode):**
+
+1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_keyword_v2_pay_for_order_cost` (`source=v2_cpo`); O/C → `inf`, **не** `source=worst`.
+2. CH-tier: `profile_cost` → `worst_costs[mode]` (per-mode, без gate «вся матрица invalid») → `inf`.
+
+**N-state vs MIN-only (диагностика UI):**
+
+- `n_state` ⟺ `NO_CONV` или нет CH без V2 CPO.
+- `no_ch_min_only` ⟺ нет CH + есть V2 CPO (не n_state).
+- CH + imputed conv (`RK_AGGREGATE` / `PEER_MAX`) — полная лестница, `n_state=False`.
+
+Тесты: `tests/unit/auto_updater_v3/test_keyword_v3_ladder_view.py`.
+
 ## Unified pooled contract
 
 Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:

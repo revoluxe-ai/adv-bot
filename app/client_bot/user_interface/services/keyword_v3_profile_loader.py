@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import cast
 
 from sqlalchemy import select
@@ -11,15 +12,32 @@ from app.client_bot.user_interface.views.keyword_v3_profile_ui import KeywordV3P
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.di.wb_manager_hub import WBManagerHubFactory
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+    RedisCalculatedKeywordsCacheManager,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    build_mode_candidates,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
+    build_keyword_v3_contexts,
+    load_campaign_v3_contexts,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    build_eligibility_map,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+    cache_worst_costs_for_adv,
+    has_campaign_worst_costs,
+    ladder_view_to_candidates,
+    resolve_ladder_stage_display,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_worst_costs_cache import (
+    V3WorstCostsRedisCache,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     diagnose_keyword_v3_data,
@@ -30,6 +48,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+    KeywordV3Context,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
@@ -51,8 +72,23 @@ async def _load_wb_cabinet(wb_cabinet_id: int) -> WBCabinet | None:
         return result.scalar_one_or_none()
 
 
+async def _redis_keywords_for_complex_adv(
+    complex_adv: ComplexAdv,
+    *,
+    cache_only: bool = False,
+) -> list[CalculatedKeyword] | None:
+    """Ключи РК из Redis — для ``load_campaign_v3_contexts`` в карточке Telegram.
+
+    ``cache_only=False`` не пересчитывает V2 в UI (только кеш).
+    """
+    _ = cache_only
+    return await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(
+        complex_adv.adv_id
+    )
+
+
 async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAdv:
-    """Собрать ``ComplexAdv`` для одной кампании (как в ``get_keywords_for_keyboard``)."""
+    """Собрать ``ComplexAdv`` с провайдером ключей (нужен для peer pool лестницы)."""
     search_adv = None
     search_adv_id = adv_setting.search_adv_id
     if search_adv_id:
@@ -64,6 +100,7 @@ async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAd
         adv_setting=adv_setting,
         search_adv=search_adv,
         shop_id=shop_id,
+        get_keywords_func=_redis_keywords_for_complex_adv,
     )
 
 
@@ -120,6 +157,7 @@ def _profile_fields_from_diagnostic(
     *,
     keyword_ctr: float | None = None,
     conv_views_to_orders: float | None = None,
+    worst_costs: dict | None = None,
 ) -> dict[str, object]:
     """Общие поля ``KeywordV3ProfileData`` из диагностики ключа."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
@@ -133,7 +171,9 @@ def _profile_fields_from_diagnostic(
         "diagnostic": diagnostic,
         "keyword_ctr": keyword_ctr,
         "conv_views_to_orders": conv_views_to_orders,
-        "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(calculated_keyword),
+        "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(
+            calculated_keyword, worst_costs=worst_costs
+        ),
     }
 
 
@@ -156,7 +196,7 @@ async def load_keyword_v3_profile_data(
     adv_setting: AdvSetting,
     calculated_keyword: CalculatedKeyword,
 ) -> KeywordV3ProfileData | None:
-    """Профиль лестницы для одного ключа: CH bid curve + ``build_mode_candidates``.
+    """Профиль лестницы для одного ключа: SSOT ``resolve_ladder_stage_display``.
 
     Returns:
         Данные для UI или ``None``, если WB/CH контекст недоступен.
@@ -223,13 +263,43 @@ async def load_keyword_v3_profile_data(
         )
         return _profile_load_failure(calculated_keyword, reason="ошибка запроса CH")
 
+    all_contexts = await load_campaign_v3_contexts(complex_adv, raw_profiles)
+    if not all_contexts:
+        single = build_keyword_v3_contexts([calculated_keyword], raw_profiles)
+        all_contexts = single if single else []
+    ladder_inputs = LadderInputs.from_contexts(all_contexts)
+    if not ladder_inputs.worst_costs:
+        cached_worst = await V3WorstCostsRedisCache().get_worst_costs(
+            adv_setting.adv_id
+        )
+        if cached_worst:
+            ladder_inputs = replace(ladder_inputs, worst_costs=cached_worst)
+    await cache_worst_costs_for_adv(adv_setting.adv_id, ladder_inputs.worst_costs)
+    has_worst = has_campaign_worst_costs(ladder_inputs.worst_costs)
+
     bids = resolve_keyword_bid_profile(raw_profiles, calculated_keyword.text)
     profile_points = (
         profile_points_from_bid_positions(bids) if bids else None
     )
-    diagnostic = diagnose_keyword_v3_data(calculated_keyword, profile_points)
-    if not bids:
-        keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
+    ctx = KeywordV3Context(
+        keyword=calculated_keyword.model_copy(
+            update={"position_profile": profile_points}
+        ),
+        position_profile=profile_points,
+    )
+    diagnostic = diagnose_keyword_v3_data(
+        calculated_keyword,
+        profile_points,
+        peer_contexts=all_contexts,
+    )
+    keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
+
+    if (
+        diagnostic.n_state
+        and not diagnostic.no_ch_min_only
+        and not diagnostic.has_ch_position_profile
+        and not has_worst
+    ):
         return KeywordV3ProfileData(
             current_mode=calculated_keyword.strategy_mode,
             candidates=_empty_n_state_candidates(),
@@ -238,23 +308,37 @@ async def load_keyword_v3_profile_data(
                 diagnostic,
                 keyword_ctr=keyword_ctr,
                 conv_views_to_orders=conv_views_to_orders,
+                worst_costs=ladder_inputs.worst_costs,
             ),
         )
 
-    candidates = build_mode_candidates(
-        profile=profile_points,
-        keyword_text=calculated_keyword.text,
-        conv_views_to_orders=calculated_keyword.conv_views_to_orders,
+    eligibility_map = build_eligibility_map(all_contexts)
+    ks_id = calculated_keyword.keyword_setting_original_id
+    elig = (
+        eligibility_map.get(int(ks_id)) if ks_id is not None else None
     )
-    keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
+    ladder = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
+    candidates = ladder_view_to_candidates(ladder)
+    stage_sources = {
+        mode: ladder.stages[mode].source.value for mode in ladder.stages
+    }
 
+    campaign_worst_only = (
+        not diagnostic.has_ch_position_profile and has_worst
+    )
+    fields = _profile_fields_from_diagnostic(
+        calculated_keyword,
+        diagnostic,
+        keyword_ctr=keyword_ctr,
+        conv_views_to_orders=conv_views_to_orders,
+        worst_costs=ladder_inputs.worst_costs,
+    )
+    fields["n_state"] = bool(fields["n_state"]) and not has_worst
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
-        **_profile_fields_from_diagnostic(
-            calculated_keyword,
-            diagnostic,
-            keyword_ctr=keyword_ctr,
-            conv_views_to_orders=conv_views_to_orders,
-        ),
+        campaign_worst_only=campaign_worst_only,
+        campaign_worst_costs=dict(ladder_inputs.worst_costs),
+        stage_sources=stage_sources,
+        **fields,
     )

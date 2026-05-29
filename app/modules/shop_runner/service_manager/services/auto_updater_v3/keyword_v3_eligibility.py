@@ -162,6 +162,19 @@ def resolve_keyword_v3_eligibility(
             decision_tier=decision.tier,
         )
 
+    if decision.tier == KeywordV3DecisionTier.NO_CONV:
+        # CH есть, conv импутировать нельзя — CPO ступеней через worst max по РК (per-mode).
+        return KeywordV3Eligibility(
+            data_tier=KeywordDataTier.KEYWORD_PESSIMISTIC_FALLBACK,
+            allowed_modes=_FULL_LADDER_TARGET_MODES,
+            max_allowed_mode=KeywordStrategyMode.MAX_CONVERSION,
+            participates_in_ladder=True,
+            target_place_fallback_zero=False,
+            imputed=False,
+            fallback_kind="pessimistic",
+            decision_tier=decision.tier,
+        )
+
     return _invalid_eligibility(decision)
 
 

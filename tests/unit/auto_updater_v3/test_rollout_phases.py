@@ -139,9 +139,7 @@ def test_collect_potential_passing_states_skips_invalid() -> None:
         conv=0.0,
         cpm_set_bid=0,
     )
-    invalid_ctx = KeywordV3Context(
-        keyword=invalid_kw, position_profile=_sample_profile()
-    )
+    invalid_ctx = KeywordV3Context(keyword=invalid_kw, position_profile=None)
     prepared = build_prepared_from_contexts([invalid_ctx])
     elig = resolve_keyword_v3_eligibility(invalid_ctx, [invalid_ctx])
     assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID

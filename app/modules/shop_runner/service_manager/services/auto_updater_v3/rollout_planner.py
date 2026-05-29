@@ -515,45 +515,22 @@ def _resolve_state_cost_for_mode(
     worst_costs: dict[AggressionTargetMode, float],
     prepared: PreparedList | None = None,
     eligibility: "KeywordV3Eligibility | None" = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> tuple[float, bool]:
-    """Себестоимость режима: eligibility no-CH → V2 CPO; иначе CH / worst-imputation."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
-        rating_aligned_cpm,
-        resolve_keyword_v2_pay_for_order_cost,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        KeywordDataTier,
-        can_target_mode,
+    """Себестоимость режима через ``keyword_v3_ladder_view.cost_for_mode`` (SSOT)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+        cost_for_mode,
     )
 
-    if eligibility is not None:
-        if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
-            if to_mode == KeywordStrategyMode.MIN_CPA:
-                cpm = rating_aligned_cpm(ctx.keyword)
-                v2_cost = resolve_keyword_v2_pay_for_order_cost(
-                    ctx.keyword, worst_costs=worst_costs
-                )
-                if v2_cost is not None:
-                    imputed = cpm is None or cpm <= 0
-                    return float(v2_cost), imputed
-            return float("inf"), False
-        if to_mode != KeywordStrategyMode.OFF and not can_target_mode(eligibility, to_mode):
-            return float("inf"), False
-
-    catalog = build_mode_candidates(
-        profile=ctx.position_profile,
-        keyword_text=ctx.keyword.text,
-        conv_views_to_orders=_conv_for_ctx(ctx, prepared),
-    )
-    target = AggressionTargetMode[to_mode.name]
-    mc = catalog.get(target)
-    profile_cost: float | None = None
-    if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
-        profile_cost = float(mc.predicted_cpa)
-    return resolve_effective_state_cost(
-        profile_cost=profile_cost,
-        worst_cost=worst_costs.get(target),
-        allow_worst_imputation=missing_target_matrix_from_catalog(catalog),
+    if ladder_inputs is None:
+        all_ctx = [c for c, _ in prepared] if prepared else [ctx]
+        ladder_inputs = LadderInputs.from_contexts(all_ctx)
+    return cost_for_mode(
+        ctx,
+        to_mode,
+        ladder_inputs=ladder_inputs,
+        eligibility=eligibility,
     )
 
 
@@ -586,11 +563,11 @@ def resolve_effective_state_cost_for_mode(
     prepared: PreparedList | None = None,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     eligibility: "KeywordV3Eligibility | None" = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> tuple[float, bool]:
-    """Единый API себестоимости target mode для ladder-фаз V3.
+    """Единый API себестоимости target mode для ladder-фаз V3 (делегирует ``cost_for_mode``).
 
-    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` и ``MIN_CPA`` — V2 CPO /
-    ``keyword.pay_for_order``; O/C/M без CH → ``inf``.
+    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` и ``MIN_CPA`` — V2 CPO; O/C без CH → ``inf``.
     """
     elig = _eligibility_for_ctx(
         ctx, eligibility_by_ks_id, eligibility=eligibility
@@ -601,6 +578,7 @@ def resolve_effective_state_cost_for_mode(
         worst_costs=worst_costs,
         prepared=prepared,
         eligibility=elig,
+        ladder_inputs=ladder_inputs,
     )
 
 
@@ -612,6 +590,7 @@ def collect_potential_passing_states(
     worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[_StateView]:
     """Кандидаты UP/realloc с ``state_cost <= resolve`` (passing potential)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
@@ -656,6 +635,7 @@ def collect_potential_passing_states(
                 worst_costs=worst_costs,
                 prepared=prepared,
                 eligibility_by_ks_id=eligibility_by_ks_id,
+                ladder_inputs=ladder_inputs,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -727,6 +707,7 @@ def plan_cost_reallocation(
     policy: SelectionPolicy,
     worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """COST_REALLOCATION: схлопнутое итоговое действие на ключ.
 
@@ -748,6 +729,7 @@ def plan_cost_reallocation(
             worst_costs=worst_costs,
             eligibility_by_ks_id=eligibility_by_ks_id,
             overrides=overrides,
+            ladder_inputs=ladder_inputs,
         )
         if not potential_passing:
             break
@@ -759,6 +741,7 @@ def plan_cost_reallocation(
             worst_costs=worst_costs,
             eligibility_by_ks_id=eligibility_by_ks_id,
             overrides=overrides,
+            ladder_inputs=ladder_inputs,
         )
         if not active_expensive:
             break
@@ -797,6 +780,7 @@ def plan_profitable_expansion(
     policy: SelectionPolicy,
     worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """PROFITABLE_EXPANSION (M1): UP до max passing mode с учётом eligibility."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
@@ -842,6 +826,7 @@ def plan_profitable_expansion(
                 worst_costs=worst_costs,
                 prepared=prepared,
                 eligibility_by_ks_id=eligibility_by_ks_id,
+                ladder_inputs=ladder_inputs,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -963,6 +948,7 @@ def _collect_active_more_expensive_than(
     worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[_StateView]:
     """Активные ключи, у которых ``state_cost(current) > min_cost``."""
     overrides = overrides or {}
@@ -989,6 +975,7 @@ def _collect_active_more_expensive_than(
             worst_costs=worst_costs,
             prepared=prepared,
             eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder_inputs,
         )
         if cost == float("inf") or cost <= min_cost:
             continue

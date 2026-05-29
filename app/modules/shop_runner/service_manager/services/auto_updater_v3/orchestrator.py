@@ -43,12 +43,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     plan_campaign_no_data_bootstrap_safe,
     plan_data_bootstrap_v3,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
-    profile_points_from_bid_positions,
-    resolve_keyword_bid_profile,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
+    build_keyword_v3_contexts,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     normalize_v3_rollout_aggressiveness,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+    cache_worst_costs_for_adv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     build_worst_costs,
@@ -91,20 +94,6 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
-
-
-def build_keyword_v3_contexts(
-    keywords: list[CalculatedKeyword],
-    raw_profiles: dict[str, list[BidPosition]],
-) -> list[KeywordV3Context]:
-    """Собрать контексты ключей с position_profile из WB bid profiles."""
-    contexts: list[KeywordV3Context] = []
-    for kw in keywords:
-        bids = resolve_keyword_bid_profile(raw_profiles, kw.text)
-        profile = profile_points_from_bid_positions(bids) if bids else None
-        merged = kw.model_copy(update={"position_profile": profile})
-        contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))
-    return contexts
 
 
 def _apply_v3_phase(
@@ -321,6 +310,10 @@ async def process_adv_v3(
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
                 worst_costs = build_worst_costs(prepared)
+                ladder_inputs = LadderInputs.from_contexts(contexts)
+                await cache_worst_costs_for_adv(
+                    complex_adv.adv_id, ladder_inputs.worst_costs
+                )
 
                 # COST_REALLOCATION — portfolio DOWN при запасе по CPA (не overspend guard):
                 # снимаем дорогую агрессию, затем PROFITABLE_EXPANSION перераспределяет
@@ -335,6 +328,7 @@ async def process_adv_v3(
                         policy=policy,
                         worst_costs=worst_costs,
                         eligibility_by_ks_id=eligibility,
+                        ladder_inputs=ladder_inputs,
                     )
                     if realloc_actions:
                         preamble_realloc_count = len(realloc_actions)
@@ -349,6 +343,10 @@ async def process_adv_v3(
                         eligibility = build_eligibility_map(contexts)
                         prepared = build_prepared_from_contexts(contexts)
                         worst_costs = build_worst_costs(prepared)
+                        ladder_inputs = LadderInputs.from_contexts(contexts)
+                        await cache_worst_costs_for_adv(
+                            complex_adv.adv_id, ladder_inputs.worst_costs
+                        )
 
                 expansion_actions = plan_profitable_expansion(
                     prepared,
@@ -356,6 +354,7 @@ async def process_adv_v3(
                     policy=policy,
                     worst_costs=worst_costs,
                     eligibility_by_ks_id=eligibility,
+                    ladder_inputs=ladder_inputs,
                 )
                 if expansion_actions:
                     preamble_expansion_count = len(expansion_actions)
