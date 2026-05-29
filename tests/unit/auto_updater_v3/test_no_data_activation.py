@@ -22,7 +22,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     plan_no_ch_min_bootstrap_actions,
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
-    rebalance_ladder_points,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     merge_and_dedup_actions,
@@ -310,29 +309,6 @@ def test_merge_and_dedup_higher_priority_bucket_wins_across_lists() -> None:
     merged = merge_and_dedup_actions([cleanup_down], [m1_up], [], [])
     assert len(merged) == 1
     assert merged[0].action == V3ActionType.DOWN
-
-
-@pytest.mark.unit
-def test_rebalance_ladder_points_no_data_off_counts_one() -> None:
-    off = _kw(ks_id=10, text="nd", mode=KeywordStrategyMode.OFF, conv=0.0)
-    assert rebalance_ladder_points(off, KeywordStrategyMode.OFF) == 1
-
-
-@pytest.mark.unit
-def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
-    prof = _sample_profile()
-    min_kw = _kw(ks_id=11, text="ok", mode=KeywordStrategyMode.MIN_CPA, conv=0.08, cpm_set_bid=200)
-    min_kw = min_kw.model_copy(update={"position_profile": prof})
-    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.MIN_CPA) == 1
-    opt = _kw(ks_id=12, text="ok2", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
-    opt = opt.model_copy(update={"position_profile": prof})
-    assert rebalance_ladder_points(opt, KeywordStrategyMode.OPTIMUM) == 2
-
-
-@pytest.mark.unit
-def test_rebalance_ladder_points_missing_ch_counts_one() -> None:
-    min_kw = _kw(ks_id=13, text="noch", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
-    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.OPTIMUM) == 1
 
 
 @pytest.mark.unit

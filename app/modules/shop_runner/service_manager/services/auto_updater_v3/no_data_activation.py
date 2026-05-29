@@ -217,35 +217,6 @@ def keyword_lacks_v3_decision_data(
     return _keyword_lacks_v3_decision_data(ctx, contexts)
 
 
-def rebalance_ladder_points(
-    keyword: CalculatedKeyword,
-    mode: KeywordStrategyMode,
-    *,
-    position_profile: list[PositionProfilePoint] | None = None,
-    contexts: list["KeywordV3Context"] | None = None,
-) -> int:
-    """Баллы gap-rebalance: N-state = 1; без своего V2 CPO = 1; иначе ``mode_level``."""
-    profile = (
-        keyword.position_profile if position_profile is None else position_profile
-    )
-    if contexts is not None:
-        from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-            KeywordV3Context,
-        )
-
-        ctx = KeywordV3Context(keyword=keyword, position_profile=profile)
-        if keyword_lacks_v3_decision_data(ctx, contexts):
-            return 1
-        if keyword_v2_pay_for_order_unavailable(keyword):
-            return 1
-        return mode_level(mode)
-    if keyword_v2_pay_for_order_unavailable(keyword):
-        return 1
-    if keyword_missing_ch_position_profile(profile):
-        return 1
-    return mode_level(mode)
-
-
 def split_prepared_by_v2_cpo(
     prepared: PreparedList,
 ) -> tuple[PreparedList, PreparedList]:
