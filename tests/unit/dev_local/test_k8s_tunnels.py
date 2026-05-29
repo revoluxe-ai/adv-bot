@@ -58,8 +58,26 @@ def test_tunnel_port_ready_dead_process() -> None:
     proc = MagicMock()
     proc.poll.return_value = 1
     spec = k8s_tunnels._tunnel_specs()[0]
+    runtime = k8s_tunnels._TunnelRuntime(proc=proc, external=False)
     with patch.object(k8s_tunnels, "_tcp_port_open", return_value=False):
-        assert k8s_tunnels._tunnel_port_ready(proc, spec) is False
+        assert k8s_tunnels._tunnel_port_ready(runtime, spec) is False
+
+
+def test_start_skips_monitor_when_ports_already_open() -> None:
+    specs = k8s_tunnels._tunnel_specs()
+
+    with (
+        patch.object(k8s_tunnels.Path, "is_file", return_value=True),
+        patch.object(k8s_tunnels, "_ports_ready", return_value=True),
+        patch.object(k8s_tunnels, "_adopt_external_forward") as adopt,
+        patch.object(k8s_tunnels.threading, "Thread") as mock_thread,
+        patch.object(k8s_tunnels, "atexit"),
+    ):
+        k8s_tunnels._monitor_started = False
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
+
+    mock_thread.assert_not_called()
+    assert adopt.call_count == len(specs)
 
 
 def test_postgres_tunnel_uses_pod_by_default() -> None:
