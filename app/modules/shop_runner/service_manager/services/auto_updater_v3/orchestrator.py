@@ -40,6 +40,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     plan_campaign_no_data_bootstrap_safe,
     plan_data_bootstrap_v3,
+    plan_no_ch_min_bootstrap_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -240,7 +241,9 @@ async def process_adv_v3(
         )
 
         if dto is not None:
-            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            keyword_bootstrap_actions = plan_data_bootstrap_v3(
+                contexts, include_no_ch_min_bootstrap=False
+            )
             if keyword_bootstrap_actions:
                 preamble_bootstrap_count = len(keyword_bootstrap_actions)
                 logger.info(
@@ -378,6 +381,25 @@ async def process_adv_v3(
                         contexts = _apply_v3_phase(
                             ledger, guard_actions, raw_profiles
                         )
+
+        if dto is not None and campaign_mode in (
+            CampaignMode.NORMAL,
+            CampaignMode.NOT_READY,
+        ):
+            no_ch_post = plan_no_ch_min_bootstrap_actions(
+                build_prepared_from_contexts(contexts)
+            )
+            if no_ch_post:
+                preamble_bootstrap_count += len(no_ch_post)
+                logger.info(
+                    "[adv_id=%s] v3 NO_CH_POST_BOOTSTRAP: actions=%s",
+                    complex_adv.adv_id,
+                    len(no_ch_post),
+                )
+                contexts = _apply_v3_phase(ledger, no_ch_post, raw_profiles)
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
+                )
 
         if (
             plan is not None

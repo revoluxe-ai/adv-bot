@@ -28,6 +28,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     KeywordV3DecisionTier,
     keyword_lacks_v3_decision_data as _keyword_lacks_v3_decision_data,
     keyword_v2_pay_for_order_unavailable_with_conv,
+    resolve_keyword_v2_pay_for_order_cost,
     resolve_keyword_v3_decision,
     tier_label_ru,
 )
@@ -170,35 +171,13 @@ def keyword_missing_ch_position_profile(
 
 
 def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
-    """Нет CPO ключа по той же цепочке, что V2 (рейтинг / ``pay_for_order``).
-
-    ``orders_per_1000_rub = conv_views_to_orders × 1_000_000 / CPM``;
-    CPO = ``1000 / orders_per_1000_rub``. Если CPM неизвестен или заказов на 1000₽ нет —
-    данных для экономического решения по ключу нет.
-
-    Args:
-        keyword: Рассчитанный ключ (CPM из каскада, conv из CH).
-
-    Returns:
-        True, если ``pay_for_order`` в V2 был бы ``None``.
-
-    Raises:
-        TypeError: если передан не ``CalculatedKeyword`` (например ORM ``KeywordSetting``).
-    """
+    """Нет CPO: conv из CH + CPM set_bid/stats (как rating), не каскад с bid_log."""
     if not isinstance(keyword, CalculatedKeyword):
         raise TypeError(
             "keyword_v2_pay_for_order_unavailable expects CalculatedKeyword, "
             f"got {type(keyword).__name__}"
         )
-    if keyword.pay_for_order is not None:
-        return False
-    orders = calc_orders_per_1000_rub(
-        keyword.conv_views_to_orders,
-        keyword.cpm,
-    )
-    if orders is None:
-        return True
-    return calc_pay_for_order(orders) is None
+    return resolve_keyword_v2_pay_for_order_cost(keyword) is None
 
 
 def keyword_lacks_v3_decision_data(
@@ -382,12 +361,15 @@ def plan_no_ch_min_bootstrap_actions(prepared: PreparedList) -> list[V3Action]:
 
 def plan_data_bootstrap_v3(
     contexts: list["KeywordV3Context"],
+    *,
+    include_no_ch_min_bootstrap: bool = True,
 ) -> list[V3Action]:
-    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID + NO_CH MIN-only) + caps по tier."""
+    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID + опционально NO_CH MIN-only) + caps."""
     prepared = _build_prepared(contexts)
     peer_contexts = [ctx for ctx, _ in prepared]
     actions = plan_no_data_keyword_actions(prepared)
-    actions.extend(plan_no_ch_min_bootstrap_actions(prepared))
+    if include_no_ch_min_bootstrap:
+        actions.extend(plan_no_ch_min_bootstrap_actions(prepared))
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,

@@ -80,26 +80,43 @@ def _keyword_has_own_conv(keyword: CalculatedKeyword) -> bool:
     return stat.views > 0 and keyword.conv_views_to_orders > 0
 
 
+def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
+    """CPM как в рейтинге/карточке: set_bid → stats из CH, без bid_log/api.
+
+    ``KeywordCpmSources.resolved_cpm()`` идёт set_bid → api → bid_log → stats;
+    для экономики NO_CH bid_log часто завышает CPO относительно UI (510₽).
+    """
+    sources = keyword.cpm_sources
+    if sources is not None:
+        if sources.cpm_set_bid is not None:
+            return float(sources.cpm_set_bid)
+        if sources.cpm_from_stats is not None:
+            return float(sources.cpm_from_stats)
+    stat_cpm = getattr(keyword.cluster_stat, "cpm", None)
+    if stat_cpm is not None and float(stat_cpm) > 0:
+        return float(stat_cpm)
+    return None
+
+
 def keyword_has_v2_cpo(keyword: CalculatedKeyword) -> bool:
-    """Есть V2 CPO: ``pay_for_order`` или расчёт из conv+CPM (не только ``conv_views_to_orders``)."""
-    if keyword.pay_for_order is not None:
-        return True
-    conv = keyword.conv_views_to_orders
-    return not keyword_v2_pay_for_order_unavailable_with_conv(
-        keyword,
-        conv_views_to_orders=float(conv) if conv is not None and conv > 0 else None,
-    )
+    """Есть V2 CPO по conv из CH и CPM рейтинга (set_bid/stats)."""
+    return resolve_keyword_v2_pay_for_order_cost(keyword) is not None
 
 
 def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float | None:
-    """Себестоимость заказа V2 для no-CH MIN-only ``state_cost``."""
-    pfo = keyword.pay_for_order
-    if pfo is not None:
-        return float(pfo)
+    """Себестоимость заказа V2 для NO-CH: conv из CH + CPM set_bid/stats (как rating).
+
+    Не использует ``keyword.pay_for_order`` первым — там полный каскад с bid_log.
+    Формула та же: ``orders_per_1000_rub = conv × 1_000_000 / CPM``, CPO = 1000 / orders.
+    """
     conv = keyword.conv_views_to_orders
     if conv is None or conv <= 0:
         return None
-    orders = calc_orders_per_1000_rub(float(conv), keyword.cpm)
+    cpm = rating_aligned_cpm(keyword)
+    if cpm is None or cpm <= 0:
+        pfo = keyword.pay_for_order
+        return None if pfo is None else float(pfo)
+    orders = calc_orders_per_1000_rub(float(conv), cpm)
     if orders is None:
         return None
     result = calc_pay_for_order(orders)
@@ -230,10 +247,15 @@ def keyword_v2_pay_for_order_unavailable_with_conv(
     *,
     conv_views_to_orders: float | None,
 ) -> bool:
-    """Нет CPO при заданной conv (своя или импутированная)."""
+    """Нет CPO при заданной conv: CPM set_bid/stats (как rating), не bid_log."""
     if conv_views_to_orders is None or conv_views_to_orders <= 0:
         return True
-    orders = calc_orders_per_1000_rub(conv_views_to_orders, keyword.cpm)
+    cpm = rating_aligned_cpm(keyword)
+    if cpm is None or cpm <= 0:
+        cpm = keyword.cpm
+    if cpm is None or cpm <= 0:
+        return True
+    orders = calc_orders_per_1000_rub(conv_views_to_orders, cpm)
     if orders is None:
         return True
     return calc_pay_for_order(orders) is None

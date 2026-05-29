@@ -357,6 +357,10 @@ def plan_campaign_trim_by_max_state_cost(
 
     Вызывается из orchestrator, когда ``fact.pay_for_order > plan.max_pay_for_order``.
     """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+    )
+
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
@@ -371,6 +375,12 @@ def plan_campaign_trim_by_max_state_cost(
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
+            continue
+        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+        if (
+            elig is not None
+            and elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+        ):
             continue
         target = _find_trim_target_mode(
             ctx,
