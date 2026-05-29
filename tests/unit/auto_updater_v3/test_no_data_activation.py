@@ -326,6 +326,26 @@ def test_plan_no_ch_min_bootstrap_off_auto_up_to_min() -> None:
 
 
 @pytest.mark.unit
+def test_plan_no_ch_min_bootstrap_skips_up_when_pay_for_order_above_max() -> None:
+    """NO CH: ``pay_for_order`` из ключа > max — без UP MIN."""
+    off = _kw(
+        ks_id=93,
+        text="дорогой no ch",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=2,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    prepared = [(ctx, KeywordStrategyMode.OFF)]
+    pfo = off.pay_for_order
+    assert pfo is not None and pfo > 1.0
+    actions = plan_no_ch_min_bootstrap_actions(
+        prepared, max_pay_for_order=float(pfo) - 1.0
+    )
+    assert actions == []
+
+
 @pytest.mark.unit
 def test_plan_data_bootstrap_auto_uses_eligibility_cap() -> None:
     """Auto-mode bootstrap: UP после FORCE_OFF на вычисленный cap, не всегда MIN_CPA."""

@@ -200,16 +200,27 @@ def plan_rollout_underperform_one(
     return plan_one_up_by_policy(prepared, policy=policy)
 
 
-def _keyword_exceeds_max_pfo(
-    ctx: KeywordV3Context,
+def keyword_pay_for_order_exceeds_max(
+    ctx: "KeywordV3Context",
     *,
     max_pay_for_order: float,
 ) -> bool:
-    """True, если у ключа известен pay_for_order и он строго выше максимального порога."""
+    """True, если ``keyword.pay_for_order`` (как в UI) строго выше ``plan.max_pay_for_order``."""
     pfo = ctx.keyword.pay_for_order
     if pfo is None:
         return False
     return float(pfo) > float(max_pay_for_order)
+
+
+def _keyword_exceeds_max_pfo(
+    ctx: "KeywordV3Context",
+    *,
+    max_pay_for_order: float,
+) -> bool:
+    """Alias для внутренних вызовов (см. ``keyword_pay_for_order_exceeds_max``)."""
+    return keyword_pay_for_order_exceeds_max(
+        ctx, max_pay_for_order=max_pay_for_order
+    )
 
 
 def plan_overspend_force_off_over_max(
@@ -381,6 +392,16 @@ def plan_campaign_trim_by_max_state_cost(
             elig is not None
             and elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
         ):
+            if keyword_pay_for_order_exceeds_max(
+                ctx, max_pay_for_order=float(max_pay_for_order)
+            ):
+                _append_trim_to_mode(
+                    actions,
+                    ks_id=ks_id,
+                    current=current,
+                    target=KeywordStrategyMode.OFF,
+                    hard_status=hard_status,
+                )
             continue
         target = _find_trim_target_mode(
             ctx,

@@ -67,6 +67,33 @@ def test_trim_lowers_mode_when_state_cost_above_max() -> None:
 
 
 @pytest.mark.unit
+def test_trim_no_ch_min_to_off_when_keyword_pay_for_order_above_max() -> None:
+    """NO CH tier: trim по ``keyword.pay_for_order`` (как UI), не skip."""
+    kw = _calc_kw(
+        ks_id=20,
+        text="no_ch_expensive",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(435.0),
+        hard_status=2,
+    )
+    assert kw.pay_for_order is not None
+    assert kw.pay_for_order > 300.0
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=kw, position_profile=None)]
+    )
+    actions = plan_campaign_trim_by_max_state_cost(
+        prepared,
+        max_pay_for_order=300.0,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].reason == "trim_max_state_cost"
+
+
+@pytest.mark.unit
 def test_m1_promotes_off_to_highest_passing_mode() -> None:
     from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
         FactData,

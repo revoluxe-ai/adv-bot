@@ -332,11 +332,29 @@ def plan_campaign_no_data_bootstrap_safe(
     return actions
 
 
-def plan_no_ch_min_bootstrap_actions(prepared: PreparedList) -> list[V3Action]:
+def _no_ch_bootstrap_allowed_by_pay_for_order(
+    ctx: "KeywordV3Context",
+    *,
+    max_pay_for_order: float | None,
+) -> bool:
+    """NO CH: UP только если ``keyword.pay_for_order`` (как в карточке) ≤ max."""
+    pfo = ctx.keyword.pay_for_order
+    if pfo is None:
+        return False
+    if max_pay_for_order is None:
+        return True
+    return float(pfo) <= float(max_pay_for_order)
+
+
+def plan_no_ch_min_bootstrap_actions(
+    prepared: PreparedList,
+    *,
+    max_pay_for_order: float | None = None,
+) -> list[V3Action]:
     """NO_CH + V2 CPO: MIN + target 0 + БС для auto (нет CH-лестницы O/C/M).
 
     Аналог N-state bootstrap, но только для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``.
-    OFF → UP MIN; auto на MIN/O/C → FORCE_OFF + UP MIN (``hard_status`` → БС).
+    OFF → UP MIN, если ``pay_for_order`` ≤ ``max_pay_for_order``; иначе без UP.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
@@ -357,6 +375,10 @@ def plan_no_ch_min_bootstrap_actions(prepared: PreparedList) -> list[V3Action]:
             continue
         hard_status = int(ctx.keyword.hard_status)
         if not _hard_status_allows_up(hard_status):
+            continue
+        if not _no_ch_bootstrap_allowed_by_pay_for_order(
+            ctx, max_pay_for_order=max_pay_for_order
+        ):
             continue
 
         if mode == KeywordStrategyMode.OFF:
@@ -390,7 +412,9 @@ def plan_data_bootstrap_v3(
     peer_contexts = [ctx for ctx, _ in prepared]
     actions = plan_no_data_keyword_actions(prepared)
     if include_no_ch_min_bootstrap:
-        actions.extend(plan_no_ch_min_bootstrap_actions(prepared))
+        actions.extend(
+            plan_no_ch_min_bootstrap_actions(prepared, max_pay_for_order=None)
+        )
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,

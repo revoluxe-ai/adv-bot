@@ -386,8 +386,14 @@ async def process_adv_v3(
             CampaignMode.NORMAL,
             CampaignMode.NOT_READY,
         ):
+            max_pfo = (
+                float(plan.max_pay_for_order)
+                if plan is not None and plan.max_pay_for_order is not None
+                else None
+            )
             no_ch_post = plan_no_ch_min_bootstrap_actions(
-                build_prepared_from_contexts(contexts)
+                build_prepared_from_contexts(contexts),
+                max_pay_for_order=max_pfo,
             )
             if no_ch_post:
                 preamble_bootstrap_count += len(no_ch_post)
