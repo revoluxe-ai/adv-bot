@@ -559,11 +559,11 @@ class KeywordSettingMessage(TextWithKeyboard):
                     self._keyword_original_id,
                 )
                 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
-                    _profile_load_failure,
+                    profile_load_failure,
                 )
 
                 self._v3_profile_block = format_keyword_v3_profile_block(
-                    _profile_load_failure(
+                    profile_load_failure(
                         calculated_keyword,
                         reason=f"ошибка загрузки ({type(exc).__name__})",
                     )
