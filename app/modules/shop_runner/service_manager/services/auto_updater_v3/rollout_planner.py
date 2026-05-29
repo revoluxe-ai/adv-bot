@@ -216,17 +216,6 @@ def keyword_pay_for_order_exceeds_max(
     return float(pfo) > float(max_pay_for_order)
 
 
-def _keyword_exceeds_max_pfo(
-    ctx: "KeywordV3Context",
-    *,
-    max_pay_for_order: float,
-) -> bool:
-    """Alias для внутренних вызовов (см. ``keyword_pay_for_order_exceeds_max``)."""
-    return keyword_pay_for_order_exceeds_max(
-        ctx, max_pay_for_order=max_pay_for_order
-    )
-
-
 def plan_overspend_force_off_over_max(
     prepared: PreparedList,
     *,
@@ -249,7 +238,9 @@ def plan_overspend_force_off_over_max(
             continue
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        if not _keyword_exceeds_max_pfo(ctx, max_pay_for_order=max_pay_for_order):
+        if not keyword_pay_for_order_exceeds_max(
+            ctx, max_pay_for_order=max_pay_for_order
+        ):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
