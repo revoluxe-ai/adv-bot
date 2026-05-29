@@ -67,15 +67,8 @@ class KeywordV3ProfileData:
     conv_views_to_orders: float | None = None
 
 
-def _format_pct(value: float | None, *, decimals: int = 2) -> str:
-    """Доля → проценты для Telegram (``0.0123`` → ``1.23%``)."""
-    if value is None:
-        return "—"
-    return f"{value * 100:.{decimals}f}%"
-
-
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
-    """Компактные проценты: ``0`` → ``0%``, ``0.07`` → ``0.07%``."""
+    """Доля → компактные проценты для Telegram (``0`` → ``0%``, ``0.07`` → ``0.07%``)."""
     if value is None:
         return "—"
     pct = value * 100
