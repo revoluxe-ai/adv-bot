@@ -110,7 +110,7 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
 
 @pytest.mark.unit
 def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
-    """Один агрегат РК на ``build_target_place_fallback_zero_by_keyword_id``."""
+    """Один агрегат РК на вызов; результат совпадает с ``build_eligibility_map``."""
     kw_a = _calculated_kw_fixture(
         ks_id=10, text="a", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
     )
@@ -121,6 +121,10 @@ def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
         KeywordV3Context(keyword=kw_a, position_profile=_sample_profile()),
         KeywordV3Context(keyword=kw_b, position_profile=_sample_profile()),
     ]
+    expected = {
+        ks_id: elig.target_place_fallback_zero
+        for ks_id, elig in build_eligibility_map(contexts).items()
+    }
     with patch(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data._weighted_campaign_conv",
         wraps=_weighted_campaign_conv,
@@ -128,4 +132,4 @@ def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
         result = build_target_place_fallback_zero_by_keyword_id(contexts)
 
     assert weighted_mock.call_count == 1
-    assert len(result) == 2
+    assert result == expected
