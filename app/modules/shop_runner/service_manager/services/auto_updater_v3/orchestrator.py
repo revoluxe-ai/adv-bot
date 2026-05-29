@@ -74,6 +74,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode import (
     CampaignMode,
     allows_ladder_phases,
+    is_campaign_full_stop,
     resolve_campaign_mode,
 )
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
@@ -216,7 +217,7 @@ async def process_adv_v3(
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
         nonlocal target_place_synced
-        if target_place_synced:
+        if target_place_synced or is_campaign_full_stop(campaign_mode):
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await _safe_sync_target_places_v3(
@@ -257,7 +258,14 @@ async def process_adv_v3(
                 state.name if state is not None else "None",
             )
 
-        if campaign_mode != CampaignMode.NOT_READY and dto is not None:
+        if is_campaign_full_stop(campaign_mode):
+            logger.info(
+                "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
+                complex_adv.adv_id,
+            )
+            return
+
+        if dto is not None:
             keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
             if keyword_bootstrap_actions:
                 preamble_bootstrap_count += len(keyword_bootstrap_actions)
@@ -437,19 +445,13 @@ async def process_adv_v3(
                     force_off_count,
                 )
 
-        if campaign_mode != CampaignMode.NOT_READY:
-            flushed = await ledger.flush_to_db(complex_adv)
-            if flushed:
-                logger.info(
-                    "[adv_id=%s] v3: netto flush committed",
-                    complex_adv.adv_id,
-                )
-            await _sync_target_places_once()
-        else:
+        flushed = await ledger.flush_to_db(complex_adv)
+        if flushed:
             logger.info(
-                "[adv_id=%s] v3 NOT_READY: full stop (no actions, flush, sync)",
+                "[adv_id=%s] v3: netto flush committed",
                 complex_adv.adv_id,
             )
+        await _sync_target_places_once()
     finally:
-        if campaign_mode != CampaignMode.NOT_READY:
+        if not is_campaign_full_stop(campaign_mode):
             await _sync_target_places_once()

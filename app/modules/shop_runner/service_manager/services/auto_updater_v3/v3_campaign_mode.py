@@ -37,3 +37,8 @@ def resolve_campaign_mode(state: SalesStates | None) -> CampaignMode:
 def allows_ladder_phases(mode: CampaignMode) -> bool:
     """COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD / selector."""
     return mode == CampaignMode.NORMAL
+
+
+def is_campaign_full_stop(mode: CampaignMode) -> bool:
+    """``NOT_READY``: без keyword bootstrap, ladder, flush, target_place sync."""
+    return mode == CampaignMode.NOT_READY

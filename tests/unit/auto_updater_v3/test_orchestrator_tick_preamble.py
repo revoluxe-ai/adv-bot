@@ -216,6 +216,49 @@ async def test_process_adv_v3_not_ready_full_stop() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_process_adv_v3_no_plan_full_stop() -> None:
+    """plan is None → NOT_READY по умолчанию, без bootstrap и sync."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 16
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.individual_keywords_target_place_mode = True
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    sync_mock = AsyncMock()
+    keyword_bootstrap = MagicMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            keyword_bootstrap,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            return_value=None,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",
+            sync_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ) as flush_mock,
+    ):
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    keyword_bootstrap.assert_not_called()
+    sync_mock.assert_not_awaited()
+    flush_mock.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 12
