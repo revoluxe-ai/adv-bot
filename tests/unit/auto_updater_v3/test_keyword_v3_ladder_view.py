@@ -241,12 +241,10 @@ def test_expansion_cost_matches_cost_for_mode() -> None:
     contexts = [ctx]
     prepared = build_prepared_from_contexts(contexts)
     ladder_inputs = LadderInputs.from_contexts(contexts)
-    worst_costs = build_worst_per_state_costs(prepared)
     actions = plan_profitable_expansion(
         prepared,
         resolve=500.0,
         policy=_policy(),
-        worst_costs=worst_costs,
         ladder_inputs=ladder_inputs,
     )
     assert actions
@@ -348,8 +346,6 @@ def test_resolve_effective_state_cost_for_mode_uses_ladder_inputs() -> None:
         resolve_effective_state_cost_for_mode(
             ctx=ctx,
             to_mode=KeywordStrategyMode.MIN_CPA,
-            worst_costs=ladder_inputs.worst_costs,
-            prepared=prepared,
             ladder_inputs=ladder_inputs,
         )
         spy.assert_not_called()

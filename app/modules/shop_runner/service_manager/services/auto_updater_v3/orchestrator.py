@@ -54,7 +54,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     cache_worst_costs_for_adv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    build_worst_costs,
     compute_resolve_cost_threshold,
     is_resolve_valid,
     plan_cost_reallocation,
@@ -309,7 +308,6 @@ async def process_adv_v3(
             if is_resolve_valid(plan, resolve):
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
-                worst_costs = build_worst_costs(prepared)
                 ladder_inputs = LadderInputs.from_contexts(contexts)
                 await cache_worst_costs_for_adv(
                     complex_adv.adv_id, ladder_inputs.worst_costs
@@ -326,7 +324,6 @@ async def process_adv_v3(
                         prepared,
                         resolve=resolve,
                         policy=policy,
-                        worst_costs=worst_costs,
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
@@ -342,7 +339,6 @@ async def process_adv_v3(
                         )
                         eligibility = build_eligibility_map(contexts)
                         prepared = build_prepared_from_contexts(contexts)
-                        worst_costs = build_worst_costs(prepared)
                         ladder_inputs = LadderInputs.from_contexts(contexts)
                         await cache_worst_costs_for_adv(
                             complex_adv.adv_id, ladder_inputs.worst_costs
@@ -352,7 +348,6 @@ async def process_adv_v3(
                     prepared,
                     resolve=resolve,
                     policy=policy,
-                    worst_costs=worst_costs,
                     eligibility_by_ks_id=eligibility,
                     ladder_inputs=ladder_inputs,
                 )

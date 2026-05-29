@@ -40,7 +40,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
-    build_worst_per_state_costs,
     collect_transition_candidates,
     missing_target_matrix_from_catalog,
     passes_rec_gate_for_up,
@@ -58,6 +57,9 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordV3Eligibility,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
     )
@@ -71,6 +73,20 @@ _HARD_STATUS_WHITE_LIST = 2
 def _hard_status_allows_up(hard_status: int) -> bool:
     """UP (ladder): авто (1) и белый список (2)."""
     return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
+
+
+def ladder_inputs_for_prepared(
+    prepared: PreparedList,
+    ladder_inputs: "LadderInputs | None" = None,
+) -> "LadderInputs":
+    """Единый ``LadderInputs`` на проход planner; worst только в ``ladder_inputs.worst_costs``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs as _LadderInputs,
+    )
+
+    if ladder_inputs is not None:
+        return ladder_inputs
+    return _LadderInputs.from_contexts([ctx for ctx, _ in prepared])
 
 
 # If more than this many OFF→MIN candidates exist, stay on strict MIN-first (level 2).
@@ -274,8 +290,7 @@ def _find_trim_target_mode(
     current: KeywordStrategyMode,
     *,
     max_pay_for_order: float,
-    worst_costs: dict[AggressionTargetMode, float],
-    prepared: PreparedList | None,
+    ladder_inputs: "LadderInputs",
     policy: SelectionPolicy,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> KeywordStrategyMode:
@@ -293,8 +308,7 @@ def _find_trim_target_mode(
         cost, _ = resolve_effective_state_cost_for_mode(
             ctx=ctx,
             to_mode=mode,
-            worst_costs=worst_costs,
-            prepared=prepared,
+            ladder_inputs=ladder_inputs,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
         if cost != float("inf") and cost <= max_pay_for_order:
@@ -375,7 +389,7 @@ def plan_campaign_trim_by_max_state_cost(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    worst_costs = build_worst_costs(prepared)
+    ladder_inputs = ladder_inputs_for_prepared(prepared)
     actions: list[V3Action] = []
     for ctx, current in prepared:
         if current == KeywordStrategyMode.OFF:
@@ -406,8 +420,7 @@ def plan_campaign_trim_by_max_state_cost(
             ctx,
             current,
             max_pay_for_order=float(max_pay_for_order),
-            worst_costs=worst_costs,
-            prepared=prepared,
+            ladder_inputs=ladder_inputs,
             policy=policy,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
@@ -512,7 +525,6 @@ def _resolve_state_cost_for_mode(
     *,
     ctx: KeywordV3Context,
     to_mode: KeywordStrategyMode,
-    worst_costs: dict[AggressionTargetMode, float],
     prepared: PreparedList | None = None,
     eligibility: "KeywordV3Eligibility | None" = None,
     ladder_inputs: "LadderInputs | None" = None,
@@ -524,8 +536,10 @@ def _resolve_state_cost_for_mode(
     )
 
     if ladder_inputs is None:
-        all_ctx = [c for c, _ in prepared] if prepared else [ctx]
-        ladder_inputs = LadderInputs.from_contexts(all_ctx)
+        if prepared is not None:
+            ladder_inputs = ladder_inputs_for_prepared(prepared)
+        else:
+            ladder_inputs = LadderInputs.from_contexts([ctx])
     return cost_for_mode(
         ctx,
         to_mode,
@@ -550,22 +564,18 @@ def _iter_one_step(current: KeywordStrategyMode) -> list[KeywordStrategyMode]:
     return [] if nxt is None else [nxt]
 
 
-def build_worst_costs(prepared: PreparedList) -> dict[AggressionTargetMode, float]:
-    """Адаптер для имьютации worst-per-state стоимости."""
-    return build_worst_per_state_costs(prepared)
-
-
 def resolve_effective_state_cost_for_mode(
     *,
     ctx: "KeywordV3Context",
     to_mode: KeywordStrategyMode,
-    worst_costs: dict[AggressionTargetMode, float],
     prepared: PreparedList | None = None,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     eligibility: "KeywordV3Eligibility | None" = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> tuple[float, bool]:
     """Единый API себестоимости target mode для ladder-фаз V3 (делегирует ``cost_for_mode``).
+
+    Worst/per-mode cost — только из ``ladder_inputs`` (или пересборка из ``prepared``).
 
     Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` и ``MIN_CPA`` — V2 CPO; O/C без CH → ``inf``.
     """
@@ -575,7 +585,6 @@ def resolve_effective_state_cost_for_mode(
     return _resolve_state_cost_for_mode(
         ctx=ctx,
         to_mode=to_mode,
-        worst_costs=worst_costs,
         prepared=prepared,
         eligibility=elig,
         ladder_inputs=ladder_inputs,
@@ -587,7 +596,6 @@ def collect_potential_passing_states(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
@@ -598,6 +606,7 @@ def collect_potential_passing_states(
         clamp_target_mode,
     )
 
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
@@ -632,10 +641,8 @@ def collect_potential_passing_states(
             cost, imputed = resolve_effective_state_cost_for_mode(
                 ctx=ctx,
                 to_mode=capped,
-                worst_costs=worst_costs,
-                prepared=prepared,
                 eligibility_by_ks_id=eligibility_by_ks_id,
-                ladder_inputs=ladder_inputs,
+                ladder_inputs=ladder,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -705,7 +712,6 @@ def plan_cost_reallocation(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
@@ -714,6 +720,7 @@ def plan_cost_reallocation(
     WL: один DOWN до ``final_target``; авто: FORCE_OFF (+ технический UP до
     ``final_target``, если не OFF). Активные дороже ``min(potential passing cost)``.
     """
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     stored_by_ks: dict[int, tuple[KeywordStrategyMode, int]] = {}
     for ctx, mode in prepared:
         ks_id = ctx.keyword.keyword_setting_original_id
@@ -726,10 +733,9 @@ def plan_cost_reallocation(
             prepared,
             resolve=resolve,
             policy=policy,
-            worst_costs=worst_costs,
             eligibility_by_ks_id=eligibility_by_ks_id,
             overrides=overrides,
-            ladder_inputs=ladder_inputs,
+            ladder_inputs=ladder,
         )
         if not potential_passing:
             break
@@ -738,10 +744,9 @@ def plan_cost_reallocation(
             prepared,
             min_cost=min_potential_cost,
             policy=policy,
-            worst_costs=worst_costs,
             eligibility_by_ks_id=eligibility_by_ks_id,
             overrides=overrides,
-            ladder_inputs=ladder_inputs,
+            ladder_inputs=ladder,
         )
         if not active_expensive:
             break
@@ -778,7 +783,6 @@ def plan_profitable_expansion(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
@@ -788,6 +792,7 @@ def plan_profitable_expansion(
         clamp_target_mode,
     )
 
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     actions: list[V3Action] = []
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
@@ -823,10 +828,8 @@ def plan_profitable_expansion(
             cost, imputed = resolve_effective_state_cost_for_mode(
                 ctx=ctx,
                 to_mode=capped,
-                worst_costs=worst_costs,
-                prepared=prepared,
                 eligibility_by_ks_id=eligibility_by_ks_id,
-                ladder_inputs=ladder_inputs,
+                ladder_inputs=ladder,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -885,9 +888,10 @@ def plan_mass_cheap_promotion(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """M1: для каждого ключа поднять до highest passing state из класса A."""
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     actions: list[V3Action] = []
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
@@ -909,8 +913,7 @@ def plan_mass_cheap_promotion(
             cost, imputed = _resolve_state_cost_for_mode(
                 ctx=ctx,
                 to_mode=to_mode,
-                worst_costs=worst_costs,
-                prepared=prepared,
+                ladder_inputs=ladder,
             )
             if cost == float("inf") or cost > resolve:
                 continue
@@ -945,12 +948,12 @@ def _collect_active_more_expensive_than(
     *,
     min_cost: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[_StateView]:
     """Активные ключи, у которых ``state_cost(current) > min_cost``."""
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
@@ -972,10 +975,8 @@ def _collect_active_more_expensive_than(
         cost, imputed = resolve_effective_state_cost_for_mode(
             ctx=ctx,
             to_mode=current,
-            worst_costs=worst_costs,
-            prepared=prepared,
             eligibility_by_ks_id=eligibility_by_ks_id,
-            ladder_inputs=ladder_inputs,
+            ladder_inputs=ladder,
         )
         if cost == float("inf") or cost <= min_cost:
             continue
@@ -998,9 +999,10 @@ def _collect_active_expensive(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
+    ladder_inputs: "LadderInputs | None" = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
 ) -> list[_StateView]:
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
@@ -1022,8 +1024,7 @@ def _collect_active_expensive(
         cost, imputed = _resolve_state_cost_for_mode(
             ctx=ctx,
             to_mode=current,
-            worst_costs=worst_costs,
-            prepared=prepared,
+            ladder_inputs=ladder,
         )
         if cost == float("inf") or cost <= resolve:
             continue
@@ -1046,9 +1047,10 @@ def _collect_potential_expensive(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
+    ladder_inputs: "LadderInputs | None" = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
 ) -> list[_StateView]:
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
@@ -1069,8 +1071,7 @@ def _collect_potential_expensive(
             cost, imputed = _resolve_state_cost_for_mode(
                 ctx=ctx,
                 to_mode=to_mode,
-                worst_costs=worst_costs,
-                prepared=prepared,
+                ladder_inputs=ladder,
             )
             if cost == float("inf") or cost <= resolve:
                 continue
@@ -1093,9 +1094,10 @@ def plan_state_rebalance(
     *,
     resolve: float,
     policy: SelectionPolicy,
-    worst_costs: dict[AggressionTargetMode, float],
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """M2: итеративно убрать разрыв max(active_B) > min(potential_B)."""
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides: dict[int, KeywordStrategyMode] = {}
     down_actions: list[V3Action] = []
     up_actions: list[V3Action] = []
@@ -1105,14 +1107,14 @@ def plan_state_rebalance(
             prepared,
             resolve=resolve,
             policy=policy,
-            worst_costs=worst_costs,
+            ladder_inputs=ladder,
             overrides=overrides,
         )
         potential_expensive = _collect_potential_expensive(
             prepared,
             resolve=resolve,
             policy=policy,
-            worst_costs=worst_costs,
+            ladder_inputs=ladder,
             overrides=overrides,
         )
         if not active_expensive or not potential_expensive:
@@ -1148,7 +1150,7 @@ def plan_state_rebalance(
             prepared,
             resolve=resolve,
             policy=policy,
-            worst_costs=worst_costs,
+            ladder_inputs=ladder,
             overrides=overrides,
         )
         if not potential_expensive:

@@ -68,14 +68,14 @@ UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUA
 |--------|------|
 | `keyword_v3_contexts.py` | `build_keyword_v3_contexts`, `load_campaign_v3_contexts` |
 | `keyword_v3_ladder_view.py` | `LadderInputs`, `cost_for_mode`, `resolve_ladder_stage_display` |
-| `rollout_planner.py` | фазы делегируют в `cost_for_mode` через `ladder_inputs` |
+| `rollout_planner.py` | фазы делегируют в `cost_for_mode` через `ladder_inputs` (отдельный `worst_costs` в API planner **нет**) |
 
-**Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` не вызывает `build_worst_per_state_costs` повторно.
+**Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` и `ladder_inputs_for_prepared` не пересчитывают worst вне `LadderInputs`.
 
 **Правило cost (per-mode):**
 
 1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_keyword_v2_pay_for_order_cost` (`source=v2_cpo`); O/C → `inf`, **не** `source=worst`.
-2. CH-tier: `profile_cost` → `worst_costs[mode]` (per-mode, без gate «вся матрица invalid») → `inf`.
+2. CH-tier: `profile_cost` → `ladder_inputs.worst_costs[mode]` (per-mode, без gate «вся матрица invalid») → `inf`.
 
 **N-state vs MIN-only (диагностика UI):**
 

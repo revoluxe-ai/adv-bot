@@ -34,10 +34,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
     build_prepared_from_contexts,
-    build_worst_per_state_costs,
 )
 from tests.unit.test_auto_updater_v3 import (
     _calc_kw,
@@ -77,12 +79,12 @@ def test_plan_cost_reallocation_emits_down_only() -> None:
             KeywordV3Context(keyword=cheap, position_profile=prof),
         ]
     )
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_cost_reallocation(
         prepared,
         resolve=50.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
     )
     assert actions
     assert all(a.action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF) for a in actions)
@@ -113,12 +115,12 @@ def test_plan_profitable_expansion_respects_max_allowed_mode() -> None:
         fallback_kind="none",
         decision_tier=KeywordV3DecisionTier.FULL,
     )
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_profitable_expansion(
         prepared,
         resolve=500.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id={10: min_only_elig},
     )
     assert len(actions) == 1
@@ -143,12 +145,12 @@ def test_collect_potential_passing_states_skips_invalid() -> None:
     prepared = build_prepared_from_contexts([invalid_ctx])
     elig = resolve_keyword_v3_eligibility(invalid_ctx, [invalid_ctx])
     assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     passing = collect_potential_passing_states(
         prepared,
         resolve=500.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id={20: elig},
     )
     assert passing == []
@@ -165,11 +167,11 @@ def test_resolve_effective_state_cost_for_mode_returns_finite_for_min() -> None:
     )
     c = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
     prepared = build_prepared_from_contexts([c])
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     cost, imputed = resolve_effective_state_cost_for_mode(
         ctx=c,
         to_mode=KeywordStrategyMode.MIN_CPA,
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         prepared=prepared,
     )
     assert cost < float("inf")
@@ -224,12 +226,12 @@ def test_invalid_eligibility_excluded_from_reallocation() -> None:
         fallback_kind=None,
         decision_tier=KeywordV3DecisionTier.NO_CONV,
     )
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_cost_reallocation(
         prepared,
         resolve=5.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id={50: elig},
     )
     assert actions == []
@@ -261,11 +263,11 @@ def test_no_ch_min_state_cost_uses_v2_cpo_not_worst_imputation() -> None:
         60: resolve_keyword_v3_eligibility(no_ch_ctx, contexts),
         61: resolve_keyword_v3_eligibility(exp_ctx, contexts),
     }
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     min_cost, imputed = resolve_effective_state_cost_for_mode(
         ctx=no_ch_ctx,
         to_mode=KeywordStrategyMode.MIN_CPA,
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         prepared=prepared,
         eligibility_by_ks_id=elig_map,
     )
@@ -275,7 +277,7 @@ def test_no_ch_min_state_cost_uses_v2_cpo_not_worst_imputation() -> None:
     opt_cost, _ = resolve_effective_state_cost_for_mode(
         ctx=no_ch_ctx,
         to_mode=KeywordStrategyMode.OPTIMUM,
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         prepared=prepared,
         eligibility_by_ks_id=elig_map,
     )
@@ -303,12 +305,12 @@ def test_profitable_expansion_no_ch_auto_off_up_to_min_at_49_cpo() -> None:
     assert elig_map[71].data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
     assert elig_map[71].allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
 
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_profitable_expansion(
         prepared,
         resolve=80.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id=elig_map,
     )
     assert len(actions) == 1
@@ -330,12 +332,12 @@ def test_plan_profitable_expansion_no_ch_off_to_min() -> None:
     no_ch_ctx = KeywordV3Context(keyword=no_ch_kw, position_profile=None)
     prepared = build_prepared_from_contexts([no_ch_ctx])
     elig_map = {70: resolve_keyword_v3_eligibility(no_ch_ctx, [no_ch_ctx])}
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_profitable_expansion(
         prepared,
         resolve=100.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id=elig_map,
     )
     assert len(actions) == 1
@@ -358,12 +360,12 @@ def test_profitable_expansion_no_ch_off_no_up_when_v2_cpo_above_resolve() -> Non
     no_ch_ctx = KeywordV3Context(keyword=no_ch_kw, position_profile=None)
     prepared = build_prepared_from_contexts([no_ch_ctx])
     elig_map = {72: resolve_keyword_v3_eligibility(no_ch_ctx, [no_ch_ctx])}
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_profitable_expansion(
         prepared,
         resolve=100.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id=elig_map,
     )
     assert not actions
@@ -398,12 +400,12 @@ def test_cost_reallocation_uses_min_potential_not_resolve() -> None:
         80: resolve_keyword_v3_eligibility(contexts[0], contexts),
         81: resolve_keyword_v3_eligibility(contexts[1], contexts),
     }
-    worst_costs = build_worst_per_state_costs(prepared)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
     actions = plan_cost_reallocation(
         prepared,
         resolve=200.0,
         policy=_policy(),
-        worst_costs=worst_costs,
+        ladder_inputs=ladder_inputs,
         eligibility_by_ks_id=elig_map,
     )
     assert actions
