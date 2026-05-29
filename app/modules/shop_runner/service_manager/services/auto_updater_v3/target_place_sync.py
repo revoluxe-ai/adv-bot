@@ -82,7 +82,8 @@ async def sync_keyword_target_places_v3(
 
     Args:
         force_all_target_place_zero: CAMPAIGN_NO_DATA — min bid (0) для **управляемых** ключей.
-        target_place_fallback_zero_by_keyword_id: CAMPAIGN_NORMAL — ``ks_id → force 0``.
+        target_place_fallback_zero_by_keyword_id: CAMPAIGN_NORMAL — ``ks_id → force 0``
+            для NO_CH tier (в т.ч. пока ключ ещё OFF).
     """
     stmt = select(KeywordSetting).where(
         KeywordSetting.adv_setting_id == adv.adv_setting_original_id
@@ -105,13 +106,12 @@ async def sync_keyword_target_places_v3(
             if force_all_target_place_zero:
                 if not _hard_status_is_managed(hard_status):
                     continue
-                if strategy_mode == KeywordStrategyMode.OFF:
-                    keyword.target_place = None
-                else:
-                    keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+                keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
                 continue
 
-            if fallback_zero and strategy_mode != KeywordStrategyMode.OFF:
+            if fallback_zero:
+                if not _hard_status_is_managed(hard_status):
+                    continue
                 keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
                 continue
 

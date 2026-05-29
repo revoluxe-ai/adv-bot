@@ -413,3 +413,43 @@ async def test_sync_eligibility_fallback_zero_by_keyword_id(
     )
 
     assert min_kw.target_place == 0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_sync_eligibility_fallback_zero_off_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_CH tier: OFF + fallback_zero → target_place=0, не «по кампании» (None)."""
+    off_kw = _kw_row(
+        strategy_mode=KeywordStrategyMode.OFF,
+        target_place=None,
+        ks_id=42,
+    )
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.all.return_value = [off_kw]
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=fake_result)
+    session.commit = AsyncMock()
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
+        _patched_sm(session_cm),
+    )
+
+    adv = MagicMock()
+    adv.adv_setting_original_id = 1
+    adv.adv_id = 123
+
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles={},
+        calculated_by_text={},
+        target_place_fallback_zero_by_keyword_id={42: True},
+    )
+
+    assert off_kw.target_place == 0
