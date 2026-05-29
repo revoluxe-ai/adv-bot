@@ -2,9 +2,8 @@
 
 from aiogram import Router
 from aiogram.fsm.scene import SceneRegistry
-from aiogram.utils import callback_answer
 
-from .callback_helpers import CallbackTimingMiddleware
+from .callback_helpers import CallbackTimingMiddleware, SafeCallbackAnswerMiddleware
 from ..modules.admin_user_balance.scene import (
     UserBalanceScene,
     register_user_balance_scene,
@@ -23,7 +22,7 @@ _ = global_router.message.middleware(GateMiddleware())
 # Порядок критичен: answer на callback — до GateMiddleware (Postgres) и handler.
 _ = global_router.callback_query.middleware(CallbackTimingMiddleware())
 _ = global_router.callback_query.middleware(
-    callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
+    SafeCallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )
 _ = global_router.callback_query.middleware(GateMiddleware())
 
