@@ -67,7 +67,11 @@ PreparedList = list[_PreparedEntry]
 def build_prepared_from_contexts(
     contexts: list["KeywordV3Context"],
 ) -> PreparedList:
-    """Собрать ``PreparedList`` из контекстов ключей (единая точка для V3 planners)."""
+    """Собрать ``PreparedList`` из контекстов ключей.
+
+    Каноническое определение для V3 planners; импортировать из ``transition_ranking``,
+    не из ``selector``.
+    """
     prepared: PreparedList = []
     for ctx in contexts:
         prepared.append((ctx, stored_strategy_mode(ctx.keyword)))

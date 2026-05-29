@@ -33,10 +33,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
-    build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
+    build_prepared_from_contexts,
     build_worst_per_state_costs,
 )
 from tests.unit.test_auto_updater_v3 import (

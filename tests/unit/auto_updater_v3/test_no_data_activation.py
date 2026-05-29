@@ -29,6 +29,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (

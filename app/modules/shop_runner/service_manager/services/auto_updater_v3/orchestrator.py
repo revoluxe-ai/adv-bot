@@ -60,7 +60,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
-    build_prepared_from_contexts,
     select_v3_post_gate_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
@@ -71,6 +70,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledge
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
+    build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode import (
     CampaignMode,
