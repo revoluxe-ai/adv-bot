@@ -249,16 +249,15 @@ def _start_all_tunnels(kubeconfig: str, specs: list[_TunnelSpec]) -> None:
         _start_tunnel(spec, kubeconfig)
 
 
-def _tunnel_port_ready(runtime: _TunnelRuntime | None, spec: _TunnelSpec) -> bool:
-    if _tcp_port_open("127.0.0.1", spec.probe_port):
-        return True
-    if runtime is None:
-        return False
-    if runtime.external:
-        return False
-    if runtime.proc is None:
-        return False
-    return runtime.proc.poll() is None
+def _tunnel_port_ready(
+    _runtime: _TunnelRuntime | None,
+    spec: _TunnelSpec,
+) -> bool:
+    """Туннель здоров только если localhost:probe_port принимает TCP.
+
+    Живой kubectl без слушающего порта (зависший bind) — нездоров: watchdog перезапустит.
+    """
+    return _tcp_port_open("127.0.0.1", spec.probe_port)
 
 
 def wait_for_dev_tunnels_ready(

@@ -66,6 +66,17 @@ def test_tunnel_port_ready_dead_process() -> None:
         assert k8s_tunnels._tunnel_port_ready(runtime, spec) is False
 
 
+@pytest.mark.unit
+def test_tunnel_port_ready_stuck_kubectl_port_closed() -> None:
+    """Живой kubectl без TCP на probe_port — нездоров, monitor должен перезапустить."""
+    proc = MagicMock()
+    proc.poll.return_value = None
+    spec = k8s_tunnels._tunnel_specs()[0]
+    runtime = k8s_tunnels._TunnelRuntime(proc=proc, external=False)
+    with patch.object(k8s_tunnels, "_tcp_port_open", return_value=False):
+        assert k8s_tunnels._tunnel_port_ready(runtime, spec) is False
+
+
 def test_start_skips_monitor_when_ports_already_open() -> None:
     specs = k8s_tunnels._tunnel_specs()
 
