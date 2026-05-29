@@ -152,7 +152,8 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_not_ready_skips_sync() -> None:
+async def test_process_adv_v3_not_ready_still_syncs_after_keyword_bootstrap() -> None:
+    """NOT_READY: realloc/selector нет, но keyword bootstrap + target_place sync — да."""
     complex_adv = MagicMock()
     complex_adv.adv_id = 15
     complex_adv.adv_setting = MagicMock()
@@ -163,11 +164,20 @@ async def test_process_adv_v3_not_ready_skips_sync() -> None:
     dto = MagicMock()
     sync_mock = AsyncMock()
     bootstrap = MagicMock(return_value=[])
+    keyword_bootstrap = MagicMock(return_value=[])
 
     with (
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
             new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_target_place_fallback_zero_by_keyword_id",
+            return_value={},
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            keyword_bootstrap,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
@@ -198,8 +208,9 @@ async def test_process_adv_v3_not_ready_skips_sync() -> None:
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
+    keyword_bootstrap.assert_called_once()
     bootstrap.assert_not_called()
-    sync_mock.assert_not_awaited()
+    sync_mock.assert_awaited_once()
 
 
 @pytest.mark.unit

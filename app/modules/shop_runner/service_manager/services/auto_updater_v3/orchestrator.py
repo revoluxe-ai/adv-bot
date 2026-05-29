@@ -2,8 +2,8 @@
 
 Порядок на **каждом** тике (``CampaignMode``):
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
-  2. ``NOT_READY`` — full stop (без bootstrap/sync).
-  3. ``NO_DATA`` — только safe DATA_BOOTSTRAP → flush → target_place (force 0).
+  2. ``NOT_READY`` — без realloc/expansion/guard/selector; keyword bootstrap + sync всё равно.
+  3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
   4. ``NORMAL`` — preamble: bootstrap → realloc → expansion → max guard → gate → shelf cleanup.
   5. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
 
@@ -215,7 +215,7 @@ async def process_adv_v3(
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
         nonlocal target_place_synced
-        if target_place_synced or campaign_mode == CampaignMode.NOT_READY:
+        if target_place_synced:
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await _safe_sync_target_places_v3(
@@ -235,6 +235,25 @@ async def process_adv_v3(
 
     try:
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+        sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+            contexts
+        )
+
+        if dto is not None:
+            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            if keyword_bootstrap_actions:
+                preamble_bootstrap_count = len(keyword_bootstrap_actions)
+                logger.info(
+                    "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
+                    complex_adv.adv_id,
+                    preamble_bootstrap_count,
+                )
+                contexts = _apply_v3_phase(
+                    ledger, keyword_bootstrap_actions, raw_profiles
+                )
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
+                )
 
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
@@ -284,24 +303,6 @@ async def process_adv_v3(
                 aggressiveness=aggr,
             )
             resolve = compute_resolve_cost_threshold(plan, fact)
-            sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                contexts
-            )
-
-            bootstrap_actions = plan_data_bootstrap_v3(contexts)
-            if bootstrap_actions:
-                preamble_bootstrap_count = len(bootstrap_actions)
-                logger.info(
-                    "[adv_id=%s] v3 DATA_BOOTSTRAP: actions=%s",
-                    complex_adv.adv_id,
-                    preamble_bootstrap_count,
-                )
-                contexts = _apply_v3_phase(
-                    ledger, bootstrap_actions, raw_profiles
-                )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
-                )
 
             if is_resolve_valid(plan, resolve):
                 eligibility = build_eligibility_map(contexts)
