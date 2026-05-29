@@ -78,7 +78,8 @@ def test_eligibility_invalid_empty_allowed_modes() -> None:
     )
     stat = kw.cluster_stat.model_copy(update={"views": 0, "conv_views_to_orders": 0.0})
     kw = kw.model_copy(update={"cluster_stat": stat})
-    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    # INVALID: нет CH и нет V2 CPO (NO_CONV требует CH-матрицу на ключе)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
     assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID
     assert elig.allowed_modes == frozenset()

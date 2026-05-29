@@ -85,7 +85,8 @@ def test_no_conv_tier_when_ch_but_no_imputation() -> None:
     decision = resolve_keyword_v3_decision(ctx, [ctx])
     assert decision.tier == KeywordV3DecisionTier.NO_CONV
     assert decision.has_ch_position_profile
-    assert keyword_lacks_v3_decision_data(ctx, [ctx])
+    # NO_CONV: pessimistic ladder (worst CPO), не INVALID / N-state bootstrap
+    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
 
 
 @pytest.mark.unit

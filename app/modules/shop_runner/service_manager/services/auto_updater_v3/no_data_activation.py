@@ -225,7 +225,10 @@ def keyword_lacks_v3_decision_data(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> bool:
-    """Ключ в N-state preamble: нет CH или нет conv даже после импутации РК."""
+    """Ключ в N-state preamble: ``KEYWORD_INVALID`` (нет CH и нет V2 CPO для MIN).
+
+    ``NO_CONV`` с CH — pessimistic ladder, не bootstrap здесь.
+    """
     return _keyword_lacks_v3_decision_data(ctx, contexts)
 
 
