@@ -17,7 +17,7 @@ def _reset_monitor_state() -> None:
     k8s_tunnels._atexit_registered = False
     k8s_tunnels._processes_by_name = {}
     yield
-    k8s_tunnels._stop_all_tunnels()
+    k8s_tunnels._stop_owned_tunnels()
     k8s_tunnels._monitor_started = False
     k8s_tunnels._atexit_registered = False
     k8s_tunnels._processes_by_name = {}

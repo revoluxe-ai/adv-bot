@@ -195,11 +195,6 @@ def _terminate_process(proc: subprocess.Popen[bytes]) -> None:
         proc.wait(timeout=5)
 
 
-def _stop_all_tunnels() -> None:
-    """Останавливает только kubectl, запущенные этим процессом."""
-    _stop_owned_tunnels()
-
-
 def _stop_owned_tunnels() -> None:
     """Останавливает только kubectl, запущенные этим процессом (не чужой forward)."""
     global _processes_by_name
