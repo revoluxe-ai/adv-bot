@@ -52,6 +52,21 @@ def test_start_missing_kubeconfig_leaves_monitor_not_started() -> None:
     mock_thread.assert_not_called()
 
 
+def test_already_started_waits_outside_monitor_lock() -> None:
+    """Повторный start с wait_ready не держит _monitor_lock на время poll/sleep."""
+    lock_held_during_wait: bool | None = None
+
+    def _wait_stub(*, specs: list) -> None:
+        nonlocal lock_held_during_wait
+        lock_held_during_wait = k8s_tunnels._monitor_lock.locked()
+
+    k8s_tunnels._monitor_started = True
+    with patch.object(k8s_tunnels, "wait_for_dev_tunnels_ready", side_effect=_wait_stub):
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=True)
+
+    assert lock_held_during_wait is False
+
+
 def test_start_dev_tunnels_monitor_idempotent() -> None:
     mock_thread_instance = MagicMock()
 
@@ -88,6 +103,28 @@ def test_tunnel_port_ready_stuck_kubectl_port_closed() -> None:
     runtime = k8s_tunnels._TunnelRuntime(proc=proc, external=False)
     with patch.object(k8s_tunnels, "_tcp_port_open", return_value=False):
         assert k8s_tunnels._tunnel_port_ready(runtime, spec) is False
+
+
+def test_ports_ready_waits_outside_monitor_lock() -> None:
+    """Первый start при уже открытых портах не держит lock на время wait_ready."""
+    lock_held_during_wait: bool | None = None
+
+    def _wait_stub(*, specs: list) -> None:
+        nonlocal lock_held_during_wait
+        lock_held_during_wait = k8s_tunnels._monitor_lock.locked()
+
+    with (
+        patch.object(k8s_tunnels.Path, "is_file", return_value=True),
+        patch.object(k8s_tunnels, "_ports_ready", return_value=True),
+        patch.object(k8s_tunnels, "_adopt_external_forward"),
+        patch.object(k8s_tunnels, "wait_for_dev_tunnels_ready", side_effect=_wait_stub),
+        patch.object(k8s_tunnels.threading, "Thread"),
+        patch.object(k8s_tunnels, "atexit"),
+    ):
+        k8s_tunnels._monitor_started = False
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=True)
+
+    assert lock_held_during_wait is False
 
 
 def test_start_skips_monitor_when_ports_already_open() -> None:

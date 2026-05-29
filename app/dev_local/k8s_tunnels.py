@@ -338,36 +338,38 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
     """
     global _monitor_started
 
-    kubeconfig: str
-    specs: list[_TunnelSpec]
+    kubeconfig = ""
+    specs: list[_TunnelSpec] = []
     start_monitor_thread = False
+    wait_specs_after_lock: list[_TunnelSpec] | None = None
 
     with _monitor_lock:
         if _monitor_started:
+            if wait_ready:
+                wait_specs_after_lock = _tunnel_specs()
+        else:
+            kubeconfig = _default_kubeconfig()
+            if not Path(kubeconfig).is_file():
+                raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
+
             specs = _tunnel_specs()
-            if wait_ready:
-                wait_for_dev_tunnels_ready(specs=specs)
-            return
 
-        kubeconfig = _default_kubeconfig()
-        if not Path(kubeconfig).is_file():
-            raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
+            if _ports_ready(specs):
+                logger.info(
+                    "All dev tunnel ports already forwarded; skipping kubectl in this process"
+                )
+                for spec in specs:
+                    _adopt_external_forward(spec)
+                _monitor_started = True
+                if wait_ready:
+                    wait_specs_after_lock = specs
+            else:
+                _monitor_started = True
+                start_monitor_thread = True
 
-        specs = _tunnel_specs()
-
-        if _ports_ready(specs):
-            logger.info(
-                "All dev tunnel ports already forwarded; skipping kubectl in this process"
-            )
-            for spec in specs:
-                _adopt_external_forward(spec)
-            _monitor_started = True
-            if wait_ready:
-                wait_for_dev_tunnels_ready(specs=specs)
-            return
-
-        _monitor_started = True
-        start_monitor_thread = True
+    if wait_specs_after_lock is not None:
+        wait_for_dev_tunnels_ready(specs=wait_specs_after_lock)
+        return
 
     if not start_monitor_thread:
         return
