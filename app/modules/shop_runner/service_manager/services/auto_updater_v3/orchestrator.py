@@ -322,6 +322,9 @@ async def process_adv_v3(
                 prepared = build_prepared_from_contexts(contexts)
                 worst_costs = build_worst_costs(prepared)
 
+                # COST_REALLOCATION — portfolio DOWN при запасе по CPA (не overspend guard):
+                # снимаем дорогую агрессию, затем PROFITABLE_EXPANSION перераспределяет
+                # в более дешёвые passing states. При высоком fact CPA — MAX_CPA_GUARD ниже.
                 if (
                     fact.pay_for_order is not None
                     and float(fact.pay_for_order) < 0.9 * float(resolve)
