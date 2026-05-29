@@ -4,7 +4,17 @@ N-state (preamble) — нет CH-матрицы **или** нельзя импу
 ``keyword_v3_decision_data``). Недостаток только своей conv при наличии CH → агрегат РК /
 max по соседним ключам, лестница M1/M2/M3.
 
-На уровне **кампании** — ``SalesStates.NO_DATA`` (``detect_campaign_state``).
+**NO CH при NORMAL-кампании** (нет bid profile, но есть свой V2 CPO на ключе):
+
+- tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — только MIN, ``target_place=0``;
+- UP/trim/OVERSPEND: граница ``keyword.pay_for_order`` vs ``plan.max_pay_for_order``
+  (как в UI), см. ``_no_ch_bootstrap_allowed_by_pay_for_order``,
+  ``plan_no_ch_min_bootstrap_actions``, ``rollout_planner.plan_campaign_trim_by_max_state_cost``;
+- ``resolve_keyword_v2_pay_for_order_cost`` — отдельная консервативная метрика (rating CPM),
+  не подменяет ``pay_for_order`` в гейтах.
+
+На уровне **кампании** — ``SalesStates.NO_DATA`` (``detect_campaign_state``): force MIN + target 0
+для всех управляемых ключей **без** проверки ``pay_for_order`` на bootstrap.
 """
 
 from __future__ import annotations
@@ -66,7 +76,12 @@ _NO_CH_MIN_BOOTSTRAP_REASON = "no_ch_min_bootstrap"
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3DataDiagnostic:
-    """Что есть/нет для V3 по ключу (уровень данных + CH-матрица)."""
+    """Что есть/нет для V3 по ключу (уровень данных + CH-матрица).
+
+    ``has_v2_cpo`` — наличие **своего** V2 CPO (conv ключа + rating CPM), не imputed conv.
+    Для CH+``RK_AGGREGATE``/``PEER_MAX`` updater использует ``effective_conv_for_v3``;
+    ``has_v2_cpo=False`` при imputed conv не означает INVALID tier.
+    """
 
     has_v2_cpo: bool
     has_ch_position_profile: bool
@@ -125,7 +140,13 @@ def diagnose_keyword_v3_data(
     *,
     peer_contexts: list["KeywordV3Context"] | None = None,
 ) -> KeywordV3DataDiagnostic:
-    """Сводка: уровень данных V3, CH-матрица, CPO с учётом импутации conv."""
+    """Сводка для UI: CH-матрица, tier decision, флаг **своего** V2 CPO.
+
+    Ветка ``peer_contexts is not None`` — для диагностики с контекстом РК; в prod loader
+    пока вызывает без peers (один ключ). ``keyword_v2_pay_for_order_unavailable_with_conv``
+    намеренно не пересчитывает V2 CPO с imputed conv — см. docstring там и module
+    ``keyword_v3_decision_data``.
+    """
     has_ch = not keyword_missing_ch_position_profile(position_profile)
     if peer_contexts is not None and has_ch:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -170,7 +191,10 @@ def keyword_missing_ch_position_profile(
 
 
 def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
-    """Нет CPO: conv из CH + CPM set_bid/stats (как rating), не каскад с bid_log."""
+    """Нет **своего** V2 CPO (conv ключа + rating CPM); не каскад ``keyword.pay_for_order``.
+
+    Для границ NO CH tier в updater используется ``keyword.pay_for_order`` (карточка/UI).
+    """
     if not isinstance(keyword, CalculatedKeyword):
         raise TypeError(
             "keyword_v2_pay_for_order_unavailable expects CalculatedKeyword, "
@@ -359,7 +383,11 @@ def _no_ch_bootstrap_allowed_by_pay_for_order(
     *,
     max_pay_for_order: float | None,
 ) -> bool:
-    """NO CH: UP только если ``keyword.pay_for_order`` (как в карточке) ≤ max."""
+    """NO CH: UP только если ``keyword.pay_for_order`` (как в карточке) ≤ max.
+
+    Основная операционная граница для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``;
+    не путать с ``resolve_keyword_v2_pay_for_order_cost`` (rating CPM без bid_log).
+    """
     pfo = ctx.keyword.pay_for_order
     if pfo is None:
         return False

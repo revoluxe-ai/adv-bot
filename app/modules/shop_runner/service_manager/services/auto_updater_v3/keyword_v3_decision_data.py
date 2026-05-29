@@ -3,6 +3,20 @@
 ``NO_CH_MATRIX`` — нет CH bid profile. ``NO_CONV`` — матрица есть, conv нельзя импутировать.
 Недостаток своей conv/CPO не отправляет ключ в ``plan_no_data_keyword_actions``: подставляется
 ``effective_conv`` для ``build_mode_candidates`` / M1/M2/M3 с отдельным ``KeywordV3DecisionTier``.
+
+Два независимых контура себестоимости (намеренно не смешиваются):
+
+1. **NO CH + свой V2 CPO** (``KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``):
+   MIN-only, ``target_place=0``. Границы UP/trim/OVERSPEND — ``keyword.pay_for_order``
+   (как в карточке Telegram, каскад CPM с bid_log). Импутация conv по РК **не** применяется.
+
+2. **CH + импутированная conv** (``RK_AGGREGATE`` / ``PEER_MAX``):
+   Лестница M/O/C через ``effective_conv_for_v3`` → ``build_mode_candidates`` /
+   ``predicted_cpa`` по CH-матрице. ``resolve_keyword_v2_pay_for_order_cost`` здесь **не**
+   пересчитывает CPO с imputed conv: это метрика **своего** V2 (conv + rating CPM), без bid_log.
+
+``resolve_keyword_v2_pay_for_order_cost`` также **не** подставляет ``keyword.pay_for_order`` —
+иначе смешиваются rating CPM и каскад bid_log (см. ``candidates.resolve_effective_state_cost``).
 """
 
 from __future__ import annotations
@@ -117,7 +131,11 @@ def keyword_has_v2_cpo(
     *,
     worst_costs: dict[AggressionTargetMode, float] | None = None,
 ) -> bool:
-    """Есть V2 CPO: rating CPM + conv или pessimistic MIN с других ключей."""
+    """Есть **свой** V2 CPO: ``keyword.conv_views_to_orders`` + rating CPM или pessimistic MIN.
+
+    Не означает «можно считать лестницу с imputed conv» — для CH+импутации см.
+    ``resolve_keyword_v3_decision`` / ``effective_conv_for_v3``.
+    """
     return (
         resolve_keyword_v2_pay_for_order_cost(keyword, worst_costs=worst_costs)
         is not None
@@ -129,10 +147,20 @@ def resolve_keyword_v2_pay_for_order_cost(
     *,
     worst_costs: dict[AggressionTargetMode, float] | None = None,
 ) -> float | None:
-    """Себестоимость для NO-CH MIN: conv + rating CPM; иначе pessimistic MIN с РК.
+    """Себестоимость для NO-CH MIN и флага «свой V2 CPO»: **только** conv ключа + rating CPM.
 
-    Не использует ``keyword.pay_for_order`` (каскад с bid_log). При отсутствии CPM
-    возвращает ``worst_costs[MIN_CPA]`` — worst predicted CPA по ключам с CH-матрицей.
+    Намеренно **не** использует:
+
+    - ``keyword.pay_for_order`` — там полный CPM-каскад (set_bid → bid_log → stats);
+    - imputed ``effective_conv`` — для CH+RK_AGGREGATE/PEER_MAX экономика идёт через
+      ``build_mode_candidates(profile, conv=effective_conv_for_v3(...))``, не через эту функцию.
+
+    При отсутствии rating CPM возвращает ``worst_costs[MIN_CPA]`` — worst predicted CPA
+    по ключам РК с CH-матрицей (pessimistic fallback для NO CH без CPM).
+
+    Операционные границы (bootstrap UP, OVERSPEND trim) для tier NO CH — ``keyword.pay_for_order``
+    в ``no_data_activation._no_ch_bootstrap_allowed_by_pay_for_order`` и
+    ``rollout_planner.keyword_pay_for_order_exceeds_max``.
     """
     conv = keyword.conv_views_to_orders
     if conv is None or conv <= 0:
@@ -272,7 +300,19 @@ def keyword_v2_pay_for_order_unavailable_with_conv(
     conv_views_to_orders: float | None,
     worst_costs: dict[AggressionTargetMode, float] | None = None,
 ) -> bool:
-    """Нет CPO: rating CPM + conv или pessimistic MIN; без каскада bid_log."""
+    """«Нет **своего** V2 CPO» для диагностики; imputed conv в расчёт **не** подставляется.
+
+    ``conv_views_to_orders`` — только guard «есть ли effective conv у decision tier»
+    (``None``/``<=0`` → unavailable). Дальше проверяется **собственная** conv ключа через
+    ``resolve_keyword_v2_pay_for_order_cost(keyword)`` — это ожидаемо:
+
+    - tier ``RK_AGGREGATE``/``PEER_MAX``: updater живёт на CH+imputed conv, не на V2 CPO;
+      ``has_v2_cpo=False`` здесь = «нет своего V2», не «ключ INVALID».
+    - tier ``NO_CH_MATRIX``: imputed conv не бывает; границы — ``keyword.pay_for_order``.
+
+    Не расширять до ``calc_orders_per_1000_rub(imputed_conv, cpm)`` без смены контракта
+    метрик (см. module docstring).
+    """
     if conv_views_to_orders is None or conv_views_to_orders <= 0:
         return True
     return (

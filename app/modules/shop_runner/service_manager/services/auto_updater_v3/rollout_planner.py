@@ -205,7 +205,11 @@ def keyword_pay_for_order_exceeds_max(
     *,
     max_pay_for_order: float,
 ) -> bool:
-    """True, если ``keyword.pay_for_order`` (как в UI) строго выше ``plan.max_pay_for_order``."""
+    """True, если ``keyword.pay_for_order`` (как в UI) строго выше ``plan.max_pay_for_order``.
+
+    Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — основной критерий FORCE_OFF при
+    OVERSPEND/trim (нет CH ``state_cost``; imputed conv не используется).
+    """
     pfo = ctx.keyword.pay_for_order
     if pfo is None:
         return False
@@ -367,6 +371,10 @@ def plan_campaign_trim_by_max_state_cost(
     """Снизить режим до ближайшего с ``state_cost <= plan.max_pay_for_order`` (не resolve).
 
     Вызывается из orchestrator, когда ``fact.pay_for_order > plan.max_pay_for_order``.
+
+    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` (нет CH-матрицы): не пропускаем tier —
+    сравниваем ``keyword.pay_for_order`` с max и при превышении → OFF. Imputed conv
+    и ``resolve_keyword_v2_pay_for_order_cost`` здесь не участвуют.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,

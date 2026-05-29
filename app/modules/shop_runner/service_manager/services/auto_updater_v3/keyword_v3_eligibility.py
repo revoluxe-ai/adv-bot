@@ -2,6 +2,11 @@
 
 ``allowed_modes`` — рабочие UP/realloc target modes **без OFF**. ``OFF`` допустим только
 как результат DOWN/FORCE_OFF, не как UP-кандидат (см. ``can_target_mode``).
+
+Tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: нет CH-матрицы, но есть свой V2 CPO на ключе.
+Границы UP/trim — ``keyword.pay_for_order`` (UI), не imputed conv и не
+``resolve_keyword_v2_pay_for_order_cost``. Tier ``KEYWORD_PESSIMISTIC_FALLBACK``: CH есть,
+conv импутирована с РК — лестница через ``effective_conv_for_v3``.
 """
 
 from __future__ import annotations
@@ -42,7 +47,11 @@ _EMPTY_TARGET_MODES: frozenset[KeywordStrategyMode] = frozenset()
 
 
 class KeywordDataTier(str, Enum):
-    """Keyword-level tier данных (не campaign state)."""
+    """Keyword-level tier данных (не campaign state).
+
+    ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — нет CH bid profile, свой V2 CPO на ключе;
+    MIN-only; границы UP/trim — ``keyword.pay_for_order`` (как в UI).
+    """
 
     KEYWORD_FULL = "keyword_full"
     KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV = "keyword_no_ch_profile_with_own_conv"
@@ -92,7 +101,11 @@ def resolve_keyword_v3_eligibility(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> KeywordV3Eligibility:
-    """Свести conv/CH decision к продуктовому ``KeywordDataTier``."""
+    """Свести conv/CH decision к продуктовому ``KeywordDataTier``.
+
+    NO CH + ``keyword_has_v2_cpo`` → MIN-only, ``target_place_fallback_zero=True``.
+    CH + imputed conv → полная лестница с ``fallback_kind="pessimistic"`` (не V2 CPO path).
+    """
     decision = resolve_keyword_v3_decision(ctx, contexts)
     has_ch = decision.has_ch_position_profile
     eff = decision.effective_conv_views_to_orders
