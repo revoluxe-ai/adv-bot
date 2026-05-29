@@ -42,12 +42,12 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_predict_keywords_target_place",
-            return_value=predictor,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(max_pay_for_order=100.0, orders=10),
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
@@ -61,7 +61,19 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=SalesStates.OVERSPEND,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_actions",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
             select_mock,
         ),
         patch(

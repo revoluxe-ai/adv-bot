@@ -1,11 +1,11 @@
 """AutoUpdater v3 orchestration (per-keyword aggression).
 
-Порядок на **каждом** тике:
-  1. CH bid profiles; plan/fact → ``detect_campaign_state``.
-  2. Кампания ``NO_DATA`` (Н) или ``state is None`` — полный стоп (как V2).
-  3. Иначе preamble: **M1** → **trim** (если ``fact.pay_for_order > plan.max``) →
-     no_data (N-state ключей) → selector **M2/M3** (``OVERSPEND`` не режет gate).
-  4. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
+Порядок на **каждом** тике (``CampaignMode``):
+  1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
+  2. ``NOT_READY`` — full stop (без bootstrap/sync).
+  3. ``NO_DATA`` — только safe DATA_BOOTSTRAP → flush → target_place (force 0).
+  4. ``NORMAL`` — preamble: bootstrap → realloc → expansion → max guard → gate → shelf cleanup.
+  5. Нетто-flush ``strategy_mode`` + ``hard_status``; ``target_place`` после flush.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
@@ -30,34 +30,50 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
     resolve_shelf_click_mode_from_adv,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-    normalize_v3_rollout_aggressiveness,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    build_eligibility_map,
+    build_target_place_fallback_zero_by_keyword_id,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    plan_campaign_no_data_bootstrap_safe,
+    plan_data_bootstrap_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
     resolve_keyword_bid_profile,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-    plan_no_data_activation_v3,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    build_worst_costs,
     compute_resolve_cost_threshold,
-    plan_campaign_trim_by_max_state_cost,
+    is_resolve_valid,
+    plan_cost_reallocation,
+    plan_max_cpa_guard,
+    plan_profitable_expansion,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
     build_prepared_from_contexts,
-    plan_m1_mass_cheap_promotion_with_plan_fact,
-    select_v3_actions,
+    select_v3_post_gate_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync import (
     sync_keyword_target_places_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (
     V3TickKeywordLedger,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    SelectionPolicy,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode import (
+    CampaignMode,
+    allows_ladder_phases,
+    resolve_campaign_mode,
 )
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
@@ -74,11 +90,6 @@ from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 logger = logging.getLogger(__name__)
 
 
-def _v3_campaign_ladder_blocked(state: SalesStates | None) -> bool:
-    """Как ``AdvControlSystem``: без агрегата fact CPO по РК сценарий не крутим."""
-    return state is None or state == SalesStates.NO_DATA
-
-
 def build_keyword_v3_contexts(
     keywords: list[CalculatedKeyword],
     raw_profiles: dict[str, list[BidPosition]],
@@ -91,6 +102,17 @@ def build_keyword_v3_contexts(
         merged = kw.model_copy(update={"position_profile": profile})
         contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))
     return contexts
+
+
+def _apply_v3_phase(
+    ledger: V3TickKeywordLedger,
+    actions: list[V3Action],
+    raw_profiles: dict[str, list[BidPosition]],
+) -> list[KeywordV3Context]:
+    """Применить фазу in-memory и пересобрать контексты."""
+    if actions:
+        ledger.apply_in_memory(actions)
+    return build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
 
 async def _load_v3_wb_context(
@@ -146,6 +168,8 @@ async def _safe_sync_target_places_v3(
     raw_profiles: dict[str, list[BidPosition]],
     *,
     keywords: list[CalculatedKeyword],
+    force_all_target_place_zero: bool = False,
+    target_place_fallback_zero_by_keyword_id: dict[int, bool] | None = None,
 ) -> None:
     """Best-effort sync ``target_place`` без подмены ошибки из ``try`` (PEP 409)."""
     try:
@@ -153,6 +177,10 @@ async def _safe_sync_target_places_v3(
             dto,
             raw_profiles,
             calculated_by_text=_calculated_keywords_by_text(keywords),
+            force_all_target_place_zero=force_all_target_place_zero,
+            target_place_fallback_zero_by_keyword_id=(
+                target_place_fallback_zero_by_keyword_id
+            ),
         )
     except Exception:
         logger.error(
@@ -180,109 +208,179 @@ async def process_adv_v3(
     target_place_synced = False
     selector_actions_logged: list[V3Action] = []
 
-    campaign_ladder_blocked = False
+    campaign_mode = CampaignMode.NOT_READY
+    sync_force_zero = False
+    sync_fallback_by_id: dict[int, bool] | None = None
 
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
         nonlocal target_place_synced
-        if target_place_synced or campaign_ladder_blocked:
+        if target_place_synced or campaign_mode == CampaignMode.NOT_READY:
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
             await _safe_sync_target_places_v3(
-                complex_adv, dto, raw_profiles, keywords=ledger.keywords
+                complex_adv,
+                dto,
+                raw_profiles,
+                keywords=ledger.keywords,
+                force_all_target_place_zero=sync_force_zero,
+                target_place_fallback_zero_by_keyword_id=sync_fallback_by_id,
             )
             target_place_synced = True
+
+    preamble_bootstrap_count = 0
+    preamble_realloc_count = 0
+    preamble_expansion_count = 0
+    preamble_guard_count = 0
 
     try:
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
 
-        # --- Plan/fact: раньше лестницы; Н/None = стоп как V2 ---
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
         if plan is None:
-            logger.debug("[adv_id=%s] v3: no plan, skip selector", complex_adv.adv_id)
+            logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
         else:
             updater = AdvSettingAutoUpdater(adv, max_last_period)
             fact = await updater.get_fact_data(ledger.keywords)
-
             state = detect_campaign_state(plan, fact)
-            campaign_ladder_blocked = _v3_campaign_ladder_blocked(state)
-            if campaign_ladder_blocked:
+            campaign_mode = resolve_campaign_mode(state)
+            logger.info(
+                "[adv_id=%s] v3: campaign_mode=%s state=%s",
+                complex_adv.adv_id,
+                campaign_mode.value,
+                state.name if state is not None else "None",
+            )
+
+        if campaign_mode == CampaignMode.NO_DATA and dto is not None:
+            bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
+            if bootstrap_actions:
+                preamble_bootstrap_count = len(bootstrap_actions)
                 logger.info(
-                    "[adv_id=%s] v3: campaign state=%s — ladder wait (align V2)",
+                    "[adv_id=%s] v3 DATA_BOOTSTRAP (NO_DATA): actions=%s",
                     complex_adv.adv_id,
-                    state.name if state is not None else "None",
+                    preamble_bootstrap_count,
+                )
+                contexts = _apply_v3_phase(
+                    ledger, bootstrap_actions, raw_profiles
+                )
+            sync_force_zero = True
+
+        elif campaign_mode == CampaignMode.NORMAL and dto is not None:
+            assert plan is not None and fact is not None
+            shelf_active = complex_adv.shelf_promotion_active
+            shelf_click_mode = (
+                resolve_shelf_click_mode_from_adv(complex_adv)
+                if shelf_active
+                else None
+            )
+            aggr = normalize_v3_rollout_aggressiveness(
+                complex_adv.v3_rollout_aggressiveness
+            )
+            click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+            policy = SelectionPolicy.from_aggressiveness(
+                click_mode=click_mode,
+                aggressiveness=aggr,
+            )
+            resolve = compute_resolve_cost_threshold(plan, fact)
+            sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                contexts
+            )
+
+            bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            if bootstrap_actions:
+                preamble_bootstrap_count = len(bootstrap_actions)
+                logger.info(
+                    "[adv_id=%s] v3 DATA_BOOTSTRAP: actions=%s",
+                    complex_adv.adv_id,
+                    preamble_bootstrap_count,
+                )
+                contexts = _apply_v3_phase(
+                    ledger, bootstrap_actions, raw_profiles
+                )
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
                 )
 
-        preamble_m1_count = 0
-        preamble_trim_count = 0
+            if is_resolve_valid(plan, resolve):
+                eligibility = build_eligibility_map(contexts)
+                prepared = build_prepared_from_contexts(contexts)
+                worst_costs = build_worst_costs(prepared)
 
-        if not campaign_ladder_blocked and dto is not None:
-            if plan is not None and fact is not None:
-                shelf_active = complex_adv.shelf_promotion_active
-                shelf_click_mode = (
-                    resolve_shelf_click_mode_from_adv(complex_adv)
-                    if shelf_active
-                    else None
-                )
-                aggr = normalize_v3_rollout_aggressiveness(
-                    complex_adv.v3_rollout_aggressiveness
-                )
-
-                m1_actions = plan_m1_mass_cheap_promotion_with_plan_fact(
-                    contexts,
-                    plan=plan,
-                    fact=fact,
-                    shelf_promotion_active=shelf_active,
-                    shelf_click_mode=shelf_click_mode,
-                    aggr=aggr,
-                )
-                if m1_actions:
-                    preamble_m1_count = len(m1_actions)
-                    logger.info(
-                        "[adv_id=%s] v3 preamble M1: actions=%s",
-                        complex_adv.adv_id,
-                        preamble_m1_count,
+                if (
+                    fact.pay_for_order is not None
+                    and float(fact.pay_for_order) < 0.9 * float(resolve)
+                ):
+                    realloc_actions = plan_cost_reallocation(
+                        prepared,
+                        resolve=resolve,
+                        policy=policy,
+                        worst_costs=worst_costs,
+                        eligibility_by_ks_id=eligibility,
                     )
-                    _ = ledger.apply_in_memory(m1_actions)
-                    contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+                    if realloc_actions:
+                        preamble_realloc_count = len(realloc_actions)
+                        logger.info(
+                            "[adv_id=%s] v3 COST_REALLOCATION: actions=%s",
+                            complex_adv.adv_id,
+                            preamble_realloc_count,
+                        )
+                        contexts = _apply_v3_phase(
+                            ledger, realloc_actions, raw_profiles
+                        )
+                        eligibility = build_eligibility_map(contexts)
+                        prepared = build_prepared_from_contexts(contexts)
+                        worst_costs = build_worst_costs(prepared)
+
+                expansion_actions = plan_profitable_expansion(
+                    prepared,
+                    resolve=resolve,
+                    policy=policy,
+                    worst_costs=worst_costs,
+                    eligibility_by_ks_id=eligibility,
+                )
+                if expansion_actions:
+                    preamble_expansion_count = len(expansion_actions)
+                    logger.info(
+                        "[adv_id=%s] v3 PROFITABLE_EXPANSION: actions=%s",
+                        complex_adv.adv_id,
+                        preamble_expansion_count,
+                    )
+                    contexts = _apply_v3_phase(
+                        ledger, expansion_actions, raw_profiles
+                    )
+                    sync_fallback_by_id = (
+                        build_target_place_fallback_zero_by_keyword_id(contexts)
+                    )
 
                 if (
                     fact.pay_for_order is not None
                     and float(fact.pay_for_order) > float(plan.max_pay_for_order)
                 ):
-                    trim_click = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-                    trim_actions = plan_campaign_trim_by_max_state_cost(
-                        build_prepared_from_contexts(contexts),
+                    prepared = build_prepared_from_contexts(contexts)
+                    guard_actions = plan_max_cpa_guard(
+                        prepared,
                         max_pay_for_order=float(plan.max_pay_for_order),
-                        shelf_click_mode=trim_click,
+                        shelf_click_mode=click_mode,
                         aggressiveness=aggr,
                     )
-                    if trim_actions:
-                        preamble_trim_count = len(trim_actions)
+                    if guard_actions:
+                        preamble_guard_count = len(guard_actions)
                         logger.info(
-                            "[adv_id=%s] v3 preamble trim (max=%s): actions=%s",
+                            "[adv_id=%s] v3 MAX_CPA_GUARD: actions=%s",
                             complex_adv.adv_id,
-                            plan.max_pay_for_order,
-                            preamble_trim_count,
+                            preamble_guard_count,
                         )
-                        _ = ledger.apply_in_memory(trim_actions)
-                        contexts = build_keyword_v3_contexts(
-                            ledger.keywords, raw_profiles
+                        contexts = _apply_v3_phase(
+                            ledger, guard_actions, raw_profiles
                         )
 
-            no_data_actions = plan_no_data_activation_v3(contexts)
-            if no_data_actions:
-                logger.info(
-                    "[adv_id=%s] v3 no_data activation planned: actions=%s",
-                    complex_adv.adv_id,
-                    len(no_data_actions),
-                )
-                _ = ledger.apply_in_memory(no_data_actions)
-                contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-
-        if plan is not None and not campaign_ladder_blocked:
+        if (
+            plan is not None
+            and allows_ladder_phases(campaign_mode)
+            and campaign_mode == CampaignMode.NORMAL
+        ):
             plan_fact_change = ChangePlanFact(adv)
             plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
 
@@ -302,17 +400,12 @@ async def process_adv_v3(
                 )
             else:
                 shelf_active = complex_adv.shelf_promotion_active
-                selector_actions_logged = select_v3_actions(
-                    state=state,
+                selector_actions_logged = select_v3_post_gate_actions(
                     contexts=contexts,
                     shelf_promotion_active=shelf_active,
-                    rollout_aggressiveness=complex_adv.v3_rollout_aggressiveness,
                     shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
                     if shelf_active
                     else None,
-                    plan_max_pay_for_order=float(plan.max_pay_for_order),
-                    plan=plan,
-                    fact=fact,
                 )
                 _ = ledger.apply_in_memory(selector_actions_logged)
                 await cache_plan_fact_snapshot()
@@ -325,53 +418,23 @@ async def process_adv_v3(
                 force_off_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "FORCE_OFF"
                 )
-                m2_count = sum(
-                    1 for a in selector_actions_logged if a.reason.startswith("m2_")
-                )
-                m3_count = sum(
-                    1 for a in selector_actions_logged if a.reason.startswith("m3_")
-                )
                 logger.info(
                     "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
-                    "preamble_m1=%s preamble_trim=%s "
-                    "up=%s down=%s off=%s m2=%s m3=%s",
+                    "bootstrap=%s realloc=%s expansion=%s guard=%s "
+                    "post_gate up=%s down=%s off=%s",
                     complex_adv.adv_id,
-                    state.name,
-                    compute_resolve_cost_threshold(plan, fact),
-                    fact.pay_for_order,
-                    preamble_m1_count,
-                    preamble_trim_count,
+                    state.name if state else "None",
+                    compute_resolve_cost_threshold(plan, fact)
+                    if fact is not None
+                    else None,
+                    fact.pay_for_order if fact else None,
+                    preamble_bootstrap_count,
+                    preamble_realloc_count,
+                    preamble_expansion_count,
+                    preamble_guard_count,
                     up_count,
                     down_count,
                     force_off_count,
-                    m2_count,
-                    m3_count,
-                )
-                for act in selector_actions_logged:
-                    sel = act.selection_log
-                    if sel is not None:
-                        logger.info(
-                            "[adv_id=%s] v3_selection state=%s action=%s reason=%s "
-                            "pool=%s pool_after_rec=%s tier=%s state_cost=%s "
-                            "%s->%s move=%s imputed=%s",
-                            complex_adv.adv_id,
-                            state.name,
-                            act.action.value,
-                            act.reason,
-                            sel.pool_size,
-                            sel.pool_size_after_rec,
-                            sel.rec_tier,
-                            sel.state_cost,
-                            sel.from_mode,
-                            sel.to_mode,
-                            sel.move_kind,
-                            sel.imputed,
-                        )
-                logger.info(
-                    "[adv_id=%s] v3: state=%s actions=%s",
-                    complex_adv.adv_id,
-                    state.name,
-                    [a.model_dump() for a in selector_actions_logged],
                 )
 
         flushed = await ledger.flush_to_db(complex_adv)

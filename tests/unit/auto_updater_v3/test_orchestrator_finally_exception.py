@@ -38,12 +38,11 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(),
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_fact_data",
-            new=AsyncMock(return_value=MagicMock()),
-        ),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
@@ -53,7 +52,7 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
             side_effect=_ROOT_ERROR,
         ),
         patch(
@@ -61,6 +60,9 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             new=AsyncMock(side_effect=OSError("db down")),
         ),
     ):
+        updater_cls.return_value.get_fact_data = AsyncMock(
+            return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
+        )
         with pytest.raises(RuntimeError, match="root cause from try") as exc_info:
             await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 

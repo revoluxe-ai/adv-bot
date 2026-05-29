@@ -59,6 +59,7 @@ NO_DATA_TARGET_PLACE_FALLBACK: int = 0
 _HARD_STATUS_AUTO_MODE = 1
 _HARD_STATUS_WHITE_LIST = 2
 
+_DATA_BOOTSTRAP_REASON = "data_bootstrap_safe"
 _NO_DATA_REASON = "no_data_min_bid"
 
 
@@ -74,9 +75,12 @@ class KeywordV3DataDiagnostic:
 
     @property
     def n_state(self) -> bool:
-        """N-state: только preamble MIN_CPA (нет CH или нет conv даже с импутацией)."""
+        """N-state: нет данных для лестницы (INVALID / нет conv без импутации).
+
+        NO_CH + own conv / V2 CPO — не n_state: tier MIN-only, ``target_place=0``.
+        """
         if not self.has_ch_position_profile:
-            return True
+            return not self.has_v2_cpo
         if self.decision_tier in (
             KeywordV3DecisionTier.NO_CH_MATRIX,
             KeywordV3DecisionTier.NO_CONV,
@@ -244,13 +248,18 @@ def split_prepared_by_v2_cpo(
     return with_data, without_data
 
 
-def _append_min_cpa_up(actions: list[V3Action], *, ks_id: int) -> None:
+def _append_min_cpa_up(
+    actions: list[V3Action],
+    *,
+    ks_id: int,
+    reason: str = _NO_DATA_REASON,
+) -> None:
     actions.append(
         V3Action(
             action=V3ActionType.UP,
             keyword_setting_id=ks_id,
             target_strategy_mode=KeywordStrategyMode.MIN_CPA,
-            reason=_NO_DATA_REASON,
+            reason=reason,
         )
     )
 
@@ -259,16 +268,117 @@ def _append_force_off_then_min_cpa(
     actions: list[V3Action],
     *,
     ks_id: int,
+    reason: str = _NO_DATA_REASON,
 ) -> None:
     """Сброс в OFF и UP на MIN_CPA: ``hard_status`` → белый список (2)."""
     actions.append(
         V3Action(
             action=V3ActionType.FORCE_OFF,
             keyword_setting_id=ks_id,
-            reason=_NO_DATA_REASON,
+            reason=reason,
         )
     )
-    _append_min_cpa_up(actions, ks_id=ks_id)
+    _append_min_cpa_up(actions, ks_id=ks_id, reason=reason)
+
+
+def plan_campaign_no_data_bootstrap_safe(
+    contexts: list["KeywordV3Context"],
+) -> list[V3Action]:
+    """CAMPAIGN_NO_DATA: управляемые ключи (auto/БС) строго → MIN_CPA, без O/C/M.
+
+    Fixed/manual/protected (``hard_status`` 3/4+) не трогаем.
+    """
+    prepared = _build_prepared(contexts)
+    actions: list[V3Action] = []
+    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
+    reason = _DATA_BOOTSTRAP_REASON
+
+    for ctx, mode in prepared:
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+        if not _hard_status_allows_up(hard_status):
+            continue
+
+        if mode == KeywordStrategyMode.OFF:
+            _append_min_cpa_up(actions, ks_id=ks_id, reason=reason)
+        elif mode_level(mode) > min_level:
+            if hard_status == _HARD_STATUS_WHITE_LIST:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.DOWN,
+                        keyword_setting_id=ks_id,
+                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        reason=reason,
+                    )
+                )
+            elif hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
+        elif mode == KeywordStrategyMode.MIN_CPA:
+            if hard_status == _HARD_STATUS_AUTO_MODE:
+                _append_force_off_then_min_cpa(actions, ks_id=ks_id, reason=reason)
+
+    return actions
+
+
+def plan_data_bootstrap_v3(
+    contexts: list["KeywordV3Context"],
+) -> list[V3Action]:
+    """CAMPAIGN_NORMAL: keyword-level bootstrap (INVALID) + caps по tier."""
+    prepared = _build_prepared(contexts)
+    peer_contexts = [ctx for ctx, _ in prepared]
+    actions = plan_no_data_keyword_actions(prepared)
+
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+        can_target_mode,
+        clamp_target_mode,
+        resolve_keyword_v3_eligibility,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
+        mode_level,
+    )
+
+    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
+    covered: set[int] = {
+        int(a.keyword_setting_id)
+        for a in actions
+        if a.keyword_setting_id is not None
+    }
+
+    for ctx, mode in prepared:
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None or int(ks_id) in covered:
+            continue
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        elig = resolve_keyword_v3_eligibility(ctx, peer_contexts)
+        if elig.data_tier == KeywordDataTier.KEYWORD_INVALID:
+            continue
+        if mode_level(mode) <= min_level:
+            continue
+        cap = clamp_target_mode(elig, mode)
+        if mode_level(cap) >= mode_level(mode):
+            continue
+        if not can_target_mode(elig, cap):
+            cap = KeywordStrategyMode.MIN_CPA
+        hard_status = int(ctx.keyword.hard_status)
+        if hard_status == _HARD_STATUS_WHITE_LIST:
+            actions.append(
+                V3Action(
+                    action=V3ActionType.DOWN,
+                    keyword_setting_id=ks_id,
+                    target_strategy_mode=cap,
+                    reason="data_bootstrap_down",
+                )
+            )
+        elif hard_status == _HARD_STATUS_AUTO_MODE:
+            _append_force_off_then_min_cpa(
+                actions, ks_id=ks_id, reason="data_bootstrap_down"
+            )
+
+    return actions
 
 
 def plan_no_data_keyword_actions(prepared: PreparedList) -> list[V3Action]:
@@ -348,9 +458,8 @@ def _build_prepared(
 def plan_no_data_activation_v3(
     contexts: list["KeywordV3Context"],
 ) -> list[V3Action]:
-    """Спланировать N-state для ключей без V2 CPO / CH (без записи в БД)."""
-    prepared = _build_prepared(contexts)
-    return plan_no_data_keyword_actions(prepared)
+    """Alias: keyword bootstrap для NORMAL (см. ``plan_data_bootstrap_v3``)."""
+    return plan_data_bootstrap_v3(contexts)
 
 
 async def run_no_data_activation_v3(

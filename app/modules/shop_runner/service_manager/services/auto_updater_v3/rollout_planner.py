@@ -52,6 +52,12 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 )
 
 if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+        ShelfClickMode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordV3Eligibility,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
     )
@@ -495,6 +501,259 @@ def _iter_one_step(current: KeywordStrategyMode) -> list[KeywordStrategyMode]:
 def build_worst_costs(prepared: PreparedList) -> dict[AggressionTargetMode, float]:
     """Адаптер для имьютации worst-per-state стоимости."""
     return build_worst_per_state_costs(prepared)
+
+
+def resolve_effective_state_cost_for_mode(
+    *,
+    ctx: "KeywordV3Context",
+    to_mode: KeywordStrategyMode,
+    worst_costs: dict[AggressionTargetMode, float],
+    prepared: PreparedList | None = None,
+) -> tuple[float, bool]:
+    """Публичный API себестоимости режима для ladder-фаз V3."""
+    return _resolve_state_cost_for_mode(
+        ctx=ctx,
+        to_mode=to_mode,
+        worst_costs=worst_costs,
+        prepared=prepared,
+    )
+
+
+def collect_potential_passing_states(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    policy: SelectionPolicy,
+    worst_costs: dict[AggressionTargetMode, float],
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    overrides: dict[int, KeywordStrategyMode] | None = None,
+) -> list[_StateView]:
+    """Кандидаты UP/realloc с ``state_cost <= resolve`` (passing potential)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        can_target_mode,
+        clamp_target_mode,
+    )
+
+    overrides = overrides or {}
+    out: list[_StateView] = []
+    for ctx, stored_mode in prepared:
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        if not passes_rec_gate_for_up(
+            ctx.keyword.above_rec_conversion,
+            click_mode=policy.click_mode,
+        ):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        elig = (
+            eligibility_by_ks_id.get(int(ks_id))
+            if eligibility_by_ks_id
+            else None
+        )
+        if elig is not None and not elig.participates_in_ladder:
+            continue
+        current = overrides.get(int(ks_id), stored_mode)
+        for to_mode in _iter_one_step(current):
+            capped = (
+                clamp_target_mode(elig, to_mode)
+                if elig is not None
+                else to_mode
+            )
+            if elig is not None and not can_target_mode(elig, capped):
+                continue
+            if mode_level(capped) > mode_level(policy.max_target_mode):
+                continue
+            cost, imputed = _resolve_state_cost_for_mode(
+                ctx=ctx,
+                to_mode=capped,
+                worst_costs=worst_costs,
+                prepared=prepared,
+            )
+            if cost == float("inf") or cost > resolve:
+                continue
+            out.append(
+                _StateView(
+                    ks_id=int(ks_id),
+                    strategy_mode=capped,
+                    cost=cost,
+                    from_mode=current,
+                    to_mode=capped,
+                    imputed=imputed,
+                )
+            )
+    out.sort(key=lambda x: x.cost)
+    return out
+
+
+def plan_cost_reallocation(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    policy: SelectionPolicy,
+    worst_costs: dict[AggressionTargetMode, float],
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> list[V3Action]:
+    """COST_REALLOCATION: только DOWN/FORCE_OFF (без UP)."""
+    overrides: dict[int, KeywordStrategyMode] = {}
+    down_actions: list[V3Action] = []
+    for _ in range(50):
+        active_expensive = _collect_active_expensive(
+            prepared,
+            resolve=resolve,
+            policy=policy,
+            worst_costs=worst_costs,
+            overrides=overrides,
+        )
+        potential_passing = collect_potential_passing_states(
+            prepared,
+            resolve=resolve,
+            policy=policy,
+            worst_costs=worst_costs,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            overrides=overrides,
+        )
+        if not active_expensive or not potential_passing:
+            break
+        worst_active = active_expensive[0]
+        if eligibility_by_ks_id is not None:
+            elig = eligibility_by_ks_id.get(worst_active.ks_id)
+            if elig is not None and not elig.participates_in_ladder:
+                break
+        cheapest_passing = potential_passing[0]
+        if worst_active.cost <= cheapest_passing.cost:
+            break
+        nxt = step_down(worst_active.strategy_mode)
+        if nxt is None:
+            break
+        overrides[worst_active.ks_id] = nxt
+        if nxt == KeywordStrategyMode.OFF:
+            down_actions.append(
+                V3Action(
+                    action=V3ActionType.FORCE_OFF,
+                    keyword_setting_id=worst_active.ks_id,
+                    reason="cost_reallocation_force_off",
+                )
+            )
+        else:
+            down_actions.append(
+                V3Action(
+                    action=V3ActionType.DOWN,
+                    keyword_setting_id=worst_active.ks_id,
+                    target_strategy_mode=nxt,
+                    reason="cost_reallocation_down",
+                )
+            )
+    return down_actions
+
+
+def plan_profitable_expansion(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    policy: SelectionPolicy,
+    worst_costs: dict[AggressionTargetMode, float],
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> list[V3Action]:
+    """PROFITABLE_EXPANSION (M1): UP до max passing mode с учётом eligibility."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        can_target_mode,
+        clamp_target_mode,
+    )
+
+    actions: list[V3Action] = []
+    for ctx, current_mode in prepared:
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        if not passes_rec_gate_for_up(
+            ctx.keyword.above_rec_conversion,
+            click_mode=policy.click_mode,
+        ):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        elig = (
+            eligibility_by_ks_id.get(int(ks_id))
+            if eligibility_by_ks_id
+            else None
+        )
+        if elig is not None and not elig.participates_in_ladder:
+            continue
+        best_mode: KeywordStrategyMode | None = None
+        best_cost: float | None = None
+        best_imputed = False
+        for to_mode in _iter_upper_modes(current_mode):
+            capped = (
+                clamp_target_mode(elig, to_mode)
+                if elig is not None
+                else to_mode
+            )
+            if elig is not None and not can_target_mode(elig, capped):
+                continue
+            if mode_level(capped) > mode_level(policy.max_target_mode):
+                continue
+            cost, imputed = _resolve_state_cost_for_mode(
+                ctx=ctx,
+                to_mode=capped,
+                worst_costs=worst_costs,
+                prepared=prepared,
+            )
+            if cost == float("inf") or cost > resolve:
+                continue
+            if best_mode is None or mode_level(capped) > mode_level(best_mode):
+                best_mode = capped
+                best_cost = cost
+                best_imputed = imputed
+        if best_mode is None or best_mode == current_mode:
+            continue
+        actions.append(
+            V3Action(
+                action=V3ActionType.UP,
+                keyword_setting_id=ks_id,
+                target_strategy_mode=best_mode,
+                reason="profitable_expansion",
+                selection_log=V3SelectionLog(
+                    mechanism="profitable_expansion",
+                    state_cost=best_cost,
+                    pay_for_order=float(ctx.keyword.pay_for_order or 0.0),
+                    from_mode=current_mode.name,
+                    to_mode=best_mode.name,
+                    move_kind=f"{current_mode.name.lower()}_to_{best_mode.name.lower()}",
+                    imputed=best_imputed,
+                ),
+            )
+        )
+    return actions
+
+
+def plan_max_cpa_guard(
+    prepared: PreparedList,
+    *,
+    max_pay_for_order: float,
+    shelf_click_mode: ShelfClickMode,
+    aggressiveness: V3RolloutAggressiveness,
+) -> list[V3Action]:
+    """MAX_CPA_GUARD: trim только по ``plan.max_pay_for_order``."""
+    actions = plan_campaign_trim_by_max_state_cost(
+        prepared,
+        max_pay_for_order=float(max_pay_for_order),
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+    )
+    return [
+        act.model_copy(
+            update={
+                "reason": (
+                    "max_cpa_guard"
+                    if act.reason == "trim"
+                    else act.reason.replace("trim_", "max_cpa_guard_")
+                )
+            }
+        )
+        for act in actions
+    ]
 
 
 def plan_mass_cheap_promotion(

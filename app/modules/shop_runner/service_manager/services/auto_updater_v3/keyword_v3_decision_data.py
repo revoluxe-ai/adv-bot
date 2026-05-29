@@ -125,6 +125,31 @@ def resolve_keyword_v3_decision(
     profile = ctx.position_profile
     has_ch = bool(profile)
     if not has_ch:
+        if _keyword_has_own_conv(ctx.keyword):
+            return KeywordV3Decision(
+                tier=KeywordV3DecisionTier.NO_CH_MATRIX,
+                effective_conv_views_to_orders=float(
+                    ctx.keyword.conv_views_to_orders
+                ),
+                imputed=False,
+                has_ch_position_profile=False,
+            )
+        eff_conv: float | None = None
+        if ctx.keyword.conv_views_to_orders > 0:
+            eff_conv = float(ctx.keyword.conv_views_to_orders)
+        elif not keyword_v2_pay_for_order_unavailable_with_conv(
+            ctx.keyword,
+            conv_views_to_orders=ctx.keyword.conv_views_to_orders or None,
+        ):
+            if ctx.keyword.conv_views_to_orders > 0:
+                eff_conv = float(ctx.keyword.conv_views_to_orders)
+        if eff_conv is not None and eff_conv > 0:
+            return KeywordV3Decision(
+                tier=KeywordV3DecisionTier.NO_CH_MATRIX,
+                effective_conv_views_to_orders=eff_conv,
+                imputed=False,
+                has_ch_position_profile=False,
+            )
         return KeywordV3Decision(
             tier=KeywordV3DecisionTier.NO_CH_MATRIX,
             effective_conv_views_to_orders=None,
@@ -178,8 +203,16 @@ def keyword_lacks_v3_decision_data(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> bool:
-    """N-state preamble: нет CH или нельзя подобрать conv даже из РК/соседей."""
-    return not resolve_keyword_v3_decision(ctx, contexts).in_ladder_pool
+    """Keyword-level bootstrap (INVALID tier): нет данных даже для MIN-only ladder."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+        resolve_keyword_v3_eligibility,
+    )
+
+    return (
+        resolve_keyword_v3_eligibility(ctx, contexts).data_tier
+        == KeywordDataTier.KEYWORD_INVALID
+    )
 
 
 def keyword_v2_pay_for_order_unavailable_with_conv(

@@ -1,9 +1,8 @@
 """Select UP/DOWN actions from campaign state and per-keyword v3 context.
 
 Signal matrix (v3):
-- Plan/fact unchanged short-circuit in orchestrator (кроме OVERSPEND).
-- M1 (mass cheap) и trim по ``plan.max_pay_for_order`` — в orchestrator до cache gate.
-- Selector после gate: только M2/M3 (+ shelf cleanup), без повторного M1.
+- Preamble (bootstrap → realloc → expansion → guard) — в orchestrator до cache gate.
+- Post-gate selector: **только shelf cleanup** (FINAL_TUNING / M3 disabled на MVP).
 
 ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV) — отдельный контур ``change_adv_strategy``.
 """
@@ -153,6 +152,23 @@ def _plan_m2_m3_with_plan_fact(
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
 
 
+def select_v3_post_gate_actions(
+    *,
+    contexts: list[KeywordV3Context],
+    shelf_promotion_active: bool,
+    shelf_click_mode: ShelfClickMode | None = None,
+) -> list[V3Action]:
+    """Post-gate: shelf rec-false cleanup only (без M2/M3/FINAL_TUNING)."""
+    if not shelf_promotion_active:
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_shelf")]
+    prepared = build_prepared_from_contexts(contexts)
+    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+    cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
+    if cleanup:
+        return cleanup
+    return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_actions")]
+
+
 def select_v3_actions(
     *,
     state: SalesStates,
@@ -164,10 +180,7 @@ def select_v3_actions(
     plan: PlanData | None = None,
     fact: FactData | None = None,
 ) -> list[V3Action]:
-    """План M2/M3 после preamble (M1 и trim — в orchestrator)."""
-    prepared = build_prepared_from_contexts(contexts)
-    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
-
+    """Legacy selector; при plan/fact делегирует в post-gate (shelf only)."""
     if plan is not None and fact is not None:
         if state == SalesStates.NO_DATA:
             return [
@@ -176,15 +189,14 @@ def select_v3_actions(
                     reason="campaign_no_data_wait",
                 )
             ]
-
-        return _plan_m2_m3_with_plan_fact(
-            prepared,
-            plan=plan,
-            fact=fact,
+        return select_v3_post_gate_actions(
+            contexts=contexts,
             shelf_promotion_active=shelf_promotion_active,
             shelf_click_mode=shelf_click_mode,
-            aggr=aggr,
         )
+
+    prepared = build_prepared_from_contexts(contexts)
+    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
 
     if shelf_promotion_active:
         click_mode = (

@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     keyword_lacks_v3_decision_data,
     keyword_missing_ch_position_profile,
     keyword_v2_pay_for_order_unavailable,
+    plan_campaign_no_data_bootstrap_safe,
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
     rebalance_ladder_points,
@@ -146,11 +147,11 @@ def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
 
 @pytest.mark.unit
 def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
-    """N-state: есть V2 CPO, но нет CH — OFF → MIN_CPA."""
+    """NO_CH+own conv — не INVALID; safe bootstrap (CAMPAIGN_NO_DATA) → MIN."""
     off = _kw(ks_id=3, text="c", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=off, position_profile=None)
-    assert keyword_lacks_v3_decision_data(ctx, [ctx])
-    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
+    actions = plan_campaign_no_data_bootstrap_safe([ctx])
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
@@ -158,9 +159,13 @@ def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
 
 @pytest.mark.unit
 def test_plan_no_data_down_optimum_without_ch_profile() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        plan_campaign_no_data_bootstrap_safe,
+    )
+
     opt = _kw(ks_id=4, text="d", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=opt, position_profile=None)
-    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OPTIMUM)])
+    actions = plan_campaign_no_data_bootstrap_safe([ctx])
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
@@ -206,7 +211,7 @@ def test_diagnose_keyword_v3_data_cpo_without_ch_profile() -> None:
     diag = diagnose_keyword_v3_data(kw, None)
     assert diag.has_v2_cpo
     assert not diag.has_ch_position_profile
-    assert diag.n_state
+    assert not diag.n_state
     assert diag.missing_labels_ru() == ("нет матрицы CH (bid profile по ключу)",)
 
 
