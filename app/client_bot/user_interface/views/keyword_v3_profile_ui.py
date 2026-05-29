@@ -95,6 +95,18 @@ def _stage_uses_campaign_max_rk(
     return (data.stage_sources or {}).get(agg) == "worst"
 
 
+def _worst_suffix_for_stage(
+    data: KeywordV3ProfileData, agg: AggressionTargetMode
+) -> str:
+    """Суффикс ``|maxРК…`` для ступени с cost из worst по РК."""
+    if not _stage_uses_campaign_max_rk(data, agg) or data.campaign_worst_costs is None:
+        return ""
+    worst_val = data.campaign_worst_costs.get(agg)
+    if worst_val is None:
+        return ""
+    return f"|maxРК{worst_val:.0f}"
+
+
 def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
     """Нужна строка легенды про maxРК хотя бы для одной ступени M/O/C."""
     if data.campaign_worst_only:
@@ -207,8 +219,12 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     if cand is not None and cand.is_valid and cand.predicted_cpa is not None:
         cpo = f"{cand.predicted_cpa:.2f}"
         if cand.position is None or cand.bid is None:
-            suffix = " (max РК)" if data.campaign_worst_only else ""
-            return f"{star}{letter} CPO={cpo}{suffix}"
+            worst_suffix = _worst_suffix_for_stage(data, agg)
+            if worst_suffix:
+                return f"{star}{letter} CPO={cpo}{worst_suffix}"
+            if _stage_uses_campaign_max_rk(data, agg):
+                return f"{star}{letter} CPO={cpo} (max РК)"
+            return f"{star}{letter} CPO={cpo}"
     if cand is None or not cand.is_valid:
         if mode == KeywordStrategyMode.MIN_CPA and data.no_ch_min_only:
             cpo = (
@@ -229,11 +245,7 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     ctr = _format_pct_compact(data.keyword_ctr)
-    worst_suffix = ""
-    if _stage_uses_campaign_max_rk(data, agg) and data.campaign_worst_costs is not None:
-        worst_val = data.campaign_worst_costs.get(agg)
-        if worst_val is not None:
-            worst_suffix = f"|maxРК{worst_val:.0f}"
+    worst_suffix = _worst_suffix_for_stage(data, agg)
     if worst_suffix:
         return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}{worst_suffix}"
     return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"

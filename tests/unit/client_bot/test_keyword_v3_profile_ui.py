@@ -303,6 +303,32 @@ def test_profile_worst_source_shows_max_rk_suffix() -> None:
 
 
 @pytest.mark.unit
+def test_profile_worst_source_simplified_line_shows_max_rk_suffix() -> None:
+    """CH + worst, без поз/ставки: упрощённая строка с ``|maxРК``, как полный формат."""
+    data = _profile_data(
+        diagnostic=KeywordV3DataDiagnostic(
+            has_v2_cpo=False,
+            has_ch_position_profile=True,
+            decision_tier=KeywordV3DecisionTier.NO_CONV,
+        ),
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                predicted_cpa=814.0,
+                is_valid=True,
+                position=None,
+                bid=None,
+            ),
+        },
+        campaign_worst_costs={AggressionTargetMode.MIN_CPA: 814.0},
+        stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "M CPO=814.00|maxРК814" in text
+    assert " (max РК)" not in text
+
+
+@pytest.mark.unit
 def test_profile_no_conv_tier_shows_max_rk_header() -> None:
     """NO_CONV + CH: заголовок про max CPO по РК, не про имп. conv."""
     diag = KeywordV3DataDiagnostic(
