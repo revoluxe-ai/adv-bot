@@ -401,11 +401,7 @@ async def process_adv_v3(
                     contexts
                 )
 
-        if (
-            plan is not None
-            and allows_ladder_phases(campaign_mode)
-            and campaign_mode == CampaignMode.NORMAL
-        ):
+        if plan is not None and allows_ladder_phases(campaign_mode):
             plan_fact_change = ChangePlanFact(adv)
             plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
 
