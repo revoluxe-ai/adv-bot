@@ -142,20 +142,22 @@ def _empty_n_state_candidates() -> dict[AggressionTargetMode, ModeCandidate]:
 def _keyword_profile_metrics(
     calculated_keyword: CalculatedKeyword,
 ) -> tuple[float | None, float | None]:
-    """CTR факт ключа и показ→заказ V2 для блока профиля лестницы."""
+    """Conv показ→корзина и показ→заказ ключа для блока профиля лестницы."""
     stat = calculated_keyword.cluster_stat
-    ctr = calculated_keyword.ctr if stat.views > 0 else None
+    conv_cart: float | None = None
+    if stat.views > 0 and calculated_keyword.add_to_cart >= 0:
+        conv_cart = float(calculated_keyword.add_to_cart) / float(stat.views)
     conv_order = calculated_keyword.conv_views_to_orders
     if conv_order <= 0:
-        return ctr, None
-    return ctr, float(conv_order)
+        return conv_cart, None
+    return conv_cart, float(conv_order)
 
 
 def _profile_fields_from_diagnostic(
     calculated_keyword: CalculatedKeyword,
     diagnostic: object,
     *,
-    keyword_ctr: float | None = None,
+    conv_views_to_cart: float | None = None,
     conv_views_to_orders: float | None = None,
     worst_costs: dict | None = None,
 ) -> dict[str, object]:
@@ -169,7 +171,7 @@ def _profile_fields_from_diagnostic(
         "n_state": diagnostic.n_state,
         "no_ch_min_only": diagnostic.no_ch_min_only,
         "diagnostic": diagnostic,
-        "keyword_ctr": keyword_ctr,
+        "conv_views_to_cart": conv_views_to_cart,
         "conv_views_to_orders": conv_views_to_orders,
         "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(
             calculated_keyword, worst_costs=worst_costs
@@ -303,7 +305,9 @@ async def load_keyword_v3_profile_data(
         profile_points,
         peer_contexts=all_contexts,
     )
-    keyword_ctr, conv_views_to_orders = _keyword_profile_metrics(calculated_keyword)
+    conv_views_to_cart, conv_views_to_orders = _keyword_profile_metrics(
+        calculated_keyword
+    )
 
     if (
         diagnostic.n_state
@@ -317,7 +321,7 @@ async def load_keyword_v3_profile_data(
             **_profile_fields_from_diagnostic(
                 calculated_keyword,
                 diagnostic,
-                keyword_ctr=keyword_ctr,
+                conv_views_to_cart=conv_views_to_cart,
                 conv_views_to_orders=conv_views_to_orders,
                 worst_costs=ladder_inputs.worst_costs,
             ),
@@ -342,7 +346,7 @@ async def load_keyword_v3_profile_data(
     fields = _profile_fields_from_diagnostic(
         calculated_keyword,
         diagnostic,
-        keyword_ctr=keyword_ctr,
+        conv_views_to_cart=conv_views_to_cart,
         conv_views_to_orders=conv_views_to_orders,
         worst_costs=ladder_inputs.worst_costs,
     )

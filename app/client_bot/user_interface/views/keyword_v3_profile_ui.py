@@ -67,7 +67,7 @@ class KeywordV3ProfileData:
     no_ch_min_only: bool = False
     diagnostic: KeywordV3DataDiagnostic | None = None
     load_failure: str | None = None
-    keyword_ctr: float | None = None
+    conv_views_to_cart: float | None = None
     conv_views_to_orders: float | None = None
     v2_pay_for_order: float | None = None
     keyword_pay_for_order: float | None = None
@@ -143,8 +143,8 @@ def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
     """Легенда: сокращения строк M/O/C и общая к→з ключа."""
     conv_order = _format_pct_compact(data.conv_views_to_orders)
     lines = [
-        "   п|с|CTR|CPO — поз|ставка|факт|state_cost",
-        f"   к→з {conv_order} — conv ключа (своя)",
+        "   п|с|к→к|CPO — поз|ставка|conv CH на точке|CPO заказа",
+        f"   к→з {conv_order} — conv показ→заказ ключа (для CPO)",
     ]
     if _profile_shows_max_rk_legend(data):
         lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
@@ -248,9 +248,9 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     pos = int(cand.position) if cand.position is not None else "—"
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
-    ctr = _format_pct_compact(data.keyword_ctr)
+    conv_cart = _format_pct_compact(cand.predicted_conversion)
     worst_suffix = _worst_suffix_for_stage(data, agg)
     if worst_suffix:
-        return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}{worst_suffix}"
-    return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"
+        return f"{star}{letter} п{pos}|с{bid}|к→к{conv_cart}|CPO{cpo}{worst_suffix}"
+    return f"{star}{letter} п{pos}|с{bid}|к→к{conv_cart}|CPO{cpo}"
 
