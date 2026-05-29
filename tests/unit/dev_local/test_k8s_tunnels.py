@@ -39,6 +39,19 @@ def test_tcp_port_open_failure() -> None:
         assert k8s_tunnels._tcp_port_open("127.0.0.1", 15432) is False
 
 
+def test_start_missing_kubeconfig_leaves_monitor_not_started() -> None:
+    with (
+        patch.object(k8s_tunnels.Path, "is_file", return_value=False),
+        patch.object(k8s_tunnels.threading, "Thread") as mock_thread,
+    ):
+        k8s_tunnels._monitor_started = False
+        with pytest.raises(FileNotFoundError, match="Kubeconfig not found"):
+            k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
+
+    assert k8s_tunnels._monitor_started is False
+    mock_thread.assert_not_called()
+
+
 def test_start_dev_tunnels_monitor_idempotent() -> None:
     mock_thread_instance = MagicMock()
 

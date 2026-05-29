@@ -329,22 +329,31 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
     Если порты уже слушают (другая точка входа / dev-tunnels.ps1) — только ждёт
     готовности, без второго kubectl и без watchdog.
 
+    Проверка kubeconfig и ``_tunnel_specs()`` выполняются под ``_monitor_lock``,
+    чтобы параллельные вызовы не гонялись с idempotency-guard и не поднимали
+    ``FileNotFoundError`` у одного caller'а, пока другой уже стартовал monitor.
+
     Args:
         wait_ready: дождаться TCP на localhost перед возвратом.
     """
     global _monitor_started
 
-    kubeconfig = _default_kubeconfig()
-    if not Path(kubeconfig).is_file():
-        raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
-
-    specs = _tunnel_specs()
+    kubeconfig: str
+    specs: list[_TunnelSpec]
+    start_monitor_thread = False
 
     with _monitor_lock:
         if _monitor_started:
+            specs = _tunnel_specs()
             if wait_ready:
                 wait_for_dev_tunnels_ready(specs=specs)
             return
+
+        kubeconfig = _default_kubeconfig()
+        if not Path(kubeconfig).is_file():
+            raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
+
+        specs = _tunnel_specs()
 
         if _ports_ready(specs):
             logger.info(
@@ -358,6 +367,10 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
             return
 
         _monitor_started = True
+        start_monitor_thread = True
+
+    if not start_monitor_thread:
+        return
 
     _register_atexit_once()
     thread = threading.Thread(
