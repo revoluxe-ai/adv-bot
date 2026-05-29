@@ -117,25 +117,31 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     from tests.unit.auto_updater_v3.test_no_data_activation import _kw as _calc_kw
 
     ts = datetime.now()
-    profiles = _profiles_for_db_keyword("updater_kw", ts)
+    base_profile = _synthetic_ladder_profile("updater_kw", ts)
+    profiles = {
+        "updater_kw_off": base_profile,
+        "updater_kw_min": base_profile,
+        "updater_kw_opt": base_profile,
+        "updater_kw_max": base_profile,
+    }
 
     min_kw = MagicMock()
-    min_kw.text = "updater_kw"
+    min_kw.text = "updater_kw_min"
     min_kw.strategy_mode = KeywordStrategyMode.MIN_CPA
     min_kw.target_place = None
 
     opt_kw = MagicMock()
-    opt_kw.text = "updater_kw"
+    opt_kw.text = "updater_kw_opt"
     opt_kw.strategy_mode = KeywordStrategyMode.OPTIMUM
     opt_kw.target_place = None
 
     max_kw = MagicMock()
-    max_kw.text = "updater_kw"
+    max_kw.text = "updater_kw_max"
     max_kw.strategy_mode = KeywordStrategyMode.MAX_CONVERSION
     max_kw.target_place = None
 
     off_kw = MagicMock()
-    off_kw.text = "updater_kw"
+    off_kw.text = "updater_kw_off"
     off_kw.strategy_mode = KeywordStrategyMode.OFF
     off_kw.target_place = 99
 
@@ -161,13 +167,34 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
         adv=adv,
         bid_profiles=profiles,
         calculated_by_text={
-            "updater_kw": _calc_kw(
+            "updater_kw_off": _calc_kw(
                 ks_id=1,
-                text="updater_kw",
+                text="updater_kw_off",
+                mode=KeywordStrategyMode.OFF,
+                conv=0.01,
+                cpm_set_bid=200,
+            ),
+            "updater_kw_min": _calc_kw(
+                ks_id=2,
+                text="updater_kw_min",
                 mode=KeywordStrategyMode.MIN_CPA,
                 conv=0.01,
                 cpm_set_bid=200,
-            )
+            ),
+            "updater_kw_opt": _calc_kw(
+                ks_id=3,
+                text="updater_kw_opt",
+                mode=KeywordStrategyMode.OPTIMUM,
+                conv=0.01,
+                cpm_set_bid=200,
+            ),
+            "updater_kw_max": _calc_kw(
+                ks_id=4,
+                text="updater_kw_max",
+                mode=KeywordStrategyMode.MAX_CONVERSION,
+                conv=0.01,
+                cpm_set_bid=200,
+            ),
         },
     )
 
@@ -177,7 +204,7 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
         min_kw.target_place,
         opt_kw.target_place,
         max_kw.target_place,
-        keyword="updater_kw",
+        keyword="updater_kw_*",
     )
 
 
