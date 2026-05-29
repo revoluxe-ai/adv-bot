@@ -86,6 +86,25 @@ def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
     return f"{text}%"
 
 
+def _stage_uses_campaign_max_rk(
+    data: KeywordV3ProfileData, agg: AggressionTargetMode
+) -> bool:
+    """Показывать maxРК только если CPO ступени из worst по РК, не из профиля ключа."""
+    if data.campaign_worst_only:
+        return True
+    return (data.stage_sources or {}).get(agg) == "worst"
+
+
+def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
+    """Нужна строка легенды про maxРК хотя бы для одной ступени M/O/C."""
+    if data.campaign_worst_only:
+        return True
+    for agg in AggressionTargetMode:
+        if _stage_uses_campaign_max_rk(data, agg):
+            return True
+    return False
+
+
 def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
     """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
     for mode in (
@@ -109,7 +128,7 @@ def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
         "   п|с|CTR|CPO — поз|ставка|факт|state_cost",
         f"   к→з {conv_order} — conv ключа (своя)",
     ]
-    if data.diagnostic is not None and data.diagnostic.imputed_conv:
+    if _profile_shows_max_rk_legend(data):
         lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
     return lines
 
@@ -211,19 +230,10 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     ctr = _format_pct_compact(data.keyword_ctr)
     worst_suffix = ""
-    if data.campaign_worst_costs is not None:
+    if _stage_uses_campaign_max_rk(data, agg) and data.campaign_worst_costs is not None:
         worst_val = data.campaign_worst_costs.get(agg)
         if worst_val is not None:
             worst_suffix = f"|maxРК{worst_val:.0f}"
-    src = (data.stage_sources or {}).get(agg, "")
-    if src == "worst":
-        cost_note = "maxРК"
-    elif src == "profile" and worst_suffix:
-        cost_note = "проф"
-    else:
-        cost_note = ""
-    if cost_note and worst_suffix:
-        return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}({cost_note}){worst_suffix}"
     if worst_suffix:
         return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}{worst_suffix}"
     return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"

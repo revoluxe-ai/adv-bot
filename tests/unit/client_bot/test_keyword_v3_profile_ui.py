@@ -249,6 +249,60 @@ def test_profile_full_tier_no_imputed_header() -> None:
 
 
 @pytest.mark.unit
+def test_profile_full_tier_hides_max_rk_when_own_profile() -> None:
+    """FULL + source=profile: без |maxРК, даже если worst_costs переданы."""
+    data = _profile_data(
+        candidates={
+            AggressionTargetMode.MIN_CPA: _valid_candidate(
+                AggressionTargetMode.MIN_CPA, 21, 510.0, 253.84
+            ),
+            AggressionTargetMode.OPTIMUM: _valid_candidate(
+                AggressionTargetMode.OPTIMUM, 1, 12095.0, 6020.02
+            ),
+            AggressionTargetMode.MAX_CONVERSION: _valid_candidate(
+                AggressionTargetMode.MAX_CONVERSION, 1, 12095.0, 6020.02
+            ),
+        },
+        campaign_worst_costs={
+            AggressionTargetMode.MIN_CPA: 814.0,
+            AggressionTargetMode.OPTIMUM: 23906.0,
+            AggressionTargetMode.MAX_CONVERSION: 23906.0,
+        },
+        stage_sources={
+            AggressionTargetMode.MIN_CPA: "profile",
+            AggressionTargetMode.OPTIMUM: "profile",
+            AggressionTargetMode.MAX_CONVERSION: "profile",
+        },
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "maxРК" not in text
+    assert "CPO253.84" in text
+    assert "(проф)" not in text
+
+
+@pytest.mark.unit
+def test_profile_worst_source_shows_max_rk_suffix() -> None:
+    """NO_CONV / worst: CPO из РК + суффикс |maxРК."""
+    data = _profile_data(
+        diagnostic=KeywordV3DataDiagnostic(
+            has_v2_cpo=False,
+            has_ch_position_profile=True,
+            decision_tier=KeywordV3DecisionTier.NO_CONV,
+        ),
+        candidates={
+            AggressionTargetMode.MIN_CPA: _valid_candidate(
+                AggressionTargetMode.MIN_CPA, 1, 100.0, 814.0
+            ),
+        },
+        campaign_worst_costs={AggressionTargetMode.MIN_CPA: 814.0},
+        stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "|maxРК814" in text
+    assert "maxРК — max CPO" in text
+
+
+@pytest.mark.unit
 def test_profile_no_conv_tier_shows_max_rk_header() -> None:
     """NO_CONV + CH: заголовок про max CPO по РК, не про имп. conv."""
     diag = KeywordV3DataDiagnostic(
