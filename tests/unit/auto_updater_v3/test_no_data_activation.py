@@ -138,6 +138,33 @@ def test_keyword_v2_pay_for_order_available_with_conv_and_cpm() -> None:
 
 
 @pytest.mark.unit
+def test_keyword_v2_pay_for_order_available_when_only_bid_log_cascade() -> None:
+    """Полный каскад CPM (bid_log) даёт pay_for_order — target_place не в fallback 0."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        resolve_keyword_v2_pay_for_order_cost,
+    )
+
+    kw = _kw(ks_id=6, text="bid_log_only", mode=KeywordStrategyMode.MIN_CPA, conv=0.05, cpm_set_bid=200)
+    sources = kw.cpm_sources
+    assert sources is not None
+    kw = kw.model_copy(
+        update={
+            "cpm_sources": sources.model_copy(
+                update={
+                    "cpm_set_bid": None,
+                    "cpm_from_api": None,
+                    "cpm_from_stats": None,
+                    "cpm_from_bid_log": 3990.0,
+                }
+            ),
+        }
+    )
+    assert kw.pay_for_order is not None
+    assert resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=None) is None
+    assert not keyword_v2_pay_for_order_unavailable(kw)
+
+
+@pytest.mark.unit
 def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
     off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0)
     ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())

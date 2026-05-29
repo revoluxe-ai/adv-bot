@@ -191,15 +191,21 @@ def keyword_missing_ch_position_profile(
 
 
 def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
-    """Нет **своего** V2 CPO (conv ключа + rating CPM); не каскад ``keyword.pay_for_order``.
+    """Нет CPO для операционных guard'ов (N-state, ``target_place``).
 
-    Для границ NO CH tier в updater используется ``keyword.pay_for_order`` (карточка/UI).
+    Доступен, если есть ``keyword.pay_for_order`` (полный CPM-каскад, в т.ч. bid_log)
+    **или** ``resolve_keyword_v2_pay_for_order_cost`` (rating CPM без bid_log).
+
+    Строгий «свой V2 CPO» для NO CH tier — ``keyword_has_v2_cpo`` /
+    ``resolve_keyword_v2_pay_for_order_cost`` (без подстановки ``pay_for_order``).
     """
     if not isinstance(keyword, CalculatedKeyword):
         raise TypeError(
             "keyword_v2_pay_for_order_unavailable expects CalculatedKeyword, "
             f"got {type(keyword).__name__}"
         )
+    if keyword.pay_for_order is not None:
+        return False
     return resolve_keyword_v2_pay_for_order_cost(keyword) is None
 
 
