@@ -1,7 +1,8 @@
 """Форматирование профиля ключа V3 (лестница stage) для карточки Telegram.
 
-Текст вставляется в ``KeywordSettingMessage`` с ``ParseMode.MARKDOWN`` (legacy V1):
-экранируем только ``_``, ``*``, ``[``, ````` — не синтаксис MarkdownV2.
+``KeywordSettingMessage`` использует ``ParseMode.MARKDOWN`` (legacy V1). Курсив ``_…_``
+здесь не применяем: клиент часто показывает ``\\_`` буквально. Заголовок — ``*bold*``;
+остальной текст — plain, без ``_`` в разметке.
 """
 
 from __future__ import annotations
@@ -65,18 +66,14 @@ class KeywordV3ProfileData:
 
 
 def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
-    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы."""
+    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы (plain text)."""
     v2 = "✓" if diagnostic.has_v2_cpo else "✗"
     ch = "✓" if diagnostic.has_ch_position_profile else "✗"
-    parts = [
-        f"V2 CPO {_escape_markdown_v1(v2)}",
-        f"CH матрица {_escape_markdown_v1(ch)}",
-    ]
-    line = "   _Данные: " + " | ".join(parts) + "_"
+    line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
     missing = diagnostic.missing_labels_ru()
     if missing:
-        gaps = "; ".join(_escape_markdown_v1(m) for m in missing)
-        line += f"\n   _Нет: {gaps}_"
+        gaps = "; ".join(missing)
+        line += f"\n   Нет: {gaps}"
     return line
 
 
@@ -98,10 +95,9 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
-        footer = _escape_markdown_v1(
-            "MIN_CPA + target 0 → min bid WB, белый список (апдейтер)"
+        lines.append(
+            "   M + target 0 → min bid WB, белый список (апдейтер)"
         )
-        lines.append(f"   _{footer}_")
     return "\n".join(lines) + "\n"
 
 
