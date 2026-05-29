@@ -174,7 +174,18 @@ def _profile_fields_from_diagnostic(
         "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(
             calculated_keyword, worst_costs=worst_costs
         ),
+        "keyword_pay_for_order": _keyword_pay_for_order_field(calculated_keyword),
     }
+
+
+def _keyword_pay_for_order_field(
+    calculated_keyword: CalculatedKeyword,
+) -> float | None:
+    """Себест. заказа из карточки ключа для UI NO CH tier."""
+    pfo = calculated_keyword.pay_for_order
+    if pfo is None or float(pfo) <= 0:
+        return None
+    return float(pfo)
 
 
 def profile_load_failure(
@@ -324,7 +335,9 @@ async def load_keyword_v3_profile_data(
     }
 
     campaign_worst_only = (
-        not diagnostic.has_ch_position_profile and has_worst
+        not diagnostic.has_ch_position_profile
+        and has_worst
+        and not diagnostic.no_ch_min_only
     )
     fields = _profile_fields_from_diagnostic(
         calculated_keyword,

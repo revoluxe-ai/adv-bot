@@ -74,7 +74,7 @@ UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUA
 
 **Правило cost (per-mode):**
 
-1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_keyword_v2_pay_for_order_cost` (`source=v2_cpo`); O/C → `inf`, **не** `source=worst`.
+1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_no_ch_operational_pay_for_order_cost` (`keyword.pay_for_order`, `source=pay_for_order`); O/C → `inf`, **не** `source=worst`.
 2. CH-tier: `profile_cost` → `ladder_inputs.worst_costs[mode]` (per-mode, без gate «вся матрица invalid») → `inf`.
 
 **N-state vs MIN-only (диагностика UI):**

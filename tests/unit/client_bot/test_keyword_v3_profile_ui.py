@@ -157,10 +157,11 @@ def test_profile_n_state_when_no_v2_cpo_and_no_ch() -> None:
     )
     text = format_keyword_v3_profile_block(data)
     assert "N-state" in text
-    assert "N-state bootstrap" in text
     assert "V2 CPO" in text and "CH матрица" in text
-    assert "min bid WB" in text
+    assert "min bid WB" not in text
     assert "п|с|CPO" not in text
+    assert "CPO=" not in text
+    assert "OFF —" not in text
 
 
 @pytest.mark.unit
@@ -177,13 +178,13 @@ def test_profile_no_ch_min_only_not_n_state() -> None:
         candidates={
             AggressionTargetMode.MIN_CPA: ModeCandidate(
                 mode=AggressionTargetMode.MIN_CPA,
-                is_valid=False,
-                invalid_reason="no_position_profile",
+                is_valid=True,
+                predicted_cpa=367.13,
             ),
         },
         n_state=False,
         no_ch_min_only=True,
-        v2_pay_for_order=367.13,
+        keyword_pay_for_order=367.13,
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=True,
             has_ch_position_profile=False,
@@ -193,8 +194,12 @@ def test_profile_no_ch_min_only_not_n_state() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "NO CH (только MIN)" in text
     assert "N-state" not in text
-    assert "CPO=367.13 (V2)" in text
-    assert "NO CH bootstrap" in text
+    assert "CPO=" not in text
+    assert "(V2)" not in text
+    assert "maxРК" not in text
+    assert "себест. заказа" in text
+    assert "O/C —" not in text
+    assert "min bid WB" not in text
     assert "нет матрицы CH" in text
 
 

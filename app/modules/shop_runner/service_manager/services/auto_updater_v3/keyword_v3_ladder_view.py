@@ -24,8 +24,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     CampaignV3DecisionCache,
     effective_conv_for_v3,
-    rating_aligned_cpm,
-    resolve_keyword_v2_pay_for_order_cost,
+    resolve_no_ch_operational_pay_for_order_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
@@ -54,6 +53,7 @@ class LadderCostSource(str, Enum):
     WORST = "worst"
     NONE = "none"
     V2_CPO = "v2_cpo"
+    PAY_FOR_ORDER = "pay_for_order"
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,7 +180,7 @@ def cost_for_mode(
     ladder_inputs: LadderInputs,
     eligibility: KeywordV3Eligibility | None = None,
 ) -> tuple[float, bool]:
-    """Себестоимость target mode: eligibility NO_CH → V2; CH → profile → per-mode worst.
+    """Себестоимость target mode: NO CH → ``pay_for_order``; CH → profile → per-mode worst.
 
     Args:
         ctx: Контекст ключа.
@@ -196,13 +196,9 @@ def cost_for_mode(
     if eligibility is not None:
         if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
             if to_mode == KeywordStrategyMode.MIN_CPA:
-                cpm = rating_aligned_cpm(ctx.keyword)
-                v2_cost = resolve_keyword_v2_pay_for_order_cost(
-                    ctx.keyword, worst_costs=ladder_inputs.worst_costs
-                )
-                if v2_cost is not None:
-                    imputed = cpm is None or cpm <= 0
-                    return float(v2_cost), imputed
+                pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+                if pfo_cost is not None:
+                    return float(pfo_cost), False
             return float("inf"), False
         if not eligibility.participates_in_ladder or not can_target_mode(
             eligibility, to_mode
@@ -246,19 +242,15 @@ def _resolve_stage(
     if eligibility is not None:
         if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
             if target == AggressionTargetMode.MIN_CPA:
-                cpm = rating_aligned_cpm(ctx.keyword)
-                v2_cost = resolve_keyword_v2_pay_for_order_cost(
-                    ctx.keyword, worst_costs=ladder_inputs.worst_costs
-                )
-                if v2_cost is not None:
-                    cost_imputed = cpm is None or cpm <= 0
+                pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+                if pfo_cost is not None:
                     return LadderStageResult(
                         mode=target,
                         is_valid=True,
-                        cost=float(v2_cost),
-                        source=LadderCostSource.V2_CPO,
+                        cost=float(pfo_cost),
+                        source=LadderCostSource.PAY_FOR_ORDER,
                         conv_imputed=conv_imputed,
-                        cost_imputed=cost_imputed,
+                        cost_imputed=False,
                         candidate=mc,
                     )
             return LadderStageResult(

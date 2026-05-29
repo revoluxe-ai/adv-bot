@@ -70,6 +70,7 @@ class KeywordV3ProfileData:
     keyword_ctr: float | None = None
     conv_views_to_orders: float | None = None
     v2_pay_for_order: float | None = None
+    keyword_pay_for_order: float | None = None
     campaign_worst_only: bool = False
     campaign_worst_costs: dict[AggressionTargetMode, float] | None = None
     stage_sources: dict[AggressionTargetMode, str] | None = None
@@ -117,6 +118,11 @@ def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
     return False
 
 
+def _keyword_ladder_ui_suppressed(data: KeywordV3ProfileData) -> bool:
+    """N-state / NO CH min-only: лестница M/O/C на ключе не показывается."""
+    return data.n_state or data.no_ch_min_only
+
+
 def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
     """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
     for mode in (
@@ -145,11 +151,19 @@ def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
     return lines
 
 
-def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
-    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы (plain text)."""
-    v2 = "✓" if diagnostic.has_v2_cpo else "✗"
+def _format_diagnostic_line(
+    diagnostic: KeywordV3DataDiagnostic,
+    *,
+    no_ch_min_only: bool = False,
+) -> str:
+    """Строка «что есть / чего нет» для V2 CPO / себест. заказа и CH-матрицы."""
     ch = "✓" if diagnostic.has_ch_position_profile else "✗"
-    line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
+    if no_ch_min_only:
+        pfo = "✓" if diagnostic.has_v2_cpo else "✗"
+        line = f"   Данные: себест. заказа {pfo} | CH матрица {ch}"
+    else:
+        v2 = "✓" if diagnostic.has_v2_cpo else "✗"
+        line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
     missing = diagnostic.missing_labels_ru()
     if missing:
         gaps = "; ".join(missing)
@@ -186,22 +200,19 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         # FULL и прочие — обычный заголовок без «импутации»
     lines = [header]
     if data.diagnostic is not None:
-        lines.append(_format_diagnostic_line(data.diagnostic))
-    if _ladder_has_valid_candidate(data):
-        if data.campaign_worst_only:
-            lines.append("   CPO — max state_cost M/O/C по ключам РК с CH")
-        else:
-            lines.extend(_format_metrics_legend_lines(data))
-    for mode in _LADDER_ORDER:
-        lines.append(_format_stage_line(data, mode))
-    if data.n_state:
         lines.append(
-            "   M + target 0 → min bid WB, белый список (N-state bootstrap)"
+            _format_diagnostic_line(
+                data.diagnostic, no_ch_min_only=data.no_ch_min_only
+            )
         )
-    elif data.no_ch_min_only:
-        lines.append(
-            "   M + target 0 → min bid WB, белый список (NO CH bootstrap)"
-        )
+    if not _keyword_ladder_ui_suppressed(data):
+        if _ladder_has_valid_candidate(data):
+            if data.campaign_worst_only:
+                lines.append("   CPO — max state_cost M/O/C по ключам РК с CH")
+            else:
+                lines.extend(_format_metrics_legend_lines(data))
+        for mode in _LADDER_ORDER:
+            lines.append(_format_stage_line(data, mode))
     return "\n".join(lines) + "\n"
 
 
@@ -226,13 +237,6 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
                 return f"{star}{letter} CPO={cpo} (max РК)"
             return f"{star}{letter} CPO={cpo}"
     if cand is None or not cand.is_valid:
-        if mode == KeywordStrategyMode.MIN_CPA and data.no_ch_min_only:
-            cpo = (
-                f"{data.v2_pay_for_order:.2f}"
-                if data.v2_pay_for_order is not None
-                else "—"
-            )
-            return f"{star}{letter} CPO={cpo} (V2) | target 0 — min bid WB"
         reason = ""
         if cand is not None and cand.invalid_reason:
             raw = _INVALID_REASON_SHORT.get(

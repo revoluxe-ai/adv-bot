@@ -577,7 +577,7 @@ def resolve_effective_state_cost_for_mode(
 
     Worst/per-mode cost — только из ``ladder_inputs`` (или пересборка из ``prepared``).
 
-    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` и ``MIN_CPA`` — V2 CPO; O/C без CH → ``inf``.
+    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` и ``MIN_CPA`` — ``pay_for_order``; O/C без CH → ``inf``.
     """
     elig = _eligibility_for_ctx(
         ctx, eligibility_by_ks_id, eligibility=eligibility
