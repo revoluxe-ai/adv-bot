@@ -15,7 +15,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
     V3RolloutAggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    build_worst_costs,
+    compute_resolve_cost_threshold,
+    is_resolve_valid,
     plan_campaign_trim_by_max_state_cost,
+    plan_mass_cheap_promotion,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    SelectionPolicy,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -68,10 +75,6 @@ def test_m1_promotes_off_to_highest_passing_mode() -> None:
     from app.modules.common_slaves.wildberries.models.fact_methods_enum import (
         FactMethods,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-        plan_m1_mass_cheap_promotion_with_plan_fact,
-    )
-
     prof = _sample_profile()
     off_kw = _calc_kw(
         ks_id=17783584,
@@ -94,13 +97,20 @@ def test_m1_promotes_off_to_highest_passing_mode() -> None:
         pay_for_order=350.0,
         fact_method=FactMethods.DIRECT_SALES,
     )
-    actions = plan_m1_mass_cheap_promotion_with_plan_fact(
-        [KeywordV3Context(keyword=off_kw, position_profile=prof)],
-        plan=plan,
-        fact=fact,
-        shelf_promotion_active=False,
-        shelf_click_mode=None,
-        aggr=V3RolloutAggressiveness.MAX,
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=off_kw, position_profile=prof)]
+    )
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    assert is_resolve_valid(plan, resolve)
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    actions = plan_mass_cheap_promotion(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        worst_costs=build_worst_costs(prepared),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP

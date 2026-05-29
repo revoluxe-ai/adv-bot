@@ -26,14 +26,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-    V3RolloutAggressiveness,
     normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    build_worst_costs,
-    compute_resolve_cost_threshold,
-    is_resolve_valid,
-    plan_mass_cheap_promotion,
     plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
@@ -43,7 +38,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.shelf_prom
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
-    SelectionPolicy,
     plan_shelf_rec_false_cleanup_down,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -66,41 +60,11 @@ class KeywordV3Context:
 def build_prepared_from_contexts(
     contexts: list[KeywordV3Context],
 ) -> PreparedList:
-    """Собрать ``PreparedList`` для preamble (M1/trim) и selector."""
+    """Собрать ``PreparedList`` для preamble planners и selector."""
     prepared: PreparedList = []
     for ctx in contexts:
         prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
     return prepared
-
-
-def plan_m1_mass_cheap_promotion_with_plan_fact(
-    contexts: list[KeywordV3Context],
-    *,
-    plan: PlanData,
-    fact: FactData,
-    shelf_promotion_active: bool,
-    shelf_click_mode: ShelfClickMode | None,
-    aggr: V3RolloutAggressiveness | int | None = None,
-) -> list[V3Action]:
-    """M1: UP каждого ключа до наивысшего M/O/C с ``state_cost <= resolve``."""
-    _ = shelf_promotion_active
-    prepared = build_prepared_from_contexts(contexts)
-    resolve = compute_resolve_cost_threshold(plan, fact)
-    if not is_resolve_valid(plan, resolve):
-        return []
-
-    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    policy = SelectionPolicy.from_aggressiveness(
-        click_mode=click_mode,
-        aggressiveness=normalize_v3_rollout_aggressiveness(aggr),
-    )
-    worst_costs = build_worst_costs(prepared)
-    return plan_mass_cheap_promotion(
-        prepared,
-        resolve=resolve,
-        policy=policy,
-        worst_costs=worst_costs,
-    )
 
 
 def select_v3_post_gate_actions(
