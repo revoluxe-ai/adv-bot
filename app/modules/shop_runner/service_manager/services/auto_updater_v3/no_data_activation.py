@@ -454,9 +454,6 @@ def plan_data_bootstrap_v3(
     actions = plan_no_data_keyword_actions(
         prepared, eligibility_by_ks_id=eligibility_by_ks_id
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-        mode_level,
-    )
 
     min_level = mode_level(KeywordStrategyMode.MIN_CPA)
     covered: set[int] = {
