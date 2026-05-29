@@ -103,6 +103,7 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
 
     dto = MagicMock()
     bootstrap = MagicMock(return_value=[])
+    keyword_bootstrap = MagicMock(return_value=[])
     sync_mock = AsyncMock()
     expansion = MagicMock(return_value=[])
 
@@ -110,6 +111,10 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
             new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            keyword_bootstrap,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
@@ -144,6 +149,7 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
+    keyword_bootstrap.assert_not_called()
     bootstrap.assert_called_once()
     expansion.assert_not_called()
     sync_mock.assert_awaited_once()

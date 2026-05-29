@@ -265,22 +265,6 @@ async def process_adv_v3(
             )
             return
 
-        if dto is not None:
-            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
-            if keyword_bootstrap_actions:
-                preamble_bootstrap_count += len(keyword_bootstrap_actions)
-                logger.info(
-                    "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
-                    complex_adv.adv_id,
-                    len(keyword_bootstrap_actions),
-                )
-                contexts = _apply_v3_phase(
-                    ledger, keyword_bootstrap_actions, raw_profiles
-                )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
-                )
-
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
             if bootstrap_actions:
@@ -297,6 +281,21 @@ async def process_adv_v3(
 
         elif campaign_mode == CampaignMode.NORMAL and dto is not None:
             assert plan is not None and fact is not None
+            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            if keyword_bootstrap_actions:
+                preamble_bootstrap_count += len(keyword_bootstrap_actions)
+                logger.info(
+                    "[adv_id=%s] v3 KEYWORD_BOOTSTRAP: actions=%s",
+                    complex_adv.adv_id,
+                    len(keyword_bootstrap_actions),
+                )
+                contexts = _apply_v3_phase(
+                    ledger, keyword_bootstrap_actions, raw_profiles
+                )
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
+                )
+
             shelf_active = complex_adv.shelf_promotion_active
             shelf_click_mode = (
                 resolve_shelf_click_mode_from_adv(complex_adv)
