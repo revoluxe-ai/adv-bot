@@ -14,8 +14,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    build_worst_costs,
     compute_resolve_cost_threshold,
     is_resolve_valid,
     plan_campaign_trim_by_max_state_cost,
@@ -137,7 +139,9 @@ def test_m1_promotes_off_to_highest_passing_mode() -> None:
         prepared,
         resolve=resolve,
         policy=policy,
-        worst_costs=build_worst_costs(prepared),
+        ladder_inputs=LadderInputs.from_contexts(
+            [ctx for ctx, _ in prepared]
+        ),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP

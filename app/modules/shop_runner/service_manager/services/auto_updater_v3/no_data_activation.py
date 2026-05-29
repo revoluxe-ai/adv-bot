@@ -91,17 +91,24 @@ class KeywordV3DataDiagnostic:
 
     @property
     def n_state(self) -> bool:
-        """N-state: нет данных для лестницы (INVALID / нет conv без импутации).
+        """N-state: ``NO_CONV`` или нет CH без V2 CPO (bootstrap OFF→MIN).
 
-        NO_CH + own conv / V2 CPO — не n_state: tier MIN-only, ``target_place=0``.
+        NO CH + V2 CPO — ``no_ch_min_only``, не n_state. CH + imputed / FULL / RK / PEER — лестница.
         """
+        if self.no_ch_min_only:
+            return False
+        if self.decision_tier == KeywordV3DecisionTier.NO_CONV:
+            return not self.has_ch_position_profile
         if not self.has_ch_position_profile:
             return not self.has_v2_cpo
+        if self.imputed_conv:
+            return False
         if self.decision_tier in (
-            KeywordV3DecisionTier.NO_CH_MATRIX,
-            KeywordV3DecisionTier.NO_CONV,
+            KeywordV3DecisionTier.FULL,
+            KeywordV3DecisionTier.RK_AGGREGATE,
+            KeywordV3DecisionTier.PEER_MAX,
         ):
-            return True
+            return False
         return not self.has_v2_cpo
 
     @property
@@ -114,6 +121,11 @@ class KeywordV3DataDiagnostic:
         labels: list[str] = []
         if self.decision_tier is not None and self.imputed_conv:
             labels.append(f"conv: {tier_label_ru(self.decision_tier)} (импутация)")
+        elif (
+            self.has_ch_position_profile
+            and self.decision_tier == KeywordV3DecisionTier.NO_CONV
+        ):
+            labels.append("conv: max CPO по РК (без имп. conv)")
         elif not self.has_v2_cpo:
             labels.append(self.v2_cpo_gap or "нет V2 CPO (себес. заказа)")
         if not self.has_ch_position_profile:
@@ -213,7 +225,10 @@ def keyword_lacks_v3_decision_data(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> bool:
-    """Ключ в N-state preamble: нет CH или нет conv даже после импутации РК."""
+    """Ключ в N-state preamble: ``KEYWORD_INVALID`` (нет CH и нет V2 CPO для MIN).
+
+    ``NO_CONV`` с CH — pessimistic ladder, не bootstrap здесь.
+    """
     return _keyword_lacks_v3_decision_data(ctx, contexts)
 
 

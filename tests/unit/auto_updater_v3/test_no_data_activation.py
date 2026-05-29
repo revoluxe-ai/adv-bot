@@ -167,8 +167,9 @@ def test_keyword_v2_pay_for_order_available_when_only_bid_log_cascade() -> None:
 
 @pytest.mark.unit
 def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
-    off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0)
-    ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
+    """INVALID (нет CH, нет conv/V2): OFF → MIN через ``plan_no_data_min_up_actions``."""
+    off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
     assert keyword_lacks_v3_decision_data(ctx, [ctx])
     actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
     assert len(actions) == 1

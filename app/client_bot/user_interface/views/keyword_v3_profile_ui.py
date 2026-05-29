@@ -16,6 +16,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     AggressionTargetMode,
     ModeCandidate,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    KeywordV3DecisionTier,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     KeywordV3DataDiagnostic,
 )
@@ -67,6 +70,9 @@ class KeywordV3ProfileData:
     keyword_ctr: float | None = None
     conv_views_to_orders: float | None = None
     v2_pay_for_order: float | None = None
+    campaign_worst_only: bool = False
+    campaign_worst_costs: dict[AggressionTargetMode, float] | None = None
+    stage_sources: dict[AggressionTargetMode, str] | None = None
 
 
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
@@ -78,6 +84,37 @@ def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
         return "0%"
     text = f"{pct:.{decimals}f}".rstrip("0").rstrip(".")
     return f"{text}%"
+
+
+def _stage_uses_campaign_max_rk(
+    data: KeywordV3ProfileData, agg: AggressionTargetMode
+) -> bool:
+    """Показывать maxРК только если CPO ступени из worst по РК, не из профиля ключа."""
+    if data.campaign_worst_only:
+        return True
+    return (data.stage_sources or {}).get(agg) == "worst"
+
+
+def _worst_suffix_for_stage(
+    data: KeywordV3ProfileData, agg: AggressionTargetMode
+) -> str:
+    """Суффикс ``|maxРК…`` для ступени с cost из worst по РК."""
+    if not _stage_uses_campaign_max_rk(data, agg) or data.campaign_worst_costs is None:
+        return ""
+    worst_val = data.campaign_worst_costs.get(agg)
+    if worst_val is None:
+        return ""
+    return f"|maxРК{worst_val:.0f}"
+
+
+def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
+    """Нужна строка легенды про maxРК хотя бы для одной ступени M/O/C."""
+    if data.campaign_worst_only:
+        return True
+    for agg in AggressionTargetMode:
+        if _stage_uses_campaign_max_rk(data, agg):
+            return True
+    return False
 
 
 def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
@@ -99,10 +136,13 @@ def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
 def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
     """Легенда: сокращения строк M/O/C и общая к→з ключа."""
     conv_order = _format_pct_compact(data.conv_views_to_orders)
-    return [
-        "   п|с|CTR|CPO — поз|ставка|факт|…",
-        f"   к→з {conv_order} — заказ V2 (общ)",
+    lines = [
+        "   п|с|CTR|CPO — поз|ставка|факт|state_cost",
+        f"   к→з {conv_order} — conv ключа (своя)",
     ]
+    if _profile_shows_max_rk_legend(data):
+        lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
+    return lines
 
 
 def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
@@ -131,11 +171,27 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         header = "📊 *Профиль ключа (V3):* N-state"
     elif data.no_ch_min_only:
         header = "📊 *Профиль ключа (V3):* NO CH (только MIN)"
+    elif data.campaign_worst_only:
+        header = "📊 *Профиль ключа (V3):* max CPO по РК (нет CH на ключе)"
+    elif data.diagnostic is not None and data.diagnostic.has_ch_position_profile:
+        if data.diagnostic.imputed_conv:
+            if data.diagnostic.decision_tier == KeywordV3DecisionTier.RK_AGGREGATE:
+                header = "📊 *Профиль ключа (V3):* CH + имп. conv (РК)"
+            elif data.diagnostic.decision_tier == KeywordV3DecisionTier.PEER_MAX:
+                header = "📊 *Профиль ключа (V3):* CH + имп. conv (max ключ)"
+            else:
+                header = "📊 *Профиль ключа (V3):* CH + имп. conv"
+        elif data.diagnostic.decision_tier == KeywordV3DecisionTier.NO_CONV:
+            header = "📊 *Профиль ключа (V3):* CH + max CPO по РК (нет conv)"
+        # FULL и прочие — обычный заголовок без «импутации»
     lines = [header]
     if data.diagnostic is not None:
         lines.append(_format_diagnostic_line(data.diagnostic))
     if _ladder_has_valid_candidate(data):
-        lines.extend(_format_metrics_legend_lines(data))
+        if data.campaign_worst_only:
+            lines.append("   CPO — max state_cost M/O/C по ключам РК с CH")
+        else:
+            lines.extend(_format_metrics_legend_lines(data))
     for mode in _LADDER_ORDER:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
@@ -160,6 +216,15 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     agg = _MODE_TO_AGG.get(mode)
     assert agg is not None
     cand = data.candidates.get(agg)
+    if cand is not None and cand.is_valid and cand.predicted_cpa is not None:
+        cpo = f"{cand.predicted_cpa:.2f}"
+        if cand.position is None or cand.bid is None:
+            worst_suffix = _worst_suffix_for_stage(data, agg)
+            if worst_suffix:
+                return f"{star}{letter} CPO={cpo}{worst_suffix}"
+            if _stage_uses_campaign_max_rk(data, agg):
+                return f"{star}{letter} CPO={cpo} (max РК)"
+            return f"{star}{letter} CPO={cpo}"
     if cand is None or not cand.is_valid:
         if mode == KeywordStrategyMode.MIN_CPA and data.no_ch_min_only:
             cpo = (
@@ -180,5 +245,8 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
     ctr = _format_pct_compact(data.keyword_ctr)
+    worst_suffix = _worst_suffix_for_stage(data, agg)
+    if worst_suffix:
+        return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}{worst_suffix}"
     return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"
 
