@@ -206,12 +206,22 @@ def build_eligibility_map(
 def build_target_place_fallback_zero_by_keyword_id(
     contexts: list["KeywordV3Context"],
 ) -> dict[int, bool]:
-    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``."""
+    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
+
+    Один ``CampaignV3DecisionCache`` на вызов (как в ``build_eligibility_map``).
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        CampaignV3DecisionCache,
+    )
+
+    campaign_cache = CampaignV3DecisionCache.from_contexts(contexts)
     out: dict[int, bool] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
-        elig = resolve_keyword_v3_eligibility(ctx, contexts)
+        elig = resolve_keyword_v3_eligibility(
+            ctx, contexts, campaign_cache=campaign_cache
+        )
         out[int(ks_id)] = elig.target_place_fallback_zero
     return out

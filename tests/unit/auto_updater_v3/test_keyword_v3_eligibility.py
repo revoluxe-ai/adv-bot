@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
     build_eligibility_map,
+    build_target_place_fallback_zero_by_keyword_id,
     can_target_mode,
     resolve_keyword_v3_eligibility,
 )
@@ -102,6 +103,29 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
         wraps=_weighted_campaign_conv,
     ) as weighted_mock:
         result = build_eligibility_map(contexts)
+
+    assert weighted_mock.call_count == 1
+    assert len(result) == 2
+
+
+@pytest.mark.unit
+def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
+    """Один агрегат РК на ``build_target_place_fallback_zero_by_keyword_id``."""
+    kw_a = _calculated_kw_fixture(
+        ks_id=10, text="a", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
+    )
+    kw_b = _calculated_kw_fixture(
+        ks_id=11, text="b", mode=KeywordStrategyMode.MIN_CPA, conv=0.04
+    )
+    contexts = [
+        KeywordV3Context(keyword=kw_a, position_profile=_sample_profile()),
+        KeywordV3Context(keyword=kw_b, position_profile=_sample_profile()),
+    ]
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data._weighted_campaign_conv",
+        wraps=_weighted_campaign_conv,
+    ) as weighted_mock:
+        result = build_target_place_fallback_zero_by_keyword_id(contexts)
 
     assert weighted_mock.call_count == 1
     assert len(result) == 2
