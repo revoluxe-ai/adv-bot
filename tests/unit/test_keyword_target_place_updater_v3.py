@@ -420,7 +420,7 @@ async def test_sync_eligibility_fallback_zero_by_keyword_id(
 async def test_sync_eligibility_fallback_zero_off_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """NO_CH tier: OFF + fallback_zero → target_place=0, не «по кампании» (None)."""
+    """NO_CH tier OFF: без fallback в map → target_place=None (не min-bid 0)."""
     off_kw = _kw_row(
         strategy_mode=KeywordStrategyMode.OFF,
         target_place=None,
@@ -449,7 +449,7 @@ async def test_sync_eligibility_fallback_zero_off_mode(
         adv=adv,
         bid_profiles={},
         calculated_by_text={},
-        target_place_fallback_zero_by_keyword_id={42: True},
+        target_place_fallback_zero_by_keyword_id={42: False},
     )
 
-    assert off_kw.target_place == 0
+    assert off_kw.target_place is None

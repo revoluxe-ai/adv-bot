@@ -109,6 +109,17 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
 
 
 @pytest.mark.unit
+def test_build_target_place_fallback_zero_excludes_off_mode() -> None:
+    """OFF после guard: map без True, хотя tier NO_CH даёт fallback в eligibility."""
+    kw = _calculated_kw_fixture(
+        ks_id=5, text="off_no_ch", mode=KeywordStrategyMode.OFF, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    result = build_target_place_fallback_zero_by_keyword_id([ctx])
+    assert result[5] is False
+
+
+@pytest.mark.unit
 def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
     """Один агрегат РК на вызов; результат совпадает с ``build_eligibility_map``."""
     kw_a = _calculated_kw_fixture(

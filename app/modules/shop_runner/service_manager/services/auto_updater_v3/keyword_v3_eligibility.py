@@ -209,6 +209,7 @@ def build_target_place_fallback_zero_by_keyword_id(
     """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
 
     Один ``CampaignV3DecisionCache`` на вызов (как в ``build_eligibility_map``).
+    ``OFF`` не включается: после MAX_CPA_GUARD / FORCE_OFF sync ставит ``None``, не 0.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
@@ -223,5 +224,9 @@ def build_target_place_fallback_zero_by_keyword_id(
         elig = resolve_keyword_v3_eligibility(
             ctx, contexts, campaign_cache=campaign_cache
         )
-        out[int(ks_id)] = elig.target_place_fallback_zero
+        mode = ctx.keyword.keyword_setting.strategy_mode
+        out[int(ks_id)] = (
+            elig.target_place_fallback_zero
+            and mode != KeywordStrategyMode.OFF
+        )
     return out

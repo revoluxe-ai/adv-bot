@@ -391,6 +391,9 @@ async def process_adv_v3(
                     contexts = _apply_v3_phase(
                         ledger, guard_actions, raw_profiles
                     )
+                    sync_fallback_by_id = (
+                        build_target_place_fallback_zero_by_keyword_id(contexts)
+                    )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
             plan_fact_change = ChangePlanFact(adv)
