@@ -61,10 +61,12 @@ class KeywordV3ProfileData:
     current_mode: KeywordStrategyMode
     candidates: dict[AggressionTargetMode, ModeCandidate]
     n_state: bool = False
+    no_ch_min_only: bool = False
     diagnostic: KeywordV3DataDiagnostic | None = None
     load_failure: str | None = None
     keyword_ctr: float | None = None
     conv_views_to_orders: float | None = None
+    v2_pay_for_order: float | None = None
 
 
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
@@ -127,6 +129,8 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     header = "📊 *Профиль ключа (V3):*"
     if data.n_state:
         header = "📊 *Профиль ключа (V3):* N-state"
+    elif data.no_ch_min_only:
+        header = "📊 *Профиль ключа (V3):* NO CH (только MIN)"
     lines = [header]
     if data.diagnostic is not None:
         lines.append(_format_diagnostic_line(data.diagnostic))
@@ -136,7 +140,11 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         lines.append(_format_stage_line(data, mode))
     if data.n_state:
         lines.append(
-            "   M + target 0 → min bid WB, белый список (апдейтер)"
+            "   M + target 0 → min bid WB, белый список (N-state bootstrap)"
+        )
+    elif data.no_ch_min_only:
+        lines.append(
+            "   M + target 0 → min bid WB, белый список (NO CH bootstrap)"
         )
     return "\n".join(lines) + "\n"
 
@@ -153,6 +161,13 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     assert agg is not None
     cand = data.candidates.get(agg)
     if cand is None or not cand.is_valid:
+        if mode == KeywordStrategyMode.MIN_CPA and data.no_ch_min_only:
+            cpo = (
+                f"{data.v2_pay_for_order:.2f}"
+                if data.v2_pay_for_order is not None
+                else "—"
+            )
+            return f"{star}{letter} CPO={cpo} (V2) | target 0 — min bid WB"
         reason = ""
         if cand is not None and cand.invalid_reason:
             raw = _INVALID_REASON_SHORT.get(

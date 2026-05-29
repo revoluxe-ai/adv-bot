@@ -1,23 +1,29 @@
 """Select UP/DOWN actions from campaign state and per-keyword v3 context.
 
-Signal matrix (v3):
-- Plan/fact unchanged short-circuit in orchestrator.
-- ``SalesStates`` from ``detect_campaign_state`` — global economy (OPTIMAL / UNDERPERFORM / …).
-- Полочная фаза: ``rec_system_mode`` + авто ``started`` → ``plan_shelf_promotion_actions``
-  с ``ShelfClickMode`` (organic/shelf клики). Иначе — ``RolloutPlanner`` + ``aggressiveness``.
+Контракт V3 (два входа):
 
-Стратегия активации:
-- Единый pooled-UP в shelf/non-shelf с фильтром target по ``aggressiveness`` (1/2/3).
-- Rec-gate включается только в shelf-dominant режиме (``shelf>=organic``/``UNKNOWN``).
+1. **Production (orchestrator):** preamble (bootstrap, realloc, expansion,
+   ``plan_max_cpa_guard`` при OVERSPEND) → ``select_v3_post_gate_actions`` (только полка).
+   ``select_v3_actions`` с ``plan``/``fact`` **не** выполняет ladder/OVERSPEND.
 
-При **OVERSPEND** (факт > ``max_pay_for_order``): сначала массовый ``FORCE_OFF`` для всех
-активных ключей с ``pay_for_order > max``; иначе один DOWN (``plan_rollout_down_one``).
+2. **Legacy / тесты без plan/fact:** полный ``select_v3_actions`` — OVERSPEND через
+   ``plan_overspend_actions``, UNDERPERFORM/STABLE через rollout planner.
+
+При ``plan is not None and fact is not None``:
+
+- ``NO_DATA`` → ``DO_NOTHING`` (``campaign_no_data_wait``);
+- иначе → только ``select_v3_post_gate_actions`` (shelf cleanup).
+
+``plan_max_pay_for_order`` на этом пути **игнорируется** (guard в orchestrator).
+Для OVERSPEND вне orchestrator: ``plan=None``, ``fact=None``, задать
+``plan_max_pay_for_order``.
 
 ``AdvSetting.strategy`` (MIN_CPO/MAX_CONV) — отдельный контур ``change_adv_strategy``.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -27,35 +33,23 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    stored_strategy_mode,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-    V3RolloutAggressiveness,
     normalize_v3_rollout_aggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    build_worst_costs,
-    compute_resolve_cost_threshold,
-    is_resolve_valid,
-    merge_and_dedup_actions,
-    plan_headroom_plus_one,
-    plan_mass_cheap_promotion,
     plan_overspend_actions,
     plan_rollout_down_one,
     plan_rollout_underperform_one,
-    plan_state_rebalance,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.shelf_promotion_policy import (
     plan_shelf_promotion_actions,  # legacy wrapper
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
-    SelectionPolicy,
+    build_prepared_from_contexts,
     plan_shelf_rec_false_cleanup_down,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -69,69 +63,62 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
     PositionProfilePoint,
 )
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class KeywordV3Context:
     keyword: CalculatedKeyword
     position_profile: list[PositionProfilePoint] | None
 
 
-def _plan_m1_m2_m3_with_plan_fact(
-    prepared: PreparedList,
+def select_v3_post_gate_actions(
     *,
-    plan: PlanData,
-    fact: FactData,
+    contexts: list[KeywordV3Context],
+    shelf_promotion_active: bool,
+    shelf_click_mode: ShelfClickMode | None = None,
+) -> list[V3Action]:
+    """Post-gate: shelf rec-false cleanup only (без M2/M3/FINAL_TUNING)."""
+    if not shelf_promotion_active:
+        return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_shelf")]
+    prepared = build_prepared_from_contexts(contexts)
+    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+    cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
+    if cleanup:
+        return cleanup
+    return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_actions")]
+
+
+def _select_v3_actions_with_plan_fact(
+    *,
+    state: SalesStates,
+    contexts: list[KeywordV3Context],
     shelf_promotion_active: bool,
     shelf_click_mode: ShelfClickMode | None,
-    aggr: V3RolloutAggressiveness,
-    include_m3_headroom: bool = True,
 ) -> list[V3Action]:
-    """M1/M2/M3 (+ shelf cleanup) для ключей с валидным resolve.
+    """Ветка orchestrator post-gate: не ladder, не ``plan_overspend_actions``.
 
-    Args:
-        include_m3_headroom: False для ``SalesStates.NO_DATA`` — нет campaign fact CPO,
-            M3 (headroom vs ``0.9 * resolve``) не применяется.
+    OVERSPEND/UNDERPERFORM/STABLE/OPTIMAL с plan/fact обрабатываются в ``process_adv_v3``
+    до вызова селектора (``plan_max_cpa_guard``, realloc, expansion, …).
     """
-    resolve = compute_resolve_cost_threshold(plan, fact)
-    if not is_resolve_valid(plan, resolve):
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="skip_invalid_resolve")]
-
-    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    policy = SelectionPolicy.from_aggressiveness(
-        click_mode=click_mode,
-        aggressiveness=aggr,
-    )
-    cleanup_actions: list[V3Action] = []
-    if shelf_promotion_active:
-        cleanup_actions = plan_shelf_rec_false_cleanup_down(
-            prepared, click_mode=click_mode
+    if state == SalesStates.NO_DATA:
+        return [
+            V3Action(
+                action=V3ActionType.DO_NOTHING,
+                reason="campaign_no_data_wait",
+            )
+        ]
+    if state != SalesStates.OPTIMAL:
+        logger.debug(
+            "select_v3_actions: state=%s with plan/fact — preamble в orchestrator, "
+            "post-gate shelf only",
+            state.name,
         )
-    worst_costs = build_worst_costs(prepared)
-    m1_actions = plan_mass_cheap_promotion(
-        prepared,
-        resolve=resolve,
-        policy=policy,
-        worst_costs=worst_costs,
+    return select_v3_post_gate_actions(
+        contexts=contexts,
+        shelf_promotion_active=shelf_promotion_active,
+        shelf_click_mode=shelf_click_mode,
     )
-    m2_actions = plan_state_rebalance(
-        prepared,
-        resolve=resolve,
-        policy=policy,
-        worst_costs=worst_costs,
-    )
-    m3_actions: list[V3Action] = []
-    if include_m3_headroom and fact.pay_for_order is not None:
-        m3_actions = plan_headroom_plus_one(
-            prepared,
-            resolve=resolve,
-            fact_pay_for_order=float(fact.pay_for_order),
-            policy=policy,
-        )
-    merged = merge_and_dedup_actions(
-        cleanup_actions, m1_actions, m2_actions, m3_actions
-    )
-    if merged:
-        return merged
-    return [V3Action(action=V3ActionType.DO_NOTHING, reason="no_actions")]
 
 
 def select_v3_actions(
@@ -145,42 +132,33 @@ def select_v3_actions(
     plan: PlanData | None = None,
     fact: FactData | None = None,
 ) -> list[V3Action]:
-    """Return planned mode changes for one cycle (OVERSPEND may return several FORCE_OFF)."""
-    prepared: PreparedList = []
-    for ctx in contexts:
-        mode = stored_strategy_mode(ctx.keyword)
-        prepared.append((ctx, mode))
+    """Legacy selector: ladder/OVERSPEND только **без** ``plan``/``fact``.
 
-    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
+    Args:
+        state: ``SalesStates`` кампании.
+        contexts: ключи с CH-профилем.
+        shelf_promotion_active: полка включена.
+        rollout_aggressiveness: 1–3 для UNDERPERFORM (только без plan/fact).
+        shelf_click_mode: режим кликов полки.
+        plan_max_pay_for_order: max себес для ``plan_overspend_actions`` (только если
+            ``plan`` и ``fact`` не переданы).
+        plan: если задан вместе с ``fact`` — post-gate контур orchestrator (см. module
+            docstring); ``plan_max_pay_for_order`` не используется.
+        fact: см. ``plan``.
 
+    Returns:
+        Список ``V3Action`` для применения к ledger.
+    """
     if plan is not None and fact is not None:
-        # Главный путь orchestrator всегда передаёт plan/fact; OVERSPEND обрабатываем
-        # до M1/M2/M3 (массовый FORCE_OFF по ключам выше max).
-        if state == SalesStates.OVERSPEND:
-            max_pfo = plan_max_pay_for_order
-            if max_pfo is None:
-                max_pfo = float(plan.max_pay_for_order)
-            return plan_overspend_actions(
-                prepared, max_pay_for_order=float(max_pfo)
-            )
-
-        if state == SalesStates.NO_DATA:
-            # Оркестратор не вызывает selector при кампании «Н»; страховка для прямых вызовов.
-            return [
-                V3Action(
-                    action=V3ActionType.DO_NOTHING,
-                    reason="campaign_no_data_wait",
-                )
-            ]
-
-        return _plan_m1_m2_m3_with_plan_fact(
-            prepared,
-            plan=plan,
-            fact=fact,
+        return _select_v3_actions_with_plan_fact(
+            state=state,
+            contexts=contexts,
             shelf_promotion_active=shelf_promotion_active,
             shelf_click_mode=shelf_click_mode,
-            aggr=aggr,
         )
+
+    prepared = build_prepared_from_contexts(contexts)
+    aggr = normalize_v3_rollout_aggressiveness(rollout_aggressiveness)
 
     if shelf_promotion_active:
         click_mode = (
@@ -208,6 +186,7 @@ def select_v3_actions(
         ]
 
     if state == SalesStates.OVERSPEND:
+        # Только без plan/fact; с plan/fact — MAX_CPA_GUARD в orchestrator.
         if plan_max_pay_for_order is not None:
             return plan_overspend_actions(
                 prepared, max_pay_for_order=float(plan_max_pay_for_order)

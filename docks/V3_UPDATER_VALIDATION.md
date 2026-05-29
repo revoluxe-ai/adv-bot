@@ -1,5 +1,52 @@
 # V3 updater: наблюдаемость и контролируемая валидация
 
+## Campaign mode vs keyword data tier (V3)
+
+Два независимых уровня решений:
+
+### Campaign-level (`CampaignMode`, `v3_campaign_mode.py`)
+
+| Режим | Условие | Поведение |
+|-------|---------|-----------|
+| **NOT_READY** | `detect_campaign_state(...) is None` | full stop — без bootstrap, sync, cache |
+| **NO_DATA** | `SalesStates.NO_DATA` (`fact.pay_for_order is None`) | только `plan_campaign_no_data_bootstrap_safe` → flush → sync с `force_all_target_place_zero=True` (управляемые ключи) |
+| **NORMAL** | OVERSPEND / UNDERPERFORM / STABLE / OPTIMAL | полный preamble + gate + shelf cleanup |
+
+При **NO_DATA** запрещены: COST_REALLOCATION, PROFITABLE_EXPANSION, MAX_CPA_GUARD, selector, `ChangePlanFact` gate.
+
+### Keyword-level (`KeywordDataTier`, `keyword_v3_eligibility.py`)
+
+| Tier | UP/realloc targets | Лестница |
+|------|-------------------|----------|
+| **KEYWORD_FULL** | MIN, OPT, MAX | да |
+| **KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV** | только MIN | да (MIN-only), `target_place=0` |
+| **KEYWORD_PESSIMISTIC_FALLBACK** | MIN, OPT, MAX | да (imputed conv) |
+| **KEYWORD_INVALID** | ∅ | нет |
+
+`OFF` **не** target mode: `can_target_mode(_, OFF) == False`. UP/realloc фильтруют через `can_target_mode` и `max_allowed_mode`.
+
+## Порядок тика (`process_adv_v3`)
+
+```
+load CH profiles → plan/fact → resolve_campaign_mode
+
+NOT_READY → full stop (no bootstrap, flush, sync)
+NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
+NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → [resolve valid: realloc + expansion]
+            → MAX_CPA_GUARD (если fact > plan.max; вне is_resolve_valid) → plan/fact gate
+            → shelf cleanup (post-gate) → flush → target_place
+```
+
+Каждая фаза NORMAL: `_apply_v3_phase` → rebuild contexts → пересчёт eligibility.
+
+Фазы NORMAL (только `allows_ladder_phases`):
+
+1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
+2. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
+3. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
+4. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
+5. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
+
 ## Structured logs
 
 Строки `v3_selection` в orchestrator: `pool`, `tier` (`confirmed` / `missing_above_rec`), `state_cost`, переход `from_mode->to_mode`, `move`, `imputed` (worst-per-state при `missing_target_matrix`).
@@ -34,34 +81,23 @@ Rec-gate:
 
 Сравнить за 7 дней: jump vs M→O, средний `state_cost`, `pay_for_order`, доля shelf/organic.
 
-## Gap-rebalance (phase 0 в `process_adv_v3`)
+## Preamble (NORMAL) и post-gate selector
 
-Перед plan/fact и `select_v3_actions`, **всегда** (даже если plan/fact в cache не менялся):
+На каждом тике **NORMAL**, **до** `check_equal_in_cache`:
 
-1. БС (`hard_status == 2`), сортировка `pay_for_order` asc (MIN_CPO).
-2. Первая «дыра»: `OFF` с активными ключами ниже по списку.
-3. Хвост (строго ниже якоря OFF) → `FORCE_OFF`, сумма `mode_level` = N.
-4. N× UP по ветке shelf/non-shelf (`plan_cost_first_up_one`).
+1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
+2. **COST_REALLOCATION** — DOWN-only rebalance (headroom).
+3. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
+4. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
 
-V3 **не** обслуживается в `white_list_tail_trimmer` (только v2 trim). Не зависит от `white_list_mode`.
+Selector после gate: **только shelf cleanup** (rec-false DOWN / FORCE_OFF), без M2/M3/FINAL_TUNING.
 
-Логи: `v3 gap rebalance: force_off=… up=…`, при обрыве UP — `v3_gap_rebalance: UP stopped early`.
+При `SalesStates.OVERSPEND` селектор по-прежнему **не** режется cache gate
+(`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
 
-Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
-
-## OVERSPEND: массовый OFF по max себесу
-
-При `SalesStates.OVERSPEND` (факт кампании `> plan.max_pay_for_order`) за один цикл:
-
-- все активные ключи (не OFF) с известным `pay_for_order > max` → `FORCE_OFF` (сразу OFF, без пошагового DOWN);
-- ключи с `pay_for_order is None` не трогаются;
-- если ни один ключ не выше max — один обычный DOWN (как раньше).
-
-Проверка: unit `test_select_overspend_force_off_all_keys_above_max`,
-`test_select_overspend_force_off_with_plan_and_fact`, shelf `test_select_overspend_shelf_force_off_above_max`.
-
-При неизменном plan/fact в Redis цикл обычно пропускается, **кроме OVERSPEND** — пока факт
-кампании `> max`, селектор и apply выполняются каждый тик (`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
+Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_plan_fact``
+(post-gate only; ``plan_max_pay_for_order`` игнорируется). OVERSPEND trim — в preamble
+(``plan_max_cpa_guard``). Без plan/fact: ``plan_overspend_actions`` по ``plan_max_pay_for_order``.
 
 ## UI: последнее V3-действие в блоке «Обновл:»
 
@@ -76,7 +112,7 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 
 Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
 
-## Новый state-first контракт (M1/M2/M3)
+## State-first контракт (resolve / state_cost)
 
 В V3 решения принимаются по `state_cost` — прогноз **себестоимости заказа** для режима
 (как `CalculatedKeyword.pay_for_order` в V2: `calc_pay_for_order(calc_orders_per_1000_rub(conv, CPM))`
@@ -85,23 +121,17 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
 - `resolve = target_pay_for_order`, если `fact.predict_orders >= plan.orders`;
 - иначе `resolve = max_pay_for_order`.
 
-Три механизма запускаются на каждом тике:
+API ladder-фаз:
 
-1. `M1 (mass_cheap_promotion)` — для каждого ключа UP до наивысшего состояния с
-   `state_cost <= resolve` (только UP, без DOWN/OFF).
-2. `M2 (state_rebalance)` — работает только со `state_cost > resolve`,
-   итеративно выполняет 1:1 `DOWN` худшего активного и `UP` лучшего потенциального
-   до устранения разрыва `max(active_B) > min(potential_B)`.
-3. `M3 (headroom_plus_one)` — если `fact.pay_for_order < 0.9 * resolve`, выполняет
-   один `UP` на самый дешёвый потенциальный state.
+- `resolve_effective_state_cost_for_mode` — себестоимость target mode;
+- `collect_potential_passing_states` — pooled UP-кандидаты с `state_cost <= resolve`, фильтр eligibility;
+- `plan_cost_reallocation` — DOWN-only rebalance;
+- `plan_profitable_expansion` — UP до max passing mode;
+- `plan_max_cpa_guard` — trim по max CPA.
 
-**Shelf cleanup (параллельно с M1/M2/M3):** при активной полочной фазе
-(`shelf_promotion_active` и `shelf>=organic` или `UNKNOWN`) на том же тике планируется
-массовый сброс всех активных ключей с `above_rec=False` (не проходят rec-gate на UP):
-БС — один шаг `DOWN`, авто (`hard_status=1`) — `FORCE_OFF` (applier не делает `DOWN`
-для авто). Действия cleanup сливаются с M1/M2/M3; при конфликте по `keyword_setting_id`
-побеждает cleanup. Legacy shelf-путь (`UNDERPERFORM` без plan/fact) по-прежнему может
-отдать только cleanup, если список непустой.
+**Shelf cleanup (post-gate):** при активной полочной фазе
+(`shelf_promotion_active` и `shelf>=organic` или `UNKNOWN`) — массовый сброс ключей с `above_rec=False`:
+БС — `DOWN`, авто — `FORCE_OFF`.
 
 Общие guard-правила:
 
@@ -117,23 +147,22 @@ Unit: `tests\unit\auto_updater_v3\test_ladder_gap_rebalance.py`.
   по механизмам (`m1/m2/m3`);
 - в UI используется агрегат цикла `+up/-down/off` из `LastV3UpdaterAction` snapshot.
 
-## NO_DATA (Н) кампании vs N-state ключа
+## NO_DATA кампании vs N-state ключа
 
-- **Кампания «Н»:** `SalesStates.NO_DATA` — только `fact.pay_for_order is None` по агрегату РК (`detect_campaign_state`). Причины: нет заказов в окне, нет ключей со статистикой, и т.п. **V3 = V2:** лестница не крутится (нет phase0, preamble no_data, selector, `target_place` sync); Redis plan/fact не пишем; ждём данных.
-- **Недопродажи + pay:** при `predict_orders < plan.orders` — `pay > max` → OVERSPEND; `pay ≥ 90% max` → OPTIMAL; иначе UNDERPERFORM.
-- **N-state ключа** (кампания **не** «Н»): только нет CH `position_profile` **или** нельзя импутировать conv (см. ``keyword_v3_decision_data``). Нет своих показов, но есть CH → **не** N-state: ``RK_AGGREGATE`` (средневзвешенная conv по ключам с показами) → ``PEER_MAX`` (max conv по другим ключам) → M1/M2/M3 с ``imputed``; preamble MIN_CPA только при ``NO_CH_MATRIX``.
-- **Gap-rebalance:** нет V2 CPO = **1 балл** (как MIN_CPA); **не** выполняется при кампании «Н».
-- **UI:** «Н» в меню РК — только кампания; N-state в карточке ключа — диагностика CH/V2 CPO.
-- **`target_place`:** `0` = min bid WB; sync только если кампания не «Н»/None.
+- **Кампания NO_DATA:** `SalesStates.NO_DATA` — `fact.pay_for_order is None`. V3: safe bootstrap (управляемые → MIN_CPA) → flush → sync `target_place=0`; без realloc/expansion/guard/selector/gate.
+- **NOT_READY:** `detect_campaign_state() is None` — полный стоп без bootstrap и sync.
+- **N-state ключа** (кампания NORMAL): нет conv даже с импутацией → INVALID; NO_CH + own conv → MIN-only tier (не n_state); NO_CH без conv → INVALID.
+- **UI:** «Н» в меню РК — campaign NO_DATA; диагностика ключа — CH/V2 CPO / tier.
+- **`target_place`:** `0` = min bid WB; NO_DATA — force 0 (managed); NORMAL NO_CH tier — fallback map by `KeywordSetting.id`.
 
-Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\unit\test_process_adv_v3_plan_fact_cache.py`, `tests\test_sales_states.py`.
+Unit: `tests\unit\auto_updater_v3\test_no_data_activation.py`, `tests\unit\auto_updater_v3\test_keyword_v3_eligibility.py`, `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`, `tests\unit\auto_updater_v3\test_rollout_phases.py`, `tests\unit\test_process_adv_v3_plan_fact_cache.py`.
 
 ## target_place и ClickHouse bid profiles
 
 - **Один** `get_keyword_bid_profiles` на цикл `process_adv_v3` (`_load_v3_wb_context`); phase 0 и phase 1 переиспользуют тот же snapshot.
 - При cache miss `min_bids.search` для `main_nmid`: `backfill_min_bids_for_adv` (как `preload_min_bids_cache_miss` → при необходимости WB API) и повторный `get_wb_advs_dto`; иначе пустые профили без падения цикла.
-- **Порядок тика:** CH profiles → plan/fact → при «Н»/None стоп → иначе **gap-rebalance (phase0)** → **no-data activation (ключи)** → selector (Redis gate) → flush → `target_place` (`_sync_target_places_once` + `finally`).
-- **`sync_keyword_target_places_v3`** — при `individual_keywords_target_place_mode`; не режется short-circuit plan/fact; `calculated_by_text` для V2 CPO и `conv_views_to_orders`. **`target_place` = `ModeCandidate.position`** из `build_mode_candidates` (MIN — min CPO заказа), не legacy `get_target_position_for_strategy_mode`. Нет CH-профиля или нет V2 CPO → `target_place=0` (активные режимы). `_safe_sync_target_places_v3`: при падении sync — `logger.error`, исключение из `try` не подменяется.
+- **Порядок тика:** CH profiles → plan/fact → `CampaignMode` → фазы по режиму → flush → `target_place`.
+- **`sync_keyword_target_places_v3`** — `force_all_target_place_zero` (NO_DATA, managed keys); `target_place_fallback_zero_by_keyword_id` (NORMAL, by `KeywordSetting.id`).
 
 Unit: `tests\unit\auto_updater_v3\test_orchestrator_tick_preamble.py`.
 - Обновляются **все** ключи, включая OFF (позиция из профиля как для MIN_CPA; торги OFF по-прежнему отрезаются в `UpdateClusterBidsManager`).

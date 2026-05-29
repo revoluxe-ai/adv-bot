@@ -129,7 +129,7 @@ def test_profile_invalid_candidate_shows_reason() -> None:
 
 
 @pytest.mark.unit
-def test_profile_n_state_when_no_ch_matrix() -> None:
+def test_profile_n_state_when_no_v2_cpo_and_no_ch() -> None:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
         KeywordV3DataDiagnostic,
     )
@@ -145,20 +145,51 @@ def test_profile_n_state_when_no_ch_matrix() -> None:
         },
         n_state=True,
         diagnostic=KeywordV3DataDiagnostic(
-            has_v2_cpo=True,
+            has_v2_cpo=False,
             has_ch_position_profile=False,
         ),
     )
     text = format_keyword_v3_profile_block(data)
     assert "N-state" in text
+    assert "N-state bootstrap" in text
     assert "V2 CPO" in text and "CH матрица" in text
-    assert "нет матрицы CH" in text
     assert "min bid WB" in text
-    assert "M + target 0" in text
-    assert "\\_" not in text
-    assert "_Данные:" not in text
-    assert "_Нет:" not in text
     assert "п|с|CPO" not in text
+
+
+@pytest.mark.unit
+def test_profile_no_ch_min_only_not_n_state() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        KeywordV3DataDiagnostic,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        KeywordV3DecisionTier,
+    )
+
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.OFF,
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                is_valid=False,
+                invalid_reason="no_position_profile",
+            ),
+        },
+        n_state=False,
+        no_ch_min_only=True,
+        v2_pay_for_order=367.13,
+        diagnostic=KeywordV3DataDiagnostic(
+            has_v2_cpo=True,
+            has_ch_position_profile=False,
+            decision_tier=KeywordV3DecisionTier.NO_CH_MATRIX,
+        ),
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "NO CH (только MIN)" in text
+    assert "N-state" not in text
+    assert "CPO=367.13 (V2)" in text
+    assert "NO CH bootstrap" in text
+    assert "нет матрицы CH" in text
 
 
 @pytest.mark.unit

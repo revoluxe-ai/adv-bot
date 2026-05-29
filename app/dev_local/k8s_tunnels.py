@@ -1,7 +1,7 @@
 """kubectl port-forward к Postgres и ClickHouse для локальной разработки (RUN_LOCAL=true).
 
-Запускает два процесса ``kubectl port-forward`` и фоновый watchdog (раз в секунду):
-проверяет, что процесс жив и локальный TCP-порт отвечает; при сбое — перезапуск.
+Поддерживает несколько точек входа: если порты уже проброшены другим процессом,
+новый процесс только проверяет TCP и не запускает второй kubectl.
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ _READY_POLL_INTERVAL_SEC = 0.5
 _DEFAULT_READY_TIMEOUT_SEC = 90.0
 
 _monitor_started = False
+_atexit_registered = False
 _monitor_lock = threading.Lock()
-_processes_by_name: dict[str, subprocess.Popen[bytes] | None] = {}
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,17 @@ class _TunnelSpec:
     local_ports: tuple[int, ...]
     remote_ports: tuple[int, ...]
     probe_port: int
+
+
+@dataclass
+class _TunnelRuntime:
+    """Состояние туннеля в текущем процессе."""
+
+    proc: subprocess.Popen[bytes] | None
+    external: bool  # порт уже слушал другой kubectl / ручной forward
+
+
+_processes_by_name: dict[str, _TunnelRuntime] = {}
 
 
 def _repo_root() -> Path:
@@ -71,7 +82,6 @@ def _tunnel_specs() -> list[_TunnelSpec]:
     ch_http = _int_env("DEV_TUNNEL_CH_HTTP_PORT", 18123)
     ch_native = _int_env("DEV_TUNNEL_CH_NATIVE_PORT", 19000)
     forward_ch_native = _str_env("DEV_TUNNEL_CH_FORWARD_NATIVE", "false").lower() == "true"
-    # svc/postgres-db — headless без selector; port-forward только к pooler или pod.
     pg_resource = _str_env("DEV_TUNNEL_PG_RESOURCE", "pod/postgres-db-0")
     ch_local_ports: tuple[int, ...] = (ch_http,)
     ch_remote_ports: tuple[int, ...] = (8123,)
@@ -105,6 +115,10 @@ def _tcp_port_open(host: str, port: int) -> bool:
             return True
     except OSError:
         return False
+
+
+def _ports_ready(specs: list[_TunnelSpec]) -> bool:
+    return all(_tcp_port_open("127.0.0.1", spec.probe_port) for spec in specs)
 
 
 def _build_port_forward_args(spec: _TunnelSpec) -> list[str]:
@@ -181,41 +195,48 @@ def _terminate_process(proc: subprocess.Popen[bytes]) -> None:
         proc.wait(timeout=5)
 
 
-def _stop_all_tunnels() -> None:
+def _stop_owned_tunnels() -> None:
+    """Останавливает только kubectl, запущенные этим процессом (не чужой forward)."""
     global _processes_by_name
-    for proc in _processes_by_name.values():
-        if proc is not None:
-            _terminate_process(proc)
+    for runtime in _processes_by_name.values():
+        if runtime.external or runtime.proc is None:
+            continue
+        _terminate_process(runtime.proc)
     _processes_by_name = {}
 
 
 def _stop_tunnel(name: str) -> None:
     global _processes_by_name
-    proc = _processes_by_name.pop(name, None)
-    if proc is not None:
-        _terminate_process(proc)
+    runtime = _processes_by_name.pop(name, None)
+    if runtime is not None and not runtime.external and runtime.proc is not None:
+        _terminate_process(runtime.proc)
+
+
+def _adopt_external_forward(spec: _TunnelSpec) -> None:
+    """Помечает туннель как уже проброшенный (другой процесс или ручной kubectl)."""
+    global _processes_by_name
+    _processes_by_name[spec.name] = _TunnelRuntime(proc=None, external=True)
+    logger.info(
+        "Tunnel %s: port %s already listening, reusing existing port-forward",
+        spec.name,
+        spec.probe_port,
+    )
 
 
 def _start_tunnel(
     spec: _TunnelSpec, kubeconfig: str
 ) -> subprocess.Popen[bytes] | None:
-    """Перезапускает один туннель (остальные не трогает).
-
-    Если порт уже слушает (ручной port-forward) — kubectl не запускаем.
-    """
+    """Запускает или переиспользует port-forward для одного туннеля."""
     global _processes_by_name
+
     if _tcp_port_open("127.0.0.1", spec.probe_port):
-        logger.info(
-            "Tunnel %s: port %s already listening, using existing forward",
-            spec.name,
-            spec.probe_port,
-        )
         _stop_tunnel(spec.name)
-        _processes_by_name[spec.name] = None
+        _adopt_external_forward(spec)
         return None
+
     _stop_tunnel(spec.name)
     proc = _start_port_forward(spec, kubeconfig)
-    _processes_by_name[spec.name] = proc
+    _processes_by_name[spec.name] = _TunnelRuntime(proc=proc, external=False)
     return proc
 
 
@@ -225,25 +246,14 @@ def _start_all_tunnels(kubeconfig: str, specs: list[_TunnelSpec]) -> None:
 
 
 def _tunnel_port_ready(
-    proc: subprocess.Popen[bytes] | None, spec: _TunnelSpec
+    _runtime: _TunnelRuntime | None,
+    spec: _TunnelSpec,
 ) -> bool:
-    if _tcp_port_open("127.0.0.1", spec.probe_port):
-        return True
-    if proc is None:
-        return False
-    if proc.poll() is not None:
-        return False
-    return False
+    """Туннель здоров только если localhost:probe_port принимает TCP.
 
-
-def _all_tunnels_ready(specs: list[_TunnelSpec]) -> bool:
-    for spec in specs:
-        if spec.name not in _processes_by_name:
-            return False
-        proc = _processes_by_name[spec.name]
-        if not _tunnel_port_ready(proc, spec):
-            return False
-    return True
+    Живой kubectl без слушающего порта (зависший bind) — нездоров: watchdog перезапустит.
+    """
+    return _tcp_port_open("127.0.0.1", spec.probe_port)
 
 
 def wait_for_dev_tunnels_ready(
@@ -251,6 +261,8 @@ def wait_for_dev_tunnels_ready(
     specs: list[_TunnelSpec] | None = None,
 ) -> None:
     """Блокирует до готовности всех туннелей (TCP на localhost).
+
+    Не зависит от того, кто поднял port-forward — этот или другой процесс.
 
     Raises:
         TimeoutError: туннели не поднялись за timeout_sec.
@@ -262,8 +274,8 @@ def wait_for_dev_tunnels_ready(
 
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
-        if _all_tunnels_ready(tunnel_specs):
-            logger.info("Dev k8s tunnels are ready")
+        if _ports_ready(tunnel_specs):
+            logger.info("Dev k8s tunnels are ready on localhost")
             return
         time.sleep(_READY_POLL_INTERVAL_SEC)
 
@@ -275,48 +287,94 @@ def wait_for_dev_tunnels_ready(
 
 
 def _monitor_loop(kubeconfig: str, specs: list[_TunnelSpec]) -> None:
-    """Watchdog: раз в секунду проверяет процессы и порты, перезапускает при сбое."""
+    """Watchdog: перезапускает только туннели, запущенные этим процессом."""
     _start_all_tunnels(kubeconfig, specs)
     time.sleep(_STARTUP_WAIT_SEC)
 
     while True:
         time.sleep(_MONITOR_INTERVAL_SEC)
         for spec in specs:
-            proc = _processes_by_name.get(spec.name)
-            if _tunnel_port_ready(proc, spec):
+            runtime = _processes_by_name.get(spec.name)
+            if _tunnel_port_ready(runtime, spec):
                 continue
-            if proc is not None and proc.poll() is not None:
-                _log_tunnel_exit(spec, proc)
+
+            if (
+                runtime is not None
+                and not runtime.external
+                and runtime.proc is not None
+                and runtime.proc.poll() is not None
+            ):
+                _log_tunnel_exit(spec, runtime.proc)
+
             logger.warning(
-                "Tunnel %s unhealthy, restarting (pid=%s, poll=%s)",
+                "Tunnel %s unhealthy, restarting (external=%s)",
                 spec.name,
-                proc.pid if proc else None,
-                proc.poll() if proc else None,
+                runtime.external if runtime else None,
             )
             _start_tunnel(spec, kubeconfig)
             time.sleep(_STARTUP_WAIT_SEC)
 
 
+def _register_atexit_once() -> None:
+    global _atexit_registered
+    if _atexit_registered:
+        return
+    atexit.register(_stop_owned_tunnels)
+    _atexit_registered = True
+
+
 def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
-    """Идемпотентно запускает фоновый монитор port-forward (только один поток на процесс).
+    """Идемпотентно обеспечивает port-forward для локальной разработки.
+
+    Если порты уже слушают (другая точка входа / dev-tunnels.ps1) — только ждёт
+    готовности, без второго kubectl и без watchdog.
+
+    Проверка kubeconfig и ``_tunnel_specs()`` выполняются под ``_monitor_lock``,
+    чтобы параллельные вызовы не гонялись с idempotency-guard и не поднимали
+    ``FileNotFoundError`` у одного caller'а, пока другой уже стартовал monitor.
 
     Args:
-        wait_ready: дождаться TCP на localhost перед возвратом (для bootstrap приложения).
+        wait_ready: дождаться TCP на localhost перед возвратом.
     """
     global _monitor_started
 
+    kubeconfig = ""
+    specs: list[_TunnelSpec] = []
+    start_monitor_thread = False
+    wait_specs_after_lock: list[_TunnelSpec] | None = None
+
     with _monitor_lock:
         if _monitor_started:
-            return
-        _monitor_started = True
+            if wait_ready:
+                wait_specs_after_lock = _tunnel_specs()
+        else:
+            kubeconfig = _default_kubeconfig()
+            if not Path(kubeconfig).is_file():
+                raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
 
-    kubeconfig = _default_kubeconfig()
-    if not Path(kubeconfig).is_file():
-        raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
+            specs = _tunnel_specs()
 
-    specs = _tunnel_specs()
-    atexit.register(_stop_all_tunnels)
+            if _ports_ready(specs):
+                logger.info(
+                    "All dev tunnel ports already forwarded; skipping kubectl in this process"
+                )
+                for spec in specs:
+                    _adopt_external_forward(spec)
+                _monitor_started = True
+                if wait_ready:
+                    wait_specs_after_lock = specs
+            else:
+                _monitor_started = True
+                start_monitor_thread = True
 
+    if wait_specs_after_lock is not None:
+        wait_for_dev_tunnels_ready(specs=wait_specs_after_lock)
+        return
+
+    if not start_monitor_thread:
+        return
+
+    _register_atexit_once()
     thread = threading.Thread(
         target=_monitor_loop,
         args=(kubeconfig, specs),

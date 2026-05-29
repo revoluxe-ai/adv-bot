@@ -25,20 +25,11 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
+    complex_adv.v3_rollout_aggressiveness = 2
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
     dto.min_target_position = 5
-
-    async def _phase0_raise(
-        _adv: object,
-        *,
-        contexts: list[object],
-        shelf_promotion_active: bool,
-        shelf_click_mode: object,
-        rollout_aggressiveness: int | None,
-    ) -> list[object]:
-        raise _ROOT_ERROR
 
     with (
         patch(
@@ -47,12 +38,11 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(),
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_fact_data",
-            new=AsyncMock(return_value=MagicMock()),
-        ),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
@@ -62,14 +52,17 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            new=AsyncMock(side_effect=_phase0_raise),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            side_effect=_ROOT_ERROR,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",
             new=AsyncMock(side_effect=OSError("db down")),
         ),
     ):
+        updater_cls.return_value.get_fact_data = AsyncMock(
+            return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
+        )
         with pytest.raises(RuntimeError, match="root cause from try") as exc_info:
             await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 

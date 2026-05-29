@@ -24,8 +24,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
 
-    phase0 = AsyncMock(return_value=[])
-    no_data = MagicMock(return_value=[])
+    bootstrap = MagicMock(return_value=[])
 
     with (
         patch(
@@ -33,12 +32,8 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
             new=AsyncMock(return_value=(MagicMock(), {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            phase0,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
-            no_data,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
+            bootstrap,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
@@ -66,8 +61,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
         )
 
     plan_fact.set_new_plan_fact.assert_not_awaited()
-    phase0.assert_not_awaited()
-    no_data.assert_not_called()
+    bootstrap.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -84,21 +78,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     wb_manager = MagicMock()
     wb_manager.get_wb_advs_dto = AsyncMock(return_value=[])
 
-    async def _passthrough_phase0(
-        _adv: object,
-        *,
-        contexts: list[object],
-        shelf_promotion_active: bool,
-        shelf_click_mode: object,
-        rollout_aggressiveness: int | None,
-    ) -> list[object]:
-        return []
-
     with (
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            new=AsyncMock(side_effect=_passthrough_phase0),
-        ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(),
@@ -130,7 +110,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
 
 
 @pytest.mark.asyncio
-async def test_process_adv_v3_skips_ladder_when_campaign_no_data() -> None:
+async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 3
     complex_adv.adv_setting = MagicMock()
@@ -139,14 +119,13 @@ async def test_process_adv_v3_skips_ladder_when_campaign_no_data() -> None:
     complex_adv.v3_rollout_aggressiveness = 2
 
     dto = MagicMock()
-    dto.min_target_position = 5
-    phase0 = AsyncMock(return_value=[])
-    no_data = MagicMock(return_value=[])
+    bootstrap = MagicMock(return_value=[])
     select_mock = MagicMock(return_value=[])
     sync_mock = AsyncMock()
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
+    expansion = MagicMock(return_value=[])
 
     with (
         patch(
@@ -154,15 +133,15 @@ async def test_process_adv_v3_skips_ladder_when_campaign_no_data() -> None:
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            phase0,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
+            bootstrap,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_no_data_activation_v3",
-            no_data,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            expansion,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_actions",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
             select_mock,
         ),
         patch(
@@ -171,7 +150,7 @@ async def test_process_adv_v3_skips_ladder_when_campaign_no_data() -> None:
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(max_pay_for_order=100.0, orders=10),
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
@@ -195,8 +174,9 @@ async def test_process_adv_v3_skips_ladder_when_campaign_no_data() -> None:
         complex_adv.get_keywords = AsyncMock(return_value=[])
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    phase0.assert_not_awaited()
-    no_data.assert_not_called()
+    bootstrap.assert_called_once()
+    expansion.assert_not_called()
     select_mock.assert_not_called()
-    sync_mock.assert_not_awaited()
+    sync_mock.assert_awaited_once()
+    assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is True
     plan_fact.set_new_plan_fact.assert_not_awaited()

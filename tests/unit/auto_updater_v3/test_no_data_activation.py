@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 
@@ -16,15 +17,20 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     keyword_lacks_v3_decision_data,
     keyword_missing_ch_position_profile,
     keyword_v2_pay_for_order_unavailable,
+    plan_campaign_no_data_bootstrap_safe,
+    plan_data_bootstrap_v3,
+    plan_no_ch_min_bootstrap_actions,
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
-    rebalance_ladder_points,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     merge_and_dedup_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
@@ -133,6 +139,33 @@ def test_keyword_v2_pay_for_order_available_with_conv_and_cpm() -> None:
 
 
 @pytest.mark.unit
+def test_keyword_v2_pay_for_order_available_when_only_bid_log_cascade() -> None:
+    """Полный каскад CPM (bid_log) даёт pay_for_order — target_place не в fallback 0."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        resolve_keyword_v2_pay_for_order_cost,
+    )
+
+    kw = _kw(ks_id=6, text="bid_log_only", mode=KeywordStrategyMode.MIN_CPA, conv=0.05, cpm_set_bid=200)
+    sources = kw.cpm_sources
+    assert sources is not None
+    kw = kw.model_copy(
+        update={
+            "cpm_sources": sources.model_copy(
+                update={
+                    "cpm_set_bid": None,
+                    "cpm_from_api": None,
+                    "cpm_from_stats": None,
+                    "cpm_from_bid_log": 3990.0,
+                }
+            ),
+        }
+    )
+    assert kw.pay_for_order is not None
+    assert resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=None) is None
+    assert not keyword_v2_pay_for_order_unavailable(kw)
+
+
+@pytest.mark.unit
 def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
     off = _kw(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0)
     ctx = KeywordV3Context(keyword=off, position_profile=_sample_profile())
@@ -146,11 +179,11 @@ def test_plan_no_data_min_up_off_without_v2_cpo() -> None:
 
 @pytest.mark.unit
 def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
-    """N-state: есть V2 CPO, но нет CH — OFF → MIN_CPA."""
+    """NO_CH+own conv — не INVALID; safe bootstrap (CAMPAIGN_NO_DATA) → MIN."""
     off = _kw(ks_id=3, text="c", mode=KeywordStrategyMode.OFF, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=off, position_profile=None)
-    assert keyword_lacks_v3_decision_data(ctx, [ctx])
-    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OFF)])
+    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
+    actions = plan_campaign_no_data_bootstrap_safe([ctx])
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
@@ -158,9 +191,13 @@ def test_plan_no_data_min_up_off_without_ch_profile_despite_v2_cpo() -> None:
 
 @pytest.mark.unit
 def test_plan_no_data_down_optimum_without_ch_profile() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+        plan_campaign_no_data_bootstrap_safe,
+    )
+
     opt = _kw(ks_id=4, text="d", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
     ctx = KeywordV3Context(keyword=opt, position_profile=None)
-    actions = plan_no_data_keyword_actions([(ctx, KeywordStrategyMode.OPTIMUM)])
+    actions = plan_campaign_no_data_bootstrap_safe([ctx])
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
@@ -206,7 +243,7 @@ def test_diagnose_keyword_v3_data_cpo_without_ch_profile() -> None:
     diag = diagnose_keyword_v3_data(kw, None)
     assert diag.has_v2_cpo
     assert not diag.has_ch_position_profile
-    assert diag.n_state
+    assert not diag.n_state
     assert diag.missing_labels_ru() == ("нет матрицы CH (bid profile по ключу)",)
 
 
@@ -275,23 +312,88 @@ def test_merge_and_dedup_higher_priority_bucket_wins_across_lists() -> None:
 
 
 @pytest.mark.unit
-def test_rebalance_ladder_points_no_data_off_counts_one() -> None:
-    off = _kw(ks_id=10, text="nd", mode=KeywordStrategyMode.OFF, conv=0.0)
-    assert rebalance_ladder_points(off, KeywordStrategyMode.OFF) == 1
+def test_plan_no_ch_min_bootstrap_off_auto_up_to_min() -> None:
+    """NO CH + V2 CPO + OFF + auto → UP MIN (без gate resolve)."""
+    off = _kw(
+        ks_id=90,
+        text="крем для лица с блеском",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    prepared = [(ctx, KeywordStrategyMode.OFF)]
+    actions = plan_no_ch_min_bootstrap_actions(prepared)
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason == "no_ch_min_bootstrap"
 
 
 @pytest.mark.unit
-def test_rebalance_ladder_points_with_cpo_uses_mode_level() -> None:
-    prof = _sample_profile()
-    min_kw = _kw(ks_id=11, text="ok", mode=KeywordStrategyMode.MIN_CPA, conv=0.08, cpm_set_bid=200)
-    min_kw = min_kw.model_copy(update={"position_profile": prof})
-    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.MIN_CPA) == 1
-    opt = _kw(ks_id=12, text="ok2", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
-    opt = opt.model_copy(update={"position_profile": prof})
-    assert rebalance_ladder_points(opt, KeywordStrategyMode.OPTIMUM) == 2
+def test_plan_no_ch_min_bootstrap_skips_up_when_pay_for_order_above_max() -> None:
+    """NO CH: ``pay_for_order`` из ключа > max — без UP MIN."""
+    off = _kw(
+        ks_id=93,
+        text="дорогой no ch",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=2,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    prepared = [(ctx, KeywordStrategyMode.OFF)]
+    pfo = off.pay_for_order
+    assert pfo is not None and pfo > 1.0
+    actions = plan_no_ch_min_bootstrap_actions(
+        prepared, max_pay_for_order=float(pfo) - 1.0
+    )
+    assert actions == []
 
 
 @pytest.mark.unit
-def test_rebalance_ladder_points_missing_ch_counts_one() -> None:
-    min_kw = _kw(ks_id=13, text="noch", mode=KeywordStrategyMode.OPTIMUM, conv=0.08, cpm_set_bid=200)
-    assert rebalance_ladder_points(min_kw, KeywordStrategyMode.OPTIMUM) == 1
+def test_plan_data_bootstrap_auto_uses_eligibility_cap() -> None:
+    """Auto-mode bootstrap: UP после FORCE_OFF на вычисленный cap, не всегда MIN_CPA."""
+    kw = _kw(
+        ks_id=92,
+        text="cap_test",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=200,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    elig_patch = (
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3"
+        ".keyword_v3_eligibility"
+    )
+    with (
+        patch(f"{elig_patch}.clamp_target_mode", return_value=KeywordStrategyMode.OPTIMUM),
+        patch(f"{elig_patch}.can_target_mode", return_value=True),
+    ):
+        actions = plan_data_bootstrap_v3([ctx])
+
+    bootstrap = [a for a in actions if a.reason == "data_bootstrap_down"]
+    assert any(a.action == V3ActionType.FORCE_OFF for a in bootstrap)
+    up = [a for a in bootstrap if a.action == V3ActionType.UP]
+    assert len(up) == 1
+    assert up[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+
+
+def test_plan_data_bootstrap_does_not_include_no_ch_off_to_min() -> None:
+    """plan_data_bootstrap_v3 не поднимает NO_CH OFF→MIN (только safe-start helper)."""
+    off = _kw(
+        ks_id=91,
+        text="no_ch",
+        mode=KeywordStrategyMode.OFF,
+        hard_status=1,
+        conv=0.08,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=off, position_profile=None)
+    prepared = build_prepared_from_contexts([ctx])
+    bootstrap_actions = plan_data_bootstrap_v3([ctx])
+    assert not any(a.reason == "no_ch_min_bootstrap" for a in bootstrap_actions)
+    safe_start = plan_no_ch_min_bootstrap_actions(prepared, max_pay_for_order=10_000.0)
+    assert any(a.reason == "no_ch_min_bootstrap" for a in safe_start)

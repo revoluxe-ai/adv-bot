@@ -26,6 +26,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
+    stored_strategy_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     effective_conv_for_v3,
@@ -61,6 +62,20 @@ def _hard_status_allows_up(hard_status: int) -> bool:
 
 _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
 PreparedList = list[_PreparedEntry]
+
+
+def build_prepared_from_contexts(
+    contexts: list["KeywordV3Context"],
+) -> PreparedList:
+    """Собрать ``PreparedList`` из контекстов ключей.
+
+    Каноническое определение для V3 planners; импортировать из ``transition_ranking``,
+    не из ``selector``.
+    """
+    prepared: PreparedList = []
+    for ctx in contexts:
+        prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
+    return prepared
 
 
 class RecTier(str, Enum):

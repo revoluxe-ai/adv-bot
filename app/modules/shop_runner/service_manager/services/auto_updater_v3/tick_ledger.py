@@ -1,6 +1,6 @@
 """In-memory ladder state за один тик V3 и нетто-flush в БД.
 
-Фазы (phase0, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
+Фазы (M1, trim, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
 in-memory; в конце тика — один commit только ``strategy_mode`` + ``hard_status`` для
 ключей, у которых нетто-режим отличается от baseline, с bulk-проверкой свежего
 ``hard_status`` в БД (отбрасываем ``hard_status`` не in {1, 2}).
@@ -62,18 +62,18 @@ class V3TickKeywordLedger:
         self._reindex()
 
     def _reindex(self) -> None:
-        self._by_id = {
-            kw.keyword_setting_original_id: kw
-            for kw in self.keywords
-            if kw.keyword_setting_original_id is not None
-        }
+        self._by_id = {}
+        for kw in self.keywords:
+            ks_id = kw.keyword_setting_original_id
+            if ks_id is not None:
+                self._by_id[int(ks_id)] = kw
 
     @classmethod
     def from_keywords(cls, keywords: list[CalculatedKeyword]) -> V3TickKeywordLedger:
         """Создать ledger и зафиксировать baseline ``strategy_mode`` по каждому ключу."""
         ledger = cls(keywords=list(keywords))
         for ks_id, kw in ledger._by_id.items():
-            ledger._baseline_mode[ks_id] = kw.keyword_setting.strategy_mode
+            ledger._baseline_mode[int(ks_id)] = kw.keyword_setting.strategy_mode
         return ledger
 
     def _keyword_text(self, ks_id: int) -> str:
@@ -145,7 +145,7 @@ class V3TickKeywordLedger:
                 continue
             if action.keyword_setting_id is None:
                 continue
-            ks_id = action.keyword_setting_id
+            ks_id = int(action.keyword_setting_id)
             kw = self._by_id.get(ks_id)
             if kw is None:
                 continue
@@ -202,8 +202,8 @@ class V3TickKeywordLedger:
         """REBALANCE_TRANSFER: down source + up target in-memory."""
         if action.from_keyword_setting_id is None or action.to_keyword_setting_id is None:
             return False
-        from_id = action.from_keyword_setting_id
-        to_id = action.to_keyword_setting_id
+        from_id = int(action.from_keyword_setting_id)
+        to_id = int(action.to_keyword_setting_id)
         kw_from = self._by_id.get(from_id)
         kw_to = self._by_id.get(to_id)
         if kw_from is None or kw_to is None:

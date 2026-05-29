@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+    SalesStates,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
     process_adv_v3,
 )
@@ -38,28 +41,16 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
     state = MagicMock()
     state.name = "UNDERPERFORM"
 
-    async def _phase0_noop(
-        _adv: object,
-        *,
-        contexts: list[object],
-        shelf_promotion_active: bool,
-        shelf_click_mode: object,
-        rollout_aggressiveness: int | None,
-    ) -> list[object]:
-        return []
+    load_ctx = AsyncMock(return_value=(dto, {"kw": []}))
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_predict_keywords_target_place",
-            return_value=predictor,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.run_ladder_gap_rebalance_v3",
-            new=AsyncMock(side_effect=_phase0_noop),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=load_ctx,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(max_pay_for_order=100.0, orders=10),
+            return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
@@ -70,10 +61,22 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
-            return_value=state,
+            return_value=SalesStates.UNDERPERFORM,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_actions",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
             return_value=[],
         ),
         patch(
@@ -86,4 +89,4 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=wb_manager)
 
-    predictor.get_keyword_bid_profiles.assert_awaited_once()
+    load_ctx.assert_awaited_once()

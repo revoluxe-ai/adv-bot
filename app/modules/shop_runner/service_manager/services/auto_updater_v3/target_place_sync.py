@@ -37,6 +37,14 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+_HARD_STATUS_AUTO_MODE = 1
+_HARD_STATUS_WHITE_LIST = 2
+
+
+def _hard_status_is_managed(hard_status: int) -> bool:
+    """Auto (1) или white-list (2): V3 может менять ``target_place`` при force-zero."""
+    return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
+
 
 def _effective_strategy_mode(
     keyword: KeywordSetting,
@@ -64,11 +72,18 @@ async def sync_keyword_target_places_v3(
     bid_profiles: dict[str, list[BidPosition]],
     *,
     calculated_by_text: dict[str, CalculatedKeyword] | None = None,
+    force_all_target_place_zero: bool = False,
+    target_place_fallback_zero_by_keyword_id: dict[int, bool] | None = None,
 ) -> None:
     """Пересчёт ``target_place`` для всех ключей РК по профилю и ``strategy_mode``.
 
     ``strategy_mode`` берётся из ``calculated_by_text`` (ledger/Redis тика), не из устаревшей
     строки ``KeywordSetting``, чтобы ``target_place`` совпадал с профилем V3 в UI.
+
+    Args:
+        force_all_target_place_zero: CAMPAIGN_NO_DATA — min bid (0) для **управляемых** ключей.
+        target_place_fallback_zero_by_keyword_id: CAMPAIGN_NORMAL — ``ks_id → force 0``
+            для NO_CH tier (в т.ч. пока ключ ещё OFF).
     """
     stmt = select(KeywordSetting).where(
         KeywordSetting.adv_setting_id == adv.adv_setting_original_id
@@ -80,14 +95,36 @@ async def sync_keyword_target_places_v3(
             profile = resolve_keyword_bid_profile(bid_profiles, keyword.text)
             calc_kw = _calculated_keyword_lookup(calculated_by_text, keyword.text)
             strategy_mode = _effective_strategy_mode(keyword, calc_kw)
+            hard_status = int(keyword.hard_status)
+
+            ks_id = int(keyword.id)
+            fallback_zero = (
+                target_place_fallback_zero_by_keyword_id is not None
+                and target_place_fallback_zero_by_keyword_id.get(ks_id, False)
+            )
+
+            if force_all_target_place_zero:
+                if not _hard_status_is_managed(hard_status):
+                    continue
+                keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+                continue
+
+            if fallback_zero:
+                if not _hard_status_is_managed(hard_status):
+                    continue
+                keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+                continue
+
             no_v2_cpo = (
-                calc_kw is None
-                or keyword_v2_pay_for_order_unavailable(calc_kw)
+                calc_kw is None or keyword_v2_pay_for_order_unavailable(calc_kw)
             )
             if not profile or no_v2_cpo:
-                if strategy_mode == KeywordStrategyMode.OFF:
+                if (
+                    strategy_mode == KeywordStrategyMode.OFF
+                    and no_v2_cpo
+                ):
                     keyword.target_place = None
-                else:
+                elif _hard_status_is_managed(hard_status):
                     logger.warning(
                         "No bid profile or no V2 CPO for keyword %s, adv_id=%s; "
                         "target_place=%s (min bid)",
@@ -96,7 +133,10 @@ async def sync_keyword_target_places_v3(
                         NO_DATA_TARGET_PLACE_FALLBACK,
                     )
                     keyword.target_place = NO_DATA_TARGET_PLACE_FALLBACK
+                else:
+                    keyword.target_place = None
                 continue
+            assert calc_kw is not None
             profile_points = profile_points_from_bid_positions(profile)
             candidates = build_mode_candidates(
                 profile=profile_points,

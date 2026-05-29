@@ -89,10 +89,26 @@ def test_no_conv_tier_when_ch_but_no_imputation() -> None:
 
 
 @pytest.mark.unit
-def test_no_ch_matrix_triggers_n_state() -> None:
+def test_no_ch_matrix_without_conv_is_invalid() -> None:
+    """Нет CH и нет conv — INVALID tier (bootstrap)."""
+    kw = _calculated_kw_fixture(
+        ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0
+    )
+    stat = kw.cluster_stat.model_copy(update={"views": 0, "conv_views_to_orders": 0.0})
+    kw = kw.model_copy(update={"cluster_stat": stat})
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    assert resolve_keyword_v3_decision(ctx, [ctx]).tier == KeywordV3DecisionTier.NO_CH_MATRIX
+    assert keyword_lacks_v3_decision_data(ctx, [ctx])
+
+
+@pytest.mark.unit
+def test_no_ch_with_own_conv_not_n_state() -> None:
+    """Нет CH, но есть своя conv — MIN-only ladder, не INVALID."""
     kw = _calculated_kw_fixture(
         ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.08
     )
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
-    assert resolve_keyword_v3_decision(ctx, [ctx]).tier == KeywordV3DecisionTier.NO_CH_MATRIX
-    assert keyword_lacks_v3_decision_data(ctx, [ctx])
+    decision = resolve_keyword_v3_decision(ctx, [ctx])
+    assert decision.tier == KeywordV3DecisionTier.NO_CH_MATRIX
+    assert decision.effective_conv_views_to_orders == pytest.approx(0.08)
+    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
