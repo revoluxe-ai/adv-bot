@@ -637,13 +637,18 @@ def _highest_passing_mode_in_upper_groups(
     modes_groups: tuple[tuple[KeywordStrategyMode, ...], ...],
     *,
     ctx: "KeywordV3Context",
+    state_candidates: dict[AggressionTargetMode, ModeCandidate],
     elig: "KeywordV3Eligibility | None",
     policy: SelectionPolicy,
     resolve: float,
     ladder_inputs: "LadderInputs | None",
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None,
 ) -> tuple[KeywordStrategyMode | None, float | None, bool]:
-    """Max ``mode_level`` среди passing режимов в каждой alias-группе нового ``target_place``."""
+    """Max ``mode_level`` среди passing режимов в каждой alias-группе нового ``target_place``.
+
+    Args:
+        state_candidates: уже вычисленный M/O/C catalog (``_mode_catalog_for_ctx`` у caller).
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         can_target_mode,
         clamp_target_mode,
@@ -659,7 +664,6 @@ def _highest_passing_mode_in_upper_groups(
     )
     rec = ladder.rec_orders_per_view
     rk = ladder.rk_orders_per_cart
-    state_candidates = _mode_catalog_for_ctx(ctx, None, ladder)
     best_mode: KeywordStrategyMode | None = None
     best_cost: float | None = None
     best_imputed = False
@@ -739,6 +743,7 @@ def collect_potential_passing_states(
         capped, cost, imputed = _highest_passing_mode_in_upper_groups(
             (groups[0],),
             ctx=ctx,
+            state_candidates=catalog,
             elig=elig,
             policy=policy,
             resolve=resolve,
@@ -962,6 +967,7 @@ def plan_profitable_expansion(
         best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
             mode_groups,
             ctx=ctx,
+            state_candidates=catalog,
             elig=elig,
             policy=policy,
             resolve=resolve,
@@ -1039,6 +1045,7 @@ def plan_mass_cheap_promotion(
         best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
             mode_groups,
             ctx=ctx,
+            state_candidates=catalog,
             elig=None,
             policy=policy,
             resolve=resolve,
