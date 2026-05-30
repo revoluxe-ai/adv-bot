@@ -62,6 +62,31 @@ def order_cpo_at_ch_point(
     return calc_pay_for_order(orders)
 
 
+async def load_rec_orders_per_view_for_v3(
+    adv: AdvSetting,
+    *,
+    rec_system_promotion_mode_active: bool,
+) -> float | None:
+    """Baseline полок (заказы/показ) для state-level rec_gate — те же условия, что ``above_rec_conversion``.
+
+    Returns:
+        ``get_rec_conversion`` или ``None``, если правило не применяется (auto campaign inactive и т.д.).
+    """
+    if not rec_system_promotion_mode_active:
+        return None
+    from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
+        is_auto_campaign_active,
+    )
+    from app.modules.shop_runner.wb_stat_manager.rec_conversion_service import (
+        get_rec_conversion,
+    )
+
+    auto_campaign_active = await is_auto_campaign_active(adv)
+    if auto_campaign_active is False:
+        return None
+    return await get_rec_conversion(adv.adv_id)
+
+
 async def load_rk_orders_per_cart_7d(
     adv: AdvSetting,
     *,

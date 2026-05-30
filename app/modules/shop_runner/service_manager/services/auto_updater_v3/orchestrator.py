@@ -202,6 +202,8 @@ async def process_adv_v3(
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
+    ladder_inputs: LadderInputs | None = None
+    policy: SelectionPolicy | None = None
 
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
@@ -304,22 +306,28 @@ async def process_adv_v3(
                 aggressiveness=aggr,
             )
             resolve = compute_resolve_cost_threshold(plan, fact)
+            from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+                load_rec_orders_per_view_for_v3,
+                load_rk_orders_per_cart_7d,
+            )
+
+            rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv)
+            rec_orders_per_view = await load_rec_orders_per_view_for_v3(
+                adv,
+                rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
+            )
+            ladder_inputs = LadderInputs.from_contexts(
+                contexts,
+                rk_orders_per_cart=rk_orders_per_cart,
+                rec_orders_per_view=rec_orders_per_view,
+            )
+            await cache_worst_costs_for_adv(
+                complex_adv.adv_id, ladder_inputs.worst_costs
+            )
 
             if is_resolve_valid(plan, resolve):
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
-                from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
-                    load_rk_orders_per_cart_7d,
-                )
-
-                rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv)
-                ladder_inputs = LadderInputs.from_contexts(
-                    contexts,
-                    rk_orders_per_cart=rk_orders_per_cart,
-                )
-                await cache_worst_costs_for_adv(
-                    complex_adv.adv_id, ladder_inputs.worst_costs
-                )
                 # COST_REALLOCATION — portfolio DOWN при запасе по CPA (не overspend guard):
                 # снимаем дорогую агрессию, затем PROFITABLE_EXPANSION перераспределяет
                 # в более дешёвые passing states. При высоком fact CPA — MAX_CPA_GUARD ниже.
@@ -349,6 +357,7 @@ async def process_adv_v3(
                         ladder_inputs = LadderInputs.from_contexts(
                             contexts,
                             rk_orders_per_cart=rk_orders_per_cart,
+                            rec_orders_per_view=rec_orders_per_view,
                         )
                         await cache_worst_costs_for_adv(
                             complex_adv.adv_id, ladder_inputs.worst_costs
@@ -428,6 +437,8 @@ async def process_adv_v3(
                     shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
                     if shelf_active
                     else None,
+                    ladder_inputs=ladder_inputs,
+                    policy=policy,
                 )
                 _ = ledger.apply_in_memory(selector_actions_logged)
                 await cache_plan_fact_snapshot()

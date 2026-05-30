@@ -73,7 +73,7 @@ def test_plan_rollout_down_one_passes_rk_to_build_mode_candidates(
         )
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.build_mode_candidates",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view.build_mode_candidates",
         _spy_build_mode_candidates,
     )
     contexts = [

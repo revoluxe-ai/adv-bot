@@ -77,13 +77,32 @@ def select_v3_post_gate_actions(
     contexts: list[KeywordV3Context],
     shelf_promotion_active: bool,
     shelf_click_mode: ShelfClickMode | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    policy: "SelectionPolicy | None" = None,
 ) -> list[V3Action]:
-    """Post-gate: shelf rec-false cleanup only (без M2/M3/FINAL_TUNING)."""
+    """Post-gate: shelf rec cleanup по state-level gate (без M2/M3/FINAL_TUNING)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+    )
+
     if not shelf_promotion_active:
         return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_shelf")]
     prepared = build_prepared_from_contexts(contexts)
     click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    cleanup = plan_shelf_rec_false_cleanup_down(prepared, click_mode=click_mode)
+    gate_policy = policy or SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=3,
+    )
+    gate_ladder = ladder_inputs or LadderInputs.from_contexts(contexts)
+    cleanup = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=click_mode,
+        ladder_inputs=gate_ladder,
+        policy=gate_policy,
+    )
     if cleanup:
         return cleanup
     return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_actions")]

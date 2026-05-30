@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.client_bot.user_interface.views.keyword_strategy_ui import strategy_mode_letter
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -25,6 +26,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     KeywordV3DataDiagnostic,
 )
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+        ShelfClickMode,
+    )
 
 _PROFILE_UNAVAILABLE = (
     "📊 *Профиль ключа (V3):* недоступен (нет данных CH/WB)\n"
@@ -79,6 +85,8 @@ class KeywordV3ProfileData:
     campaign_worst_costs: dict[AggressionTargetMode, float] | None = None
     stage_sources: dict[AggressionTargetMode, str] | None = None
     rk_orders_per_cart: float | None = None
+    rec_orders_per_view: float | None = None
+    shelf_click_mode: "ShelfClickMode | None" = None
 
 
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
@@ -176,8 +184,10 @@ def _format_current_mode_target_line(data: KeywordV3ProfileData) -> str | None:
 def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
     """Легенда метрик строк M/O/C и формула CPO."""
     lines = [
-        "   п|с|к→к|PFC|CPO — поз|ставка|conv CH|руб/корзина|CPO заказа",
+        "   п|с|к→к|к→з|PFC|CPO — поз|ставка|conv CH|к→з|PFC|CPO заказа",
         "   CPO = PFC / (зак/корз РК) = к→к CH × корз→заказ РК 7д",
+        "   П — state выше полочной конверсии по прогнозу к→з",
+        "   Н — baseline полок неизвестен; gate не блокирует",
     ]
     if _profile_shows_max_rk_legend(data):
         lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
@@ -292,9 +302,38 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
         else "—"
     )
     conv_cart = _format_pct_compact(cand.predicted_conversion)
+    conv_order = _format_pct_compact(cand.predicted_orders_per_view)
+    mark = _rec_gate_mark_for_stage(data, cand)
+    mark_prefix = f"{mark} " if mark else ""
     worst_suffix = _worst_suffix_for_stage(data, agg)
-    metrics = f"п{pos}|с{bid}|к→к{conv_cart}|PFC{pfc}|CPO{cpo}"
+    metrics = f"п{pos}|с{bid}|к→к{conv_cart}|к→з{conv_order}|PFC{pfc}|CPO{cpo}"
     if worst_suffix:
-        return f"{star}{letter} {metrics}{worst_suffix}"
-    return f"{star}{letter} {metrics}"
+        return f"{star}{mark_prefix}{letter} {metrics}{worst_suffix}"
+    return f"{star}{mark_prefix}{letter} {metrics}"
+
+
+def _rec_gate_mark_for_stage(
+    data: KeywordV3ProfileData,
+    cand: ModeCandidate,
+) -> str:
+    """Марка полочного gate: ``П`` / ``Н`` / пусто."""
+    if data.shelf_click_mode is None:
+        return ""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        resolve_rec_gate_mark,
+    )
+
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=data.shelf_click_mode,
+        aggressiveness=3,
+    )
+    return resolve_rec_gate_mark(
+        cand,
+        policy=policy,
+        rec_orders_per_view=data.rec_orders_per_view,
+        rk_orders_per_cart=data.rk_orders_per_cart,
+    )
 

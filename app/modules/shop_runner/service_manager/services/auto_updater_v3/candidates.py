@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.v3_optimum_balance import 
     select_optimum_row_production,
 )
 from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+    conv_views_to_orders_at_ch_point,
     order_cpo_at_ch_point,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
@@ -133,6 +134,23 @@ def build_mode_candidates(
             rk_orders_per_cart=rk_orders_per_cart if use_rk else None,
         )
 
+    def _orders_per_view(row: PositionProfilePoint) -> float | None:
+        if not use_rk:
+            return None
+        return conv_views_to_orders_at_ch_point(
+            conv_carts_to_views=row.predicted_conversion,
+            rk_orders_per_cart=rk_orders_per_cart,
+        )
+
+    def _with_orders_per_view(
+        mc: ModeCandidate,
+        row: PositionProfilePoint,
+    ) -> ModeCandidate:
+        opv = _orders_per_view(row)
+        if opv is None:
+            return mc
+        return mc.model_copy(update={"predicted_orders_per_view": opv})
+
     # MIN_CPA: минимальный CPO по профилю (на точке CH × RK корзина→заказ)
     pfo_rows: list[tuple[PositionProfilePoint, float]] = []
     for p in usable:
@@ -152,38 +170,44 @@ def build_mode_candidates(
         )
     else:
         best_min, best_pfo = min(pfo_rows, key=lambda t: float(t[1] or 0.0))
-        min_cpa = ModeCandidate(
-            mode=AggressionTargetMode.MIN_CPA,
-            bid=float(best_min.bid),
-            position=best_min.position,
-            predicted_conversion=best_min.predicted_conversion,
-            predicted_cpa=best_pfo,
-            pay_for_cart=_pay_for_cart_at_point(best_min),
-            economy_score=-float(best_pfo or 0.0),
-            is_valid=True,
+        min_cpa = _with_orders_per_view(
+            ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                bid=float(best_min.bid),
+                position=best_min.position,
+                predicted_conversion=best_min.predicted_conversion,
+                predicted_cpa=best_pfo,
+                pay_for_cart=_pay_for_cart_at_point(best_min),
+                economy_score=-float(best_pfo or 0.0),
+                is_valid=True,
+            ),
+            best_min,
         )
 
     # MAX_CONVERSION: точка с максимальной conv_carts_to_views (топ), CPO на её ставке
     best_conv = max(usable, key=lambda p: float(p.predicted_conversion or 0.0))
     max_pfo = _pfo(best_conv)
-    max_conv = ModeCandidate(
-        mode=AggressionTargetMode.MAX_CONVERSION,
-        bid=float(best_conv.bid),
-        position=best_conv.position,
-        predicted_conversion=best_conv.predicted_conversion,
-        predicted_cpa=max_pfo,
-        pay_for_cart=_pay_for_cart_at_point(best_conv),
-        conversion_score=float(best_conv.predicted_conversion or 0.0),
-        is_valid=max_pfo is not None,
-        invalid_reason=(
-            None
-            if max_pfo is not None
-            else (
-                "no_rk_conv_carts_to_orders"
-                if use_rk
-                else "no_keyword_conv_views_to_orders"
-            )
+    max_conv = _with_orders_per_view(
+        ModeCandidate(
+            mode=AggressionTargetMode.MAX_CONVERSION,
+            bid=float(best_conv.bid),
+            position=best_conv.position,
+            predicted_conversion=best_conv.predicted_conversion,
+            predicted_cpa=max_pfo,
+            pay_for_cart=_pay_for_cart_at_point(best_conv),
+            conversion_score=float(best_conv.predicted_conversion or 0.0),
+            is_valid=max_pfo is not None,
+            invalid_reason=(
+                None
+                if max_pfo is not None
+                else (
+                    "no_rk_conv_carts_to_orders"
+                    if use_rk
+                    else "no_keyword_conv_views_to_orders"
+                )
+            ),
         ),
+        best_conv,
     )
 
     # OPTIMUM: balance conv/economy на всём usable-профиле
@@ -205,16 +229,19 @@ def build_mode_candidates(
     else:
         best_opt = opt_pick.row
         opt_pfo = opt_pick.cpo
-        optimum = ModeCandidate(
-            mode=AggressionTargetMode.OPTIMUM,
-            bid=float(best_opt.bid),
-            position=best_opt.position,
-            predicted_conversion=best_opt.predicted_conversion,
-            predicted_cpa=opt_pfo,
-            pay_for_cart=_pay_for_cart_at_point(best_opt),
-            conversion_score=float(best_opt.predicted_conversion or 0.0),
-            economy_score=opt_pick.score,
-            is_valid=True,
+        optimum = _with_orders_per_view(
+            ModeCandidate(
+                mode=AggressionTargetMode.OPTIMUM,
+                bid=float(best_opt.bid),
+                position=best_opt.position,
+                predicted_conversion=best_opt.predicted_conversion,
+                predicted_cpa=opt_pfo,
+                pay_for_cart=_pay_for_cart_at_point(best_opt),
+                conversion_score=float(best_opt.predicted_conversion or 0.0),
+                economy_score=opt_pick.score,
+                is_valid=True,
+            ),
+            best_opt,
         )
 
     return {

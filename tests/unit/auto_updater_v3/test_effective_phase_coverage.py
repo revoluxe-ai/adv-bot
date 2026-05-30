@@ -254,8 +254,20 @@ def test_shelf_cleanup_down_skips_opt_alias(monkeypatch: pytest.MonkeyPatch) -> 
     prepared = build_prepared_from_contexts(
         [KeywordV3Context(keyword=kw, position_profile=[])]
     )
+    ctx = prepared[0][0]
+    ladder = LadderInputs.from_contexts(
+        [ctx],
+        rk_orders_per_cart=0.25,
+        rec_orders_per_view=0.01,
+    )
     actions = plan_shelf_rec_false_cleanup_down(
-        prepared, click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=SelectionPolicy.from_aggressiveness(
+            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+            aggressiveness=V3RolloutAggressiveness.MAX,
+        ),
     )
     assert len(actions) == 1
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA

@@ -20,6 +20,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
@@ -52,6 +55,20 @@ def _policy(
     return SelectionPolicy.from_aggressiveness(
         click_mode=click_mode,
         aggressiveness=aggressiveness,
+    )
+
+
+def _ladder_for_prepared(
+    prepared: list,
+    *,
+    rk_orders_per_cart: float = 0.25,
+    rec_orders_per_view: float | None = 0.01,
+) -> LadderInputs:
+    contexts = [c for c, _ in prepared]
+    return LadderInputs.from_contexts(
+        contexts,
+        rk_orders_per_cart=rk_orders_per_cart,
+        rec_orders_per_view=rec_orders_per_view,
     )
 
 
@@ -109,6 +126,7 @@ def test_jump_off_collects_effective_targets_only() -> None:
 
 @pytest.mark.unit
 def test_rec_gate_blocks_false_on_shelf() -> None:
+    """State-level: M проходит к→з, O/C — нет (``above_rec`` ключа не важен)."""
     prof = sample_profile()
     prepared = [
         (
@@ -119,13 +137,21 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+        ladder_inputs=_ladder_for_prepared(
+            prepared,
+            rk_orders_per_cart=0.25,
+            rec_orders_per_view=0.004,
+        ),
     )
-    assert candidates == []
+    to_modes = {c.to_mode for c in candidates}
+    assert KeywordStrategyMode.MIN_CPA in to_modes
+    assert KeywordStrategyMode.OPTIMUM not in to_modes
+    assert KeywordStrategyMode.MAX_CONVERSION not in to_modes
 
 
 @pytest.mark.unit
 def test_missing_above_rec_allows_effective_jump_on_shelf() -> None:
-    """missing_above_rec -> tier ниже confirmed; UP только в effective-режимы."""
+    """missing_above_rec -> tier ниже confirmed; UP в effective-режимы (alias-safe)."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(
@@ -144,13 +170,13 @@ def test_missing_above_rec_allows_effective_jump_on_shelf() -> None:
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+        ladder_inputs=_ladder_for_prepared(prepared, rec_orders_per_view=None, rk_orders_per_cart=0.25),
     )
     assert candidates
     assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in candidates)
-    assert any(
-        c.to_mode in (KeywordStrategyMode.OPTIMUM, KeywordStrategyMode.MAX_CONVERSION)
-        for c in candidates
-    )
+    to_modes = {c.to_mode for c in candidates}
+    assert KeywordStrategyMode.MIN_CPA in to_modes
+    assert len(to_modes) >= 1
 
 
 @pytest.mark.unit
@@ -217,9 +243,12 @@ def test_shelf_false_cleanup_down_active() -> None:
     ks_dto = base.keyword_setting.model_copy(update={"hard_status": 2})
     kw = base.model_copy(update={"keyword_setting": ks_dto})
     prepared = [(KeywordV3Context(keyword=kw, position_profile=prof), KeywordStrategyMode.MIN_CPA)]
+    ladder = _ladder_for_prepared(prepared)
     actions = plan_shelf_rec_false_cleanup_down(
         prepared,
         click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
@@ -241,34 +270,33 @@ def test_shelf_false_cleanup_down_active_when_traffic_unknown() -> None:
     ks_dto = base.keyword_setting.model_copy(update={"hard_status": 2})
     kw = base.model_copy(update={"keyword_setting": ks_dto})
     prepared = [(KeywordV3Context(keyword=kw, position_profile=prof), KeywordStrategyMode.MIN_CPA)]
+    ladder = _ladder_for_prepared(prepared)
     actions = plan_shelf_rec_false_cleanup_down(
         prepared,
         click_mode=ShelfClickMode.UNKNOWN,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.UNKNOWN),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
 
 
 @pytest.mark.unit
-def test_shelf_false_cleanup_mass_all_above_rec_false() -> None:
-    """За один тик — действие на каждый активный ключ с above_rec=False."""
-    prof = sample_profile()
+def test_shelf_false_cleanup_mass_state_gate_fails() -> None:
+    """State-level cleanup: только ключи, у которых текущий state не проходит gate."""
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof_fail = sample_profile()
+    prof_pass = [
+        PositionProfilePoint(
+            position=1, bid=100, predicted_conversion=0.05, pay_for_cart=10.0, timestamp=ts
+        ),
+    ]
     prepared = [
         (
             ctx(
                 ks_id=1,
-                mode=KeywordStrategyMode.MIN_CPA,
-                profile=prof,
-                above_rec=False,
-                hard_status=2,
-            ),
-            KeywordStrategyMode.MIN_CPA,
-        ),
-        (
-            ctx(
-                ks_id=2,
                 mode=KeywordStrategyMode.OPTIMUM,
-                profile=prof,
+                profile=prof_fail,
                 above_rec=False,
                 hard_status=2,
             ),
@@ -276,18 +304,35 @@ def test_shelf_false_cleanup_mass_all_above_rec_false() -> None:
         ),
         (
             ctx(
+                ks_id=2,
+                mode=KeywordStrategyMode.MIN_CPA,
+                profile=prof_fail,
+                above_rec=False,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+        (
+            ctx(
                 ks_id=3,
                 mode=KeywordStrategyMode.MIN_CPA,
-                profile=prof,
+                profile=prof_pass,
                 above_rec=True,
                 hard_status=2,
             ),
             KeywordStrategyMode.MIN_CPA,
         ),
     ]
+    ladder = LadderInputs.from_contexts(
+        [c for c, _ in prepared],
+        rk_orders_per_cart=0.25,
+        rec_orders_per_view=0.01,
+    )
     actions = plan_shelf_rec_false_cleanup_down(
         prepared,
         click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
     )
     assert len(actions) == 2
     ids = {a.keyword_setting_id for a in actions}
@@ -310,9 +355,12 @@ def test_shelf_false_cleanup_auto_uses_force_off() -> None:
             KeywordStrategyMode.MIN_CPA,
         ),
     ]
+    ladder = _ladder_for_prepared(prepared)
     actions = plan_shelf_rec_false_cleanup_down(
         prepared,
         click_mode=ShelfClickMode.UNKNOWN,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.UNKNOWN),
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.FORCE_OFF

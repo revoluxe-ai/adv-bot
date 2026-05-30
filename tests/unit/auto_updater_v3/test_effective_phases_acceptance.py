@@ -300,10 +300,10 @@ def test_expansion_o_eq_m_up_min_to_max() -> None:
 def test_expansion_o_eq_c_single_up_from_min(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """PROFITABLE_EXPANSION: O=C — один UP из MIN в OPT (MAX alias, без второго UP)."""
+    """PROFITABLE_EXPANSION: O=C — один UP из MIN в MAX (OPT alias, без второго UP)."""
     cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
     assert iter_effective_upper_modes(KeywordStrategyMode.MIN_CPA, cat) == [
-        KeywordStrategyMode.OPTIMUM
+        KeywordStrategyMode.MAX_CONVERSION
     ]
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
@@ -328,7 +328,7 @@ def test_expansion_o_eq_c_single_up_from_min(
         ladder_inputs=LadderInputs.from_contexts([ctx for ctx, _ in prepared]),
     )
     assert len(actions) == 1
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 @pytest.mark.unit

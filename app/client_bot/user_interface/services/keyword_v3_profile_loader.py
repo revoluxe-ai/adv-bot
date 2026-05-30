@@ -281,13 +281,19 @@ async def load_keyword_v3_profile_data(
         single = build_keyword_v3_contexts([calculated_keyword], raw_profiles)
         all_contexts = single if single else []
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+        load_rec_orders_per_view_for_v3,
         load_rk_orders_per_cart_7d,
     )
 
     rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv_setting)
+    rec_orders_per_view = await load_rec_orders_per_view_for_v3(
+        adv_setting,
+        rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
+    )
     ladder_inputs = LadderInputs.from_contexts(
         all_contexts,
         rk_orders_per_cart=rk_orders_per_cart,
+        rec_orders_per_view=rec_orders_per_view,
     )
     if not ladder_inputs.worst_costs:
         cached_worst = await V3WorstCostsRedisCache().get_worst_costs(
@@ -346,6 +352,16 @@ async def load_keyword_v3_profile_data(
         mode: ladder.stages[mode].source.value for mode in ladder.stages
     }
 
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+        ShelfClickMode,
+        resolve_shelf_click_mode_from_adv,
+    )
+
+    shelf_click_mode = (
+        resolve_shelf_click_mode_from_adv(complex_adv)
+        if complex_adv.shelf_promotion_active
+        else ShelfClickMode.ORGANIC_DOMINANT
+    )
     campaign_worst_only = (
         not diagnostic.has_ch_position_profile
         and has_worst
@@ -366,5 +382,7 @@ async def load_keyword_v3_profile_data(
         campaign_worst_costs=dict(ladder_inputs.worst_costs),
         stage_sources=stage_sources,
         rk_orders_per_cart=rk_orders_per_cart,
+        rec_orders_per_view=rec_orders_per_view,
+        shelf_click_mode=shelf_click_mode,
         **fields,
     )
