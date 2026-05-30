@@ -1307,6 +1307,7 @@ def plan_headroom_plus_one(
     resolve: float,
     fact_pay_for_order: float | None,
     policy: SelectionPolicy,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """M3: один UP на cheapest effective transition если есть headroom.
 
@@ -1315,7 +1316,9 @@ def plan_headroom_plus_one(
     """
     if fact_pay_for_order is None or fact_pay_for_order >= 0.9 * resolve:
         return []
-    candidates = collect_transition_candidates(prepared, policy=policy)
+    candidates = collect_transition_candidates(
+        prepared, policy=policy, ladder_inputs=ladder_inputs
+    )
     if not candidates:
         return []
     best = min(candidates, key=lambda c: c.state_cost)
