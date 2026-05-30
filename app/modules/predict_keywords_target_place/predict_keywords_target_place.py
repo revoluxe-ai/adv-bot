@@ -14,6 +14,9 @@ from app.modules.shop_runner.service_manager.services.v3_optimum_balance import 
     select_min_cpa_row,
     select_optimum_row_production,
 )
+from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+    order_cpo_at_ch_point,
+)
 
 from .clickhouse_manager import ClickHouseManager
 from .clickhouse_manager.dto import ConvCartToViewsOnPosition
@@ -234,10 +237,6 @@ class PredictKeywordsTargetPlace:
         rows: list[tuple[BidPosition, float, float]] = []
         for pos in positions:
             if use_rk:
-                from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
-                    order_cpo_at_ch_point,
-                )
-
                 cpo = order_cpo_at_ch_point(
                     bid=float(pos.bid),
                     conv_carts_to_views=pos.conv_carts_to_views,
