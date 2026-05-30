@@ -300,6 +300,7 @@ def plan_overspend_actions(
     prepared: PreparedList,
     *,
     max_pay_for_order: float,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """OVERSPEND: массовый OFF по ключам выше max, иначе один DOWN."""
     forced = plan_overspend_force_off_over_max(
@@ -307,7 +308,9 @@ def plan_overspend_actions(
     )
     if forced:
         return forced
-    return plan_rollout_down_one(prepared, reason="overspend")
+    return plan_rollout_down_one(
+        prepared, reason="overspend", ladder_inputs=ladder_inputs
+    )
 
 
 def _find_trim_target_mode(
@@ -480,8 +483,14 @@ def plan_rollout_down_one(
     prepared: PreparedList,
     *,
     reason: str,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
-    """Single DOWN: highest pay_for_order first (expensive → cheap)."""
+    """Single DOWN: highest pay_for_order first (expensive → cheap).
+
+    Каталог M/O/C строится с ``ladder_inputs.rk_orders_per_cart`` (RK CPO), как в
+    ``plan_max_cpa_guard`` / ``try_valid_rollout_up`` — не legacy conv-only.
+    """
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     actives = _active_entries(prepared)
     actives.sort(key=lambda t: _down_sort_key(t[0]), reverse=True)
     for ctx, mode in actives:
@@ -489,7 +498,7 @@ def plan_rollout_down_one(
             continue
         if mode == KeywordStrategyMode.OFF:
             continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared)
+        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
         step = resolve_next_effective_step_down(mode, catalog)
         log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
         nxt = step.next_mode
@@ -1299,16 +1308,17 @@ def plan_headroom_plus_one(
     fact_pay_for_order: float | None,
     policy: SelectionPolicy,
 ) -> list[V3Action]:
-    """M3: один UP на cheapest potential если есть headroom."""
+    """M3: один UP на cheapest effective transition если есть headroom.
+
+    Кандидаты уже отфильтрованы ``collect_transition_candidates`` / effective steps;
+    не требуем ``mode_level(to) == mode_level(from) + 1`` (alias O=M → MIN→MAX).
+    """
     if fact_pay_for_order is None or fact_pay_for_order >= 0.9 * resolve:
         return []
     candidates = collect_transition_candidates(prepared, policy=policy)
-    one_step = [
-        c for c in candidates if mode_level(c.to_mode) == mode_level(c.from_mode) + 1
-    ]
-    if not one_step:
+    if not candidates:
         return []
-    best = min(one_step, key=lambda c: c.state_cost)
+    best = min(candidates, key=lambda c: c.state_cost)
     return [
         V3Action(
             action=V3ActionType.UP,
