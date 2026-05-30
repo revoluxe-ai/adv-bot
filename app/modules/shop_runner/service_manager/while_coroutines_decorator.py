@@ -92,18 +92,16 @@ def while_coroutine_decorator(
                         try:
                             await asyncio.wait_for(tick_task, timeout=timeout_sec)
                         except asyncio.TimeoutError:
-                            if not tick_task.done():
-                                tick_task.cancel()
-                                try:
-                                    await asyncio.wait_for(
-                                        asyncio.shield(tick_task),
-                                        timeout=TICK_FINALLY_GRACE_SECONDS,
-                                    )
-                                except (
-                                    asyncio.TimeoutError,
-                                    asyncio.CancelledError,
-                                ):
-                                    pass
+                            try:
+                                await asyncio.wait_for(
+                                    asyncio.shield(tick_task),
+                                    timeout=TICK_FINALLY_GRACE_SECONDS,
+                                )
+                            except (
+                                asyncio.TimeoutError,
+                                asyncio.CancelledError,
+                            ):
+                                pass
                             raise
                     await asyncio.sleep(pause_on_success)
                     continue
