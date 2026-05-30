@@ -196,13 +196,13 @@ class PredictKeywordsTargetPlace:
         )
         if pfo_rows:
             if strategy_mode == KeywordStrategyMode.MIN_CPA:
-                picked = select_min_cpa_row(pfo_rows)
-                if picked is not None:
-                    return max(1, int(picked[0].position))
+                min_pick = select_min_cpa_row(pfo_rows)
+                if min_pick is not None:
+                    return max(1, int(min_pick[0].position))
             if strategy_mode == KeywordStrategyMode.OPTIMUM:
-                picked = select_optimum_row_production(pfo_rows)
-                if picked is not None:
-                    return max(1, int(picked.row.position))
+                opt_pick = select_optimum_row_production(pfo_rows)
+                if opt_pick is not None:
+                    return max(1, int(opt_pick.row.position))
 
         if strategy_mode == KeywordStrategyMode.MIN_CPA:
             best_position = min(usable, key=lambda p: p.pay_for_cart)

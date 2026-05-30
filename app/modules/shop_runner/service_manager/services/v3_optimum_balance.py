@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Literal, Protocol, TypeVar
+from typing import Generic, Literal, Protocol, TypeVar, cast
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_orders_per_1000_rub,
@@ -58,7 +58,8 @@ class _HasPositionBid(Protocol):
     bid: int | float
 
 
-T = TypeVar("T", bound=_HasPositionBid)
+# Без bound: mypy не считает Pydantic/dataclass структурно совместимыми с Protocol.
+T = TypeVar("T")
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,13 +202,20 @@ def score_optimum_rows(
     return scored
 
 
+def _row_bid_position(row: T) -> tuple[float, int]:
+    """position/bid для tie-break (PositionProfilePoint, BidPosition, …)."""
+    rp = cast(_HasPositionBid, row)
+    return float(rp.bid), int(rp.position)
+
+
 def _optimum_tie_key(s: OptimumScoredRow[T]) -> tuple[float, float, float, int]:
     """При равном score (±EPS) — более экономичная точка."""
+    bid, position = _row_bid_position(s.row)
     return (
         round(s.score / OPTIMUM_SCORE_EPS) * OPTIMUM_SCORE_EPS,
         -s.cpo,
-        -float(s.row.bid),
-        -int(s.row.position),
+        -bid,
+        -position,
     )
 
 
@@ -223,10 +231,8 @@ def select_optimum_row(
     """
     pool = rows
     if exclude_max_row is not None and len(rows) > 1:
-        ex = (int(exclude_max_row.position), float(exclude_max_row.bid))
-        filtered = [
-            r for r in rows if (int(r[0].position), float(r[0].bid)) != ex
-        ]
+        ex_key = _row_bid_position(exclude_max_row)
+        filtered = [r for r in rows if _row_bid_position(r[0]) != ex_key]
         if filtered:
             pool = filtered
 
@@ -261,7 +267,12 @@ def select_optimum_row_cpo_cap(
     cap = min_cpo * float(max_cpo_penalty)
     pool = [r for r in rows if float(r[2]) <= cap + 1e-9]
     if not pool:
-        pool = [min(rows, key=lambda t: (float(t[2]), float(t[0].bid), int(t[0].position)))]
+        pool = [
+            min(
+                rows,
+                key=lambda t: (float(t[2]), *_row_bid_position(t[0])),
+            )
+        ]
     scored = score_optimum_rows(pool, mode=OptimumScoreMode.CURRENT)
     if not scored:
         return None
@@ -283,6 +294,9 @@ def select_min_cpa_row(
         return None
     best = min(
         rows,
-        key=lambda t: (float(t[2]), float(t[0].bid), int(t[0].position)),
+        key=lambda t: (
+            float(t[2]),
+            *_row_bid_position(t[0]),
+        ),
     )
     return best[0], best[2]
