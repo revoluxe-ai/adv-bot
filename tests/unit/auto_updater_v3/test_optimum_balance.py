@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.v3_optimum_balance import (
     OPTIMUM_MAX_CPO_PENALTY_COMPARE,
+    OptimumScoreMode,
     normalized_optimum_score,
     normalized_point_metrics,
     select_optimum_row,
@@ -300,18 +301,20 @@ def test_compare_cap_constant_is_1_5() -> None:
 
 
 @pytest.mark.unit
-def test_production_optimum_equals_balance_current() -> None:
+def test_production_optimum_uses_clean_balance_not_cpo_cap() -> None:
+    """Production = balance на всём профиле; не делегирует в ``select_optimum_row_cpo_cap``."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     top = PositionProfilePoint(position=1, bid=10_000, predicted_conversion=0.13, timestamp=ts)
     mid = PositionProfilePoint(position=40, bid=500, predicted_conversion=0.015, timestamp=ts)
     rows = [(top, 0.13, 400.0), (mid, 0.015, 100.0)]
     prod = select_optimum_row_production(rows)
-    balance = select_optimum_row(rows, mode="current")
-    assert prod is not None and balance is not None
-    assert (prod.row.position, prod.row.bid) == (
-        balance.row.position,
-        balance.row.bid,
+    assert prod is not None
+    assert prod == select_optimum_row(rows, mode=OptimumScoreMode.CURRENT)
+    capped = select_optimum_row_cpo_cap(
+        rows, max_cpo_penalty=OPTIMUM_MAX_CPO_PENALTY_COMPARE
     )
+    assert capped is not None
+    assert capped.row.position == 40
 
 
 @pytest.mark.unit

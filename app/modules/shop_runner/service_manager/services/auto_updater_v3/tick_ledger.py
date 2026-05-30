@@ -76,6 +76,14 @@ class V3TickKeywordLedger:
             ledger._baseline_mode[int(ks_id)] = kw.keyword_setting.strategy_mode
         return ledger
 
+    def baseline_mode_for(self, ks_id: int) -> KeywordStrategyMode | None:
+        """Baseline ``strategy_mode`` на старте тика."""
+        return self._baseline_mode.get(int(ks_id))
+
+    def baseline_modes_snapshot(self) -> dict[int, KeywordStrategyMode]:
+        """Копия baseline по всем ключам тика."""
+        return dict(self._baseline_mode)
+
     def _keyword_text(self, ks_id: int) -> str:
         kw = self._by_id.get(ks_id)
         return kw.text if kw is not None else ""

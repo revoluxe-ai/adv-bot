@@ -231,7 +231,6 @@ async def process_adv_v3(
         sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
             contexts
         )
-
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
@@ -248,7 +247,6 @@ async def process_adv_v3(
                 campaign_mode.value,
                 state.name if state is not None else "None",
             )
-
         if is_campaign_full_stop(campaign_mode):
             logger.info(
                 "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
@@ -269,7 +267,9 @@ async def process_adv_v3(
                     len(bootstrap_actions),
                 )
                 contexts = _apply_v3_phase(
-                    ledger, bootstrap_actions, raw_profiles
+                    ledger,
+                    bootstrap_actions,
+                    raw_profiles,
                 )
             sync_force_zero = True
 
@@ -285,7 +285,9 @@ async def process_adv_v3(
                     len(keyword_bootstrap_actions),
                 )
                 contexts = _apply_v3_phase(
-                    ledger, keyword_bootstrap_actions, raw_profiles
+                    ledger,
+                    keyword_bootstrap_actions,
+                    raw_profiles,
                 )
                 sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                     contexts
@@ -324,7 +326,6 @@ async def process_adv_v3(
             await cache_worst_costs_for_adv(
                 complex_adv.adv_id, ladder_inputs.worst_costs
             )
-
             if is_resolve_valid(plan, resolve):
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
@@ -350,7 +351,9 @@ async def process_adv_v3(
                             preamble_realloc_count,
                         )
                         contexts = _apply_v3_phase(
-                            ledger, realloc_actions, raw_profiles
+                            ledger,
+                            realloc_actions,
+                            raw_profiles,
                         )
                         eligibility = build_eligibility_map(contexts)
                         prepared = build_prepared_from_contexts(contexts)
@@ -378,24 +381,36 @@ async def process_adv_v3(
                         preamble_expansion_count,
                     )
                     contexts = _apply_v3_phase(
-                        ledger, expansion_actions, raw_profiles
+                        ledger,
+                        expansion_actions,
+                        raw_profiles,
                     )
                     sync_fallback_by_id = (
                         build_target_place_fallback_zero_by_keyword_id(contexts)
                     )
 
-            if (
+            guard_condition = (
                 fact.pay_for_order is not None
                 and float(fact.pay_for_order) > float(plan.max_pay_for_order)
-            ):
+            )
+            if guard_condition:
                 guard_eligibility = build_eligibility_map(contexts)
                 guard_prepared = build_prepared_from_contexts(contexts)
+                guard_ladder_inputs = LadderInputs.from_contexts(
+                    contexts,
+                    rk_orders_per_cart=rk_orders_per_cart,
+                    rec_orders_per_view=rec_orders_per_view,
+                )
+                await cache_worst_costs_for_adv(
+                    complex_adv.adv_id, guard_ladder_inputs.worst_costs
+                )
                 guard_actions = plan_max_cpa_guard(
                     guard_prepared,
                     max_pay_for_order=float(plan.max_pay_for_order),
                     shelf_click_mode=click_mode,
                     aggressiveness=aggr,
                     eligibility_by_ks_id=guard_eligibility,
+                    ladder_inputs=guard_ladder_inputs,
                 )
                 if guard_actions:
                     preamble_guard_count = len(guard_actions)
@@ -405,7 +420,9 @@ async def process_adv_v3(
                         preamble_guard_count,
                     )
                     contexts = _apply_v3_phase(
-                        ledger, guard_actions, raw_profiles
+                        ledger,
+                        guard_actions,
+                        raw_profiles,
                     )
                     sync_fallback_by_id = (
                         build_target_place_fallback_zero_by_keyword_id(contexts)

@@ -323,6 +323,89 @@ def plan_overspend_actions(
     )
 
 
+def _trim_state_cost_for_mode(
+    ctx: "KeywordV3Context",
+    mode: KeywordStrategyMode,
+    *,
+    current: KeywordStrategyMode,
+    ladder_inputs: "LadderInputs",
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> tuple[float, bool]:
+    """Себестоимость режима для trim/guard; для **текущего** режима — не ниже CPO на ``target_place``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
+    )
+
+    cost, imputed = resolve_effective_state_cost_for_mode(
+        ctx=ctx,
+        to_mode=mode,
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+    )
+    if mode != current:
+        return cost, imputed
+    operational = operational_cpo_at_keyword_target_place(ctx, ladder_inputs=ladder_inputs)
+    if operational is None:
+        return cost, imputed
+    if cost == float("inf"):
+        return float(operational), imputed
+    return max(float(cost), float(operational)), imputed
+
+
+def should_skip_trim_for_same_effective_target(
+    *,
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    trim_target: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    max_pay_for_order: float,
+    ladder_inputs: "LadderInputs",
+) -> bool:
+    """Совпадает ли trim-skip «тот же target_place», что в ``plan_campaign_trim_by_max_state_cost``.
+
+    True только если режимы ведут в одну точку каталога **и** операционный CPO на
+    ``keyword.target_place`` отсутствует или ``<= max_pay_for_order``. При CPO выше max
+    live guard **не** пропускает trim (режим меняется, ставка может остаться на месте).
+    """
+    if trim_target == current:
+        return False
+    current_c = candidate_for_strategy_mode(current, catalog)
+    target_c = candidate_for_strategy_mode(trim_target, catalog)
+    if not mode_candidates_same_effective_target(current_c, target_c):
+        return False
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
+    )
+
+    operational = operational_cpo_at_keyword_target_place(
+        ctx, ladder_inputs=ladder_inputs
+    )
+    return operational is None or float(operational) <= float(max_pay_for_order)
+
+
+def _fallback_min_instead_of_off_trim(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    max_pay_for_order: float,
+    ladder_inputs: "LadderInputs",
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> KeywordStrategyMode | None:
+    """Если effective DOWN ушёл в OFF, но MIN по CPO проходит max — trim в MIN (WL-кейс O=M)."""
+    if current == KeywordStrategyMode.MIN_CPA:
+        return None
+    min_cost, _ = _trim_state_cost_for_mode(
+        ctx,
+        KeywordStrategyMode.MIN_CPA,
+        current=current,
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+    )
+    if min_cost != float("inf") and min_cost <= max_pay_for_order:
+        return KeywordStrategyMode.MIN_CPA
+    return None
+
+
 def _find_trim_target_mode(
     ctx: "KeywordV3Context",
     current: KeywordStrategyMode,
@@ -345,9 +428,10 @@ def _find_trim_target_mode(
                 return KeywordStrategyMode.OFF
             mode = step.next_mode
             continue
-        cost, _ = resolve_effective_state_cost_for_mode(
-            ctx=ctx,
-            to_mode=mode,
+        cost, _ = _trim_state_cost_for_mode(
+            ctx,
+            mode,
+            current=current,
             ladder_inputs=ladder_inputs,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
@@ -356,6 +440,24 @@ def _find_trim_target_mode(
         step = resolve_next_effective_step_down(mode, catalog)
         log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
         if step.next_mode is None:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                max_pay_for_order=max_pay_for_order,
+                ladder_inputs=ladder_inputs,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            return fb if fb is not None else KeywordStrategyMode.OFF
+        if step.next_mode == KeywordStrategyMode.OFF:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                max_pay_for_order=max_pay_for_order,
+                ladder_inputs=ladder_inputs,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            if fb is not None:
+                return fb
             return KeywordStrategyMode.OFF
         mode = step.next_mode
 
@@ -413,6 +515,7 @@ def plan_campaign_trim_by_max_state_cost(
     shelf_click_mode: "ShelfClickMode",
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """Снизить режим до ближайшего с ``state_cost <= plan.max_pay_for_order`` (не resolve).
 
@@ -430,7 +533,7 @@ def plan_campaign_trim_by_max_state_cost(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    ladder_inputs = ladder_inputs_for_prepared(prepared)
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     actions: list[V3Action] = []
     for ctx, current in prepared:
         if current == KeywordStrategyMode.OFF:
@@ -457,35 +560,42 @@ def plan_campaign_trim_by_max_state_cost(
                     hard_status=hard_status,
                 )
             continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder_inputs)
+        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
         target = _find_trim_target_mode(
             ctx,
             current,
             catalog=catalog,
             max_pay_for_order=float(max_pay_for_order),
-            ladder_inputs=ladder_inputs,
+            ladder_inputs=ladder,
             policy=policy,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
+        skip_reasons: list[str] = []
         if target == current:
-            continue
-        current_c = candidate_for_strategy_mode(current, catalog)
-        target_c = candidate_for_strategy_mode(target, catalog)
-        if mode_candidates_same_effective_target(current_c, target_c):
+            skip_reasons.append("trim_target_eq_current")
+        if should_skip_trim_for_same_effective_target(
+            ctx=ctx,
+            current=current,
+            trim_target=target,
+            catalog=catalog,
+            max_pay_for_order=float(max_pay_for_order),
+            ladder_inputs=ladder,
+        ):
+            skip_reasons.append("same_target_place")
             logger.debug(
                 "v3 skip trim kw=%s: %s and %s same target_place",
                 ctx.keyword.text,
                 current.name,
                 target.name,
             )
-            continue
-        _append_trim_to_mode(
-            actions,
-            ks_id=ks_id,
-            current=current,
-            target=target,
-            hard_status=hard_status,
-        )
+        if not skip_reasons and target != current:
+            _append_trim_to_mode(
+                actions,
+                ks_id=ks_id,
+                current=current,
+                target=target,
+                hard_status=hard_status,
+            )
     return actions
 
 
@@ -999,6 +1109,186 @@ def plan_profitable_expansion(
     return actions
 
 
+def diagnose_max_cpa_guard_keyword(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    max_pay_for_order: float,
+    prepared: PreparedList,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    guard_would_run: bool | None = None,
+    fact_pay_for_order: float | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+) -> dict[str, object]:
+    """Диагностика MAX_CPA_GUARD для одного ключа (dry-run / support).
+
+    Для паритета с orchestrator передайте тот же ``LadderInputs``, что в
+    ``plan_max_cpa_guard`` (``rk_orders_per_cart``, ``rec_orders_per_view``).
+    Без ``ladder_inputs`` строится из ``prepared`` без RK/rec — CPO может расходиться
+    с production guard.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
+    )
+
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+    )
+    if ladder_inputs is None:
+        ladder = ladder_inputs_for_prepared(prepared)
+        ladder_inputs_source = "derived_from_prepared"
+    else:
+        ladder = ladder_inputs
+        ladder_inputs_source = "ladder_inputs"
+    ks_id = ctx.keyword.keyword_setting_original_id
+    hard_status = int(ctx.keyword.hard_status)
+
+    catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
+    operational_cpo = operational_cpo_at_keyword_target_place(
+        ctx, ladder_inputs=ladder
+    )
+    mode_costs: dict[str, float | None] = {}
+    for mode in (
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MAX_CONVERSION,
+    ):
+        cost, _ = resolve_effective_state_cost_for_mode(
+            ctx=ctx,
+            to_mode=mode,
+            prepared=prepared,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder,
+        )
+        mode_costs[mode.name] = None if cost == float("inf") else float(cost)
+
+    cur_cost, _ = resolve_effective_state_cost_for_mode(
+        ctx=ctx,
+        to_mode=current,
+        prepared=prepared,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder,
+    )
+    current_state_cost = None if cur_cost == float("inf") else float(cur_cost)
+
+    skip_reasons: list[str] = []
+    trim_target: KeywordStrategyMode | None = None
+
+    if guard_would_run is False:
+        skip_reasons.append("guard_not_run")
+    if current == KeywordStrategyMode.OFF:
+        skip_reasons.append("current_off")
+    elif hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+        skip_reasons.append(f"hard_status={hard_status}_not_managed")
+    else:
+        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+        if (
+            elig is not None
+            and elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+        ):
+            if keyword_pay_for_order_exceeds_max(
+                ctx, max_pay_for_order=float(max_pay_for_order)
+            ):
+                trim_target = KeywordStrategyMode.OFF
+            else:
+                skip_reasons.append("no_ch_pfo_under_max")
+        else:
+            trim_target = _find_trim_target_mode(
+                ctx,
+                current,
+                catalog=catalog,
+                max_pay_for_order=float(max_pay_for_order),
+                ladder_inputs=ladder,
+                policy=policy,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            if trim_target == current:
+                if (
+                    current_state_cost is not None
+                    and current_state_cost <= max_pay_for_order
+                ):
+                    skip_reasons.append("current_state_cost_under_max")
+                else:
+                    skip_reasons.append("trim_target_equals_current")
+            else:
+                if should_skip_trim_for_same_effective_target(
+                    ctx=ctx,
+                    current=current,
+                    trim_target=trim_target,
+                    catalog=catalog,
+                    max_pay_for_order=float(max_pay_for_order),
+                    ladder_inputs=ladder,
+                ):
+                    skip_reasons.append("same_target_place")
+                elif (
+                    trim_target == KeywordStrategyMode.OFF
+                    and mode_costs.get("MIN_CPA") is not None
+                    and float(mode_costs["MIN_CPA"] or 0) > max_pay_for_order
+                ):
+                    skip_reasons.append("min_state_cost_above_max")
+
+    guard_action: V3Action | None = None
+    if ks_id is not None and trim_target is not None and trim_target != current:
+        acts = plan_max_cpa_guard(
+            [(ctx, current)],
+            max_pay_for_order=float(max_pay_for_order),
+            shelf_click_mode=shelf_click_mode,
+            aggressiveness=aggressiveness,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder,
+        )
+        for act in acts:
+            if act.keyword_setting_id == int(ks_id):
+                guard_action = act
+                break
+        if guard_action is None and not skip_reasons:
+            skip_reasons.append("plan_max_cpa_guard_no_action")
+
+    return {
+        "guard_would_run": guard_would_run,
+        "guard_condition_fact_gt_max": (
+            fact_pay_for_order is not None
+            and float(fact_pay_for_order) > float(max_pay_for_order)
+        ),
+        "fact_pay_for_order": fact_pay_for_order,
+        "plan_max_pay_for_order": float(max_pay_for_order),
+        "current_mode": current.name,
+        "stored_strategy_mode": current.name,
+        "hard_status": hard_status,
+        "current_state_cost": current_state_cost,
+        "M_state_cost": mode_costs.get("MIN_CPA"),
+        "O_state_cost": mode_costs.get("OPTIMUM"),
+        "C_state_cost": mode_costs.get("MAX_CONVERSION"),
+        "trim_target_mode": trim_target.name if trim_target is not None else None,
+        "guard_action": (
+            {
+                "action": guard_action.action.value,
+                "target_strategy_mode": (
+                    guard_action.target_strategy_mode.name
+                    if guard_action.target_strategy_mode is not None
+                    else None
+                ),
+                "reason": guard_action.reason,
+            }
+            if guard_action is not None
+            else None
+        ),
+        "guard_skip_reason": ";".join(skip_reasons) if skip_reasons else None,
+        "ladder_inputs_source": ladder_inputs_source,
+        "rk_orders_per_cart": ladder.rk_orders_per_cart,
+        "rec_orders_per_view": ladder.rec_orders_per_view,
+        "operational_cpo_at_target_place": (
+            None if operational_cpo is None else float(operational_cpo)
+        ),
+    }
+
+
 def plan_max_cpa_guard(
     prepared: PreparedList,
     *,
@@ -1006,6 +1296,7 @@ def plan_max_cpa_guard(
     shelf_click_mode: ShelfClickMode,
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """MAX_CPA_GUARD: trim только по ``plan.max_pay_for_order``."""
     actions = plan_campaign_trim_by_max_state_cost(
@@ -1014,6 +1305,7 @@ def plan_max_cpa_guard(
         shelf_click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder_inputs,
     )
     return [
         act.model_copy(
