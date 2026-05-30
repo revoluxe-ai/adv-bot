@@ -129,33 +129,3 @@ def state_passes_rec_gate_for_mode(
         rec_orders_per_view=rec_orders_per_view,
         rk_orders_per_cart=rk_orders_per_cart,
     )
-
-
-def rec_gate_block_reason_for_mode(
-    to_mode: KeywordStrategyMode,
-    *,
-    policy: SelectionPolicy,
-    rec_orders_per_view: float | None,
-    rk_orders_per_cart: float | None,
-    candidate: ModeCandidate | None,
-) -> str | None:
-    """Причина блокировки для debug/why_no_action или ``None`` если gate pass."""
-    if not _shelf_rec_policy_active(policy.click_mode):
-        return None
-    if rec_orders_per_view is None:
-        return None
-    if candidate is None:
-        return f"blocked_by_state_rec_gate_{to_mode.name}"
-    if rk_orders_per_cart is None or _state_orders_per_view(
-        candidate, rk_orders_per_cart=rk_orders_per_cart
-    ) is None:
-        return "blocked_by_missing_rk_orders_per_cart_for_state_rec_gate"
-    if passes_rec_gate_for_target_state(
-        candidate,
-        target_mode=to_mode,
-        policy=policy,
-        rec_orders_per_view=rec_orders_per_view,
-        rk_orders_per_cart=rk_orders_per_cart,
-    ):
-        return None
-    return f"blocked_by_state_rec_gate_{to_mode.name}"
