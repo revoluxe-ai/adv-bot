@@ -18,6 +18,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
     count_effective_released_aggression_steps,
+    iter_effective_upper_mode_groups,
     iter_effective_upper_modes,
     mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
@@ -119,6 +120,30 @@ def test_example_2_opt_max_same_place_up_min_to_max() -> None:
 
 
 @pytest.mark.unit
+def test_off_up_fallback_single_mode_when_target_place_unknown() -> None:
+    """NO CH / invalid place: OFF→MIN одним элементом, без alias-группы."""
+    cat = {
+        AggressionTargetMode.MIN_CPA: ModeCandidate(
+            mode=AggressionTargetMode.MIN_CPA,
+            is_valid=False,
+            invalid_reason="no_position_profile",
+        ),
+        AggressionTargetMode.OPTIMUM: ModeCandidate(
+            mode=AggressionTargetMode.OPTIMUM,
+            is_valid=False,
+            invalid_reason="no_position_profile",
+        ),
+        AggressionTargetMode.MAX_CONVERSION: ModeCandidate(
+            mode=AggressionTargetMode.MAX_CONVERSION,
+            is_valid=False,
+            invalid_reason="no_position_profile",
+        ),
+    }
+    groups = iter_effective_upper_mode_groups(KeywordStrategyMode.OFF, cat)
+    assert groups == ((KeywordStrategyMode.MIN_CPA,),)
+
+
+@pytest.mark.unit
 def test_example_3_all_same_place_no_steps() -> None:
     """MIN=OPT=MAX=1 → между M/O/C действий нет."""
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
@@ -126,6 +151,32 @@ def test_example_3_all_same_place_no_steps() -> None:
     assert resolve_next_effective_step_up(KeywordStrategyMode.OPTIMUM, cat).next_mode is None
     assert iter_effective_upper_modes(KeywordStrategyMode.MIN_CPA, cat) == []
 
+
+@pytest.mark.unit
+def test_off_up_alias_group_includes_all_modes_at_same_place() -> None:
+    """OFF→UP: alias-группа включает MIN/OPT/MAX при одном target_place."""
+    cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
+    groups = iter_effective_upper_mode_groups(KeywordStrategyMode.OFF, cat)
+    assert groups == (
+        (
+            KeywordStrategyMode.MIN_CPA,
+            KeywordStrategyMode.OPTIMUM,
+            KeywordStrategyMode.MAX_CONVERSION,
+        ),
+    )
+
+
+@pytest.mark.unit
+def test_off_up_single_group_when_moc_same_place() -> None:
+    """MIN=OPT=MAX=40 → одна группа из OFF, без второго шага."""
+    cat = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    groups = iter_effective_upper_mode_groups(KeywordStrategyMode.OFF, cat)
+    assert len(groups) == 1
+    assert set(groups[0]) == {
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MAX_CONVERSION,
+    }
 
 @pytest.mark.unit
 def test_released_steps_alias_zero_off_or_place_change_one() -> None:

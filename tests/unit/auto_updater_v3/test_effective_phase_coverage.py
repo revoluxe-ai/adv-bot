@@ -122,7 +122,7 @@ def test_expansion_m_o_c_same_place_no_up(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.unit
 def test_expansion_off_to_min_when_m_o_c_collapsed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PROFITABLE_EXPANSION: OFF→MIN даже при M=O=C на одном place."""
+    """PROFITABLE_EXPANSION: OFF→highest passing при M=O=C на одном place."""
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
     _patch_catalog(monkeypatch, cat)
     kw = _calc_kw(ks_id=2, text="off", mode=KeywordStrategyMode.OFF, rating=5.0, conv=0.05)
@@ -133,7 +133,7 @@ def test_expansion_off_to_min_when_m_o_c_collapsed(monkeypatch: pytest.MonkeyPat
         prepared, resolve=10_000.0, policy=_policy()
     )
     assert len(actions) == 1
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 @pytest.mark.unit

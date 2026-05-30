@@ -92,16 +92,6 @@ def logical_modes_at_target_place_above(
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> tuple[KeywordStrategyMode, ...]:
     """Все валидные режимы выше ``above`` с заданным ``target_place`` (alias-группа)."""
-    if above == KeywordStrategyMode.OFF:
-        nxt = step_up(KeywordStrategyMode.OFF)
-        if nxt is None:
-            return ()
-        mc = candidate_for_strategy_mode(nxt, catalog)
-        if mc is None or not mc.is_valid:
-            return ()
-        if target_place_from_mode_candidate(mc) != target_place:
-            return ()
-        return (nxt,)
     out: list[KeywordStrategyMode] = []
     for mode in _LADDER_MODES:
         if mode_level(mode) <= mode_level(above):
@@ -211,17 +201,19 @@ def iter_effective_upper_mode_groups(
             logger.debug("%s", msg)
         if res.next_mode is None:
             return tuple(groups)
-        if cursor == KeywordStrategyMode.OFF:
-            groups.append((res.next_mode,))
-            cursor = res.next_mode
-            continue
         nxt_c = candidate_for_strategy_mode(res.next_mode, catalog)
         place = target_place_from_mode_candidate(nxt_c)
         if place is None:
+            if cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+                groups.append((res.next_mode,))
+                cursor = res.next_mode
+                continue
             return tuple(groups)
         group = logical_modes_at_target_place_above(cursor, place, catalog)
         if group:
             groups.append(group)
+        elif cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+            groups.append((res.next_mode,))
         cursor = res.next_mode
 
 

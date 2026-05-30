@@ -98,4 +98,7 @@ def test_profitable_expansion_off_to_min_when_above_rec_false() -> None:
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].target_strategy_mode in (
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MAX_CONVERSION,
+    )
