@@ -534,7 +534,7 @@ def plan_shelf_rec_false_cleanup_down(
     - ``rec_orders_per_view is None`` — gate неактивен, cleanup не выполняется;
     - текущий state PASS / UNKNOWN / INACTIVE — не трогаем;
     - текущий state FAIL, MIN PASS/UNKNOWN — effective DOWN до MIN (не FORCE_OFF);
-    - ``hard_status=2`` (БС): DOWN по лестнице;
+    - ``hard_status=2`` (БС): DOWN по лестнице; при MIN и ``step_down`` без цели — fallback OFF;
     - ``hard_status=1`` (авто): FORCE_OFF только если MIN тоже FAIL.
 
     Key-level ``above_rec_conversion`` не используется.
@@ -604,7 +604,21 @@ def plan_shelf_rec_false_cleanup_down(
             log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
             nxt = step.next_mode
             if nxt is None:
-                continue
+                if mode == KeywordStrategyMode.MIN_CPA:
+                    logger.warning(
+                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s at MIN, "
+                        "step_down returned None; fallback OFF",
+                        ks_id,
+                    )
+                    nxt = KeywordStrategyMode.OFF
+                else:
+                    logger.warning(
+                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s mode=%s, "
+                        "step_down returned None; skip cleanup",
+                        ks_id,
+                        mode.name,
+                    )
+                    continue
             actions.append(
                 V3Action(
                     action=V3ActionType.DOWN,

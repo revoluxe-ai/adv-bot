@@ -368,6 +368,65 @@ def test_shelf_false_cleanup_auto_uses_force_off() -> None:
 
 
 @pytest.mark.unit
+def test_shelf_false_cleanup_whitelist_min_fallback_off_when_step_down_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Whitelist at MIN + FAIL gate: step_down None → DOWN OFF, не silent skip."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+        EffectiveStepResult,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        RecGateStatus,
+    )
+
+    prof = sample_profile()
+    prepared = [
+        (
+            ctx(
+                ks_id=11,
+                mode=KeywordStrategyMode.MIN_CPA,
+                profile=prof,
+                above_rec=False,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+    ]
+    ladder = _ladder_for_prepared(prepared)
+
+    def _fail_gate(
+        _cats: dict,
+        to_mode: KeywordStrategyMode,
+        _policy: SelectionPolicy,
+        *,
+        rec_orders_per_view: float | None,
+        rk_orders_per_cart: float | None,
+    ) -> RecGateStatus:
+        _ = (_cats, to_mode, _policy, rec_orders_per_view, rk_orders_per_cart)
+        return RecGateStatus.FAIL
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate.state_rec_gate_status_for_mode",
+        _fail_gate,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking.resolve_next_effective_step_down",
+        lambda _mode, _cat: EffectiveStepResult(None, ()),
+    )
+
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.OFF
+    assert actions[0].reason == "shelf_rec_false_cleanup"
+
+
+@pytest.mark.unit
 def test_shelf_false_cleanup_skipped_on_organic_dominant() -> None:
     prof = sample_profile()
     prepared = [
