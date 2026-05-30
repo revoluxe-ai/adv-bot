@@ -729,6 +729,23 @@ class Settings:
         return False
 
     @property
+    def STATS_FRESHNESS_GUARD_ENABLED(self) -> bool:
+        """Guard Redis-фильтрации свежести статы в корутинах shop_runner.
+
+        При ``False`` ``_split_advs_by_stats_freshness`` возвращает все РК как fresh
+        без обращения к Redis.
+        """
+        value = os.getenv("STATS_FRESHNESS_GUARD_ENABLED")
+        if value is None:
+            return True
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise Exception("STATS_FRESHNESS_GUARD_ENABLED env var is not bool")
+
+    @property
     def AUTO_SHELF_BID_CONTROL_DRY_RUN(self) -> bool:
         """Dry-run для control-модуля полок.
 

@@ -207,8 +207,21 @@ class CoroutinesManager:
         *,
         operation_name: str,
     ) -> tuple[list[ComplexAdv], list[ComplexAdv]]:
+        """Разделяет РК на fresh и stale_over_6h по Redis-кешу свежести статы.
+
+        При ``settings.STATS_FRESHNESS_GUARD_ENABLED=False`` возвращает ``(advs, [])``
+        без обращения к Redis.
+        """
         if not advs:
             return [], []
+        if not settings.STATS_FRESHNESS_GUARD_ENABLED:
+            logger.info(
+                "stats_freshness_guard disabled: shop_id=%s op=%s total=%s",
+                self.shop_id,
+                operation_name,
+                len(advs),
+            )
+            return advs, []
         adv_ids = [adv.adv_id for adv in advs]
         entries = await self._redis_stats_freshness_cache.mget_entries(
             self.shop_id, adv_ids
