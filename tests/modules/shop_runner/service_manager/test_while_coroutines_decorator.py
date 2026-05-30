@@ -1,5 +1,6 @@
 """Tests for while_coroutine_decorator: shop_id in error logs and retry/sleep behavior."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -133,3 +134,29 @@ async def test_decorator_sleep_and_retry_behavior_unchanged() -> None:
     assert call_count == 2
     assert pause_on_error in sleep_calls
     assert pause_on_success in sleep_calls
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_timeout_runs_finally_before_next_tick() -> None:
+    """On tick timeout, finally block of func should still complete (grace via shield)."""
+    finally_ran = asyncio.Event()
+    decorator = while_coroutine_decorator(60, 1, timeout_sec=0.05)
+
+    async def slow_with_finally(self: object) -> None:
+        try:
+            await asyncio.sleep(10)
+        finally:
+            finally_ran.set()
+
+    wrapped = decorator(slow_with_finally)
+    self_mock = MagicMock()
+    self_mock.shop_id = "1"
+
+    with patch(f"{MODULE}.logger"):
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_sleep.side_effect = Exception("exit_loop")
+            with pytest.raises(Exception, match="exit_loop"):
+                await wrapped(self_mock)
+
+    assert finally_ran.is_set()

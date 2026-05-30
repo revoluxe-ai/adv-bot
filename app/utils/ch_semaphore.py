@@ -85,20 +85,6 @@ class _AntiCHCrashSemaphore:
             raise
         return self
 
-    async def guarded(self, awaitable: Awaitable[T]) -> T:
-        """Выполнить awaitable с operation timeout, пока удерживается semaphore."""
-        try:
-            return await asyncio.wait_for(
-                awaitable, timeout=CH_OPERATION_TIMEOUT_SECONDS
-            )
-        except asyncio.TimeoutError:
-            logger.error(
-                "ClickHouse operation timed out after %ss (guarded)",
-                CH_OPERATION_TIMEOUT_SECONDS,
-                exc_info=True,
-            )
-            raise
-
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,

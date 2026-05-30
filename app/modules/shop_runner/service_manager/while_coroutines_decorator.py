@@ -12,6 +12,9 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 
 logger = logging.getLogger(__name__)
 
+# После tick timeout даём finally внутри func завершить async cleanup (shield).
+TICK_FINALLY_GRACE_SECONDS = 30
+
 
 class MainCoroutineRuntimeError(RuntimeError):
     pass
@@ -85,10 +88,23 @@ def while_coroutine_decorator(
                     if timeout_sec is None:
                         await func(*args, **kwargs)
                     else:
-                        await asyncio.wait_for(
-                            func(*args, **kwargs),
-                            timeout=timeout_sec,
-                        )
+                        tick_task = asyncio.create_task(func(*args, **kwargs))
+                        try:
+                            await asyncio.wait_for(tick_task, timeout=timeout_sec)
+                        except asyncio.TimeoutError:
+                            if not tick_task.done():
+                                tick_task.cancel()
+                                try:
+                                    await asyncio.wait_for(
+                                        asyncio.shield(tick_task),
+                                        timeout=TICK_FINALLY_GRACE_SECONDS,
+                                    )
+                                except (
+                                    asyncio.TimeoutError,
+                                    asyncio.CancelledError,
+                                ):
+                                    pass
+                            raise
                     await asyncio.sleep(pause_on_success)
                     continue
                 except asyncio.TimeoutError:
