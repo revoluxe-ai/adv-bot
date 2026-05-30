@@ -13,6 +13,8 @@
 
 - ``NO_DATA`` → ``DO_NOTHING`` (``campaign_no_data_wait``);
 - иначе → только ``select_v3_post_gate_actions`` (shelf cleanup).
+  Для state-level shelf cleanup нужны ``ladder_inputs`` (с ``rec_orders_per_view``)
+  и ``policy`` — как в orchestrator; без них cleanup не выполняется.
 
 ``plan_max_pay_for_order`` на этом пути **игнорируется** (guard в orchestrator).
 Для OVERSPEND вне orchestrator: ``plan=None``, ``fact=None``, задать
@@ -114,12 +116,19 @@ def _select_v3_actions_with_plan_fact(
     contexts: list[KeywordV3Context],
     shelf_promotion_active: bool,
     shelf_click_mode: ShelfClickMode | None,
+    ladder_inputs: "LadderInputs | None" = None,
+    policy: "SelectionPolicy | None" = None,
+    rollout_aggressiveness: int | None = None,
 ) -> list[V3Action]:
     """Ветка orchestrator post-gate: не ladder, не ``plan_overspend_actions``.
 
     OVERSPEND/UNDERPERFORM/STABLE/OPTIMAL с plan/fact обрабатываются в ``process_adv_v3``
     до вызова селектора (``plan_max_cpa_guard``, realloc, expansion, …).
     """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+    )
+
     if state == SalesStates.NO_DATA:
         return [
             V3Action(
@@ -133,10 +142,17 @@ def _select_v3_actions_with_plan_fact(
             "post-gate shelf only",
             state.name,
         )
+    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
+    gate_policy = policy or SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=normalize_v3_rollout_aggressiveness(rollout_aggressiveness),
+    )
     return select_v3_post_gate_actions(
         contexts=contexts,
         shelf_promotion_active=shelf_promotion_active,
         shelf_click_mode=shelf_click_mode,
+        ladder_inputs=ladder_inputs,
+        policy=gate_policy,
     )
 
 
@@ -150,6 +166,8 @@ def select_v3_actions(
     plan_max_pay_for_order: float | None = None,
     plan: PlanData | None = None,
     fact: FactData | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    policy: "SelectionPolicy | None" = None,
 ) -> list[V3Action]:
     """Legacy selector: ladder/OVERSPEND только **без** ``plan``/``fact``.
 
@@ -164,6 +182,8 @@ def select_v3_actions(
         plan: если задан вместе с ``fact`` — post-gate контур orchestrator (см. module
             docstring); ``plan_max_pay_for_order`` не используется.
         fact: см. ``plan``.
+        ladder_inputs: baseline rec/RK для state-level shelf cleanup (plan/fact path).
+        policy: политика selection для shelf cleanup (plan/fact path).
 
     Returns:
         Список ``V3Action`` для применения к ledger.
@@ -174,6 +194,9 @@ def select_v3_actions(
             contexts=contexts,
             shelf_promotion_active=shelf_promotion_active,
             shelf_click_mode=shelf_click_mode,
+            ladder_inputs=ladder_inputs,
+            policy=policy,
+            rollout_aggressiveness=rollout_aggressiveness,
         )
 
     prepared = build_prepared_from_contexts(contexts)
