@@ -3,6 +3,9 @@
 ``KeywordSettingMessage`` использует ``ParseMode.MARKDOWN`` (legacy V1). Курсив ``_…_``
 здесь не применяем: клиент часто показывает ``\\_`` буквально. Заголовок — ``*bold*``;
 остальной текст — plain, без ``_`` в разметке.
+
+Отдельно выводится **корз→заказ РК 7д** (``rk_orders_per_cart`` из ``wb_common_stat``) —
+множитель в CPO точки CH вместе с ``к→к`` на ставке.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ _INVALID_REASON_SHORT: dict[str, str] = {
     "no_position_profile": "нет профиля",
     "no_conversion_points": "нет конверсий",
     "no_keyword_conv_views_to_orders": "нет conv показ→заказ",
+    "no_rk_conv_carts_to_orders": "нет корз→заказ РК 7д",
     "optimum_score_non_positive": "optimum ≤ 0",
 }
 
@@ -67,12 +71,14 @@ class KeywordV3ProfileData:
     no_ch_min_only: bool = False
     diagnostic: KeywordV3DataDiagnostic | None = None
     load_failure: str | None = None
-    keyword_ctr: float | None = None
+    conv_views_to_cart: float | None = None
     conv_views_to_orders: float | None = None
     v2_pay_for_order: float | None = None
+    keyword_pay_for_order: float | None = None
     campaign_worst_only: bool = False
     campaign_worst_costs: dict[AggressionTargetMode, float] | None = None
     stage_sources: dict[AggressionTargetMode, str] | None = None
+    rk_orders_per_cart: float | None = None
 
 
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
@@ -117,6 +123,11 @@ def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
     return False
 
 
+def _keyword_ladder_ui_suppressed(data: KeywordV3ProfileData) -> bool:
+    """N-state / NO CH min-only: лестница M/O/C на ключе не показывается."""
+    return data.n_state or data.no_ch_min_only
+
+
 def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
     """Есть хотя бы одна валидная строка M/O/C — показываем легенду метрик."""
     for mode in (
@@ -133,23 +144,59 @@ def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
     return False
 
 
+def _format_rk_cart_to_order_line(data: KeywordV3ProfileData) -> str:
+    """Конверсия РК корзина→заказ (7д, ``wb_common_stat``) — множитель в CPO на точке CH."""
+    rk = data.rk_orders_per_cart
+    if rk is None or rk <= 0:
+        return "   РК 7д корз→заказ: — (нет данных wb_common_stat)"
+    carts_per_order = 1.0 / float(rk)
+    pct = _format_pct_compact(rk)
+    return (
+        f"   РК 7д корз→заказ: {pct} "
+        f"({rk:.3g} зак/корз, {carts_per_order:.2g} корз/зак)"
+    )
+
+
+def _format_current_mode_target_line(data: KeywordV3ProfileData) -> str | None:
+    """Позиция и ставка CH для текущего stored-режима (сверка с «Целевая позиция» в карточке)."""
+    if data.current_mode == KeywordStrategyMode.OFF:
+        return None
+    agg = _MODE_TO_AGG.get(data.current_mode)
+    if agg is None:
+        return None
+    cand = data.candidates.get(agg)
+    if cand is None or not cand.is_valid:
+        return None
+    letter = strategy_mode_letter(data.current_mode)
+    pos = int(cand.position) if cand.position is not None else "—"
+    bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
+    return f"   Цель режима {letter}: п{pos}|с{bid} (из CH M/O/C)"
+
+
 def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
-    """Легенда: сокращения строк M/O/C и общая к→з ключа."""
-    conv_order = _format_pct_compact(data.conv_views_to_orders)
+    """Легенда метрик строк M/O/C и формула CPO."""
     lines = [
-        "   п|с|CTR|CPO — поз|ставка|факт|state_cost",
-        f"   к→з {conv_order} — conv ключа (своя)",
+        "   п|с|к→к|PFC|CPO — поз|ставка|conv CH|руб/корзина|CPO заказа",
+        "   CPO = PFC / (зак/корз РК) = к→к CH × корз→заказ РК 7д",
     ]
     if _profile_shows_max_rk_legend(data):
         lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
     return lines
 
 
-def _format_diagnostic_line(diagnostic: KeywordV3DataDiagnostic) -> str:
-    """Строка «что есть / чего нет» для V2 CPO и CH-матрицы (plain text)."""
-    v2 = "✓" if diagnostic.has_v2_cpo else "✗"
+def _format_diagnostic_line(
+    diagnostic: KeywordV3DataDiagnostic,
+    *,
+    no_ch_min_only: bool = False,
+) -> str:
+    """Строка «что есть / чего нет» для V2 CPO / себест. заказа и CH-матрицы."""
     ch = "✓" if diagnostic.has_ch_position_profile else "✗"
-    line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
+    if no_ch_min_only:
+        pfo = "✓" if diagnostic.has_v2_cpo else "✗"
+        line = f"   Данные: себест. заказа {pfo} | CH матрица {ch}"
+    else:
+        v2 = "✓" if diagnostic.has_v2_cpo else "✗"
+        line = f"   Данные: V2 CPO {v2} | CH матрица {ch}"
     missing = diagnostic.missing_labels_ru()
     if missing:
         gaps = "; ".join(missing)
@@ -186,22 +233,24 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         # FULL и прочие — обычный заголовок без «импутации»
     lines = [header]
     if data.diagnostic is not None:
-        lines.append(_format_diagnostic_line(data.diagnostic))
-    if _ladder_has_valid_candidate(data):
-        if data.campaign_worst_only:
-            lines.append("   CPO — max state_cost M/O/C по ключам РК с CH")
-        else:
-            lines.extend(_format_metrics_legend_lines(data))
-    for mode in _LADDER_ORDER:
-        lines.append(_format_stage_line(data, mode))
-    if data.n_state:
         lines.append(
-            "   M + target 0 → min bid WB, белый список (N-state bootstrap)"
+            _format_diagnostic_line(
+                data.diagnostic, no_ch_min_only=data.no_ch_min_only
+            )
         )
-    elif data.no_ch_min_only:
-        lines.append(
-            "   M + target 0 → min bid WB, белый список (NO CH bootstrap)"
-        )
+    if not data.no_ch_min_only:
+        lines.append(_format_rk_cart_to_order_line(data))
+    target_line = _format_current_mode_target_line(data)
+    if target_line is not None:
+        lines.append(target_line)
+    if not _keyword_ladder_ui_suppressed(data):
+        if _ladder_has_valid_candidate(data):
+            if data.campaign_worst_only:
+                lines.append("   CPO — max state_cost M/O/C по ключам РК с CH")
+            else:
+                lines.extend(_format_metrics_legend_lines(data))
+        for mode in _LADDER_ORDER:
+            lines.append(_format_stage_line(data, mode))
     return "\n".join(lines) + "\n"
 
 
@@ -226,13 +275,6 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
                 return f"{star}{letter} CPO={cpo} (max РК)"
             return f"{star}{letter} CPO={cpo}"
     if cand is None or not cand.is_valid:
-        if mode == KeywordStrategyMode.MIN_CPA and data.no_ch_min_only:
-            cpo = (
-                f"{data.v2_pay_for_order:.2f}"
-                if data.v2_pay_for_order is not None
-                else "—"
-            )
-            return f"{star}{letter} CPO={cpo} (V2) | target 0 — min bid WB"
         reason = ""
         if cand is not None and cand.invalid_reason:
             raw = _INVALID_REASON_SHORT.get(
@@ -244,9 +286,15 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     pos = int(cand.position) if cand.position is not None else "—"
     bid = int(cand.bid + 0.5) if cand.bid is not None else "—"
     cpo = f"{cand.predicted_cpa:.2f}" if cand.predicted_cpa is not None else "—"
-    ctr = _format_pct_compact(data.keyword_ctr)
+    pfc = (
+        f"{cand.pay_for_cart:.0f}"
+        if cand.pay_for_cart is not None
+        else "—"
+    )
+    conv_cart = _format_pct_compact(cand.predicted_conversion)
     worst_suffix = _worst_suffix_for_stage(data, agg)
+    metrics = f"п{pos}|с{bid}|к→к{conv_cart}|PFC{pfc}|CPO{cpo}"
     if worst_suffix:
-        return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}{worst_suffix}"
-    return f"{star}{letter} п{pos}|с{bid}|CTR{ctr}|CPO{cpo}"
+        return f"{star}{letter} {metrics}{worst_suffix}"
+    return f"{star}{letter} {metrics}"
 

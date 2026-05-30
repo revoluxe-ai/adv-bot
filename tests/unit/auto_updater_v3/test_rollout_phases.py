@@ -238,8 +238,8 @@ def test_invalid_eligibility_excluded_from_reallocation() -> None:
 
 
 @pytest.mark.unit
-def test_no_ch_min_state_cost_uses_v2_cpo_not_worst_imputation() -> None:
-    """NO_CH tier: MIN cost = V2 CPO, OPT/MAX = inf."""
+def test_no_ch_min_state_cost_uses_pay_for_order_not_worst_imputation() -> None:
+    """NO_CH tier: MIN cost = pay_for_order, OPT/MAX = inf."""
     prof = _sample_profile()
     no_ch_kw = _calc_kw(
         ks_id=60,
@@ -346,8 +346,8 @@ def test_plan_profitable_expansion_no_ch_off_to_min() -> None:
 
 
 @pytest.mark.unit
-def test_profitable_expansion_no_ch_off_no_up_when_v2_cpo_above_resolve() -> None:
-    """NORMAL NO_CH: V2 CPO=1000, resolve=100, OFF — без UP (только expansion)."""
+def test_profitable_expansion_no_ch_off_no_up_when_pay_for_order_above_resolve() -> None:
+    """NORMAL NO_CH: pay_for_order=1000, resolve=100, OFF — без UP (только expansion)."""
     no_ch_kw = _calc_kw(
         ks_id=72,
         text="no_ch_expensive",

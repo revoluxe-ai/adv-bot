@@ -38,14 +38,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
     V3SelectionLog,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    step_down,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    iter_effective_upper_modes,
+    log_skipped_aliases,
+    resolve_next_effective_step_down,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
 
 if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
     )
@@ -143,18 +148,48 @@ def max_target_mode_for_aggressiveness(
     return KeywordStrategyMode.MAX_CONVERSION
 
 
+def _ladder_inputs_for_prepared(
+    prepared: PreparedList,
+    ladder_inputs: "LadderInputs | None" = None,
+) -> "LadderInputs":
+    """Единый ``LadderInputs`` на проход pooled ranking (RK + worst_costs SSOT)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs as _LadderInputs,
+    )
+
+    if ladder_inputs is not None:
+        return ladder_inputs
+    contexts = [c for c, _ in prepared]
+    return _LadderInputs.from_contexts(contexts)
+
+
 def _catalog_for_ctx(
     ctx: "KeywordV3Context",
     contexts: PreparedList | None = None,
+    *,
+    ladder_inputs: "LadderInputs | None" = None,
+    rk_orders_per_cart: float | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    peer = [c for c, _ in contexts] if contexts else [ctx]
-    conv = effective_conv_for_v3(ctx, peer)
-    if conv is None:
-        conv = ctx.keyword.conv_views_to_orders
+    """Каталог M/O/C: через ``LadderInputs`` (RK) или legacy conv/rk явно."""
+    if ladder_inputs is not None:
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+            _catalog_for_ctx as _ladder_catalog_for_ctx,
+        )
+
+        return _ladder_catalog_for_ctx(ctx, ladder_inputs)
+
+    rk = rk_orders_per_cart
+    conv = None
+    if rk is None or rk <= 0:
+        peer = [c for c, _ in contexts] if contexts else [ctx]
+        conv = effective_conv_for_v3(ctx, peer)
+        if conv is None:
+            conv = ctx.keyword.conv_views_to_orders
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
         conv_views_to_orders=conv,
+        rk_orders_per_cart=rk,
     )
 
 
@@ -301,11 +336,19 @@ def _resolve_state_cost(
 
 def build_worst_per_state_costs(
     prepared: PreparedList,
+    *,
+    rk_orders_per_cart: float | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> dict[AggressionTargetMode, float]:
     """Worst (max) predicted CPA per M/O/C среди ключей с валидной матрицей."""
+    if ladder_inputs is not None:
+        return dict(ladder_inputs.worst_costs)
+
     worst: dict[AggressionTargetMode, float] = {}
     for ctx, _mode in prepared:
-        catalog = _catalog_for_ctx(ctx, prepared)
+        catalog = _catalog_for_ctx(
+            ctx, prepared, rk_orders_per_cart=rk_orders_per_cart
+        )
         if missing_target_matrix_from_catalog(catalog):
             continue
         if not _has_valid_target_place_data(catalog):
@@ -329,9 +372,11 @@ def collect_transition_candidates(
     prepared: PreparedList,
     *,
     policy: SelectionPolicy,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[TransitionCandidate]:
-    """Все допустимые UP-переходы с метриками (jump по upper states)."""
-    worst_costs = build_worst_per_state_costs(prepared)
+    """Все допустимые UP-переходы с метриками (effective upper modes + RK catalog)."""
+    ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
+    worst_costs = ladder.worst_costs
     out: list[TransitionCandidate] = []
 
     for ctx, current_mode in prepared:
@@ -349,7 +394,7 @@ def collect_transition_candidates(
         if ks_id is None:
             continue
 
-        catalog = _catalog_for_ctx(ctx, prepared)
+        catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
         use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
@@ -357,7 +402,7 @@ def collect_transition_candidates(
         )
         pfo = float(ctx.keyword.pay_for_order or 0.0)
 
-        for to_mode in upper_target_modes(current_mode):
+        for to_mode in iter_effective_upper_modes(current_mode, catalog):
             if not _target_allowed(
                 to_mode=to_mode,
                 max_target_mode=policy.max_target_mode,
@@ -455,6 +500,7 @@ def plan_shelf_rec_false_cleanup_down(
     prepared: PreparedList,
     *,
     click_mode: ShelfClickMode,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """Полка: массовый сброс всех активных ключей с ``above_rec=False``.
 
@@ -469,6 +515,7 @@ def plan_shelf_rec_false_cleanup_down(
     if not shelf_rec_conversion_policy_active(click_mode):
         return []
 
+    ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
     actions: list[V3Action] = []
     for ctx, mode in prepared:
         if mode == KeywordStrategyMode.OFF:
@@ -483,7 +530,10 @@ def plan_shelf_rec_false_cleanup_down(
             continue
 
         if hard_status == _HARD_STATUS_WHITE_LIST:
-            nxt = step_down(mode)
+            catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
+            step = resolve_next_effective_step_down(mode, catalog)
+            log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+            nxt = step.next_mode
             if nxt is None:
                 continue
             actions.append(
@@ -509,9 +559,12 @@ def plan_one_up_by_policy(
     prepared: PreparedList,
     *,
     policy: SelectionPolicy,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """Unified pooled planner: один UP из общего пула кандидатов."""
-    candidates = collect_transition_candidates(prepared, policy=policy)
+    candidates = collect_transition_candidates(
+        prepared, policy=policy, ladder_inputs=ladder_inputs
+    )
     if not candidates:
         return [
             V3Action(
@@ -539,6 +592,7 @@ def plan_cost_first_up_one(
     layered: bool,
     aggressiveness: V3RolloutAggressiveness,
     piecewise_shelf: bool,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """Backward-compatible wrapper around unified pooled planner."""
     _ = (layered, piecewise_shelf)  # deprecated knobs, kept for compatibility
@@ -546,4 +600,6 @@ def plan_cost_first_up_one(
         click_mode=click_mode,
         aggressiveness=aggressiveness,
     )
-    return plan_one_up_by_policy(prepared, policy=policy)
+    return plan_one_up_by_policy(
+        prepared, policy=policy, ladder_inputs=ladder_inputs
+    )

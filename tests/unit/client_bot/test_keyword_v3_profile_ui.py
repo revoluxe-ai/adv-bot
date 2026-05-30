@@ -28,13 +28,18 @@ def _valid_candidate(
     cpa: float,
     *,
     conv_cart: float = 0.021,
+    pay_for_cart: float | None = None,
 ) -> ModeCandidate:
+    pfc = pay_for_cart
+    if pfc is None and conv_cart > 0:
+        pfc = (1.0 / conv_cart) * bid / 1000.0
     return ModeCandidate(
         mode=mode,
         bid=bid,
         position=position,
         predicted_cpa=cpa,
         predicted_conversion=conv_cart,
+        pay_for_cart=pfc,
         is_valid=True,
     )
 
@@ -43,7 +48,7 @@ def _profile_data(**kwargs: object) -> KeywordV3ProfileData:
     defaults = {
         "current_mode": KeywordStrategyMode.MIN_CPA,
         "candidates": {},
-        "keyword_ctr": 0.0094,
+        "conv_views_to_cart": 0.0224,
         "conv_views_to_orders": 0.01,
     }
     defaults.update(kwargs)
@@ -68,18 +73,20 @@ def test_profile_off_first_and_star_on_current() -> None:
     text = format_keyword_v3_profile_block(data)
     lines = [ln for ln in text.strip().split("\n") if ln.strip()]
     assert lines[0].startswith("📊")
-    assert "п|с|CTR|CPO" in lines[1]
-    assert "к→з 1%" in lines[2]
-    assert "conv ключа" in lines[2]
-    assert "OFF — отключен" in lines[3]
+    assert "РК 7д корз→заказ" in text
+    assert "п|с|к→к|PFC|CPO" in text
+    assert "CPO = PFC /" in text
+    assert "OFF — отключен" in text
     assert "лестница отключена" not in text
-    assert "🌟" in lines[4] and "M п12|с145" in lines[4]
-    assert "CTR0.94%" in lines[4]
-    assert "CPO89.50" in lines[4]
-    assert lines[4].endswith("CPO89.50")
+    assert "🌟" in text and "M п12|с145" in text
+    assert "к→к2.1%" in text
+    assert "PFC" in text
+    assert "CTR" not in text
+    assert "CPO89.50" in text
     assert "кк" not in text
-    assert "к→з" not in lines[4]
-    assert "O п8|с210" in lines[5]
+    assert "к→з" not in text.split("к→к")[0]  # не путаем с к→к CH
+    assert "O п8|с210" in text
+    assert "Цель режима M" in text
     joined = "\n".join(lines)
     assert (
         joined.index("OFF")
@@ -87,6 +94,47 @@ def test_profile_off_first_and_star_on_current() -> None:
         < joined.index("O п")
         < joined.index("C п")
     )
+
+
+@pytest.mark.unit
+def test_profile_shows_rk_cart_to_order_conversion() -> None:
+    """Строка РК 7д: доля зак/корз и обратная корз/зак для проверки CPO."""
+    data = _profile_data(
+        rk_orders_per_cart=0.247,
+        candidates={
+            AggressionTargetMode.MIN_CPA: _valid_candidate(
+                AggressionTargetMode.MIN_CPA, 1, 4580.0, 143.32
+            ),
+        },
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "РК 7д корз→заказ: 24.7%" in text
+    assert "0.247 зак/корз" in text
+    assert "корз/зак" in text
+
+
+@pytest.mark.unit
+def test_profile_stage_conv_from_candidate_not_keyword_aggregate() -> None:
+    """к→к в строке M/O/C — ``predicted_conversion`` точки CH, не факт ключа."""
+    data = _profile_data(
+        conv_views_to_cart=0.0072,
+        candidates={
+            AggressionTargetMode.MIN_CPA: _valid_candidate(
+                AggressionTargetMode.MIN_CPA, 22, 510.0, 402.31, conv_cart=0.009
+            ),
+            AggressionTargetMode.OPTIMUM: _valid_candidate(
+                AggressionTargetMode.OPTIMUM, 1, 20450.0, 16131.92, conv_cart=0.015
+            ),
+            AggressionTargetMode.MAX_CONVERSION: _valid_candidate(
+                AggressionTargetMode.MAX_CONVERSION, 1, 20450.0, 16131.92, conv_cart=0.02
+            ),
+        },
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "к→к0.9%" in text
+    assert "к→к1.5%" in text
+    assert "к→к2%" in text
+    assert "к→к0.72%" not in text
 
 
 @pytest.mark.unit
@@ -130,8 +178,9 @@ def test_profile_invalid_candidate_shows_reason() -> None:
     assert "нет conv показ→заказ" in text
     assert "нет конверсий" in text
     assert "🌟" in text and "O п5|с200" in text
-    assert "CTR0.94%" in text
-    assert "к→з 1%" in text
+    assert "к→к2.1%" in text
+    assert "CTR" not in text
+    assert "РК 7д корз→заказ" in text
 
 
 @pytest.mark.unit
@@ -157,10 +206,11 @@ def test_profile_n_state_when_no_v2_cpo_and_no_ch() -> None:
     )
     text = format_keyword_v3_profile_block(data)
     assert "N-state" in text
-    assert "N-state bootstrap" in text
     assert "V2 CPO" in text and "CH матрица" in text
-    assert "min bid WB" in text
+    assert "min bid WB" not in text
     assert "п|с|CPO" not in text
+    assert "CPO=" not in text
+    assert "OFF —" not in text
 
 
 @pytest.mark.unit
@@ -177,13 +227,13 @@ def test_profile_no_ch_min_only_not_n_state() -> None:
         candidates={
             AggressionTargetMode.MIN_CPA: ModeCandidate(
                 mode=AggressionTargetMode.MIN_CPA,
-                is_valid=False,
-                invalid_reason="no_position_profile",
+                is_valid=True,
+                predicted_cpa=367.13,
             ),
         },
         n_state=False,
         no_ch_min_only=True,
-        v2_pay_for_order=367.13,
+        keyword_pay_for_order=367.13,
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=True,
             has_ch_position_profile=False,
@@ -193,8 +243,12 @@ def test_profile_no_ch_min_only_not_n_state() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "NO CH (только MIN)" in text
     assert "N-state" not in text
-    assert "CPO=367.13 (V2)" in text
-    assert "NO CH bootstrap" in text
+    assert "CPO=" not in text
+    assert "(V2)" not in text
+    assert "maxРК" not in text
+    assert "себест. заказа" in text
+    assert "O/C —" not in text
+    assert "min bid WB" not in text
     assert "нет матрицы CH" in text
 
 
@@ -219,7 +273,8 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\)" not in text
     assert "\\|" not in text
     assert "поз\\. " not in text
-    assert "M п12|с145|CTR0.94%|CPO89.50" in text
+    assert "M п12|с145|к→к2.1%|PFC" in text
+    assert "РК 7д корз→заказ" in text
     assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text
     assert "имп. max CPO" not in text

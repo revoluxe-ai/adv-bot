@@ -45,6 +45,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
     load_keyword_v3_profile_data,
+    profile_load_failure,
 )
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     format_keyword_v3_profile_block,
@@ -552,22 +553,17 @@ class KeywordSettingMessage(TextWithKeyboard):
                 profile_data = await load_keyword_v3_profile_data(
                     adv_setting, calculated_keyword
                 )
-                self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
-            except Exception as exc:
+            except Exception:
                 logger.exception(
-                    "Failed to load v3 keyword profile for keyword_setting_id=%s",
-                    self._keyword_original_id,
+                    "v3 keyword profile: unexpected load error adv_id=%s keyword=%s",
+                    adv_setting.adv_id,
+                    calculated_keyword.text,
                 )
-                from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
-                    profile_load_failure,
+                profile_data = profile_load_failure(
+                    calculated_keyword,
+                    reason="ошибка загрузки профиля",
                 )
-
-                self._v3_profile_block = format_keyword_v3_profile_block(
-                    profile_load_failure(
-                        calculated_keyword,
-                        reason=f"ошибка загрузки ({type(exc).__name__})",
-                    )
-                )
+            self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
 
         return await super().__call__()
 

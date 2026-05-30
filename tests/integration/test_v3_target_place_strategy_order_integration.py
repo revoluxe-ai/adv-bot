@@ -36,6 +36,7 @@ from tests.integration.test_predict_keywords_target_place_integration import (
     _ensure_predict_tables,
     _make_adv_mock,
 )
+from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
 
 pytestmark = pytest.mark.integration
 
@@ -43,13 +44,13 @@ pytestmark = pytest.mark.integration
 def _synthetic_ladder_profile(keyword: str, ts: datetime) -> list[BidPosition]:
     """Профиль, где MAX→pos1, OPT→pos2, MIN→pos3 (разные и упорядочены).
 
-    MIN_CPA (V3): min CPO заказа при conv=0.01 → pos 3; MAX — max conv на pos 1;
-    OPTIMUM — max conv/(1+pay) на pos 2.
+    MIN_CPA: min CPO → pos 3; MAX — max conv на pos 1;
+    OPTIMUM (production balance): компромисс → pos 2, не pos 1/3.
     """
     positions = [
         (1, 500, 0.40),
-        (2, 80, 0.25),
-        (3, 60, 0.22),
+        (2, 45, 0.36),
+        (3, 40, 0.20),
     ]
     out: list[BidPosition] = []
     for pos, bid, conv in positions:
@@ -163,6 +164,17 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
+    # Минимальный adv без nmids: RK ratio мокаем (как unit conftest), без CH wb_common_stat.
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+        AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+    )
+
+    expected = target_places_for_v3_modes(
+        base_profile,
+        rk_orders_per_cart=RK_ORDERS_PER_CART_TEST,
+    )
+
     await sync_keyword_target_places_v3(
         adv=adv,
         bid_profiles=profiles,
@@ -198,8 +210,11 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
         },
     )
 
-    # OFF: свежая позиция из профиля (как MIN_CPA), не сохранённое 99
-    assert off_kw.target_place == 3
+    # OFF: прокси MIN_CPA из профиля (RK CPO), не сохранённое 99
+    assert off_kw.target_place == expected[KeywordStrategyMode.MIN_CPA]
+    assert min_kw.target_place == expected[KeywordStrategyMode.MIN_CPA]
+    assert opt_kw.target_place == expected[KeywordStrategyMode.OPTIMUM]
+    assert max_kw.target_place == expected[KeywordStrategyMode.MAX_CONVERSION]
     assert_ladder_positions_distinct_and_ordered(
         min_kw.target_place,
         opt_kw.target_place,

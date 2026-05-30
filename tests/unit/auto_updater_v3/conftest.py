@@ -32,6 +32,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import 
 )
 
 
+RK_ORDERS_PER_CART_TEST = 2.0
+
+
 def sample_profile(
     *,
     min_pay: float = 25.0,

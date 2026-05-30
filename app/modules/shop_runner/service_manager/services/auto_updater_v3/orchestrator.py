@@ -308,11 +308,18 @@ async def process_adv_v3(
             if is_resolve_valid(plan, resolve):
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
-                ladder_inputs = LadderInputs.from_contexts(contexts)
+                from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+                    load_rk_orders_per_cart_7d,
+                )
+
+                rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv)
+                ladder_inputs = LadderInputs.from_contexts(
+                    contexts,
+                    rk_orders_per_cart=rk_orders_per_cart,
+                )
                 await cache_worst_costs_for_adv(
                     complex_adv.adv_id, ladder_inputs.worst_costs
                 )
-
                 # COST_REALLOCATION — portfolio DOWN при запасе по CPA (не overspend guard):
                 # снимаем дорогую агрессию, затем PROFITABLE_EXPANSION перераспределяет
                 # в более дешёвые passing states. При высоком fact CPA — MAX_CPA_GUARD ниже.
@@ -339,7 +346,10 @@ async def process_adv_v3(
                         )
                         eligibility = build_eligibility_map(contexts)
                         prepared = build_prepared_from_contexts(contexts)
-                        ladder_inputs = LadderInputs.from_contexts(contexts)
+                        ladder_inputs = LadderInputs.from_contexts(
+                            contexts,
+                            rk_orders_per_cart=rk_orders_per_cart,
+                        )
                         await cache_worst_costs_for_adv(
                             complex_adv.adv_id, ladder_inputs.worst_costs
                         )

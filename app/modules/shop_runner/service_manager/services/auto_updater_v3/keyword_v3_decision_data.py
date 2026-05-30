@@ -7,8 +7,8 @@
 Два независимых контура себестоимости (намеренно не смешиваются):
 
 1. **NO CH + свой V2 CPO** (``KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``):
-   MIN-only, ``target_place=0``. Границы UP/trim/OVERSPEND — ``keyword.pay_for_order``
-   (как в карточке Telegram, каскад CPM с bid_log). Импутация conv по РК **не** применяется.
+   MIN-only, ``target_place=0``. Лестница/UI/expansion MIN — ``resolve_no_ch_operational_pay_for_order_cost``
+   (``keyword.pay_for_order``). Границы UP/trim/OVERSPEND — та же метрика. Импутация conv по РК **не** применяется.
 
 2. **CH + импутированная conv** (``RK_AGGREGATE`` / ``PEER_MAX``):
    Лестница M/O/C через ``effective_conv_for_v3`` → ``build_mode_candidates`` /
@@ -136,6 +136,23 @@ def pessimistic_min_cpa_cost(
     if cost is None or cost <= 0:
         return None
     return float(cost)
+
+
+def resolve_no_ch_operational_pay_for_order_cost(
+    keyword: CalculatedKeyword,
+) -> float | None:
+    """Операционная себестоимость NO CH tier: ``keyword.pay_for_order`` (как в карточке Telegram).
+
+    Используется в ``cost_for_mode`` / UI вместо ``resolve_keyword_v2_pay_for_order_cost``
+    (rating CPM без bid_log). Trim/guard/expansion для NO CH — та же метрика.
+    """
+    pfo = keyword.pay_for_order
+    if pfo is None:
+        return None
+    value = float(pfo)
+    if value <= 0:
+        return None
+    return value
 
 
 def keyword_has_v2_cpo(

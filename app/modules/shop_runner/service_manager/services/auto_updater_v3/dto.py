@@ -25,6 +25,9 @@ class ModeCandidate(BaseModel):
     predicted_orders: float | None = None
     predicted_spend: float | None = None
     predicted_cpa: float | None = None
+    """CPO заказа на точке CH: к→к × корзина→заказ РК 7д, bid точки."""
+    pay_for_cart: float | None = None
+    """Руб/корзина на точке CH (``PositionProfilePoint.pay_for_cart``)."""
     predicted_conversion: float | None = None
     conversion_score: float | None = None
     economy_score: float | None = None
@@ -56,6 +59,7 @@ class V3SelectionLog(BaseModel):
     move_kind: str | None = None
     imputed: bool | None = None
     mechanism: str | None = None
+    skipped_mode_aliases: list[str] | None = None
 
 
 class V3Action(BaseModel):

@@ -74,7 +74,7 @@ UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUA
 
 **Правило cost (per-mode):**
 
-1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_keyword_v2_pay_for_order_cost` (`source=v2_cpo`); O/C → `inf`, **не** `source=worst`.
+1. Сначала `eligibility`: tier `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → MIN только `resolve_no_ch_operational_pay_for_order_cost` (`keyword.pay_for_order`, `source=pay_for_order`); O/C → `inf`, **не** `source=worst`.
 2. CH-tier: `profile_cost` → `ladder_inputs.worst_costs[mode]` (per-mode, без gate «вся матрица invalid») → `inf`.
 
 **N-state vs MIN-only (диагностика UI):**
@@ -84,6 +84,12 @@ UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUA
 - CH + imputed conv (`RK_AGGREGATE` / `PEER_MAX`) — полная лестница, `n_state=False`.
 
 Тесты: `tests/unit/auto_updater_v3/test_keyword_v3_ladder_view.py`.
+
+**Выбор точек M/O/C в `candidates.build_mode_candidates`:**
+
+- **MIN_CPA** — min `predicted_cpa` (CPO заказа, conv ключа V2).
+- **MAX_CONVERSION** — max `predicted_conversion` (conv показ→корзина CH).
+- **OPTIMUM** — max `0.5*conv_n + 0.5*economy_n` по usable точкам (`v3_optimum_balance.py`); tie — меньший CPO, ставка, позиция. Не середина между позициями M и C, а компромисс на всей матрице.
 
 ## Unified pooled contract
 

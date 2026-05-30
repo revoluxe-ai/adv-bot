@@ -382,20 +382,31 @@ def test_rollout_underperform_up_skips_black_list_hard_status() -> None:
 
 
 @pytest.mark.unit
-def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
+def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MID (2): UP MIN→OPT; OFF в blacklist не конкурирует с imputed OFF→MIN."""
+    from tests.unit.auto_updater_v3.test_effective_ladder_steps import _fake_catalog_places
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking._catalog_for_ctx",
+        lambda _ctx, _prepared=None, **_kwargs: _fake_catalog_places(
+            min_place=40, opt_place=1, max_place=1
+        ),
+    )
     cheap_opt = [
         PositionProfilePoint(
             position=1,
-            bid=500,
-            predicted_conversion=0.40,
-            pay_for_cart=200.0,
+            bid=10_000,
+            predicted_conversion=0.13,
+            pay_for_cart=50.0,
             timestamp=datetime(2024, 1, 1, tzinfo=UTC),
         ),
         PositionProfilePoint(
-            position=2,
-            bid=80,
-            predicted_conversion=0.02,
-            pay_for_cart=5.0,
+            position=40,
+            bid=500,
+            predicted_conversion=0.015,
+            pay_for_cart=10.0,
             timestamp=datetime(2024, 1, 1, tzinfo=UTC),
         ),
     ]
@@ -406,7 +417,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
             mode=KeywordStrategyMode.OFF,
             rating=1.0,
             conv=0.01,
-            hard_status=1,
+            hard_status=0,
         ),
         position_profile=None,
     )
@@ -416,7 +427,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off() -> None:
             text="strong",
             mode=KeywordStrategyMode.MIN_CPA,
             rating=1.0,
-            conv=0.5,
+            conv=0.015,
             hard_status=1,
         ),
         position_profile=cheap_opt,

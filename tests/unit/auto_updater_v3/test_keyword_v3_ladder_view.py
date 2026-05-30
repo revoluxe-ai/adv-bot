@@ -97,8 +97,8 @@ def test_ui_cost_parity_with_cost_for_mode() -> None:
 
 
 @pytest.mark.unit
-def test_m_profile_o_worst_not_inf() -> None:
-    """M profile, O worst (не ``inf``) при invalid OPT в каталоге ключа."""
+def test_m_profile_o_profile_not_inf() -> None:
+    """M/O на одной точке профиля — PROFILE (не ``inf``), не worst."""
     from datetime import UTC, datetime
 
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
@@ -135,8 +135,8 @@ def test_m_profile_o_worst_not_inf() -> None:
     assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.PROFILE
     opt = view.stages[AggressionTargetMode.OPTIMUM]
     assert opt.cost is not None
-    assert opt.source == LadderCostSource.WORST
-    assert opt.cost_imputed
+    assert opt.source == LadderCostSource.PROFILE
+    assert not opt.cost_imputed
 
 
 @pytest.mark.unit
@@ -198,8 +198,8 @@ def test_imputed_profile_cpo_can_differ_from_campaign_worst_max() -> None:
 
 
 @pytest.mark.unit
-def test_no_ch_v2_cpo_min_only_never_worst_source() -> None:
-    """NO_CH + V2 CPO: MIN ``v2_cpo``, O/C ``none``, never ``worst``."""
+def test_no_ch_pay_for_order_min_only_never_worst_source() -> None:
+    """NO_CH tier: MIN ``pay_for_order``, O/C ``none``, never ``worst``."""
     kw = _calculated_kw_fixture(
         ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.08
     )
@@ -213,7 +213,9 @@ def test_no_ch_v2_cpo_min_only_never_worst_source() -> None:
     assert not diag.n_state
 
     view = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
-    assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.V2_CPO
+    assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.PAY_FOR_ORDER
+    pfo = float(kw.pay_for_order or 0)
+    assert view.stages[AggressionTargetMode.MIN_CPA].cost == pytest.approx(pfo, rel=0.02)
     assert view.stages[AggressionTargetMode.OPTIMUM].source == LadderCostSource.NONE
     assert view.stages[AggressionTargetMode.MAX_CONVERSION].source == LadderCostSource.NONE
 
