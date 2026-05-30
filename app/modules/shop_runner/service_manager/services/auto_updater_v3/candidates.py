@@ -134,7 +134,12 @@ def build_mode_candidates(
         )
 
     # MIN_CPA: минимальный CPO по профилю (на точке CH × RK корзина→заказ)
-    pfo_rows = [(p, _pfo(p)) for p in usable if _pfo(p) is not None]
+    pfo_rows: list[tuple[PositionProfilePoint, float]] = []
+    for p in usable:
+        cpo = _pfo(p)
+        if cpo is None:
+            continue
+        pfo_rows.append((p, cpo))
     if not pfo_rows:
         min_cpa = ModeCandidate(
             mode=AggressionTargetMode.MIN_CPA,
