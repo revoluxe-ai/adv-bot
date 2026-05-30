@@ -533,7 +533,8 @@ def plan_shelf_rec_false_cleanup_down(
 
     - ``rec_orders_per_view is None`` — gate неактивен, cleanup не выполняется;
     - текущий state PASS / UNKNOWN / INACTIVE — не трогаем;
-    - текущий state FAIL, MIN PASS/UNKNOWN — effective DOWN до MIN (не FORCE_OFF);
+    - текущий state FAIL, MIN PASS/UNKNOWN — effective DOWN до MIN для БС (``hard_status=2``);
+      для авто (``hard_status=1``) — ``FORCE_OFF`` (applier не применяет DOWN);
     - ``hard_status=2`` (БС): DOWN по лестнице; при MIN и ``step_down`` без цели — fallback OFF;
     - ``hard_status=1`` (авто): FORCE_OFF только если MIN тоже FAIL.
 
@@ -589,14 +590,23 @@ def plan_shelf_rec_false_cleanup_down(
         )
 
         if rec_gate_allows_up(min_status) and mode != KeywordStrategyMode.MIN_CPA:
-            actions.append(
-                V3Action(
-                    action=V3ActionType.DOWN,
-                    keyword_setting_id=ks_id,
-                    target_strategy_mode=KeywordStrategyMode.MIN_CPA,
-                    reason="shelf_rec_false_cleanup",
+            if hard_status == _HARD_STATUS_WHITE_LIST:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.DOWN,
+                        keyword_setting_id=ks_id,
+                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        reason="shelf_rec_false_cleanup",
+                    )
                 )
-            )
+            else:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.FORCE_OFF,
+                        keyword_setting_id=ks_id,
+                        reason="shelf_rec_false_cleanup",
+                    )
+                )
             continue
 
         if hard_status == _HARD_STATUS_WHITE_LIST:

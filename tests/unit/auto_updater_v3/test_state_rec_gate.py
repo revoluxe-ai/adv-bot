@@ -298,8 +298,8 @@ def test_cleanup_down_on_fail_current_pass_min() -> None:
             policy=_policy_shelf(),
         )
     assert len(actions) == 1
-    assert actions[0].action == V3ActionType.DOWN
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].reason == "shelf_rec_false_cleanup"
 
 
 @pytest.mark.unit

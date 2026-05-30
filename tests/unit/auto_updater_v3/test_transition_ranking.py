@@ -340,6 +340,117 @@ def test_shelf_false_cleanup_mass_state_gate_fails() -> None:
 
 
 @pytest.mark.unit
+def test_shelf_false_cleanup_auto_shortcut_to_min_uses_force_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Auto OPT fail + MIN pass: FORCE_OFF, не DOWN (applier игнорирует DOWN для авто)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        RecGateStatus,
+    )
+
+    prof = sample_profile()
+
+    def _status(
+        _cats: dict,
+        to_mode: KeywordStrategyMode,
+        _policy: SelectionPolicy,
+        *,
+        rec_orders_per_view: float | None,
+        rk_orders_per_cart: float | None,
+    ) -> RecGateStatus:
+        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        if to_mode == KeywordStrategyMode.MIN_CPA:
+            return RecGateStatus.PASS
+        if to_mode == KeywordStrategyMode.OPTIMUM:
+            return RecGateStatus.FAIL
+        return RecGateStatus.PASS
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate.state_rec_gate_status_for_mode",
+        _status,
+    )
+
+    prepared = [
+        (
+            ctx(
+                ks_id=20,
+                mode=KeywordStrategyMode.OPTIMUM,
+                profile=prof,
+                above_rec=False,
+                hard_status=1,
+            ),
+            KeywordStrategyMode.OPTIMUM,
+        ),
+    ]
+    ladder = _ladder_for_prepared(prepared)
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].keyword_setting_id == 20
+    assert actions[0].target_strategy_mode is None
+
+
+@pytest.mark.unit
+def test_shelf_false_cleanup_whitelist_shortcut_to_min_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Whitelist OPT fail + MIN pass: DOWN до MIN."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        RecGateStatus,
+    )
+
+    prof = sample_profile()
+
+    def _status(
+        _cats: dict,
+        to_mode: KeywordStrategyMode,
+        _policy: SelectionPolicy,
+        *,
+        rec_orders_per_view: float | None,
+        rk_orders_per_cart: float | None,
+    ) -> RecGateStatus:
+        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        if to_mode == KeywordStrategyMode.MIN_CPA:
+            return RecGateStatus.PASS
+        if to_mode == KeywordStrategyMode.OPTIMUM:
+            return RecGateStatus.FAIL
+        return RecGateStatus.PASS
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate.state_rec_gate_status_for_mode",
+        _status,
+    )
+
+    prepared = [
+        (
+            ctx(
+                ks_id=21,
+                mode=KeywordStrategyMode.OPTIMUM,
+                profile=prof,
+                above_rec=False,
+                hard_status=2,
+            ),
+            KeywordStrategyMode.OPTIMUM,
+        ),
+    ]
+    ladder = _ladder_for_prepared(prepared)
+    actions = plan_shelf_rec_false_cleanup_down(
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
 def test_shelf_false_cleanup_auto_uses_force_off() -> None:
     """Авто (hard_status=1): FORCE_OFF, т.к. applier не применяет DOWN для авто."""
     prof = sample_profile()
