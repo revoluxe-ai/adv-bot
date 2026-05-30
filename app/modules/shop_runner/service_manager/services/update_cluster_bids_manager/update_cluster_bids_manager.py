@@ -47,7 +47,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
 
-from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
 
 # TODO: Внедрить в ректрай WB Api декораторы всплески
 
@@ -87,6 +87,7 @@ class UpdateClusterBidsManager:
         redis_cluster_bids_manager: RedisClusterBidsManager,
         redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
+        tasks_manager: TasksManager,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
@@ -95,6 +96,7 @@ class UpdateClusterBidsManager:
         self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
             redis_cluster_bids_timestamp_manager
         )
+        self._tasks_manager = tasks_manager
 
     async def _get_local_data(
         self, advs: list[ComplexAdv]
@@ -161,6 +163,7 @@ class UpdateClusterBidsManager:
             handlers,
             max_workers=3,
             return_exceptions=False,
+            tasks_manager=self._tasks_manager,
         )
         current_bids = cast(list[NormqueryBidDTO], results[0])
         min_bids = cast(AdvMinNmidsBids, results[1])
@@ -466,6 +469,7 @@ class UpdateClusterBidsManager:
         results = await run_tasks(
             handlers,
             max_workers=_max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
         datas: set[AdvIdItemCalculateData] = set()
         for result in results:
@@ -488,6 +492,7 @@ class UpdateClusterBidsManager:
             handlers,
             max_workers=2,
             return_exceptions=True,
+            tasks_manager=self._tasks_manager,
         )
         wb_error: BaseException | None = None
         for idx, result in enumerate(tasks):

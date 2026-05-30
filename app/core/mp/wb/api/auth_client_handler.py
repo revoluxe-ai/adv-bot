@@ -47,6 +47,7 @@ class AuthClientHandler:
             httpx_client=httpx_client,
             token=token,
             section=section,
+            shop_id=self.__shop_id,
             raise_on_unexpected_status=False,
         )
         return client

@@ -32,6 +32,7 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     adv = MagicMock()
     adv.auction_adv_id = 10
@@ -56,6 +57,7 @@ async def test_get_calculate_data_individual_mode_no_kw_target_snap_ignores_adv_
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     cluster_text = "normquery_snap_test"
     kw = GoodKeywordFactory.build(
@@ -98,6 +100,7 @@ async def test_get_fact_datas_uses_batch_plan_fact_reader_once(
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     adv1 = MagicMock()
     adv1.adv_id = 101
@@ -150,6 +153,7 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=api_cache,
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
 
     map_data = AdvIdItemCalculateData(
@@ -182,6 +186,7 @@ async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     adv = MagicMock()
     adv.auction_adv_id = 10
@@ -242,6 +247,7 @@ async def test_get_calculate_data_v3_excludes_auto_with_non_off_mode() -> None:
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     adv = MagicMock()
     adv.auction_adv_id = 10
@@ -281,6 +287,7 @@ async def test_get_calculate_data_non_v3_includes_off_strategy_keywords() -> Non
         redis_cluster_bids_manager=MagicMock(),
         redis_api_cluster_bids_manager=MagicMock(),
         redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
     )
     adv = MagicMock()
     adv.auction_adv_id = 10
