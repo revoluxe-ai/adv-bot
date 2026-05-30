@@ -210,7 +210,7 @@ def try_valid_rollout_up(
         target = AggressionTargetMode[nxt.name]
     except KeyError:
         return None
-    mc = cand.get(target)
+    mc = catalog.get(target)
     if mc is None or not mc.is_valid:
         logger.debug(
             "v3 skip UP kw=%s: invalid candidate for %s",
