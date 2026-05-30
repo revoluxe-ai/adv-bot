@@ -701,6 +701,14 @@ class Settings:
             return 7
         return int(value)
 
+    @property
+    def PROMOTION_HTTP_CONCURRENCY_LIMIT(self) -> int:
+        """Макс. одновременных in-flight PROMOTION HTTP запросов (process-wide)."""
+        value = os.getenv("PROMOTION_HTTP_CONCURRENCY_LIMIT")
+        if not value:
+            return 80
+        return int(value)
+
 
     @property
     def UPDATE_FULL_ADV_STAT_PERIOD(self) -> int:

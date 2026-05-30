@@ -1,4 +1,6 @@
 # app/core/mp/wb/api_client.py
+"""Authenticated httpx proxy для сгенерированных WB API clients."""
+
 from typing import Any
 import logging
 
@@ -6,6 +8,7 @@ import httpx
 from attrs import define, field
 
 from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
+from app.core.mp.wb.api.promotion_http_concurrency import acquire_promotion_http
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +16,18 @@ logger = logging.getLogger(__name__)
 class _AuthAsyncProxy:
     """Тонкий прокси над общим httpx.AsyncClient: добавляет Authorization и НЕ закрывает клиент."""
 
-    def __init__(self, httpx_client: httpx.AsyncClient, token: str) -> None:
+    def __init__(
+        self,
+        httpx_client: httpx.AsyncClient,
+        token: str,
+        *,
+        section: SectionsEnum,
+        shop_id: str | None = None,
+    ) -> None:
         self._httpx_client = httpx_client
         self._token = token
+        self._section = section
+        self._shop_id = shop_id
         self._header_name = "Authorization"
         self._prefix = "Bearer"
 
@@ -31,6 +43,15 @@ class _AuthAsyncProxy:
         headers = dict(kwargs.get("headers") or {})
         headers[self._header_name] = f"{self._prefix} {self._token}"
         kwargs["headers"] = headers
+        if self._section is SectionsEnum.PROMOTION:
+            async with acquire_promotion_http(
+                shop_id=self._shop_id,
+                http_method=method,
+                endpoint=url,
+            ):
+                return await self._httpx_client.request(
+                    method=method, url=url, **kwargs
+                )
         return await self._httpx_client.request(method=method, url=url, **kwargs)
 
 
@@ -42,6 +63,7 @@ class AuthenticatedCastClient:
     _httpx_client: httpx.AsyncClient = field(alias="httpx_client")
     _token: str = field(alias="token")
     _section: SectionsEnum = field(alias="section")
+    _shop_id: str | None = field(default=None, alias="shop_id")
     # генератор часто читает этот флаг
     raise_on_unexpected_status: bool = field(default=False)
 
@@ -62,4 +84,9 @@ class AuthenticatedCastClient:
         return {}
 
     def get_async_httpx_client(self) -> _AuthAsyncProxy:
-        return _AuthAsyncProxy(self._httpx_client, self._token)
+        return _AuthAsyncProxy(
+            self._httpx_client,
+            self._token,
+            section=self._section,
+            shop_id=self._shop_id,
+        )

@@ -686,6 +686,7 @@ class CoroutinesManager:
         results: list[BaseException | None] = await run_tasks(
             handlers,
             max_workers=self._max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
 
         for i, result in enumerate(results):
@@ -782,6 +783,7 @@ class CoroutinesManager:
             results = await run_tasks(
                 handlers,
                 max_workers=max_workers,
+                tasks_manager=self._tasks_manager,
             )
 
             for (adv_setting, spec_campaign_type, spec_adv_id), result in zip(
@@ -904,6 +906,7 @@ class CoroutinesManager:
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
+            tasks_manager=self._tasks_manager,
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
@@ -940,6 +943,7 @@ class CoroutinesManager:
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
+            tasks_manager=self._tasks_manager,
         )
         wb_manager = container.wb_manager()
         redis_api_cluster_bids_manager = container.redis_api_cluster_bids_manager()
@@ -981,6 +985,7 @@ class CoroutinesManager:
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
+            tasks_manager=self._tasks_manager,
         )
         wb_manager = container.wb_manager()
         t0 = time.perf_counter()
@@ -1040,6 +1045,7 @@ class CoroutinesManager:
         container = ClusterBidsManagerContainer(
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
+            tasks_manager=self._tasks_manager,
         )
         wb_manager = container.wb_manager()
         t0 = time.perf_counter()
@@ -1426,11 +1432,11 @@ class CoroutinesManager:
             handlers.append(handler)
 
         max_workers = self._max_workers_for(len(handlers), 16)
-        # Локальный TasksManager: общая очередь shop-runner может не доходить до handlers.
         results = await run_tasks(
             handlers=handlers,
             max_workers=max_workers,
             return_exceptions=True,
+            tasks_manager=self._tasks_manager,
         )
 
         for adv, result in zip(complex_advs, results):
@@ -1467,6 +1473,7 @@ class CoroutinesManager:
             handlers=handlers,
             max_workers=max_workers,
             return_exceptions=True,
+            tasks_manager=self._tasks_manager,
         )
         for adv, result in zip(control_candidates, results, strict=True):
             if isinstance(result, BaseException):
@@ -1563,6 +1570,7 @@ class CoroutinesManager:
         results = await run_tasks(
             handlers=handlers,
             max_workers=16,
+            tasks_manager=self._tasks_manager,
         )
         for result, adv in zip(results,  wb_adv_dto):
             if isinstance(result, BaseException):
