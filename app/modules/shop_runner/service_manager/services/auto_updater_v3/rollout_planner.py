@@ -686,7 +686,7 @@ def _highest_passing_mode_in_upper_groups(
                 ctx=ctx,
                 to_mode=capped,
                 eligibility_by_ks_id=eligibility_by_ks_id,
-                ladder_inputs=ladder_inputs,
+                ladder_inputs=ladder,
             )
             if cost == float("inf") or cost > resolve:
                 continue
