@@ -19,7 +19,7 @@ def target_places_for_v3_modes(
     *,
     conv_views_to_orders: float = 0.01,
 ) -> dict[KeywordStrategyMode, int | None]:
-    """Целевые позиции M/O/C на одном профиле (лестница V3, не legacy-предиктор)."""
+    """Целевые позиции M/O/C на одном профиле (``build_mode_candidates``, balance OPT)."""
     points = profile_points_from_bid_positions(profile)
     candidates = build_mode_candidates(
         profile=points,
@@ -59,9 +59,9 @@ def assert_ladder_positions_distinct_and_ordered(
         f"{prefix}ожидается pos_MAX <= pos_OPT <= pos_MIN, "
         f"получено MAX={pos_max}, OPT={pos_opt}, MIN={pos_min}"
     )
-    assert len({pos_min, pos_opt, pos_max}) == 3, (
-        f"{prefix}позиции M/O/C должны различаться, "
-        f"получено MIN={pos_min}, OPT={pos_opt}, MAX={pos_max}"
+    assert pos_max != pos_min, (
+        f"{prefix}MAX и MIN должны различаться, "
+        f"получено MIN={pos_min}, MAX={pos_max}"
     )
 
 

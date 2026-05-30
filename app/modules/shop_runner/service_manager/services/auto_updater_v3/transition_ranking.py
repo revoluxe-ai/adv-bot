@@ -38,8 +38,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
     V3SelectionLog,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    step_down,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    iter_effective_upper_modes,
+    log_skipped_aliases,
+    resolve_next_effective_step_down,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -146,15 +148,21 @@ def max_target_mode_for_aggressiveness(
 def _catalog_for_ctx(
     ctx: "KeywordV3Context",
     contexts: PreparedList | None = None,
+    *,
+    rk_orders_per_cart: float | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    peer = [c for c, _ in contexts] if contexts else [ctx]
-    conv = effective_conv_for_v3(ctx, peer)
-    if conv is None:
-        conv = ctx.keyword.conv_views_to_orders
+    rk = rk_orders_per_cart
+    conv = None
+    if rk is None or rk <= 0:
+        peer = [c for c, _ in contexts] if contexts else [ctx]
+        conv = effective_conv_for_v3(ctx, peer)
+        if conv is None:
+            conv = ctx.keyword.conv_views_to_orders
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
         conv_views_to_orders=conv,
+        rk_orders_per_cart=rk,
     )
 
 
@@ -301,11 +309,15 @@ def _resolve_state_cost(
 
 def build_worst_per_state_costs(
     prepared: PreparedList,
+    *,
+    rk_orders_per_cart: float | None = None,
 ) -> dict[AggressionTargetMode, float]:
     """Worst (max) predicted CPA per M/O/C среди ключей с валидной матрицей."""
     worst: dict[AggressionTargetMode, float] = {}
     for ctx, _mode in prepared:
-        catalog = _catalog_for_ctx(ctx, prepared)
+        catalog = _catalog_for_ctx(
+            ctx, prepared, rk_orders_per_cart=rk_orders_per_cart
+        )
         if missing_target_matrix_from_catalog(catalog):
             continue
         if not _has_valid_target_place_data(catalog):
@@ -357,7 +369,7 @@ def collect_transition_candidates(
         )
         pfo = float(ctx.keyword.pay_for_order or 0.0)
 
-        for to_mode in upper_target_modes(current_mode):
+        for to_mode in iter_effective_upper_modes(current_mode, catalog):
             if not _target_allowed(
                 to_mode=to_mode,
                 max_target_mode=policy.max_target_mode,
@@ -483,7 +495,10 @@ def plan_shelf_rec_false_cleanup_down(
             continue
 
         if hard_status == _HARD_STATUS_WHITE_LIST:
-            nxt = step_down(mode)
+            catalog = _catalog_for_ctx(ctx, prepared)
+            step = resolve_next_effective_step_down(mode, catalog)
+            log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+            nxt = step.next_mode
             if nxt is None:
                 continue
             actions.append(

@@ -85,16 +85,25 @@ class LadderInputs:
     prepared: PreparedList
     worst_costs: dict[AggressionTargetMode, float]
     campaign_cache: CampaignV3DecisionCache
+    rk_orders_per_cart: float | None = None
 
     @classmethod
-    def from_contexts(cls, contexts: list[KeywordV3Context]) -> LadderInputs:
+    def from_contexts(
+        cls,
+        contexts: list[KeywordV3Context],
+        *,
+        rk_orders_per_cart: float | None = None,
+    ) -> LadderInputs:
         """Один проход: prepared + worst_costs + campaign_cache."""
         prepared = build_prepared_from_contexts(contexts)
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,
-            worst_costs=build_worst_per_state_costs(prepared),
+            worst_costs=build_worst_per_state_costs(
+                prepared, rk_orders_per_cart=rk_orders_per_cart
+            ),
             campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
+            rk_orders_per_cart=rk_orders_per_cart,
         )
 
 
@@ -120,14 +129,22 @@ def _catalog_for_ctx(
     ctx: KeywordV3Context,
     ladder_inputs: LadderInputs,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Каталог M/O/C с imputed conv (peers = все контексты РК)."""
-    conv = effective_conv_for_v3(ctx, ladder_inputs.all_contexts)
-    if conv is None:
-        conv = ctx.keyword.conv_views_to_orders
+    """Каталог M/O/C: CPO на точке CH × RK корзина→заказ (7 дней)."""
+    rk = ladder_inputs.rk_orders_per_cart
+    conv = None
+    if rk is None or rk <= 0:
+        conv = effective_conv_for_v3(
+            ctx,
+            ladder_inputs.all_contexts,
+            campaign_cache=ladder_inputs.campaign_cache,
+        )
+        if conv is None:
+            conv = ctx.keyword.conv_views_to_orders
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
         conv_views_to_orders=conv,
+        rk_orders_per_cart=rk,
     )
 
 

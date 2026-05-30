@@ -548,26 +548,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.spend = keyword.spend
 
         if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
-            try:
-                profile_data = await load_keyword_v3_profile_data(
-                    adv_setting, calculated_keyword
-                )
-                self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
-            except Exception as exc:
-                logger.exception(
-                    "Failed to load v3 keyword profile for keyword_setting_id=%s",
-                    self._keyword_original_id,
-                )
-                from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
-                    profile_load_failure,
-                )
-
-                self._v3_profile_block = format_keyword_v3_profile_block(
-                    profile_load_failure(
-                        calculated_keyword,
-                        reason=f"ошибка загрузки ({type(exc).__name__})",
-                    )
-                )
+            profile_data = await load_keyword_v3_profile_data(
+                adv_setting, calculated_keyword
+            )
+            self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
 
         return await super().__call__()
 

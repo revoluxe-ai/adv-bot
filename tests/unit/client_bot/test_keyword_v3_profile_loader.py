@@ -145,6 +145,11 @@ async def test_load_keyword_v3_profile_data_success() -> None:
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
         ) as worst_cache_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+            new_callable=AsyncMock,
+            return_value=2.0,
+        ),
     ):
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
             KeywordV3Context,
@@ -263,6 +268,11 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
         ) as worst_cache_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+            new_callable=AsyncMock,
+            return_value=2.0,
+        ),
     ):
         worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)
         container = MagicMock()

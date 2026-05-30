@@ -280,7 +280,15 @@ async def load_keyword_v3_profile_data(
     if not all_contexts:
         single = build_keyword_v3_contexts([calculated_keyword], raw_profiles)
         all_contexts = single if single else []
-    ladder_inputs = LadderInputs.from_contexts(all_contexts)
+    from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+        load_rk_orders_per_cart_7d,
+    )
+
+    rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv_setting)
+    ladder_inputs = LadderInputs.from_contexts(
+        all_contexts,
+        rk_orders_per_cart=rk_orders_per_cart,
+    )
     if not ladder_inputs.worst_costs:
         cached_worst = await V3WorstCostsRedisCache().get_worst_costs(
             adv_setting.adv_id
@@ -357,5 +365,6 @@ async def load_keyword_v3_profile_data(
         campaign_worst_only=campaign_worst_only,
         campaign_worst_costs=dict(ladder_inputs.worst_costs),
         stage_sources=stage_sources,
+        rk_orders_per_cart=rk_orders_per_cart,
         **fields,
     )

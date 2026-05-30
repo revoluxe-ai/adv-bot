@@ -4,7 +4,7 @@
 Корутина ``update_individual_keyword_target_places`` для V3 не используется (только V2).
 
 ``target_place`` берётся из ``ModeCandidate.position`` (лестница V3), а не из legacy-предиктора
-``get_target_position_for_strategy_mode`` (MIN по min корзине).
+``build_mode_candidates`` / ``resolve_v3_target_place`` (MIN по CPO заказа V2).
 """
 
 from __future__ import annotations
@@ -19,7 +19,11 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
+    moc_equality_flags,
     resolve_v3_target_place,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     NO_DATA_TARGET_PLACE_FALLBACK,
@@ -88,6 +92,20 @@ async def sync_keyword_target_places_v3(
     stmt = select(KeywordSetting).where(
         KeywordSetting.adv_setting_id == adv.adv_setting_original_id
     )
+    from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+        load_rk_orders_per_cart_7d,
+    )
+
+    rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv.complex_adv.adv_setting)
+
+    moc_stats: dict[str, int] = {
+        "with_ladder": 0,
+        "o_eq_c": 0,
+        "o_eq_m": 0,
+        "o_ne_c": 0,
+        "skipped_no_profile": 0,
+    }
+
     async with sm(read_only=False) as session:
         result: Result[tuple[KeywordSetting]] = await session.execute(stmt)
         keywords = result.scalars().all()
@@ -119,6 +137,7 @@ async def sync_keyword_target_places_v3(
                 calc_kw is None or keyword_v2_pay_for_order_unavailable(calc_kw)
             )
             if not profile or no_v2_cpo:
+                moc_stats["skipped_no_profile"] += 1
                 if (
                     strategy_mode == KeywordStrategyMode.OFF
                     and no_v2_cpo
@@ -141,8 +160,26 @@ async def sync_keyword_target_places_v3(
             candidates = build_mode_candidates(
                 profile=profile_points,
                 keyword_text=keyword.text,
-                conv_views_to_orders=calc_kw.conv_views_to_orders,
+                conv_views_to_orders=(
+                    calc_kw.conv_views_to_orders
+                    if rk_orders_per_cart is None
+                    else None
+                ),
+                rk_orders_per_cart=rk_orders_per_cart,
             )
+            o_eq_c, o_eq_m = moc_equality_flags(
+                candidates[AggressionTargetMode.MIN_CPA],
+                candidates[AggressionTargetMode.OPTIMUM],
+                candidates[AggressionTargetMode.MAX_CONVERSION],
+            )
+            moc_stats["with_ladder"] += 1
+            if o_eq_c:
+                moc_stats["o_eq_c"] += 1
+            else:
+                moc_stats["o_ne_c"] += 1
+            if o_eq_m:
+                moc_stats["o_eq_m"] += 1
+
             resolved = resolve_v3_target_place(strategy_mode, candidates)
             if resolved is None:
                 if strategy_mode == KeywordStrategyMode.OFF:
@@ -160,3 +197,17 @@ async def sync_keyword_target_places_v3(
             else:
                 keyword.target_place = resolved
         await session.commit()
+
+    n = moc_stats["with_ladder"]
+    if n > 0:
+        logger.info(
+            "v3 campaign MOC stats adv_id=%s with_ladder=%s o_eq_c=%s (%.1f%%) "
+            "o_ne_c=%s skipped_no_profile=%s rk=%s",
+            adv.adv_id,
+            n,
+            moc_stats["o_eq_c"],
+            100.0 * moc_stats["o_eq_c"] / n,
+            moc_stats["o_ne_c"],
+            moc_stats["skipped_no_profile"],
+            rk_orders_per_cart,
+        )

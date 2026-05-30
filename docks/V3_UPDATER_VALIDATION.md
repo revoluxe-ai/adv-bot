@@ -85,6 +85,12 @@ UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUA
 
 Тесты: `tests/unit/auto_updater_v3/test_keyword_v3_ladder_view.py`.
 
+**Выбор точек M/O/C в `candidates.build_mode_candidates`:**
+
+- **MIN_CPA** — min `predicted_cpa` (CPO заказа, conv ключа V2).
+- **MAX_CONVERSION** — max `predicted_conversion` (conv показ→корзина CH).
+- **OPTIMUM** — max `0.5*conv_n + 0.5*economy_n` по usable точкам (`v3_optimum_balance.py`); tie — меньший CPO, ставка, позиция. Не середина между позициями M и C, а компромисс на всей матрице.
+
 ## Unified pooled contract
 
 Для `UNDERPERFORM` в shelf и non-shelf используется один и тот же pooled-процесс:

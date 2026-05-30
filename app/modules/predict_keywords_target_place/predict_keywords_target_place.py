@@ -1,5 +1,4 @@
 import logging
-import math
 
 from app.modules.bids_for_positions_manager.dto import BidPositionRow
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -9,6 +8,12 @@ from ..bids_for_positions_manager.bids_for_positions_manager import (
 
 from ..common_slaves.wildberries.models.enums.strategy import Strategy
 from ...shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
+
+from app.modules.shop_runner.service_manager.services.v3_optimum_balance import (
+    order_cpo_from_bid,
+    select_min_cpa_row,
+    select_optimum_row_production,
+)
 
 from .clickhouse_manager import ClickHouseManager
 from .clickhouse_manager.dto import ConvCartToViewsOnPosition
@@ -157,35 +162,96 @@ class PredictKeywordsTargetPlace:
         self,
         positions: list[BidPosition],
         strategy_mode: KeywordStrategyMode,
+        *,
+        conv_views_to_orders: float | None = None,
+        rk_orders_per_cart: float | None = None,
     ) -> int | None:
-        """Per-keyword target position for V3 strategy ladder mode."""
+        """Per-keyword target position for V3 strategy ladder mode.
+
+        Args:
+            rk_orders_per_cart: заказов на корзину РК (7д); SSOT CPO с ``build_mode_candidates``.
+            conv_views_to_orders: legacy fallback, если RK ratio не задан.
+        """
         if not positions:
             logger.error("Пустой список позиций для прогноза целевой позиции")
             return None
 
-        if strategy_mode == KeywordStrategyMode.MIN_CPA:
-            best_position: BidPosition = min(positions, key=lambda p: p.pay_for_cart)
-            return max(1, best_position.position)
+        usable = [
+            p
+            for p in positions
+            if p.conv_carts_to_views is not None and float(p.conv_carts_to_views) >= 0
+        ]
+        if not usable:
+            return None
+
+        best_conv_position = max(usable, key=lambda p: float(p.conv_carts_to_views or 0.0))
 
         if strategy_mode == KeywordStrategyMode.MAX_CONVERSION:
-            best_position = max(positions, key=lambda p: p.conv_carts_to_views or 0.0)
+            return max(1, best_conv_position.position)
+
+        pfo_rows = self._order_cpo_rows(
+            usable,
+            conv_views_to_orders,
+            rk_orders_per_cart=rk_orders_per_cart,
+        )
+        if pfo_rows:
+            if strategy_mode == KeywordStrategyMode.MIN_CPA:
+                picked = select_min_cpa_row(pfo_rows)
+                if picked is not None:
+                    return max(1, int(picked[0].position))
+            if strategy_mode == KeywordStrategyMode.OPTIMUM:
+                picked = select_optimum_row_production(pfo_rows)
+                if picked is not None:
+                    return max(1, int(picked.row.position))
+
+        if strategy_mode == KeywordStrategyMode.MIN_CPA:
+            best_position = min(usable, key=lambda p: p.pay_for_cart)
             return max(1, best_position.position)
 
         if strategy_mode == KeywordStrategyMode.OPTIMUM:
-            best_position = max(positions, key=self._optimum_score)
-            return max(1, best_position.position)
+            logger.warning(
+                "OPTIMUM без conv_views_to_orders: fallback на pay_for_cart недоступен"
+            )
+            return None
 
         raise NotImplementedError(
             f"Неизвестная стратегия выбора целевой позиции для key-mode: {strategy_mode}"
         )
 
     @staticmethod
-    def _optimum_score(position: BidPosition) -> float:
-        conv = float(position.conv_carts_to_views or 0.0)
-        pay = position.pay_for_cart
-        if not math.isfinite(pay) or pay <= 0:
-            return -1.0
-        return conv / (1.0 + pay)
+    def _order_cpo_rows(
+        positions: list[BidPosition],
+        conv_views_to_orders: float | None,
+        *,
+        rk_orders_per_cart: float | None = None,
+    ) -> list[tuple[BidPosition, float, float]]:
+        """``(position, conv_cart, cpo_order)`` для MIN/OPTIMUM V3."""
+        use_rk = rk_orders_per_cart is not None and rk_orders_per_cart > 0
+        if not use_rk and (
+            conv_views_to_orders is None or conv_views_to_orders <= 0
+        ):
+            return []
+        rows: list[tuple[BidPosition, float, float]] = []
+        for pos in positions:
+            if use_rk:
+                from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+                    order_cpo_at_ch_point,
+                )
+
+                cpo = order_cpo_at_ch_point(
+                    bid=float(pos.bid),
+                    conv_carts_to_views=pos.conv_carts_to_views,
+                    rk_orders_per_cart=rk_orders_per_cart,
+                )
+            else:
+                cpo = order_cpo_from_bid(
+                    bid=float(pos.bid),
+                    conv_views_to_orders=float(conv_views_to_orders),  # type: ignore[arg-type]
+                )
+            if cpo is None:
+                continue
+            rows.append((pos, float(pos.conv_carts_to_views or 0.0), cpo))
+        return rows
 
     @staticmethod
     def _fill_positions_convs(

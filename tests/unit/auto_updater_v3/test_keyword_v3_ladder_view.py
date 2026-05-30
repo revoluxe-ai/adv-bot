@@ -97,8 +97,8 @@ def test_ui_cost_parity_with_cost_for_mode() -> None:
 
 
 @pytest.mark.unit
-def test_m_profile_o_worst_not_inf() -> None:
-    """M profile, O worst (не ``inf``) при invalid OPT в каталоге ключа."""
+def test_m_profile_o_profile_not_inf() -> None:
+    """M/O на одной точке профиля — PROFILE (не ``inf``), не worst."""
     from datetime import UTC, datetime
 
     from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
@@ -135,8 +135,8 @@ def test_m_profile_o_worst_not_inf() -> None:
     assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.PROFILE
     opt = view.stages[AggressionTargetMode.OPTIMUM]
     assert opt.cost is not None
-    assert opt.source == LadderCostSource.WORST
-    assert opt.cost_imputed
+    assert opt.source == LadderCostSource.PROFILE
+    assert not opt.cost_imputed
 
 
 @pytest.mark.unit

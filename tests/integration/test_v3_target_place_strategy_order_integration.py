@@ -43,13 +43,13 @@ pytestmark = pytest.mark.integration
 def _synthetic_ladder_profile(keyword: str, ts: datetime) -> list[BidPosition]:
     """Профиль, где MAX→pos1, OPT→pos2, MIN→pos3 (разные и упорядочены).
 
-    MIN_CPA (V3): min CPO заказа при conv=0.01 → pos 3; MAX — max conv на pos 1;
-    OPTIMUM — max conv/(1+pay) на pos 2.
+    MIN_CPA: min CPO → pos 3; MAX — max conv на pos 1;
+    OPTIMUM (production balance): компромисс → pos 2, не pos 1/3.
     """
     positions = [
         (1, 500, 0.40),
-        (2, 80, 0.25),
-        (3, 60, 0.22),
+        (2, 45, 0.36),
+        (3, 40, 0.20),
     ]
     out: list[BidPosition] = []
     for pos, bid, conv in positions:

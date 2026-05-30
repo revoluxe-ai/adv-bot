@@ -269,20 +269,23 @@ def test_get_target_position_for_strategy_mode_min_cpa() -> None:
 
 @pytest.mark.unit
 def test_get_target_position_for_strategy_mode_optimum() -> None:
+    """Production CPO-cap: дорогой top conv исключён → OPTIMUM на min-CPO позиции."""
     predictor = PredictKeywordsTargetPlace(AsyncMock(), AsyncMock())
     ts = datetime.now()
     positions = [
-        BidPosition("kw1", 1, 150, ts),
-        BidPosition("kw1", 2, 120, ts),
+        BidPosition("kw1", 1, 10_000, ts),
+        BidPosition("kw1", 2, 100, ts),
     ]
-    positions[0].conv_carts_to_views = 0.3
-    positions[1].conv_carts_to_views = 0.1
+    positions[0].conv_carts_to_views = 0.13
+    positions[1].conv_carts_to_views = 0.01
 
     result = predictor.get_target_position_for_strategy_mode(
-        positions, KeywordStrategyMode.OPTIMUM
+        positions,
+        KeywordStrategyMode.OPTIMUM,
+        rk_orders_per_cart=2.0,
     )
 
-    assert result == 1
+    assert result == 2
 
 
 @pytest.mark.unit
