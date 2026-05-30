@@ -35,6 +35,12 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _stats_freshness_guard_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Контрактные тесты не зависят от STATS_FRESHNESS_GUARD_ENABLED в локальном .env."""
+    monkeypatch.setenv("STATS_FRESHNESS_GUARD_ENABLED", "true")
+
+
 @pytest.fixture
 def client_session_mock():
     session = AsyncMock()

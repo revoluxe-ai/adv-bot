@@ -18,6 +18,12 @@ from app.modules.shop_runner.service_manager.services.stats_freshness_guard impo
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 
 
+@pytest.fixture(autouse=True)
+def _stats_freshness_guard_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Тесты guard не зависят от STATS_FRESHNESS_GUARD_ENABLED в локальном .env."""
+    monkeypatch.setenv("STATS_FRESHNESS_GUARD_ENABLED", "true")
+
+
 def _build_manager(fake_redis) -> CoroutinesManager:
     wb_api = MagicMock()
     wb_api.wb_cabinet = SimpleNamespace(shop_id="test_shop")
