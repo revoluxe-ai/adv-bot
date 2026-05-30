@@ -76,6 +76,27 @@ async def test_pool_timeout_uses_short_retry_budget(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_pool_timeout_attempts_independent_of_other_errors() -> None:
+    """Счётчик pool-timeout не делит лимит с 429/read timeout и др."""
+    adapter = _build_adapter()
+    call_count = 0
+
+    @retry_decorator(period=1, limit=100, max_attempts=50, max_delay=120)
+    async def flaky_method(self) -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count <= 2:
+            raise HttpTimeOutError("read timeout")
+        raise PoolTimeoutError(original_exc=None)
+
+    with pytest.raises(MaxAttemptsError, match="PoolTimeout"):
+        await flaky_method(adapter)
+
+    assert call_count == 2 + POOL_TIMEOUT_MAX_ATTEMPTS
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_http_timeout_still_uses_max_attempts() -> None:
     adapter = _build_adapter()
     call_count = 0

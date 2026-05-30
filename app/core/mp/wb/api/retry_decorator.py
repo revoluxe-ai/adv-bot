@@ -77,6 +77,7 @@ def retry_decorator(
                     "_last_query_time": None,
                     "_current_pause": min_pause,
                     "_attempts": 0,
+                    "_pool_timeout_attempts": 0,
                     "_lock": asyncio.Lock(),
                 }
 
@@ -107,6 +108,7 @@ def retry_decorator(
                         # усреднение разгоняло следующие запросы слишком близко друг к другу.
                         state["_current_pause"] = max(min_pause, blended_pause)
                         state["_attempts"] = 0
+                        state["_pool_timeout_attempts"] = 0
                         return result
 
                     except ApiForbiddenError as e:
@@ -145,18 +147,19 @@ def retry_decorator(
 
                     except PoolTimeoutError as e:
                         state["_last_query_time"] = time.time()
-                        state["_attempts"] += 1
+                        pool_attempts = state.get("_pool_timeout_attempts", 0) + 1
+                        state["_pool_timeout_attempts"] = pool_attempts
                         items_count = _extract_items_count(args, kwargs)
-                        if state["_attempts"] >= POOL_TIMEOUT_MAX_ATTEMPTS:
+                        if pool_attempts >= POOL_TIMEOUT_MAX_ATTEMPTS:
                             logger.error(
                                 "WB PoolTimeout retries exhausted: exc_type=PoolTimeout "
                                 "endpoint=%s section=%s shop_id=%s coroutine=%s "
-                                "attempts=%s items_count=%s",
+                                "pool_timeout_attempts=%s items_count=%s",
                                 method_name,
                                 section_name,
                                 shop_id,
                                 method_name,
-                                state["_attempts"],
+                                pool_attempts,
                                 items_count,
                             )
                             raise MaxAttemptsError(
@@ -171,7 +174,7 @@ def retry_decorator(
                             section_name,
                             shop_id,
                             method_name,
-                            state["_attempts"],
+                            pool_attempts,
                             POOL_TIMEOUT_MAX_ATTEMPTS,
                             items_count,
                         )
