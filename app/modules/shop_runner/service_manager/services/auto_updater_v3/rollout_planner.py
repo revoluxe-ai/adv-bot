@@ -352,6 +352,37 @@ def _trim_state_cost_for_mode(
     return max(float(cost), float(operational)), imputed
 
 
+def should_skip_trim_for_same_effective_target(
+    *,
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    trim_target: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    max_pay_for_order: float,
+    ladder_inputs: "LadderInputs",
+) -> bool:
+    """Совпадает ли trim-skip «тот же target_place», что в ``plan_campaign_trim_by_max_state_cost``.
+
+    True только если режимы ведут в одну точку каталога **и** операционный CPO на
+    ``keyword.target_place`` отсутствует или ``<= max_pay_for_order``. При CPO выше max
+    live guard **не** пропускает trim (режим меняется, ставка может остаться на месте).
+    """
+    if trim_target == current:
+        return False
+    current_c = candidate_for_strategy_mode(current, catalog)
+    target_c = candidate_for_strategy_mode(trim_target, catalog)
+    if not mode_candidates_same_effective_target(current_c, target_c):
+        return False
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
+    )
+
+    operational = operational_cpo_at_keyword_target_place(
+        ctx, ladder_inputs=ladder_inputs
+    )
+    return operational is None or float(operational) <= float(max_pay_for_order)
+
+
 def _fallback_min_instead_of_off_trim(
     ctx: "KeywordV3Context",
     current: KeywordStrategyMode,
@@ -542,29 +573,21 @@ def plan_campaign_trim_by_max_state_cost(
         skip_reasons: list[str] = []
         if target == current:
             skip_reasons.append("trim_target_eq_current")
-        current_c = candidate_for_strategy_mode(current, catalog)
-        target_c = candidate_for_strategy_mode(target, catalog)
-        if target != current and mode_candidates_same_effective_target(
-            current_c, target_c
+        if should_skip_trim_for_same_effective_target(
+            ctx=ctx,
+            current=current,
+            trim_target=target,
+            catalog=catalog,
+            max_pay_for_order=float(max_pay_for_order),
+            ladder_inputs=ladder,
         ):
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-                operational_cpo_at_keyword_target_place,
+            skip_reasons.append("same_target_place")
+            logger.debug(
+                "v3 skip trim kw=%s: %s and %s same target_place",
+                ctx.keyword.text,
+                current.name,
+                target.name,
             )
-
-            operational = operational_cpo_at_keyword_target_place(
-                ctx, ladder_inputs=ladder
-            )
-            if (
-                operational is None
-                or float(operational) <= float(max_pay_for_order)
-            ):
-                skip_reasons.append("same_target_place")
-                logger.debug(
-                    "v3 skip trim kw=%s: %s and %s same target_place",
-                    ctx.keyword.text,
-                    current.name,
-                    target.name,
-                )
         if not skip_reasons and target != current:
             _append_trim_to_mode(
                 actions,
@@ -1176,10 +1199,15 @@ def diagnose_max_cpa_guard_keyword(
                 else:
                     skip_reasons.append("trim_target_equals_current")
             else:
-                current_c = candidate_for_strategy_mode(current, catalog)
-                target_c = candidate_for_strategy_mode(trim_target, catalog)
-                if mode_candidates_same_effective_target(current_c, target_c):
-                    skip_reasons.append("same_effective_target")
+                if should_skip_trim_for_same_effective_target(
+                    ctx=ctx,
+                    current=current,
+                    trim_target=trim_target,
+                    catalog=catalog,
+                    max_pay_for_order=float(max_pay_for_order),
+                    ladder_inputs=ladder_inputs,
+                ):
+                    skip_reasons.append("same_target_place")
                 elif (
                     trim_target == KeywordStrategyMode.OFF
                     and mode_costs.get("MIN_CPA") is not None
