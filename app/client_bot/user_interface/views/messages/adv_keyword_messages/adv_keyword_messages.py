@@ -196,10 +196,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         self._mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
 
-        from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-            normalize_automatic_version_ui,
-        )
-
         result = await super().__call__()
         return result
 
