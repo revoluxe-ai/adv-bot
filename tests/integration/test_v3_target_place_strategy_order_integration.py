@@ -36,6 +36,7 @@ from tests.integration.test_predict_keywords_target_place_integration import (
     _ensure_predict_tables,
     _make_adv_mock,
 )
+from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
 
 pytestmark = pytest.mark.integration
 
@@ -163,6 +164,17 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
 
+    # Минимальный adv без nmids: RK ratio мокаем (как unit conftest), без CH wb_common_stat.
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+        AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+    )
+
+    expected = target_places_for_v3_modes(
+        base_profile,
+        rk_orders_per_cart=RK_ORDERS_PER_CART_TEST,
+    )
+
     await sync_keyword_target_places_v3(
         adv=adv,
         bid_profiles=profiles,
@@ -198,8 +210,11 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
         },
     )
 
-    # OFF: свежая позиция из профиля (как MIN_CPA), не сохранённое 99
-    assert off_kw.target_place == 3
+    # OFF: прокси MIN_CPA из профиля (RK CPO), не сохранённое 99
+    assert off_kw.target_place == expected[KeywordStrategyMode.MIN_CPA]
+    assert min_kw.target_place == expected[KeywordStrategyMode.MIN_CPA]
+    assert opt_kw.target_place == expected[KeywordStrategyMode.OPTIMUM]
+    assert max_kw.target_place == expected[KeywordStrategyMode.MAX_CONVERSION]
     assert_ladder_positions_distinct_and_ordered(
         min_kw.target_place,
         opt_kw.target_place,

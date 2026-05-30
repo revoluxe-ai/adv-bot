@@ -18,13 +18,17 @@ def target_places_for_v3_modes(
     profile: list[BidPosition],
     *,
     conv_views_to_orders: float = 0.01,
+    rk_orders_per_cart: float | None = None,
 ) -> dict[KeywordStrategyMode, int | None]:
     """Целевые позиции M/O/C на одном профиле (``build_mode_candidates``, balance OPT)."""
     points = profile_points_from_bid_positions(profile)
     candidates = build_mode_candidates(
         profile=points,
         keyword_text="",
-        conv_views_to_orders=conv_views_to_orders,
+        conv_views_to_orders=(
+            conv_views_to_orders if rk_orders_per_cart is None else None
+        ),
+        rk_orders_per_cart=rk_orders_per_cart,
     )
     return {
         mode: target_place_for_v3_strategy_mode(mode, candidates)
