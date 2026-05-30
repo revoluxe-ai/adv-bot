@@ -37,22 +37,76 @@ def _get_shop_id_for_log(args: tuple[Any, ...]) -> str:
     return f"missing_shop_id(type={type(obj).__name__})"
 
 
+def _get_tick_context_for_log(
+    args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> dict[str, str]:
+    """Контекст для логов tick: shop_id, cabinet_id, adv_id (если доступны)."""
+    context: dict[str, str] = {"shop_id": _get_shop_id_for_log(args)}
+    if not args:
+        return context
+    obj = args[0]
+    wb_api = getattr(obj, "_wb_api", None)
+    wb_cabinet = getattr(wb_api, "wb_cabinet", None) if wb_api is not None else None
+    if wb_cabinet is not None:
+        cabinet_id = getattr(wb_cabinet, "id", None)
+        if cabinet_id not in (None, ""):
+            context["cabinet_id"] = str(cabinet_id)
+    for key in ("adv_id", "cabinet_id", "shop_id"):
+        value = kwargs.get(key)
+        if value not in (None, ""):
+            context[key] = str(value)
+    return context
+
+
 def while_coroutine_decorator(
-    pause_on_success: int, pause_on_error: int = 5
+    pause_on_success: int,
+    pause_on_error: int = 5,
+    *,
+    timeout_sec: int | None = None,
 ) -> Callable[
     [Callable[F_Spec, Awaitable[T_Result]]],
     Callable[F_Spec, Coroutine[Any, Any, T_Result]],
 ]:
+    """Бесконечный цикл вызова ``func`` с паузами.
+
+    ``timeout_sec``: если задан, один проход ``func`` ограничивается ``asyncio.wait_for``.
+    На ``TimeoutError`` tick прерывается, пишется ERROR и цикл продолжается после ``pause_on_error``.
+    """
+
     def decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
     ) -> Callable[F_Spec, Coroutine[Any, Any, T_Result]]:
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
+            loop = asyncio.get_running_loop()
             while True:
+                tick_started_at = loop.time()
                 try:
-                    await func(*args, **kwargs)
+                    if timeout_sec is None:
+                        await func(*args, **kwargs)
+                    else:
+                        await asyncio.wait_for(
+                            func(*args, **kwargs),
+                            timeout=timeout_sec,
+                        )
                     await asyncio.sleep(pause_on_success)
                     continue
+                except asyncio.TimeoutError:
+                    elapsed = loop.time() - tick_started_at
+                    ctx = _get_tick_context_for_log(args, kwargs)
+                    logger.error(
+                        "Таймаут tick корутины "
+                        "(coroutine=%s, timeout_sec=%s, elapsed=%.3f, shop_id=%s, "
+                        "cabinet_id=%s, adv_id=%s)",
+                        func.__name__,
+                        timeout_sec,
+                        elapsed,
+                        ctx.get("shop_id", "—"),
+                        ctx.get("cabinet_id", "—"),
+                        ctx.get("adv_id", "—"),
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(pause_on_error)
                 except InterfaceError:
                     logger.exception(f"Корутина: {func.__name__}")
                     await asyncio.sleep(pause_on_error)

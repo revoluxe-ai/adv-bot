@@ -13,7 +13,7 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import (
 from app.shared.domains.wb.utils.additional_cost_per_order import (
     compute_additional_cost_per_order,
 )
-from app.utils.ch_semaphore import anti_ch_crash_semaphore
+from app.utils.ch_semaphore import anti_ch_crash_semaphore, run_ch_with_timeout
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -310,17 +310,15 @@ def _get_insert_query() -> str:
 async def insert(stats: Iterable[FullAdvStat]) -> None:
     if not stats:
         return
-    async with anti_ch_crash_semaphore:
+
+    async def _insert_stats() -> None:
         async with get_clickhouse_client() as client:
-            # Получаем запрос для вставки
             query = _get_insert_query()
             version = str(time.time())
-            # Подготовим параметры для вставки
             values = []
             for stat in stats:
-                adv_id = stat.advertId  # ID рекламного объявления
+                adv_id = stat.advertId
                 for day in stat.days:
-                    # Вставляем данные каждого дня как параметры
                     values.append(
                         [
                             adv_id,
@@ -331,13 +329,15 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
                             day.atbs,
                             day.orders,
                             day.sum_price,
-                            version,  # Здесь можно использовать значение для версии
+                            version,
                         ]
                     )
 
             for row in values:
                 query_result = await client.query(query, parameters=row)
                 logger.debug(query_result)
+
+    await run_ch_with_timeout(_insert_stats())
 
 
 async def get_keywords_spend(

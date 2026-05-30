@@ -343,7 +343,7 @@ class CoroutinesManager:
         keywords = await complex_adv.get_keywords()
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(60 * 5)
+    @while_coroutine_decorator(60 * 5, timeout_sec=900)
     async def update_common_sale_stat(self) -> None:
         # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N РК)
         advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
@@ -364,6 +364,11 @@ class CoroutinesManager:
         for nmid in updated_nmids:
             for adv_id in nmid_to_adv_ids.get(nmid, set()):
                 await self._redis_common_stat_timestamp_manager.set(adv_id)
+        logger.info(
+            "heartbeat update_common_sale_stat shop_id=%s updated_nmids=%s",
+            self.shop_id,
+            len(updated_nmids),
+        )
         return None
 
     @staticmethod
@@ -374,7 +379,7 @@ class CoroutinesManager:
             await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
 
-    @while_coroutine_decorator(5 * 60, 1)
+    @while_coroutine_decorator(5 * 60, 1, timeout_sec=900)
     async def update_full_adv_stat(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
@@ -391,6 +396,12 @@ class CoroutinesManager:
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
+        logger.info(
+            "heartbeat update_full_adv_stat shop_id=%s adv_count=%s stats_rows=%s",
+            self.shop_id,
+            len(all_adv_ids),
+            len(full_stats),
+        )
         return None
 
     @staticmethod
@@ -688,7 +699,7 @@ class CoroutinesManager:
                 )
         return None
 
-    @while_coroutine_decorator(60, 60)
+    @while_coroutine_decorator(60, 60, timeout_sec=900)
     async def auto_budget_watchdog(self) -> None:
         """Сначала автопополнение бюджетов (если есть кандидаты), затем запуск/пауза РК.
 
@@ -796,6 +807,12 @@ class CoroutinesManager:
             return None
         finally:
             await self._run_auto_adv_active_control(advs)
+            logger.info(
+                "heartbeat auto_budget_watchdog shop_id=%s advs=%s",
+                self.shop_id,
+                len(advs),
+            )
+        return None
 
     async def _run_auto_adv_active_control(self, advs: list[ComplexAdv]) -> None:
         wb_manager_hub = self._wb_manager_hub
@@ -849,7 +866,7 @@ class CoroutinesManager:
                 force_after_start_rejection=force,
             )
 
-    @while_coroutine_decorator(5 * 60, 60)
+    @while_coroutine_decorator(5 * 60, 60, timeout_sec=900)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
         wb_manager_hub = self._wb_manager_hub
@@ -861,6 +878,11 @@ class CoroutinesManager:
         updated_original_adv_ids = await updater.update_today_stats(complex_advs)
         for adv_orig_id in updated_original_adv_ids:
             await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
+        logger.info(
+            "heartbeat update_clusters_adv_stats_today shop_id=%s updated=%s",
+            self.shop_id,
+            len(updated_original_adv_ids),
+        )
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
@@ -874,7 +896,7 @@ class CoroutinesManager:
         )
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
-    @while_coroutine_decorator(60 * 5, 60)
+    @while_coroutine_decorator(60 * 5, 60, timeout_sec=900)
     async def update_cluster_bids(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
@@ -900,6 +922,11 @@ class CoroutinesManager:
         if not advs_filtred:
             return None
         await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
+        logger.info(
+            "heartbeat update_cluster_bids shop_id=%s advs=%s",
+            self.shop_id,
+            len(advs_filtred),
+        )
         return None
 
     @while_coroutine_decorator(60 * 5, 60)

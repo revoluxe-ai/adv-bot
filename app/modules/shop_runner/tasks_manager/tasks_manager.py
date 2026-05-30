@@ -7,6 +7,9 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Опциональный таймаут handler в worker; None — прежнее поведение без ограничения.
+DEFAULT_TASK_HANDLER_TIMEOUT_SECONDS: float | None = None
+
 
 @dataclass
 class _TaskEntry:
@@ -14,11 +17,21 @@ class _TaskEntry:
     future: asyncio.Future[Any]
 
 
+def _handler_label(handler: Callable[[], Awaitable[Any]]) -> str:
+    return getattr(handler, "__name__", repr(handler))
+
+
 class TasksManager:
-    def __init__(self, max_workers: int):
+    def __init__(
+        self,
+        max_workers: int,
+        *,
+        handler_timeout_sec: float | None = DEFAULT_TASK_HANDLER_TIMEOUT_SECONDS,
+    ):
         self._queue: asyncio.Queue[_TaskEntry] = asyncio.Queue()
         self._max_workers = max_workers
         self._workers: list[asyncio.Task[None]] = []
+        self._handler_timeout_sec = handler_timeout_sec
 
     def start(self) -> None:
         self._start_workers()
@@ -61,6 +74,11 @@ class TasksManager:
             _ = await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers = []
 
+    async def _run_handler(self, handler: Callable[[], Awaitable[Any]]) -> Any:
+        if self._handler_timeout_sec is None:
+            return await handler()
+        return await asyncio.wait_for(handler(), timeout=self._handler_timeout_sec)
+
     async def _worker(self) -> None:
         while True:
             try:
@@ -68,11 +86,30 @@ class TasksManager:
             except asyncio.CancelledError:
                 break
 
+            handler_name = _handler_label(entry.handler)
+            loop = asyncio.get_running_loop()
+            started_at = loop.time()
             try:
-                result = await entry.handler()
+                result = await self._run_handler(entry.handler)
             except asyncio.CancelledError:
                 _ = entry.future.cancel()
                 raise
+            except asyncio.TimeoutError:
+                elapsed = loop.time() - started_at
+                timeout_exc = asyncio.TimeoutError(
+                    f"TasksManager handler timed out after {self._handler_timeout_sec}s: "
+                    f"{handler_name}"
+                )
+                if not entry.future.done():
+                    entry.future.set_exception(timeout_exc)
+                logger.error(
+                    "Таймаут задачи TasksManager "
+                    "(handler=%s, timeout_sec=%s, elapsed=%.3f)",
+                    handler_name,
+                    self._handler_timeout_sec,
+                    elapsed,
+                    exc_info=True,
+                )
             except Exception as exc:
                 if not entry.future.done():
                     entry.future.set_exception(exc)

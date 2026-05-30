@@ -10,6 +10,8 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 
 logger = logging.getLogger(__name__)
 
+SINGLE_RUN_WAIT_TIMEOUT_SECONDS = 900
+
 
 def _to_hashable(val: Any) -> Any:
     """Convert a value to a hashable form for cache key; dicts become sorted tuples."""
@@ -51,7 +53,20 @@ def single_run() -> (
             if key in events:
                 self._single_run_call_counter[key] += 1
                 try:
-                    await events[key].wait()
+                    try:
+                        await asyncio.wait_for(
+                            events[key].wait(),
+                            timeout=SINGLE_RUN_WAIT_TIMEOUT_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "single_run wait timed out (function=%s, key=%s, timeout_sec=%s)",
+                            func.__name__,
+                            key,
+                            SINGLE_RUN_WAIT_TIMEOUT_SECONDS,
+                            exc_info=True,
+                        )
+                        raise
                     value = results.get(key)
                     if value is None:
                         raise KeyError(key)
