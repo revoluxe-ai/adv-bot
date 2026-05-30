@@ -47,7 +47,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     effective_conv_for_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
-    state_passes_rec_gate_for_mode,
+    rec_gate_allows_up,
+    state_rec_gate_status_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
@@ -670,13 +671,14 @@ def _highest_passing_mode_in_upper_groups(
             capped = (
                 clamp_target_mode(elig, to_mode) if elig is not None else to_mode
             )
-            if not state_passes_rec_gate_for_mode(
+            gate_status = state_rec_gate_status_for_mode(
                 state_candidates,
                 capped,
                 policy,
                 rec_orders_per_view=rec,
                 rk_orders_per_cart=rk,
-            ):
+            )
+            if not rec_gate_allows_up(gate_status):
                 continue
             if elig is not None and not can_target_mode(elig, capped):
                 continue
@@ -1183,13 +1185,14 @@ def _collect_potential_expensive(
         to_mode = step.next_mode
         if mode_level(to_mode) > mode_level(policy.max_target_mode):
             continue
-        if not state_passes_rec_gate_for_mode(
+        gate_status = state_rec_gate_status_for_mode(
             catalog,
             to_mode,
             policy,
             rec_orders_per_view=ladder.rec_orders_per_view,
             rk_orders_per_cart=ladder.rk_orders_per_cart,
-        ):
+        )
+        if not rec_gate_allows_up(gate_status):
             continue
         cost, imputed = _resolve_state_cost_for_mode(
             ctx=ctx,

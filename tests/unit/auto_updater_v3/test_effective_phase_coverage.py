@@ -11,6 +11,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+    ModeCandidate,
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
@@ -241,6 +243,16 @@ def test_guard_max_to_min_skips_opt_alias() -> None:
 def test_shelf_cleanup_down_skips_opt_alias(monkeypatch: pytest.MonkeyPatch) -> None:
     """transition_ranking DOWN: MAX→MIN, не MAX→OPT (alias)."""
     cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
+    rec = 0.01
+    cat[AggressionTargetMode.MIN_CPA] = cat[AggressionTargetMode.MIN_CPA].model_copy(
+        update={"predicted_orders_per_view": rec + 0.001}
+    )
+    cat[AggressionTargetMode.OPTIMUM] = cat[AggressionTargetMode.OPTIMUM].model_copy(
+        update={"predicted_orders_per_view": rec - 0.001}
+    )
+    cat[AggressionTargetMode.MAX_CONVERSION] = cat[
+        AggressionTargetMode.MAX_CONVERSION
+    ].model_copy(update={"predicted_orders_per_view": rec - 0.002})
     _patch_catalog(monkeypatch, cat)
     kw = _calc_kw(
         ks_id=50,

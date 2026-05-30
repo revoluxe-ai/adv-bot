@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 
@@ -27,18 +28,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
-from unittest.mock import patch
-
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+    REC_GATE_MARK_FAIL,
     REC_GATE_MARK_PASS,
-    REC_GATE_MARK_UNKNOWN_BASELINE,
-    passes_rec_gate_for_target_state,
+    REC_GATE_MARK_UNKNOWN,
+    RecGateStatus,
+    rec_gate_allows_up,
+    rec_gate_triggers_cleanup,
     resolve_rec_gate_mark,
-    state_passes_rec_gate_for_mode,
+    resolve_rec_gate_status_for_target_state,
+    state_rec_gate_status_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
     build_prepared_from_contexts,
+    collect_transition_candidates,
     plan_shelf_rec_false_cleanup_down,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
@@ -69,15 +73,18 @@ def _mc(*, conv_cart: float, opv: float | None = None) -> ModeCandidate:
 
 
 @pytest.mark.unit
-def test_gate_pass_when_rec_none() -> None:
+def test_gate_inactive_when_rec_none() -> None:
     mc = _mc(conv_cart=0.01)
-    assert passes_rec_gate_for_target_state(
+    status = resolve_rec_gate_status_for_target_state(
         mc,
         target_mode=KeywordStrategyMode.MIN_CPA,
         policy=_policy_shelf(),
         rec_orders_per_view=None,
         rk_orders_per_cart=RK,
     )
+    assert status == RecGateStatus.INACTIVE
+    assert rec_gate_allows_up(status)
+    assert not rec_gate_triggers_cleanup(status)
     assert (
         resolve_rec_gate_mark(
             mc,
@@ -85,42 +92,82 @@ def test_gate_pass_when_rec_none() -> None:
             rec_orders_per_view=None,
             rk_orders_per_cart=RK,
         )
-        == REC_GATE_MARK_UNKNOWN_BASELINE
+        == REC_GATE_MARK_FAIL
     )
 
 
 @pytest.mark.unit
-def test_gate_fail_when_rk_missing_but_baseline_known() -> None:
+def test_gate_unknown_when_rk_missing_allows_up_mark_n() -> None:
     mc = _mc(conv_cart=0.02, opv=None)
     mc = mc.model_copy(update={"predicted_orders_per_view": None})
-    assert not passes_rec_gate_for_target_state(
+    pol = _policy_shelf()
+    status = resolve_rec_gate_status_for_target_state(
         mc,
         target_mode=KeywordStrategyMode.MIN_CPA,
-        policy=_policy_shelf(),
+        policy=pol,
         rec_orders_per_view=REC,
         rk_orders_per_cart=None,
     )
+    assert status == RecGateStatus.UNKNOWN
+    assert rec_gate_allows_up(status)
+    assert not rec_gate_triggers_cleanup(status)
+    assert (
+        resolve_rec_gate_mark(
+            mc,
+            policy=pol,
+            rec_orders_per_view=REC,
+            rk_orders_per_cart=None,
+        )
+        == REC_GATE_MARK_UNKNOWN
+    )
 
 
 @pytest.mark.unit
-def test_gate_strictly_greater_than_baseline() -> None:
+def test_gate_unknown_when_state_opv_missing_allows_up_no_cleanup() -> None:
+    mc = ModeCandidate(
+        mode=AggressionTargetMode.OPTIMUM,
+        predicted_conversion=None,
+        predicted_orders_per_view=None,
+        is_valid=False,
+    )
+    pol = _policy_shelf()
+    status = resolve_rec_gate_status_for_target_state(
+        mc,
+        target_mode=KeywordStrategyMode.OPTIMUM,
+        policy=pol,
+        rec_orders_per_view=REC,
+        rk_orders_per_cart=RK,
+    )
+    assert status == RecGateStatus.UNKNOWN
+    assert rec_gate_allows_up(status)
+    assert not rec_gate_triggers_cleanup(status)
+
+
+@pytest.mark.unit
+def test_gate_pass_and_fail_strictly_greater_than_baseline() -> None:
     above = _mc(conv_cart=0.03, opv=REC + 0.001)
     below = _mc(conv_cart=0.01, opv=REC - 0.001)
     pol = _policy_shelf()
-    assert passes_rec_gate_for_target_state(
+    pass_status = resolve_rec_gate_status_for_target_state(
         above,
         target_mode=KeywordStrategyMode.MIN_CPA,
         policy=pol,
         rec_orders_per_view=REC,
         rk_orders_per_cart=RK,
     )
-    assert not passes_rec_gate_for_target_state(
+    fail_status = resolve_rec_gate_status_for_target_state(
         below,
         target_mode=KeywordStrategyMode.MIN_CPA,
         policy=pol,
         rec_orders_per_view=REC,
         rk_orders_per_cart=RK,
     )
+    assert pass_status == RecGateStatus.PASS
+    assert rec_gate_allows_up(pass_status)
+    assert not rec_gate_triggers_cleanup(pass_status)
+    assert fail_status == RecGateStatus.FAIL
+    assert not rec_gate_allows_up(fail_status)
+    assert rec_gate_triggers_cleanup(fail_status)
     assert (
         resolve_rec_gate_mark(
             above,
@@ -130,10 +177,172 @@ def test_gate_strictly_greater_than_baseline() -> None:
         )
         == REC_GATE_MARK_PASS
     )
+    assert (
+        resolve_rec_gate_mark(
+            below,
+            policy=pol,
+            rec_orders_per_view=REC,
+            rk_orders_per_cart=RK,
+        )
+        == REC_GATE_MARK_FAIL
+    )
 
 
 @pytest.mark.unit
-def test_expansion_off_to_min_when_above_rec_false_but_m_state_passes() -> None:
+def test_up_allowed_on_unknown_rk_via_collect_transition_candidates() -> None:
+    prof = [
+        PositionProfilePoint(
+            position=49, bid=510.0, predicted_conversion=0.02, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    kw = _calc_kw(
+        ks_id=10,
+        text="kw",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        hard_status=2,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    ladder = LadderInputs.from_contexts(
+        [ctx],
+        rk_orders_per_cart=None,
+        rec_orders_per_view=REC,
+    )
+    candidates = collect_transition_candidates(
+        prepared,
+        policy=_policy_shelf(),
+        ladder_inputs=ladder,
+    )
+    assert any(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
+
+
+@pytest.mark.unit
+def test_cleanup_skipped_on_unknown_current_state() -> None:
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=100.0, predicted_conversion=0.04, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    kw = _calc_kw(
+        ks_id=1,
+        text="kw",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        above_rec=False,
+        hard_status=2,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    ladder = LadderInputs.from_contexts(
+        [ctx],
+        rk_orders_per_cart=None,
+        rec_orders_per_view=REC,
+    )
+    assert (
+        plan_shelf_rec_false_cleanup_down(
+            prepared,
+            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+            ladder_inputs=ladder,
+            policy=_policy_shelf(),
+        )
+        == []
+    )
+
+
+@pytest.mark.unit
+def test_cleanup_down_on_fail_current_pass_min() -> None:
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=5340.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
+        ),
+        PositionProfilePoint(
+            position=49, bid=510.0, predicted_conversion=0.02, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    kw = _calc_kw(
+        ks_id=2,
+        text="kw",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        above_rec=False,
+        hard_status=1,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK, rec_orders_per_view=0.004)
+
+    def _status(
+        _cats: dict,
+        to_mode: KeywordStrategyMode,
+        _policy: SelectionPolicy,
+        *,
+        rec_orders_per_view: float | None,
+        rk_orders_per_cart: float | None,
+    ) -> RecGateStatus:
+        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        if to_mode == KeywordStrategyMode.MIN_CPA:
+            return RecGateStatus.PASS
+        if to_mode == KeywordStrategyMode.OPTIMUM:
+            return RecGateStatus.FAIL
+        return RecGateStatus.PASS
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate.state_rec_gate_status_for_mode",
+        side_effect=_status,
+    ):
+        actions = plan_shelf_rec_false_cleanup_down(
+            prepared,
+            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+            ladder_inputs=ladder,
+            policy=_policy_shelf(),
+        )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_mass_cleanup_impossible_when_all_unknown() -> None:
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=100.0, predicted_conversion=0.04, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    prepared = [
+        (
+            KeywordV3Context(
+                keyword=_calc_kw(
+                    ks_id=i,
+                    text=f"kw{i}",
+                    mode=KeywordStrategyMode.OPTIMUM,
+                    rating=1.0,
+                    hard_status=2,
+                ),
+                position_profile=prof,
+            ),
+            KeywordStrategyMode.OPTIMUM,
+        )
+        for i in (1, 2, 3)
+    ]
+    ladder = LadderInputs.from_contexts(
+        [c for c, _ in prepared],
+        rk_orders_per_cart=None,
+        rec_orders_per_view=REC,
+    )
+    assert (
+        plan_shelf_rec_false_cleanup_down(
+            prepared,
+            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+            ladder_inputs=ladder,
+            policy=_policy_shelf(),
+        )
+        == []
+    )
+
+
+@pytest.mark.unit
+def test_expansion_off_to_min_when_m_state_passes() -> None:
     prof = [
         PositionProfilePoint(
             position=49, bid=510.0, predicted_conversion=0.02, pay_for_cart=1.0, timestamp=TS
@@ -226,60 +435,7 @@ def test_cleanup_no_action_when_rec_none() -> None:
 
 
 @pytest.mark.unit
-def test_cleanup_down_to_min_not_force_off_when_min_passes() -> None:
-    """OPT не проходит gate, MIN проходит → DOWN до MIN (не FORCE_OFF на авто)."""
-    prof = [
-        PositionProfilePoint(
-            position=1, bid=5340.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
-        ),
-        PositionProfilePoint(
-            position=49, bid=510.0, predicted_conversion=0.02, pay_for_cart=1.0, timestamp=TS
-        ),
-    ]
-    kw = _calc_kw(
-        ks_id=2,
-        text="kw",
-        mode=KeywordStrategyMode.OPTIMUM,
-        rating=1.0,
-        above_rec=False,
-        hard_status=1,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
-    prepared = build_prepared_from_contexts([ctx])
-    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK, rec_orders_per_view=0.004)
-
-    def _gate(
-        _cats: dict,
-        to_mode: KeywordStrategyMode,
-        _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
-    ) -> bool:
-        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
-        if to_mode == KeywordStrategyMode.MIN_CPA:
-            return True
-        if to_mode == KeywordStrategyMode.OPTIMUM:
-            return False
-        return True
-
-    with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate.state_passes_rec_gate_for_mode",
-        side_effect=_gate,
-    ):
-        actions = plan_shelf_rec_false_cleanup_down(
-            prepared,
-            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
-            ladder_inputs=ladder,
-            policy=_policy_shelf(),
-        )
-    assert len(actions) == 1
-    assert actions[0].action == V3ActionType.DOWN
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
-
-
-@pytest.mark.unit
-def test_state_passes_for_mode_from_candidates_dict() -> None:
+def test_state_status_for_mode_from_candidates_dict() -> None:
     cats = build_mode_candidates(
         profile=[
             PositionProfilePoint(
@@ -293,10 +449,12 @@ def test_state_passes_for_mode_from_candidates_dict() -> None:
         keyword_text="kw",
         rk_orders_per_cart=RK,
     )
-    assert state_passes_rec_gate_for_mode(
+    status = state_rec_gate_status_for_mode(
         cats,
         KeywordStrategyMode.MIN_CPA,
         _policy_shelf(),
         rec_orders_per_view=0.004,
         rk_orders_per_cart=RK,
     )
+    assert status == RecGateStatus.PASS
+    assert rec_gate_allows_up(status)

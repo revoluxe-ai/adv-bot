@@ -277,8 +277,8 @@ def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
     """Активно ли полочное правило по ``above_rec`` (shelf >= organic или нет traffic DTO).
 
     Единый триггер для:
-    - rec-gate на UP (``passes_rec_gate_for_up``): на полке при ``above_rec=False`` только MIN;
-    - cleanup (``plan_shelf_rec_false_cleanup_down``): массовый сброс активных с ``above_rec=False``.
+    - rec-gate на UP: state-level ``rec_gate_allows_up`` (PASS/UNKNOWN/INACTIVE);
+    - cleanup (``plan_shelf_rec_false_cleanup_down``): только state с ``FAIL``.
 
     Args:
         click_mode: Режим organic/shelf из ``resolve_shelf_click_mode`` (полочная фаза).
@@ -420,16 +420,18 @@ def collect_transition_candidates(
             if mc is None:
                 continue
             from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
-                state_passes_rec_gate_for_mode,
+                rec_gate_allows_up,
+                state_rec_gate_status_for_mode,
             )
 
-            if not state_passes_rec_gate_for_mode(
+            gate_status = state_rec_gate_status_for_mode(
                 catalog,
                 to_mode,
                 policy,
                 rec_orders_per_view=ladder.rec_orders_per_view,
                 rk_orders_per_cart=ladder.rk_orders_per_cart,
-            ):
+            )
+            if not rec_gate_allows_up(gate_status):
                 continue
             if not _target_allowed(
                 to_mode=to_mode,
@@ -527,13 +529,13 @@ def plan_shelf_rec_false_cleanup_down(
     ladder_inputs: "LadderInputs | None" = None,
     policy: SelectionPolicy | None = None,
 ) -> list[V3Action]:
-    """Полка: cleanup активных ключей, у которых **текущий** state не проходит state rec_gate.
+    """Полка: cleanup активных ключей, у которых **текущий** state = ``RecGateStatus.FAIL``.
 
-    - baseline ``rec_orders_per_view is None`` (mark **Н**) — ключ не трогаем;
-    - текущий state проходит gate — не трогаем;
-    - O/C не проходят, MIN проходит — effective DOWN до MIN (не FORCE_OFF);
+    - ``rec_orders_per_view is None`` — gate неактивен, cleanup не выполняется;
+    - текущий state PASS / UNKNOWN / INACTIVE — не трогаем;
+    - текущий state FAIL, MIN PASS/UNKNOWN — effective DOWN до MIN (не FORCE_OFF);
     - ``hard_status=2`` (БС): DOWN по лестнице;
-    - ``hard_status=1`` (авто): FORCE_OFF только если MIN тоже не проходит gate.
+    - ``hard_status=1`` (авто): FORCE_OFF только если MIN тоже FAIL.
 
     Key-level ``above_rec_conversion`` не используется.
     """
@@ -541,7 +543,9 @@ def plan_shelf_rec_false_cleanup_down(
         return []
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
-        state_passes_rec_gate_for_mode,
+        rec_gate_allows_up,
+        rec_gate_triggers_cleanup,
+        state_rec_gate_status_for_mode,
     )
 
     ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
@@ -566,16 +570,17 @@ def plan_shelf_rec_false_cleanup_down(
             continue
 
         state_candidates = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-        if state_passes_rec_gate_for_mode(
+        current_status = state_rec_gate_status_for_mode(
             state_candidates,
             mode,
             gate_policy,
             rec_orders_per_view=rec,
             rk_orders_per_cart=rk,
-        ):
+        )
+        if not rec_gate_triggers_cleanup(current_status):
             continue
 
-        min_passes = state_passes_rec_gate_for_mode(
+        min_status = state_rec_gate_status_for_mode(
             state_candidates,
             KeywordStrategyMode.MIN_CPA,
             gate_policy,
@@ -583,7 +588,7 @@ def plan_shelf_rec_false_cleanup_down(
             rk_orders_per_cart=rk,
         )
 
-        if min_passes and mode != KeywordStrategyMode.MIN_CPA:
+        if rec_gate_allows_up(min_status) and mode != KeywordStrategyMode.MIN_CPA:
             actions.append(
                 V3Action(
                     action=V3ActionType.DOWN,

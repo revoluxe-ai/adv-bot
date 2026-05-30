@@ -18,7 +18,7 @@ _ALLOWED_FILES = frozenset(
 
 @pytest.mark.unit
 def test_v3_modules_do_not_call_passes_rec_gate_for_up_in_selection() -> None:
-    """Grep guard: selection paths use ``state_passes_rec_gate_for_mode`` only."""
+    """Grep guard: selection paths use state-level ``state_rec_gate_status_for_mode``."""
     offenders: list[str] = []
     for path in sorted(_V3_ROOT.rglob("*.py")):
         if path.name in _ALLOWED_FILES:

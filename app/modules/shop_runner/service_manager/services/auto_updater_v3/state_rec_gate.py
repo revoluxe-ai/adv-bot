@@ -2,10 +2,17 @@
 
 Сравнивает ``ModeCandidate.predicted_orders_per_view`` (к→з) с ``rec_orders_per_view``
 (baseline полок). Key-level ``above_rec_conversion`` здесь не используется.
+
+Статусы:
+- ``INACTIVE`` — gate не применяется (organic или ``rec_orders_per_view is None``);
+- ``PASS`` — к→з state строго выше baseline;
+- ``UNKNOWN`` — baseline есть, но к→з state неизвестен (нет RK или OPV);
+- ``FAIL`` — к→з известен и не выше baseline.
 """
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -29,8 +36,20 @@ if TYPE_CHECKING:
     )
 
 REC_GATE_MARK_PASS = "П"
-REC_GATE_MARK_UNKNOWN_BASELINE = "Н"
+REC_GATE_MARK_UNKNOWN = "Н"
 REC_GATE_MARK_FAIL = ""
+
+# Обратная совместимость имён в тестах/UI
+REC_GATE_MARK_UNKNOWN_BASELINE = REC_GATE_MARK_UNKNOWN
+
+
+class RecGateStatus(str, Enum):
+    """Результат state-level rec gate для одного target state."""
+
+    INACTIVE = "inactive"
+    PASS = "pass"
+    FAIL = "fail"
+    UNKNOWN = "unknown"
 
 
 def _shelf_rec_policy_active(click_mode: ShelfClickMode) -> bool:
@@ -54,37 +73,55 @@ def _state_orders_per_view(
     )
 
 
-def passes_rec_gate_for_target_state(
+def resolve_rec_gate_status_for_target_state(
     candidate: ModeCandidate,
     *,
     target_mode: KeywordStrategyMode,
     policy: SelectionPolicy,
     rec_orders_per_view: float | None,
     rk_orders_per_cart: float | None,
-) -> bool:
-    """State проходит полочный gate, если к→з state выше baseline полок.
+) -> RecGateStatus:
+    """Вычислить статус rec gate для целевого state M/O/C.
 
     Args:
-        candidate: ``ModeCandidate`` целевого state (M/O/C).
+        candidate: ``ModeCandidate`` целевого state.
         target_mode: Целевой режим (для логов; gate по ``candidate``).
         policy: Политика тика (organic/shelf).
-        rec_orders_per_view: Baseline заказы/показ полок; ``None`` — gate pass.
+        rec_orders_per_view: Baseline заказы/показ полок.
         rk_orders_per_cart: RK корз→заказ 7д для расчёта к→з.
 
     Returns:
-        True если state разрешён с учётом полочного gate.
+        ``RecGateStatus`` для state.
     """
     _ = target_mode
     if not _shelf_rec_policy_active(policy.click_mode):
-        return True
+        return RecGateStatus.INACTIVE
     if rec_orders_per_view is None:
-        return True
+        return RecGateStatus.INACTIVE
+    if rk_orders_per_cart is None:
+        return RecGateStatus.UNKNOWN
     state_opv = _state_orders_per_view(
         candidate, rk_orders_per_cart=rk_orders_per_cart
     )
     if state_opv is None:
-        return False
-    return state_opv > float(rec_orders_per_view)
+        return RecGateStatus.UNKNOWN
+    if state_opv > float(rec_orders_per_view):
+        return RecGateStatus.PASS
+    return RecGateStatus.FAIL
+
+
+def rec_gate_allows_up(status: RecGateStatus) -> bool:
+    """UP / expansion разрешён при PASS, UNKNOWN и INACTIVE; FAIL блокирует."""
+    return status in (
+        RecGateStatus.INACTIVE,
+        RecGateStatus.PASS,
+        RecGateStatus.UNKNOWN,
+    )
+
+
+def rec_gate_triggers_cleanup(status: RecGateStatus) -> bool:
+    """Cleanup/DOWN/FORCE_OFF только при явном FAIL текущего state."""
+    return status == RecGateStatus.FAIL
 
 
 def resolve_rec_gate_mark(
@@ -94,35 +131,34 @@ def resolve_rec_gate_mark(
     rec_orders_per_view: float | None,
     rk_orders_per_cart: float | None,
 ) -> str:
-    """Марка полочного gate для UI/debug: ``П`` / ``Н`` / пусто."""
-    if not _shelf_rec_policy_active(policy.click_mode):
-        return REC_GATE_MARK_FAIL
-    if rec_orders_per_view is None:
-        return REC_GATE_MARK_UNKNOWN_BASELINE
-    if passes_rec_gate_for_target_state(
+    """Марка полочного gate для UI: ``П`` / ``Н`` / пусто."""
+    status = resolve_rec_gate_status_for_target_state(
         candidate,
         target_mode=KeywordStrategyMode.MIN_CPA,
         policy=policy,
         rec_orders_per_view=rec_orders_per_view,
         rk_orders_per_cart=rk_orders_per_cart,
-    ):
+    )
+    if status == RecGateStatus.PASS:
         return REC_GATE_MARK_PASS
+    if status == RecGateStatus.UNKNOWN:
+        return REC_GATE_MARK_UNKNOWN
     return REC_GATE_MARK_FAIL
 
 
-def state_passes_rec_gate_for_mode(
+def state_rec_gate_status_for_mode(
     state_candidates_by_mode: dict[AggressionTargetMode, ModeCandidate],
     to_mode: KeywordStrategyMode,
     policy: SelectionPolicy,
     *,
     rec_orders_per_view: float | None,
     rk_orders_per_cart: float | None,
-) -> bool:
-    """Rec_gate для конкретного target mode по ``state_candidates_by_mode``."""
+) -> RecGateStatus:
+    """Rec_gate status для конкретного target mode по ``state_candidates_by_mode``."""
     mc = candidate_for_strategy_mode(to_mode, state_candidates_by_mode)
     if mc is None:
-        return False
-    return passes_rec_gate_for_target_state(
+        return RecGateStatus.FAIL
+    return resolve_rec_gate_status_for_target_state(
         mc,
         target_mode=to_mode,
         policy=policy,

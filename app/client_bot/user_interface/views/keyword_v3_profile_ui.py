@@ -187,7 +187,7 @@ def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
         "   п|с|к→к|к→з|PFC|CPO — поз|ставка|conv CH|к→з|PFC|CPO заказа",
         "   CPO = PFC / (зак/корз РК) = к→к CH × корз→заказ РК 7д",
         "   П — state выше полочной конверсии по прогнозу к→з",
-        "   Н — baseline полок неизвестен; gate не блокирует",
+        "   Н — конверсия state неизвестна (условно полочный); UP разрешён",
     ]
     if _profile_shows_max_rk_legend(data):
         lines.append("   maxРК — max CPO режима по ключам РК с CH (worst)")
