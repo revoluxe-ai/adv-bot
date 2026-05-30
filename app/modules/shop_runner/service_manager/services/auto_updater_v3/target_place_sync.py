@@ -202,11 +202,13 @@ async def sync_keyword_target_places_v3(
     if n > 0:
         logger.info(
             "v3 campaign MOC stats adv_id=%s with_ladder=%s o_eq_c=%s (%.1f%%) "
-            "o_ne_c=%s skipped_no_profile=%s rk=%s",
+            "o_eq_m=%s (%.1f%%) o_ne_c=%s skipped_no_profile=%s rk=%s",
             adv.adv_id,
             n,
             moc_stats["o_eq_c"],
             100.0 * moc_stats["o_eq_c"] / n,
+            moc_stats["o_eq_m"],
+            100.0 * moc_stats["o_eq_m"] / n,
             moc_stats["o_ne_c"],
             moc_stats["skipped_no_profile"],
             rk_orders_per_cart,
