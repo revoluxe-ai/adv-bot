@@ -223,7 +223,6 @@ def iter_effective_upper_mode_groups(
         if group:
             groups.append(group)
         cursor = res.next_mode
-    return tuple(groups)
 
 
 def iter_effective_upper_modes(
