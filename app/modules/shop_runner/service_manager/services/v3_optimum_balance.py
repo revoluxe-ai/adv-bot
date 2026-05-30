@@ -103,13 +103,13 @@ def normalized_point_metrics(
     cpo_min: float,
     cpo_max: float,
 ) -> NormalizedPointMetrics:
-    """conv_n и economy_n (1 - cpa_n) на диапазоне профиля."""
+    """conv_n и economy_n на диапазоне профиля; при ``cpo_max == cpo_min``: ``cpa_n=0``, ``economy_n=1``."""
     if conv_max == conv_min:
         conv_n = 1.0
     else:
         conv_n = (conv - conv_min) / (conv_max - conv_min)
     if cpo_max == cpo_min:
-        cpa_n = 1.0
+        cpa_n = 0.0
         economy_n = 1.0
     else:
         cpa_n = (cpo - cpo_min) / (cpo_max - cpo_min)

@@ -23,6 +23,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.v3_optimum_balance import (
     OPTIMUM_MAX_CPO_PENALTY_COMPARE,
     normalized_optimum_score,
+    normalized_point_metrics,
     select_optimum_row,
     select_optimum_row_cpo_cap,
     select_optimum_row_production,
@@ -197,6 +198,48 @@ def test_normalized_score_degeneracy() -> None:
     assert normalized_optimum_score(
         0.03, 10.0, conv_min=0.01, conv_max=0.03, cpo_min=10.0, cpo_max=10.0
     ) == 1.0
+
+
+@pytest.mark.unit
+def test_degenerate_equal_cpo_cpa_n_zero_economy_n_invariant() -> None:
+    """Одинаковый CPO: cpa_n=0, economy_n=1 (economy_n = 1 - cpa_n); score → max conv."""
+    cpo_flat = 10.0
+    conv_lo, conv_hi = 0.01, 0.03
+    m_lo = normalized_point_metrics(
+        conv_lo,
+        cpo_flat,
+        conv_min=conv_lo,
+        conv_max=conv_hi,
+        cpo_min=cpo_flat,
+        cpo_max=cpo_flat,
+    )
+    m_hi = normalized_point_metrics(
+        conv_hi,
+        cpo_flat,
+        conv_min=conv_lo,
+        conv_max=conv_hi,
+        cpo_min=cpo_flat,
+        cpo_max=cpo_flat,
+    )
+    for m in (m_lo, m_hi):
+        assert m.cpa_n == 0.0
+        assert m.economy_n == 1.0
+        assert m.economy_n == pytest.approx(1.0 - m.cpa_n)
+
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=100, predicted_conversion=0.03, pay_for_cart=1.0, timestamp=ts
+        ),
+        PositionProfilePoint(
+            position=2, bid=100, predicted_conversion=0.01, pay_for_cart=1.0, timestamp=ts
+        ),
+    ]
+    cand = build_mode_candidates(
+        profile=prof, keyword_text="kw", rk_orders_per_cart=RK
+    )
+    assert cand[AggressionTargetMode.OPTIMUM].position == 1
+    assert cand[AggressionTargetMode.MAX_CONVERSION].position == 1
 
 
 @pytest.mark.unit
