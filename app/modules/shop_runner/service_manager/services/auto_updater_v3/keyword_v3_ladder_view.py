@@ -86,6 +86,7 @@ class LadderInputs:
     worst_costs: dict[AggressionTargetMode, float]
     campaign_cache: CampaignV3DecisionCache
     rk_orders_per_cart: float | None = None
+    rec_orders_per_view: float | None = None
 
     @classmethod
     def from_contexts(
@@ -93,6 +94,7 @@ class LadderInputs:
         contexts: list[KeywordV3Context],
         *,
         rk_orders_per_cart: float | None = None,
+        rec_orders_per_view: float | None = None,
     ) -> LadderInputs:
         """Один проход: prepared + worst_costs + campaign_cache."""
         prepared = build_prepared_from_contexts(contexts)
@@ -104,6 +106,7 @@ class LadderInputs:
             ),
             campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
             rk_orders_per_cart=rk_orders_per_cart,
+            rec_orders_per_view=rec_orders_per_view,
         )
 
 
@@ -125,11 +128,11 @@ async def cache_worst_costs_for_adv(
         )
 
 
-def _catalog_for_ctx(
+def state_candidates_by_mode_for_ctx(
     ctx: KeywordV3Context,
     ladder_inputs: LadderInputs,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Каталог M/O/C: CPO на точке CH × RK корзина→заказ (7 дней)."""
+    """SSOT: M/O/C ``ModeCandidate`` для ключа на тике (``rk_orders_per_cart`` из ``LadderInputs``)."""
     rk = ladder_inputs.rk_orders_per_cart
     conv = None
     if rk is None or rk <= 0:
@@ -146,6 +149,14 @@ def _catalog_for_ctx(
         conv_views_to_orders=conv,
         rk_orders_per_cart=rk,
     )
+
+
+def _catalog_for_ctx(
+    ctx: KeywordV3Context,
+    ladder_inputs: LadderInputs,
+) -> dict[AggressionTargetMode, ModeCandidate]:
+    """Legacy name; delegates to ``state_candidates_by_mode_for_ctx``."""
+    return state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
 
 
 def _strategy_mode_for_agg(mode: AggressionTargetMode) -> KeywordStrategyMode:

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -33,6 +36,29 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import 
 
 
 RK_ORDERS_PER_CART_TEST = 2.0
+
+
+@pytest.fixture(autouse=True)
+def _stub_v3_orchestrator_baseline_loaders(request: pytest.FixtureRequest):
+    """Orchestrator unit-тесты: без реального ClickHouse для RK/rec baseline."""
+    if "test_orchestrator" not in request.node.nodeid:
+        yield
+        return
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+            new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
+            new=AsyncMock(return_value=0.01),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.cache_worst_costs_for_adv",
+            new=AsyncMock(),
+        ),
+    ):
+        yield
 
 
 def sample_profile(

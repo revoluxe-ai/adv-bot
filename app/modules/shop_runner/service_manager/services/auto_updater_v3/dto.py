@@ -29,6 +29,9 @@ class ModeCandidate(BaseModel):
     pay_for_cart: float | None = None
     """Руб/корзина на точке CH (``PositionProfilePoint.pay_for_cart``)."""
     predicted_conversion: float | None = None
+    """Conv корзина→показ (к→к) на точке CH."""
+    predicted_orders_per_view: float | None = None
+    """Conv показ→заказ (к→з): ``predicted_conversion × rk_orders_per_cart``."""
     conversion_score: float | None = None
     economy_score: float | None = None
     volume_score: float | None = None

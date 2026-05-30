@@ -98,7 +98,7 @@ def test_collect_transition_candidates_skips_opt_alias() -> None:
 
 @pytest.mark.unit
 def test_edge_off_to_min_expansion_when_m_o_c_same_place() -> None:
-    """OFF + degenerate ladder: expansion → MIN_CPA (не MAX)."""
+    """OFF + degenerate ladder (M=O=C): expansion → highest passing (MAX)."""
     prof = [
         PositionProfilePoint(
             position=1, bid=510.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
@@ -120,7 +120,7 @@ def test_edge_off_to_min_expansion_when_m_o_c_same_place() -> None:
         policy=_policy(),
     )
     assert len(actions) == 1
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 @pytest.mark.unit
@@ -152,8 +152,8 @@ def test_edge_no_ch_off_to_min_only_no_opt_max() -> None:
 
 
 @pytest.mark.unit
-def test_edge_o_eq_c_expansion_single_up_to_opt() -> None:
-    """O=C: из MIN один UP в OPT (place MAX), не в MAX отдельным action."""
+def test_edge_o_eq_c_expansion_single_up_to_max() -> None:
+    """O=C: из MIN один UP в MAX (OPT alias), без отдельного OPT→MAX."""
     prof = [
         PositionProfilePoint(
             position=1, bid=10_000.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
@@ -171,10 +171,7 @@ def test_edge_o_eq_c_expansion_single_up_to_opt() -> None:
         policy=_policy(),
     )
     assert len(actions) == 1
-    assert actions[0].target_strategy_mode in (
-        KeywordStrategyMode.OPTIMUM,
-        KeywordStrategyMode.MAX_CONVERSION,
-    )
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
     assert actions[0].target_strategy_mode != KeywordStrategyMode.MIN_CPA
 
 

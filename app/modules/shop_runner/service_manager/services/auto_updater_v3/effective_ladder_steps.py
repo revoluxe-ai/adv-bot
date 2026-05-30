@@ -18,8 +18,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     aggression_target_for_stored_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
+    mode_level,
     step_down,
     step_up,
+)
+
+_LADDER_MODES: tuple[KeywordStrategyMode, ...] = (
+    KeywordStrategyMode.MIN_CPA,
+    KeywordStrategyMode.OPTIMUM,
+    KeywordStrategyMode.MAX_CONVERSION,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,11 +86,34 @@ class EffectiveStepResult:
     skipped_aliases: tuple[str, ...]
 
 
+def logical_modes_at_target_place_above(
+    above: KeywordStrategyMode,
+    target_place: int,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> tuple[KeywordStrategyMode, ...]:
+    """Все валидные режимы выше ``above`` с заданным ``target_place`` (alias-группа)."""
+    out: list[KeywordStrategyMode] = []
+    for mode in _LADDER_MODES:
+        if mode_level(mode) <= mode_level(above):
+            continue
+        mc = candidate_for_strategy_mode(mode, catalog)
+        if mc is None or not mc.is_valid:
+            continue
+        place = target_place_from_mode_candidate(mc)
+        if place == target_place:
+            out.append(mode)
+    return tuple(out)
+
+
 def resolve_next_effective_step_up(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> EffectiveStepResult:
-    """Первый режим выше ``current`` с другим ``target_place``."""
+    """Следующий effective UP: новый ``target_place`` и max ``mode_level`` в alias-группе.
+
+    DOWN по-прежнему пропускает alias; UP внутри группы с одним place выбирает
+    самый высокий логический режим (например MIN→MAX при O=C на pos1).
+    """
     if current == KeywordStrategyMode.OFF:
         nxt = step_up(KeywordStrategyMode.OFF)
         return EffectiveStepResult(nxt, ())
@@ -107,7 +137,23 @@ def resolve_next_effective_step_up(
             )
             cursor = nxt
             continue
-        return EffectiveStepResult(nxt, tuple(skipped))
+        target_place = target_place_from_mode_candidate(nxt_c)
+        if target_place is None:
+            return EffectiveStepResult(None, tuple(skipped))
+        group = logical_modes_at_target_place_above(cursor, target_place, catalog)
+        if not group:
+            return EffectiveStepResult(None, tuple(skipped))
+        highest = max(group, key=mode_level)
+        for mode in group:
+            if mode != highest:
+                skipped.append(
+                    skipped_mode_alias_reason(
+                        mode,
+                        highest,
+                        target_place=target_place,
+                    )
+                )
+        return EffectiveStepResult(highest, tuple(skipped))
 
 
 def resolve_next_effective_step_down(
@@ -142,11 +188,40 @@ def resolve_next_effective_step_down(
         return EffectiveStepResult(nxt, tuple(skipped))
 
 
+def iter_effective_upper_mode_groups(
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> tuple[tuple[KeywordStrategyMode, ...], ...]:
+    """Группы режимов по новому ``target_place`` (alias внутри группы) для UP-планировщиков."""
+    groups: list[tuple[KeywordStrategyMode, ...]] = []
+    cursor = current
+    while True:
+        res = resolve_next_effective_step_up(cursor, catalog)
+        for msg in res.skipped_aliases:
+            logger.debug("%s", msg)
+        if res.next_mode is None:
+            return tuple(groups)
+        nxt_c = candidate_for_strategy_mode(res.next_mode, catalog)
+        place = target_place_from_mode_candidate(nxt_c)
+        if place is None:
+            if cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+                groups.append((res.next_mode,))
+                cursor = res.next_mode
+                continue
+            return tuple(groups)
+        group = logical_modes_at_target_place_above(cursor, place, catalog)
+        if group:
+            groups.append(group)
+        elif cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+            groups.append((res.next_mode,))
+        cursor = res.next_mode
+
+
 def iter_effective_upper_modes(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> list[KeywordStrategyMode]:
-    """Все режимы выше ``current`` с попарно различным ``target_place``."""
+    """По одному режиму на каждый новый ``target_place`` (max logical в alias-группе)."""
     out: list[KeywordStrategyMode] = []
     cursor = current
     while True:

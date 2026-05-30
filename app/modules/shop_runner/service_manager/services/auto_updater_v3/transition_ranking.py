@@ -277,8 +277,8 @@ def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
     """Активно ли полочное правило по ``above_rec`` (shelf >= organic или нет traffic DTO).
 
     Единый триггер для:
-    - rec-gate на UP (``passes_rec_gate_for_up``): разрешены только ``above_rec`` True/None;
-    - cleanup (``plan_shelf_rec_false_cleanup_down``): массовый сброс активных с ``above_rec=False``.
+    - rec-gate на UP: state-level ``rec_gate_allows_up`` (PASS/UNKNOWN/INACTIVE);
+    - cleanup (``plan_shelf_rec_false_cleanup_down``): только state с ``FAIL``.
 
     Args:
         click_mode: Режим organic/shelf из ``resolve_shelf_click_mode`` (полочная фаза).
@@ -296,11 +296,28 @@ def passes_rec_gate_for_up(
     above_rec: bool | None,
     *,
     click_mode: ShelfClickMode,
+    to_mode: KeywordStrategyMode | None = None,
 ) -> bool:
-    """UP разрешён: organic — без rec-барьера; на полке — не ``above_rec=False``."""
+    """UP разрешён с учётом полочного ``above_rec``.
+
+    Organic — без rec-барьера. На полке при ``above_rec=False``:
+    - в ``MIN_CPA`` (в т.ч. OFF→MIN bootstrap) — по экономике, rec не режет;
+    - в ``OPTIMUM`` / ``MAX_CONVERSION`` — блок (STEP_UP агрессии).
+
+    Args:
+        above_rec: Сигнал ``above_rec_conversion`` ключа.
+        click_mode: Режим organic/shelf кампании.
+        to_mode: Целевой режим UP; ``None`` — legacy: любой UP кроме MIN блокируется.
+    """
     if not shelf_rec_conversion_policy_active(click_mode):
         return True
-    return above_rec is not False
+    if above_rec is not False:
+        return True
+    if to_mode == KeywordStrategyMode.MIN_CPA:
+        return True
+    if to_mode is None:
+        return False
+    return False
 
 
 def _rec_tier_for_keyword(
@@ -384,11 +401,6 @@ def collect_transition_candidates(
             continue
         if current_mode == KeywordStrategyMode.MAX_CONVERSION:
             continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
-            continue
 
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
@@ -403,14 +415,28 @@ def collect_transition_candidates(
         pfo = float(ctx.keyword.pay_for_order or 0.0)
 
         for to_mode in iter_effective_upper_modes(current_mode, catalog):
+            target = _target_mode_for_strategy(to_mode)
+            mc = catalog.get(target)
+            if mc is None:
+                continue
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+                rec_gate_allows_up,
+                state_rec_gate_status_for_mode,
+            )
+
+            gate_status = state_rec_gate_status_for_mode(
+                catalog,
+                to_mode,
+                policy,
+                rec_orders_per_view=ladder.rec_orders_per_view,
+                rk_orders_per_cart=ladder.rk_orders_per_cart,
+            )
+            if not rec_gate_allows_up(gate_status):
+                continue
             if not _target_allowed(
                 to_mode=to_mode,
                 max_target_mode=policy.max_target_mode,
             ):
-                continue
-            target = _target_mode_for_strategy(to_mode)
-            mc = catalog.get(target)
-            if mc is None:
                 continue
             cost, imputed = _resolve_state_cost(
                 mc,
@@ -501,26 +527,41 @@ def plan_shelf_rec_false_cleanup_down(
     *,
     click_mode: ShelfClickMode,
     ladder_inputs: "LadderInputs | None" = None,
+    policy: SelectionPolicy | None = None,
 ) -> list[V3Action]:
-    """Полка: массовый сброс всех активных ключей с ``above_rec=False``.
+    """Полка: cleanup активных ключей, у которых **текущий** state = ``RecGateStatus.FAIL``.
 
-    Ключи с ``above_rec=False`` не проходят rec-gate на UP и «висят» в минусе полки;
-    за один тик планируется действие на каждый такой активный ключ.
+    - ``rec_orders_per_view is None`` — gate неактивен, cleanup не выполняется;
+    - текущий state PASS / UNKNOWN / INACTIVE — не трогаем;
+    - текущий state FAIL, MIN PASS/UNKNOWN — effective DOWN до MIN для БС (``hard_status=2``);
+      для авто (``hard_status=1``) — ``FORCE_OFF`` (applier не применяет DOWN);
+    - ``hard_status=2`` (БС): DOWN по лестнице; при MIN и ``step_down`` без цели — fallback OFF;
+    - ``hard_status=1`` (авто): FORCE_OFF только если MIN тоже FAIL.
 
-    - ``hard_status=2`` (БС): один шаг ``DOWN`` по лестнице (``target_strategy_mode``).
-    - ``hard_status=1`` (авто): ``FORCE_OFF`` — applier не применяет ``DOWN`` для авто.
-
-    ``hard_status`` 3/4 не трогаем. При ``ORGANIC_DOMINANT`` возвращает пустой список.
+    Key-level ``above_rec_conversion`` не используется.
     """
     if not shelf_rec_conversion_policy_active(click_mode):
         return []
 
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        rec_gate_allows_up,
+        rec_gate_triggers_cleanup,
+        state_rec_gate_status_for_mode,
+    )
+
     ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
+    gate_policy = policy or SelectionPolicy.from_aggressiveness(
+        click_mode=click_mode,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    rec = ladder.rec_orders_per_view
+    rk = ladder.rk_orders_per_cart
+    if rec is None:
+        return []
+
     actions: list[V3Action] = []
     for ctx, mode in prepared:
         if mode == KeywordStrategyMode.OFF:
-            continue
-        if ctx.keyword.above_rec_conversion is not False:
             continue
         hard_status = int(ctx.keyword.hard_status)
         if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
@@ -529,13 +570,65 @@ def plan_shelf_rec_false_cleanup_down(
         if ks_id is None:
             continue
 
+        state_candidates = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
+        current_status = state_rec_gate_status_for_mode(
+            state_candidates,
+            mode,
+            gate_policy,
+            rec_orders_per_view=rec,
+            rk_orders_per_cart=rk,
+        )
+        if not rec_gate_triggers_cleanup(current_status):
+            continue
+
+        min_status = state_rec_gate_status_for_mode(
+            state_candidates,
+            KeywordStrategyMode.MIN_CPA,
+            gate_policy,
+            rec_orders_per_view=rec,
+            rk_orders_per_cart=rk,
+        )
+
+        if rec_gate_allows_up(min_status) and mode != KeywordStrategyMode.MIN_CPA:
+            if hard_status == _HARD_STATUS_WHITE_LIST:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.DOWN,
+                        keyword_setting_id=ks_id,
+                        target_strategy_mode=KeywordStrategyMode.MIN_CPA,
+                        reason="shelf_rec_false_cleanup",
+                    )
+                )
+            else:
+                actions.append(
+                    V3Action(
+                        action=V3ActionType.FORCE_OFF,
+                        keyword_setting_id=ks_id,
+                        reason="shelf_rec_false_cleanup",
+                    )
+                )
+            continue
+
         if hard_status == _HARD_STATUS_WHITE_LIST:
-            catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-            step = resolve_next_effective_step_down(mode, catalog)
+            step = resolve_next_effective_step_down(mode, state_candidates)
             log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
             nxt = step.next_mode
             if nxt is None:
-                continue
+                if mode == KeywordStrategyMode.MIN_CPA:
+                    logger.warning(
+                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s at MIN, "
+                        "step_down returned None; fallback OFF",
+                        ks_id,
+                    )
+                    nxt = KeywordStrategyMode.OFF
+                else:
+                    logger.warning(
+                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s mode=%s, "
+                        "step_down returned None; skip cleanup",
+                        ks_id,
+                        mode.name,
+                    )
+                    continue
             actions.append(
                 V3Action(
                     action=V3ActionType.DOWN,

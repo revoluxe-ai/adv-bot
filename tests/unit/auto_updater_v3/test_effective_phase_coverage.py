@@ -11,6 +11,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
     ShelfClickMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+    ModeCandidate,
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
@@ -120,7 +122,7 @@ def test_expansion_m_o_c_same_place_no_up(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.unit
 def test_expansion_off_to_min_when_m_o_c_collapsed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PROFITABLE_EXPANSION: OFF→MIN даже при M=O=C на одном place."""
+    """PROFITABLE_EXPANSION: OFF→highest passing при M=O=C на одном place."""
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
     _patch_catalog(monkeypatch, cat)
     kw = _calc_kw(ks_id=2, text="off", mode=KeywordStrategyMode.OFF, rating=5.0, conv=0.05)
@@ -131,7 +133,7 @@ def test_expansion_off_to_min_when_m_o_c_collapsed(monkeypatch: pytest.MonkeyPat
         prepared, resolve=10_000.0, policy=_policy()
     )
     assert len(actions) == 1
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 @pytest.mark.unit
@@ -241,6 +243,16 @@ def test_guard_max_to_min_skips_opt_alias() -> None:
 def test_shelf_cleanup_down_skips_opt_alias(monkeypatch: pytest.MonkeyPatch) -> None:
     """transition_ranking DOWN: MAX→MIN, не MAX→OPT (alias)."""
     cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
+    rec = 0.01
+    cat[AggressionTargetMode.MIN_CPA] = cat[AggressionTargetMode.MIN_CPA].model_copy(
+        update={"predicted_orders_per_view": rec + 0.001}
+    )
+    cat[AggressionTargetMode.OPTIMUM] = cat[AggressionTargetMode.OPTIMUM].model_copy(
+        update={"predicted_orders_per_view": rec - 0.001}
+    )
+    cat[AggressionTargetMode.MAX_CONVERSION] = cat[
+        AggressionTargetMode.MAX_CONVERSION
+    ].model_copy(update={"predicted_orders_per_view": rec - 0.002})
     _patch_catalog(monkeypatch, cat)
     kw = _calc_kw(
         ks_id=50,
@@ -254,8 +266,20 @@ def test_shelf_cleanup_down_skips_opt_alias(monkeypatch: pytest.MonkeyPatch) -> 
     prepared = build_prepared_from_contexts(
         [KeywordV3Context(keyword=kw, position_profile=[])]
     )
+    ctx = prepared[0][0]
+    ladder = LadderInputs.from_contexts(
+        [ctx],
+        rk_orders_per_cart=0.25,
+        rec_orders_per_view=0.01,
+    )
     actions = plan_shelf_rec_false_cleanup_down(
-        prepared, click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL
+        prepared,
+        click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        ladder_inputs=ladder,
+        policy=SelectionPolicy.from_aggressiveness(
+            click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+            aggressiveness=V3RolloutAggressiveness.MAX,
+        ),
     )
     assert len(actions) == 1
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA

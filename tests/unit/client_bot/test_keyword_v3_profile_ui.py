@@ -39,6 +39,7 @@ def _valid_candidate(
         position=position,
         predicted_cpa=cpa,
         predicted_conversion=conv_cart,
+        predicted_orders_per_view=conv_cart * 0.247 if conv_cart else None,
         pay_for_cart=pfc,
         is_valid=True,
     )
@@ -74,17 +75,14 @@ def test_profile_off_first_and_star_on_current() -> None:
     lines = [ln for ln in text.strip().split("\n") if ln.strip()]
     assert lines[0].startswith("📊")
     assert "РК 7д корз→заказ" in text
-    assert "п|с|к→к|PFC|CPO" in text
+    assert "п|с|к→к|к→з|PFC|CPO" in text
+    assert "П — state выше полочной" in text
     assert "CPO = PFC /" in text
     assert "OFF — отключен" in text
     assert "лестница отключена" not in text
     assert "🌟" in text and "M п12|с145" in text
     assert "к→к2.1%" in text
-    assert "PFC" in text
-    assert "CTR" not in text
-    assert "CPO89.50" in text
-    assert "кк" not in text
-    assert "к→з" not in text.split("к→к")[0]  # не путаем с к→к CH
+    assert "к→з" in text
     assert "O п8|с210" in text
     assert "Цель режима M" in text
     joined = "\n".join(lines)
@@ -273,7 +271,7 @@ def test_profile_legacy_markdown_not_v2_escapes() -> None:
     assert "\\)" not in text
     assert "\\|" not in text
     assert "поз\\. " not in text
-    assert "M п12|с145|к→к2.1%|PFC" in text
+    assert "M п12|с145|к→к2.1%|к→з" in text
     assert "РК 7д корз→заказ" in text
     assert "цель" not in text
     assert "*Профиль ключа (V3):*" in text

@@ -33,6 +33,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
     count_effective_released_aggression_steps,
+    iter_effective_upper_mode_groups,
     iter_effective_upper_modes,
     log_skipped_aliases,
     mode_candidates_same_effective_target,
@@ -45,12 +46,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     effective_conv_for_v3,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+    rec_gate_allows_up,
+    state_rec_gate_status_for_mode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
     collect_transition_candidates,
     missing_target_matrix_from_catalog,
-    passes_rec_gate_for_up,
     plan_one_up_by_policy,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -108,13 +112,19 @@ def _mode_catalog_for_ctx(
     prepared: PreparedList | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """M/O/C кандидаты для effective ladder steps."""
+    """M/O/C state candidates; delegates to ``state_candidates_by_mode_for_ctx`` when ladder set."""
+    if ladder_inputs is not None:
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+            state_candidates_by_mode_for_ctx,
+        )
+
+        return state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
     conv = _conv_for_ctx(ctx, prepared)
-    rk = ladder_inputs.rk_orders_per_cart if ladder_inputs is not None else None
+    rk = None
     return build_mode_candidates(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
-        conv_views_to_orders=conv if rk is None else None,
+        conv_views_to_orders=conv,
         rk_orders_per_cart=rk,
     )
 
@@ -623,6 +633,82 @@ def resolve_effective_state_cost_for_mode(
     )
 
 
+def _highest_passing_mode_in_upper_groups(
+    modes_groups: tuple[tuple[KeywordStrategyMode, ...], ...],
+    *,
+    ctx: "KeywordV3Context",
+    state_candidates: dict[AggressionTargetMode, ModeCandidate],
+    elig: "KeywordV3Eligibility | None",
+    policy: SelectionPolicy,
+    resolve: float,
+    ladder_inputs: "LadderInputs | None",
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None,
+) -> tuple[KeywordStrategyMode | None, float | None, bool]:
+    """Max ``mode_level`` среди passing режимов в каждой alias-группе нового ``target_place``.
+
+    Args:
+        state_candidates: уже вычисленный M/O/C catalog (``_mode_catalog_for_ctx`` у caller).
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        can_target_mode,
+        clamp_target_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs as _LadderInputs,
+    )
+
+    ladder = (
+        ladder_inputs
+        if ladder_inputs is not None
+        else _LadderInputs.from_contexts([ctx])
+    )
+    rec = ladder.rec_orders_per_view
+    rk = ladder.rk_orders_per_cart
+    best_mode: KeywordStrategyMode | None = None
+    best_cost: float | None = None
+    best_imputed = False
+    for modes_group in modes_groups:
+        group_best: KeywordStrategyMode | None = None
+        group_cost: float | None = None
+        group_imputed = False
+        for to_mode in modes_group:
+            capped = (
+                clamp_target_mode(elig, to_mode) if elig is not None else to_mode
+            )
+            gate_status = state_rec_gate_status_for_mode(
+                state_candidates,
+                capped,
+                policy,
+                rec_orders_per_view=rec,
+                rk_orders_per_cart=rk,
+            )
+            if not rec_gate_allows_up(gate_status):
+                continue
+            if elig is not None and not can_target_mode(elig, capped):
+                continue
+            if mode_level(capped) > mode_level(policy.max_target_mode):
+                continue
+            cost, imputed = resolve_effective_state_cost_for_mode(
+                ctx=ctx,
+                to_mode=capped,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+                ladder_inputs=ladder,
+            )
+            if cost == float("inf") or cost > resolve:
+                continue
+            if group_best is None or mode_level(capped) > mode_level(group_best):
+                group_best = capped
+                group_cost = cost
+                group_imputed = imputed
+        if group_best is None:
+            continue
+        if best_mode is None or mode_level(group_best) > mode_level(best_mode):
+            best_mode = group_best
+            best_cost = group_cost
+            best_imputed = group_imputed
+    return best_mode, best_cost, best_imputed
+
+
 def collect_potential_passing_states(
     prepared: PreparedList,
     *,
@@ -633,21 +719,11 @@ def collect_potential_passing_states(
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[_StateView]:
     """Кандидаты UP/realloc с ``state_cost <= resolve`` (passing potential)."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        can_target_mode,
-        clamp_target_mode,
-    )
-
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
@@ -661,25 +737,20 @@ def collect_potential_passing_states(
             continue
         current = overrides.get(int(ks_id), stored_mode)
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        step = resolve_next_effective_step_up(current, catalog)
-        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
-        if step.next_mode is None:
+        groups = iter_effective_upper_mode_groups(current, catalog)
+        if not groups:
             continue
-        to_mode = step.next_mode
-        capped = (
-            clamp_target_mode(elig, to_mode) if elig is not None else to_mode
-        )
-        if elig is not None and not can_target_mode(elig, capped):
-            continue
-        if mode_level(capped) > mode_level(policy.max_target_mode):
-            continue
-        cost, imputed = resolve_effective_state_cost_for_mode(
+        capped, cost, imputed = _highest_passing_mode_in_upper_groups(
+            (groups[0],),
             ctx=ctx,
-            to_mode=capped,
-            eligibility_by_ks_id=eligibility_by_ks_id,
+            state_candidates=catalog,
+            elig=elig,
+            policy=policy,
+            resolve=resolve,
             ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
         )
-        if cost == float("inf") or cost > resolve:
+        if capped is None or cost is None:
             continue
         out.append(
             _StateView(
@@ -875,20 +946,10 @@ def plan_profitable_expansion(
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
     """PROFITABLE_EXPANSION (M1): UP до max passing mode с учётом eligibility."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        can_target_mode,
-        clamp_target_mode,
-    )
-
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     actions: list[V3Action] = []
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
@@ -902,31 +963,17 @@ def plan_profitable_expansion(
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
         current_c = candidate_for_strategy_mode(current_mode, catalog)
-        best_mode: KeywordStrategyMode | None = None
-        best_cost: float | None = None
-        best_imputed = False
-        for to_mode in iter_effective_upper_modes(current_mode, catalog):
-            capped = (
-                clamp_target_mode(elig, to_mode)
-                if elig is not None
-                else to_mode
-            )
-            if elig is not None and not can_target_mode(elig, capped):
-                continue
-            if mode_level(capped) > mode_level(policy.max_target_mode):
-                continue
-            cost, imputed = resolve_effective_state_cost_for_mode(
-                ctx=ctx,
-                to_mode=capped,
-                eligibility_by_ks_id=eligibility_by_ks_id,
-                ladder_inputs=ladder,
-            )
-            if cost == float("inf") or cost > resolve:
-                continue
-            if best_mode is None or mode_level(capped) > mode_level(best_mode):
-                best_mode = capped
-                best_cost = cost
-                best_imputed = imputed
+        mode_groups = iter_effective_upper_mode_groups(current_mode, catalog)
+        best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
+            mode_groups,
+            ctx=ctx,
+            state_candidates=catalog,
+            elig=elig,
+            policy=policy,
+            resolve=resolve,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
         if best_mode is None or best_mode == current_mode:
             continue
         best_c = candidate_for_strategy_mode(best_mode, catalog)
@@ -989,33 +1036,22 @@ def plan_mass_cheap_promotion(
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
-            continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
         current_c = candidate_for_strategy_mode(current_mode, catalog)
-        best_mode: KeywordStrategyMode | None = None
-        best_cost: float | None = None
-        best_imputed = False
-        for to_mode in iter_effective_upper_modes(current_mode, catalog):
-            if mode_level(to_mode) > mode_level(policy.max_target_mode):
-                continue
-            cost, imputed = _resolve_state_cost_for_mode(
-                ctx=ctx,
-                to_mode=to_mode,
-                ladder_inputs=ladder,
-            )
-            if cost == float("inf") or cost > resolve:
-                continue
-            if best_mode is None or mode_level(to_mode) > mode_level(best_mode):
-                best_mode = to_mode
-                best_cost = cost
-                best_imputed = imputed
+        mode_groups = iter_effective_upper_mode_groups(current_mode, catalog)
+        best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
+            mode_groups,
+            ctx=ctx,
+            state_candidates=catalog,
+            elig=None,
+            policy=policy,
+            resolve=resolve,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=None,
+        )
         if best_mode is None or best_mode == current_mode:
             continue
         best_c = candidate_for_strategy_mode(best_mode, catalog)
@@ -1056,11 +1092,6 @@ def _collect_active_more_expensive_than(
     out: list[_StateView] = []
     for ctx, stored_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
@@ -1106,11 +1137,6 @@ def _collect_active_expensive(
     for ctx, stored_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
-            continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
@@ -1154,11 +1180,6 @@ def _collect_potential_expensive(
     for ctx, stored_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        if not passes_rec_gate_for_up(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        ):
-            continue
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
@@ -1170,6 +1191,15 @@ def _collect_potential_expensive(
             continue
         to_mode = step.next_mode
         if mode_level(to_mode) > mode_level(policy.max_target_mode):
+            continue
+        gate_status = state_rec_gate_status_for_mode(
+            catalog,
+            to_mode,
+            policy,
+            rec_orders_per_view=ladder.rec_orders_per_view,
+            rk_orders_per_cart=ladder.rk_orders_per_cart,
+        )
+        if not rec_gate_allows_up(gate_status):
             continue
         cost, imputed = _resolve_state_cost_for_mode(
             ctx=ctx,
