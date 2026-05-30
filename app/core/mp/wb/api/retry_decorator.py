@@ -1,3 +1,5 @@
+"""Декоратор повторных попыток WB API с rate-limit и отдельной политикой для PoolTimeout."""
+
 import asyncio
 import time
 from functools import wraps
@@ -15,15 +17,36 @@ from .excs import (
     UnknownApiRequestError,
     MaxAttemptsError,
     HttpTimeOutError,
+    PoolTimeoutError,
 )
 
 logger = logging.getLogger(__name__)
 # TODO Реализовать систему всплесков
 
+POOL_TIMEOUT_MAX_ATTEMPTS = 3
+POOL_TIMEOUT_RETRY_PAUSE_SEC = 2.0
 
 # Тип результата функции
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+
+def _extract_items_count(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    for value in args:
+        if isinstance(value, (list, tuple, set)):
+            return len(value)
+    body = kwargs.get("body")
+    if body is not None:
+        items = getattr(body, "items", None)
+        if items is not None:
+            return len(items)
+    ids = kwargs.get("ids")
+    if isinstance(ids, str) and ids:
+        return len(ids.split(","))
+    adv_ids = kwargs.get("adv_ids")
+    if isinstance(adv_ids, (list, tuple, set)):
+        return len(adv_ids)
+    return None
 
 
 def retry_decorator(
@@ -54,11 +77,13 @@ def retry_decorator(
                     "_last_query_time": None,
                     "_current_pause": min_pause,
                     "_attempts": 0,
+                    "_pool_timeout_attempts": 0,
                     "_lock": asyncio.Lock(),
                 }
 
             state = api_call_state[method_name]
             shop_id = instance.shop_id
+            section_name = instance.section.name
             locker = state["_lock"]
             async with locker:
                 while True:
@@ -83,6 +108,7 @@ def retry_decorator(
                         # усреднение разгоняло следующие запросы слишком близко друг к другу.
                         state["_current_pause"] = max(min_pause, blended_pause)
                         state["_attempts"] = 0
+                        state["_pool_timeout_attempts"] = 0
                         return result
 
                     except ApiForbiddenError as e:
@@ -118,6 +144,40 @@ def retry_decorator(
                             )
                         if state["_attempts"] >= max_attempts:
                             raise MaxAttemptsError() from e
+
+                    except PoolTimeoutError as e:
+                        state["_last_query_time"] = time.time()
+                        pool_attempts = state.get("_pool_timeout_attempts", 0) + 1
+                        state["_pool_timeout_attempts"] = pool_attempts
+                        items_count = _extract_items_count(args, kwargs)
+                        if pool_attempts >= POOL_TIMEOUT_MAX_ATTEMPTS:
+                            logger.error(
+                                "WB PoolTimeout retries exhausted: exc_type=PoolTimeout "
+                                "endpoint=%s section=%s shop_id=%s coroutine=%s "
+                                "pool_timeout_attempts=%s items_count=%s",
+                                method_name,
+                                section_name,
+                                shop_id,
+                                method_name,
+                                pool_attempts,
+                                items_count,
+                            )
+                            raise MaxAttemptsError(
+                                f"PoolTimeout: не удалось выполнить {method_name} "
+                                f"за {POOL_TIMEOUT_MAX_ATTEMPTS} попыток для shop_id={shop_id}"
+                            ) from e
+                        state["_current_pause"] = POOL_TIMEOUT_RETRY_PAUSE_SEC
+                        logger.warning(
+                            "WB PoolTimeout retry: exc_type=PoolTimeout endpoint=%s "
+                            "section=%s shop_id=%s coroutine=%s attempt=%s/%s items_count=%s",
+                            method_name,
+                            section_name,
+                            shop_id,
+                            method_name,
+                            pool_attempts,
+                            POOL_TIMEOUT_MAX_ATTEMPTS,
+                            items_count,
+                        )
 
                     except (
                         UnknownApiRequestError,

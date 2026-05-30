@@ -81,3 +81,19 @@ class UnknownWBApiStatus(WBApiError):
 
 class HttpTimeOutError(WBApiError):
     pass
+
+
+class PoolTimeoutError(HttpTimeOutError):
+    """Исчерпан пул HTTP-соединений (httpcore.PoolTimeout) до получения response."""
+
+    def __init__(
+        self,
+        message: str = "Превышено время ожидания слота пула HTTP-соединений",
+        *,
+        original_exc: BaseException | None = None,
+    ) -> None:
+        self.original_exc = original_exc
+        self.exc_type = (
+            type(original_exc).__name__ if original_exc is not None else "PoolTimeout"
+        )
+        super().__init__(message)
