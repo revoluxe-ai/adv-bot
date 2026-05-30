@@ -223,19 +223,17 @@ def moc_equality_flags(
     optimum: ModeCandidate,
     max_conv: ModeCandidate,
 ) -> tuple[bool, bool]:
-    """Совпадение ступеней лестницы: ``(o_eq_c, o_eq_m)``."""
-    o_eq_m = (
-        min_cpa.is_valid
-        and optimum.is_valid
-        and min_cpa.position == optimum.position
-        and min_cpa.bid == optimum.bid
+    """Совпадение ступеней лестницы для MOC-stats: ``(o_eq_c, o_eq_m)``.
+
+    Критерий как у effective ladder: только ``target_place`` (``position``),
+    без сравнения bid/CPO — см. ``mode_candidates_same_effective_target``.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+        mode_candidates_same_effective_target,
     )
-    o_eq_c = (
-        optimum.is_valid
-        and max_conv.is_valid
-        and optimum.position == max_conv.position
-        and optimum.bid == max_conv.bid
-    )
+
+    o_eq_m = mode_candidates_same_effective_target(min_cpa, optimum)
+    o_eq_c = mode_candidates_same_effective_target(optimum, max_conv)
     return o_eq_c, o_eq_m
 
 
