@@ -155,23 +155,6 @@ def resolve_no_ch_operational_pay_for_order_cost(
     return value
 
 
-def resolve_no_ch_operational_pay_for_order_cost(
-    keyword: CalculatedKeyword,
-) -> float | None:
-    """Операционная себестоимость NO CH tier: ``keyword.pay_for_order`` (как в карточке Telegram).
-
-    Используется в ``cost_for_mode`` / UI вместо ``resolve_keyword_v2_pay_for_order_cost``
-    (rating CPM без bid_log). Trim/guard/expansion для NO CH — та же метрика.
-    """
-    pfo = keyword.pay_for_order
-    if pfo is None:
-        return None
-    value = float(pfo)
-    if value <= 0:
-        return None
-    return value
-
-
 def keyword_has_v2_cpo(
     keyword: CalculatedKeyword,
     *,
