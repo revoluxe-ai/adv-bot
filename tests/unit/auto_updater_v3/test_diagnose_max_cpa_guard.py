@@ -244,6 +244,11 @@ def test_diagnose_no_same_place_skip_when_operational_above_max(
     _patch_catalog_and_trim_costs(monkeypatch, operational_cpo=493.0)
     ctx = _ctx_opt_at_place(place=22)
     prepared = build_prepared_from_contexts([ctx])
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+
+    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK)
     diag = diagnose_max_cpa_guard_keyword(
         ctx,
         KeywordStrategyMode.OPTIMUM,
@@ -253,7 +258,10 @@ def test_diagnose_no_same_place_skip_when_operational_above_max(
         aggressiveness=V3RolloutAggressiveness.MAX,
         guard_would_run=True,
         fact_pay_for_order=554.0,
+        ladder_inputs=ladder,
     )
+    assert diag["ladder_inputs_source"] == "ladder_inputs"
+    assert diag["rk_orders_per_cart"] == RK
     skip = diag.get("guard_skip_reason") or ""
     assert "same_target_place" not in skip
     assert "same_effective_target" not in skip
@@ -262,11 +270,6 @@ def test_diagnose_no_same_place_skip_when_operational_above_max(
     assert guard_action["action"] == V3ActionType.DOWN.value
     assert guard_action["target_strategy_mode"] == KeywordStrategyMode.MIN_CPA.name
 
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-        LadderInputs,
-    )
-
-    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK)
     live = plan_max_cpa_guard(
         prepared,
         max_pay_for_order=MAX_PFO,
@@ -276,3 +279,134 @@ def test_diagnose_no_same_place_skip_when_operational_above_max(
     )
     assert len(live) == 1
     assert live[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert guard_action["target_strategy_mode"] == live[0].target_strategy_mode.name
+
+
+@pytest.mark.unit
+def test_diagnose_guard_parity_dense_tonal_with_rk_ladder() -> None:
+    """С RK ladder diagnose и plan_max_cpa_guard совпадают (кейс adv 32824944)."""
+    from tests.unit.auto_updater_v3.test_max_cpa_guard_white_list_trim import (
+        _profile_dense_tonal,
+    )
+
+    rk = 0.2
+    kw = _calc_kw(
+        ks_id=KS_ID,
+        text="плотный тональный крем",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=10.0,
+        conv=0.02,
+        hard_status=2,
+    )
+    kw = kw.model_copy(
+        update={
+            "keyword_setting": kw.keyword_setting.model_copy(
+                update={"target_place": 1}
+            )
+        }
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_profile_dense_tonal())
+    prepared = build_prepared_from_contexts([ctx])
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+
+    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=rk)
+    live = plan_max_cpa_guard(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        ladder_inputs=ladder,
+    )
+    diag = diagnose_max_cpa_guard_keyword(
+        ctx,
+        KeywordStrategyMode.OPTIMUM,
+        max_pay_for_order=MAX_PFO,
+        prepared=prepared,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        ladder_inputs=ladder,
+        fact_pay_for_order=554.0,
+    )
+    assert diag["ladder_inputs_source"] == "ladder_inputs"
+    assert diag["rk_orders_per_cart"] == rk
+    assert len(live) == 1
+    assert diag["guard_action"] is not None
+    assert diag["guard_action"]["action"] == V3ActionType.DOWN.value
+    assert (
+        diag["guard_action"]["target_strategy_mode"]
+        == live[0].target_strategy_mode.name
+    )
+
+
+@pytest.mark.unit
+def test_diagnose_derived_ladder_differs_from_rk_ladder() -> None:
+    """Без ladder_inputs нет RK — CPO/operational расходятся с production guard."""
+    from tests.unit.auto_updater_v3.test_max_cpa_guard_white_list_trim import (
+        _profile_dense_tonal,
+    )
+
+    rk = 0.2
+    kw = _calc_kw(
+        ks_id=KS_ID,
+        text="плотный тональный крем",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=10.0,
+        conv=0.02,
+        hard_status=2,
+    )
+    kw = kw.model_copy(
+        update={
+            "keyword_setting": kw.keyword_setting.model_copy(
+                update={"target_place": 1}
+            )
+        }
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_profile_dense_tonal())
+    prepared = build_prepared_from_contexts([ctx])
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+
+    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=rk)
+    diag_rk = diagnose_max_cpa_guard_keyword(
+        ctx,
+        KeywordStrategyMode.OPTIMUM,
+        max_pay_for_order=MAX_PFO,
+        prepared=prepared,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        ladder_inputs=ladder,
+        fact_pay_for_order=554.0,
+    )
+    diag_derived = diagnose_max_cpa_guard_keyword(
+        ctx,
+        KeywordStrategyMode.OPTIMUM,
+        max_pay_for_order=MAX_PFO,
+        prepared=prepared,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        fact_pay_for_order=554.0,
+    )
+    assert diag_rk["ladder_inputs_source"] == "ladder_inputs"
+    assert diag_rk["rk_orders_per_cart"] == rk
+    assert diag_derived["ladder_inputs_source"] == "derived_from_prepared"
+    assert diag_derived["rk_orders_per_cart"] is None
+    assert diag_rk["operational_cpo_at_target_place"] is not None
+    assert diag_derived["operational_cpo_at_target_place"] != diag_rk[
+        "operational_cpo_at_target_place"
+    ]
+    live = plan_max_cpa_guard(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        ladder_inputs=ladder,
+    )
+    assert len(live) == 1
+    assert diag_rk["guard_action"] is not None
+    assert (
+        diag_rk["guard_action"]["target_strategy_mode"]
+        == live[0].target_strategy_mode.name
+    )

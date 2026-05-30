@@ -1120,21 +1120,39 @@ def diagnose_max_cpa_guard_keyword(
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     guard_would_run: bool | None = None,
     fact_pay_for_order: float | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
 ) -> dict[str, object]:
-    """Диагностика MAX_CPA_GUARD для одного ключа (dry-run / support)."""
+    """Диагностика MAX_CPA_GUARD для одного ключа (dry-run / support).
+
+    Для паритета с orchestrator передайте тот же ``LadderInputs``, что в
+    ``plan_max_cpa_guard`` (``rk_orders_per_cart``, ``rec_orders_per_view``).
+    Без ``ladder_inputs`` строится из ``prepared`` без RK/rec — CPO может расходиться
+    с production guard.
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
     )
 
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    ladder_inputs = ladder_inputs_for_prepared(prepared)
+    if ladder_inputs is None:
+        ladder = ladder_inputs_for_prepared(prepared)
+        ladder_inputs_source = "derived_from_prepared"
+    else:
+        ladder = ladder_inputs
+        ladder_inputs_source = "ladder_inputs"
     ks_id = ctx.keyword.keyword_setting_original_id
     hard_status = int(ctx.keyword.hard_status)
 
-    catalog = _mode_catalog_for_ctx(ctx, prepared, ladder_inputs)
+    catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
+    operational_cpo = operational_cpo_at_keyword_target_place(
+        ctx, ladder_inputs=ladder
+    )
     mode_costs: dict[str, float | None] = {}
     for mode in (
         KeywordStrategyMode.MIN_CPA,
@@ -1146,7 +1164,7 @@ def diagnose_max_cpa_guard_keyword(
             to_mode=mode,
             prepared=prepared,
             eligibility_by_ks_id=eligibility_by_ks_id,
-            ladder_inputs=ladder_inputs,
+            ladder_inputs=ladder,
         )
         mode_costs[mode.name] = None if cost == float("inf") else float(cost)
 
@@ -1155,7 +1173,7 @@ def diagnose_max_cpa_guard_keyword(
         to_mode=current,
         prepared=prepared,
         eligibility_by_ks_id=eligibility_by_ks_id,
-        ladder_inputs=ladder_inputs,
+        ladder_inputs=ladder,
     )
     current_state_cost = None if cur_cost == float("inf") else float(cur_cost)
 
@@ -1186,7 +1204,7 @@ def diagnose_max_cpa_guard_keyword(
                 current,
                 catalog=catalog,
                 max_pay_for_order=float(max_pay_for_order),
-                ladder_inputs=ladder_inputs,
+                ladder_inputs=ladder,
                 policy=policy,
                 eligibility_by_ks_id=eligibility_by_ks_id,
             )
@@ -1205,7 +1223,7 @@ def diagnose_max_cpa_guard_keyword(
                     trim_target=trim_target,
                     catalog=catalog,
                     max_pay_for_order=float(max_pay_for_order),
-                    ladder_inputs=ladder_inputs,
+                    ladder_inputs=ladder,
                 ):
                     skip_reasons.append("same_target_place")
                 elif (
@@ -1223,6 +1241,7 @@ def diagnose_max_cpa_guard_keyword(
             shelf_click_mode=shelf_click_mode,
             aggressiveness=aggressiveness,
             eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder,
         )
         for act in acts:
             if act.keyword_setting_id == int(ks_id):
@@ -1261,6 +1280,12 @@ def diagnose_max_cpa_guard_keyword(
             else None
         ),
         "guard_skip_reason": ";".join(skip_reasons) if skip_reasons else None,
+        "ladder_inputs_source": ladder_inputs_source,
+        "rk_orders_per_cart": ladder.rk_orders_per_cart,
+        "rec_orders_per_view": ladder.rec_orders_per_view,
+        "operational_cpo_at_target_place": (
+            None if operational_cpo is None else float(operational_cpo)
+        ),
     }
 
 
