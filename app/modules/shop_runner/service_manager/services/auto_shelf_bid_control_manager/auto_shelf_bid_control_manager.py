@@ -154,19 +154,29 @@ class AutoShelfBidControlManager:
         covered_bids: list[int],
         min_distance: int,
     ) -> int | None:
-        """Выбрать максимально удаленную непокрытую точку в диапазоне."""
+        """Выбрать середину самого широкого зазора между покрытыми ставками цикла.
+
+        Кандидат не может совпадать с уже покрытой ставкой (``covered_bids``).
+        """
         if max_bid < min_bid:
             return None
         if not covered_bids:
             return cls._middle_bid(min_bid, max_bid)
         covered = sorted(set(int(x) for x in covered_bids))
+        covered_set = set(covered)
         candidates: list[tuple[int, int]] = []
-        candidates.append((abs(covered[0] - min_bid), min_bid))
-        candidates.append((abs(max_bid - covered[-1]), max_bid))
+        if min_bid not in covered_set:
+            candidates.append((abs(covered[0] - min_bid), min_bid))
+        if max_bid not in covered_set:
+            candidates.append((abs(max_bid - covered[-1]), max_bid))
         for left, right in zip(covered, covered[1:]):
             mid = int(round((left + right) / 2))
+            if mid in covered_set:
+                continue
             distance = min(abs(mid - left), abs(right - mid))
             candidates.append((distance, mid))
+        if not candidates:
+            return None
         max_distance, bid = max(candidates, key=lambda x: (x[0], -x[1]))
         if max_distance < min_distance:
             return None
@@ -582,9 +592,12 @@ class AutoShelfBidControlManager:
             )
             return None
 
+        cycle_from_ts = state.current_cycle_started_at
+        if cycle_from_ts is None:
+            cycle_from_ts = now
         covered_stats = await self._analytics.get_bid_stats(
             nmid=nmid,
-            from_ts=report_day_start_utc(),
+            from_ts=cycle_from_ts,
             currency=state.currency,
         )
         covered_bids = [

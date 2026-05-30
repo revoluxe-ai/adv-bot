@@ -111,6 +111,31 @@ def test_choose_next_test_bid_returns_none_when_range_is_covered() -> None:
     assert bid is None
 
 
+def test_choose_next_test_bid_full_cycle_coverage_picks_280_not_covered_bid() -> None:
+    """Все точки цикла покрыты — следующая ставка в зазоре 200–360, не 360."""
+    covered = [12_000, 20_000, 36_000, 48_000, 60_000]
+    bid = AutoShelfBidControlManager.choose_next_test_bid(
+        min_bid=12_000,
+        max_bid=60_000,
+        covered_bids=covered,
+        min_distance=1,
+    )
+    assert bid == 28_000
+    assert bid not in covered
+
+
+def test_choose_next_test_bid_never_returns_already_covered_bid() -> None:
+    covered = [12_000, 60_000]
+    bid = AutoShelfBidControlManager.choose_next_test_bid(
+        min_bid=12_000,
+        max_bid=60_000,
+        covered_bids=covered,
+        min_distance=1,
+    )
+    assert bid == 36_000
+    assert bid not in covered
+
+
 def test_calc_target_main_impressions_with_valid_share() -> None:
     target = AutoShelfBidControlManager._calc_target_main_impressions(500, 0.1)
     assert target == 4500
