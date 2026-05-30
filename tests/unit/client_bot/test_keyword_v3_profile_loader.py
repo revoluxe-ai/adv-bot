@@ -62,6 +62,14 @@ def _calculated_keyword() -> CalculatedKeyword:
     )
 
 
+def _complex_adv_mock() -> MagicMock:
+    """ComplexAdv без truthy MagicMock-полей (rec/shelf gate)."""
+    adv = MagicMock()
+    adv.rec_system_promotion_mode_active = False
+    adv.shelf_promotion_active = False
+    return adv
+
+
 @pytest.mark.unit
 def test_positions_size_for_adv_clamps_above_predictor_limit() -> None:
     adv = MagicMock()
@@ -150,6 +158,11 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             new_callable=AsyncMock,
             return_value=2.0,
         ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
     ):
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
             KeywordV3Context,
@@ -163,7 +176,7 @@ async def test_load_keyword_v3_profile_data_success() -> None:
         load_contexts.return_value = [
             KeywordV3Context(keyword=kw, position_profile=prof)
         ]
-        complex_adv = MagicMock()
+        complex_adv = _complex_adv_mock()
         build_adv.return_value = complex_adv
 
         container = MagicMock()
@@ -244,7 +257,7 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader._build_complex_adv",
             new_callable=AsyncMock,
-            return_value=MagicMock(),
+            return_value=_complex_adv_mock(),
         ),
         patch(
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.DIManager.create",
@@ -272,6 +285,11 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
             new_callable=AsyncMock,
             return_value=2.0,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
+            new_callable=AsyncMock,
+            return_value=None,
         ),
     ):
         worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)

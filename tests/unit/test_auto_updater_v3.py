@@ -391,7 +391,7 @@ def test_rollout_underperform_level2_can_pick_min_to_opt_when_few_off(
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking._catalog_for_ctx",
         lambda _ctx, _prepared=None, **_kwargs: _fake_catalog_places(
-            min_place=40, opt_place=1, max_place=1
+            min_place=40, opt_place=1, max_place=2
         ),
     )
     cheap_opt = [
