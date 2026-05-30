@@ -764,6 +764,23 @@ class Settings:
         raise Exception("AUTO_SHELF_BID_CONTROL_DRY_RUN env var is not bool")
 
     @property
+    def V3_ABOVE_TARGET_MIN_BID_ENABLED(self) -> bool:
+        """Правило «выше цели при мин. ставке» (МС) для ``automatic_version=3``.
+
+        По умолчанию False — для V3 правило выключено.
+        V2 и другие версии не затрагиваются.
+        """
+        value = os.getenv("V3_ABOVE_TARGET_MIN_BID_ENABLED")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise Exception("V3_ABOVE_TARGET_MIN_BID_ENABLED env var is not bool")
+
+    @property
     def PROXY(self) -> str | None:
         value = os.getenv("PROXY")
         if value is None or not str(value).strip():

@@ -98,6 +98,18 @@ def _coerce_optional_float_for_resolve(value: object) -> float | None:
     return None
 
 
+def _should_apply_above_target_min_bid(complex_adv: "ComplexAdv") -> bool:
+    """Нужно ли применять правило МС при расчёте итоговых ключей для данной РК."""
+    from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+        is_v3_campaign,
+    )
+    from app.settings import settings
+
+    if is_v3_campaign(complex_adv.auto_updater_version):
+        return settings.V3_ABOVE_TARGET_MIN_BID_ENABLED
+    return True
+
+
 class CalculatedKeywordsManager(BaseClickHouseManager):
     async def get_calculated_keywords(self,
                                       complex_adv: 'ComplexAdv',
@@ -132,10 +144,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         if min_bid_for_adv is None:
             min_bid_for_adv = await self._fetch_min_search_bid_aggregate(complex_adv)
 
+        apply_above_target_min_bid = _should_apply_above_target_min_bid(complex_adv)
+
         cooldown_map: dict[str, AboveTargetCooldownEntry | None] | None = None
         cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None = None
         cooldown_redis_mgr: RedisAboveTargetMinBidCooldownManager | None = None
-        if min_bid_for_adv is not None:
+        if min_bid_for_adv is not None and apply_above_target_min_bid:
             cooldown_updates = {}
             hub_kw = await self._get_wb_manager_hub(complex_adv)
             cooldown_redis_mgr = RedisAboveTargetMinBidCooldownManager(
@@ -151,6 +165,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             cooldown_map=cooldown_map,
             cooldown_updates=cooldown_updates,
             now=now,
+            apply_above_target_min_bid=apply_above_target_min_bid,
         )
         if cooldown_redis_mgr is not None and cooldown_updates:
             await cooldown_redis_mgr.apply_updates(complex_adv.adv_id, cooldown_updates)
@@ -344,6 +359,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         cooldown_map: dict[str, AboveTargetCooldownEntry | None] | None = None,
         cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None = None,
         now: datetime | None = None,
+        apply_above_target_min_bid: bool = True,
     ) -> list[CalculatedKeyword]:
         calculated_keyword_list: list[CalculatedKeyword] = []
         from .dto.inner_dto.keyword_state import KeywordState
@@ -399,6 +415,8 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         def _apply_above_target_cooldown(
             pre_kw_: PreCalculatedKeyword, state_: KeywordState
         ) -> KeywordState:
+            if not apply_above_target_min_bid:
+                return state_
             keyword_pay_for_order = calc_pay_for_order(pre_kw_.orders_per_1000_rub)
             return apply_above_target_min_bid_cooldown(
                 pre_kw=pre_kw_,
