@@ -23,6 +23,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
+    _should_apply_above_target_min_bid,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import (
     PreCalculatedKeyword,
@@ -1649,4 +1650,79 @@ async def test_above_target_min_bid_does_not_override_always_on(
     assert result[0].status == KeywordStatus.GOOD
     assert result[0].reason == KeywordStatusReason.ALWAYS_ON
     assert updates == {}
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_skipped_for_v3_when_setting_disabled(
+    complex_adv_mock_whitelist, fixed_now, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """V3 + V3_ABOVE_TARGET_MIN_BID_ENABLED=false: правило МС не применяется."""
+    monkeypatch.delenv("V3_ABOVE_TARGET_MIN_BID_ENABLED", raising=False)
+    complex_adv_mock_whitelist.auto_updater_version = 3
+    pre_kw = _pre_kw_above_target_at_min(text="k_v3_off", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+        apply_above_target_min_bid=_should_apply_above_target_min_bid(
+            complex_adv_mock_whitelist
+        ),
+    )
+    assert result[0].status == KeywordStatus.GOOD
+    assert result[0].reason == KeywordStatusReason.WHITE_LIST
+    assert updates == {}
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_applied_for_v2_when_v3_setting_disabled(
+    complex_adv_mock_whitelist, fixed_now, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """V2 + V3_ABOVE_TARGET_MIN_BID_ENABLED=false: правило МС по-прежнему работает."""
+    monkeypatch.delenv("V3_ABOVE_TARGET_MIN_BID_ENABLED", raising=False)
+    complex_adv_mock_whitelist.auto_updater_version = 2
+    pre_kw = _pre_kw_above_target_at_min(text="k_v2", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+        apply_above_target_min_bid=_should_apply_above_target_min_bid(
+            complex_adv_mock_whitelist
+        ),
+    )
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+    assert updates.get("k_v2") == AboveTargetCooldownEntry(fixed_now, 1000)
+
+
+@pytest.mark.asyncio
+async def test_above_target_min_bid_applied_for_v3_when_setting_enabled(
+    complex_adv_mock_whitelist, fixed_now, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """V3 + V3_ABOVE_TARGET_MIN_BID_ENABLED=true: правило МС применяется."""
+    monkeypatch.setenv("V3_ABOVE_TARGET_MIN_BID_ENABLED", "true")
+    complex_adv_mock_whitelist.auto_updater_version = 3
+    pre_kw = _pre_kw_above_target_at_min(text="k_v3_on", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+        apply_above_target_min_bid=_should_apply_above_target_min_bid(
+            complex_adv_mock_whitelist
+        ),
+    )
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+    assert updates.get("k_v3_on") == AboveTargetCooldownEntry(fixed_now, 1000)
 
