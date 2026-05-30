@@ -3,7 +3,7 @@ from datetime import date
 from typing import Sequence
 from typing import TYPE_CHECKING
 
-from app.utils.ch_semaphore import anti_ch_crash_semaphore
+from app.utils.ch_semaphore import run_ch_with_timeout
 
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
@@ -49,7 +49,7 @@ async def get_existing_adv_nmid_dates(
     """ % (pairs_str, start_date.isoformat(), end_date.isoformat())
 
     try:
-        async with anti_ch_crash_semaphore:
+        async def _fetch_existing() -> set[tuple[int, int, date]]:
             async with get_clickhouse_client() as client:
                 result = await client.query(query)
                 rows = result.result_rows
@@ -62,12 +62,13 @@ async def get_existing_adv_nmid_dates(
                     if isinstance(row_date, date):
                         existing.add((adv_id, nmid, row_date))
                     else:
-                        # Если вернулась строка, парсим
                         from datetime import datetime
+
                         parsed_date = datetime.strptime(str(row_date), "%Y-%m-%d").date()
                         existing.add((adv_id, nmid, parsed_date))
+                return existing
 
-            return existing
+        return await run_ch_with_timeout(_fetch_existing())
     except Exception:
         logger.error("Ошибка получения существующих дат из ClickHouse", exc_info=True)
         return set()
@@ -103,9 +104,11 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
         for row in stats
     ]
 
-    async with anti_ch_crash_semaphore:
+    async def _insert() -> None:
         async with get_clickhouse_client() as client:
             await client.insert('default_db.clusters_adv_stats', data, column_names=column_names)
+
+    await run_ch_with_timeout(_insert())
 
 
 async def update_clusters_adv_stats(stats: Sequence["NormqueryStatsDTO"]) -> None:
