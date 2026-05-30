@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
+    predicted_pay_for_order_from_point,
     resolve_effective_state_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -177,6 +178,46 @@ def has_campaign_worst_costs(worst_costs: dict[AggressionTargetMode, float]) -> 
 
 def _keyword_has_ch_profile(ctx: KeywordV3Context) -> bool:
     return bool(ctx.position_profile)
+
+
+def operational_cpo_at_keyword_target_place(
+    ctx: KeywordV3Context,
+    *,
+    ladder_inputs: LadderInputs,
+) -> float | None:
+    """CPO на фактической ``target_place`` ключа (ставка в WB), RK SSOT как в каталоге.
+
+    Для MAX_CPA_GUARD: режим в БД может быть OPTIMUM, а ставка ещё на дорогой позиции
+    (до sync), хотя ``build_mode_candidates`` уже выбрал дешёвую точку для O/C.
+    """
+    place = ctx.keyword.target_place
+    if place is None or int(place) <= 0:
+        return None
+    profile = ctx.position_profile
+    if not profile:
+        return None
+    row = next((p for p in profile if int(p.position) == int(place)), None)
+    if row is None:
+        return None
+    rk = ladder_inputs.rk_orders_per_cart
+    conv: float | None = None
+    if rk is None or rk <= 0:
+        conv = effective_conv_for_v3(
+            ctx,
+            ladder_inputs.all_contexts,
+            campaign_cache=ladder_inputs.campaign_cache,
+        )
+        if conv is None:
+            conv = ctx.keyword.conv_views_to_orders
+    cpo = predicted_pay_for_order_from_point(
+        row,
+        conv_views_to_orders=conv,
+        rk_orders_per_cart=rk if rk is not None and rk > 0 else None,
+    )
+    if cpo is None or not math.isfinite(float(cpo)):
+        return None
+    value = float(cpo)
+    return value if value > 0 else None
 
 
 def _stage_from_campaign_worst(

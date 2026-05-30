@@ -6,14 +6,14 @@ SSOT для ``candidates.build_mode_candidates`` и
 
 Production OPTIMUM (``select_optimum_row_production``):
 
-- Balance на всём usable-профиле: max ``0.5*conv_n + 0.5*economy_n``.
+- Balance на всём usable-профиле: max ``0.5*conv_n + 0.5*economy_n`` (без CPO-cap).
 - OPTIMUM может совпадать с MIN_CPA или MAX_CONVERSION — честный результат данных.
+- Ограничение дорогой агрессии — resolve, MAX_CPA_GUARD, trim, не формула OPT.
 
 Compare/debug (не production):
 
-- **current** / production: balance на всём профиле.
 - **A** / **B**: альтернативные веса/center_bonus (``select_optimum_row``).
-- **C** (``select_optimum_row_cpo_cap``): cap 1.3 / 1.5 / 2.0 — только тесты/эксперименты.
+- **C** (``select_optimum_row_cpo_cap``): cap 1.3 / 1.5 / 2.0 — тесты, compare-скрипты.
 
 Нормализация balance (внутри выбранного пула):
 
@@ -36,7 +36,6 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
 OPTIMUM_CONV_WEIGHT = 0.5
 OPTIMUM_ECONOMY_WEIGHT = 0.5
 OPTIMUM_SCORE_EPS = 1e-6
-# Compare/debug cap (не production)
 OPTIMUM_MAX_CPO_PENALTY_COMPARE = 1.5
 
 # Вариант A (compare/debug)

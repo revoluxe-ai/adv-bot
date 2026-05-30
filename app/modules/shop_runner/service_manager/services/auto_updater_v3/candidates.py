@@ -4,7 +4,7 @@
 ``к→к`` точки × (корзина→заказ РК за 7 дней из ``wb_common_stat``) → conv показ→заказ
 на ставке → ``calc_pay_for_order``. SSOT: ``v3_point_order_cpo``.
 
-OPTIMUM: ``select_optimum_row_production`` — balance conv/economy на всём профиле.
+OPTIMUM: ``select_optimum_row_production`` — balance conv/economy на всём usable-профиле.
 """
 
 from __future__ import annotations
