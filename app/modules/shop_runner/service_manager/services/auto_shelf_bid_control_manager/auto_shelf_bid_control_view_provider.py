@@ -206,9 +206,34 @@ class AutoShelfBidControlViewProvider:
         if settings_obj and target_main is None:
             warnings.append("invalid_test_share")
 
+        cycle_bid_stats: list[BidStatsDTO] = []
+        cycle_best: BidStatsDTO | None = None
+        global_best: BidStatsDTO | None = None
+        cycle_from_ts = (
+            state.current_cycle_started_at
+            if state is not None and state.current_cycle_started_at is not None
+            else None
+        )
+        if cycle_from_ts is not None and nmid:
+            cycle_bid_stats = await self._analytics.get_bid_stats(
+                nmid=nmid,
+                from_ts=cycle_from_ts,
+                currency=currency,
+            )
+            if state is not None:
+                cycle_best, _, global_best = await resolve_cycle_best_bids(
+                    self._analytics,
+                    nmid=nmid,
+                    currency=currency,
+                    current_cycle_started_at=cycle_from_ts,
+                    previous_cycle_started_at=state.previous_cycle_started_at,
+                )
+
         covered_points_count = 0
-        if target_test is not None:
-            covered_points_count = len([item for item in bid_stats if item.impressions >= target_test])
+        if target_test is not None and cycle_bid_stats:
+            covered_points_count = len(
+                [item for item in cycle_bid_stats if item.impressions >= target_test]
+            )
 
         min_bid_minor_value: int | None = None
         if nmid and auto_adv_id is not None:
@@ -242,7 +267,11 @@ class AutoShelfBidControlViewProvider:
             if int(settings_obj.max_bid_minor) < min_bid_minor_value:
                 warnings.append("max_bid_lower_than_min_bid")
             covered_bids = (
-                [item.bid_minor for item in bid_stats if item.impressions >= target_test]
+                [
+                    item.bid_minor
+                    for item in cycle_bid_stats
+                    if item.impressions >= target_test
+                ]
                 if target_test is not None
                 else []
             )
@@ -265,28 +294,7 @@ class AutoShelfBidControlViewProvider:
             state=state,
         )
 
-        cycle_bid_stats: list[BidStatsDTO] = []
-        cycle_best: BidStatsDTO | None = None
-        global_best: BidStatsDTO | None = None
-        cycle_covered_points_count = 0
-        if state is not None and nmid:
-            cycle_from_ts = state.current_cycle_started_at or stats_from_ts
-            cycle_bid_stats = await self._analytics.get_bid_stats(
-                nmid=nmid,
-                from_ts=cycle_from_ts,
-                currency=currency,
-            )
-            cycle_best, _, global_best = await resolve_cycle_best_bids(
-                self._analytics,
-                nmid=nmid,
-                currency=currency,
-                current_cycle_started_at=cycle_from_ts,
-                previous_cycle_started_at=state.previous_cycle_started_at,
-            )
-            if target_test is not None:
-                cycle_covered_points_count = len(
-                    [item for item in cycle_bid_stats if item.impressions >= target_test]
-                )
+        cycle_covered_points_count = covered_points_count
         cycle_bid_points = self._map_bid_stats_to_points(
             cycle_bid_stats,
             target_test=target_test,

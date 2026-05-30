@@ -54,8 +54,10 @@
    затем fallbacks. Итоговая main-ставка ограничивается `[min_bid_minor, max_bid_minor]`
    (`_clamp_bid_minor`). Смена фазы test↔main: `save_state` до PATCH WB
    (`_persist_state_then_set_bid`).
-7. `next_test_bid` выбирается как максимально удаленная непокрытая точка диапазона
-   `[min_bid_minor, max_bid_minor]` (оба в копейках).
+7. `next_test_bid` / `covered_bids` / `covered_points_count` — по окну текущего цикла
+   (`from_ts = current_cycle_started_at`): середина самого широкого зазора между
+   покрытыми ставками в `[min_bid_minor, max_bid_minor]`; уже покрытая ставка не
+   может быть выбрана снова.
 8. `get_bid_stats` / best bid по CPC: одна строка на `bid_minor` (mode в CH не дробит точку).
    Поле DTO ``cart_cpa`` временно хранит CPC score (не CPA корзины).
 9. Telegram: на главном экране блока «Покрытые ставки» нет. Кнопка «Покрытия цикла» —
@@ -63,8 +65,8 @@
    сортировка по CPC (лучшие сверху), ✅ покрыта / ⏳ набор / ⭐ лучшая глобальная.
    Агрегаты по `bid_minor` от `current_cycle_started_at`, ◀️/▶️. «Лучшая ставка цикла»
    в UI — «Лучшая ставка цикла» (`cycle_best`) и «Лучшая глобальная ставка»
-   (`global_best` = min CPC текущий ∪ предыдущий цикл). `next_test_bid` /
-   `covered_points_count` — отчётный день.
+   (`global_best` = min CPC текущий ∪ предыдущий цикл). `bid_points` /
+   `bid_points_total` — отчётный день (диагностика «за сегодня», не для next_test).
 
 ## Conversion policy v1 (setter)
 

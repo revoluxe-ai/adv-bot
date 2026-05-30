@@ -60,10 +60,10 @@ class AutoShelfBidControlViewDTO:
     min_bid_distance_minor: int | None  # копейки, мин. шаг между тестовыми ставками
     test_impressions: int | None
     main_impressions: int | None
-    covered_points_count: int
-    bid_points_total: int  # всего точек за отчётный день (главный экран)
-    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день
-    cycle_covered_points_count: int  # покрытые точки текущего цикла
+    covered_points_count: int  # покрытые точки текущего цикла (порог test)
+    bid_points_total: int  # всего точек за отчётный день (диагностика)
+    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день (диагностика)
+    cycle_covered_points_count: int  # дубль covered_points_count для совместимости
     cycle_bid_points: list[BidPointStatsDTO]  # агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
