@@ -42,6 +42,9 @@ import dotenv
 # Загружаем .env, но НЕ перезаписываем уже установленные переменные окружения для тестов
 dotenv.load_dotenv(override=False)
 
+# В тестах guard включён по умолчанию; отдельные кейсы отключают через monkeypatch.
+os.environ["STATS_FRESHNESS_GUARD_ENABLED"] = "true"
+
 # Now it's safe to import modules that use settings
 import asyncio
 from clickhouse_connect import get_async_client
