@@ -78,7 +78,7 @@ async def with_raise_errors(
     **kwargs: Any,
 ) -> Any:
     endpoint = getattr(method, "__name__", "unknown")
-    section_name = client.section.name if client.section is not None else "unknown"
+    section_name = client.section.name
     items_count = _extract_items_count(kwargs)
 
     try:

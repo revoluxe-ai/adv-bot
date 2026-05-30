@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -53,7 +53,7 @@ async def acquire_promotion_http(
     shop_id: str | None,
     http_method: str | None = None,
     endpoint: str | None = None,
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, None]:
     """Захват global semaphore перед PROMOTION HTTP request."""
     sem = get_promotion_global_semaphore()
     wait_started = time.monotonic()
