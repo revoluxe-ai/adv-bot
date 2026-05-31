@@ -27,10 +27,14 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import (
     PreCalculatedKeyword,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.above_target_min_bid_diagnostic import (
+    AboveTargetMinBidDiagnosticState,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
     KeywordStatusReason,
 )
+from app.client_bot.user_interface.views.above_target_min_bid_ui import format_ms_rule_line
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
 
 from tests.factories.keyword_pipeline import (
@@ -1649,4 +1653,221 @@ async def test_above_target_min_bid_does_not_override_always_on(
     assert result[0].status == KeywordStatus.GOOD
     assert result[0].reason == KeywordStatusReason.ALWAYS_ON
     assert updates == {}
+
+
+# ============================================================================
+# Diagnostic MS (above_target_min_bid) — mirror factual apply outcome
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_pass_by_cost(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    complex_adv_mock_whitelist.target_pay_for_order = 200.0
+    pre_kw = _pre_kw_above_target_at_min(text="ms_pass", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.PASS_BY_COST
+    assert result[0].status == KeywordStatus.GOOD
+    assert diag.cost_gate_evaluated is True
+    assert diag.cost_condition_pass is True
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_blocked_by_cost(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    complex_adv_mock_whitelist.target_pay_for_order = 1.0
+    pre_kw = _pre_kw_above_target_at_min(text="ms_block", hard_status=HardStatus.WHITELIST)
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.BLOCKED
+    assert result[0].status == KeywordStatus.BAD
+    assert result[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
+    assert diag.cost_gate_evaluated is True
+    assert diag.cost_condition_pass is False
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_inactive_position_above_target(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    pre_kw = _pre_kw_above_target_at_min(
+        text="ms_inactive_pos",
+        hard_status=HardStatus.WHITELIST,
+        target_place=5,
+        position=10.0,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.INACTIVE
+    assert diag.position_condition_pass is False
+    assert result[0].status == KeywordStatus.GOOD
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_inactive_cpm_above_min(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    pre_kw = _pre_kw_above_target_at_min(
+        text="ms_inactive_cpm",
+        hard_status=HardStatus.WHITELIST,
+        cpm=150.0,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.INACTIVE
+    assert diag.min_bid_condition_pass is False
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_temporary_recheck(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    last = fixed_now - timedelta(hours=25, minutes=30)
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=12345,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="ms_retest",
+        keyword_setting__target_place=20,
+        cluster_stat__norm_query="ms_retest",
+        cluster_stat__position=5.0,
+        cluster_stat__cpm=100.0,
+        cluster_stat__views=1000,
+        cluster_stat__clicks=100,
+        cluster_stat__conv_views_to_orders=0.05,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={"ms_retest": AboveTargetCooldownEntry(last, 900)},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK
+    assert result[0].status == KeywordStatus.GOOD
+    assert result[0].cooldown_display_tag == COOLDOWN_RETEST_DISPLAY_TAG
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_blocked_without_pfo_no_cost_gate(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    complex_adv_mock_whitelist.target_pay_for_order = 100.0
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=12345,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="ms_no_pfo",
+        keyword_setting__target_place=20,
+        cluster_stat__norm_query="ms_no_pfo",
+        cluster_stat__position=5.0,
+        cluster_stat__cpm=100.0,
+        cluster_stat__views=1000,
+        cluster_stat__clicks=100,
+        cluster_stat__conv_views_to_orders=0.0,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.BLOCKED
+    assert result[0].status == KeywordStatus.BAD
+    assert diag.cost_gate_evaluated is False
+    assert diag.reason_no_data == "нет PFO"
+    ui_line = format_ms_rule_line(diag)
+    assert "PFO н/д" in ui_line
+    assert ">" not in ui_line.split("PFO")[-1]
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_prod_like_korea_cosmetics_pass(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """Кейс adv 32824944: pos 38 < target 71, CPM 510≤510, PFO 74 ≤ threshold 550."""
+    complex_adv_mock_whitelist.target_pay_for_order = 550.0
+    _conv_for_pay_74 = (1000.0 * 510.0) / (74.0 * 1_000_000.0)
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=32824944,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="косметика женская корея",
+        keyword_setting__target_place=71,
+        cluster_stat__norm_query="косметика женская корея",
+        cluster_stat__position=38.0,
+        cluster_stat__cpm=510.0,
+        cluster_stat__views=5000,
+        cluster_stat__clicks=200,
+        cluster_stat__conv_views_to_orders=_conv_for_pay_74,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=510,
+        cooldown_map={},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    kw = result[0]
+    diag = kw.above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.PASS_BY_COST
+    assert kw.status == KeywordStatus.GOOD
+    assert kw.reason == KeywordStatusReason.WHITE_LIST
+    assert diag.position_condition_pass is True
+    assert diag.min_bid_condition_pass is True
+    ui_line = format_ms_rule_line(diag)
+    assert ui_line.startswith("МС: pass")
+    assert "38" in ui_line and "71" in ui_line
+    assert "510" in ui_line
 
