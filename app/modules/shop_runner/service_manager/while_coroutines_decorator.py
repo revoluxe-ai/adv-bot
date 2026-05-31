@@ -1,12 +1,19 @@
+"""Бесконечный цикл shop-корутин с паузами; отдельный backoff при PoolTimeout saturation."""
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
+import httpcore
+import httpx
 from sqlalchemy.exc import InterfaceError
 
-from app.core.wb_api.exceptions import ApiForbiddenError, MaxAttemptsError
+from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
+from app.core.mp.wb.api.excs import PoolTimeoutError
+from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
@@ -14,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # После tick timeout даём finally внутри func завершить async cleanup (shield).
 TICK_FINALLY_GRACE_SECONDS = 30
+
+# Длинная пауза между tick при исчерпании pool/retry (снижает offered-load storm).
+PROMOTION_POOL_ERROR_BACKOFF_SEC = 90
 
 
 class MainCoroutineRuntimeError(RuntimeError):
@@ -59,6 +69,32 @@ def _get_tick_context_for_log(
         if value not in (None, ""):
             context[key] = str(value)
     return context
+
+
+def is_pool_timeout_related(exc: BaseException) -> bool:
+    """True, если ошибка связана с исчерпанием HTTP pool (PoolTimeout / MaxAttempts после pool)."""
+    if isinstance(exc, PoolTimeoutError):
+        return True
+    if isinstance(exc, (httpcore.PoolTimeout, httpx.PoolTimeout)):
+        return True
+    if isinstance(exc, (MpMaxAttemptsError, LegacyMaxAttemptsError)):
+        if str(exc).startswith("PoolTimeout:"):
+            return True
+    seen: set[int] = set()
+    cause: BaseException | None = exc.__cause__
+    while cause is not None and id(cause) not in seen:
+        seen.add(id(cause))
+        if is_pool_timeout_related(cause):
+            return True
+        cause = cause.__cause__
+    return False
+
+
+def resolve_error_pause_seconds(exc: BaseException, pause_on_error: int) -> int:
+    """Пауза после ошибки tick: длинная при pool saturation, иначе ``pause_on_error``."""
+    if is_pool_timeout_related(exc):
+        return PROMOTION_POOL_ERROR_BACKOFF_SEC
+    return pause_on_error
 
 
 def while_coroutine_decorator(
@@ -121,9 +157,11 @@ def while_coroutine_decorator(
                         exc_info=True,
                     )
                     await asyncio.sleep(pause_on_error)
-                except InterfaceError:
+                except InterfaceError as exc:
                     logger.exception(f"Корутина: {func.__name__}")
-                    await asyncio.sleep(pause_on_error)
+                    await asyncio.sleep(
+                        resolve_error_pause_seconds(exc, pause_on_error)
+                    )
                 except ApiForbiddenError:
                     raise
                 except NotFoundActiveAdvCompany as exc:
@@ -132,22 +170,40 @@ def while_coroutine_decorator(
                 except StopShopUpdateException as exc:
                     logger.info("Коробка остановлена: %s", exc)
                     break
-                except MaxAttemptsError as exc:
+                except (MpMaxAttemptsError, LegacyMaxAttemptsError) as exc:
+                    pause_sec = resolve_error_pause_seconds(exc, pause_on_error)
                     logger.error(
-                        f"Максимальное количество попыток для {func.__name__} достигнуто: {exc}",
+                        "Максимальное количество попыток для %s достигнуто: %s "
+                        "(error_pause_sec=%s pool_timeout=%s)",
+                        func.__name__,
+                        exc,
+                        pause_sec,
+                        is_pool_timeout_related(exc),
                         exc_info=True,
                     )
-                    await asyncio.sleep(pause_on_error)
+                    await asyncio.sleep(pause_sec)
+                except PoolTimeoutError as exc:
+                    pause_sec = resolve_error_pause_seconds(exc, pause_on_error)
+                    logger.warning(
+                        "PoolTimeout в корутине %s, пауза %ss перед следующим tick "
+                        "(shop_id=%s)",
+                        func.__name__,
+                        pause_sec,
+                        _get_shop_id_for_log(args),
+                    )
+                    await asyncio.sleep(pause_sec)
                 except Exception as exc:
                     shop_id = _get_shop_id_for_log(args)
+                    pause_sec = resolve_error_pause_seconds(exc, pause_on_error)
                     logger.error(
-                        "Ошибка (shop_id=%s, coroutine=%s): %s",
+                        "Ошибка (shop_id=%s, coroutine=%s, error_pause_sec=%s): %s",
                         shop_id,
                         func.__name__,
+                        pause_sec,
                         exc,
                         exc_info=True,
                     )
-                    await asyncio.sleep(pause_on_error)
+                    await asyncio.sleep(pause_sec)
 
         return wrapper
 

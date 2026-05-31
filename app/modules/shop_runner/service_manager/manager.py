@@ -476,6 +476,7 @@ class CoroutinesManager:
             handlers,
             max_workers=max_workers,
             return_exceptions=False,
+            tasks_manager=self._tasks_manager,
         )
         return None
 
