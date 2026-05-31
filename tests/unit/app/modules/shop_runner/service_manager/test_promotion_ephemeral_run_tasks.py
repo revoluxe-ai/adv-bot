@@ -21,6 +21,7 @@ _CLUSTER_BIDS_PY = (
 )
 
 _PROMOTION_HEAVY_METHODS = (
+    "adv_settings_auto_update",
     "update_minus_phrases_in_advs",
     "auto_budget_watchdog",
     "update_individual_keyword_target_places",
