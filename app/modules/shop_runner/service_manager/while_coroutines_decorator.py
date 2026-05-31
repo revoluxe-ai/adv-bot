@@ -1,6 +1,7 @@
 """Бесконечный цикл shop-корутин с паузами; отдельный backoff при PoolTimeout saturation."""
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
@@ -32,6 +33,46 @@ class MainCoroutineRuntimeError(RuntimeError):
 
 T_Result = TypeVar("T_Result")
 F_Spec = ParamSpec("F_Spec")
+
+
+async def _shutdown_tick_task_after_timeout(
+    tick_task: asyncio.Task[Any],
+    *,
+    coroutine_name: str,
+    shop_id: str,
+) -> None:
+    """Дождаться завершения tick в grace; иначе cancel, чтобы не держать pool/sem."""
+    try:
+        await asyncio.wait_for(
+            asyncio.shield(tick_task),
+            timeout=TICK_FINALLY_GRACE_SECONDS,
+        )
+        return
+    except asyncio.TimeoutError:
+        if tick_task.done():
+            return
+        tick_task.cancel()
+        try:
+            await tick_task
+        except asyncio.CancelledError:
+            logger.warning(
+                "Tick task cancelled after timeout grace "
+                "(coroutine=%s shop_id=%s grace_sec=%s)",
+                coroutine_name,
+                shop_id,
+                TICK_FINALLY_GRACE_SECONDS,
+            )
+        except Exception:
+            logger.exception(
+                "Tick task raised after cancel (coroutine=%s shop_id=%s)",
+                coroutine_name,
+                shop_id,
+            )
+    except asyncio.CancelledError:
+        if not tick_task.done():
+            tick_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await tick_task
 
 
 def _get_shop_id_for_log(args: tuple[Any, ...]) -> str:
@@ -128,16 +169,11 @@ def while_coroutine_decorator(
                         try:
                             await asyncio.wait_for(tick_task, timeout=timeout_sec)
                         except asyncio.TimeoutError:
-                            try:
-                                await asyncio.wait_for(
-                                    asyncio.shield(tick_task),
-                                    timeout=TICK_FINALLY_GRACE_SECONDS,
-                                )
-                            except (
-                                asyncio.TimeoutError,
-                                asyncio.CancelledError,
-                            ):
-                                pass
+                            await _shutdown_tick_task_after_timeout(
+                                tick_task,
+                                coroutine_name=func.__name__,
+                                shop_id=_get_shop_id_for_log(args),
+                            )
                             raise
                     await asyncio.sleep(pause_on_success)
                     continue
