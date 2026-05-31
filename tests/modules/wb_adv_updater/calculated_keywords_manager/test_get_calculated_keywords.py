@@ -1834,7 +1834,44 @@ async def test_ms_diagnostic_temporary_recheck_missing_threshold(
     assert diag.reason_no_data == "нет threshold"
     ui_line = format_ms_rule_line(diag)
     assert "threshold н/д" in ui_line
+    assert "cost gate не оценён" in ui_line
     assert ">" not in ui_line
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_temporary_recheck_cost_gate_pass_fields(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """Diagnostic fields: pay<=threshold при retest (unit parity через apply helper)."""
+    from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid_cooldown import (
+        _ms_gate_snapshot,
+        _retest_diagnostic_context,
+    )
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import (
+        KeywordState,
+    )
+
+    pre_kw = _pre_kw_above_target_at_min(text="ms_retest_pass_fields")
+    gates = _ms_gate_snapshot(pre_kw, 100)
+    returned = KeywordState(
+        status=KeywordStatus.GOOD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        best_keyword_status=True,
+        cooldown_display_tag=COOLDOWN_RETEST_DISPLAY_TAG,
+    )
+    diag = _retest_diagnostic_context(
+        gates=gates,
+        keyword_pay_for_order=74.0,
+        resolved_target_cost=550.0,
+        returned_state=returned,
+        cooldown_elapsed_hours=25.5,
+    )
+    assert diag.state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK
+    assert diag.cost_gate_evaluated is True
+    assert diag.cost_condition_pass is True
+    ui_line = format_ms_rule_line(diag)
+    assert "≤" in ui_line
+    assert ">" not in ui_line.split("PFO")[-1]
 
 
 @pytest.mark.asyncio

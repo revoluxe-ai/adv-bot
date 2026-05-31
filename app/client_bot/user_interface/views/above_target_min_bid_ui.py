@@ -88,7 +88,12 @@ def _temporary_recheck_line(diag: AboveTargetMinBidDiagnostic, summary: str) -> 
         if diag.cost_condition_pass:
             return f"{prefix}, PFO {pfo}≤{threshold}"
         return f"{prefix}, PFO {pfo}>{threshold}"
-    return f"{prefix}, {_format_pfo_part(diag)}, {_format_threshold_part(diag)}"
+    pfo_part = _format_pfo_part(diag)
+    threshold_part = _format_threshold_part(diag)
+    gate_note = "cost gate не оценён"
+    if diag.reason_no_data:
+        gate_note = f"{gate_note}: {diag.reason_no_data}"
+    return f"{prefix}, {pfo_part}, {threshold_part}, {gate_note}"
 
 
 def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:

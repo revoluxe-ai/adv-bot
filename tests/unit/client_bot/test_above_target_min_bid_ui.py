@@ -140,6 +140,23 @@ def test_format_ms_rule_line_blocked_without_cost_gate_both_missing() -> None:
     assert ">" not in line
 
 
+def test_format_ms_rule_line_temporary_recheck_with_cost_gate_pass() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
+            pay_for_order=74.0,
+            resolved_target_cost=550.0,
+            cost_gate_evaluated=True,
+            cost_condition_pass=True,
+            cooldown_display_tag="Т",
+        )
+    )
+    assert line.startswith("МС: тест")
+    assert "74" in line and "550" in line
+    assert "≤" in line
+    assert ">" not in line.split("PFO")[-1]
+
+
 def test_format_ms_rule_line_temporary_recheck_with_cost_gate() -> None:
     line = format_ms_rule_line(
         _diag(
@@ -171,6 +188,7 @@ def test_format_ms_rule_line_temporary_recheck_missing_threshold() -> None:
     assert line.startswith("МС: тест")
     assert "PFO 900" in line
     assert "threshold н/д" in line
+    assert "cost gate не оценён: нет threshold" in line
     assert ">" not in line
 
 
