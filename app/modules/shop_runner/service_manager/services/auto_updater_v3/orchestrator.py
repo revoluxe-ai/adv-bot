@@ -4,7 +4,7 @@
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
   2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — keyword bootstrap → [resolve valid: realloc + expansion] → MAX_CPA_GUARD
+  4. ``NORMAL`` — keyword bootstrap → active invalid cleanup → [resolve valid: realloc + expansion] → MAX_CPA_GUARD
      (по ``plan.max``, вне ``is_resolve_valid``) → gate.
   5. NO_CH OFF→MIN только через ``PROFITABLE_EXPANSION`` (V2 CPO ≤ resolve).
   6. Нетто-flush + ``target_place`` только если режим не ``NOT_READY``.
@@ -56,6 +56,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     compute_resolve_cost_threshold,
     is_resolve_valid,
+    plan_active_invalid_state_cleanup,
     plan_cost_reallocation,
     plan_max_cpa_guard,
     plan_profitable_expansion,
@@ -222,6 +223,7 @@ async def process_adv_v3(
             target_place_synced = True
 
     preamble_bootstrap_count = 0
+    preamble_cleanup_count = 0
     preamble_realloc_count = 0
     preamble_expansion_count = 0
     preamble_guard_count = 0
@@ -326,9 +328,43 @@ async def process_adv_v3(
             await cache_worst_costs_for_adv(
                 complex_adv.adv_id, ladder_inputs.worst_costs
             )
-            if is_resolve_valid(plan, resolve):
+            eligibility = build_eligibility_map(contexts)
+            prepared = build_prepared_from_contexts(contexts)
+            cleanup_resolve = resolve if is_resolve_valid(plan, resolve) else None
+            cleanup_actions = plan_active_invalid_state_cleanup(
+                prepared,
+                max_pay_for_order=float(plan.max_pay_for_order),
+                resolve=cleanup_resolve,
+                eligibility_by_ks_id=eligibility,
+                ladder_inputs=ladder_inputs,
+            )
+            if cleanup_actions:
+                preamble_cleanup_count = len(cleanup_actions)
+                logger.info(
+                    "[adv_id=%s] v3 ACTIVE_INVALID_CLEANUP: actions=%s",
+                    complex_adv.adv_id,
+                    preamble_cleanup_count,
+                )
+                contexts = _apply_v3_phase(
+                    ledger,
+                    cleanup_actions,
+                    raw_profiles,
+                )
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts
+                )
                 eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
+                ladder_inputs = LadderInputs.from_contexts(
+                    contexts,
+                    rk_orders_per_cart=rk_orders_per_cart,
+                    rec_orders_per_view=rec_orders_per_view,
+                )
+                await cache_worst_costs_for_adv(
+                    complex_adv.adv_id, ladder_inputs.worst_costs
+                )
+
+            if is_resolve_valid(plan, resolve):
                 # COST_REALLOCATION — portfolio DOWN при запасе по CPA (не overspend guard):
                 # снимаем дорогую агрессию, затем PROFITABLE_EXPANSION перераспределяет
                 # в более дешёвые passing states. При высоком fact CPA — MAX_CPA_GUARD ниже.
@@ -470,7 +506,7 @@ async def process_adv_v3(
                 )
                 logger.info(
                     "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
-                    "bootstrap=%s realloc=%s expansion=%s guard=%s "
+                    "bootstrap=%s cleanup=%s realloc=%s expansion=%s guard=%s "
                     "post_gate up=%s down=%s off=%s",
                     complex_adv.adv_id,
                     state.name if state else "None",
@@ -479,6 +515,7 @@ async def process_adv_v3(
                     else None,
                     fact.pay_for_order if fact else None,
                     preamble_bootstrap_count,
+                    preamble_cleanup_count,
                     preamble_realloc_count,
                     preamble_expansion_count,
                     preamble_guard_count,
