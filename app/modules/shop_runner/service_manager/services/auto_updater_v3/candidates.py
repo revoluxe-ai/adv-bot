@@ -100,6 +100,9 @@ def build_mode_candidates(
 ) -> dict[AggressionTargetMode, ModeCandidate]:
     """Return three mode candidates; invalid if profile missing or unusable.
 
+    Usable — только ``ch_observed=True`` (реальные buckets CH). Синтетика
+    ``_fill_positions`` не участвует в M/O/C (см. ``BidPositionRow.ch_observed``).
+
     ``rk_orders_per_cart`` — заказов на корзину РК (7 дней, ``wb_common_stat``), SSOT CPO.
     ``conv_views_to_orders`` — только legacy/fallback, если RK ratio не задан.
     """
@@ -114,7 +117,13 @@ def build_mode_candidates(
     if not profile:
         return empty
 
-    usable = [p for p in profile if p.predicted_conversion is not None and p.bid >= 0]
+    usable = [
+        p
+        for p in profile
+        if p.predicted_conversion is not None
+        and p.bid >= 0
+        and p.ch_observed
+    ]
     if not usable:
         return {
             m: ModeCandidate(

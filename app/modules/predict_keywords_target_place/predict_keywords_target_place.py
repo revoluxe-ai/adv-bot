@@ -123,6 +123,7 @@ class PredictKeywordsTargetPlace:
                     position=r.position,
                     bid=r.bid,
                     timestamp=r.timestamp,
+                    ch_observed=r.ch_observed,
                 )
                 for r in row_list
             ]
