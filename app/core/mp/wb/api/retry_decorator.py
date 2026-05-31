@@ -30,11 +30,18 @@ POOL_TIMEOUT_RETRY_PAUSE_SEC = 2.0
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
+_Collection = list[Any] | tuple[Any, ...] | set[Any]
+
+
+def _collection_length(value: _Collection) -> int:
+    """Длина коллекции с явной типизацией для pyright strict."""
+    return len(value)
+
 
 def _extract_items_count(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
     for value in args:
         if isinstance(value, (list, tuple, set)):
-            return len(value)
+            return _collection_length(cast(_Collection, value))
     body = kwargs.get("body")
     if body is not None:
         items = getattr(body, "items", None)
@@ -45,7 +52,7 @@ def _extract_items_count(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int |
         return len(ids.split(","))
     adv_ids = kwargs.get("adv_ids")
     if isinstance(adv_ids, (list, tuple, set)):
-        return len(adv_ids)
+        return _collection_length(cast(_Collection, adv_ids))
     return None
 
 
