@@ -9,7 +9,9 @@ from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
 from app.core.mp.wb.api.excs import PoolTimeoutError
 from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
     PROMOTION_POOL_ERROR_BACKOFF_SEC,
+    TICK_FINALLY_GRACE_SECONDS,
     _get_shop_id_for_log,
+    _shutdown_tick_task_after_timeout,
     is_pool_timeout_related,
     resolve_error_pause_seconds,
     while_coroutine_decorator,
@@ -311,3 +313,59 @@ async def test_decorator_pool_timeout_error_direct() -> None:
     assert call_count == 2
     assert sleep_calls[0] == PROMOTION_POOL_ERROR_BACKOFF_SEC
     assert sleep_calls[1] == 10
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_shutdown_tick_task_cancels_orphan_after_grace() -> None:
+    """После grace orphan task отменяется и не остаётся pending."""
+    hold = asyncio.Event()
+
+    async def long_running() -> None:
+        await hold.wait()
+
+    tick_task = asyncio.create_task(long_running())
+    await asyncio.sleep(0)
+
+    await _shutdown_tick_task_after_timeout(
+        tick_task,
+        coroutine_name="update_clusters_adv_stats_today",
+        shop_id="shop-1",
+    )
+
+    assert tick_task.done()
+    assert tick_task.cancelled()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_timeout_cancels_tick_when_grace_exhausted() -> None:
+    """timeout_sec: orphan tick cancel — следующий loop не ждёт бесконечный sleep."""
+    hold = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    decorator = while_coroutine_decorator(60, 1, timeout_sec=0.05)
+
+    async def long_tick(self: object) -> None:
+        try:
+            await hold.wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    wrapped = decorator(long_tick)
+    self_mock = MagicMock()
+    self_mock.shop_id = "shop-1"
+
+    with patch(f"{MODULE}.TICK_FINALLY_GRACE_SECONDS", 0.05):
+        with patch(f"{MODULE}.logger"):
+            with patch(
+                f"{MODULE}.asyncio.sleep",
+                new_callable=AsyncMock,
+                side_effect=_StopTestLoop("exit"),
+            ):
+                with pytest.raises(_StopTestLoop, match="exit"):
+                    await wrapped(self_mock)
+
+    await asyncio.wait_for(cancelled.wait(), timeout=2.0)
+    assert hold.is_set() is False
