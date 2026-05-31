@@ -372,6 +372,12 @@ async def test_ensure_budget_limits_by_successful_topups(monkeypatch) -> None:
         "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums",
         AsyncMock(return_value=(adv_setting.auto_budget_daily_limit, 0.0)),
     )
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_get_last_full_stat_update",
+        AsyncMock(return_value=now),
+    )
 
     wb_modifier = SimpleNamespace(
         get_campaign_budget=AsyncMock(
