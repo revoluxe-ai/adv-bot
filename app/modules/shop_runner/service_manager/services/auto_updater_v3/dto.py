@@ -31,7 +31,7 @@ class ModeCandidate(BaseModel):
     predicted_conversion: float | None = None
     """Conv корзина→показ (к→к) на точке CH."""
     predicted_orders_per_view: float | None = None
-    """Conv показ→заказ (к→з): ``predicted_conversion × rk_orders_per_cart``."""
+    """Conv показ→заказ (к→з): ``predicted_conversion × orders_per_cart`` (сглаженный по ключу)."""
     conversion_score: float | None = None
     economy_score: float | None = None
     volume_score: float | None = None

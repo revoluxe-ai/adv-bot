@@ -63,6 +63,12 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 
 ## SSOT лестницы M/O/C (`keyword_v3_ladder_view.py`)
 
+**orders_per_cart для CPO:** effective rate только через ``LadderInputs.orders_per_cart_for_ctx(ctx)``
+(сглаживание ``smooth_key_orders_per_cart``: prior ``V3_KEY_CART_TO_ORDER_PRIOR_CARTS``, baseline
+``campaign_orders_per_cart_7d`` из ``wb_common_stat`` 7d, key ``orders``/``add_to_cart`` 7d из cluster stats).
+Исключения: UI-строка «РК 7д»; ``target_place_sync`` без ``CalculatedKeyword`` → campaign fallback;
+``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` → ``pay_for_order``, не CH×orders_per_cart.
+
 UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
 
 | Модуль | Роль |

@@ -191,13 +191,15 @@ def try_valid_rollout_up(
         return None
 
     conv = _conv_for_ctx(ctx, prepared)
-    rk = ladder_inputs.rk_orders_per_cart if ladder_inputs is not None else None
+    opc = (
+        ladder_inputs.orders_per_cart_for_ctx(ctx) if ladder_inputs is not None else None
+    )
     if mode == KeywordStrategyMode.OFF:
         cand = build_mode_candidates(
             profile=ctx.position_profile,
             keyword_text=ctx.keyword.text,
-            conv_views_to_orders=conv if rk is None else None,
-            rk_orders_per_cart=rk,
+            conv_views_to_orders=conv if opc is None else None,
+            orders_per_cart=opc,
         )
         min_c = cand.get(AggressionTargetMode.MIN_CPA)
         if min_c is None or not min_c.is_valid:
@@ -773,7 +775,7 @@ def _highest_passing_mode_in_upper_groups(
         else _LadderInputs.from_contexts([ctx])
     )
     rec = ladder.rec_orders_per_view
-    rk = ladder.rk_orders_per_cart
+    opc = ladder.orders_per_cart_for_ctx(ctx)
     best_mode: KeywordStrategyMode | None = None
     best_cost: float | None = None
     best_imputed = False
@@ -790,7 +792,7 @@ def _highest_passing_mode_in_upper_groups(
                 capped,
                 policy,
                 rec_orders_per_view=rec,
-                rk_orders_per_cart=rk,
+                orders_per_cart=opc,
             )
             if not rec_gate_allows_up(gate_status):
                 continue
@@ -1701,7 +1703,8 @@ def diagnose_max_cpa_guard_keyword(
         ),
         "guard_skip_reason": ";".join(skip_reasons) if skip_reasons else None,
         "ladder_inputs_source": ladder_inputs_source,
-        "rk_orders_per_cart": ladder.rk_orders_per_cart,
+        "campaign_orders_per_cart_7d": ladder.campaign_orders_per_cart_7d,
+        "rk_orders_per_cart": ladder.campaign_orders_per_cart_7d,
         "rec_orders_per_view": ladder.rec_orders_per_view,
         "operational_cpo_at_target_place": (
             None if operational_cpo is None else float(operational_cpo)
@@ -1909,7 +1912,7 @@ def _collect_potential_expensive(
             to_mode,
             policy,
             rec_orders_per_view=ladder.rec_orders_per_view,
-            rk_orders_per_cart=ladder.rk_orders_per_cart,
+            orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
         )
         if not rec_gate_allows_up(gate_status):
             continue

@@ -4,8 +4,8 @@
 здесь не применяем: клиент часто показывает ``\\_`` буквально. Заголовок — ``*bold*``;
 остальной текст — plain, без ``_`` в разметке.
 
-Отдельно выводится **корз→заказ РК 7д** (``rk_orders_per_cart`` из ``wb_common_stat``) —
-множитель в CPO точки CH вместе с ``к→к`` на ставке.
+Отдельно: **РК 7д**, raw и **сглаженная** ключевая корз→заказ (prior к РК).
+CPO на точке CH = ``к→к`` × сглаженный ``orders_per_cart`` (SSOT ``orders_per_cart_for_ctx``).
 """
 
 from __future__ import annotations
@@ -84,9 +84,19 @@ class KeywordV3ProfileData:
     campaign_worst_only: bool = False
     campaign_worst_costs: dict[AggressionTargetMode, float] | None = None
     stage_sources: dict[AggressionTargetMode, str] | None = None
-    rk_orders_per_cart: float | None = None
+    campaign_orders_per_cart_7d: float | None = None
+    key_orders_7d: int = 0
+    key_carts_7d: int = 0
+    key_orders_per_cart_raw: float | None = None
+    key_orders_per_cart_smoothed: float | None = None
+    prior_carts_strength: int = 0
     rec_orders_per_view: float | None = None
     shelf_click_mode: "ShelfClickMode | None" = None
+
+    @property
+    def rk_orders_per_cart(self) -> float | None:
+        """Deprecated: ``campaign_orders_per_cart_7d`` (baseline РК для prior/UI)."""
+        return self.campaign_orders_per_cart_7d
 
 
 def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
@@ -153,16 +163,30 @@ def _ladder_has_valid_candidate(data: KeywordV3ProfileData) -> bool:
 
 
 def _format_rk_cart_to_order_line(data: KeywordV3ProfileData) -> str:
-    """Конверсия РК корзина→заказ (7д, ``wb_common_stat``) — множитель в CPO на точке CH."""
-    rk = data.rk_orders_per_cart
-    if rk is None or rk <= 0:
+    """Конверсия РК корзина→заказ (7д, ``wb_common_stat``) — prior для сглаживания ключа."""
+    campaign = data.campaign_orders_per_cart_7d
+    if campaign is None or campaign <= 0:
         return "   РК 7д корз→заказ: — (нет данных wb_common_stat)"
-    carts_per_order = 1.0 / float(rk)
-    pct = _format_pct_compact(rk)
+    carts_per_order = 1.0 / float(campaign)
+    pct = _format_pct_compact(campaign)
     return (
         f"   РК 7д корз→заказ: {pct} "
-        f"({rk:.3g} зак/корз, {carts_per_order:.2g} корз/зак)"
+        f"({campaign:.3g} зак/корз, {carts_per_order:.2g} корз/зак)"
     )
+
+
+def _format_key_cart_to_order_lines(data: KeywordV3ProfileData) -> list[str]:
+    """Raw и сглаженная корз→заказ ключа + prior."""
+    orders = data.key_orders_7d
+    carts = data.key_carts_7d
+    raw_pct = _format_pct_compact(data.key_orders_per_cart_raw)
+    smooth_pct = _format_pct_compact(data.key_orders_per_cart_smoothed)
+    prior = data.prior_carts_strength
+    return [
+        f"   ключ корз→заказ raw: {orders} зак / {carts} корз = {raw_pct}",
+        f"   ключ корз→заказ сглаж.: {smooth_pct}",
+        f"   prior: {prior} корзин",
+    ]
 
 
 def _format_current_mode_target_line(data: KeywordV3ProfileData) -> str | None:
@@ -185,7 +209,7 @@ def _format_metrics_legend_lines(data: KeywordV3ProfileData) -> list[str]:
     """Легенда метрик строк M/O/C и формула CPO."""
     lines = [
         "   п|с|к→к|к→з|PFC|CPO — поз|ставка|conv CH|к→з|PFC|CPO заказа",
-        "   CPO = PFC / (зак/корз РК) = к→к CH × корз→заказ РК 7д",
+        "   CPO = PFC / (к→з) = к→к CH × сглаженная ключевая корз→заказ (prior к РК 7д)",
         "   П — state выше полочной конверсии по прогнозу к→з",
         "   Н — конверсия state неизвестна (условно полочный); UP разрешён",
     ]
@@ -250,6 +274,7 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         )
     if not data.no_ch_min_only:
         lines.append(_format_rk_cart_to_order_line(data))
+        lines.extend(_format_key_cart_to_order_lines(data))
     target_line = _format_current_mode_target_line(data)
     if target_line is not None:
         lines.append(target_line)
@@ -334,6 +359,6 @@ def _rec_gate_mark_for_stage(
         cand,
         policy=policy,
         rec_orders_per_view=data.rec_orders_per_view,
-        rk_orders_per_cart=data.rk_orders_per_cart,
+        orders_per_cart=data.key_orders_per_cart_smoothed,
     )
 

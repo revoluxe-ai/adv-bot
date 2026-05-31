@@ -169,8 +169,9 @@ def _catalog_for_ctx(
     *,
     ladder_inputs: "LadderInputs | None" = None,
     rk_orders_per_cart: float | None = None,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Каталог M/O/C: через ``LadderInputs`` (RK) или legacy conv/rk явно."""
+    """Каталог M/O/C: через ``LadderInputs.orders_per_cart_for_ctx`` или legacy resolve."""
     if ladder_inputs is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
             _catalog_for_ctx as _ladder_catalog_for_ctx,
@@ -178,9 +179,22 @@ def _catalog_for_ctx(
 
         return _ladder_catalog_for_ctx(ctx, ladder_inputs)
 
-    rk = rk_orders_per_cart
+    from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+        resolve_orders_per_cart_for_cpo,
+    )
+
+    campaign_opc = (
+        campaign_orders_per_cart_7d
+        if campaign_orders_per_cart_7d is not None
+        else rk_orders_per_cart
+    )
+    opc = resolve_orders_per_cart_for_cpo(
+        campaign_orders_per_cart_7d=campaign_opc,
+        key_orders=ctx.keyword.orders,
+        key_carts=ctx.keyword.add_to_cart,
+    )
     conv = None
-    if rk is None or rk <= 0:
+    if opc is None or opc <= 0:
         peer = [c for c, _ in contexts] if contexts else [ctx]
         conv = effective_conv_for_v3(ctx, peer)
         if conv is None:
@@ -189,7 +203,7 @@ def _catalog_for_ctx(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
         conv_views_to_orders=conv,
-        rk_orders_per_cart=rk,
+        orders_per_cart=opc,
     )
 
 
@@ -355,16 +369,25 @@ def build_worst_per_state_costs(
     prepared: PreparedList,
     *,
     rk_orders_per_cart: float | None = None,
+    campaign_orders_per_cart_7d: float | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> dict[AggressionTargetMode, float]:
-    """Worst (max) predicted CPA per M/O/C среди ключей с валидной матрицей."""
+    """Worst (max) predicted CPA per M/O/C среди доноров с valid CH-каталогом (per-key smoothed)."""
     if ladder_inputs is not None:
         return dict(ladder_inputs.worst_costs)
+
+    campaign_opc = (
+        campaign_orders_per_cart_7d
+        if campaign_orders_per_cart_7d is not None
+        else rk_orders_per_cart
+    )
 
     worst: dict[AggressionTargetMode, float] = {}
     for ctx, _mode in prepared:
         catalog = _catalog_for_ctx(
-            ctx, prepared, rk_orders_per_cart=rk_orders_per_cart
+            ctx,
+            prepared,
+            campaign_orders_per_cart_7d=campaign_opc,
         )
         if missing_target_matrix_from_catalog(catalog):
             continue
@@ -429,7 +452,7 @@ def collect_transition_candidates(
                 to_mode,
                 policy,
                 rec_orders_per_view=ladder.rec_orders_per_view,
-                rk_orders_per_cart=ladder.rk_orders_per_cart,
+                orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
             )
             if not rec_gate_allows_up(gate_status):
                 continue
@@ -555,7 +578,6 @@ def plan_shelf_rec_false_cleanup_down(
         aggressiveness=V3RolloutAggressiveness.MAX,
     )
     rec = ladder.rec_orders_per_view
-    rk = ladder.rk_orders_per_cart
     if rec is None:
         return []
 
@@ -571,12 +593,13 @@ def plan_shelf_rec_false_cleanup_down(
             continue
 
         state_candidates = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
+        opc = ladder.orders_per_cart_for_ctx(ctx)
         current_status = state_rec_gate_status_for_mode(
             state_candidates,
             mode,
             gate_policy,
             rec_orders_per_view=rec,
-            rk_orders_per_cart=rk,
+            orders_per_cart=opc,
         )
         if not rec_gate_triggers_cleanup(current_status):
             continue
@@ -586,7 +609,7 @@ def plan_shelf_rec_false_cleanup_down(
             KeywordStrategyMode.MIN_CPA,
             gate_policy,
             rec_orders_per_view=rec,
-            rk_orders_per_cart=rk,
+            orders_per_cart=opc,
         )
 
         if rec_gate_allows_up(min_status) and mode != KeywordStrategyMode.MIN_CPA:

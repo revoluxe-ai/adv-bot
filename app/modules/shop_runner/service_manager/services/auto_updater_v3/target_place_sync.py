@@ -93,10 +93,13 @@ async def sync_keyword_target_places_v3(
         KeywordSetting.adv_setting_id == adv.adv_setting_original_id
     )
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
-        load_rk_orders_per_cart_7d,
+        load_campaign_orders_per_cart_7d,
+        resolve_orders_per_cart_for_cpo,
     )
 
-    rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv.complex_adv.adv_setting)
+    campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(
+        adv.complex_adv.adv_setting
+    )
 
     moc_stats: dict[str, int] = {
         "with_ladder": 0,
@@ -157,15 +160,22 @@ async def sync_keyword_target_places_v3(
                 continue
             assert calc_kw is not None
             profile_points = profile_points_from_bid_positions(profile)
+            orders_per_cart = resolve_orders_per_cart_for_cpo(
+                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                key_orders=calc_kw.orders,
+                key_carts=calc_kw.add_to_cart,
+            )
+            if orders_per_cart is None:
+                orders_per_cart = campaign_orders_per_cart_7d
             candidates = build_mode_candidates(
                 profile=profile_points,
                 keyword_text=keyword.text,
                 conv_views_to_orders=(
                     calc_kw.conv_views_to_orders
-                    if rk_orders_per_cart is None
+                    if orders_per_cart is None
                     else None
                 ),
-                rk_orders_per_cart=rk_orders_per_cart,
+                orders_per_cart=orders_per_cart,
             )
             o_eq_c, o_eq_m = moc_equality_flags(
                 candidates[AggressionTargetMode.MIN_CPA],
@@ -211,5 +221,5 @@ async def sync_keyword_target_places_v3(
             100.0 * moc_stats["o_eq_m"] / n,
             moc_stats["o_ne_c"],
             moc_stats["skipped_no_profile"],
-            rk_orders_per_cart,
+            campaign_orders_per_cart_7d,
         )

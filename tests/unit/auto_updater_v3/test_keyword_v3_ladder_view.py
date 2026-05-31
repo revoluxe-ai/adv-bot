@@ -97,6 +97,45 @@ def test_ui_cost_parity_with_cost_for_mode() -> None:
 
 
 @pytest.mark.unit
+def test_operational_cpo_uses_smoothed_orders_per_cart() -> None:
+    """``operational_cpo_at_keyword_target_place`` == CPO каталога с ``orders_per_cart_for_ctx``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        operational_cpo_at_keyword_target_place,
+        state_candidates_by_mode_for_ctx,
+    )
+
+    prof = _rollout_profile()
+    kw = _calc_kw(
+        ks_id=1,
+        text="guard",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(30.0),
+    )
+    stat = kw.cluster_stat.model_copy(update={"orders": 12, "add_to_cart": 5})
+    ctx = KeywordV3Context(
+        keyword=kw.model_copy(update={"cluster_stat": stat}),
+        position_profile=prof,
+    )
+    ladder = LadderInputs.from_contexts([ctx], campaign_orders_per_cart_7d=0.10)
+    catalog = state_candidates_by_mode_for_ctx(ctx, ladder)
+    min_mc = catalog[AggressionTargetMode.MIN_CPA]
+    assert min_mc.is_valid and min_mc.position is not None
+    ks = ctx.keyword.keyword_setting.model_copy(
+        update={"target_place": int(min_mc.position)}
+    )
+    ctx_at_target = KeywordV3Context(
+        keyword=ctx.keyword.model_copy(update={"keyword_setting": ks}),
+        position_profile=prof,
+    )
+    operational = operational_cpo_at_keyword_target_place(
+        ctx_at_target, ladder_inputs=ladder
+    )
+    assert operational is not None and min_mc.predicted_cpa is not None
+    assert operational == pytest.approx(min_mc.predicted_cpa)
+
+
+@pytest.mark.unit
 def test_m_profile_o_profile_not_inf() -> None:
     """M/O на одной точке профиля — PROFILE (не ``inf``), не worst."""
     from datetime import UTC, datetime

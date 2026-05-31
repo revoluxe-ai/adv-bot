@@ -354,11 +354,9 @@ def test_shelf_false_cleanup_auto_shortcut_to_min_uses_force_off(
         _cats: dict,
         to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, _policy, kwargs)
         if to_mode == KeywordStrategyMode.MIN_CPA:
             return RecGateStatus.PASS
         if to_mode == KeywordStrategyMode.OPTIMUM:
@@ -410,11 +408,9 @@ def test_shelf_false_cleanup_whitelist_shortcut_to_min_down(
         _cats: dict,
         to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, _policy, kwargs)
         if to_mode == KeywordStrategyMode.MIN_CPA:
             return RecGateStatus.PASS
         if to_mode == KeywordStrategyMode.OPTIMUM:
@@ -509,11 +505,9 @@ def test_shelf_false_cleanup_whitelist_min_fallback_off_when_step_down_none(
         _cats: dict,
         to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, to_mode, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, to_mode, _policy, kwargs)
         return RecGateStatus.FAIL
 
     monkeypatch.setattr(
@@ -623,3 +617,56 @@ def test_collect_candidates_skips_invalid_target_without_keyword_fallback() -> N
         policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
     )
     assert not candidates
+
+
+@pytest.mark.unit
+def test_build_worst_uses_per_key_smoothed_excludes_non_donors() -> None:
+    """Worst = max CPO с per-key smoothed; ключ без CH-матрицы не донор."""
+    campaign = 0.10
+    prof = sample_profile(min_pay=25.0, high_pay=40.0)
+    ctx_low = KeywordV3Context(
+        keyword=calc_kw(
+            ks_id=1,
+            text="low",
+            mode=KeywordStrategyMode.MIN_CPA,
+            orders=2,
+            add_to_cart=20,
+        ),
+        position_profile=prof,
+    )
+    ctx_high = KeywordV3Context(
+        keyword=calc_kw(
+            ks_id=2,
+            text="high",
+            mode=KeywordStrategyMode.MIN_CPA,
+            orders=15,
+            add_to_cart=20,
+        ),
+        position_profile=prof,
+    )
+    ctx_no_ch = ctx(ks_id=3, mode=KeywordStrategyMode.MIN_CPA, profile=None)
+    prepared = [
+        (ctx_low, KeywordStrategyMode.MIN_CPA),
+        (ctx_high, KeywordStrategyMode.MIN_CPA),
+        (ctx_no_ch, KeywordStrategyMode.MIN_CPA),
+    ]
+    ladder = LadderInputs.from_contexts(
+        [ctx_low, ctx_high, ctx_no_ch],
+        campaign_orders_per_cart_7d=campaign,
+    )
+    worst = ladder.worst_costs
+    cat_low = build_mode_candidates(
+        profile=prof,
+        keyword_text="low",
+        orders_per_cart=ladder.orders_per_cart_for_ctx(ctx_low),
+    )
+    cat_high = build_mode_candidates(
+        profile=prof,
+        keyword_text="high",
+        orders_per_cart=ladder.orders_per_cart_for_ctx(ctx_high),
+    )
+    cpo_low = cat_low[AggressionTargetMode.MIN_CPA].predicted_cpa
+    cpo_high = cat_high[AggressionTargetMode.MIN_CPA].predicted_cpa
+    assert cpo_low is not None and cpo_high is not None
+    assert cpo_low > cpo_high
+    assert worst[AggressionTargetMode.MIN_CPA] == pytest.approx(float(cpo_low))
