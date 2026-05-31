@@ -248,6 +248,22 @@ def test_format_ms_rule_line_card_target_differs_from_rule() -> None:
     assert "pos 38 < target 71," not in line
 
 
+def test_format_ms_rule_line_card_unset_target_differs_from_rule() -> None:
+    """Карточка «Не задана», на ключе target 71 — показываем расхождение."""
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.PASS_BY_COST,
+            cost_gate_evaluated=True,
+            cost_condition_pass=True,
+            target_place=71,
+        ),
+        card_target_place=None,
+        card_target_source="default",
+    )
+    assert "target 71 (на ключе)" in line
+    assert "цель карточки: Не задана (по умолчанию)" in line
+
+
 def test_format_ms_rule_line_inactive_no_target_before_cpm_check() -> None:
     """Без target на ключе правило не доходит до min-bid gate — не показываем CPM > min."""
     line = format_ms_rule_line(

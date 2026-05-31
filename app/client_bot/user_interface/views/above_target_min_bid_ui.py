@@ -21,9 +21,11 @@ def _fmt_num(value: float | None, *, digits: int = 1) -> str:
 def _card_target_differs_from_rule(
     rule_target: int | None,
     card_target: int | None,
+    *,
+    card_source: TargetPlaceSource | None = None,
 ) -> bool:
-    """True, если «Целевая позиция» карточки не совпадает с target_place ключа для МС."""
-    if card_target is None:
+    """True, если эффективная цель карточки не совпадает с target_place ключа для МС."""
+    if card_source is None:
         return False
     return rule_target != card_target
 
@@ -34,7 +36,9 @@ def _card_target_suffix(
     card_source: TargetPlaceSource | None,
 ) -> str:
     """Пояснение, когда правило МС смотрит на ключ, а карточка — на другую цель."""
-    if not _card_target_differs_from_rule(rule_target, card_target):
+    if not _card_target_differs_from_rule(
+        rule_target, card_target, card_source=card_source
+    ):
         return ""
     value_str, source_label = format_target_place_display(
         card_target, card_source or "default"
@@ -42,9 +46,14 @@ def _card_target_suffix(
     return f", цель карточки: {value_str} ({source_label})"
 
 
-def _rule_target_label(target: int, *, card_target: int | None) -> str:
+def _rule_target_label(
+    target: int,
+    *,
+    card_target: int | None,
+    card_source: TargetPlaceSource | None = None,
+) -> str:
     """Подпись target в pos-gate: «на ключе», если карточка показывает другую цель."""
-    if _card_target_differs_from_rule(target, card_target):
+    if _card_target_differs_from_rule(target, card_target, card_source=card_source):
         return f"target {target} (на ключе)"
     return f"target {target}"
 
@@ -61,7 +70,9 @@ def _pos_min_summary(
     min_bid = diag.min_bid
     parts: list[str] = []
     if pos is not None and target is not None:
-        target_label = _rule_target_label(target, card_target=card_target)
+        target_label = _rule_target_label(
+            target, card_target=card_target, card_source=card_source
+        )
         if diag.position_condition_pass:
             parts.append(f"pos {pos} < {target_label}")
         else:
@@ -90,7 +101,9 @@ def _inactive_reason(
         pos = diag.current_position
         target = diag.target_place
         if pos is not None and target is not None:
-            target_label = _rule_target_label(target, card_target=card_target)
+            target_label = _rule_target_label(
+            target, card_target=card_target, card_source=card_source
+        )
             reason = f"pos {pos} >= {target_label}"
             suffix = _card_target_suffix(target, card_target, card_source)
             return f"{reason}{suffix}" if suffix else reason
