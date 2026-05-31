@@ -94,16 +94,16 @@ def _inactive_reason(
             reason = f"pos {pos} >= {target_label}"
             suffix = _card_target_suffix(target, card_target, card_source)
             return f"{reason}{suffix}" if suffix else reason
-    if diag.min_bid_condition_pass is False:
-        cpm = diag.current_cpm
-        min_bid = diag.min_bid
-        if cpm is not None and min_bid is not None:
-            return f"CPM {cpm} > min {min_bid}"
     if diag.target_place is None:
         suffix = _card_target_suffix(None, card_target, card_source)
         if suffix:
             return f"нет target_place на ключе{suffix}"
         return "нет target_place"
+    if diag.min_bid_condition_pass is False:
+        cpm = diag.current_cpm
+        min_bid = diag.min_bid
+        if cpm is not None and min_bid is not None:
+            return f"CPM {cpm} > min {min_bid}"
     if diag.current_cpm is None or diag.current_cpm <= 0:
         return "нет CPM"
     return (

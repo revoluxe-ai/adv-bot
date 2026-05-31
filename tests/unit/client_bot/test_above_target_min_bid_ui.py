@@ -248,6 +248,23 @@ def test_format_ms_rule_line_card_target_differs_from_rule() -> None:
     assert "pos 38 < target 71," not in line
 
 
+def test_format_ms_rule_line_inactive_no_target_before_cpm_check() -> None:
+    """Без target на ключе правило не доходит до min-bid gate — не показываем CPM > min."""
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.INACTIVE,
+            target_place=None,
+            position_condition_pass=None,
+            min_bid_condition_pass=False,
+            current_cpm=600,
+            min_bid=510,
+        )
+    )
+    assert line.startswith("МС: нет")
+    assert "нет target_place" in line
+    assert "CPM" not in line
+
+
 def test_format_ms_rule_line_inactive_no_keyword_target_card_shows_campaign() -> None:
     line = format_ms_rule_line(
         _diag(
