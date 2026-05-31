@@ -32,7 +32,7 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → [resolve valid: realloc + expansion]
+NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP → [resolve valid: realloc + expansion]
             → MAX_CPA_GUARD (если fact > plan.max; вне is_resolve_valid) → plan/fact gate
             → shelf cleanup (post-gate) → flush → target_place
 ```
@@ -42,10 +42,11 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → [resolve valid: reallo
 Фазы NORMAL (только `allows_ladder_phases`):
 
 1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
-2. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
-3. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
-4. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
-5. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
+2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF). Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: отсутствие CH-кандидата не invalid; MIN при ``pay_for_order`` ≤ max не трогаем; OPT/MAX без operational cost → DOWN на MIN по ``PAY_FOR_ORDER``, иначе FORCE_OFF.
+3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
+4. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
+5. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
+6. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
 
 ## Structured logs
 
@@ -117,9 +118,10 @@ Rec-gate:
 На каждом тике **NORMAL**, **до** `check_equal_in_cache`:
 
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
-2. **COST_REALLOCATION** — DOWN-only rebalance (headroom).
-3. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
-4. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
+2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
+3. **COST_REALLOCATION** — DOWN-only rebalance (headroom).
+4. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
+5. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
 
 Selector после gate: **только shelf cleanup** (rec-false DOWN / FORCE_OFF), без M2/M3/FINAL_TUNING.
 
