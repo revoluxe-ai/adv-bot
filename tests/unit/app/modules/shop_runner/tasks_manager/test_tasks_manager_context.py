@@ -153,3 +153,55 @@ async def test_wb_manager_hub_context_reached_inside_shared_worker() -> None:
         _hub_var.reset(token)
 
     assert reached == [fake_hub], "hub not visible in shared worker — fallback would fire"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_timeout_cancels_child_handler_task() -> None:
+    """При handler timeout дочерняя task не продолжает работать в фоне."""
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def long_handler() -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    manager = TasksManager(max_workers=1, handler_timeout_sec=0.05)
+    future = await manager.add_task(long_handler)
+    manager.start()
+
+    await started.wait()
+    with pytest.raises(asyncio.TimeoutError):
+        await future
+    await asyncio.wait_for(cancelled.wait(), timeout=1.0)
+    await manager.stop()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_worker_cancel_cancels_child_handler_task() -> None:
+    """При остановке manager отменяется и дочерняя handler-task."""
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def long_handler() -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    manager = TasksManager(max_workers=1)
+    future = await manager.add_task(long_handler)
+    manager.start()
+
+    await started.wait()
+    await manager.stop()
+
+    assert future.cancelled()
+    await asyncio.wait_for(cancelled.wait(), timeout=1.0)
