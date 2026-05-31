@@ -125,7 +125,7 @@ async def test_acquire_promotion_http_waits_when_limit_reached(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_slow_semaphore_wait_logs_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_acquire_returns_timing_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PROMOTION_HTTP_CONCURRENCY_LIMIT", "1")
     reset_promotion_http_concurrency_state()
 
@@ -135,24 +135,81 @@ async def test_slow_semaphore_wait_logs_warning(monkeypatch: pytest.MonkeyPatch)
         await asyncio.sleep(1.2)
         sem.release()
 
-    with patch(
-        "app.core.mp.wb.api.promotion_http_concurrency.logger.warning"
-    ) as warn_mock:
+    holder_task = asyncio.create_task(holder())
+    await asyncio.sleep(0.02)
+    async with acquire_promotion_http(
+        shop_id="shop-warn",
+        http_method="GET",
+        endpoint="/adv/v3/fullstats",
+    ) as timing:
+        assert timing.wait_semaphore_sec >= 1.0
+        assert timing.in_flight == 1
+        assert timing.limit == 1
+    await holder_task
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_slow_promotion_request_logs_structured_timing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PROMOTION_HTTP_CONCURRENCY_LIMIT", "1")
+    reset_promotion_http_concurrency_state()
+
+    async def holder() -> None:
+        sem = get_promotion_global_semaphore()
+        await sem.acquire()
+        await asyncio.sleep(1.2)
+        sem.release()
+
+    async def request(*_args: object, **_kwargs: object) -> MagicMock:
+        return MagicMock()
+
+    client = AsyncMock(spec=httpx.AsyncClient)
+    client.request = request
+    proxy = _AuthAsyncProxy(
+        client, "token", section=SectionsEnum.PROMOTION, shop_id="shop-warn"
+    )
+
+    with patch("app.core.mp.wb.api.api_client.logger.warning") as warn_mock:
         holder_task = asyncio.create_task(holder())
         await asyncio.sleep(0.02)
-        await _run_acquire_and_release(
-            shop_id="shop-warn",
-            http_method="GET",
-            endpoint="/adv/v3/fullstats",
-        )
+        _ = await proxy.request("GET", "/adv/v3/fullstats")
         await holder_task
+
         warn_mock.assert_called_once()
         msg = str(warn_mock.call_args)
-        assert "section=PROMOTION" in msg
-        assert "wait_sec=" in msg
-        assert "limit=" in msg
-        assert "GET /adv/v3/fullstats" in msg
+        assert "wb_promotion_http_timing" in msg
+        assert "section=%s" in msg
+        assert "wait_semaphore_sec=%.3f" in msg
+        assert "inside_request_duration_sec=%.3f" in msg
+        assert "total_duration_sec=%.3f" in msg
+        assert "in_flight=%s" in msg
+        assert "limit=%s" in msg
         assert "shop-warn" in msg
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_pool_timeout_logs_pool_timeout_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PROMOTION_HTTP_CONCURRENCY_LIMIT", "1")
+    reset_promotion_http_concurrency_state()
+
+    client = AsyncMock(spec=httpx.AsyncClient)
+    client.request = AsyncMock(side_effect=httpx.PoolTimeout("pool exhausted"))
+    proxy = _AuthAsyncProxy(
+        client, "token", section=SectionsEnum.PROMOTION, shop_id="shop-pool"
+    )
+
+    with patch("app.core.mp.wb.api.api_client.logger.warning") as warn_mock:
+        with pytest.raises(httpx.PoolTimeout):
+            await proxy.request("GET", "/adv/v0/normquery/stats")
+
+        warn_mock.assert_called_once()
+        args = warn_mock.call_args.args
+        assert "pool_timeout=%s" in args[0]
+        assert True in args
+        assert "PoolTimeout" in args
 
 
 async def _run_acquire_and_release(

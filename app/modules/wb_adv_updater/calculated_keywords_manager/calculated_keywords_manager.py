@@ -1,6 +1,14 @@
+"""Расчёт и кэширование keyword-состояния для WB adv updater.
+
+Модуль собирает данные ClickHouse/Redis/WB manager hub для расчёта ставок,
+диагностик и bidder-status. Fallback создания WBManagerHub оставлен только для
+нештатных путей и логируется warning-ом для обнаружения утечки отдельного pool.
+"""
+
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+import inspect
 import logging
 from numbers import Real
 from typing import Generator, Protocol, Sequence, TypeVar, cast
@@ -580,11 +588,28 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             redis_client_wrapper = RedisClient(redis_client=raw_redis_client)
             httpx_client_handler = HttpxClientHandler()
+            logger.warning(
+                "event=wb_manager_hub_fallback_created "
+                "fallback_wb_manager_hub_created=true shop_id=%s reason=%s "
+                "caller=%s handler_id=%s",
+                complex_adv.shop_id,
+                "missing_context",
+                _get_caller_name(),
+                id(httpx_client_handler),
+            )
 
             wb_manager_hub_container = WBManagerHubContainer(
                 _shop_id=complex_adv.shop_id,
                 _httpx_client_handler=httpx_client_handler,
                 _redis_wrapper=redis_client_wrapper,
+            )
+            logger.warning(
+                "event=wb_manager_hub_container_created shop_id=%s "
+                "handler_id=%s caller=%s fallback=%s",
+                complex_adv.shop_id,
+                id(httpx_client_handler),
+                _get_caller_name(),
+                True,
             )
             return wb_manager_hub_container.wb_manager_hub()
 
@@ -613,3 +638,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             complex_adv, texts
         )
         return statuses_map
+
+
+def _get_caller_name() -> str:
+    """Вернуть ближайший внешний caller для diagnostic fallback-log."""
+    stack = inspect.stack()
+    if len(stack) < 3:
+        return "—"
+    return stack[2].function
