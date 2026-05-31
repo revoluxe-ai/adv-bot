@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import logging
 from collections import deque
 from dataclasses import dataclass
@@ -15,6 +16,9 @@ DEFAULT_TASK_HANDLER_TIMEOUT_SECONDS: float | None = None
 class _TaskEntry:
     handler: Callable[[], Awaitable[Any]]
     future: asyncio.Future[Any]
+    # Snapshot ContextVar-контекста на момент постановки задачи в очередь.
+    # Используется для воспроизведения shop context внутри shared worker.
+    context: contextvars.Context
 
 
 def _handler_label(handler: Callable[[], Awaitable[Any]]) -> str:
@@ -50,7 +54,10 @@ class TasksManager:
 
     async def add_task(self, handler: Callable[[], Awaitable[Any]]) -> asyncio.Future[Any]:
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
-        await self._queue.put(_TaskEntry(handler=handler, future=future))
+        # Захватываем контекст вызывающей стороны, чтобы shared worker
+        # выполнил handler с тем же набором ContextVar (включая wb_manager_hub).
+        ctx = contextvars.copy_context()
+        await self._queue.put(_TaskEntry(handler=handler, future=future, context=ctx))
         return future
 
     async def run(self) -> None:
@@ -74,10 +81,22 @@ class TasksManager:
             _ = await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers = []
 
-    async def _run_handler(self, handler: Callable[[], Awaitable[Any]]) -> Any:
-        if self._handler_timeout_sec is None:
-            return await handler()
-        return await asyncio.wait_for(handler(), timeout=self._handler_timeout_sec)
+    async def _run_handler(
+        self,
+        handler: Callable[[], Awaitable[Any]],
+        context: contextvars.Context,
+    ) -> Any:
+        """Запустить handler внутри захваченного context с опциональным таймаутом.
+
+        context.run() принимает синхронную функцию, поэтому оборачиваем coroutine
+        в asyncio.Task, которую создаём через loop.create_task с явным context.
+        """
+        loop = asyncio.get_running_loop()
+        coro = handler()
+        task = loop.create_task(coro, context=context)
+        if self._handler_timeout_sec is not None:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=self._handler_timeout_sec)
+        return await task
 
     async def _worker(self) -> None:
         while True:
@@ -90,7 +109,7 @@ class TasksManager:
             loop = asyncio.get_running_loop()
             started_at = loop.time()
             try:
-                result = await self._run_handler(entry.handler)
+                result = await self._run_handler(entry.handler, entry.context)
             except asyncio.CancelledError:
                 _ = entry.future.cancel()
                 raise
