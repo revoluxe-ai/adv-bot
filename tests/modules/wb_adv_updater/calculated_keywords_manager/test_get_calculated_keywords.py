@@ -1789,6 +1789,52 @@ async def test_ms_diagnostic_temporary_recheck(
     assert diag.state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK
     assert result[0].status == KeywordStatus.GOOD
     assert result[0].cooldown_display_tag == COOLDOWN_RETEST_DISPLAY_TAG
+    assert diag.cost_gate_evaluated is True
+    assert diag.cost_condition_pass is False
+    ui_line = format_ms_rule_line(diag)
+    assert ui_line.startswith("МС: тест")
+    assert ">" in ui_line
+
+
+@pytest.mark.asyncio
+async def test_ms_diagnostic_temporary_recheck_missing_threshold(
+    complex_adv_mock_whitelist, fixed_now
+) -> None:
+    """Retest при отсутствии threshold: cost gate не оценён."""
+    complex_adv_mock_whitelist.target_pay_for_order = None
+    complex_adv_mock_whitelist.adv_setting.target_price_for_order = None
+    complex_adv_mock_whitelist.adv_setting.max_price_for_order = None
+    last = fixed_now - timedelta(hours=25, minutes=30)
+    pre_kw = PreCalculatedKeywordFactory(
+        adv_id=12345,
+        keyword_setting__hard_status=HardStatus.WHITELIST,
+        keyword_setting__text="ms_retest_no_thr",
+        keyword_setting__target_place=20,
+        cluster_stat__norm_query="ms_retest_no_thr",
+        cluster_stat__position=5.0,
+        cluster_stat__cpm=100.0,
+        cluster_stat__views=1000,
+        cluster_stat__clicks=100,
+        cluster_stat__conv_views_to_orders=0.05,
+        bidder_keyword_status=BidderKeywordStatus.GOOD,
+    )
+    updates: dict[str, AboveTargetCooldownEntry | None] = {}
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={"ms_retest_no_thr": AboveTargetCooldownEntry(last, 900)},
+        cooldown_updates=updates,
+        now=fixed_now,
+    )
+    diag = result[0].above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK
+    assert diag.cost_gate_evaluated is False
+    assert diag.reason_no_data == "нет threshold"
+    ui_line = format_ms_rule_line(diag)
+    assert "threshold н/д" in ui_line
+    assert ">" not in ui_line
 
 
 @pytest.mark.asyncio

@@ -79,6 +79,18 @@ def _blocked_unevaluated_cost_line(
     return f"МС: выкл — {summary}, {pfo_part}, {threshold_part}, {gate_note}"
 
 
+def _temporary_recheck_line(diag: AboveTargetMinBidDiagnostic, summary: str) -> str:
+    """TEMPORARY_RECHECK: показать cost gate, если inputs были доступны."""
+    prefix = f"МС: тест — временно включён для проверки, {summary}"
+    if diag.cost_gate_evaluated:
+        pfo = _fmt_num(diag.pay_for_order, digits=2)
+        threshold = _fmt_num(diag.resolved_target_cost, digits=2)
+        if diag.cost_condition_pass:
+            return f"{prefix}, PFO {pfo}≤{threshold}"
+        return f"{prefix}, PFO {pfo}>{threshold}"
+    return f"{prefix}, {_format_pfo_part(diag)}, {_format_threshold_part(diag)}"
+
+
 def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:
     """Одна строка для карточки ключа: «МС: pass — pos 38 < target 71, …»."""
     if diag is None:
@@ -104,7 +116,7 @@ def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:
         return _blocked_unevaluated_cost_line(diag, summary)
 
     if state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK:
-        return f"МС: тест — временно включён для проверки, {summary}"
+        return _temporary_recheck_line(diag, summary)
 
     if state == AboveTargetMinBidDiagnosticState.NO_DATA:
         detail = diag.reason_no_data or "нет данных для оценки МС"

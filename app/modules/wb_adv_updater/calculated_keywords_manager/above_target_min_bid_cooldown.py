@@ -184,6 +184,31 @@ def _blocked_diagnostic_context(
     )
 
 
+def _retest_diagnostic_context(
+    *,
+    gates: _MsGateSnapshot,
+    keyword_pay_for_order: float | None,
+    resolved_target_cost: float | None,
+    returned_state: KeywordState,
+    cooldown_elapsed_hours: float | None = None,
+) -> AboveTargetMinBidDiagnostic:
+    """Diagnostic для TEMPORARY_RECHECK: cost gate как при входе в cooldown."""
+    evaluated, cost_pass, missing_reason = _cost_gate_fields(
+        keyword_pay_for_order, resolved_target_cost
+    )
+    return _build_ms_diagnostic(
+        returned_state=returned_state,
+        diagnostic_state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
+        gates=gates,
+        keyword_pay_for_order=keyword_pay_for_order,
+        resolved_target_cost=resolved_target_cost,
+        cost_gate_evaluated=evaluated,
+        cost_condition_pass=cost_pass,
+        cooldown_elapsed_hours=cooldown_elapsed_hours,
+        reason_no_data=missing_reason,
+    )
+
+
 def apply_above_target_min_bid_cooldown(
     *,
     pre_kw: PreCalculatedKeyword,
@@ -355,14 +380,11 @@ def apply_above_target_min_bid_cooldown(
             returned = base_state.model_copy(
                 update={"cooldown_display_tag": COOLDOWN_RETEST_DISPLAY_TAG}
             )
-            diag = _build_ms_diagnostic(
-                returned_state=returned,
-                diagnostic_state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
+            diag = _retest_diagnostic_context(
                 gates=gates,
                 keyword_pay_for_order=keyword_pay_for_order,
                 resolved_target_cost=resolved_target_cost,
-                cost_gate_evaluated=False,
-                cost_condition_pass=None,
+                returned_state=returned,
                 cooldown_elapsed_hours=elapsed_h,
             )
             return _attach_ms_diagnostic(returned, diag)

@@ -140,11 +140,49 @@ def test_format_ms_rule_line_blocked_without_cost_gate_both_missing() -> None:
     assert ">" not in line
 
 
-def test_format_ms_rule_line_temporary_recheck() -> None:
+def test_format_ms_rule_line_temporary_recheck_with_cost_gate() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
+            pay_for_order=900.0,
+            resolved_target_cost=550.0,
+            cost_gate_evaluated=True,
+            cost_condition_pass=False,
+            cooldown_display_tag="Т",
+        )
+    )
+    assert line.startswith("МС: тест")
+    assert "временно включён" in line
+    assert "900" in line and "550" in line
+    assert ">" in line
+
+
+def test_format_ms_rule_line_temporary_recheck_missing_threshold() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
+            pay_for_order=900.0,
+            resolved_target_cost=None,
+            cost_gate_evaluated=False,
+            reason_no_data="нет threshold",
+            cooldown_display_tag="Т",
+        )
+    )
+    assert line.startswith("МС: тест")
+    assert "PFO 900" in line
+    assert "threshold н/д" in line
+    assert ">" not in line
+
+
+def test_format_ms_rule_line_temporary_recheck_basic() -> None:
     line = format_ms_rule_line(
         _diag(
             state=AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK,
             cooldown_display_tag="Т",
+            cost_gate_evaluated=True,
+            cost_condition_pass=False,
+            pay_for_order=900.0,
+            resolved_target_cost=550.0,
         )
     )
     assert line.startswith("МС: тест")
