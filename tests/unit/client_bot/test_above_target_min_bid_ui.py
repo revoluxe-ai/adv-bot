@@ -211,11 +211,12 @@ def test_format_ms_rule_line_no_data() -> None:
     line = format_ms_rule_line(
         _diag(
             state=AboveTargetMinBidDiagnosticState.NO_DATA,
-            reason_no_data="нет min_bid",
+            reason_no_data="нет мин. ставки WB",
         )
     )
     assert line.startswith("МС: н/д")
-    assert "min_bid" in line
+    assert "мин. ставки WB" in line
+    assert "cooldown_map" not in line
 
 
 def test_format_ms_rule_line_prod_like_korea() -> None:

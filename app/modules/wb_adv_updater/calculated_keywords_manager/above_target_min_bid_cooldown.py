@@ -209,6 +209,24 @@ def _retest_diagnostic_context(
     )
 
 
+def _missing_ms_inputs_reason(
+    *,
+    min_bid_for_adv: int | None,
+    cooldown_map: Mapping[str, datetime | AboveTargetCooldownEntry | None] | None,
+    cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None,
+    now: datetime | None,
+) -> str:
+    """Человекочитаемое объяснение для NO_DATA (без имён аргументов apply)."""
+    parts: list[str] = []
+    if min_bid_for_adv is None:
+        parts.append("мин. ставки WB")
+    if cooldown_map is None or cooldown_updates is None:
+        parts.append("состояния cooldown МС")
+    if now is None:
+        parts.append("времени расчёта")
+    return "нет " + ", ".join(parts)
+
+
 def apply_above_target_min_bid_cooldown(
     *,
     pre_kw: PreCalculatedKeyword,
@@ -242,15 +260,6 @@ def apply_above_target_min_bid_cooldown(
         or cooldown_updates is None
         or now is None
     ):
-        missing: list[str] = []
-        if min_bid_for_adv is None:
-            missing.append("min_bid")
-        if cooldown_map is None:
-            missing.append("cooldown_map")
-        if cooldown_updates is None:
-            missing.append("cooldown_updates")
-        if now is None:
-            missing.append("now")
         returned = base_state.model_copy(update={"cooldown_display_tag": None})
         diag = _build_ms_diagnostic(
             returned_state=returned,
@@ -260,7 +269,12 @@ def apply_above_target_min_bid_cooldown(
             resolved_target_cost=resolved_target_cost,
             cost_gate_evaluated=False,
             cost_condition_pass=None,
-            reason_no_data="нет " + " / ".join(missing),
+            reason_no_data=_missing_ms_inputs_reason(
+                min_bid_for_adv=min_bid_for_adv,
+                cooldown_map=cooldown_map,
+                cooldown_updates=cooldown_updates,
+                now=now,
+            ),
         )
         return _attach_ms_diagnostic(returned, diag)
 

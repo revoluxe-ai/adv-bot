@@ -1956,3 +1956,38 @@ async def test_ms_diagnostic_prod_like_korea_cosmetics_pass(
     assert "38" in ui_line and "71" in ui_line
     assert "510" in ui_line
 
+
+def test_ms_diagnostic_no_data_user_facing_reason(fixed_now) -> None:
+    """NO_DATA: reason_no_data без имён аргументов apply (cooldown_map и т.п.)."""
+    from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_min_bid_cooldown import (
+        apply_above_target_min_bid_cooldown,
+    )
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import (
+        KeywordState,
+    )
+
+    pre_kw = _pre_kw_above_target_at_min(text="ms_no_inputs")
+    base = KeywordState(
+        status=KeywordStatus.GOOD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        best_keyword_status=True,
+    )
+    state = apply_above_target_min_bid_cooldown(
+        pre_kw=pre_kw,
+        base_state=base,
+        min_bid_for_adv=None,
+        keyword_pay_for_order=100.0,
+        resolved_target_cost=550.0,
+        cooldown_map={},
+        cooldown_updates={},
+        now=fixed_now,
+    )
+    diag = state.above_target_min_bid
+    assert diag is not None
+    assert diag.state == AboveTargetMinBidDiagnosticState.NO_DATA
+    assert diag.reason_no_data == "нет мин. ставки WB"
+    ui_line = format_ms_rule_line(diag)
+    assert "cooldown_map" not in ui_line
+    assert "cooldown_updates" not in ui_line
+    assert "мин. ставки WB" in ui_line
+
