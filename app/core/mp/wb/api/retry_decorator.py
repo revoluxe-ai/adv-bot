@@ -93,6 +93,12 @@ def retry_decorator(
             section_name = instance.section.name
             locker = state["_lock"]
             async with locker:
+                # Каждый новый вызов decorated function начинает счётчики заново.
+                # Без этого _pool_timeout_attempts накапливается между вызовами:
+                # при лимите=3 следующий вызов мог получить 0 попыток из-за
+                # остатка предыдущего. В логах это проявлялось как attempts=44/72/66.
+                state["_pool_timeout_attempts"] = 0
+                state["_attempts"] = 0
                 while True:
                     time_since_last_query: float | None = None
                     time_to_wait = 0.0
