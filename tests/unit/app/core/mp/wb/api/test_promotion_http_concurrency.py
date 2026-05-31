@@ -200,5 +200,24 @@ async def test_pool_timeout_logs_pool_timeout_flag(monkeypatch: pytest.MonkeyPat
         warn_mock.assert_called_once()
         args = warn_mock.call_args.args
         assert "pool_timeout=%s" in args[0]
-        assert True in args
-        assert "PoolTimeout" in args
+        (
+            _msg,
+            _shop_id,
+            _endpoint,
+            _coroutine,
+            _section,
+            _wait_sec,
+            _inside_sec,
+            _total_sec,
+            success,
+            exc_type,
+            pool_timeout,
+            in_flight,
+            limit,
+            _client_id,
+        ) = args
+        assert success is False
+        assert exc_type == "PoolTimeout"
+        assert pool_timeout is True
+        assert in_flight == 1
+        assert limit == 1
