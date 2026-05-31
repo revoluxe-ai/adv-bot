@@ -2,6 +2,9 @@
 
 Модуль централизует параметры connection pool/timeout и логирует создание
 клиентов, чтобы диагностировать утечки отдельных PROMOTION pools.
+
+WB-клиенты создаются с ``trust_env=False``, чтобы HTTP_PROXY/HTTPS_PROXY из pod
+не перенаправляли запросы на xray-client; worker должен ходить в WB напрямую.
 """
 
 import logging
@@ -62,18 +65,22 @@ class HttpxClientHandler:
             )
 
             client = httpx.AsyncClient(
-                base_url=base_url, timeout=timeout, limits=limits
+                base_url=base_url,
+                timeout=timeout,
+                limits=limits,
+                trust_env=False,
             )
             logger.info(
                 "event=httpx_async_client_created "
                 "handler_id=%s async_client_id=%s section=%s shop_id=%s "
-                "max_connections=%s max_keepalive_connections=%s "
+                "trust_env=%s max_connections=%s max_keepalive_connections=%s "
                 "pool_timeout_sec=%.1f connect_timeout_sec=%.1f "
                 "read_timeout_sec=%.1f write_timeout_sec=%.1f",
                 id(self),
                 id(client),
                 section.name,
                 "—",
+                False,
                 HTTPX_MAX_CONNECTIONS,
                 HTTPX_MAX_KEEPALIVE_CONNECTIONS,
                 HTTPX_POOL_TIMEOUT_SEC,
