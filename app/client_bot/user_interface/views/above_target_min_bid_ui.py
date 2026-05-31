@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from app.client_bot.user_interface.utils.target_place_display import (
+    TargetPlaceSource,
+    format_target_place_display,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.above_target_min_bid_diagnostic import (
     AboveTargetMinBidDiagnostic,
     AboveTargetMinBidDiagnosticState,
@@ -14,43 +18,100 @@ def _fmt_num(value: float | None, *, digits: int = 1) -> str:
     return f"{value:.{digits}f}"
 
 
-def _pos_min_summary(diag: AboveTargetMinBidDiagnostic) -> str:
+def _card_target_differs_from_rule(
+    rule_target: int | None,
+    card_target: int | None,
+) -> bool:
+    """True, если «Целевая позиция» карточки не совпадает с target_place ключа для МС."""
+    if card_target is None:
+        return False
+    return rule_target != card_target
+
+
+def _card_target_suffix(
+    rule_target: int | None,
+    card_target: int | None,
+    card_source: TargetPlaceSource | None,
+) -> str:
+    """Пояснение, когда правило МС смотрит на ключ, а карточка — на другую цель."""
+    if not _card_target_differs_from_rule(rule_target, card_target):
+        return ""
+    value_str, source_label = format_target_place_display(
+        card_target, card_source or "default"
+    )
+    return f", цель карточки: {value_str} ({source_label})"
+
+
+def _rule_target_label(target: int, *, card_target: int | None) -> str:
+    """Подпись target в pos-gate: «на ключе», если карточка показывает другую цель."""
+    if _card_target_differs_from_rule(target, card_target):
+        return f"target {target} (на ключе)"
+    return f"target {target}"
+
+
+def _pos_min_summary(
+    diag: AboveTargetMinBidDiagnostic,
+    *,
+    card_target: int | None = None,
+    card_source: TargetPlaceSource | None = None,
+) -> str:
     pos = diag.current_position
     target = diag.target_place
     cpm = diag.current_cpm
     min_bid = diag.min_bid
     parts: list[str] = []
     if pos is not None and target is not None:
+        target_label = _rule_target_label(target, card_target=card_target)
         if diag.position_condition_pass:
-            parts.append(f"pos {pos} < target {target}")
+            parts.append(f"pos {pos} < {target_label}")
         else:
-            parts.append(f"pos {pos} >= target {target}")
+            parts.append(f"pos {pos} >= {target_label}")
     if cpm is not None and min_bid is not None:
         if diag.min_bid_condition_pass:
             parts.append(f"CPM {cpm}≤{min_bid}")
         else:
             parts.append(f"CPM {cpm}>{min_bid}")
-    return ", ".join(parts)
+    summary = ", ".join(parts)
+    suffix = _card_target_suffix(target, card_target, card_source)
+    if suffix and summary:
+        return f"{summary}{suffix}"
+    return summary or suffix.lstrip(", ")
 
 
-def _inactive_reason(diag: AboveTargetMinBidDiagnostic) -> str:
+def _inactive_reason(
+    diag: AboveTargetMinBidDiagnostic,
+    *,
+    card_target: int | None = None,
+    card_source: TargetPlaceSource | None = None,
+) -> str:
     if diag.reason_no_data:
         return diag.reason_no_data
     if diag.position_condition_pass is False:
         pos = diag.current_position
         target = diag.target_place
         if pos is not None and target is not None:
-            return f"pos {pos} >= target {target}"
+            target_label = _rule_target_label(target, card_target=card_target)
+            reason = f"pos {pos} >= {target_label}"
+            suffix = _card_target_suffix(target, card_target, card_source)
+            return f"{reason}{suffix}" if suffix else reason
     if diag.min_bid_condition_pass is False:
         cpm = diag.current_cpm
         min_bid = diag.min_bid
         if cpm is not None and min_bid is not None:
             return f"CPM {cpm} > min {min_bid}"
     if diag.target_place is None:
+        suffix = _card_target_suffix(None, card_target, card_source)
+        if suffix:
+            return f"нет target_place на ключе{suffix}"
         return "нет target_place"
     if diag.current_cpm is None or diag.current_cpm <= 0:
         return "нет CPM"
-    return _pos_min_summary(diag) or "условие МС не выполнено"
+    return (
+        _pos_min_summary(
+            diag, card_target=card_target, card_source=card_source
+        )
+        or "условие МС не выполнено"
+    )
 
 
 def _format_pfo_part(diag: AboveTargetMinBidDiagnostic) -> str:
@@ -96,16 +157,34 @@ def _temporary_recheck_line(diag: AboveTargetMinBidDiagnostic, summary: str) -> 
     return f"{prefix}, {pfo_part}, {threshold_part}, {gate_note}"
 
 
-def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:
-    """Одна строка для карточки ключа: «МС: pass — pos 38 < target 71, …»."""
+def format_ms_rule_line(
+    diag: AboveTargetMinBidDiagnostic | None,
+    *,
+    card_target_place: int | None = None,
+    card_target_source: TargetPlaceSource | None = None,
+) -> str:
+    """Одна строка для карточки ключа: «МС: pass — pos 38 < target 71, …».
+
+    Правило МС сравнивает позицию с ``keyword_setting.target_place`` (на ключе).
+    ``card_target_place`` / ``card_target_source`` — эффективная цель из строки
+    «Целевая позиция»; при расхождении добавляется пояснение «цель карточки: …».
+    """
     if diag is None:
         return "МС: н/д — нет диагностики (ожидается пересчёт)"
 
-    summary = _pos_min_summary(diag)
+    summary = _pos_min_summary(
+        diag,
+        card_target=card_target_place,
+        card_source=card_target_source,
+    )
     state = diag.state
 
     if state == AboveTargetMinBidDiagnosticState.INACTIVE:
-        reason = _inactive_reason(diag)
+        reason = _inactive_reason(
+            diag,
+            card_target=card_target_place,
+            card_source=card_target_source,
+        )
         return f"МС: нет — {reason}"
 
     if state == AboveTargetMinBidDiagnosticState.PASS_BY_COST:

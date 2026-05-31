@@ -633,7 +633,14 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             pay_for_order_str = 'Не определен (нет заказов)'
         text += f'Себес. заказа: {pay_for_order_str}\n'
-        text += format_ms_rule_line(self._calculated_keyword.above_target_min_bid) + "\n"
+        text += (
+            format_ms_rule_line(
+                self._calculated_keyword.above_target_min_bid,
+                card_target_place=value,
+                card_target_source=source,
+            )
+            + "\n"
+        )
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"

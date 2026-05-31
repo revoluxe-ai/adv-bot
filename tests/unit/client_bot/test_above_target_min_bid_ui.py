@@ -230,3 +230,34 @@ def test_format_ms_rule_line_prod_like_korea() -> None:
     assert line.startswith("МС: pass")
     assert "pos 38 < target 71" in line
     assert "CPM 510≤510" in line
+
+
+def test_format_ms_rule_line_card_target_differs_from_rule() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.PASS_BY_COST,
+            cost_gate_evaluated=True,
+            cost_condition_pass=True,
+            target_place=71,
+        ),
+        card_target_place=50,
+        card_target_source="campaign",
+    )
+    assert "target 71 (на ключе)" in line
+    assert "цель карточки: 50 (по кампании)" in line
+    assert "pos 38 < target 71," not in line
+
+
+def test_format_ms_rule_line_inactive_no_keyword_target_card_shows_campaign() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.INACTIVE,
+            target_place=None,
+            position_condition_pass=None,
+        ),
+        card_target_place=50,
+        card_target_source="campaign",
+    )
+    assert line.startswith("МС: нет")
+    assert "нет target_place на ключе" in line
+    assert "цель карточки: 50 (по кампании)" in line
