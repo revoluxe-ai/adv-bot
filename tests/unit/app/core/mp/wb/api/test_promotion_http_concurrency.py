@@ -98,11 +98,7 @@ async def test_acquire_promotion_http_waits_when_limit_reached(
     waiter_started = asyncio.Event()
 
     async def holder() -> None:
-        async with acquire_promotion_http(
-            shop_id="shop-1",
-            http_method="GET",
-            endpoint="/adv/v0/normquery/bids",
-        ):
+        async with acquire_promotion_http():
             entered.set()
             await release_holder.wait()
 
@@ -111,7 +107,7 @@ async def test_acquire_promotion_http_waits_when_limit_reached(
 
     async def waiter() -> None:
         waiter_started.set()
-        async with acquire_promotion_http(shop_id="shop-1"):
+        async with acquire_promotion_http():
             return None
 
     waiter_task = asyncio.create_task(waiter())
@@ -137,11 +133,7 @@ async def test_acquire_returns_timing_snapshot(monkeypatch: pytest.MonkeyPatch) 
 
     holder_task = asyncio.create_task(holder())
     await asyncio.sleep(0.02)
-    async with acquire_promotion_http(
-        shop_id="shop-warn",
-        http_method="GET",
-        endpoint="/adv/v3/fullstats",
-    ) as timing:
+    async with acquire_promotion_http() as timing:
         assert timing.wait_semaphore_sec >= 1.0
         assert timing.in_flight == 1
         assert timing.limit == 1
@@ -210,17 +202,3 @@ async def test_pool_timeout_logs_pool_timeout_flag(monkeypatch: pytest.MonkeyPat
         assert "pool_timeout=%s" in args[0]
         assert True in args
         assert "PoolTimeout" in args
-
-
-async def _run_acquire_and_release(
-    *,
-    shop_id: str,
-    http_method: str,
-    endpoint: str,
-) -> None:
-    async with acquire_promotion_http(
-        shop_id=shop_id,
-        http_method=http_method,
-        endpoint=endpoint,
-    ):
-        return None

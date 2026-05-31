@@ -50,11 +50,7 @@ class _AuthAsyncProxy:
         kwargs["headers"] = headers
         if self._section is SectionsEnum.PROMOTION:
             total_started = time.monotonic()
-            async with acquire_promotion_http(
-                shop_id=self._shop_id,
-                http_method=method,
-                endpoint=url,
-            ) as timing:
+            async with acquire_promotion_http() as timing:
                 request_started = time.monotonic()
                 try:
                     response = await self._httpx_client.request(

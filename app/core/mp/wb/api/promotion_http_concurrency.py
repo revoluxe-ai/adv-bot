@@ -55,13 +55,11 @@ def reset_promotion_http_concurrency_state() -> None:
 
 
 @asynccontextmanager
-async def acquire_promotion_http(
-    *,
-    shop_id: str | None,
-    http_method: str | None = None,
-    endpoint: str | None = None,
-) -> AsyncGenerator[PromotionHttpTiming, None]:
-    """Захват global semaphore перед PROMOTION HTTP request."""
+async def acquire_promotion_http() -> AsyncGenerator[PromotionHttpTiming, None]:
+    """Захват global semaphore перед PROMOTION HTTP request.
+
+    shop_id/endpoint логируются в ``_AuthAsyncProxy.request`` после release sem.
+    """
     sem = get_promotion_global_semaphore()
     limit = _get_global_limit()
     wait_started = time.monotonic()
@@ -83,11 +81,3 @@ def _get_in_flight_count(sem: asyncio.Semaphore, limit: int) -> int:
     if isinstance(current_value, int):
         return max(0, limit - current_value)
     return -1
-
-
-def _format_endpoint(http_method: str | None, endpoint: str | None) -> str:
-    if http_method and endpoint:
-        return f"{http_method} {endpoint}"
-    if endpoint:
-        return endpoint
-    return "—"
