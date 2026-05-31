@@ -93,9 +93,17 @@ def calc_kw(
     hard_status: int = 1,
     above_rec: bool | None = True,
     views: int = 50,
+    orders: int = 2,
+    add_to_cart: int = 10,
 ) -> CalculatedKeyword:
     stat = make_zero_keyword_stat(text).model_copy(
-        update={"views": views, "clicks": 10, "orders": 2, "conv_views_to_orders": 0.05}
+        update={
+            "views": views,
+            "clicks": 10,
+            "orders": orders,
+            "add_to_cart": add_to_cart,
+            "conv_views_to_orders": 0.05,
+        }
     )
     return CalculatedKeyword(
         adv_id=1,

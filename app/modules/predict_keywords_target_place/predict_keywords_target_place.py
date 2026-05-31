@@ -168,13 +168,14 @@ class PredictKeywordsTargetPlace:
         strategy_mode: KeywordStrategyMode,
         *,
         conv_views_to_orders: float | None = None,
+        orders_per_cart: float | None = None,
         rk_orders_per_cart: float | None = None,
     ) -> int | None:
         """Per-keyword target position for V3 strategy ladder mode.
 
         Args:
-            rk_orders_per_cart: заказов на корзину РК (7д); SSOT CPO с ``build_mode_candidates``.
-            conv_views_to_orders: legacy fallback, если RK ratio не задан.
+            orders_per_cart: effective заказов/корзину (сглаженный или campaign 7d).
+            conv_views_to_orders: legacy fallback, если ``orders_per_cart`` не задан.
         """
         if not positions:
             logger.error("Пустой список позиций для прогноза целевой позиции")
@@ -193,10 +194,11 @@ class PredictKeywordsTargetPlace:
         if strategy_mode == KeywordStrategyMode.MAX_CONVERSION:
             return max(1, best_conv_position.position)
 
+        opc = orders_per_cart if orders_per_cart is not None else rk_orders_per_cart
         pfo_rows = self._order_cpo_rows(
             usable,
             conv_views_to_orders,
-            rk_orders_per_cart=rk_orders_per_cart,
+            orders_per_cart=opc,
         )
         if pfo_rows:
             if strategy_mode == KeywordStrategyMode.MIN_CPA:
@@ -227,21 +229,23 @@ class PredictKeywordsTargetPlace:
         positions: list[BidPosition],
         conv_views_to_orders: float | None,
         *,
+        orders_per_cart: float | None = None,
         rk_orders_per_cart: float | None = None,
     ) -> list[tuple[BidPosition, float, float]]:
         """``(position, conv_cart, cpo_order)`` для MIN/OPTIMUM V3."""
-        use_rk = rk_orders_per_cart is not None and rk_orders_per_cart > 0
-        if not use_rk and (
+        opc = orders_per_cart if orders_per_cart is not None else rk_orders_per_cart
+        use_opc = opc is not None and opc > 0
+        if not use_opc and (
             conv_views_to_orders is None or conv_views_to_orders <= 0
         ):
             return []
         rows: list[tuple[BidPosition, float, float]] = []
         for pos in positions:
-            if use_rk:
+            if use_opc:
                 cpo = order_cpo_at_ch_point(
                     bid=float(pos.bid),
                     conv_carts_to_views=pos.conv_carts_to_views,
-                    rk_orders_per_cart=rk_orders_per_cart,
+                    orders_per_cart=opc,
                 )
             else:
                 cpo = order_cpo_from_bid(

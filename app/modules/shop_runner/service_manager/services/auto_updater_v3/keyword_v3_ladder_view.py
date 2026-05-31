@@ -86,27 +86,52 @@ class LadderInputs:
     prepared: PreparedList
     worst_costs: dict[AggressionTargetMode, float]
     campaign_cache: CampaignV3DecisionCache
-    rk_orders_per_cart: float | None = None
+    campaign_orders_per_cart_7d: float | None = None
     rec_orders_per_view: float | None = None
+
+    @property
+    def rk_orders_per_cart(self) -> float | None:
+        """Deprecated: используйте ``campaign_orders_per_cart_7d`` (baseline РК для prior/UI)."""
+        return self.campaign_orders_per_cart_7d
+
+    def orders_per_cart_for_ctx(self, ctx: KeywordV3Context) -> float | None:
+        """SSOT effective ``orders_per_cart`` для CPO V3 на ключе (сглажение к campaign 7d)."""
+        from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+            resolve_orders_per_cart_for_cpo,
+        )
+
+        return resolve_orders_per_cart_for_cpo(
+            campaign_orders_per_cart_7d=self.campaign_orders_per_cart_7d,
+            key_orders=ctx.keyword.orders,
+            key_carts=ctx.keyword.add_to_cart,
+        )
 
     @classmethod
     def from_contexts(
         cls,
         contexts: list[KeywordV3Context],
         *,
-        rk_orders_per_cart: float | None = None,
+        campaign_orders_per_cart_7d: float | None = None,
         rec_orders_per_view: float | None = None,
+        rk_orders_per_cart: float | None = None,
     ) -> LadderInputs:
         """Один проход: prepared + worst_costs + campaign_cache."""
+        campaign_opc = (
+            campaign_orders_per_cart_7d
+            if campaign_orders_per_cart_7d is not None
+            else rk_orders_per_cart
+        )
         prepared = build_prepared_from_contexts(contexts)
+        worst = build_worst_per_state_costs(
+            prepared,
+            campaign_orders_per_cart_7d=campaign_opc,
+        )
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,
-            worst_costs=build_worst_per_state_costs(
-                prepared, rk_orders_per_cart=rk_orders_per_cart
-            ),
+            worst_costs=worst,
             campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
-            rk_orders_per_cart=rk_orders_per_cart,
+            campaign_orders_per_cart_7d=campaign_opc,
             rec_orders_per_view=rec_orders_per_view,
         )
 
@@ -133,10 +158,10 @@ def state_candidates_by_mode_for_ctx(
     ctx: KeywordV3Context,
     ladder_inputs: LadderInputs,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """SSOT: M/O/C ``ModeCandidate`` для ключа на тике (``rk_orders_per_cart`` из ``LadderInputs``)."""
-    rk = ladder_inputs.rk_orders_per_cart
+    """SSOT: M/O/C ``ModeCandidate`` для ключа на тике (``orders_per_cart_for_ctx``)."""
+    opc = ladder_inputs.orders_per_cart_for_ctx(ctx)
     conv = None
-    if rk is None or rk <= 0:
+    if opc is None or opc <= 0:
         conv = effective_conv_for_v3(
             ctx,
             ladder_inputs.all_contexts,
@@ -148,7 +173,7 @@ def state_candidates_by_mode_for_ctx(
         profile=ctx.position_profile,
         keyword_text=ctx.keyword.text,
         conv_views_to_orders=conv,
-        rk_orders_per_cart=rk,
+        orders_per_cart=opc,
     )
 
 
@@ -199,9 +224,9 @@ def operational_cpo_at_keyword_target_place(
     row = next((p for p in profile if int(p.position) == int(place)), None)
     if row is None:
         return None
-    rk = ladder_inputs.rk_orders_per_cart
+    opc = ladder_inputs.orders_per_cart_for_ctx(ctx)
     conv: float | None = None
-    if rk is None or rk <= 0:
+    if opc is None or opc <= 0:
         conv = effective_conv_for_v3(
             ctx,
             ladder_inputs.all_contexts,
@@ -212,7 +237,7 @@ def operational_cpo_at_keyword_target_place(
     cpo = predicted_pay_for_order_from_point(
         row,
         conv_views_to_orders=conv,
-        rk_orders_per_cart=rk if rk is not None and rk > 0 else None,
+        orders_per_cart=opc if opc is not None and opc > 0 else None,
     )
     if cpo is None or not math.isfinite(float(cpo)):
         return None

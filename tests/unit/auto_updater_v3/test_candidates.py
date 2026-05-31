@@ -23,6 +23,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
 )
 from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
     order_cpo_at_ch_point,
+    resolve_orders_per_cart_for_cpo,
 )
 from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST, sample_profile
 
@@ -163,3 +164,38 @@ def test_resolve_effective_state_cost_does_not_fallback_to_keyword_pfo() -> None
     )
     assert cost == float("inf")
     assert not imputed
+
+
+@pytest.mark.unit
+def test_two_keywords_different_smoothed_cpo_same_ch_point() -> None:
+    """Один campaign 7d, разные key orders/carts → разный CPO на одной CH-точке."""
+    from datetime import UTC, datetime
+
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+        PositionProfilePoint,
+    )
+
+    campaign = 0.10
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=10, bid=500, predicted_conversion=0.02, timestamp=ts
+        ),
+    ]
+    opc_a = resolve_orders_per_cart_for_cpo(
+        campaign_orders_per_cart_7d=campaign, key_orders=2, key_carts=20
+    )
+    opc_b = resolve_orders_per_cart_for_cpo(
+        campaign_orders_per_cart_7d=campaign, key_orders=15, key_carts=20
+    )
+    assert opc_a is not None and opc_b is not None and opc_b > opc_a
+    cand_a = build_mode_candidates(
+        profile=prof, keyword_text="a", orders_per_cart=opc_a
+    )
+    cand_b = build_mode_candidates(
+        profile=prof, keyword_text="b", orders_per_cart=opc_b
+    )
+    cpo_a = cand_a[AggressionTargetMode.MIN_CPA].predicted_cpa
+    cpo_b = cand_b[AggressionTargetMode.MIN_CPA].predicted_cpa
+    assert cpo_a is not None and cpo_b is not None
+    assert cpo_b < cpo_a

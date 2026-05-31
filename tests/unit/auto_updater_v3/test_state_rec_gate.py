@@ -276,11 +276,9 @@ def test_cleanup_down_on_fail_current_pass_min() -> None:
         _cats: dict,
         to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, _policy, kwargs)
         if to_mode == KeywordStrategyMode.MIN_CPA:
             return RecGateStatus.PASS
         if to_mode == KeywordStrategyMode.OPTIMUM:
@@ -488,11 +486,9 @@ def test_expansion_off_picks_highest_passing_in_same_place_alias_group(
         _cats: dict,
         to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, _policy, kwargs)
         if to_mode == KeywordStrategyMode.MIN_CPA:
             return RecGateStatus.FAIL
         if to_mode in (
@@ -553,11 +549,9 @@ def test_expansion_off_no_up_when_entire_alias_group_fails(
         _cats: dict,
         _to_mode: KeywordStrategyMode,
         _policy: SelectionPolicy,
-        *,
-        rec_orders_per_view: float | None,
-        rk_orders_per_cart: float | None,
+        **kwargs: object,
     ) -> RecGateStatus:
-        _ = (_cats, _to_mode, _policy, rec_orders_per_view, rk_orders_per_cart)
+        _ = (_cats, _to_mode, _policy, kwargs)
         return RecGateStatus.FAIL
 
     monkeypatch.setattr(

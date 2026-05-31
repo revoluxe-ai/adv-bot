@@ -98,7 +98,12 @@ def test_profile_off_first_and_star_on_current() -> None:
 def test_profile_shows_rk_cart_to_order_conversion() -> None:
     """Строка РК 7д: доля зак/корз и обратная корз/зак для проверки CPO."""
     data = _profile_data(
-        rk_orders_per_cart=0.247,
+        campaign_orders_per_cart_7d=0.247,
+        key_orders_7d=5,
+        key_carts_7d=20,
+        key_orders_per_cart_raw=0.25,
+        key_orders_per_cart_smoothed=0.24,
+        prior_carts_strength=100,
         candidates={
             AggressionTargetMode.MIN_CPA: _valid_candidate(
                 AggressionTargetMode.MIN_CPA, 1, 4580.0, 143.32
@@ -108,6 +113,10 @@ def test_profile_shows_rk_cart_to_order_conversion() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "РК 7д корз→заказ: 24.7%" in text
     assert "0.247 зак/корз" in text
+    assert "ключ корз→заказ raw:" in text
+    assert "ключ корз→заказ сглаж.:" in text
+    assert "prior: 100 корзин" in text
+    assert "сглаженная ключевая корз→заказ" in text
     assert "корз/зак" in text
 
 

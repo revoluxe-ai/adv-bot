@@ -281,19 +281,26 @@ async def load_keyword_v3_profile_data(
         single = build_keyword_v3_contexts([calculated_keyword], raw_profiles)
         all_contexts = single if single else []
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+        V3_KEY_CART_TO_ORDER_PRIOR_CARTS,
+        key_orders_per_cart_snapshot,
+        load_campaign_orders_per_cart_7d,
         load_rec_orders_per_view_for_v3,
-        load_rk_orders_per_cart_7d,
     )
 
-    rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv_setting)
+    campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv_setting)
     rec_orders_per_view = await load_rec_orders_per_view_for_v3(
         adv_setting,
         rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
     )
     ladder_inputs = LadderInputs.from_contexts(
         all_contexts,
-        rk_orders_per_cart=rk_orders_per_cart,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         rec_orders_per_view=rec_orders_per_view,
+    )
+    opc_snapshot = key_orders_per_cart_snapshot(
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+        key_orders=calculated_keyword.orders,
+        key_carts=calculated_keyword.add_to_cart,
     )
     if not ladder_inputs.worst_costs:
         cached_worst = await V3WorstCostsRedisCache().get_worst_costs(
@@ -381,7 +388,13 @@ async def load_keyword_v3_profile_data(
         campaign_worst_only=campaign_worst_only,
         campaign_worst_costs=dict(ladder_inputs.worst_costs),
         stage_sources=stage_sources,
-        rk_orders_per_cart=rk_orders_per_cart,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+        key_orders_7d=opc_snapshot.key_orders_7d,
+        key_carts_7d=opc_snapshot.key_carts_7d,
+        key_orders_per_cart_raw=opc_snapshot.key_orders_per_cart_raw,
+        key_orders_per_cart_smoothed=opc_snapshot.key_orders_per_cart_smoothed,
+        prior_carts_strength=opc_snapshot.prior_carts_strength
+        or V3_KEY_CART_TO_ORDER_PRIOR_CARTS,
         rec_orders_per_view=rec_orders_per_view,
         shelf_click_mode=shelf_click_mode,
         **fields,

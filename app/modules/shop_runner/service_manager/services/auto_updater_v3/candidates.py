@@ -74,14 +74,16 @@ def predicted_pay_for_order_from_point(
     row: PositionProfilePoint,
     *,
     conv_views_to_orders: float | None,
+    orders_per_cart: float | None = None,
     rk_orders_per_cart: float | None = None,
 ) -> float | None:
-    """CPO заказа на точке: CH ``к→к`` + RK корзина→заказ или legacy conv ключа."""
-    if rk_orders_per_cart is not None and rk_orders_per_cart > 0:
+    """CPO заказа на точке: CH ``к→к`` × ``orders_per_cart`` или legacy conv ключа."""
+    opc = orders_per_cart if orders_per_cart is not None else rk_orders_per_cart
+    if opc is not None and opc > 0:
         return order_cpo_at_ch_point(
             bid=float(row.bid),
             conv_carts_to_views=row.predicted_conversion,
-            rk_orders_per_cart=rk_orders_per_cart,
+            orders_per_cart=opc,
         )
     if conv_views_to_orders is None or conv_views_to_orders <= 0 or row.bid <= 0:
         return None
@@ -96,6 +98,7 @@ def build_mode_candidates(
     profile: list[PositionProfilePoint] | None,
     keyword_text: str,
     conv_views_to_orders: float | None = None,
+    orders_per_cart: float | None = None,
     rk_orders_per_cart: float | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
     """Return three mode candidates; invalid if profile missing or unusable.
@@ -103,8 +106,8 @@ def build_mode_candidates(
     Usable — только ``ch_observed=True`` (реальные buckets CH). Синтетика
     ``_fill_positions`` не участвует в M/O/C (см. ``BidPositionRow.ch_observed``).
 
-    ``rk_orders_per_cart`` — заказов на корзину РК (7 дней, ``wb_common_stat``), SSOT CPO.
-    ``conv_views_to_orders`` — только legacy/fallback, если RK ratio не задан.
+    ``orders_per_cart`` — effective заказов/корзину (сглаженный по ключу или campaign).
+    ``conv_views_to_orders`` — legacy/fallback, если ``orders_per_cart`` не задан.
     """
     empty = {
         m: ModeCandidate(
@@ -134,21 +137,22 @@ def build_mode_candidates(
             for m in AggressionTargetMode
         }
 
-    use_rk = rk_orders_per_cart is not None and rk_orders_per_cart > 0
+    opc = orders_per_cart if orders_per_cart is not None else rk_orders_per_cart
+    use_opc = opc is not None and opc > 0
 
     def _pfo(row: PositionProfilePoint) -> float | None:
         return predicted_pay_for_order_from_point(
             row,
             conv_views_to_orders=conv_views_to_orders,
-            rk_orders_per_cart=rk_orders_per_cart if use_rk else None,
+            orders_per_cart=opc if use_opc else None,
         )
 
     def _orders_per_view(row: PositionProfilePoint) -> float | None:
-        if not use_rk:
+        if not use_opc:
             return None
         return conv_views_to_orders_at_ch_point(
             conv_carts_to_views=row.predicted_conversion,
-            rk_orders_per_cart=rk_orders_per_cart,
+            orders_per_cart=opc,
         )
 
     def _with_orders_per_view(
@@ -173,7 +177,7 @@ def build_mode_candidates(
             is_valid=False,
             invalid_reason=(
                 "no_rk_conv_carts_to_orders"
-                if use_rk
+                if use_opc
                 else "no_keyword_conv_views_to_orders"
             ),
         )
@@ -211,7 +215,7 @@ def build_mode_candidates(
                 if max_pfo is not None
                 else (
                     "no_rk_conv_carts_to_orders"
-                    if use_rk
+                    if use_opc
                     else "no_keyword_conv_views_to_orders"
                 )
             ),
@@ -231,7 +235,7 @@ def build_mode_candidates(
             is_valid=False,
             invalid_reason=(
                 "no_rk_conv_carts_to_orders"
-                if use_rk
+                if use_opc
                 else "no_keyword_conv_views_to_orders"
             ),
         )

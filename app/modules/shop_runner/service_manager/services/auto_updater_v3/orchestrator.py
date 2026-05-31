@@ -312,17 +312,17 @@ async def process_adv_v3(
             resolve = compute_resolve_cost_threshold(plan, fact)
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
-                load_rk_orders_per_cart_7d,
+                load_campaign_orders_per_cart_7d,
             )
 
-            rk_orders_per_cart = await load_rk_orders_per_cart_7d(adv)
+            campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv)
             rec_orders_per_view = await load_rec_orders_per_view_for_v3(
                 adv,
                 rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
             )
             ladder_inputs = LadderInputs.from_contexts(
                 contexts,
-                rk_orders_per_cart=rk_orders_per_cart,
+                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 rec_orders_per_view=rec_orders_per_view,
             )
             await cache_worst_costs_for_adv(
@@ -357,7 +357,7 @@ async def process_adv_v3(
                 prepared = build_prepared_from_contexts(contexts)
                 ladder_inputs = LadderInputs.from_contexts(
                     contexts,
-                    rk_orders_per_cart=rk_orders_per_cart,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                     rec_orders_per_view=rec_orders_per_view,
                 )
                 await cache_worst_costs_for_adv(
@@ -395,7 +395,7 @@ async def process_adv_v3(
                         prepared = build_prepared_from_contexts(contexts)
                         ladder_inputs = LadderInputs.from_contexts(
                             contexts,
-                            rk_orders_per_cart=rk_orders_per_cart,
+                            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                             rec_orders_per_view=rec_orders_per_view,
                         )
                         await cache_worst_costs_for_adv(
@@ -434,7 +434,7 @@ async def process_adv_v3(
                 guard_prepared = build_prepared_from_contexts(contexts)
                 guard_ladder_inputs = LadderInputs.from_contexts(
                     contexts,
-                    rk_orders_per_cart=rk_orders_per_cart,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                     rec_orders_per_view=rec_orders_per_view,
                 )
                 await cache_worst_costs_for_adv(
