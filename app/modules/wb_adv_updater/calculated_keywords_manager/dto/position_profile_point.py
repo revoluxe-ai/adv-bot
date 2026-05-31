@@ -19,5 +19,9 @@ class PositionProfilePoint(BaseModel):
         description="Rub per cart at this bid/conv; infinity represented as None after sanitize.",
     )
     timestamp: datetime | None = None
+    ch_observed: bool = Field(
+        default=True,
+        description="True — точка из CH bid_decision_log; False — синтетика _fill_positions.",
+    )
 
     model_config = {"extra": "forbid"}

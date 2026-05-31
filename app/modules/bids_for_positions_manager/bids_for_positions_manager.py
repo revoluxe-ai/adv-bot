@@ -117,6 +117,7 @@ class BidsForPositionsManager:
                         position=position,
                         bid=next_position.bid,
                         timestamp=time_stamp,
+                        ch_observed=False,
                     )
                 )
             else:
@@ -126,6 +127,7 @@ class BidsForPositionsManager:
                         position=position,
                         bid=min_bid,
                         timestamp=time_stamp,
+                        ch_observed=False,
                     )
                 )
         result = items + dummy_positions

@@ -49,6 +49,7 @@ def profile_points_from_bid_positions(rows: list[BidPosition]) -> list[PositionP
                 predicted_conversion=p.conv_carts_to_views,
                 pay_for_cart=pay_out,
                 timestamp=ts,
+                ch_observed=p.ch_observed,
             )
         )
     return sorted(out, key=lambda x: x.position)
