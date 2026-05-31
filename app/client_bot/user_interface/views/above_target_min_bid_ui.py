@@ -53,6 +53,32 @@ def _inactive_reason(diag: AboveTargetMinBidDiagnostic) -> str:
     return _pos_min_summary(diag) or "условие МС не выполнено"
 
 
+def _format_pfo_part(diag: AboveTargetMinBidDiagnostic) -> str:
+    """Фрагмент PFO для строки МС: число или «н/д»."""
+    if diag.pay_for_order is None:
+        return "PFO н/д"
+    return f"PFO {_fmt_num(diag.pay_for_order, digits=2)}"
+
+
+def _format_threshold_part(diag: AboveTargetMinBidDiagnostic) -> str:
+    """Фрагмент threshold для строки МС: число или «н/д»."""
+    if diag.resolved_target_cost is None:
+        return "threshold н/д"
+    return f"threshold {_fmt_num(diag.resolved_target_cost, digits=2)}"
+
+
+def _blocked_unevaluated_cost_line(
+    diag: AboveTargetMinBidDiagnostic, summary: str
+) -> str:
+    """BLOCKED без cost gate: раздельно PFO и threshold, без ложного «PFO н/д»."""
+    pfo_part = _format_pfo_part(diag)
+    threshold_part = _format_threshold_part(diag)
+    gate_note = "cost gate не оценён"
+    if diag.reason_no_data:
+        gate_note = f"{gate_note}: {diag.reason_no_data}"
+    return f"МС: выкл — {summary}, {pfo_part}, {threshold_part}, {gate_note}"
+
+
 def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:
     """Одна строка для карточки ключа: «МС: pass — pos 38 < target 71, …»."""
     if diag is None:
@@ -75,7 +101,7 @@ def format_ms_rule_line(diag: AboveTargetMinBidDiagnostic | None) -> str:
             pfo = _fmt_num(diag.pay_for_order, digits=2)
             threshold = _fmt_num(diag.resolved_target_cost, digits=2)
             return f"МС: выкл — {summary}, PFO {pfo}>{threshold}"
-        return f"МС: выкл — {summary}, PFO н/д, cost gate не оценён"
+        return _blocked_unevaluated_cost_line(diag, summary)
 
     if state == AboveTargetMinBidDiagnosticState.TEMPORARY_RECHECK:
         return f"МС: тест — временно включён для проверки, {summary}"

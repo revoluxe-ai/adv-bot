@@ -1826,6 +1826,8 @@ async def test_ms_diagnostic_blocked_without_pfo_no_cost_gate(
     assert diag.reason_no_data == "нет PFO"
     ui_line = format_ms_rule_line(diag)
     assert "PFO н/д" in ui_line
+    assert "100" in ui_line  # threshold из target_pay_for_order=100
+    assert "cost gate не оценён: нет PFO" in ui_line
     assert ">" not in ui_line.split("PFO")[-1]
 
 

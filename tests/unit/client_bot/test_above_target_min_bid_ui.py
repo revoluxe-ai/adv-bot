@@ -81,11 +81,12 @@ def test_format_ms_rule_line_blocked_with_cost_gate() -> None:
     assert ">" in line
 
 
-def test_format_ms_rule_line_blocked_without_cost_gate() -> None:
+def test_format_ms_rule_line_blocked_without_cost_gate_missing_pfo() -> None:
     line = format_ms_rule_line(
         _diag(
             state=AboveTargetMinBidDiagnosticState.BLOCKED,
             pay_for_order=None,
+            resolved_target_cost=550.0,
             cost_gate_evaluated=False,
             reason_no_data="нет PFO",
             resulting_status=KeywordStatus.BAD,
@@ -94,6 +95,47 @@ def test_format_ms_rule_line_blocked_without_cost_gate() -> None:
     )
     assert line.startswith("МС: выкл")
     assert "PFO н/д" in line
+    assert "550" in line
+    assert "threshold н/д" not in line
+    assert "cost gate не оценён: нет PFO" in line
+    assert ">" not in line
+
+
+def test_format_ms_rule_line_blocked_without_cost_gate_missing_threshold() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.BLOCKED,
+            pay_for_order=900.0,
+            resolved_target_cost=None,
+            cost_gate_evaluated=False,
+            reason_no_data="нет threshold",
+            resulting_status=KeywordStatus.BAD,
+            resulting_reason=KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID,
+        )
+    )
+    assert line.startswith("МС: выкл")
+    assert "PFO 900" in line
+    assert "PFO н/д" not in line
+    assert "threshold н/д" in line
+    assert "cost gate не оценён: нет threshold" in line
+    assert ">" not in line
+
+
+def test_format_ms_rule_line_blocked_without_cost_gate_both_missing() -> None:
+    line = format_ms_rule_line(
+        _diag(
+            state=AboveTargetMinBidDiagnosticState.BLOCKED,
+            pay_for_order=None,
+            resolved_target_cost=None,
+            cost_gate_evaluated=False,
+            reason_no_data="нет PFO",
+            resulting_status=KeywordStatus.BAD,
+            resulting_reason=KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID,
+        )
+    )
+    assert line.startswith("МС: выкл")
+    assert "PFO н/д" in line
+    assert "threshold н/д" in line
     assert "cost gate не оценён" in line
     assert ">" not in line
 
