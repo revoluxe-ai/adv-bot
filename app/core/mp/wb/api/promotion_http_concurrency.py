@@ -6,20 +6,27 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.settings.settings_master import Settings
 
-logger = logging.getLogger(__name__)
-
 WAIT_WARN_SEC = 1.0
 
 _global_semaphore: asyncio.Semaphore | None = None
+
+
+@dataclass(frozen=True)
+class PromotionHttpTiming:
+    """Диагностический snapshot захвата PROMOTION semaphore."""
+
+    wait_semaphore_sec: float
+    in_flight: int
+    limit: int
 
 
 def _get_settings() -> Settings:
@@ -48,34 +55,29 @@ def reset_promotion_http_concurrency_state() -> None:
 
 
 @asynccontextmanager
-async def acquire_promotion_http(
-    *,
-    shop_id: str | None,
-    http_method: str | None = None,
-    endpoint: str | None = None,
-) -> AsyncGenerator[None, None]:
-    """Захват global semaphore перед PROMOTION HTTP request."""
+async def acquire_promotion_http() -> AsyncGenerator[PromotionHttpTiming, None]:
+    """Захват global semaphore перед PROMOTION HTTP request.
+
+    shop_id/endpoint логируются в ``_AuthAsyncProxy.request`` после release sem.
+    """
     sem = get_promotion_global_semaphore()
+    limit = _get_global_limit()
     wait_started = time.monotonic()
     await sem.acquire()
     wait_sec = time.monotonic() - wait_started
     try:
-        if wait_sec >= WAIT_WARN_SEC:
-            logger.warning(
-                "section=PROMOTION wait_sec=%.3f limit=%s endpoint=%s shop_id=%s",
-                wait_sec,
-                _get_global_limit(),
-                _format_endpoint(http_method, endpoint),
-                shop_id or "—",
-            )
-        yield
+        yield PromotionHttpTiming(
+            wait_semaphore_sec=wait_sec,
+            in_flight=_get_in_flight_count(sem, limit),
+            limit=limit,
+        )
     finally:
         sem.release()
 
 
-def _format_endpoint(http_method: str | None, endpoint: str | None) -> str:
-    if http_method and endpoint:
-        return f"{http_method} {endpoint}"
-    if endpoint:
-        return endpoint
-    return "—"
+def _get_in_flight_count(sem: asyncio.Semaphore, limit: int) -> int:
+    """Вернуть примерное число in-flight PROMOTION requests для диагностики."""
+    current_value = getattr(sem, "_value", None)
+    if isinstance(current_value, int):
+        return max(0, limit - current_value)
+    return -1
