@@ -50,6 +50,9 @@ from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     format_keyword_v3_profile_block,
 )
+from app.client_bot.user_interface.views.above_target_min_bid_ui import (
+    format_ms_rule_line,
+)
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
     normalize_automatic_version_ui,
 )
@@ -630,6 +633,14 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             pay_for_order_str = 'Не определен (нет заказов)'
         text += f'Себес. заказа: {pay_for_order_str}\n'
+        text += (
+            format_ms_rule_line(
+                self._calculated_keyword.above_target_min_bid,
+                card_target_place=value,
+                card_target_source=source,
+            )
+            + "\n"
+        )
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"

@@ -10,6 +10,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
 )
 from .inner_dto.keyword_cpm_sources import KeywordCpmSources
 from .inner_dto.keyword_state import KeywordState
+from .above_target_min_bid_diagnostic import AboveTargetMinBidDiagnostic
 from .position_profile_point import PositionProfilePoint
 from .states import KeywordStatus, KeywordStatusReason
 
@@ -98,6 +99,10 @@ class CalculatedKeyword(BaseModel):
     @property
     def cooldown_display_tag(self) -> str | None:
         return self.state.cooldown_display_tag
+
+    @property
+    def above_target_min_bid(self) -> AboveTargetMinBidDiagnostic | None:
+        return self.state.above_target_min_bid
 
     @property
     def best_keyword_status(self) -> bool:
