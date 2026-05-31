@@ -19,6 +19,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     LadderStageResult,
     LadderView,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordDataTier,
+    resolve_keyword_v3_eligibility,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     plan_active_invalid_state_cleanup,
     plan_max_cpa_guard,
@@ -38,7 +42,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
 KS_ID = 501
 MAX_PFO = 400.0
@@ -116,6 +120,39 @@ def _ctx_max_wl(*, target_place: int = 1) -> KeywordV3Context:
         }
     )
     return KeywordV3Context(keyword=kw, position_profile=_profile_two_places())
+
+
+def _catalog_all_invalid() -> dict[AggressionTargetMode, ModeCandidate]:
+    """Все CH-кандидаты invalid — симулирует отсутствие пригодной CH-матрицы."""
+    return {
+        AggressionTargetMode.MIN_CPA: _mc(
+            AggressionTargetMode.MIN_CPA, place=None, cpa=None, valid=False
+        ),
+        AggressionTargetMode.OPTIMUM: _mc(
+            AggressionTargetMode.OPTIMUM, place=None, cpa=None, valid=False
+        ),
+        AggressionTargetMode.MAX_CONVERSION: _mc(
+            AggressionTargetMode.MAX_CONVERSION, place=None, cpa=None, valid=False
+        ),
+    }
+
+
+def _ctx_no_ch_active(
+    *,
+    mode: KeywordStrategyMode,
+    pay_for_order_target: float = 49.0,
+    hard_status: int = 2,
+) -> KeywordV3Context:
+    """NO_CH tier: ``position_profile=None``, operational MIN через pay_for_order."""
+    kw = _calc_kw(
+        ks_id=KS_ID,
+        text="no_ch_own_conv",
+        mode=mode,
+        rating=10.0,
+        conv=_conv_for_pay_for_order(pay_for_order_target),
+        hard_status=hard_status,
+    )
+    return KeywordV3Context(keyword=kw, position_profile=None)
 
 
 def _patch_catalog(monkeypatch: pytest.MonkeyPatch, cat: dict) -> None:
@@ -201,6 +238,137 @@ def _patch_ladder_view_for_invalid_max(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view.resolve_ladder_stage_display",
         _fake_view,
     )
+
+
+@pytest.mark.unit
+def test_no_ch_min_active_invalid_catalog_no_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_CH MIN + pay_for_order <= max: missing CH candidate не даёт cleanup."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    ctx = _ctx_no_ch_active(mode=KeywordStrategyMode.MIN_CPA, pay_for_order_target=49.0)
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    elig = resolve_keyword_v3_eligibility(ctx, contexts)
+    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+        eligibility_by_ks_id={KS_ID: elig},
+    )
+    assert actions == []
+
+
+@pytest.mark.unit
+def test_no_ch_opt_active_down_to_min_not_force_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_CH OPT без CH: DOWN MIN при pay_for_order <= max, не FORCE_OFF."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    ctx = _ctx_no_ch_active(mode=KeywordStrategyMode.OPTIMUM, pay_for_order_target=49.0)
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    elig = resolve_keyword_v3_eligibility(ctx, contexts)
+    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+        eligibility_by_ks_id={KS_ID: elig},
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason == "active_invalid_state_down"
+
+
+@pytest.mark.unit
+def test_no_ch_max_active_down_to_min(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_CH MAX без CH → DOWN MIN (аналог OPT)."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    ctx = _ctx_no_ch_active(
+        mode=KeywordStrategyMode.MAX_CONVERSION, pay_for_order_target=80.0
+    )
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    elig = resolve_keyword_v3_eligibility(ctx, contexts)
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+        eligibility_by_ks_id={KS_ID: elig},
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_no_ch_min_above_max_force_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_CH MIN с pay_for_order > max → FORCE_OFF (нет valid lower)."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    ctx = _ctx_no_ch_active(
+        mode=KeywordStrategyMode.MIN_CPA, pay_for_order_target=500.0
+    )
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].reason == "active_invalid_state_force_off"
+
+
+@pytest.mark.unit
+def test_invalid_tier_skipped_not_force_off_from_missing_ch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ключ без own conv (INVALID): cleanup не трогает (не mass FORCE_OFF)."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    kw = _calc_kw(
+        ks_id=KS_ID,
+        text="no_conv",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=0.0,
+        views=0,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    elig = resolve_keyword_v3_eligibility(ctx, contexts)
+    assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID
+    assert not elig.participates_in_ladder
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+        eligibility_by_ks_id={KS_ID: elig},
+    )
+    assert actions == []
 
 
 @pytest.mark.unit

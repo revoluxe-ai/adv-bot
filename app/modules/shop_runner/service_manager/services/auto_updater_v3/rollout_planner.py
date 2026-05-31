@@ -942,6 +942,118 @@ def _modes_below_for_cleanup(
     return tuple(reversed(below))
 
 
+def _is_no_ch_profile_with_own_conv(
+    eligibility: "KeywordV3Eligibility | None",
+) -> bool:
+    """Tier без CH-матрицы, operational MIN через ``keyword.pay_for_order``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+    )
+
+    return (
+        eligibility is not None
+        and eligibility.data_tier
+        == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+    )
+
+
+def _cleanup_diag(
+    *,
+    cur_c: ModeCandidate | None,
+    position: int | None,
+    cost: float,
+    source_value: str,
+    invalid_flags: list[str],
+) -> dict[str, object]:
+    """Общий snapshot для логов active_invalid_cleanup."""
+    return {
+        "current_candidate_valid": (
+            None if cur_c is None else bool(cur_c.is_valid)
+        ),
+        "current_candidate_position": position,
+        "current_state_cost": None if cost == float("inf") else float(cost),
+        "current_state_cost_source": source_value,
+        "invalid_flags": tuple(invalid_flags),
+    }
+
+
+def _active_state_invalid_no_ch_for_cleanup(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    max_pay_for_order: float,
+    ladder_inputs: "LadderInputs",
+    eligibility: "KeywordV3Eligibility",
+) -> tuple[bool, dict[str, object]]:
+    """Cleanup для NO CH + own conv: CH-кандидат не обязателен, operational cost — SSOT."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+        aggression_target_for_stored_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderCostSource,
+        cost_for_mode,
+        resolve_ladder_stage_display,
+    )
+
+    agg = aggression_target_for_stored_mode(current)
+    if agg is None:
+        return False, {}
+    stage = resolve_ladder_stage_display(
+        ctx, ladder_inputs, eligibility=eligibility
+    ).stages[agg]
+    cost, _imputed = cost_for_mode(
+        ctx,
+        current,
+        ladder_inputs=ladder_inputs,
+        eligibility=eligibility,
+    )
+    invalid_flags: list[str] = []
+
+    if current == KeywordStrategyMode.MIN_CPA:
+        if stage.source == LadderCostSource.PAY_FOR_ORDER and cost != float("inf"):
+            if not keyword_pay_for_order_exceeds_max(
+                ctx, max_pay_for_order=max_pay_for_order
+            ):
+                return False, _cleanup_diag(
+                    cur_c=None,
+                    position=None,
+                    cost=cost,
+                    source_value=stage.source.value,
+                    invalid_flags=(),
+                )
+        if keyword_pay_for_order_exceeds_max(
+            ctx, max_pay_for_order=max_pay_for_order
+        ):
+            invalid_flags.append("pay_for_order_above_max")
+        if cost == float("inf"):
+            invalid_flags.append("cost_inf")
+        if stage.source == LadderCostSource.WORST:
+            invalid_flags.append("cost_source_worst")
+        if stage.source == LadderCostSource.NONE:
+            invalid_flags.append("no_operational_pay_for_order")
+        return bool(invalid_flags), _cleanup_diag(
+            cur_c=None,
+            position=None,
+            cost=cost,
+            source_value=stage.source.value,
+            invalid_flags=invalid_flags,
+        )
+
+    if cost == float("inf"):
+        invalid_flags.append("cost_inf")
+    if stage.source == LadderCostSource.WORST:
+        invalid_flags.append("cost_source_worst")
+    if stage.source == LadderCostSource.NONE or not stage.is_valid:
+        invalid_flags.append("no_ch_oc_operational_cost")
+    return bool(invalid_flags), _cleanup_diag(
+        cur_c=None,
+        position=None,
+        cost=cost,
+        source_value=stage.source.value,
+        invalid_flags=invalid_flags,
+    )
+
+
 def _active_state_invalid_for_cleanup(
     ctx: "KeywordV3Context",
     current: KeywordStrategyMode,
@@ -949,8 +1061,9 @@ def _active_state_invalid_for_cleanup(
     catalog: dict[AggressionTargetMode, ModeCandidate],
     ladder_inputs: "LadderInputs",
     eligibility: "KeywordV3Eligibility | None",
+    max_pay_for_order: float,
 ) -> tuple[bool, dict[str, object]]:
-    """Нужен ли cleanup: stored active mode не согласован с CH-матрицей / worst-only cost."""
+    """Нужен ли cleanup: stored active mode не согласован с operational cost / CH-матрицей."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
         aggression_target_for_stored_mode,
     )
@@ -962,6 +1075,16 @@ def _active_state_invalid_for_cleanup(
         cost_for_mode,
         resolve_ladder_stage_display,
     )
+
+    if _is_no_ch_profile_with_own_conv(eligibility):
+        assert eligibility is not None
+        return _active_state_invalid_no_ch_for_cleanup(
+            ctx,
+            current,
+            max_pay_for_order=max_pay_for_order,
+            ladder_inputs=ladder_inputs,
+            eligibility=eligibility,
+        )
 
     agg = aggression_target_for_stored_mode(current)
     if agg is None:
@@ -991,16 +1114,13 @@ def _active_state_invalid_for_cleanup(
         invalid_flags.append("cost_source_worst")
     if position is None:
         invalid_flags.append("target_place_none")
-    diag: dict[str, object] = {
-        "current_candidate_valid": (
-            None if cur_c is None else bool(cur_c.is_valid)
-        ),
-        "current_candidate_position": position,
-        "current_state_cost": None if cost == float("inf") else float(cost),
-        "current_state_cost_source": stage.source.value,
-        "invalid_flags": tuple(invalid_flags),
-    }
-    return bool(invalid_flags), diag
+    return bool(invalid_flags), _cleanup_diag(
+        cur_c=cur_c,
+        position=position,
+        cost=cost,
+        source_value=stage.source.value,
+        invalid_flags=invalid_flags,
+    )
 
 
 def _lower_modes_valid_for_cleanup(
@@ -1032,6 +1152,28 @@ def _lower_modes_valid_for_cleanup(
     passing: list[tuple[KeywordStrategyMode, float]] = []
     for mode in _modes_below_for_cleanup(current):
         if eligibility is not None and not can_target_mode(eligibility, mode):
+            continue
+        if _is_no_ch_profile_with_own_conv(eligibility):
+            if mode != KeywordStrategyMode.MIN_CPA:
+                continue
+            stage = resolve_ladder_stage_display(
+                ctx, ladder_inputs, eligibility=eligibility
+            ).stages[AggressionTargetMode.MIN_CPA]
+            if stage.source == LadderCostSource.WORST:
+                continue
+            cost, _ = cost_for_mode(
+                ctx,
+                mode,
+                ladder_inputs=ladder_inputs,
+                eligibility=eligibility,
+            )
+            if cost == float("inf") or float(cost) > float(max_pay_for_order):
+                continue
+            if resolve_limit is not None and float(cost) > resolve_limit:
+                continue
+            if stage.source != LadderCostSource.PAY_FOR_ORDER:
+                continue
+            passing.append((mode, float(cost)))
             continue
         mc = candidate_for_strategy_mode(mode, catalog)
         if mc is None or not mc.is_valid or mc.position is None:
@@ -1148,6 +1290,7 @@ def plan_active_invalid_state_cleanup(
             catalog=catalog,
             ladder_inputs=ladder,
             eligibility=elig,
+            max_pay_for_order=max_pfo,
         )
         if not is_invalid:
             continue

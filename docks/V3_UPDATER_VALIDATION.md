@@ -42,7 +42,7 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 Фазы NORMAL (только `allows_ladder_phases`):
 
 1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
-2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF).
+2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF). Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: отсутствие CH-кандидата не invalid; MIN при ``pay_for_order`` ≤ max не трогаем; OPT/MAX без operational cost → DOWN на MIN по ``PAY_FOR_ORDER``, иначе FORCE_OFF.
 3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
 4. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
 5. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
