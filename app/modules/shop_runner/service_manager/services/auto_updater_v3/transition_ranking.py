@@ -8,8 +8,8 @@
 - сортировка в пуле: ``rec_tier -> state_cost -> pay_for_order -> keyword_id``.
 
 Два независимых сигнала:
-- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state
-  (без fallback на ``keyword.pay_for_order``);
+- ``missing_target_matrix`` — нет валидной матрицы M/O/C; cost имьютится через worst-per-state,
+  кроме collapsed CH + ``keyword.pay_for_order`` (SSOT ``cost_for_mode``);
 - ``missing_above_rec`` — ``above_rec_conversion is None``; на полке tier ниже confirmed.
 """
 
@@ -413,10 +413,26 @@ def collect_transition_candidates(
     *,
     policy: SelectionPolicy,
     ladder_inputs: "LadderInputs | None" = None,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> list[TransitionCandidate]:
     """Все допустимые UP-переходы с метриками (effective upper modes + RK catalog)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordV3Eligibility,
+        build_eligibility_map,
+        can_target_mode,
+        min_cpa_operational_via_pay_for_order,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        cost_for_mode,
+    )
+
     ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
     worst_costs = ladder.worst_costs
+    elig_map: dict[int, KeywordV3Eligibility] = (
+        eligibility_by_ks_id
+        if eligibility_by_ks_id is not None
+        else build_eligibility_map(ladder.all_contexts)
+    )
     out: list[TransitionCandidate] = []
 
     for ctx, current_mode in prepared:
@@ -431,6 +447,10 @@ def collect_transition_candidates(
 
         catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
         use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
+        elig = (
+            elig_map.get(int(ks_id)) if ks_id is not None else None
+        )
+        pfo_operational = min_cpa_operational_via_pay_for_order(ctx, elig, catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
             click_mode=policy.click_mode,
@@ -441,6 +461,8 @@ def collect_transition_candidates(
             target = _target_mode_for_strategy(to_mode)
             mc = catalog.get(target)
             if mc is None:
+                continue
+            if elig is not None and not can_target_mode(elig, to_mode):
                 continue
             from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
                 rec_gate_allows_up,
@@ -461,12 +483,20 @@ def collect_transition_candidates(
                 max_target_mode=policy.max_target_mode,
             ):
                 continue
-            cost, imputed = _resolve_state_cost(
-                mc,
-                target,
-                worst_costs,
-                use_imputation=use_matrix_imputation,
-            )
+            if pfo_operational:
+                cost, imputed = cost_for_mode(
+                    ctx,
+                    to_mode,
+                    ladder_inputs=ladder,
+                    eligibility=elig,
+                )
+            else:
+                cost, imputed = _resolve_state_cost(
+                    mc,
+                    target,
+                    worst_costs,
+                    use_imputation=use_matrix_imputation,
+                )
             if cost == float("inf"):
                 continue
             out.append(

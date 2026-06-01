@@ -221,6 +221,47 @@ def test_profile_n_state_when_no_v2_cpo_and_no_ch() -> None:
 
 
 @pytest.mark.unit
+def test_profile_collapsed_ch_pay_for_order_min_line() -> None:
+    """Collapsed CH + pay_for_order: M п0|min|CPO|PFO, O/C нет CH ladder, без maxРК."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+        AggressionTargetMode,
+        ModeCandidate,
+    )
+
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.MIN_CPA,
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                is_valid=True,
+                predicted_cpa=382.04,
+                position=0,
+            ),
+            AggressionTargetMode.OPTIMUM: ModeCandidate(
+                mode=AggressionTargetMode.OPTIMUM,
+                is_valid=False,
+                invalid_reason="no_valid_ch_ladder",
+            ),
+            AggressionTargetMode.MAX_CONVERSION: ModeCandidate(
+                mode=AggressionTargetMode.MAX_CONVERSION,
+                is_valid=False,
+                invalid_reason="no_valid_ch_ladder",
+            ),
+        },
+        keyword_pay_for_order=382.04,
+        stage_sources={
+            AggressionTargetMode.MIN_CPA: "pay_for_order",
+            AggressionTargetMode.OPTIMUM: "none",
+            AggressionTargetMode.MAX_CONVERSION: "none",
+        },
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "п0|min|CPO382.04|pay_for_order" in text
+    assert "maxРК" not in text
+    assert "нет CH ladder" in text
+
+
+@pytest.mark.unit
 def test_profile_no_ch_min_only_not_n_state() -> None:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
         KeywordV3DataDiagnostic,

@@ -180,9 +180,70 @@ def test_missing_above_rec_allows_effective_jump_on_shelf() -> None:
 
 
 @pytest.mark.unit
+def test_collapsed_ch_with_pay_for_order_no_imputed_oc_up() -> None:
+    """Collapsed CH + PFO: только OFF→MIN, без imputed UP на O/C."""
+    synthetic_only = [
+        PositionProfilePoint(
+            position=1,
+            bid=1000,
+            predicted_conversion=0.1,
+            pay_for_cart=100.0,
+            ch_observed=False,
+        ),
+    ]
+    donor_prof = sample_profile(min_pay=20.0, high_pay=30.0)
+    collapsed_ctx = ctx(
+        ks_id=3,
+        mode=KeywordStrategyMode.OFF,
+        profile=synthetic_only,
+        above_rec=True,
+    )
+    prepared = [
+        (
+            ctx(
+                ks_id=1,
+                mode=KeywordStrategyMode.OFF,
+                profile=donor_prof,
+                above_rec=True,
+            ),
+            KeywordStrategyMode.OFF,
+        ),
+        (collapsed_ctx, KeywordStrategyMode.OFF),
+    ]
+    ladder = _ladder_for_prepared(prepared)
+    candidates = collect_transition_candidates(
+        prepared,
+        policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
+        ladder_inputs=ladder,
+    )
+    to_modes = {c.to_mode for c in candidates if c.keyword_setting_id == 3}
+    assert KeywordStrategyMode.MIN_CPA in to_modes
+    assert KeywordStrategyMode.OPTIMUM not in to_modes
+    assert KeywordStrategyMode.MAX_CONVERSION not in to_modes
+    assert not any(
+        c.imputed and c.to_mode != KeywordStrategyMode.MIN_CPA
+        for c in candidates
+        if c.keyword_setting_id == 3
+    )
+
+
+@pytest.mark.unit
 def test_missing_target_matrix_imputed_uses_worst() -> None:
+    """Collapsed CH без pay_for_order: worst-imputation и ``imputed=True`` в UP."""
+    synthetic_only = [
+        PositionProfilePoint(
+            position=1,
+            bid=1000,
+            predicted_conversion=0.1,
+            pay_for_cart=100.0,
+            ch_observed=False,
+        ),
+    ]
     data_prof = sample_profile(min_pay=20.0, high_pay=30.0)
-    no_matrix = ctx(ks_id=2, mode=KeywordStrategyMode.OFF, profile=None, above_rec=None)
+    no_pfo_kw = calc_kw(ks_id=2, text="kw2", mode=KeywordStrategyMode.OFF, above_rec=None)
+    stat = no_pfo_kw.cluster_stat.model_copy(update={"conv_views_to_orders": 0.0})
+    no_pfo_kw = no_pfo_kw.model_copy(update={"cluster_stat": stat})
+    no_matrix = KeywordV3Context(keyword=no_pfo_kw, position_profile=synthetic_only)
     prepared = [
         (
             ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=data_prof, above_rec=True),
@@ -190,20 +251,20 @@ def test_missing_target_matrix_imputed_uses_worst() -> None:
         ),
         (no_matrix, KeywordStrategyMode.OFF),
     ]
-    assert missing_target_matrix(no_matrix)
-    empty_catalog = build_mode_candidates(
-        profile=None,
+    cat = build_mode_candidates(
+        profile=synthetic_only,
         keyword_text=no_matrix.keyword.text,
-        conv_views_to_orders=no_matrix.keyword.conv_views_to_orders,
+        conv_views_to_orders=0.0,
     )
-    assert missing_target_matrix_from_catalog(empty_catalog)
+    assert missing_target_matrix_from_catalog(cat)
     worst = build_worst_per_state_costs(prepared)
     assert AggressionTargetMode.MIN_CPA in worst
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
+        ladder_inputs=_ladder_for_prepared(prepared),
     )
-    imputed = [c for c in candidates if c.imputed]
+    imputed = [c for c in candidates if c.imputed and c.keyword_setting_id == 2]
     assert imputed
 
 

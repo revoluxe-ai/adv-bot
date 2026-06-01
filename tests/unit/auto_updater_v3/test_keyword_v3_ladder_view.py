@@ -237,6 +237,51 @@ def test_imputed_profile_cpo_can_differ_from_campaign_worst_max() -> None:
 
 
 @pytest.mark.unit
+def test_collapsed_ch_pay_for_order_min_only_never_worst_source() -> None:
+    """CH raw без usable M/O/C + pay_for_order: MIN PFO, O/C none, не worst."""
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+        PositionProfilePoint,
+    )
+
+    profile = [
+        PositionProfilePoint(
+            position=1,
+            bid=1000,
+            predicted_conversion=0.1,
+            pay_for_cart=100.0,
+            ch_observed=False,
+        ),
+    ]
+    kw = _calculated_kw_fixture(
+        ks_id=3, text="collapsed", mode=KeywordStrategyMode.OFF, conv=0.08
+    )
+    pfo = float(kw.pay_for_order or 0)
+    assert pfo > 0
+    ctx = KeywordV3Context(keyword=kw, position_profile=profile)
+    ladder_inputs = LadderInputs.from_contexts([ctx])
+    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
+    assert elig.data_tier == KeywordDataTier.KEYWORD_FULL
+    assert elig.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
+    assert elig.target_place_fallback_zero is True
+
+    view = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
+    assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.PAY_FOR_ORDER
+    assert view.stages[AggressionTargetMode.MIN_CPA].cost == pytest.approx(pfo, rel=0.02)
+    assert view.stages[AggressionTargetMode.OPTIMUM].source == LadderCostSource.NONE
+    assert view.stages[AggressionTargetMode.MAX_CONVERSION].source == LadderCostSource.NONE
+    assert view.stages[AggressionTargetMode.OPTIMUM].reason == "no_valid_ch_ladder"
+
+    opt_cost, opt_imputed = cost_for_mode(
+        ctx,
+        KeywordStrategyMode.OPTIMUM,
+        ladder_inputs=ladder_inputs,
+        eligibility=elig,
+    )
+    assert opt_cost == float("inf")
+    assert opt_imputed is False
+
+
+@pytest.mark.unit
 def test_no_ch_pay_for_order_min_only_never_worst_source() -> None:
     """NO_CH tier: MIN ``pay_for_order``, O/C ``none``, never ``worst``."""
     kw = _calculated_kw_fixture(

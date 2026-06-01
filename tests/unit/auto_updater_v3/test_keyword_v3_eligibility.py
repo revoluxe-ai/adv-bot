@@ -110,6 +110,33 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
 
 
 @pytest.mark.unit
+def test_eligibility_collapsed_ch_min_only_preserves_data_tier() -> None:
+    """Collapsed CH + pay_for_order: MIN-only и place 0, tier FULL не меняется."""
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+        PositionProfilePoint,
+    )
+
+    profile = [
+        PositionProfilePoint(
+            position=1,
+            bid=1000,
+            predicted_conversion=0.1,
+            pay_for_cart=100.0,
+            ch_observed=False,
+        ),
+    ]
+    kw = _calculated_kw_fixture(
+        ks_id=7, text="collapsed", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=profile)
+    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
+    assert elig.data_tier == KeywordDataTier.KEYWORD_FULL
+    assert elig.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
+    assert elig.target_place_fallback_zero is True
+    assert build_target_place_fallback_zero_by_keyword_id([ctx])[7] is True
+
+
+@pytest.mark.unit
 def test_build_target_place_fallback_zero_excludes_off_mode() -> None:
     """OFF после guard: map без True, хотя tier NO_CH даёт fallback в eligibility."""
     kw = _calculated_kw_fixture(
