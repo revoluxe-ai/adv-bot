@@ -459,7 +459,11 @@ def resolve_ladder_stage_display(
 
 
 def ladder_view_to_candidates(view: LadderView) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Преобразовать ``LadderView`` в ``ModeCandidate`` для Telegram UI."""
+    """Преобразовать ``LadderView`` в ``ModeCandidate`` для Telegram UI.
+
+    ``stage.reason`` (например ``no_valid_ch_ladder``) всегда попадает в
+    ``invalid_reason``, даже если в каталоге уже есть ``ModeCandidate``.
+    """
     out: dict[AggressionTargetMode, ModeCandidate] = {}
     for mode, stage in view.stages.items():
         base = stage.candidate
@@ -474,6 +478,10 @@ def ladder_view_to_candidates(view: LadderView) -> dict[AggressionTargetMode, Mo
         ):
             updates["position"] = 0
             updates["bid"] = None
+        if stage.reason is not None:
+            updates["invalid_reason"] = stage.reason
+        elif stage.is_valid:
+            updates["invalid_reason"] = None
         if base is not None:
             out[mode] = base.model_copy(update=updates)
             continue

@@ -271,6 +271,21 @@ def test_collapsed_ch_pay_for_order_min_only_never_worst_source() -> None:
     assert view.stages[AggressionTargetMode.MAX_CONVERSION].source == LadderCostSource.NONE
     assert view.stages[AggressionTargetMode.OPTIMUM].reason == "no_valid_ch_ladder"
 
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        ladder_view_to_candidates,
+    )
+
+    ui_candidates = ladder_view_to_candidates(view)
+    assert ui_candidates[AggressionTargetMode.OPTIMUM].is_valid is False
+    assert (
+        ui_candidates[AggressionTargetMode.OPTIMUM].invalid_reason
+        == "no_valid_ch_ladder"
+    )
+    assert (
+        ui_candidates[AggressionTargetMode.MAX_CONVERSION].invalid_reason
+        == "no_valid_ch_ladder"
+    )
+
     opt_cost, opt_imputed = cost_for_mode(
         ctx,
         KeywordStrategyMode.OPTIMUM,
