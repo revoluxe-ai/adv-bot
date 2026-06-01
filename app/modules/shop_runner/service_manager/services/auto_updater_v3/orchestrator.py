@@ -299,10 +299,6 @@ async def process_adv_v3(
                     keyword_bootstrap_actions,
                     raw_profiles,
                 )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts,
-                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-                )
 
             shelf_active = complex_adv.shelf_promotion_active
             shelf_click_mode = (
@@ -359,10 +355,6 @@ async def process_adv_v3(
                     ledger,
                     cleanup_actions,
                     raw_profiles,
-                )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts,
-                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 )
                 eligibility = build_eligibility_map(
                     contexts,
@@ -438,10 +430,6 @@ async def process_adv_v3(
                         expansion_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                        contexts,
-                        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-                    )
 
             guard_condition = (
                 fact.pay_for_order is not None
@@ -481,10 +469,12 @@ async def process_adv_v3(
                         guard_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                        contexts,
-                        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-                    )
+
+            # Всегда перед sync: даже если bootstrap/cleanup/expansion/guard без actions.
+            sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                contexts,
+                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+            )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
             plan_fact_change = ChangePlanFact(adv)
