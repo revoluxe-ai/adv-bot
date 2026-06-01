@@ -141,7 +141,7 @@ async def test_decorator_sleep_and_retry_behavior_unchanged() -> None:
 async def test_decorator_timeout_runs_finally_before_next_tick() -> None:
     """On tick timeout, finally block of func should still complete (grace via shield)."""
     finally_ran = asyncio.Event()
-    decorator = while_coroutine_decorator(60, 1, timeout_sec=0.05)
+    decorator = while_coroutine_decorator(60, 1)
 
     async def slow_with_finally(self: object) -> None:
         try:
