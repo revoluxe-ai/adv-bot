@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
+    PlanFactSummary,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -267,25 +268,40 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_pre_complex_advs(self) -> list[PreComplexAdv]:
+    async def get_pre_complex_advs(self, *, skip_plan_fact: bool = False) -> list[PreComplexAdv]:
+        """Собрать PreComplexAdv из PG.
+
+        Args:
+            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats (для корутин,
+                где факт подгружается отдельно, напр. ``update_cluster_bids``).
+        """
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
         )
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        plan_fact_reader = PlanFactReader()
-        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
-        if search_adv_ids:
-            search_adv_idv, summaries_by_adv_id = await asyncio.gather(
-                self.__get_adv_id_to_search_adv_map(search_adv_ids),
-                plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
-            )
+        summaries_by_adv_id: dict[int, PlanFactSummary] = {}
+        if skip_plan_fact:
+            if search_adv_ids:
+                search_adv_idv = await self.__get_adv_id_to_search_adv_map(
+                    search_adv_ids
+                )
+            else:
+                search_adv_idv = {}
         else:
-            search_adv_idv = {}
-            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
-                adv_ids_for_plan_fact
-            )
+            plan_fact_reader = PlanFactReader()
+            adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+            if search_adv_ids:
+                search_adv_idv, summaries_by_adv_id = await asyncio.gather(
+                    self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                    plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
+                )
+            else:
+                search_adv_idv = {}
+                summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                    adv_ids_for_plan_fact
+                )
         return [
             PreComplexAdv(
                 auto_adv=adv,
@@ -301,7 +317,12 @@ class WBShopDataManager:
         ]
 
     @single_run()
-    async def get_complex_advs(self, *, load_extras: bool = True) -> list["ComplexAdv"]:
+    async def get_complex_advs(
+        self,
+        *,
+        load_extras: bool = True,
+        skip_plan_fact: bool = False,
+    ) -> list["ComplexAdv"]:
         """Собрать активные комплексы РК.
 
         ``load_extras=True`` (по умолчанию): обогатить traffic-кликами (CH) и подтянуть
@@ -310,6 +331,9 @@ class WBShopDataManager:
 
         ``load_extras=False``: только данные из БД + nmids; для ``adv_settings_auto_update``
         и прочих фоновых корутин — без ``traffic_clicks_dto`` (полочный gate по кликам не сработает).
+
+        ``skip_plan_fact=True``: не читать ``plan_fact_stats`` в CH при сборке pre_complex
+        (факт для ``update_cluster_bids`` приходит из ``PlanFactReader`` в менеджере ставок).
         """
         # TODO(single_run/reentrancy): Важно: `get_complex_advs()` и `get_pre_complex_advs()`
         # оба помечены `@single_run()`.
@@ -337,7 +361,7 @@ class WBShopDataManager:
         # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
         #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
         # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
-        pre_complex_advs = await self.get_pre_complex_advs()
+        pre_complex_advs = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(

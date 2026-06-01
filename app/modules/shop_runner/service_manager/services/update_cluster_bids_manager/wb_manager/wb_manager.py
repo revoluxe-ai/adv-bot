@@ -350,6 +350,14 @@ class WBManager(WBBaseManager):
         context: str = "",
     ) -> AdvMinNmidsBids:
         """Только Redis v2; при miss — error в лог, ячейка не попадает в результат."""
+        return await self._get_min_bids_cache_only_impl(advs, context=context)
+
+    async def _get_min_bids_cache_only_impl(
+        self,
+        advs: list[ComplexAdv],
+        *,
+        context: str,
+    ) -> AdvMinNmidsBids:
         full_command = dto_to_command(advs)
         cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
         hits_auto: dict[int, int] = {}
@@ -364,7 +372,6 @@ class WBManager(WBBaseManager):
                 cells.append((item.adv_id, item.placement_type, nmid))
 
         cached_map = await cache_manager.get_min_bids_v2_batch(cells)
-
         for item in full_command.items:
             for nmid in item.nmids:
                 cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)

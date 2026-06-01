@@ -52,21 +52,35 @@ class KeywordsManager:
         candidates = list(filter(candidate_filter, keywords))
         return candidates
 
-    async def create_new_keyword_settings_for_complex_advs(self,
-                                                           complex_advs: list[ComplexAdv],
-                                                           stats: list["NormqueryStatsDTO"]):
-        adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
+    async def create_new_keyword_settings_for_complex_advs(
+        self,
+        complex_advs: list[ComplexAdv],
+        stats: list["NormqueryStatsDTO"],
+    ) -> None:
+        adv_id_to_complex_adv = {
+            adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids
+        }
         async with sm(read_only=False) as session:
             for stat in stats:
                 complex_adv = adv_id_to_complex_adv[stat.adv_id]
                 texts: list[str] = [st.norm_query for st in stat.stats]
-                await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
+                await self._add_new_keyword_settings_to_session(
+                    session,
+                    complex_adv,
+                    texts,
+                )
             await session.commit()
 
-    async def create_new_keyword_settings(self, complex_adv: ComplexAdv, stats: list[KeywordStat]):
+    async def create_new_keyword_settings(
+        self, complex_adv: ComplexAdv, stats: list[KeywordStat]
+    ) -> None:
         texts: list[str] = [stat.text for stat in stats]
         async with sm(read_only=False) as session:
-            await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
+            await self._add_new_keyword_settings_to_session(
+                session,
+                complex_adv,
+                texts,
+            )
             await session.commit()
 
     async def _add_new_keyword_settings_to_session(

@@ -294,7 +294,7 @@ async def test_adv_settings_auto_update_stats_freshness_hit_miss_fail_open(
     adv = _make_complex_adv(wb_api, adv_setting_mock, keywords_mocks, search_adv=_search_adv_started())
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(adv_ids[0], None, "miss")]
+        return [(adv_ids[0], None, "miss", None)]
 
     with (
         patch(
@@ -336,7 +336,7 @@ async def test_adv_settings_auto_update_stats_freshness_invalid_payload_fail_ope
     adv = _make_complex_adv(wb_api, adv_setting_mock, keywords_mocks, search_adv=_search_adv_started())
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(adv_ids[0], None, "invalid")]
+        return [(adv_ids[0], None, "invalid", None)]
 
     with (
         patch(
@@ -383,7 +383,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_skips_adv(
     )
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(adv_ids[0], emergency, "hit")]
+        return [(adv_ids[0], emergency, "hit", None)]
 
     with (
         patch(
@@ -430,7 +430,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_skips_adv(
     )
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(adv_ids[0], stale, "hit")]
+        return [(adv_ids[0], stale, "hit", None)]
 
     with (
         patch(
@@ -491,7 +491,7 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
     fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(aid, fresh, "hit") for aid in adv_ids]
+        return [(aid, fresh, "hit", None) for aid in adv_ids]
 
     with (
         patch(
@@ -549,7 +549,7 @@ async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
     fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
 
     async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(aid, fresh, "hit") for aid in adv_ids]
+        return [(aid, fresh, "hit", None) for aid in adv_ids]
 
     with (
         patch(

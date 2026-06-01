@@ -115,6 +115,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         # TODO: Сделать на будущее более глобальные объекты для списков, в котором будут передаваться не только данные, но и метаданные
         # TODO: тут получаем только для одного артикула, возможно, что нал
         stats = await self._get_all_stats(complex_adv, min_days, min_views)
+
         from app.modules.keywords_manager.keywords_manager import KeywordsManager
         keyword_manager = KeywordsManager()
         await keyword_manager.create_new_keyword_settings(complex_adv, stats)
