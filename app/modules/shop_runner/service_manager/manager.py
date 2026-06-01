@@ -69,10 +69,6 @@ from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
-from .coroutine_tick_inflight import (
-    ENDPOINT_NORMQUERY_STATS,
-    CoroutineTickInflightGuard,
-)
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
@@ -200,7 +196,7 @@ class CoroutinesManager:
         self._min_bids_old_refresh_permitted = asyncio.Event()
         self._min_bids_old_refresh_permitted.set()
         self._min_bids_wb_refresh_lock = asyncio.Lock()
-        self._clusters_adv_stats_today_inflight = CoroutineTickInflightGuard()
+
 
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
@@ -363,7 +359,7 @@ class CoroutinesManager:
         keywords = await complex_adv.get_keywords()
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(60 * 5, timeout_sec=900)
+    @while_coroutine_decorator(60 * 5, 5)
     async def update_common_sale_stat(self) -> None:
         # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N РК)
         advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
@@ -399,7 +395,7 @@ class CoroutinesManager:
             await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
 
-    @while_coroutine_decorator(5 * 60, 1, timeout_sec=900)
+    @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
@@ -721,7 +717,7 @@ class CoroutinesManager:
                 )
         return None
 
-    @while_coroutine_decorator(60, 60, timeout_sec=900)
+    @while_coroutine_decorator(60, 60)
     async def auto_budget_watchdog(self) -> None:
         """Сначала автопополнение бюджетов (если есть кандидаты), затем запуск/пауза РК.
 
@@ -888,38 +884,31 @@ class CoroutinesManager:
                 force_after_start_rejection=force,
             )
 
-    @while_coroutine_decorator(5 * 60, 60, timeout_sec=900)
+    @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
 
-        async def _run_tick() -> None:
-            wb_manager_hub = self._wb_manager_hub
-            container = ClustersAdvStatUpdaterContainer(
-                _wb_manager_hub=wb_manager_hub
-            )
-            updater: ClustersAdvStatUpdater = (
-                container.clusters_adv_stat_updater()
-            )
-            complex_advs = await self._wb_shop_data_manager.get_complex_advs(
-                load_extras=False
-            )
-            updated_original_adv_ids = await updater.update_today_stats(
-                complex_advs
-            )
-            for adv_orig_id in updated_original_adv_ids:
-                await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
-            logger.info(
-                "heartbeat update_clusters_adv_stats_today shop_id=%s updated=%s",
-                self.shop_id,
-                len(updated_original_adv_ids),
-            )
-
-        _ = await self._clusters_adv_stats_today_inflight.run_or_skip(
-            shop_id=self.shop_id,
-            coroutine="update_clusters_adv_stats_today",
-            endpoint=ENDPOINT_NORMQUERY_STATS,
-            body=_run_tick,
+        wb_manager_hub = self._wb_manager_hub
+        container = ClustersAdvStatUpdaterContainer(
+            _wb_manager_hub=wb_manager_hub
         )
+        updater: ClustersAdvStatUpdater = (
+            container.clusters_adv_stat_updater()
+        )
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs(
+            load_extras=False
+        )
+        updated_original_adv_ids = await updater.update_today_stats(
+            complex_advs
+        )
+        for adv_orig_id in updated_original_adv_ids:
+            await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
+        logger.info(
+            "heartbeat update_clusters_adv_stats_today shop_id=%s updated=%s",
+            self.shop_id,
+            len(updated_original_adv_ids),
+        )
+
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
