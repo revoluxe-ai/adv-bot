@@ -933,7 +933,7 @@ class CoroutinesManager:
         )
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
-    @while_coroutine_decorator(60 * 5, 60, timeout_sec=900)
+    @while_coroutine_decorator(60 * 5, 60)
     async def update_cluster_bids(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
