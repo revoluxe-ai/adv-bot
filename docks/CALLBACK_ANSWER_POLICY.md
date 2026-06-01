@@ -19,3 +19,14 @@ Callback answer policy (wb-sky-bot)
 2. В ревью PR проверять, что не меняется порядок outer middleware так, чтобы pre-answer оказался после GateMiddleware.
 3. При инциденте: разрешён временный fallback в GateMiddleware, но сразу выписать таск на восстановление глобального middleware и удалить fallback.
 
+Decision note for reviewers (deliberate choice)
+------------------------------------------------
+This is an explicit, team-level decision: we use a single centralized pre-answer middleware as the canonical solution for inline callback handling.
+
+What this means for reviewers:
+- Do not request permanent local fallback patches (e.g. adding callback.answer() in GateMiddleware) as the long-term fix — those are only allowed as short-term emergency hotfixes and must be accompanied by a follow-up ticket to restore the canonical middleware.
+- If a PR removes or reorders the centralized pre-answer middleware, block the change and request an RFC or explicit approval from the core bot team.
+- If a temporary fallback is merged for incident mitigation, require a follow-up PR that either reinstates the global middleware or documents and justifies a permanent change.
+
+If you disagree with this policy, open an RFC issue (label: architecture) instead of requesting ad-hoc code changes in feature PRs.
+
