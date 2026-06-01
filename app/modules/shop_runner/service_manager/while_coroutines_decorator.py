@@ -6,8 +6,7 @@ from typing import Any, ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 
-from app.core.mp.wb.api.excs import MaxAttemptsError
-from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.mp.wb.api.excs import MaxAttemptsError, ApiForbiddenError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
