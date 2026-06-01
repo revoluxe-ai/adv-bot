@@ -22,6 +22,7 @@ from app.client_bot.user_interface.views.messages.strategy_display import (
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from . import keyboard
+from .keyboard.automatic_version_ui import normalize_automatic_version_ui
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -73,11 +74,16 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
     TrafficClicksManager,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
+    SalesStates,
+    sales_state_short_label,
+)
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
 )
 
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
+from ..last_v3_action_informer import load_last_v3_action_display
 
 if TYPE_CHECKING:
     pass
@@ -133,7 +139,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._topup_failed: dict[str, str] | None = None
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
+        self._cost_threshold_kind: str | None = None
         self._plan_set: bool = False
+        self._plan_fact_ch_max_ts_str: str | None = None
+        self._campaign_sales_state: SalesStates | None = None
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
         self._emergency_mode_active: bool = False
@@ -141,6 +150,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_fresh: bool = True
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
+        self._v3_last_action_str: str | None = None
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -284,6 +294,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
+        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+            self._v3_last_action_str = await load_last_v3_action_display(self.adv)
+        else:
+            self._v3_last_action_str = None
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
 
         cost_metrics = await get_auto_campaign_cost_activity_metrics(
@@ -292,7 +306,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._target_cost = cost_metrics.target_cost
         self._avg_cost_additional = cost_metrics.avg_cost
         self._is_campaign_active_by_cost = cost_metrics.is_active
+        self._cost_threshold_kind = cost_metrics.cost_threshold_kind
         self._plan_set = cost_metrics.plan_set
+        self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
+        self._campaign_sales_state = cost_metrics.campaign_sales_state
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -476,12 +493,26 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             )
 
             if self._target_cost is not None or self._avg_cost_additional is not None:
-                text += f"Себес зак: план {target_str}, факт {avg_str}\n"
+                ch_suffix = (
+                    f" (пл-ф CH: {self._plan_fact_ch_max_ts_str} МСК)"
+                    if self._plan_fact_ch_max_ts_str
+                    else ""
+                )
+                text += f"Себес зак: план {target_str}, факт {avg_str}{ch_suffix}\n"
+                if self._campaign_sales_state is not None:
+                    text += (
+                        f"Состояние: {sales_state_short_label(self._campaign_sales_state)}\n"
+                    )
 
             if self._is_campaign_active_by_cost is False and self._avg_cost_additional is not None:
                 suggested = round(self._avg_cost_additional * 1.1, 0)
+                cost_label = (
+                    "цель зак"
+                    if self._cost_threshold_kind == "target"
+                    else "макс.зак"
+                )
                 text += (
-                    f"⚠ Рек.сис не раскр, макс.зак >= {int(suggested)} р.\n"
+                    f"⚠ Рек.сис не раскр, {cost_label} >= {int(suggested)} р.\n"
                 )
             if self._traffic_clicks_dto is not None:
                 text += (
@@ -549,10 +580,17 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"минус аук: {self.keywords_status_last_update_search_adv}\n"
             f"став класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Н/д'}\n"
             f"общ.став аук: {self.last_common_bid_update_str}\n"
-            f"добавл в БС:"
-            f" {self._update_informer.add_to_white_list_str}\n"
-            f"удал из БС:"
-            f" {self._update_informer.delete_from_white_list_str}\n"
+        )
+        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+            text += f"посл. V3: {self._v3_last_action_str or 'Нет данных'}\n"
+        else:
+            text += (
+                f"добавл в БС:"
+                f" {self._update_informer.add_to_white_list_str}\n"
+                f"удал из БС:"
+                f" {self._update_informer.delete_from_white_list_str}\n"
+            )
+        text += (
             f"цел.поз +:"
             f" {self._update_informer.up_target_place_str}\n"
             f"цел.поз -:"

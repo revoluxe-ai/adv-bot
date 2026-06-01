@@ -19,18 +19,20 @@ from app.modules.white_list_mode_settings import router as WhiteListModeSettings
 from app.modules.shop_runner.auction_boost_mode_settings import (
     AuctionBoostModeSettingsRouter,
 )
-from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram import (
     auto_updater_target_place_setting_router,
 )
 from app.modules.shop_runner.service_manager.auto_updater_version_toggle import (
     auto_updater_version_toggle_router,
+)
+from app.modules.shop_runner.service_manager.v3_rollout_aggressiveness_toggle import (
+    v3_rollout_aggressiveness_toggle_router,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
 )
 from app.modules.user_message_sender import middleware_for_adding_task
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
-from app.modules.white_list_updater import router as white_list_updater_router
 
 from ..settings import settings
 from .middlewars.return_to_start_from_state import ReturnToStart
@@ -50,11 +52,11 @@ from .user_interface.handlers import (
     adv_setting,
     change_auto_bid,
     change_cpm,
-    change_max_cpc,
     clusters,
     connect_existing_advs,
     cpm_builder,
     download_keywords,
+    adv_excel_roundtrip,
     exceptions,
     favorite_advs_for_users,
     get_shop_for_admin,
@@ -77,6 +79,7 @@ from .user_interface.handlers import (
     strategy_setting,
     rec_system_mode_toggle,
     campaign_activity,
+    auto_shelf_bid_control_menu,
     time_settings,
     white_list_mode_toggle,
 )
@@ -108,6 +111,7 @@ _ = common_router.message.middleware.register(ReturnToStart())
 common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_routers(auto_updater_target_place_setting_router)
 common_router.include_routers(auto_updater_version_toggle_router)
+common_router.include_routers(v3_rollout_aggressiveness_toggle_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
@@ -135,7 +139,6 @@ common_router.include_routers(connect_existing_advs.router)
 common_router.include_routers(rec_system_mode_toggle.router)
 common_router.include_routers(white_list_mode_toggle.router)
 common_router.include_routers(WhiteListModeSettingsRouter)
-common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
@@ -144,8 +147,10 @@ common_router.include_routers(invite_show.router)
 common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
+common_router.include_routers(adv_excel_roundtrip.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
+common_router.include_routers(auto_shelf_bid_control_menu.router)
 common_router.include_routers(time_settings.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
@@ -154,7 +159,6 @@ common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)  # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
-common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(change_auto_bid.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 # TODO(legacy-remove): модуль содержит legacy callbacks.StrategySetting;

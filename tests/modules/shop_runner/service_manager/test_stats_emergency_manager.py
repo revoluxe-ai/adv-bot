@@ -70,6 +70,41 @@ async def test_split_advs_by_stats_freshness_filters_correctly(fake_redis) -> No
 
 
 @pytest.mark.asyncio
+async def test_split_advs_by_stats_freshness_bypass_when_guard_disabled(
+    fake_redis, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STATS_FRESHNESS_GUARD_ENABLED", "false")
+    manager = _build_manager(fake_redis)
+    adv_fresh = SimpleNamespace(adv_id=1)
+    adv_stale = SimpleNamespace(adv_id=2)
+    adv_emergency = SimpleNamespace(adv_id=3)
+    advs = [adv_fresh, adv_stale, adv_emergency]
+
+    cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
+    await cache.mset_states(
+        manager.shop_id,
+        [
+            (1, StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)),
+            (2, StatsFreshnessState(is_fresh=False, is_stale_over_6h=False)),
+            (3, StatsFreshnessState(is_fresh=False, is_stale_over_6h=True)),
+        ],
+    )
+
+    with patch.object(
+        manager._redis_stats_freshness_cache,
+        "mget_entries",
+        new=AsyncMock(),
+    ) as mget_mock:
+        fresh, stale_over_6h = await manager._split_advs_by_stats_freshness(
+            advs, operation_name="test_op"
+        )
+
+    assert fresh == advs
+    assert stale_over_6h == []
+    mget_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_split_advs_by_stats_freshness_fail_open_on_cache_miss(
     fake_redis, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -151,6 +186,7 @@ async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None
     complex_adv = SimpleNamespace(
         adv_id=777,
         auto_add_only_relevant_phrase=False,
+        auto_updater_version=2,
         get_keywords=AsyncMock(return_value=keywords),
     )
 

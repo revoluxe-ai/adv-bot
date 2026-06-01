@@ -1,3 +1,9 @@
+"""Декоратор single_run: один in-flight вызов на ключ (args/kwargs).
+
+Waiter ждёт Event первого caller; timeout waiter не удаляет shared state — только first
+caller очищает key после завершения func.
+"""
+
 import asyncio
 import logging
 from collections import Counter
@@ -9,6 +15,8 @@ from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
 logger = logging.getLogger(__name__)
+
+SINGLE_RUN_WAIT_TIMEOUT_SECONDS = 900
 
 
 def _to_hashable(val: Any) -> Any:
@@ -47,11 +55,24 @@ def single_run() -> (
 
             key = make_key(func.__name__, args, kwargs)
 
-            # Если уже запущена функция — ждём
+            # Уже выполняется — ждём завершения first caller (не удаляем key при timeout).
             if key in events:
                 self._single_run_call_counter[key] += 1
                 try:
-                    await events[key].wait()
+                    try:
+                        await asyncio.wait_for(
+                            events[key].wait(),
+                            timeout=SINGLE_RUN_WAIT_TIMEOUT_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "single_run wait timed out (function=%s, key=%s, timeout_sec=%s)",
+                            func.__name__,
+                            key,
+                            SINGLE_RUN_WAIT_TIMEOUT_SECONDS,
+                            exc_info=True,
+                        )
+                        raise
                     value = results.get(key)
                     if value is None:
                         raise KeyError(key)
@@ -59,19 +80,14 @@ def single_run() -> (
                     if value_type == "exc":
                         raise payload
                     return payload
-
                 finally:
                     self._single_run_call_counter[key] -= 1
-                    if self._single_run_call_counter[key] <= 0:
-                        events.pop(key, None)
-                        results.pop(key, None)
-                        self._single_run_call_counter.pop(key, None)
 
-            # Первый вызов
+            # Первый вызов — единственный, кто создаёт и очищает shared state.
             event = asyncio.Event()
             event.clear()
             events[key] = event
-            self._single_run_call_counter[key] = 0  # Никто ещё не ждёт
+            self._single_run_call_counter[key] = 0
 
             try:
                 result = await func(self, *args, **kwargs)
@@ -88,12 +104,12 @@ def single_run() -> (
                 raise
             finally:
                 event.set()
-                # Yield to the loop so waiters can observe the result; avoid a fixed 1s stall.
-                await asyncio.sleep(0)
-                if self._single_run_call_counter[key] <= 0:
-                    events.pop(key, None)
-                    results.pop(key, None)
-                    self._single_run_call_counter.pop(key, None)
+                # Ждём, пока активные waiters прочитают results; только first caller чистит state.
+                while self._single_run_call_counter.get(key, 0) > 0:
+                    await asyncio.sleep(0)
+                events.pop(key, None)
+                results.pop(key, None)
+                self._single_run_call_counter.pop(key, None)
 
         return wrapper
 

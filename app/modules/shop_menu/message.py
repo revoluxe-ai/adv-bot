@@ -5,26 +5,34 @@ from typing import Mapping
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views.callbacks import AddNewToken, ApplyDefaultsForShop, ChangeShopDefaultMaxCPM
+from app.client_bot.user_interface.views.callbacks import (
+    AddNewToken,
+    ApplyDefaultsForShop,
+    ChangeShopDefaultMaxCPM,
+    ResetShopNonRelevantPhrases,
+    ShopMassAdvOpsBack,
+    ShopMassAdvOpsMenu,
+    ToggleCabinetActive,
+    ExportShopAdvExcel,
+    ImportShopAdvExcel,
+)
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
     ConnectExistingAdvs,
-    DeleteWbUserCabinet,
     ShowShopsList,
     TurnBot,
-    TurnWhiteListUpdate,
 )
-from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
@@ -46,6 +54,156 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
 
 logger = logging.getLogger(__name__)
+
+
+def _is_admin_user(user_telegram_id: int | None) -> bool:
+    if user_telegram_id is None:
+        return False
+    return is_bot_admin(user_telegram_id)
+
+
+def build_shop_main_keyboard(
+    wb_user_cabinet: WBUserCabinet,
+    wb_cabinet: WBCabinet,
+) -> InlineKeyboardMarkup:
+    wb_cabinet_original_id = wb_cabinet.id
+    builder = InlineKeyboardBuilder()
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Автоматические рекламные кампании",
+            callback_data=ChoiceAdvPaginator(
+                wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="➕ Добавить токен/Обновить токены",
+            callback_data=AddNewToken(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    cabinet_active = getattr(wb_cabinet, "active", True) is True
+    toggle_label = "Деактивировать магазин" if cabinet_active else "Активировать магазин"
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=toggle_label,
+            callback_data=ToggleCabinetActive(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Подключить существующие кампании",
+            callback_data=ConnectExistingAdvs(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Пополнить баланс",
+            callback_data=AddBalance(
+                wb_cabinet_original_id=wb_cabinet_original_id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Массовые операции с РК",
+            callback_data=ShopMassAdvOpsMenu(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Выгрузить все РК в Excel",
+            callback_data=ExportShopAdvExcel(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Загрузить настройки из Excel",
+            callback_data=ImportShopAdvExcel(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Вернуться к списку магазинов",
+            callback_data=ShowShopsList().pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def build_shop_mass_adv_ops_keyboard(
+    wb_user_cabinet: WBUserCabinet,
+    wb_cabinet: WBCabinet,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Отключить все кампании",
+            callback_data=TurnBot(
+                action="off_all",
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=f"Дефолтная максимальная ставка (CPM) ({wb_cabinet.default_max_cpm})",
+            callback_data=ChangeShopDefaultMaxCPM(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Применить дефолты всем кампаниям",
+            callback_data=ApplyDefaultsForShop(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Сбросить все НРФ во всех РК",
+            callback_data=ResetShopNonRelevantPhrases(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Назад",
+            callback_data=ShopMassAdvOpsBack(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
+    return builder.as_markup()
 
 
 class ShopMenu(TextWithKeyboard):
@@ -214,7 +372,7 @@ class ShopMenu(TextWithKeyboard):
         if not work_tokens:
             logger.warning(f"Токены не найдены для магазина {shop_id}")
             # Для админов делаем исключение
-            if user.user_telegram_id in const.ADMINS:
+            if _is_admin_user(user.user_telegram_id):
                 logger.debug(f"Админ {user.user_telegram_id} получает временный токен")
                 expiration_time = datetime.now() + timedelta(days=30)
                 self.expiration_time = expiration_time
@@ -236,7 +394,7 @@ class ShopMenu(TextWithKeyboard):
         )
 
         # Определение срока действия
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             expiration_time = datetime.now() + timedelta(days=30)
             logger.debug(
                 "Пользователь - админ, установлен временный срок действия токена"
@@ -255,7 +413,7 @@ class ShopMenu(TextWithKeyboard):
         # Проверка на истечение срока действия
         if (
             expiration_time < datetime.now()
-            and user.user_telegram_id not in const.ADMINS
+            and not _is_admin_user(user.user_telegram_id)
         ):
             await self.bot.send_message(
                 self.chat_id,
@@ -265,7 +423,7 @@ class ShopMenu(TextWithKeyboard):
             return False
 
         # Сохранение срока действия для дальнейшего использования
-        if user.user_telegram_id in const.ADMINS:
+        if _is_admin_user(user.user_telegram_id):
             # Для админов устанавливаем временное значение
             self.expiration_time = datetime.now() + timedelta(days=30)
             self.last_days_for_token = 30
@@ -414,10 +572,13 @@ class ShopMenu(TextWithKeyboard):
             text += "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n"
 
         # Shop information
+        cabinet_active = getattr(self._wb_cabinet, "active", True) is True
+        cabinet_status_human = "Активен" if cabinet_active else "Не активен"
         text += (
             "\n===================================\n"
             f"🏬 <b>Магазин</b>: {self._wb_user_cabinet.name}\n"
             f"🆔 <b>Shop ID</b>: {self._wb_cabinet.shop_id}\n"
+            f"📶 <b>Статус магазина в боте</b>: {cabinet_status_human}\n"
         )
 
         text += """
@@ -429,113 +590,7 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        user_telegram_id = self._user_telegram_id
-        wb_user_cabinet = self._wb_user_cabinet
-        wb_cabinet = self._wb_cabinet
-        wb_cabinet_original_id = wb_cabinet.id
-        builder = InlineKeyboardBuilder()
-
-        button = InlineKeyboardButton(
-            text="Автоматические рекламные кампании",
-            callback_data=ChoiceAdvPaginator(
-                wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
-            ).pack(),
-        )
-        builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="➕ Добавить токен/Обновить токены",
-            callback_data=AddNewToken(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-        builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="Создать и настроить кампании",
-            callback_data=CreateNewAdvs(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-
-        builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="Подключить существующие кампании",
-            callback_data=ConnectExistingAdvs(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-        _= builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="Пополнить баланс",
-            callback_data=AddBalance(
-                wb_cabinet_original_id=wb_cabinet_original_id
-            ).pack(),
-        )
-
-        builder.row(button)
-        #
-
-        if user_telegram_id in const.ADMINS:
-            button = InlineKeyboardButton(
-                text="Удалить личный кабинет магазина",
-                callback_data=DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id=self._wb_user_cabinet.id
-                ).pack(),
-            )
-
-            builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="Отключить все кампании",
-            callback_data=TurnBot(
-                action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-        builder.row(button)
-
-        if bool(self._wb_cabinet.white_list_update_active):
-            button = InlineKeyboardButton(
-                text="Выключить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="off"
-                ).pack(),
-            )
-        else:
-            button = InlineKeyboardButton(
-                text="Включить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="on"
-                ).pack(),
-            )
-
-        builder.row(button)
-
-        # Добавляем кнопку для настройки дефолтной максимальной ставки (CPM)
-        button = InlineKeyboardButton(
-            text=f"Дефолтная максимальная ставка (CPM) ({wb_cabinet.default_max_cpm})",
-            callback_data=ChangeShopDefaultMaxCPM(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-        builder.row(button)
-
-        # Добавляем кнопку "Применить дефолты всем кампаниям"
-        button = InlineKeyboardButton(
-            text="Применить дефолты всем кампаниям",
-            callback_data=ApplyDefaultsForShop(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
-        )
-        builder.row(button)
-
-        button = InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=ShowShopsList().pack()
-        )
-        builder.row(button)
-        return builder.as_markup()
+        return build_shop_main_keyboard(self._wb_user_cabinet, self._wb_cabinet)
 
     @staticmethod
     def _format_cashback_snapshot_line(

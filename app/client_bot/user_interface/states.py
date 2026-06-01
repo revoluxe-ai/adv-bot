@@ -27,10 +27,6 @@ class KeywordTargetPlace(StatesGroup):
     waiting_for_new_target_place = State()
 
 
-class ChangeMaxCPC(StatesGroup):
-    waiting_for_new_max_cpc = State()
-
-
 class ChangeAutoBid(StatesGroup):
     waiting_for_new_bid = State()
 
@@ -128,6 +124,12 @@ class AdminGrantGate(StatesGroup):
     waiting_telegram_id = State()
 
 
+class AdvExcelRoundtrip(StatesGroup):
+    """Ожидание .xlsx для импорта настроек РК."""
+
+    waiting_for_workbook = State()
+
+
 class ConnectExistingAdvsStates(StatesGroup):
     """Подключение существующих рекламных кампаний WB по NM-id."""
 
@@ -138,3 +140,12 @@ class ConnectExistingAdvsStates(StatesGroup):
     waiting_auto_adv_id = State()  # ввод ID авто-кампании
     waiting_confirm_create_both = State()  # обе отсутствуют — подтверждение create_complex_advs
     waiting_confirm_continue_invalid = State()  # только авто без поиска — продолжить создание (деактивация + create)
+
+
+class AutoShelfBidControlFSM(StatesGroup):
+    """FSM ввода параметров для Telegram-управления ставкой в полках."""
+
+    waiting_for_max_bid = State()
+    waiting_for_test_share = State()
+    waiting_for_target_test_impressions = State()
+    waiting_for_min_bid_distance = State()

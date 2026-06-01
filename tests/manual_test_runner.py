@@ -172,7 +172,6 @@ async def test_shop_menu_has_add_token_button():
     mock_wb_cabinet.calculated_balance = 1000.0
     mock_wb_cabinet.calculated_bonus = 100.0
     mock_wb_cabinet.adv_settings = []
-    mock_wb_cabinet.white_list_update_active = False
     mock_wb_cabinet.expiration_time = datetime.now() + timedelta(days=30)
 
     mock_user = MagicMock()

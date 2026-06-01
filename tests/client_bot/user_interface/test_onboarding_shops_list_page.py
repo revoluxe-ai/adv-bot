@@ -11,6 +11,8 @@ from app.client_bot.user_interface.handlers.shop_choice_message import (
 )
 from app.client_bot.user_interface.views import callbacks
 
+pytestmark = pytest.mark.unit
+
 
 def _make_wb_user_cabinet(
     name: str,
@@ -36,6 +38,7 @@ def test_shops_list_page_text_equals_title() -> None:
     assert "Добавить магазин" in page.text
     assert "✅" in page.text
     assert "❌" in page.text
+    assert "[Каб][Ток]" in page.text
 
 
 def test_get_shops_list_keyboard_empty_list() -> None:
@@ -65,12 +68,12 @@ def test_get_shops_list_keyboard_empty_invite_even_when_invite_gate_off(mock_set
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 def test_get_shops_list_keyboard_shop_active_token(mock_settings) -> None:
-    """active=True and shop_id in shop_ids_with_active_tokens -> button 'Name ✅'."""
+    """active=True and active token -> button has '[Каб][Ток] Name' prefix."""
     mock_settings.invite_gate = True
     uc = _make_wb_user_cabinet("Shop1", 1, "shop_1", active=True)
     kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens={"shop_1"})
     rows = kb.inline_keyboard
-    assert rows[1][0].text.strip() == "Shop1 ✅"
+    assert rows[1][0].text.strip() == "✅✅ Shop1"
     assert (
         rows[1][0].callback_data
         == callbacks.Shop(action="select", wb_user_cabinet_original_id=1).pack()
@@ -79,12 +82,12 @@ def test_get_shops_list_keyboard_shop_active_token(mock_settings) -> None:
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 def test_get_shops_list_keyboard_shop_inactive_token(mock_settings) -> None:
-    """Otherwise -> button 'Name ❌'."""
+    """Without active token -> token icon is ❌ in '[Каб][Ток] Name'."""
     mock_settings.invite_gate = True
     uc = _make_wb_user_cabinet("Shop2", 2, "shop_2", active=True)
     kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=set())
     rows = kb.inline_keyboard
-    assert rows[1][0].text.strip() == "Shop2 ❌"
+    assert rows[1][0].text.strip() == "✅❌ Shop2"
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
@@ -94,11 +97,23 @@ def test_get_shops_list_keyboard_shop_ids_none_uses_only_active(mock_settings) -
     uc = _make_wb_user_cabinet("Shop3", 3, "shop_3", active=True)
     kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=None)
     rows = kb.inline_keyboard
-    assert rows[1][0].text.strip() == "Shop3 ✅"
+    assert rows[1][0].text.strip() == "✅✅ Shop3"
 
     uc_inactive = _make_wb_user_cabinet("Shop4", 4, "shop_4", active=False)
     kb2 = get_shops_list_keyboard([uc_inactive], 123, shop_ids_with_active_tokens=None)
-    assert kb2.inline_keyboard[1][0].text.strip() == "Shop4 ❌"
+    assert kb2.inline_keyboard[1][0].text.strip() == "❌✅ Shop4"
+
+
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+def test_get_shops_list_keyboard_missing_active_falls_back_to_token_state(
+    mock_settings,
+) -> None:
+    """Отсутствующий wb_cabinet.active обрабатывается как active=True (fallback)."""
+    mock_settings.invite_gate = True
+    uc = _make_wb_user_cabinet("ShopFallback", 5, "shop_5", active=True)
+    del uc.wb_cabinet.active
+    kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens={"shop_5"})
+    assert kb.inline_keyboard[1][0].text.strip() == "ShopFallback ✅"
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
@@ -116,7 +131,7 @@ def test_get_shops_list_keyboard_pagination_25_shops_page1(mock_settings) -> Non
         rows[paginator_idx][0].callback_data
         == callbacks.ShopsListPaginator(page=2).pack()
     )
-    assert rows[1][0].text.strip() == "Shop0 ✅"
+    assert rows[1][0].text.strip() == "✅✅ Shop0"
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
@@ -131,7 +146,7 @@ def test_get_shops_list_keyboard_pagination_45_shops_page2(mock_settings) -> Non
     assert len(paginator_row) == 2
     assert paginator_row[0].text == "⬅️ Назад"
     assert paginator_row[1].text == "Вперёд ➡️"
-    assert rows[1][0].text.strip() == "Shop20 ✅"
+    assert rows[1][0].text.strip() == "✅✅ Shop20"
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
@@ -154,7 +169,7 @@ def test_get_shops_list_keyboard_shop_name_truncated_to_100(mock_settings) -> No
     kb = get_shops_list_keyboard([uc], 123, shop_ids_with_active_tokens=None)
     btn_text = kb.inline_keyboard[1][0].text
     assert len(btn_text) == 100
-    assert btn_text.startswith("A")  # truncated from long name
+    assert btn_text.startswith("✅✅ A")  # status prefix + truncated long name
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
@@ -184,4 +199,4 @@ async def test_shops_list_page_calls_bot_send_message(mock_settings) -> None:
     km = call_kw["reply_markup"]
     assert km is not None
     assert len(km.inline_keyboard) >= 5  # Add, shop, balance, invite, back
-    assert km.inline_keyboard[1][0].text.strip() == "TestShop ✅"
+    assert km.inline_keyboard[1][0].text.strip() == "✅✅ TestShop"

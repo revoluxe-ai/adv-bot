@@ -5,7 +5,6 @@ from functools import partial
 from multiprocessing import Process
 
 import dotenv
-import psutil # pyright: ignore
 from typing import Any
 from collections.abc import Callable, Coroutine
 
@@ -18,12 +17,11 @@ from app.modules.wb_adv_updater.runner import (
 from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
 
-dotenv.load_dotenv()
+_ = dotenv.load_dotenv()
 setup_redis_cache()
 
 
 logger = logging.getLogger(__name__)
-
 
 AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
 
@@ -37,20 +35,6 @@ run_own_process_list: list[AsyncEntry] = [
 ]
 
 
-def process_controller(process_pids: list[int], process_names: list[str]) -> None:
-    time.sleep(10)
-    while True:
-        for pid, name in zip(process_pids, process_names, strict=False):
-            logger.debug(f"Проверка процесса: {name}")
-            try:
-                proc = psutil.Process(pid)
-                assert proc.is_running()
-            except psutil.NoSuchProcess:
-                logger.error(f"Процесс с PID {pid} (имя: {name}) не существует.")
-                continue
-        time.sleep(60)
-
-
 # Обновлена типизация: принимаем обычную async-функцию без аргументов
 # (а не DI-провайдер)
 
@@ -60,21 +44,44 @@ def run_coroutines(coroutine_func:  AsyncEntry) -> None:
 
 
 def main() -> None:
-    processes: list[Process] = []
-    process_pids: list[int | None] = []
-    process_names: list[str] = []
+    process_registry: dict[int, Process] = {}
+    restart_count: dict[int, int] = {i: 0 for i, _entry in enumerate(run_own_process_list)}
 
-    for run_own_process in run_own_process_list:
+    def _process_label(index: int, run_own_process: AsyncEntry) -> str:
+        return f"{run_own_process.__name__}#{index}"
+
+    def _start_process(index: int, run_own_process: AsyncEntry) -> Process:
         func = partial(run_coroutines, run_own_process)
-        process = Process(target=func, name=run_own_process.__name__)
+        process = Process(target=func, name=_process_label(index, run_own_process))
         process.start()
-        logger.info(f"Запущен процесс {process.pid} - {run_own_process.__name__}")
-        processes.append(process)
-        process_pids.append(process.pid)
-        process_names.append(run_own_process.__name__)
+        logger.info(
+            "Запущен процесс %s - %s",
+            process.pid,
+            _process_label(index, run_own_process),
+        )
+        return process
 
-    for process in processes:
-        process.join()
+    for index, run_own_process in enumerate(run_own_process_list):
+        process_registry[index] = _start_process(index, run_own_process)
+
+    while True:
+        for index, process in list(process_registry.items()):
+            if process.is_alive():
+                continue
+
+            exit_code = process.exitcode
+            run_own_process = run_own_process_list[index]
+            restart_count[index] += 1
+            process_name = _process_label(index, run_own_process)
+            logger.error(
+                "Процесс %s завершился (exit_code=%s), перезапуск #%s",
+                process_name,
+                exit_code,
+                restart_count[index],
+            )
+            process_registry[index] = _start_process(index, run_own_process)
+
+        time.sleep(2)
     return None
 
 

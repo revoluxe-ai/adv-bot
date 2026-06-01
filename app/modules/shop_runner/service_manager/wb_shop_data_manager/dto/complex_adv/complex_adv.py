@@ -33,6 +33,13 @@ class GetKeywordsProvider(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class TrafficClicksDTO:
+    """Снимок кликов за сегодня для полочного режима (см. ``TrafficClicksManager.enrich``).
+
+    * ``shelf_clicks`` — полки/рекомендации в авто (не по ключам).
+    * ``organic_clicks`` — переходы на карточку вне суммарной рекламы комплекса.
+    * ``keyword_clicks`` — клики по ключевым фразам в авто (для расчёта полок).
+    """
+
     organic_clicks: int
     shelf_clicks: int
     keyword_clicks: int
@@ -250,10 +257,17 @@ class ComplexAdv:
 
     @property
     def rec_system_promotion_mode_active(self) -> bool:
+        """Режим «Полки» в настройках РК (``AdvSetting.rec_system_mode``)."""
         return self._adv_setting.rec_system_mode
 
     @property
+    def auto_shelf_bid_control_enabled(self) -> bool:
+        """Флаг включения control-контура общей ставки полок."""
+        return bool(self._adv_setting.auto_shelf_bid_control_enabled)
+
+    @property
     def traffic_clicks_dto(self) -> TrafficClicksDTO | None:
+        """Клики орг/пол за сегодня; None если полки выкл или enrich не вызывали / упал."""
         if not self.rec_system_promotion_mode_active:
             return None
         return self._traffic_clicks_dto
@@ -267,6 +281,7 @@ class ComplexAdv:
 
     @property
     def is_shelf_activation_allowed(self) -> bool:
+        """``shelf_clicks > organic_clicks``. Смысл — ``auto_updater_traffic_policy``."""
         dto = self.traffic_clicks_dto
         if dto is None:
             return False
@@ -295,6 +310,14 @@ class ComplexAdv:
             return True
         return False
 
+    @property
+    def shelf_promotion_active(self) -> bool:
+        """rec_system (полки) + авто-кампания started — как во v2 для полочной фазы."""
+        return self.rec_system_promotion_mode_active and self.auto_adv_active_status
+
+    @property
+    def v3_rollout_aggressiveness(self) -> int:
+        return int(self._adv_setting.aggressiveness)
 
     @property
     def shop_id(self) -> str:
@@ -327,7 +350,7 @@ class ComplexAdv:
         return self._adv_setting.auto_update_exponent
 
     @property
-    def auto_updater_version(self) -> int:
+    def auto_updater_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
     @property
@@ -336,7 +359,12 @@ class ComplexAdv:
         individual_keywords_mode_active = bool(
             adv.individual_keywords_target_place_mode
         )
-        if self.auto_updater_version in (1, 2):
+        ver = (
+            self.auto_updater_version
+            if self.auto_updater_version is not None
+            else 2
+        )
+        if ver in (1, 2, 3):
             return any(
                 [
                     adv.auto_update_white_list,
@@ -351,7 +379,7 @@ class ComplexAdv:
         return self._adv_setting
 
     @property
-    def auto_update_setting_version(self) -> int:
+    def auto_update_setting_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
     @overload

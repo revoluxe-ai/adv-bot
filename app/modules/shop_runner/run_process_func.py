@@ -12,12 +12,18 @@ from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.modules.token_monitoring.models import NotificationType
+from app.modules.token_monitoring.services.cabinet_status_service import (
+    deactivate_cabinet_atomic_with_user_trackers,
+)
 from app.modules.shop_runner.modules.wb_api import WBApi
 
+from app.modules.shop_runner.shop_id_filters import apply_shop_id_filters
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
+from app.utils.backoff import exponential_retry_delay_seconds
 from app.utils.db.session_maker import get_async_session_maker as sm
 import typing
 
@@ -27,6 +33,10 @@ if typing.TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+UNKNOWN_ERROR_RETRY_BASE_SECONDS = 10
+UNKNOWN_ERROR_RETRY_MAX_SECONDS = 120
+
 
 async def run_shop_task(
     shop_id: str,
@@ -67,13 +77,10 @@ async def _run_shop_task(
     wb_manager_hub_factory.set_wb_manager_hub(shop_id)
 
     async def _deactivate_cabinet() -> None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id)
-            result = await session.execute(stmt)
-            wb_cabinet = result.scalar()
-            if wb_cabinet is not None:
-                wb_cabinet.active = False
-                await session.commit()
+        await deactivate_cabinet_atomic_with_user_trackers(
+            shop_id,
+            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+        )
 
     try:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
@@ -121,15 +128,8 @@ async def _update_tasks(
     tasks_manager: TasksManager,
     plan_fact_reader: "PlanFactReader",
 ) -> None:
-    stmt = (
-        select(WBCabinet.shop_id)
-    )
-
-    shop_filter_list: list[str] = settings.SHOP_FILTER_LIST
-
-    stmt = stmt.where(WBCabinet.active.is_(True))
-    if shop_filter_list:
-        stmt = stmt.where(WBCabinet.shop_id.in_(shop_filter_list))
+    stmt = select(WBCabinet.shop_id).where(WBCabinet.active.is_(True))
+    stmt = apply_shop_id_filters(stmt, WBCabinet.shop_id)
 
     shop_ids: set[str] = set()
     async with sm(read_only=True) as session:
@@ -156,9 +156,12 @@ async def _update_tasks(
             if task.done():
                 if exc := task.exception():
                     logger.exception(
-                        f"Не обработанная ошибка выполнения задачи магазина: %s",
-                        exc
+                        "Не обработанная ошибка выполнения задачи магазина: %s",
+                        exc,
                     )
+                    # Удаляем до raise: иначе при retry внешнего цикла та же запись
+                    # остаётся done-with-exception и блокирует обход навсегда.
+                    del active_tasks[shop_id]
                     raise exc
                 del active_tasks[shop_id]
 
@@ -202,6 +205,7 @@ async def _run_shops_loop(
 ) -> None:
     redis_manager = RedisShopManager()
     active_tasks: dict[str, Task[None]] = {}
+    unknown_error_attempt = 0
     while True:
         try:
             await _update_tasks(
@@ -211,6 +215,7 @@ async def _run_shops_loop(
                 tasks_manager=tasks_manager,
                 plan_fact_reader=plan_fact_reader,
             )
+            unknown_error_attempt = 0
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)
@@ -220,7 +225,18 @@ async def _run_shops_loop(
             )
             await asyncio.sleep(30)
         except Exception as exc:
-            logger.error(
-                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
+            unknown_error_attempt += 1
+            pause = int(
+                exponential_retry_delay_seconds(
+                    unknown_error_attempt,
+                    base_seconds=UNKNOWN_ERROR_RETRY_BASE_SECONDS,
+                    max_seconds=UNKNOWN_ERROR_RETRY_MAX_SECONDS,
+                )
             )
-            raise exc
+            logger.error(
+                "Ошибка обработки задач обновления магазинов, повтор через %ss: %s",
+                pause,
+                exc,
+                exc_info=True,
+            )
+            await asyncio.sleep(pause)

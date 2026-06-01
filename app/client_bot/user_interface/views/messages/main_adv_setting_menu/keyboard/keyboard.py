@@ -3,12 +3,17 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot.user_interface.views import callbacks
+from .automatic_version_ui import (
+    automatic_version_main_menu_button,
+    normalize_automatic_version_ui,
+    show_relevant_phrase_toggle,
+)
+from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
     TurnBot,
     OrdersSourceToggle,
     SalesPredictMethodToggle,
-    AutoUpdaterVersionToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
@@ -36,9 +41,6 @@ from app.client_bot.user_interface.handlers.bidder_coroutine_type_toggle.callbac
 from app.client_bot.user_interface.handlers.time_settings.callbacks import TS
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
-)
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
-    AutoUpdateWhiteListSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -167,6 +169,15 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Управление ставкой в полках",
+            callback_data=callbacks.AutoShelfBidControlMenu(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+            ).pack(),
+        )
+    )
 
     _ = builder.row(
         InlineKeyboardButton(
@@ -244,19 +255,6 @@ def get_adv_setting_keyboard(
             )
         )
 
-    if adv_setting.auto_update_white_list:
-        text = "$ Выключить автообновление белого списка"
-        new_status = False
-    else:
-        text = "Включить автообновление белого списка (платно, см. тарифы)"
-        new_status = True
-
-    callback = AutoUpdateWhiteListSetting(
-        new_status=new_status, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
-
     if adv_setting.auto_update_target_place:
         text = "$ Выключить автоуправление целевой позицией"
         new_status = False
@@ -270,7 +268,9 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    if adv_setting.automatic_version == 2:
+    if show_relevant_phrase_toggle(
+        normalize_automatic_version_ui(adv_setting.automatic_version)
+    ):
         # Кнопка для auto_add_only_relevant_phrase
         if adv_setting.auto_add_only_relevant_phrase:
             relevant_text = "Выключить добавление только релевантных фраз"
@@ -320,20 +320,10 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    # Кнопка переключения версии АвтоАпдейтера
-    if adv_setting.automatic_version == 1:
-        text = "Переключить на АвтоАпдейтер V2"
-        new_version = 2
-    else:
-        text = "Переключить на АвтоАпдейтер V1"
-        new_version = 1
-
-    callback = AutoUpdaterVersionToggle(
-        new_version=new_version, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
-
+    # Версии АвтоАпдейтера: отдельное сообщение с выбором V1/V2/V3 и «Назад»
+    _ = builder.row(automatic_version_main_menu_button(adv_setting))
+    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",
@@ -397,24 +387,6 @@ def get_adv_setting_keyboard(
     _ = builder.row(button)
 
 
-    if adv_setting.reset_place is not None and adv_setting.reset_place:
-        button = InlineKeyboardButton(
-            text="Выключить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="off", adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Включить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="on", adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-
-    _ = builder.row(button)
-
-
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
         callback_data=callbacks.WBUpdate(
@@ -468,32 +440,6 @@ def get_adv_setting_keyboard(
             adv_setting_original_id=adv_setting.id
         ).pack(),
     )
-    _ = builder.row(button)
-
-    button = InlineKeyboardButton(
-        text="Задать/Изменить максимальную стоимость клика",
-        callback_data=callbacks.ChangeMaxCPC(
-            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
-
-    if not in_favorites:
-        button = InlineKeyboardButton(
-            text="Добавить в избранное",
-            callback_data=callbacks.AddToFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    else:
-        button = InlineKeyboardButton(
-            text="Удалить из избранного",
-            callback_data=callbacks.RemoveFromFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-
     _ = builder.row(button)
 
     wb_user_cabinet_original_id = wb_user_cabinet.id

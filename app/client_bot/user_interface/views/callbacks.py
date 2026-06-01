@@ -29,6 +29,14 @@ class Shop(CallbackData, prefix="shop"):
     wb_user_cabinet_original_id: int
 
 
+class ShopMassAdvOpsMenu(CallbackData, prefix="shop_mass_adv_ops_menu"):
+    wb_user_cabinet_original_id: int
+
+
+class ShopMassAdvOpsBack(CallbackData, prefix="shop_mass_adv_ops_back"):
+    wb_user_cabinet_original_id: int
+
+
 class ShopNew(CallbackData, prefix="shop_new"):
     pass
 
@@ -187,11 +195,6 @@ class InviteShow(CallbackData, prefix="invite"):
     action: str = "show"
 
 
-class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
-    action: str
-    adv_original_id: int
-
-
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
     action: str
     adv_original_id: int
@@ -269,6 +272,31 @@ class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
     adv_original_id: int
 
 
+class AutoShelfBidControlBidPoints(CallbackData, prefix="asbc_bp"):
+    """Навигация по покрытым ставкам текущего цикла (Telegram-просмотрщик).
+
+    ``index`` — номер страницы (0-based), до 10 строк на странице.
+    """
+
+    adv_setting_original_id: int
+    index: int = 0
+
+
+class AutoShelfBidControlMenu(CallbackData, prefix="auto_shelf_bid_ctrl"):
+    """Действия экрана управления ставкой полок Auto-РК.
+
+    Поддерживаемые action:
+        open, refresh,
+        enable, disable, settings,
+        set_max_bid, set_test_share, set_target_test_impressions, set_min_bid_distance,
+        reset_cycle, force_main,
+        back.
+    """
+
+    action: str
+    adv_setting_original_id: int
+
+
 class AddBlackPhrasesTemplates(CallbackData, prefix="add_black_phrases"):
     adv_setting_id: int
 
@@ -282,6 +310,10 @@ class TestBlackPhrasesTemplates(CallbackData, prefix="test_black_phrases"):
 
 
 class ExitBlackPhrasesTest(CallbackData, prefix="exit_black_phrases_test"):
+    adv_setting_id: int
+
+
+class ExportBlackPhrases(CallbackData, prefix="export_black_phrases"):
     adv_setting_id: int
 
 
@@ -301,8 +333,24 @@ class ExitRelevantPhraseTemplatesTest(CallbackData, prefix="exit_rel_phrase_test
     adv_setting_id: int
 
 
+class ExportRelevantPhraseTemplates(CallbackData, prefix="export_rel_phrase_tpl"):
+    adv_setting_id: int
+
+
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
+
+
+class ExportShopAdvExcel(CallbackData, prefix="shop_adv_excel_export"):
+    """Выгрузка всех активных РК магазина в один Excel (меню магазина)."""
+
+    wb_user_cabinet_original_id: int
+
+
+class ImportShopAdvExcel(CallbackData, prefix="shop_adv_excel_import"):
+    """Загрузка Excel с правками по магазину; далее ожидается документ в FSM."""
+
+    wb_user_cabinet_original_id: int
 
 
 class TurnClusters(CallbackData, prefix="turn_clusters"):
@@ -382,11 +430,6 @@ class ResetPlace(CallbackData, prefix="reset_place"):
     adv_setting_original_id: int
 
 
-class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
-    action: str
-    wb_cabinet_original_id: int
-
-
 class OrdersSourceToggle(CallbackData, prefix="orders_source_toggle"):
     new_source: OrdersSourceForAutoMode
     adv_setting_original_id: int
@@ -410,6 +453,31 @@ class SalesPredictMethodToggle(CallbackData, prefix="sales_predict_method_toggle
 class AutoUpdaterVersionToggle(CallbackData, prefix="auto_updater_version_toggle"):
     new_version: int
     adv_setting_original_id: int
+
+
+class AutoUpdaterVersionMenuOpen(CallbackData, prefix="auto_updater_ver_menu_open"):
+    """Открыть отдельное сообщение с выбором версии АвтоАпдейтера."""
+
+    adv_setting_original_id: int
+
+
+class AutoUpdaterVersionMenuBack(CallbackData, prefix="auto_updater_ver_menu_back"):
+    """Закрыть сообщение подменю версии (кнопка «Назад»)."""
+
+    pass
+
+
+class V3RolloutAggMenuOpen(CallbackData, prefix="v3_rollout_agg_menu_open"):
+    adv_setting_original_id: int
+
+
+class V3RolloutAggMenuBack(CallbackData, prefix="v3_rollout_agg_menu_back"):
+    pass
+
+
+class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
+    adv_setting_original_id: int
+    level: int
 
 
 class ChangeAutoUpdateExponentStatus(
@@ -494,4 +562,14 @@ class ChangeShopDefaultMaxCPM(CallbackData, prefix="change_shop_default_max_cpm"
 
 
 class ApplyDefaultsForShop(CallbackData, prefix="apply_shop_defaults"):
+    wb_user_cabinet_original_id: int
+
+
+class ResetShopNonRelevantPhrases(CallbackData, prefix="reset_shop_non_rel"):
+    wb_user_cabinet_original_id: int
+
+
+class ToggleCabinetActive(CallbackData, prefix="toggle_cabinet_active"):
+    """Переключить WBCabinet.active из меню магазина."""
+
     wb_user_cabinet_original_id: int

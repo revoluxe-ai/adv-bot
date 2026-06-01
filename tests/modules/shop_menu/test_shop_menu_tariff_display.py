@@ -1,8 +1,12 @@
 from datetime import datetime
 from typing import Any, cast
 
+import pytest
+
 from app.modules.billing.pricer.pricer import TariffDetails, TariffMode
 from app.modules.shop_menu.message import ShopMenu
+
+pytestmark = pytest.mark.unit
 
 
 class TestShopMenuTariffDisplay:
@@ -10,7 +14,7 @@ class TestShopMenuTariffDisplay:
         menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
         m = cast(Any, menu)
         m._wb_user_cabinet = type("WBUC", (), {"name": "Test Shop", "id": 1})()
-        m._wb_cabinet = type("WBC", (), {"shop_id": "shop_1", "id": 1})()
+        m._wb_cabinet = type("WBC", (), {"shop_id": "shop_1", "id": 1, "active": True})()
         m._balance = 1000.0
         m._bonus = 0.0
         m._total_active_advs_count = 2
@@ -45,4 +49,46 @@ class TestShopMenuTariffDisplay:
         assert "50%" in line
         # 2026-04-03T21:00:00Z == 2026-04-04 00:00 MSK — date label must follow Moscow calendar day
         assert "04.04.2026" in line
+
+    def test_shop_menu_text_uses_active_fallback_when_attribute_absent(self):
+        menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
+        m = cast(Any, menu)
+        m._wb_user_cabinet = type("WBUC", (), {"name": "Shop Fallback", "id": 11})()
+        # intentionally no `active` attribute
+        m._wb_cabinet = type(
+            "WBC", (), {"shop_id": "shop_fallback", "id": 22, "default_max_cpm": 1500}
+        )()
+        m._balance = 0.0
+        m._bonus = 0.0
+        m._total_active_advs_count = 0
+        m._last_charge_at = None
+        m._tariff_details = None
+        m._token_status = None
+        m._token_status_loaded = False
+        m._shop_balance_snapshot = None
+
+        text = menu.text
+        assert "Статус магазина в боте" in text
+        assert "Активен" in text
+
+    def test_shop_menu_keyboard_uses_active_fallback_when_attribute_absent(self):
+        menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
+        m = cast(Any, menu)
+        m._wb_user_cabinet = type("WBUC", (), {"name": "Shop Fallback", "id": 11})()
+        # intentionally no `active` attribute
+        m._wb_cabinet = type(
+            "WBC",
+            (),
+            {
+                "shop_id": "shop_fallback",
+                "id": 22,
+                "default_max_cpm": 1500,
+                "white_list_update_active": False,
+            },
+        )()
+
+        kb = menu.keyboard
+        rows = kb.inline_keyboard
+        flat_texts = [btn.text for row in rows for btn in row]
+        assert "Деактивировать магазин" in flat_texts
 

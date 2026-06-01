@@ -59,7 +59,13 @@ async def test_get_access_for_wb_cabinet_filters_non_personal_tokens() -> None:
 @pytest.mark.asyncio
 async def test_get_access_for_wb_cabinet_raises_when_no_personal_tokens() -> None:
     shop_id = "shop-1"
-    with patch("app.modules.common_slaves.wildberries.super_cabinet_manager.sm") as sm_mock:
+    with (
+        patch("app.modules.common_slaves.wildberries.super_cabinet_manager.sm") as sm_mock,
+        patch(
+            "app.modules.common_slaves.wildberries.super_cabinet_manager.deactivate_cabinet_atomic_with_user_trackers",
+            new_callable=AsyncMock,
+        ) as deactivate_mock,
+    ):
         session1 = MagicMock()
         session2 = MagicMock()
         sm_mock.side_effect = [_build_sm_context(session1), _build_sm_context(session2)]
@@ -89,5 +95,7 @@ async def test_get_access_for_wb_cabinet_raises_when_no_personal_tokens() -> Non
         with pytest.raises(ApiForbiddenError):
             await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
 
-        assert wb_cabinet.active is False
-        session2.commit.assert_awaited_once()
+        deactivate_mock.assert_awaited_once_with(
+            shop_id,
+            notification_type=super_cabinet_manager.NotificationType.TOKEN_DEACTIVATED.value,
+        )

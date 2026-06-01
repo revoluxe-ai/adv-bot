@@ -1,3 +1,10 @@
+"""Клики «полки» и «органика» за сегодня для полочного режима (``rec_system_mode``).
+
+Используется в ``change_adv_strategy`` (``load_extras=True``) и в UI (орг/пол в статистике).
+Без enrich ``traffic_clicks_dto`` остаётся None → сравнение organic/shelf в селекторе стратегии
+пропускается, ``is_shelf_activation_allowed`` = False.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,22 +18,21 @@ from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_man
 
 
 def compute_shelf_clicks(auto_total_clicks: int, auto_keyword_clicks: int) -> int:
-    """Return shelf/recommendation clicks from auto campaign clicks."""
+    """Клики полок/рекомендаций в авто-РК: все клики авто минус клики по ключевым фразам."""
     return max(0, auto_total_clicks - auto_keyword_clicks)
 
 
 def compute_organic_clicks(funnel_clicks: int, all_campaign_clicks: int) -> int:
-    """
-    Return organic clicks.
-
-    Organic clicks are card opens from funnel minus clicks from all campaigns
-    in the complex campaign (auto + search).
-    """
+    """Органические переходы на карточку: клики воронки минус сумма кликов всех РК комплекса."""
     return max(0, funnel_clicks - all_campaign_clicks)
 
 
 class TrafficClicksManager:
     async def enrich(self, complex_adv: ComplexAdv) -> None:
+        """Заполняет ``complex_adv.traffic_clicks_dto`` за текущие сутки (ClickHouse + воронка).
+
+        При выключенном ``rec_system_mode`` обнуляет DTO и выходит.
+        """
         if not complex_adv.rec_system_promotion_mode_active:
             complex_adv.traffic_clicks_dto = None
             return

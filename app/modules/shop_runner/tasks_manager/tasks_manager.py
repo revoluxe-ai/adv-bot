@@ -1,4 +1,6 @@
 import asyncio
+import contextlib
+import contextvars
 import logging
 from collections import deque
 from dataclasses import dataclass
@@ -7,18 +9,34 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Опциональный таймаут handler в worker; None — прежнее поведение без ограничения.
+DEFAULT_TASK_HANDLER_TIMEOUT_SECONDS: float | None = None
+
 
 @dataclass
 class _TaskEntry:
     handler: Callable[[], Awaitable[Any]]
     future: asyncio.Future[Any]
+    # Snapshot ContextVar-контекста на момент постановки задачи в очередь.
+    # Используется для воспроизведения shop context внутри shared worker.
+    context: contextvars.Context
+
+
+def _handler_label(handler: Callable[[], Awaitable[Any]]) -> str:
+    return getattr(handler, "__name__", repr(handler))
 
 
 class TasksManager:
-    def __init__(self, max_workers: int):
+    def __init__(
+        self,
+        max_workers: int,
+        *,
+        handler_timeout_sec: float | None = DEFAULT_TASK_HANDLER_TIMEOUT_SECONDS,
+    ):
         self._queue: asyncio.Queue[_TaskEntry] = asyncio.Queue()
         self._max_workers = max_workers
         self._workers: list[asyncio.Task[None]] = []
+        self._handler_timeout_sec = handler_timeout_sec
 
     def start(self) -> None:
         self._start_workers()
@@ -37,7 +55,10 @@ class TasksManager:
 
     async def add_task(self, handler: Callable[[], Awaitable[Any]]) -> asyncio.Future[Any]:
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
-        await self._queue.put(_TaskEntry(handler=handler, future=future))
+        # Захватываем контекст вызывающей стороны, чтобы shared worker
+        # выполнил handler с тем же набором ContextVar (включая wb_manager_hub).
+        ctx = contextvars.copy_context()
+        await self._queue.put(_TaskEntry(handler=handler, future=future, context=ctx))
         return future
 
     async def run(self) -> None:
@@ -61,6 +82,38 @@ class TasksManager:
             _ = await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers = []
 
+    async def _run_handler(
+        self,
+        handler: Callable[[], Awaitable[Any]],
+        context: contextvars.Context,
+    ) -> Any:
+        """Запустить handler внутри захваченного context с опциональным таймаутом.
+
+        context.run() принимает синхронную функцию, поэтому оборачиваем coroutine
+        в asyncio.Task, которую создаём через loop.create_task с явным context.
+        """
+        loop = asyncio.get_running_loop()
+        coro = handler()
+        task = loop.create_task(coro, context=context)
+        try:
+            if self._handler_timeout_sec is not None:
+                return await asyncio.wait_for(task, timeout=self._handler_timeout_sec)
+            return await task
+        except asyncio.TimeoutError:
+            await self._cancel_task_if_running(task)
+            raise
+        except asyncio.CancelledError:
+            await self._cancel_task_if_running(task)
+            raise
+
+    async def _cancel_task_if_running(self, task: asyncio.Task[Any]) -> None:
+        """Безопасно отменить дочернюю task, если она ещё выполняется."""
+        if task.done():
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
     async def _worker(self) -> None:
         while True:
             try:
@@ -68,11 +121,30 @@ class TasksManager:
             except asyncio.CancelledError:
                 break
 
+            handler_name = _handler_label(entry.handler)
+            loop = asyncio.get_running_loop()
+            started_at = loop.time()
             try:
-                result = await entry.handler()
+                result = await self._run_handler(entry.handler, entry.context)
             except asyncio.CancelledError:
                 _ = entry.future.cancel()
                 raise
+            except asyncio.TimeoutError:
+                elapsed = loop.time() - started_at
+                timeout_exc = asyncio.TimeoutError(
+                    f"TasksManager handler timed out after {self._handler_timeout_sec}s: "
+                    f"{handler_name}"
+                )
+                if not entry.future.done():
+                    entry.future.set_exception(timeout_exc)
+                logger.error(
+                    "Таймаут задачи TasksManager "
+                    "(handler=%s, timeout_sec=%s, elapsed=%.3f)",
+                    handler_name,
+                    self._handler_timeout_sec,
+                    elapsed,
+                    exc_info=True,
+                )
             except Exception as exc:
                 if not entry.future.done():
                     entry.future.set_exception(exc)

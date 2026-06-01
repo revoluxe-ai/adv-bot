@@ -34,10 +34,11 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",
+        "auto_shelf_bid_increment_stats",
+        "auto_shelf_bid_control",
         "white_list_tail_trimmer",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
@@ -117,10 +118,11 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",
+        "auto_shelf_bid_increment_stats",
+        "auto_shelf_bid_control",
         "white_list_tail_trimmer",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",
@@ -161,8 +163,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(return_value=None)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    # 1 _alive_worker_run + 24 coroutines from WBShop.run() TaskGroup
-    assert len(recorded_group.created) == 25
+    # 1 _alive_worker_run + 25 coroutines from WBShop.run() TaskGroup
+    assert len(recorded_group.created) == 26
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
@@ -180,10 +182,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
         "handle_stats_stale_emergency",
         "update_plan_fact_stats",
         "auto_budget_watchdog",
-        "auto_adv_active_control",
         "update_top_key_in_advs",
         "update_common_bid_in_search_adv",
         "increment_fact_data_stats",
+        "auto_shelf_bid_increment_stats",
+        "auto_shelf_bid_control",
         "white_list_tail_trimmer",
         "auto_reset_bid_for_auto_adv",
         "update_individual_keyword_target_places",

@@ -1,13 +1,14 @@
-"""
-Новая точка входа для обработки магазинов
+"""Новая точка входа для обработки магазинов."""
 
-"""
+from __future__ import annotations
 
 import asyncio
 import logging
 import platform
 
 import dotenv
+
+dotenv.load_dotenv()
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
@@ -16,18 +17,16 @@ from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
 from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
 
-dotenv.load_dotenv()
 setup_logging()
 setup_redis_cache()
+
+logger = logging.getLogger(__name__)
 
 system = platform.system()
 if system == "Linux":
     import uvloop
 
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-logger = logging.getLogger(__name__)
-
 
 async def run_process() -> None:
     """Запуск общего процесса на все магазины, legacy, нуждается в рефакторинге.

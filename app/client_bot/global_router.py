@@ -17,10 +17,11 @@ from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 _ = global_router.message.middleware(GateMiddleware())
-_ = global_router.callback_query.middleware(GateMiddleware())
+# Pre-answer must run before GateMiddleware/DB work to avoid stale callbacks.
 _ = global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )
+_ = global_router.callback_query.middleware(GateMiddleware())
 
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.

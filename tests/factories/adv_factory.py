@@ -20,7 +20,6 @@ class WBCabinetFactory(SQLAlchemyModelFactory):
     bonus = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0, max_value=100), 2))
     demo = False
     expiration_alarm_days_pass = None
-    white_list_update_active = False
 
 
 class WBUserCabinetFactory(SQLAlchemyModelFactory):
@@ -58,6 +57,7 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
     auto_update_target_place = True
     auto_update_exponent = True
     automatic_version = 2
+    aggressiveness = 3
     exponent_predict_ctr = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0.5, max_value=2.0), 3))
     auto_add_only_relevant_phrase = factory.LazyFunction(lambda: fake.boolean())
 

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.modules.bids_for_positions_manager.dto import BidPositionRow
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
     BidPosition,
@@ -30,6 +31,23 @@ def _make_adv(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_load_bids_with_convs_returns_empty_when_min_bid_missing() -> None:
+    """Нет min_bid для main_nmid — без KeyError, пустой профиль (V3 цикл не падает)."""
+    mock_ch = AsyncMock()
+    mock_bids_manager = AsyncMock()
+    predictor = PredictKeywordsTargetPlace(mock_ch, mock_bids_manager)
+    adv = _make_adv(main_nmid=10749810, min_bid=50)
+    adv.search_adv_min_bids = {}
+
+    result = await predictor.get_keyword_bid_profiles(adv=adv, positions_size=10)
+
+    assert result == {}
+    mock_ch.get_conv_cart_to_views.assert_not_called()
+    mock_bids_manager.get_bid_positions_normalized.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_get_keywords_target_position_calls_ch_and_bids_manager():
     """Проверяем, что get_conv_cart_to_views и get_bid_positions_normalized вызываются."""
     mock_ch = AsyncMock()
@@ -41,7 +59,9 @@ async def test_get_keywords_target_position_calls_ch_and_bids_manager():
     adv = _make_adv(main_nmid=12345, min_bid=50)
     result = await predictor.get_keywords_target_position(adv=adv, positions_size=10)
 
-    mock_ch.get_conv_cart_to_views.assert_called_once_with(nmid=12345, positions_size=10)
+    mock_ch.get_conv_cart_to_views.assert_called_once_with(
+        nmid=12345, positions_size=10
+    )
     mock_bids_manager.get_bid_positions_normalized.assert_called_once_with(
         nmid=12345, min_bid=50, positions_size=10
     )
@@ -113,8 +133,12 @@ async def test_get_keywords_target_position_returns_best_conv_when_strategy_max_
     mock_ch.get_conv_cart_to_views = AsyncMock(
         return_value={
             "kw1": [
-                ConvCartToViewsOnPosition(keyword="kw1", position=1, conv_cart_to_views=0.1),
-                ConvCartToViewsOnPosition(keyword="kw1", position=2, conv_cart_to_views=0.2),
+                ConvCartToViewsOnPosition(
+                    keyword="kw1", position=1, conv_cart_to_views=0.1
+                ),
+                ConvCartToViewsOnPosition(
+                    keyword="kw1", position=2, conv_cart_to_views=0.2
+                ),
             ]
         }
     )
@@ -223,3 +247,69 @@ def test_map_rows_to_bid_positions_fills_convs():
     assert "kw1" in result
     for pos in result["kw1"]:
         assert pos.conv_carts_to_views is not None
+
+
+@pytest.mark.unit
+def test_get_target_position_for_strategy_mode_min_cpa() -> None:
+    predictor = PredictKeywordsTargetPlace(AsyncMock(), AsyncMock())
+    ts = datetime.now()
+    positions = [
+        BidPosition("kw1", 1, 200, ts),
+        BidPosition("kw1", 2, 100, ts),
+    ]
+    positions[0].conv_carts_to_views = 0.1
+    positions[1].conv_carts_to_views = 0.1
+
+    result = predictor.get_target_position_for_strategy_mode(
+        positions, KeywordStrategyMode.MIN_CPA
+    )
+
+    assert result == 2
+
+
+@pytest.mark.unit
+def test_get_target_position_for_strategy_mode_optimum() -> None:
+    """Production CPO-cap: дорогой top conv исключён → OPTIMUM на min-CPO позиции."""
+    predictor = PredictKeywordsTargetPlace(AsyncMock(), AsyncMock())
+    ts = datetime.now()
+    positions = [
+        BidPosition("kw1", 1, 10_000, ts),
+        BidPosition("kw1", 2, 100, ts),
+    ]
+    positions[0].conv_carts_to_views = 0.13
+    positions[1].conv_carts_to_views = 0.01
+
+    result = predictor.get_target_position_for_strategy_mode(
+        positions,
+        KeywordStrategyMode.OPTIMUM,
+        rk_orders_per_cart=2.0,
+    )
+
+    assert result == 2
+
+
+@pytest.mark.unit
+def test_get_target_position_for_strategy_mode_max_conversion() -> None:
+    predictor = PredictKeywordsTargetPlace(AsyncMock(), AsyncMock())
+    ts = datetime.now()
+    positions = [
+        BidPosition("kw1", 1, 100, ts),
+        BidPosition("kw1", 2, 100, ts),
+    ]
+    positions[0].conv_carts_to_views = 0.05
+    positions[1].conv_carts_to_views = 0.2
+
+    result = predictor.get_target_position_for_strategy_mode(
+        positions, KeywordStrategyMode.MAX_CONVERSION
+    )
+
+    assert result == 2
+
+
+@pytest.mark.unit
+def test_get_target_position_for_strategy_mode_empty_positions_returns_none() -> None:
+    predictor = PredictKeywordsTargetPlace(AsyncMock(), AsyncMock())
+    assert (
+        predictor.get_target_position_for_strategy_mode([], KeywordStrategyMode.MIN_CPA)
+        is None
+    )

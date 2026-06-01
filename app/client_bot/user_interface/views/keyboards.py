@@ -23,13 +23,19 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from app.modules.predict_ctr_exponent_settings import (
-    ChangeExponentSettinginAdvSettingCallback,
-)
 from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 
+from app.client_bot.user_interface.views.keyword_strategy_ui import (
+    keyword_strategy_letter,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
+)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
+    format_keyword_list_target_place_suffix,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -312,6 +318,18 @@ def get_advs_keyboard_with_paginator(
     return keyboard
 
 
+def sorting_keywords_for_v3(keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
+    """V3: дешёвые ключи сверху (``pay_for_order`` asc, tie-break ``keyword_setting_id``)."""
+
+    def _pay_sort_key(kw: CalculatedKeyword) -> tuple[float, int]:
+        pfo = kw.pay_for_order
+        pay = float("inf") if pfo is None else float(pfo)
+        ks_id = int(kw.keyword_setting_original_id or 0)
+        return (pay, ks_id)
+
+    return sorted(keywords, key=_pay_sort_key)
+
+
 def get_keywords_setting_keyboard(
     keywords: list[CalculatedKeyword],
     adv_setting: AdvSetting,
@@ -324,6 +342,7 @@ def get_keywords_setting_keyboard(
     image_mode: str = "graphic",
 ):
     from . import keyword_statuses_util as k_util
+
     def sorting_keywords(
         kws_: list[CalculatedKeyword], sort_mode_: str
     ) -> list[CalculatedKeyword]:
@@ -350,7 +369,10 @@ def get_keywords_setting_keyboard(
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
-    keywords = sorting_keywords(keywords, sort_mode)
+    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        keywords = sorting_keywords_for_v3(keywords)
+    else:
+        keywords = sorting_keywords(keywords, sort_mode)
 
     bottoms: list[list[InlineKeyboardButton]] = []
     for keyword in keywords[start_index:end_index]:
@@ -378,17 +400,21 @@ def get_keywords_setting_keyboard(
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
 
         if adv_setting.individual_keywords_target_place_mode:
-            if target_place := keyword.target_place:
-                text += f'->{target_place}'
-            else:
-                text += f'->Н>'
+            text += format_keyword_list_target_place_suffix(keyword.target_place)
         cpm: float | None = keyword.cpm
         if cpm is not None:
             cpm_text = str(int(cpm + 0.5))
         else:
             cpm_text = "?"
         text += f"({cpm_text})"
-        text += f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)} {keyword.text}"
+        status_block = (
+            f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)}"
+        )
+        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+            mode_letter = keyword_strategy_letter(keyword)
+            text += f"{status_block}[{mode_letter}] {keyword.text}"
+        else:
+            text += f"{status_block} {keyword.text}"
         conv_views_to_orders = str(round(keyword.conv_views_to_orders * 1000, 2))
         pay_for_order = (
             str(round(keyword.pay_for_order, 2))
@@ -481,17 +507,6 @@ def get_keywords_setting_keyboard(
     ]
     bottoms.append(bottom)
 
-    bottom = [
-        InlineKeyboardButton(
-            text="Показать ключи вне индекса",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id, type="only_out_index", page=page
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(bottom)
-
     if not hide_keywords_is_not_relevant:
         bottom = [
             InlineKeyboardButton(
@@ -528,86 +543,8 @@ def get_keywords_setting_keyboard(
 
     bottoms.append(bottom)
 
-    bottom = [
-        InlineKeyboardButton(
-            text="Сортировать по ФАКТ CTR по Уб.",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id,
-                type="sort_by_ctr_desc",
-                page=page,
-            ).pack(),
-        )
-    ]
-    bottoms.append(bottom)
-
     adv_id = adv_setting.adv_id
     assert adv_id
-    button = [
-        InlineKeyboardButton(
-            text="Изменить экспоненту прог. ctr",
-            callback_data=ChangeExponentSettinginAdvSettingCallback(
-                adv_id=adv_id, wb_user_cabinet_original_id=wb_user_cabinet_original_id
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    button = [
-        InlineKeyboardButton(
-            text="Фильтр по прогнозируемым показам",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id, type="filter_by_query", page=page
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    button = [
-        InlineKeyboardButton(
-            text="Сбросить добавочные клики",
-            callback_data=callbacks.ResetAddedClicks(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
-        UpdatePositionsForActivePhrase,
-    )
-
-    button = [
-        InlineKeyboardButton(
-            text="Перепроверить позиции ключей из БС",
-            callback_data=UpdatePositionsForActivePhrase(
-                adv_setting_original_id=adv_setting.id,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                target="white_list",
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
-
-    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
-        UpdatePositionsForActivePhrase,
-    )
-
-    button = [
-        InlineKeyboardButton(
-            text="Перепроверить позиции активный ключей",
-            callback_data=UpdatePositionsForActivePhrase(
-                adv_setting_original_id=adv_setting.id,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                target="active_phrases",
-            ).pack(),
-        )
-    ]
-
-    bottoms.append(button)
 
     # Кнопка для переключения скрытия ключей без рекламных просмотров
     if adv_setting.hide_zero_views_keywords:
@@ -855,27 +792,6 @@ def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
         )
     )
 
-    return builder.as_markup()
-
-
-def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
-    adv_original_id = adv.id
-    builder = InlineKeyboardBuilder()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Назад",
-            callback_data=callbacks.Adv(adv_original_id=adv_original_id).pack(),
-        )
-    )
-
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Отключить максимальную стоимость клика",
-            callback_data=callbacks.ChangeMaxCPC(
-                action="turn_off_max_cpc", adv_original_id=adv_original_id
-            ).pack(),
-        )
-    )
     return builder.as_markup()
 
 

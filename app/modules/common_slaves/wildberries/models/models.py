@@ -29,7 +29,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode, TargetPositionMode
+from app.modules.common_slaves.wildberries.models.enums import (
+    KeywordStrategyMode,
+    OrdersSourceForAutoMode,
+    TargetPositionMode,
+)
 from .bidder_mode import BidderMode
 from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
@@ -467,6 +471,32 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
+    wb_bid_type: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        comment=(
+            "Тип ставки WB из v2/adverts: unified или manual. "
+            "Sync: apply_wb_campaign_meta_from_legacy_adv_data. "
+            "normquery minus: только manual+search (см. wb_campaign_meta)."
+        ),
+    )
+    wb_placement_search: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment=(
+            "Размещение «Поиск» (settings.placements.search). "
+            "True — единственный тип, для которого WB normquery get/set-minus."
+        ),
+    )
+    wb_placement_recommendations: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment=(
+            "Размещение «Рекомендации» (полка). "
+            "manual+search=false+recom=true → полочная auto, skip normquery в MinusPhraseManager."
+        ),
+    )
+
     hard_min_ctr: Mapped[float | None] = mapped_column( # Устарело, не используется
         Float,
         nullable=True,
@@ -496,6 +526,13 @@ class AdvSetting(BaseTable):
         server_default="true",
         comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
     )  # поле от недоделанного модуля инкрементальной статистики
+    use_cluster_stats_in_freshness = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+        comment="Учитывать кластерную статистику при проверке свежести",
+    )
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
@@ -563,6 +600,13 @@ class AdvSetting(BaseTable):
 
     rec_system_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
+    )
+    auto_shelf_bid_control_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
     )
     # TODO: Завернуть server_default в text
     hide_zero_views_keywords: Mapped[bool] = mapped_column(
@@ -639,6 +683,13 @@ class AdvSetting(BaseTable):
 
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
+    )
+    aggressiveness: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3,
+        server_default=text("3"),
+        comment="AutoUpdater v3: 1=min_cpm_first / 2=optimal_first / 3=max_conv_first (only outside shelf phase)",
     )
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
@@ -785,6 +836,13 @@ class KeywordSetting(BaseTable):
         uselist=True,
     )
     hard_status: Mapped[int] = mapped_column(Integer, default=1)
+    strategy_mode: Mapped[KeywordStrategyMode] = mapped_column(
+        SAEnum(KeywordStrategyMode),
+        nullable=False,
+        default=KeywordStrategyMode.MIN_CPA,
+        server_default=KeywordStrategyMode.MIN_CPA.name,
+        # V3: для hard_status 1/0/3 нужен OFF — выставляется в write-path и backfill при включении V3.
+    )
     added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
@@ -800,8 +858,11 @@ class KeywordSetting(BaseTable):
     def _validate_target_place(self, _key: str, value: int | None) -> int | None:
         if value is None:
             return None
-        if not isinstance(value, int) or value < 1:
-            raise ValueError("target_place must be None or an integer > 0")
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(
+                "target_place must be None or a non-negative integer "
+                "(0 = минимальная ставка WB)"
+            )
         return value
 
     __table_args__ = (
@@ -840,120 +901,6 @@ class KeywordSetting(BaseTable):
             auto_block=data.get("auto_block"),
         )
 
-#
-# class WBItemPosition(BaseModel):
-#     model_config = ConfigDict(validate_assignment=True)
-#
-#     nmid: int | None = None
-#     position: int | None = None
-#     timestamp: datetime.datetime | None = None
-#     adv_id: int | None = None
-#     keyword_text: str | None = None
-#     adv_type: int | None = None
-#     total_views: int | None = None
-#     total_orders: int | None = None
-#
-#     @property
-#     def type_native(self) -> str:
-#         if self.adv_type == 9:
-#             return "search"
-#         elif self.adv_type == 8:
-#             return "auto"
-#         else:
-#             return "unknown"
-#
-#     def to_dict(self) -> dict[str, object]:
-#         timestamp = self.timestamp
-#         return {
-#             "real_position": self.position,
-#             "promo_position": self.position,
-#             "base_position": self.position,
-#             "position": self.position,
-#             "keyword_text": self.keyword_text,
-#             "adv_id": self.adv_id,
-#             "nmid": self.nmid,
-#             "timestamp": timestamp.isoformat() if timestamp else None,
-#             "adv_type": self.adv_type,
-#             "total_views": self.total_views,
-#             "total_orders": self.total_orders,
-#         }
-#
-#     @staticmethod
-#     def from_dict(data: dict[str, object]) -> "WBItemPosition":
-#         # создаём пустую модель (разрешено, так как все поля optional)
-#         position = WBItemPosition()
-#
-#         # position
-#         raw_position = data.get("position")
-#         if isinstance(raw_position, int):
-#             position.position = raw_position
-#         elif isinstance(raw_position, str) and raw_position.isdigit():
-#             position.position = int(raw_position)
-#         else:
-#             base_raw = data.get("base_position")
-#             if isinstance(base_raw, int):
-#                 position.position = base_raw
-#             elif isinstance(base_raw, str) and base_raw.isdigit():
-#                 position.position = int(base_raw)
-#             else:
-#                 position.position = None
-#
-#         # adv_id
-#         raw_adv_id = data.get("adv_id")
-#         if isinstance(raw_adv_id, int):
-#             position.adv_id = raw_adv_id
-#         elif isinstance(raw_adv_id, str) and raw_adv_id.isdigit():
-#             position.adv_id = int(raw_adv_id)
-#         else:
-#             position.adv_id = None
-#
-#         # nmid
-#         raw_nmid = data.get("nmid")
-#         if isinstance(raw_nmid, int):
-#             position.nmid = raw_nmid
-#         elif isinstance(raw_nmid, str) and raw_nmid.isdigit():
-#             position.nmid = int(raw_nmid)
-#         else:
-#             position.nmid = None
-#
-#         # timestamp
-#         raw_ts = data.get("timestamp")
-#         if isinstance(raw_ts, str):
-#             try:
-#                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-#             except Exception:
-#                 position.timestamp = None
-#         else:
-#             position.timestamp = None
-#
-#         # keyword
-#         raw_kw = data.get("keyword_text")
-#         position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
-#
-#         # adv_type
-#         raw_adv_type = data.get("adv_type")
-#         if isinstance(raw_adv_type, int):
-#             position.adv_type = raw_adv_type
-#         elif isinstance(raw_adv_type, str) and raw_adv_type.isdigit():
-#             position.adv_type = int(raw_adv_type)
-#         else:
-#             position.adv_type = None
-#
-#         # total_views
-#         raw_total_views = data.get("total_views")
-#         if isinstance(raw_total_views, int):
-#             position.total_views = raw_total_views
-#         else:
-#             position.total_views = None
-#
-#         # total_orders
-#         raw_total_orders = data.get("total_orders")
-#         if isinstance(raw_total_orders, int):
-#             position.total_orders = raw_total_orders
-#         else:
-#             position.total_orders = None
-#
-#         return position
 
 
 class AdvTimeSettings(Base):  # type: ignore[valid-type]

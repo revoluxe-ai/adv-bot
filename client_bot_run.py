@@ -2,13 +2,13 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager
 
-from aiogram import Dispatcher, types
+from aiogram import types
 from aiogram.exceptions import TelegramAPIError
 from aiohttp import ClientSession
 from fastapi import FastAPI, Request, Response
 
 from app.client_bot.bot import aclose_telegram_http_session, get_bot
-from app.client_bot.global_router import global_router
+from app.client_bot.dispatcher_factory import create_client_bot_dispatcher
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.settings import settings
 from app.utils.redis_cache import setup_redis_cache
@@ -51,11 +51,10 @@ async def lifespan(app_fast_api: FastAPI): # noqa
         # Continue without token monitoring if it fails
 
     async with ClientSession() as client_session:
-        dp = Dispatcher(
-            client_session=client_session,
+        dp = create_client_bot_dispatcher(
+            client_session,
             billing_event_manager=billing_event_manager,
         )
-        dp.include_router(global_router)
         if POLLING_MODE:
             logger.info("⚙️ POLLING_MODE=True: FastAPI только для health-check и info.")
             yield  # FastAPI просто живёт, бот живёт отдельно
@@ -125,11 +124,10 @@ async def telegram_webhook(request: Request):
 
     update = types.Update.model_validate(await request.json())
     async with ClientSession() as client_session:
-        dp = Dispatcher(
-            client_session=client_session,
+        dp = create_client_bot_dispatcher(
+            client_session,
             billing_event_manager=billing_event_manager,
         )
-        dp.include_router(global_router)
     await dp.feed_update(bot, update)
     return {"status": "ok"}
 
@@ -179,14 +177,17 @@ if __name__ == "__main__":
 
                 async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
                     async with ClientSession() as client_session:
-                        dp = Dispatcher(
-                            client_session=client_session,
+                        dp = create_client_bot_dispatcher(
+                            client_session,
                             billing_event_manager=billing_event_manager,
                         )
-                        dp.include_router(global_router)
                         logger.info("🔄 Запуск бота в режиме POLLING...")
                         # Запуск бота с использованием long polling
-                        await dp.start_polling(bot)
+                        await dp.start_polling(
+                            bot,
+                            drop_pending_updates=True,
+                            polling_timeout=30,
+                        )
             finally:
                 await aclose_telegram_http_session()
                 logger.info("✅ Сессия бота завершена.")

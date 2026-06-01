@@ -49,6 +49,10 @@ def make_auction_adv(bid: int, advert_id: int, nmid: int) -> AuctionAdv:
 @pytest.mark.asyncio
 async def test_run_bidder_process_for_adv_injects_redis_caches(monkeypatch):
     """Проверяет что redis кэши инжектятся в режиме BY_POSITIONS."""
+    monkeypatch.setattr(
+        "app.core.di.databases.redis.RedisLifecycle.init",
+        AsyncMock(return_value=None),
+    )
     di_manager = await DIManager.create(AppContainer)
     async with di_manager as app_container:
         # Override базовых зависимостей

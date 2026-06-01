@@ -11,6 +11,11 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
 )
+from app.shared.domains.wb.utils.rec_system_shelf_mode import (
+    is_rec_system_shelf_mode_operational,
+    should_show_clicks_warning,
+    warning_suffix,
+)
 
 
 class CommonStatDataManager:
@@ -42,9 +47,16 @@ class CommonStatDataManager:
         keywords_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
             [auto_adv_id], start_date, end_date
         )
+        adv_ids_for_cluster_keywords: list[int] = [auto_adv_id]
+        if adv_setting.search_adv_id:
+            adv_ids_for_cluster_keywords.append(adv_setting.search_adv_id)
+        cluster_keyword_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
+            adv_ids_for_cluster_keywords, start_date, end_date
+        )
         # Safety: ClickHouse/stat helpers must return dicts; if something returns None, don't crash UI.
         keywords_views_by_day = keywords_views_by_day or {}
         keywords_clicks_by_day = keywords_clicks_by_day or {}
+        cluster_keyword_clicks_by_day = cluster_keyword_clicks_by_day or {}
 
         text_stat = "\n\nСтатистика по дням:\n"
         text_stat += await self._get_days_static_text(
@@ -55,6 +67,7 @@ class CommonStatDataManager:
             keywords_views_by_day,
             auto_clicks_by_day,
             keywords_clicks_by_day,
+            cluster_keyword_clicks_by_day,
         )
         return text_stat
 
@@ -97,6 +110,7 @@ class CommonStatDataManager:
         keywords_views_by_day: dict[datetime.date, int],
         auto_clicks_by_day: dict[datetime.date, int],
         keywords_clicks_by_day: dict[datetime.date, int],
+        cluster_keyword_clicks_by_day: dict[datetime.date, int],
     ) -> str:
         """
         Получает текст статистики по дням
@@ -104,6 +118,8 @@ class CommonStatDataManager:
             concatenated_adv_stat_result: Объединенный результат статистики
             auto_views_by_day: Показы авто-РК по дням
             keywords_views_by_day: Показы по ключевым словам по дням
+            keywords_clicks_by_day: Клики по ключам из кластеров только авто-РК (для полок)
+            cluster_keyword_clicks_by_day: Клики по ключам из кластеров авто+search (первое число в Кл)
 
         Returns:
             str: Текст статистики по дням
@@ -115,6 +131,7 @@ class CommonStatDataManager:
 
         text = ""
         today_date = datetime.datetime.now().date()
+        shelves_operational = await is_rec_system_shelf_mode_operational(adv)
         for stat in concatenated_adv_stat_result:
             date = stat.date
             date_str = date.strftime("%d.%m.%Y")
@@ -149,18 +166,28 @@ class CommonStatDataManager:
             extra_views = auto_views - keywords_views
             if extra_views > 0:
                 text_row += f" Доп.пок.: {extra_views}"
-            if adv.rec_system_mode:
-                auto_clicks = auto_clicks_by_day.get(date, 0)
-                auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
-                shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
-                # В organic исключаем клики всех РК комплекса за день (auto + search).
-                organic_clicks = compute_organic_clicks(
-                    common_stat.open_card,
-                    stat.clicks,
+            auto_clicks = auto_clicks_by_day.get(date, 0)
+            auto_keyword_clicks = keywords_clicks_by_day.get(date, 0)
+            shelf_clicks = compute_shelf_clicks(auto_clicks, auto_keyword_clicks)
+            # В organic исключаем клики всех РК комплекса за день (auto + search).
+            organic_clicks = compute_organic_clicks(
+                common_stat.open_card,
+                stat.clicks,
+            )
+            cluster_rek_clicks = cluster_keyword_clicks_by_day.get(date, 0)
+            clicks_control_sum = cluster_rek_clicks + organic_clicks + shelf_clicks
+            text_row += (
+                f" Кл(рек.кл/орг/пол): {cluster_rek_clicks}/{organic_clicks}/"
+                f"{shelf_clicks} ({clicks_control_sum})"
+            )
+            if date == today_date:
+                warn = should_show_clicks_warning(
+                    shelves_operational=shelves_operational,
+                    adv_clicks=cluster_rek_clicks,
+                    organic_clicks=organic_clicks,
+                    shelf_clicks=shelf_clicks,
                 )
-                text_row += (
-                    f" Кл(орг/пол): {organic_clicks}/{shelf_clicks}"
-                )
+                text_row += warning_suffix(warn)
 
             text_row += "\n"
             text += text_row

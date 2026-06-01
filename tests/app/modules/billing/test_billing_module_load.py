@@ -11,9 +11,13 @@ logging.disable()
 
 
 @pytest.mark.asyncio
-async def test_billing_module_load():
+async def test_billing_module_load(monkeypatch):
     """Unit-тест: не использует реальную БД (async_session тянет Docker)."""
     from app.core.di.app_container import AppContainer
+    monkeypatch.setattr(
+        "app.core.di.databases.redis.RedisLifecycle.init",
+        AsyncMock(return_value=None),
+    )
     mock_process = AsyncMock(name="_process_single_cabinet")
     mock_fetch_active_cabinet_ids = AsyncMock(return_value=[1, 2, 3])
 

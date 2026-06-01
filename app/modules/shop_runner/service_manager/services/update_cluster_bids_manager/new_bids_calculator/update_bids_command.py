@@ -11,6 +11,8 @@ class DirectEnum(StrEnum):
 
 @dataclass(frozen=True)
 class NewBid:
+    """Одна новая ставка по кластеру; правила min/max — в ``new_bid_calculate``."""
+
     new_bid: int
     adv_id: int
     nmid: int

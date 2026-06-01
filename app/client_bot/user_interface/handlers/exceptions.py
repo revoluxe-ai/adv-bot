@@ -1,10 +1,12 @@
 import logging
 import traceback
 import typing
+from typing import Any
 
 import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Update
@@ -17,6 +19,79 @@ from app.exc import CardNotFoundInDB
 
 logger = logging.getLogger(__name__)
 
+_SECTION_EXTRA = "\n\n--- extra ---\n\n"
+_SECTION_APP_LINES = "\n\n--- app lines ---\n\n"
+_SECTION_FULL_TRACEBACK = "\n\n--- full traceback ---\n\n"
+_SECTION_FOOTER = "\n\n--- footer ---\n\n"
+
+admin_telegram_id = 373435337
+
+
+async def _send_text_chunks(
+    bot: aiogram.Bot,
+    chat_id: int,
+    full_text: str,
+) -> None:
+    """Send long text in Telegram-sized chunks; per-chunk failures are logged only."""
+    max_len = tb.const.MAX_MESSAGE_LENGTH
+    remaining = full_text
+    while remaining:
+        chunk = remaining[:max_len]
+        remaining = remaining[max_len:]
+        try:
+            _ = await bot.send_message(chat_id=chat_id, text=chunk)
+        except Exception:
+            logger.exception(
+                "Failed to send chunked message (chat_id=%s, chunk_len=%s)",
+                chat_id,
+                len(chunk),
+            )
+
+
+async def send_admin_error_report(
+    bot: aiogram.Bot,
+    *,
+    headline: str,
+    traceback_text: str | None = None,
+    extra: str | None = None,
+    brief_trace_app_lines: str | None = None,
+    footer: str | None = None,
+) -> None:
+    """Build one admin report (headline → extra → app lines → full traceback → footer) and chunk-send."""
+    parts: list[str] = [headline.strip()]
+    if extra is not None and extra.strip():
+        parts.append(_SECTION_EXTRA + extra.strip())
+    if brief_trace_app_lines is not None and brief_trace_app_lines.strip():
+        parts.append(_SECTION_APP_LINES + brief_trace_app_lines.strip())
+    if traceback_text is not None and traceback_text.strip():
+        parts.append(_SECTION_FULL_TRACEBACK + traceback_text.strip())
+    if footer is not None and footer.strip():
+        parts.append(_SECTION_FOOTER + footer.strip())
+    report = "".join(parts)
+    await _send_text_chunks(bot, admin_telegram_id, report)
+
+
+def is_telegram_message_too_long(exc: BaseException) -> bool:
+    """Detect Telegram API response for over-limit message length."""
+    if not isinstance(exc, TelegramBadRequest):
+        return False
+    error_text = (getattr(exc, "message", None) or str(exc)).lower()
+    return "message is too long" in error_text
+
+
+def extract_telegram_method_payload(method: Any) -> str | None:
+    """Extract text-like payload from TelegramMethod for diagnostics."""
+    for attr in ("text", "caption"):
+        value = getattr(method, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def describe_telegram_method(method: Any) -> str:
+    """Fallback representation if no text/caption payload exists."""
+    return f"{type(method).__name__}: {method!r}"
+
 
 def _chat_id_from_error_update(update: Update) -> int:
     """User chat id from message or callback_query (shared error-handler resolution)."""
@@ -28,14 +103,6 @@ def _chat_id_from_error_update(update: Update) -> int:
         return int(update.callback_query.message.chat.id)
     return message.chat.id
 
-
-async def _clear_fsm_and_get_chat_id(state: FSMContext, update: Update) -> int:
-    """Reset FSM state and return the user chat id for this update (error handlers)."""
-    await state.set_state()
-    return _chat_id_from_error_update(update)
-
-
-admin_telegram_id = 373435337
 
 user_router = Router()
 
@@ -59,54 +126,52 @@ async def network_error_handler(
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ) -> None:
-    exc = error_event.exception
-    logger.warning(
-        "TelegramBadRequest: %s (message=%s)",
-        exc,
-        getattr(exc, "message", None),
-        exc_info=True,
-    )
-    error_text = (getattr(exc, "message", None) or str(exc) or "").lower()
-    update = error_event.update
-    chat_id = await _clear_fsm_and_get_chat_id(state, update)
-    if "caption is too long" in error_text:
-        message = update.message
-        if message is None:
-            cq = update.callback_query
-            assert cq is not None
-            user_name = cq.from_user.username
-            callback_data = getattr(cq, "data", None)
-        else:
-            assert message.from_user
-            user_name = message.from_user.username
-            callback_data = None
+    exception = error_event.exception
+    if not isinstance(exception, TelegramBadRequest):
+        raise SkipHandler()
+    if not is_telegram_message_too_long(exception):
+        raise SkipHandler()
 
-        admin_text = (
-            "TelegramBadRequest: caption is too long\n"
-            f"chat_id={chat_id}\n"
-            f"user={user_name}\n"
-            f"callback_data={callback_data}\n"
-            f"exc={exc}"
-        )
-        for i in range(0, len(admin_text), const.MAX_MESSAGE_LENGTH):
-            await bot.send_message(
-                admin_telegram_id,
-                admin_text[i : i + const.MAX_MESSAGE_LENGTH],
-            )
+    method = exception.method
+    method_name = type(method).__name__
+    chat_from_method = getattr(method, "chat_id", None)
+    payload = extract_telegram_method_payload(method)
+    payload_len = len(payload) if payload is not None else 0
+
+    logger.warning(
+        "Telegram message too long: method=%s chat_id=%s payload_chars=%s",
+        method_name,
+        chat_from_method,
+        payload_len,
+    )
+
+    meta = (
+        "TelegramBadRequest: message is too long\n"
+        f"method={method_name}\n"
+        f"chat_id={chat_from_method}\n"
+        f"payload_chars={payload_len}"
+    )
+    await send_admin_error_report(
+        bot,
+        headline="Telegram send_message overflow",
+        extra=meta
+        + "\n\n--- payload ---\n\n"
+        + (payload if payload is not None else describe_telegram_method(method)),
+    )
+
+    try:
+        user_chat_id = _chat_id_from_error_update(error_event.update)
         await bot.send_message(
-            chat_id=chat_id,
+            chat_id=user_chat_id,
             text=(
-                "Сообщение получилось слишком длинным и было автоматически сокращено. "
-                "Если проблема повторяется, обратитесь в поддержку -> "
-                f"{const.SUPPORT_LINK}"
+                "Сообщение слишком длинное для Telegram (лимит символов). "
+                f"Обратитесь в поддержку: {const.SUPPORT_LINK}"
             ),
         )
-        return
-    await bot.send_message(
-        chat_id=chat_id,
-        text="Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения "
-        f"проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}",
-    )
+    except Exception:
+        logger.exception("Failed to notify user after message-too-long error")
+
+    return
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
@@ -155,7 +220,11 @@ async def not_found_wb_card_error_handler(
         chat_id=chat_id,
         text=f"Ошибка получения карточки, обратитесь в поддержку -> {const.SUPPORT_LINK}",
     )
-    await bot.send_message(admin_telegram_id, str(exception))
+    await send_admin_error_report(
+        bot,
+        headline="CardNotFoundInDB",
+        extra=str(exception),
+    )
     return
 
 
@@ -183,29 +252,23 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
     trace_error = traceback.format_exc()
     logger.error(trace_error)
 
-    # Отправляем полный трейс администратору
-    part_of_trace = trace_error
-    while part_of_trace:
-        chunk = part_of_trace[: tb.const.MAX_MESSAGE_LENGTH]
-        await bot.send_message(admin_telegram_id, chunk)
-        part_of_trace = part_of_trace[tb.const.MAX_MESSAGE_LENGTH :]
-
-    # Фильтруем и отправляем строки с упоминанием пакета 'app' из уже полученного трейса
     lines_with_package_name = [
         line for line in trace_error.splitlines() if "app" in line
     ]
     if lines_with_package_name:
-        brief_trace = "\n".join(lines_with_package_name)
-        # Отправляем краткий трейс администратору частями, если он слишком длинный
-        part_of_brief_trace = brief_trace
-        while part_of_brief_trace:
-            chunk = part_of_brief_trace[: tb.const.MAX_MESSAGE_LENGTH]
-            await bot.send_message(admin_telegram_id, chunk)
-            part_of_brief_trace = part_of_brief_trace[tb.const.MAX_MESSAGE_LENGTH :]
+        brief_trace_app_lines = "\n".join(lines_with_package_name)
+        extra_for_admin: str | None = None
     else:
-        # Если в трейсе нет упоминания пакета, информируем об этом
-        await bot.send_message(
-            admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены."
+        brief_trace_app_lines = None
+        extra_for_admin = (
+            "Строки с названием пакета 'app' в трейсе не найдены."
         )
 
-    await bot.send_message(admin_telegram_id, f"Ник пользователя: {user_name}")
+    await send_admin_error_report(
+        bot,
+        headline="Unhandled exception in client bot handler",
+        traceback_text=trace_error,
+        extra=extra_for_admin,
+        brief_trace_app_lines=brief_trace_app_lines,
+        footer=f"Ник пользователя: {user_name}",
+    )

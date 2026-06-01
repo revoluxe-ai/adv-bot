@@ -181,6 +181,7 @@ class KeywordStateFactory(factory.Factory):
     reason = factory.LazyFunction(lambda: fake.status_reason())
     best_keyword_status = factory.LazyFunction(lambda: fake.boolean(chance_of_getting_true=10))
     cooldown_display_tag = None
+    above_target_min_bid = None
 
 
 # ============================================================================

@@ -18,15 +18,18 @@ def get_effective_keyword_target_place(
     """
     Effective target place for a keyword and its source.
 
-    - If individual_keywords_target_place_mode is on and keyword has target_place > 0:
-      return (target_place, "individual").
+    - If individual mode and target_place > 0: (position, "individual").
+    - If individual mode and target_place == 0: (0, "individual") — min bid WB.
     - Else if campaign has max_place > 0: return (max_place, "campaign").
     - Else: return (None, "default").
     """
     use_individual = bool(getattr(adv_setting, "individual_keywords_target_place_mode", False))
     kw_place = getattr(keyword_or_setting, "target_place", None)
-    if use_individual and isinstance(kw_place, int) and kw_place > 0:
-        return (kw_place, "individual")
+    if use_individual and isinstance(kw_place, int):
+        if kw_place > 0:
+            return (kw_place, "individual")
+        if kw_place == 0:
+            return (0, "individual")
     camp_place = getattr(adv_setting, "max_place", None)
     if isinstance(camp_place, int) and camp_place > 0:
         return (camp_place, "campaign")
@@ -39,7 +42,12 @@ def format_target_place_display(
     labels: dict[TargetPlaceSource, str] | None = None,
 ) -> tuple[str, str]:
     """Return (value_str, source_label). Uses DEFAULT_SOURCE_LABELS if labels is None."""
-    value_str = str(value) if value is not None else "Не задана"
+    if value == 0:
+        value_str = "0 (мин. ставка WB)"
+    elif value is not None:
+        value_str = str(value)
+    else:
+        value_str = "Не задана"
     lab = labels if labels is not None else DEFAULT_SOURCE_LABELS
     source_label = lab.get(source, DEFAULT_SOURCE_LABELS[source])
     return (value_str, source_label)

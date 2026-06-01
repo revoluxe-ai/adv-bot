@@ -1,0 +1,28 @@
+# ============================================================================
+# postgres-pooler-external-lb.yaml
+# ============================================================================
+# Назначение: внешний LoadBalancer (Timeweb K8s) на pgbouncer pooler Postgres.
+# Селектор совпадает с postgres-db-pooler (connection-pooler=postgres-db-pooler).
+# Пересоздавать после удаления LB в панели Timeweb: delete svc + kubectl apply.
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-db-pooler-external
+  namespace: prod-adv-bot
+  labels:
+    cluster-name: postgres-db
+    k8s.timeweb.cloud/attached-loadbalancer-algo: roundrobin
+    k8s.timeweb.cloud/attached-loadbalancer-preset-id: "391"
+spec:
+  type: LoadBalancer
+  selector:
+    application: db-connection-pooler
+    cluster-name: postgres-db
+    connection-pooler: postgres-db-pooler
+  ports:
+    - name: pgbouncer
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+      appProtocol: k8s.timeweb.cloud/proto-tcp

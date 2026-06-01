@@ -13,5 +13,6 @@ class CommonSaleStatRow:
     orders: int
     orders_sum: float
     buy_outs: int
+    buyouts_sum_rub: float
 
 

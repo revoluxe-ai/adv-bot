@@ -11,7 +11,7 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 from urllib3 import PoolManager
 
 from app.settings import settings
-from ..ch_semaphore import anti_ch_crash_semaphore
+from ..ch_semaphore import run_ch_with_timeout
 
 system_name = platform.system()
 from .clickhouse_protocol import ClickHouseClientProtocol
@@ -217,9 +217,11 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def track_connections(func: F) -> F:
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        async with anti_ch_crash_semaphore:
+        async def _run() -> Any:
             async with get_clickhouse_client() as client:
                 return await func(client, *args, **kwargs)
+
+        return await run_ch_with_timeout(_run())
 
     return cast(F, wrapper)
 

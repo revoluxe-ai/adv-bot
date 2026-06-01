@@ -24,6 +24,12 @@
 - Tests and scripts use snake_case; classes use CapWords.
 - Avoid modifying generated client code under excluded paths in `pyproject.toml`.
 
+## Documentation (required)
+- **Always** add docstrings to new or changed Python modules, public classes, and public functions/methods.
+- **Always** add a header comment block to new or changed `.sql` files under service `sql/` dirs (purpose, tables, parameters, caller). See `.cursor/rules/documentation.mdc`.
+- Module docstrings: what the unit does and how it fits the domain. Method docstrings: behavior, side effects (ClickHouse, Redis, WB API), Args/Returns where non-obvious.
+- Business logic docstrings may be in Russian; keep them concise and accurate.
+
 ## Testing Guidelines
 - Pytest is the standard framework; async tests use `pytest-asyncio`.
 - File naming: `test_*.py`, `*_test.py`, or `tests.py`; functions `test_*`, classes `Test*`.

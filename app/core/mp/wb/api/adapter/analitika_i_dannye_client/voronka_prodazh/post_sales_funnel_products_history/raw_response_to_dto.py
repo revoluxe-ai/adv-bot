@@ -24,6 +24,7 @@ def convert(parsed_response: list[ProductHistoryResponseItem]) -> list[CommonSal
                 orders=history_item.order_count,
                 orders_sum=float(history_item.order_sum),
                 buy_outs=history_item.buyout_count,
+                buyouts_sum_rub=float(history_item.buyout_sum),
             )
             rows.append(row)
 

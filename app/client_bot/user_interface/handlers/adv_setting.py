@@ -1,10 +1,11 @@
 import logging
 import aiogram
-from typing import Sequence, cast
+from typing import Any, Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result
+from sqlalchemy import Result, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -13,8 +14,10 @@ from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
 from app.core.di.app_container import AppContainer
@@ -573,3 +576,65 @@ async def apply_defaults_for_shop(
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
 
     return
+
+
+@router.callback_query(callbacks.ResetShopNonRelevantPhrases.filter())
+async def reset_shop_non_relevant_phrases(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ResetShopNonRelevantPhrases,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+
+    async with sm(read_only=False) as session:
+        adv_setting_ids_subquery = (
+            select(AdvSetting.id)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+        v3_adv_setting_ids_subquery = (
+            select(AdvSetting.id)
+            .join(AdvSetting.wb_cabinet)
+            .join(WBCabinet.wb_user_cabinets)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            .where(AdvSetting.automatic_version == 3)
+        )
+        stmt_non_v3 = (
+            update(KeywordSetting)
+            .where(
+                KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
+                KeywordSetting.adv_setting_id.notin_(v3_adv_setting_ids_subquery),
+                KeywordSetting.hard_status == const.BLACK_LIST,
+            )
+            .values(hard_status=const.AUTO_MODE)
+        )
+        stmt_v3 = (
+            update(KeywordSetting)
+            .where(
+                KeywordSetting.adv_setting_id.in_(v3_adv_setting_ids_subquery),
+                KeywordSetting.hard_status == const.BLACK_LIST,
+            )
+            .values(
+                hard_status=const.AUTO_MODE,
+                strategy_mode=KeywordStrategyMode.OFF,
+            )
+        )
+        update_non_v3_result = cast(
+            CursorResult[Any], await session.execute(stmt_non_v3)
+        )
+        update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
+        updated_count = int(update_non_v3_result.rowcount or 0) + int(
+            update_v3_result.rowcount or 0
+        )
+        await session.commit()
+
+    await bot.send_message(
+        chat_id,
+        f"Сброшено НРФ: {updated_count}. Возвращаю в меню магазина...",
+    )
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()

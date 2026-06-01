@@ -26,6 +26,7 @@ async def test_common_sale_stat_updater_chunks_and_inserts():
                     orders=1,
                     orders_sum=10.0,
                     buy_outs=1,
+                    buyouts_sum_rub=5.0,
                 )
             ],
             [
@@ -37,6 +38,7 @@ async def test_common_sale_stat_updater_chunks_and_inserts():
                     orders=2,
                     orders_sum=20.0,
                     buy_outs=2,
+                    buyouts_sum_rub=7.0,
                 )
             ],
         ]

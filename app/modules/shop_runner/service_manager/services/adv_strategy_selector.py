@@ -1,3 +1,28 @@
+"""Выбор стратегии РК (MIN_CPO / MAX_CONV) по план-факту и полочному режиму.
+
+Полочный режим (``rec_system_mode`` + авто ``started``) — отдельная ветка в
+``select_target_strategy``. Вызывается из корутины ``change_adv_strategy`` (~1 мин),
+после ``get_complex_advs(load_extras=True)`` и ``TrafficClicksManager.enrich``.
+
+Сравнение кликов (``traffic_clicks_dto``):
+    * **Полки** — клики авто-РК минус клики по ключевым фразам (рекомендации/полки).
+    * **Органика** — переходы из воронки карточки минус все рекламные клики комплекса.
+
+Влияние ``organic_clicks`` vs ``shelf_clicks`` (только если DTO заполнен):
+    * ``organic_clicks > shelf_clicks`` → **MIN_CPO** (``organic_clicks_above_shelf_clicks``).
+      Даже при отсутствии «недокрученных» полочных ключей **MAX_CONV не ставится**.
+      Параллельно ``is_shelf_activation_allowed`` = False → в отбор кандидатов в БС
+      попадают не только полочные ключи (см. ``KeywordsManager``).
+    * ``shelf_clicks >= organic_clicks`` (или DTO нет) → сравнение кликов не режет в MIN_CPO;
+      дальше смотрим pending полочные ключи.
+
+«Докрутить» полочный ключ = довести до нормы, не просто включить: в авто (``hard_status=1``),
+полочный (``above_rec_conversion``), статус **BAD**, не ``ABOVE_TARGET_AT_MIN_BID``.
+Пока такие есть → **MIN_CPO**; когда список пуст → **MAX_CONV**.
+
+Не путать с V3 ``auto_updater_v3`` (лестница UP/DOWN): здесь только поле ``AdvSetting.strategy``.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -32,6 +57,7 @@ class AdvStrategySelector:
         plan: Any | None,
         summary: Any | None,
     ) -> StrategySelection | None:
+        """Базовая стратегия без полочной ветки: план/факт и порог себестоимости (``resolve_target_cost``)."""
         if plan is None or summary is None:
             return None
 
@@ -72,6 +98,18 @@ class AdvStrategySelector:
         *,
         plan_fact_reader: PlanFactReader,
     ) -> StrategySelection | None:
+        """Целевая стратегия РК.
+
+        Без полок (``rec_system_mode`` выкл или авто не ``started``): только ``_select_by_plan_and_cost``.
+
+        С полками (оба условия выше):
+            1. Если план/факт уже требуют экономии → **MIN_CPO**, полочная логика не выполняется.
+            2. Иначе при ``organic_clicks > shelf_clicks`` (есть DTO) → **MIN_CPO**.
+            3. Иначе при отсутствии pending полочных ключей → **MAX_CONV**.
+            4. Иначе → **MIN_CPO** (есть что докручивать в полочных ключах).
+
+        ``reason`` в ``StrategySelection`` — для логов и диагностики.
+        """
         plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
         summary = None
         if plan is not None:
@@ -114,8 +152,11 @@ class AdvStrategySelector:
 
     @staticmethod
     def _all_shelf_keywords_activated(keywords: list[CalculatedKeyword]) -> bool:
-        # Полочные (above rec conversion, hard_status 1), ещё BAD и не в cooldown МС.
-        # Пока такие есть — не все «активированы» → MIN_CPO; пусто → MAX_CONV.
+        """True, если не осталось полочных ключей, которые ещё нужно докрутить.
+
+        Pending = ``above_rec_conversion``, ``hard_status == 1`` (авто), ``status == BAD``,
+        ``reason != ABOVE_TARGET_AT_MIN_BID``. Пустой pending → можно **MAX_CONV** (в полочной ветке).
+        """
         pending_shelf = [
             keyword
             for keyword in keywords

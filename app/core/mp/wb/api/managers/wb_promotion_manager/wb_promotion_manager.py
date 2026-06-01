@@ -14,6 +14,12 @@ from app.shared.domains.wb.enums import AdvType
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
 )
+from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
+    PatchApiAdvertV1BidsBody,
+    PatchApiAdvertV1BidsBodyBidsItem,
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItem,
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,7 @@ if typing.TYPE_CHECKING:
         PromotionManager,
         CampaignBudgetInfo,
         BudgetTopUpResult,
+        SetMinusPhrasesFallbackResult,
     )
     from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
         GetAdvV1BalanceResponse200,
@@ -53,6 +60,26 @@ class WBModifier:
             raise e
         await update_redis_timestamp_manager.set_one(adv_id=adv_id)
         return None
+
+    async def set_minus_phrases_with_fallback_for_adv(
+        self,
+        adv_id: int,
+        nmid: int,
+        phrases: list[str],
+        update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager,
+    ) -> "SetMinusPhrasesFallbackResult":
+        try:
+            result = await self._promotion_manager.set_minus_phrases_with_fallback(
+                advert_id=adv_id,
+                nm_id=nmid,
+                phrases=phrases,
+            )
+        except Exception as e:
+            logger.error("Ошибка обновления минус-фраз: %s", e, exc_info=True)
+            raise e
+        if not result.skipped_unsupported_campaign:
+            await update_redis_timestamp_manager.set_one(adv_id=adv_id)
+        return result
 
     async def get_minus_phrases_for_adv(self, adv_id: int, nmid: int) -> list[str]:
         """Получить текущий список минус-фраз для пары кампания + номенклатура."""
@@ -92,13 +119,6 @@ class WBModifier:
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
         """Обновляет CPM авто-кампании через PATCH /api/advert/v1/bids (ставки в копейках)."""
-        from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
-            PatchApiAdvertV1BidsBody,
-            PatchApiAdvertV1BidsBodyBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItem,
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
-        )
-
         placement = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
         nm_bids = [
             PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
@@ -117,6 +137,51 @@ class WBModifier:
             ]
         )
         await self._promotion_manager.patch_adv_v1_bids(body)
+
+    async def _resolve_shelf_bid_placement(
+        self, adv_id: int
+    ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement:
+        """Placement для ставки полок: по включённым зонам РК, иначе recommendations."""
+        default = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+        campaigns = await self._promotion_manager.get_adverts_v2_by_ids([int(adv_id)])
+        if not campaigns:
+            return default
+        placements = campaigns[0].settings.placements
+        if placements.recommendations:
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+        if placements.search:
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.SEARCH
+        return default
+
+    async def patch_auto_adv_bids_kopecks(
+        self, adv_id: int, nm_bid_kopecks: dict[int, int]
+    ) -> None:
+        """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (control ``bid_minor``).
+
+        Placement не COMBINED: для многих Auto-РК WB отдаёт 400 «combined placement is disabled»;
+        для полок используем recommendations (или search, если рекомендации выключены).
+        """
+        if not nm_bid_kopecks:
+            return None
+        placement = await self._resolve_shelf_bid_placement(adv_id)
+        nm_bids = [
+            PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
+                nm_id=int(nm_id),
+                bid_kopecks=int(kopecks),
+                placement=placement,
+            )
+            for nm_id, kopecks in nm_bid_kopecks.items()
+        ]
+        body = PatchApiAdvertV1BidsBody(
+            bids=[
+                PatchApiAdvertV1BidsBodyBidsItem(
+                    advert_id=int(adv_id),
+                    nm_bids=nm_bids,
+                )
+            ]
+        )
+        await self._promotion_manager.patch_adv_v1_bids(body)
+        return None
 
     async def get_campaign_budget(self, adv_id: int) -> "CampaignBudgetInfo":
         return await self._promotion_manager.get_campaign_budget(adv_id)

@@ -9,6 +9,7 @@ class BidPosition:
     bid: int  # стоимость 1000 показов
     timestamp: datetime
     _conv_carts_to_views: float | None = None
+    ch_observed: bool = True
 
     @property
     def conv_carts_to_views(self) -> float | None:

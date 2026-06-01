@@ -11,17 +11,21 @@ from app.utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
 
+# formatDateTime в CH: шаблон передаём через parameters (см. full_wb_adv_stat и др.),
+# иначе символы % в литерале ломают bind_query clickhouse_connect (Python %).
+# В CH с ~23.4 %M в formatDateTime — имя месяца (April), минуты — %i (не как в Python).
+PLAN_FACT_CH_TS_FORMAT_MSK = "%d.%m.%Y %H:%i"
+
 
 @dataclass
 class PlanFactSummary:
     adv_id: int
-    plan_orders: int | None
-    plan_target_pay_for_order: int | None
-    plan_max_pay_for_order: int | None
     fact_predict_orders: float | None
     fact_pay_for_order: float | None
     fact_original_orders: float | None = None
     fact_method: str | None = None
+    # max(timestamp) по adv_id, строка уже в Europe/Moscow (как в консоли CH)
+    plan_fact_ch_ts_msk: str | None = None
 
 
 class PlanFactReader:
@@ -60,12 +64,6 @@ class PlanFactReader:
         raise TypeError(f"Expected int-convertible value, got {type(value)!r}")
 
     @staticmethod
-    def _as_int_or_none(value: object) -> int | None:
-        if value is None:
-            return None
-        return PlanFactReader._as_int(value)
-
-    @staticmethod
     def _as_float_or_none(value: object) -> float | None:
         if value is None:
             return None
@@ -86,15 +84,14 @@ class PlanFactReader:
 
     @staticmethod
     def _row_to_summary(row: Sequence[object]) -> PlanFactSummary:
+        ts_raw = row[5] if len(row) > 5 else None
         return PlanFactSummary(
             adv_id=PlanFactReader._as_int(row[0]),
-            plan_orders=PlanFactReader._as_int_or_none(row[1]),
-            plan_target_pay_for_order=PlanFactReader._as_int_or_none(row[2]),
-            plan_max_pay_for_order=PlanFactReader._as_int_or_none(row[3]),
-            fact_predict_orders=PlanFactReader._as_float_or_none(row[4]),
-            fact_pay_for_order=PlanFactReader._as_float_or_none(row[5]),
-            fact_original_orders=PlanFactReader._as_float_or_none(row[6]),
-            fact_method=PlanFactReader._as_str_or_none(row[7]),
+            fact_predict_orders=PlanFactReader._as_float_or_none(row[1]),
+            fact_pay_for_order=PlanFactReader._as_float_or_none(row[2]),
+            fact_original_orders=PlanFactReader._as_float_or_none(row[3]),
+            fact_method=PlanFactReader._as_str_or_none(row[4]),
+            plan_fact_ch_ts_msk=PlanFactReader._as_str_or_none(ts_raw),
         )
 
     async def get_latest_plan_fact(
@@ -102,18 +99,21 @@ class PlanFactReader:
     ) -> PlanFactSummary | None:
         """Возвращает последнюю запись план-факт по adv_id из ClickHouse.
 
-        Поля plan_* — снимок на момент записи в кеш; для расчёта целевой
-        себестоимости и иной бизнес-логики по плану используйте текущие
-        настройки AdvSetting (PlanFactProvider.get_plan_data). Из данного
-        метода для логики берите факт: fact_predict_orders, fact_pay_for_order,
-        fact_original_orders, fact_method (при сборке FactData из кеша).
+        Для бизнес-логики используйте только факт:
+        fact_predict_orders, fact_pay_for_order, fact_original_orders, fact_method
+        (при сборке FactData из кеша). Целевые значения (plan/target/max)
+        должны приходить из текущих настроек AdvSetting/PlanData.
+        plan_fact_ch_ts_msk — max(timestamp) по adv_id, отформатированный в CH в Europe/Moscow.
         """
         query = self._load_query()
 
         async with get_clickhouse_client() as client:
             result = await client.query(
                 query,
-                parameters={"adv_id": adv_id},
+                parameters={
+                    "adv_id": adv_id,
+                    "plan_fact_ts_format": PLAN_FACT_CH_TS_FORMAT_MSK,
+                },
             )
 
         row = next(iter(result.result_rows), None)
@@ -132,13 +132,11 @@ class PlanFactReader:
         query = """
         SELECT
             adv_id,
-            argMax(plan_orders, timestamp) AS plan_orders,
-            argMax(plan_target_pay_for_order, timestamp) AS plan_target_pay_for_order,
-            argMax(plan_max_pay_for_order, timestamp) AS plan_max_pay_for_order,
             argMax(fact_predict_orders, timestamp) AS fact_predict_orders,
             argMax(fact_pay_for_order, timestamp) AS fact_pay_for_order,
             argMax(fact_original_orders, timestamp) AS fact_original_orders,
-            argMax(fact_method, timestamp) AS fact_method
+            argMax(fact_method, timestamp) AS fact_method,
+            formatDateTime(max(timestamp), %(plan_fact_ts_format)s, 'Europe/Moscow') AS plan_fact_ch_ts_msk
         FROM default_db.plan_fact_stats
         WHERE adv_id IN %(adv_ids)s
         GROUP BY adv_id
@@ -146,7 +144,10 @@ class PlanFactReader:
         async with get_clickhouse_client() as client:
             result = await client.query(
                 query,
-                parameters={"adv_ids": normalized_adv_ids},
+                parameters={
+                    "adv_ids": normalized_adv_ids,
+                    "plan_fact_ts_format": PLAN_FACT_CH_TS_FORMAT_MSK,
+                },
             )
         summaries: dict[int, PlanFactSummary] = {}
         for row in result.result_rows:

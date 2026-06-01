@@ -61,6 +61,7 @@ class CommonStatMinix(WBAPIProtocol):
                     orders=history["ordersCount"],  # type: ignore[index]
                     orders_sum=history["ordersSumRub"],  # type: ignore[index]
                     buy_outs=history["buyoutsCount"],  # type: ignore[index]
+                    buyouts_sum_rub=float(history.get("buyoutsSumRub", 0)),  # type: ignore[index]
                 )
                 stats.append(stat)
         return stats

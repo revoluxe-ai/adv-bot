@@ -52,5 +52,5 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     keep_jobs = 86400  # Храним задачи в Redis 24 часа
-    max_tries = 10  # Максимальное число попыток
+    max_tries = 1  # Без ретраев: ошибки обрабатываются в самих задачах
     job_timeout = 86400  # максимальное время на выполнение задачи

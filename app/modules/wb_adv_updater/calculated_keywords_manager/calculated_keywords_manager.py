@@ -1,6 +1,14 @@
+"""Расчёт и кэширование keyword-состояния для WB adv updater.
+
+Модуль собирает данные ClickHouse/Redis/WB manager hub для расчёта ставок,
+диагностик и bidder-status. Fallback создания WBManagerHub оставлен только для
+нештатных путей и логируется warning-ом для обнаружения утечки отдельного pool.
+"""
+
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+import inspect
 import logging
 from numbers import Real
 from typing import Generator, Protocol, Sequence, TypeVar, cast
@@ -279,6 +287,18 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
 
 
     @staticmethod
+    def resolve_keyword_rating_mode(complex_adv: "ComplexAdv") -> KeywordRatingMode:
+        """Режим рейтинга для сортировки ключей; V3 всегда MIN_CPO."""
+        auto_ver = complex_adv.adv_setting.automatic_version
+        if auto_ver == 3:
+            return KeywordRatingMode.BY_MIN_CPO
+        if complex_adv.strategy == Strategy.MIN_CPO:
+            return KeywordRatingMode.BY_MIN_CPO
+        if complex_adv.strategy == Strategy.MAX_CONV:
+            return KeywordRatingMode.BY_MAX_CONV
+        raise ValueError(f"Not implemented strategy: {complex_adv.strategy}")
+
+    @staticmethod
     def __create_pre_calculated_keywords(keyword_hard_statuses: list[KeywordHardStatus],
                                                stats: list[KeywordStat],
                                                complex_adv: 'ComplexAdv') \
@@ -286,12 +306,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         from .convertor import  keyword_setting_to_keyword_setting_dto
         text_to_stat = {stat.text: stat for stat in stats}
 
-        if complex_adv.strategy == Strategy.MIN_CPO:
-            rating_mode = KeywordRatingMode.BY_MIN_CPO
-        elif complex_adv.strategy == Strategy.MAX_CONV:
-            rating_mode = KeywordRatingMode.BY_MAX_CONV
-        else:
-            raise ValueError(f'Not implemented strategy: {complex_adv.strategy}')
+        rating_mode = CalculatedKeywordsManager.resolve_keyword_rating_mode(complex_adv)
 
         keywords: list[PreCalculatedKeyword] = []
         for keyword_hard_status in keyword_hard_statuses:
@@ -382,8 +397,9 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
+            """conv(ключ) > rec_conversion (полки). Зачем — ``auto_updater_traffic_policy``."""
             if auto_campaign_active is False:
-                return None # None - не применяем вообще это правило
+                return None  # правило не применяем
             if not complex_adv.rec_system_promotion_mode_active or rec_conversion is None:
                 return None
             return pre_kw_.cluster_stat.conv_views_to_orders > rec_conversion
@@ -572,11 +588,28 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             redis_client_wrapper = RedisClient(redis_client=raw_redis_client)
             httpx_client_handler = HttpxClientHandler()
+            logger.warning(
+                "event=wb_manager_hub_fallback_created "
+                "fallback_wb_manager_hub_created=true shop_id=%s reason=%s "
+                "caller=%s handler_id=%s",
+                complex_adv.shop_id,
+                "missing_context",
+                _get_caller_name(),
+                id(httpx_client_handler),
+            )
 
             wb_manager_hub_container = WBManagerHubContainer(
                 _shop_id=complex_adv.shop_id,
                 _httpx_client_handler=httpx_client_handler,
                 _redis_wrapper=redis_client_wrapper,
+            )
+            logger.warning(
+                "event=wb_manager_hub_container_created shop_id=%s "
+                "handler_id=%s caller=%s fallback=%s",
+                complex_adv.shop_id,
+                id(httpx_client_handler),
+                _get_caller_name(),
+                True,
             )
             return wb_manager_hub_container.wb_manager_hub()
 
@@ -605,3 +638,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             complex_adv, texts
         )
         return statuses_map
+
+
+def _get_caller_name() -> str:
+    """Вернуть ближайший внешний caller для diagnostic fallback-log."""
+    stack = inspect.stack()
+    if len(stack) < 3:
+        return "—"
+    return stack[2].function

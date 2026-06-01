@@ -52,7 +52,6 @@ def mock_wb_cabinet():
     cabinet.calculated_balance = 1000.0
     cabinet.calculated_bonus = 100.0
     cabinet.adv_settings = []
-    cabinet.white_list_update_active = False
 
     # Mock expiration time
     from datetime import datetime, timedelta

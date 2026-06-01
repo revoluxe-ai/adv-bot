@@ -22,6 +22,8 @@ __all__ = [
     "run_token_expiration_check",
     "get_expiring_tokens_summary",
     "cleanup_old_notifications",
+    "activate_cabinet",
+    "deactivate_cabinet_atomic_with_user_trackers",
 ]
 
 from .token_info_service import (
@@ -41,6 +43,10 @@ from .token_monitoring_service import (
     get_token_monitoring_service,
     install_token_monitoring,
     uninstall_token_monitoring,
+)
+from .cabinet_status_service import (
+    activate_cabinet,
+    deactivate_cabinet_atomic_with_user_trackers,
 )
 from .notification_manager import (
     NotificationManager,

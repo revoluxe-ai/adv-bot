@@ -13,9 +13,13 @@ class NotificationType(Enum):
     """Enumeration of token notification types."""
 
     TOKEN_DEACTIVATED = "TOKEN_DEACTIVATED"
+    CABINET_DEACTIVATED = "CABINET_DEACTIVATED"
     TOKEN_EXPIRING_14_DAYS = "TOKEN_EXPIRING_14_DAYS"
     TOKEN_EXPIRING_3_DAYS = "TOKEN_EXPIRING_3_DAYS"
     TOKEN_EXPIRING_1_DAY = "TOKEN_EXPIRING_1_DAY"
+
+
+CABINET_DEACTIVATED_NOTIFICATION_TYPE = NotificationType.CABINET_DEACTIVATED.value
 
 
 class TokenNotificationTracker(BaseTable):
@@ -38,7 +42,7 @@ class TokenNotificationTracker(BaseTable):
     notification_type: Mapped[str] = mapped_column(String, nullable=False)
 
     # Token expiration date (nullable for deactivation notifications)
-    token_expiry_date: Mapped[datetime.datetime] = mapped_column(
+    token_expiry_date: Mapped[datetime.datetime | None] = mapped_column(
         DateTime, nullable=True
     )
 
@@ -48,7 +52,7 @@ class TokenNotificationTracker(BaseTable):
     )
 
     # When the token issue was resolved (nullable until resolved)
-    resolved_at: Mapped[datetime.datetime] = mapped_column(
+    resolved_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime, nullable=True, index=True
     )
 

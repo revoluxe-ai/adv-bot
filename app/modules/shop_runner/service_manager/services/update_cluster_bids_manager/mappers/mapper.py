@@ -23,7 +23,7 @@ class Mapper:
         return self._current_position_mapper.get_current_position(map_data)
 
     @staticmethod
-    def get_target_position(map_data: AdvIdItemCalculateData) -> int:
+    def get_target_position(map_data: AdvIdItemCalculateData) -> int | None:
         return map_data.target_position
 
     def get_min_bid(self, map_data: AdvIdItemCalculateData) -> int | None:

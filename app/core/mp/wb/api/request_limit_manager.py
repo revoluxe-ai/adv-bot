@@ -6,6 +6,7 @@ class ApiCallState(TypedDict):
     _last_query_time: float | None
     _current_pause: float
     _attempts: int
+    _pool_timeout_attempts: int
     _lock: asyncio.Lock
 
 

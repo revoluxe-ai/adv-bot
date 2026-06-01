@@ -24,9 +24,6 @@ def test_fact_data_from_plan_fact_summary_none_predict() -> None:
     adv.sales_predict_method = FactMethods.DIRECT_SALES
     summary = PlanFactSummary(
         adv_id=1,
-        plan_orders=10,
-        plan_target_pay_for_order=100,
-        plan_max_pay_for_order=200,
         fact_predict_orders=None,
         fact_pay_for_order=50.0,
     )
@@ -39,9 +36,6 @@ def test_fact_data_from_plan_fact_summary_full_row() -> None:
     adv.sales_predict_method = FactMethods.BY_CARTS
     summary = PlanFactSummary(
         adv_id=1,
-        plan_orders=10,
-        plan_target_pay_for_order=100,
-        plan_max_pay_for_order=200,
         fact_predict_orders=95.5,
         fact_pay_for_order=520.123,
         fact_original_orders=90.0,
@@ -61,9 +55,6 @@ def test_fact_data_from_plan_fact_summary_fallback_original_to_predict() -> None
     adv.sales_predict_method = FactMethods.DIRECT_SALES
     summary = PlanFactSummary(
         adv_id=1,
-        plan_orders=10,
-        plan_target_pay_for_order=100,
-        plan_max_pay_for_order=200,
         fact_predict_orders=42.0,
         fact_pay_for_order=None,
         fact_original_orders=None,
@@ -81,9 +72,6 @@ def test_fact_data_from_plan_fact_summary_invalid_method_uses_adv() -> None:
     adv.sales_predict_method = FactMethods.BY_CARTS
     summary = PlanFactSummary(
         adv_id=1,
-        plan_orders=10,
-        plan_target_pay_for_order=100,
-        plan_max_pay_for_order=200,
         fact_predict_orders=1.0,
         fact_pay_for_order=None,
         fact_original_orders=1.0,

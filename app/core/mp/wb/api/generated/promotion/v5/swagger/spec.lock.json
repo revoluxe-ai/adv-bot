@@ -1,0 +1,10 @@
+{
+  "downloaded_at_utc": "2026-04-28T14:25:10.780553+00:00",
+  "generator": "openapi-python-client",
+  "generator_meta": "none",
+  "sha256": "a21d0e7286d42e9c4e6bc035375de6f0c4cc43abec02848ee77d2b2b4738f011",
+  "size_bytes": 202543,
+  "spec_filename": "08-promotion.yaml",
+  "spec_key": "promotion",
+  "spec_url": "https://dev.wildberries.ru/api/swagger/yaml/en/08-promotion.yaml"
+}

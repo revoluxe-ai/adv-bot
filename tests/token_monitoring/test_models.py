@@ -97,6 +97,7 @@ class TestNotificationType:
         """Test NotificationType enum members."""
         expected_members = {
             "TOKEN_DEACTIVATED",
+            "CABINET_DEACTIVATED",
             "TOKEN_EXPIRING_14_DAYS",
             "TOKEN_EXPIRING_3_DAYS",
             "TOKEN_EXPIRING_1_DAY",

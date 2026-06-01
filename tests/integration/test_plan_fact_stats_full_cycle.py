@@ -18,6 +18,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PLAN_FACT_CH_TS_FORMAT_MSK,
     PlanFactReader,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -25,6 +26,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
     PreComplexAdv,
+)
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+    RedisCalculatedKeywordsCacheManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
@@ -111,6 +115,15 @@ def _enter_pre_adv_mocks(
         patch(
             "app.modules.wb_adv_updater.phrases_processor.get_good_bad_phrases",
             new=AsyncMock(return_value=[]),
+        )
+    )
+    # Глобальный redis.asyncio клиент из app.core.redis_manager привязан к loop первого теста;
+    # без мока второй async-тест ловит «Event loop is closed». Кэш ключевых слов здесь не цель теста.
+    stack.enter_context(
+        patch.object(
+            RedisCalculatedKeywordsCacheManager,
+            "get_all_calculated_keywords_for_adv",
+            new=AsyncMock(return_value=None),
         )
     )
 
@@ -201,6 +214,24 @@ async def test_full_cycle_plan_fact_stats(
     assert row[9] == 520.0  # fact_pay_for_order
     assert row[10] == "DIRECT_SALES"  # fact_method
     assert isinstance(row[11], float)  # version
+
+    reader = PlanFactReader()
+    summary = await reader.get_latest_plan_fact(complex_adv.adv_id)
+    assert summary is not None
+    assert summary.plan_fact_ch_ts_msk is not None
+    fmt_res = await clickhouse_client.query(
+        """
+        SELECT formatDateTime(max(timestamp), %(plan_fact_ts_format)s, 'Europe/Moscow')
+        FROM default_db.plan_fact_stats
+        WHERE adv_id = %(adv_id)s
+        """,
+        parameters={
+            "adv_id": complex_adv.adv_id,
+            "plan_fact_ts_format": PLAN_FACT_CH_TS_FORMAT_MSK,
+        },
+    )
+    assert fmt_res.result_rows
+    assert summary.plan_fact_ch_ts_msk == fmt_res.result_rows[0][0]
 
 
 @pytest.mark.integration

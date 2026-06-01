@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 )
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 
+pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
@@ -64,6 +65,7 @@ async def test_process_adv_plan_fact_unchanged(complex_adv_mock, plan_data_mock,
 
     mock_change_plan_fact = MagicMock()
     mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
 
     with (
         patch(
@@ -85,6 +87,7 @@ async def test_process_adv_plan_fact_unchanged(complex_adv_mock, plan_data_mock,
         mock_change_plan_fact.check_equal_in_cache.assert_called_once_with(
             ANY, fact_data_mock
         )
+        mock_change_plan_fact.set_new_plan_fact.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -97,6 +100,7 @@ async def test_process_adv_insufficient_data(complex_adv_mock, plan_data_mock, f
 
     mock_change_plan_fact = MagicMock()
     mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
 
     with (
         patch(
@@ -120,6 +124,7 @@ async def test_process_adv_insufficient_data(complex_adv_mock, plan_data_mock, f
 
         # Проверяем, что detect_campaign_state был вызван
         mock_change_plan_fact.check_equal_in_cache.assert_called_once()
+        mock_change_plan_fact.set_new_plan_fact.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -140,6 +145,7 @@ async def test_process_adv_optimal_state(complex_adv_mock, plan_data_mock):
 
     mock_change_plan_fact = MagicMock()
     mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
 
     with (
         patch(
@@ -163,6 +169,7 @@ async def test_process_adv_optimal_state(complex_adv_mock, plan_data_mock):
 
         # Проверяем, что состояние было определено
         mock_change_plan_fact.check_equal_in_cache.assert_called_once()
+        mock_change_plan_fact.set_new_plan_fact.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -174,7 +181,6 @@ async def test_process_adv_optimal_state(complex_adv_mock, plan_data_mock):
         SalesStates.STABLE
     ],
 )
-@pytest.mark.asyncio
 async def test_process_adv_successful_execution(
     complex_adv_mock, plan_data_mock, fact_data_mock, state
 ):
@@ -224,6 +230,7 @@ async def test_process_adv_successful_execution(
 
         # Проверяем, что planner.run_for_state был вызван
         control_system.planner.run_for_state.assert_called_once()
+        mock_session.commit.assert_called_once()
 
         # Проверяем, что set_new_plan_fact был вызван с любым plan и нашим fact
         mock_change_plan_fact.set_new_plan_fact.assert_called_once_with(
@@ -336,5 +343,176 @@ async def test_process_adv_with_different_max_last_period(complex_adv_mock, plan
         assert call_args[0][1] == 5  # max_last_period передан правильно
 
 
+@pytest.mark.asyncio
+async def test_process_adv_get_fact_data_raises_propagates(
+    complex_adv_mock, plan_data_mock, fact_data_mock
+):
+    control_system = AdvControlSystem(max_last_period=2)
+    mock_updater = MagicMock()
+    mock_updater.get_fact_data = AsyncMock(side_effect=RuntimeError("fact boom"))
+
+    mock_change_plan_fact = MagicMock()
+    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater.get_plan_data",
+            return_value=plan_data_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater",
+            return_value=mock_updater,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
+            return_value=mock_change_plan_fact,
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="fact boom"):
+            await control_system.process_adv(complex_adv_mock)
+    mock_change_plan_fact.set_new_plan_fact.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_adv_planner_raises_no_set_new_plan_fact(
+    complex_adv_mock, plan_data_mock, fact_data_mock
+):
+    control_system = AdvControlSystem(max_last_period=2)
+    mock_updater = MagicMock()
+    mock_updater.get_fact_data = AsyncMock(return_value=fact_data_mock)
+
+    mock_change_plan_fact = MagicMock()
+    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater.get_plan_data",
+            return_value=plan_data_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater",
+            return_value=mock_updater,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
+            return_value=mock_change_plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.detect_campaign_state",
+            return_value=SalesStates.OVERSPEND,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
+            return_value=mock_session,
+        ),
+    ):
+        control_system.planner.run_for_state = AsyncMock(
+            side_effect=RuntimeError("planner boom")
+        )
+        with pytest.raises(RuntimeError, match="planner boom"):
+            await control_system.process_adv(complex_adv_mock)
+
+    mock_change_plan_fact.set_new_plan_fact.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_adv_commit_raises_no_set_new_plan_fact(
+    complex_adv_mock, plan_data_mock, fact_data_mock
+):
+    control_system = AdvControlSystem(max_last_period=2)
+    mock_updater = MagicMock()
+    mock_updater.get_fact_data = AsyncMock(return_value=fact_data_mock)
+
+    mock_change_plan_fact = MagicMock()
+    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock(side_effect=OSError("commit failed"))
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater.get_plan_data",
+            return_value=plan_data_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater",
+            return_value=mock_updater,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
+            return_value=mock_change_plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.detect_campaign_state",
+            return_value=SalesStates.STABLE,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
+            return_value=mock_session,
+        ),
+    ):
+        control_system.planner.run_for_state = AsyncMock()
+        with pytest.raises(OSError, match="commit failed"):
+            await control_system.process_adv(complex_adv_mock)
+
+    mock_change_plan_fact.set_new_plan_fact.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_adv_set_new_plan_fact_raises_propagates(
+    complex_adv_mock, plan_data_mock, fact_data_mock
+):
+    control_system = AdvControlSystem(max_last_period=2)
+    mock_updater = MagicMock()
+    mock_updater.get_fact_data = AsyncMock(return_value=fact_data_mock)
+
+    mock_change_plan_fact = MagicMock()
+    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock(
+        side_effect=RuntimeError("redis boom")
+    )
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater.get_plan_data",
+            return_value=plan_data_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater",
+            return_value=mock_updater,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
+            return_value=mock_change_plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.detect_campaign_state",
+            return_value=SalesStates.UNDERPERFORM,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
+            return_value=mock_session,
+        ),
+    ):
+        control_system.planner.run_for_state = AsyncMock()
+        with pytest.raises(RuntimeError, match="redis boom"):
+            await control_system.process_adv(complex_adv_mock)
+
+    mock_session.commit.assert_called_once()
 
 

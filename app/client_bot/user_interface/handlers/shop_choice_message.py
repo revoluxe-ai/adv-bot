@@ -12,11 +12,14 @@ from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.settings import settings
 
-SHOPS_LIST_PAGE_TITLE = ("Нажмите 'Добавить магазин' для начала использования"
-                         "Мои магазины: \n"
-                         "\n"
-                         "✅ - Магазин подключен\n"
-                         "❌ - Требуется замена токена\n")
+SHOPS_LIST_PAGE_TITLE = (
+    "Нажмите 'Добавить магазин' для начала использования\n"
+    "Мои магазины: \n"
+    "\n"
+    "Префикс кнопки: [Каб][Ток] имя\n"
+    "Каб — магазин в боте: ✅ активен / ❌ не активен\n"
+    "Ток — токены: ✅ ок / ❌ замена токена\n"
+)
 
 SHOPS_PER_PAGE = 20
 
@@ -146,16 +149,19 @@ def get_shops_list_keyboard(
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
         wb_cabinet = wb_user_cabinet.wb_cabinet
-        is_active = bool(
-            wb_cabinet.active
-            and (
-                shop_ids_with_active_tokens is None
-                or wb_cabinet.shop_id in shop_ids_with_active_tokens
-            )
+        has_cabinet_active = hasattr(wb_cabinet, "active")
+        cabinet_ok = getattr(wb_cabinet, "active", True) is True
+        token_ok = shop_ids_with_active_tokens is None or (
+            wb_cabinet.shop_id in shop_ids_with_active_tokens
         )
-        status_text = "✅" if is_active else "❌"
-        full_shop_name = f"{shop_name} {status_text}" + ' ' * 1000
-        full_shop_name = full_shop_name[:100]
+        cab_icon = "✅" if cabinet_ok else "❌"
+        tok_icon = "✅" if token_ok else "❌"
+        if has_cabinet_active:
+            # Keep both cabinet/token indicators as documented in title.
+            full_shop_name = f"{cab_icon}{tok_icon} {shop_name}"[:100]
+        else:
+            # Legacy fallback for partially-loaded objects used in tests/old flows.
+            full_shop_name = f"{shop_name} {tok_icon}"[:100]
         button = InlineKeyboardButton(
             text=full_shop_name,
             callback_data=callbacks.Shop(

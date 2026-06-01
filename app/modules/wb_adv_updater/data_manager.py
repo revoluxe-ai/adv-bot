@@ -1,3 +1,5 @@
+"""Сервисные операции обновления данных кампаний/карточек и вспомогательных расчётов."""
+
 import asyncio
 import cProfile
 import json
@@ -9,6 +11,7 @@ from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 
+from dependency_injector.wiring import Provide, inject
 from PIL import Image  # type: ignore
 from sqlalchemy import and_, func, select
 
@@ -17,11 +20,15 @@ from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.functions import coalesce
 
 from app.client_bot.const import ALWAYS_ON
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.exc import (
     CardNotFoundInDB,
 )
 
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
+    RedisAutoRecommendationsBidValueManager,
+)
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
@@ -31,6 +38,9 @@ from app.modules.common_slaves.wildberries.models import (
     WBCard,
     WBCategory,
     WBUserCabinet,
+)
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    sync_keyword_setting_mode_for_v3,
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
@@ -68,14 +78,8 @@ async def _card_exists_in_db(nmid: int) -> bool:
 
 
 async def _get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet | None:
-    try:
-        shop_id_int = int(shop_id)
-    except ValueError:
-        logger.warning("ensure_card_in_db: invalid shop_id=%s", shop_id)
-        return None
-
     async with _sm(read_only=True) as session:
-        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id_int).limit(1)
+        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id).limit(1)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -634,6 +638,9 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
 
 async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -661,11 +668,20 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
+            _ = sync_keyword_setting_mode_for_v3(
+                keyword_setting,
+                automatic_version=adv.automatic_version,
+                hard_status_override=2,
+                adv_strategy=adv.strategy,
+            )
         await session.commit()
 
 
 async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -694,6 +710,12 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
                 session.add(keyword_setting)
             keyword_setting.hard_status = ALWAYS_ON
             keyword_setting.relevant = True
+            _ = sync_keyword_setting_mode_for_v3(
+                keyword_setting,
+                automatic_version=adv.automatic_version,
+                hard_status_override=ALWAYS_ON,
+                adv_strategy=adv.strategy,
+            )
         await session.commit()
 
 
@@ -748,6 +770,9 @@ async def reset_relevant_phrases_templates(adv_setting_id: int) -> None:
 
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
     async with _sm(read_only=False) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+        if adv is None:
+            return
         for text in keywords:
             stmt = (
                 select(KeywordSetting)
@@ -758,9 +783,11 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
             )
             result = await session.execute(stmt)
             keyword_setting = result.scalar()
+            created = False
             if keyword_setting:
                 keyword_setting.relevant = True
             else:
+                created = True
                 adv_keyword = AdvKeyword(
                     text=text,
                     adv_setting_id=adv_setting_id,
@@ -777,8 +804,21 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                 keyword_setting.relevant = True
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
+            # Sync mode только при смене hard_status (ЧС→авто) или для нового ключа;
+            # иначе сбрасывается лестница V3 у БС (OPTIMUM/MAX → MIN_CPA).
             if keyword_setting.hard_status == 0:
                 keyword_setting.hard_status = 1
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
+            elif created:
+                _ = sync_keyword_setting_mode_for_v3(
+                    keyword_setting,
+                    automatic_version=adv.automatic_version,
+                    hard_status_override=1,
+                )
         await session.commit()
 
 
@@ -1007,7 +1047,27 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
     return max(cpm_values)
 
 
-async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
-    shop_data_updater = ShopDataUpdater(wb_api)
+@inject
+async def update_advs_data_from_wb_to_pg(
+    wb_api: WBApi,
+    *,
+    auto_recommendations_bid_cache_manager: ShopDataUpdater.AutoRecommendationsBidCacheManager | None = None,
+    redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    """Обновить кампании из WB в PG и заполнить Redis-кэш ставок полок.
+
+    Если cache manager не передан явно (например, из adv-creator tasks),
+    используется дефолтный `RedisAutoRecommendationsBidValueManager` через DI,
+    чтобы shelf increments не попадали в `no_bid` до следующего shop-runner sync.
+    """
+    bid_cache_manager = auto_recommendations_bid_cache_manager
+    if bid_cache_manager is None:
+        bid_cache_manager = RedisAutoRecommendationsBidValueManager(
+            redis_client=redis_client_wrapper,
+        )
+    shop_data_updater = ShopDataUpdater(
+        wb_api,
+        auto_recommendations_bid_cache_manager=bid_cache_manager,
+    )
     _ = await shop_data_updater.update_advs_data()
     return None

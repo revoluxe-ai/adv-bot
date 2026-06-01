@@ -15,7 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
-from app.client_bot import const, utils
+from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.message_templates.templates import (
@@ -43,8 +43,21 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
+    load_keyword_v3_profile_data,
+    profile_load_failure,
+)
+from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
+    format_keyword_v3_profile_block,
+)
+from app.client_bot.user_interface.views.above_target_min_bid_ui import (
+    format_ms_rule_line,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason, KeywordStatus
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 from app.shared.domains.wb.enums import (
     AdvType,
@@ -61,6 +74,30 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+_MAX_TEMPLATE_PREVIEW_TEXT_LEN = 1400
+_TEMPLATE_EXPORT_HINT = (
+    'Чтобы получить весь список, нажмите кнопку "Выгрузить фразы"'
+)
+
+
+def _render_phrase_templates_preview(
+    *,
+    title: str,
+    phrases: list[str],
+    update_hint: str,
+) -> tuple[str, bool]:
+    full_lines = [title, *phrases, "", update_hint]
+    full_text = "\n".join(full_lines)
+    if len(full_text) <= _MAX_TEMPLATE_PREVIEW_TEXT_LEN:
+        return full_text, False
+
+    hint_block = f"\n\n{_TEMPLATE_EXPORT_HINT}"
+    max_body_len = _MAX_TEMPLATE_PREVIEW_TEXT_LEN - len(hint_block) - 1
+    if max_body_len < 1:
+        max_body_len = 1
+    body_preview = full_text[:max_body_len].rstrip()
+    return f"{body_preview}\n{hint_block}", True
 
 
 def _campaign_type_display(campaign_type: AdvType | None) -> str:
@@ -466,6 +503,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
         self._chat_id = chat_id
+        self._v3_profile_block: str | None = None
 
     @staticmethod
     async def _get_calculated_keyword(
@@ -512,6 +550,24 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.fact_ctr = keyword.ctr
 
         self.spend = keyword.spend
+
+        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+            try:
+                profile_data = await load_keyword_v3_profile_data(
+                    adv_setting, calculated_keyword
+                )
+            except Exception:
+                logger.exception(
+                    "v3 keyword profile: unexpected load error adv_id=%s keyword=%s",
+                    adv_setting.adv_id,
+                    calculated_keyword.text,
+                )
+                profile_data = profile_load_failure(
+                    calculated_keyword,
+                    reason="ошибка загрузки профиля",
+                )
+            self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
+
         return await super().__call__()
 
     @property
@@ -577,11 +633,22 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             pay_for_order_str = 'Не определен (нет заказов)'
         text += f'Себес. заказа: {pay_for_order_str}\n'
+        text += (
+            format_ms_rule_line(
+                self._calculated_keyword.above_target_min_bid,
+                card_target_place=value,
+                card_target_source=source,
+            )
+            + "\n"
+        )
 
         if self._adv_setting.rec_system_mode and self._calculated_keyword.above_rec_conversion is not None:
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
             text += f"Выше конв. рек.: {rec_str}\n"
 
+        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+            if self._v3_profile_block:
+                text += self._v3_profile_block
 
         pos = self.position
         if pos > 0:
@@ -691,7 +758,9 @@ class NeedSubscribe(TextWithKeyboard):
 class OrderSubscribe(Text):
     @property
     def text(self) -> str:
-        return f"В случае проблем с оплатой свяжитесь по этому контакту -> {const.SUPPORT_LINK}"
+        return (f"Не работает оплата?\n"
+                f"Напишите сразу {const.SUPPORT_LINK} — пришлю рабочую ссылку, оплатите без проблем")
+
 
 
 class ExpiredSubscription(TextWithKeyboard):
@@ -721,74 +790,6 @@ class ExpiredSubscription(TextWithKeyboard):
         return keyboards.get_payment_keyboard(
             wb_cabinet_original_id=cabinet_id,
         )
-
-class MaxCPCSetting(TextWithKeyboard):
-    async def __call__(self, adv_original_id: int):
-        async with sm() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
-            adv: AdvSetting | None = result.scalar()
-            if adv is None:
-                raise ValueError('Не найдена РК в базе')
-
-        self._adv: AdvSetting = adv
-
-        keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv)
-        keywords   = [
-            kw
-            for kw in keywords
-            if str(kw.status) == KeywordStatus.GOOD
-            or kw.reason == KeywordStatusReason.MAX_CPC
-        ]
-        keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.cpc is not None]
-
-        def safe_sort(kw: CalculatedKeyword) -> float:
-            return kw.cpc if kw.cpc is not None else float('-inf')
-
-        keywords.sort(key=safe_sort, reverse=True)
-        if not self._adv.max_cpc:
-            top_kw_list = []
-            down_kw_list = keywords
-        else:
-            top_kw_list: list[CalculatedKeyword] = []
-            down_kw_list: list[CalculatedKeyword] = []
-            for keyword in keywords:
-                cpc: float | None = keyword.cpc
-                if cpc is None:
-                    continue
-                if cpc > self._adv.max_cpc:
-                    top_kw_list.append(keyword)
-                else:
-                    down_kw_list.append(keyword)
-        self._top_kw_list: list[CalculatedKeyword] = top_kw_list[-10:]
-        self._down_kw_list = down_kw_list[:10]
-        return await super().__call__()
-
-    @property
-    def text(self):
-        text = f"""Максимальная цена клика {"для кампании " + self._adv.name + " равна " + str(round(self._adv.max_cpc, 2)) + " р." if self._adv.max_cpc else "не задана"}\n"""
-        for keyword in self._top_kw_list:
-            cpc = keyword.cpc
-            if cpc is None:
-                continue
-            text += f"""{keyword.text} - {round(cpc, 2)} р. ❌\n"""
-
-        text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
-
-        for keyword in self._down_kw_list:
-            cpc = keyword.cpc
-            if cpc is None:
-                continue
-            text += f"""{keyword.text} - {round(cpc, 2)} р. ✅\n"""
-
-        text += "Введите новую максимальную цену клика для кампании:"
-        return text
-
-    @property
-    def keyboard(self):
-        return keyboards.get_setting_max_cpc_keyboard(self._adv)
-
 
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
     async def __call__(self, adv_original_id: int):
@@ -1122,8 +1123,15 @@ class WaitingForBlackPhrases(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.black_phrases:
-            blacklist = "\n".join(self.black_phrases)
-            return f"""Текущий черный список:\n{blacklist}\n\nЧтобы обновить фразы, отправьте список еще раз. Список будет обновлен."""
+            text, _ = _render_phrase_templates_preview(
+                title="Текущий черный список:",
+                phrases=self.black_phrases,
+                update_hint=(
+                    "Чтобы обновить фразы, отправьте список еще раз. "
+                    "Список будет обновлен."
+                ),
+            )
+            return text
         else:
             return (
                 "Укажите через перенос строки шаблоны для черного списка (исключение из продвижения).\n\n"
@@ -1155,6 +1163,14 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 InlineKeyboardButton(
                     text="Сбросить черный список",
                     callback_data=callbacks.ResetBlackPhrases(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
+            builder.row(
+                InlineKeyboardButton(
+                    text="Выгрузить фразы",
+                    callback_data=callbacks.ExportBlackPhrases(
                         adv_setting_id=self.adv_setting_id
                     ).pack(),
                 )
@@ -1191,11 +1207,15 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
     @property
     def text(self) -> str:
         if self.relevant_phrases:
-            lines = "\n".join(self.relevant_phrases)
-            return (
-                f"Текущие шаблоны релевантных фраз:\n{lines}\n\n"
-                "Чтобы обновить, отправьте список ещё раз — он будет заменён."
+            text, _ = _render_phrase_templates_preview(
+                title="Текущие шаблоны релевантных фраз:",
+                phrases=self.relevant_phrases,
+                update_hint=(
+                    "Чтобы обновить, отправьте список ещё раз — "
+                    "он будет заменён."
+                ),
             )
+            return text
         return (
             "Укажите через перенос строки шаблоны для автоматической пометки "
             "фраз как релевантных.\n\n"
@@ -1229,6 +1249,14 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
                 InlineKeyboardButton(
                     text="Сбросить шаблоны релевантных фраз",
                     callback_data=callbacks.ResetRelevantPhraseTemplates(
+                        adv_setting_id=self.adv_setting_id
+                    ).pack(),
+                )
+            )
+            builder.row(
+                InlineKeyboardButton(
+                    text="Выгрузить фразы",
+                    callback_data=callbacks.ExportRelevantPhraseTemplates(
                         adv_setting_id=self.adv_setting_id
                     ).pack(),
                 )

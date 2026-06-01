@@ -35,17 +35,23 @@ class PlanFactProvider:
         self._max_last_period = max_last_period
         self._fact_sales_manager = fact_sales_manager or FactSalesDeltaManager()
 
+    async def try_get_incremental_fact_data(self) -> FactData | None:
+        """Пытается получить факт из инкрементальных снапшотов без расчёта stat."""
+        if not self._adv.use_incremental_stats:
+            return None
+        fact_data: FactData | None = await self._fact_sales_manager.calculate_fact_data(
+            self._adv.adv_id,
+            self._adv.sales_predict_method,
+            self._adv.nmids,
+        )
+        return fact_data
+
     async def get_fact_data(
         self, stat: CommonAdvsStatData
     ) ->FactData:
-        if self._adv.use_incremental_stats:
-            fact_data: FactData | None = await self._fact_sales_manager.calculate_fact_data(
-                self._adv.adv_id,
-                self._adv.sales_predict_method,
-                self._adv.nmids,
-            )
-            if fact_data:
-                return fact_data
+        fact_data = await self.try_get_incremental_fact_data()
+        if fact_data is not None:
+            return fact_data
         return self._get_fact_data_from_stat(stat)
 
 
@@ -66,6 +72,8 @@ class PlanFactProvider:
 
         Реализация в ``plan_fact_reader``; ленивый импорт, чтобы не зациклить
         загрузку ``PlanFactProvider`` с ``wb_shop_data_manager``.
+        Важно: целевые значения (plan/target/max) берутся не из CH-сводки,
+        а из текущих настроек ``AdvSetting`` через ``get_plan_data``.
         """
         from app.modules.shop_runner.service_manager.services.plan_fact_controller import (
             plan_fact_reader,

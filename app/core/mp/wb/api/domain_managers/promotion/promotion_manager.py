@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import Any
+import json
+import logging
+import re
+from typing import Any, cast
 import datetime
 from typing import List, TYPE_CHECKING
 
@@ -19,6 +22,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
+from app.core.mp.wb.api.excs import BadRequestError
 from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
     GetMinBidsCommand,
 )
@@ -49,6 +53,8 @@ if TYPE_CHECKING:
     from app.core.mp.wb.dto.adv_info import AdvInfoDTO
 
 
+logger = logging.getLogger(__name__)
+
 @dataclass(slots=True)
 class CampaignBudgetInfo:
     total: int | None
@@ -59,6 +65,91 @@ class CampaignBudgetInfo:
 class BudgetTopUpResult:
     total: int | None
     raw: dict[str, Any]
+
+
+@dataclass(slots=True, frozen=True)
+class SetMinusPhrasesFallbackResult:
+    """Результат set-minus с пошаговым отбрасыванием невалидных norm_query.
+
+    Attributes:
+        applied_phrases: Фразы, успешно отправленные в WB.
+        dropped_invalid_phrases: Отброшенные WB как невалидные для nmid.
+        attempts: Число попыток POST set-minus.
+        skipped_unsupported_campaign: True, если WB ответил 400 «manual bid,
+            search placement only» — тип/размещение РК не поддерживает normquery.
+            Вызывающий код не должен падать; для auto non-search это ожидаемо
+            при отсутствии раннего skip в ``MinusPhraseManager``.
+    """
+
+    applied_phrases: list[str]
+    dropped_invalid_phrases: list[str]
+    attempts: int
+    skipped_unsupported_campaign: bool = False
+
+
+_UNSUPPORTED_NORMQUERY_MINUS_MESSAGE = (
+    "only for campaigns with manual bid, search placement"
+)
+
+_INVALID_NORM_QUERY_PATTERNS = (
+    re.compile(r"norm_query\s+'(.+?)'\s+is not valid for nm\s+\d+"),
+    re.compile(r'norm_query\s+"(.+?)"\s+is not valid for nm\s+\d+'),
+    re.compile(r"norm_query\s+'(.+?)'\s+is not valid for nm"),
+    re.compile(r'norm_query\s+"(.+?)"\s+is not valid for nm'),
+)
+
+
+def _extract_invalid_norm_query(detail: str | None) -> str | None:
+    if not isinstance(detail, str):
+        return None
+    payload: dict[str, Any] | None = None
+    try:
+        loaded_payload = json.loads(detail)
+        if isinstance(loaded_payload, dict):
+            payload = cast(dict[str, Any], loaded_payload)
+    except json.JSONDecodeError:
+        pass
+
+    message = detail
+    if payload is not None:
+        parsed_detail = payload.get("detail")
+        if isinstance(parsed_detail, str):
+            message = parsed_detail
+
+    for pattern in _INVALID_NORM_QUERY_PATTERNS:
+        match = pattern.search(message)
+        if match is None:
+            continue
+        invalid_phrase = match.group(1).strip()
+        if invalid_phrase:
+            return invalid_phrase
+    return None
+
+
+def _is_unsupported_campaign_for_normquery_minus(detail: str | None) -> bool:
+    """True, если WB отклонил set-minus из-за типа/размещения кампании.
+
+    Текст ошибки: ``only for campaigns with manual bid, search placement``.
+    Возникает для полочной/unified auto и любой РК без manual+search.
+
+    Страховочный слой, если ``MinusPhraseManager`` не сделал ранний skip
+    (auto-ветка пропускает только ``wb_is_manual_shelf_only``, не все auto).
+    """
+    if not isinstance(detail, str):
+        return False
+    message = detail
+    payload: dict[str, Any] | None = None
+    try:
+        loaded_payload = json.loads(detail)
+        if isinstance(loaded_payload, dict):
+            payload = cast(dict[str, Any], loaded_payload)
+    except json.JSONDecodeError:
+        pass
+    if payload is not None:
+        parsed_detail = payload.get("detail")
+        if isinstance(parsed_detail, str):
+            message = parsed_detail
+    return _UNSUPPORTED_NORMQUERY_MINUS_MESSAGE in message
 
 
 class PromotionManager:
@@ -79,6 +170,66 @@ class PromotionManager:
         await request(
             self._client.minus_phrases_adapter.post_adv_v0_normquery_set_minus,
             command,
+        )
+
+    async def set_minus_phrases_with_fallback(
+        self,
+        advert_id: int,
+        nm_id: int,
+        phrases: list[str],
+        *,
+        max_attempts: int | None = None,
+    ) -> SetMinusPhrasesFallbackResult:
+        """POST normquery set-minus с отбрасыванием невалидных фраз по одной.
+
+        Два вида BadRequestError обрабатываются по-разному:
+
+        1. **Unsupported campaign** (не manual+search) — warning, возврат с
+           ``skipped_unsupported_campaign=True``, без raise. См. docstring
+           ``MinusPhraseManager._update_minuses_in_auto_adv`` про asymmetry skip.
+        2. **Invalid norm_query** для nmid — фраза удаляется из списка, retry.
+
+        Side effects: вызов WB API ``POST /adv/v0/normquery/set-minus``.
+        """
+        active_phrases = list(dict.fromkeys(phrases))
+        dropped_invalid_phrases: list[str] = []
+        # Максимум одна "полезная" попытка на каждую уникальную фразу
+        # плюс финальная попытка после удалений.
+        effective_max_attempts = (
+            max_attempts if max_attempts is not None else len(active_phrases) + 1
+        )
+
+        for attempt in range(1, effective_max_attempts + 1):
+            try:
+                await self.set_minus_phrases(advert_id, nm_id, active_phrases)
+                return SetMinusPhrasesFallbackResult(
+                    applied_phrases=active_phrases,
+                    dropped_invalid_phrases=dropped_invalid_phrases,
+                    attempts=attempt,
+                )
+            except BadRequestError as exc:
+                if _is_unsupported_campaign_for_normquery_minus(exc.detail):
+                    logger.warning(
+                        "normquery set-minus не поддерживается для advert_id=%s nm_id=%s: %s",
+                        advert_id,
+                        nm_id,
+                        exc.detail,
+                    )
+                    return SetMinusPhrasesFallbackResult(
+                        applied_phrases=[],
+                        dropped_invalid_phrases=[],
+                        attempts=attempt,
+                        skipped_unsupported_campaign=True,
+                    )
+                invalid_phrase = _extract_invalid_norm_query(exc.detail)
+                if invalid_phrase is None or invalid_phrase not in active_phrases:
+                    raise
+                active_phrases = [p for p in active_phrases if p != invalid_phrase]
+                dropped_invalid_phrases.append(invalid_phrase)
+                continue
+        raise BadRequestError(
+            "Max attempts reached for set_minus_phrases_with_fallback "
+            f"advert_id={advert_id} nm_id={nm_id} attempts={effective_max_attempts}"
         )
 
     async def get_minus_phrases(self, advert_id: int, nm_id: int) -> list[str]:

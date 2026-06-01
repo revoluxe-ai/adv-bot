@@ -36,7 +36,6 @@ async def test_balance_reminder_service_update_creates_sent_reminder_and_event(
         bonus=0.0,
         active=True,
         demo=True,
-        white_list_update_active=False,
     )
     wb_user_cabinet = WBUserCabinet(user=user, wb_cabinet=wb_cabinet, name="test-cabinet")
     adv_setting = AdvSetting(

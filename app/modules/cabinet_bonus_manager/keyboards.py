@@ -16,13 +16,43 @@ def get_shop_bonus_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup
     keyboard = [
         [
             InlineKeyboardButton(
-                text="➕ Добавить",
+                text="💰 Баланс ➕",
+                callback_data=AdminBonus(
+                    action="add_balance", wb_cabinet_original_id=wb_cabinet_original_id
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text="💰 Баланс ➖",
+                callback_data=AdminBonus(
+                    action="subtract_balance",
+                    wb_cabinet_original_id=wb_cabinet_original_id,
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text="💰 Баланс 🔄",
+                callback_data=AdminBonus(
+                    action="reset_balance", wb_cabinet_original_id=wb_cabinet_original_id
+                ).pack(),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="💸 Списать: бонусы → баланс",
+                callback_data=AdminBonus(
+                    action="subtract_priority",
+                    wb_cabinet_original_id=wb_cabinet_original_id,
+                ).pack(),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🎁 Бонусы ➕",
                 callback_data=AdminBonus(
                     action="add", wb_cabinet_original_id=wb_cabinet_original_id
                 ).pack(),
             ),
             InlineKeyboardButton(
-                text="➖ Снять",
+                text="🎁 Бонусы ➖",
                 callback_data=AdminBonus(
                     action="subtract", wb_cabinet_original_id=wb_cabinet_original_id
                 ).pack(),
@@ -30,7 +60,7 @@ def get_shop_bonus_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup
         ],
         [
             InlineKeyboardButton(
-                text="🔄 Обнулить",
+                text="🎁 Бонусы 🔄",
                 callback_data=AdminBonus(
                     action="reset", wb_cabinet_original_id=wb_cabinet_original_id
                 ).pack(),

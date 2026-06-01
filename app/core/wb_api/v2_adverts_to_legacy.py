@@ -34,6 +34,16 @@ def v2_advert_item_to_legacy(item: dict[str, Any]) -> dict[str, Any]:
     first_nm = nm_settings[0] if nm_settings else {}
     first_subject = first_nm.get("subject") or {}
     first_bids = first_nm.get("bids_kopecks") or {}
+    recommendations_bids_by_nmid_kopecks: dict[int, int] = {}
+    for nm_setting in nm_settings:
+        nm_id = nm_setting.get("nm_id")
+        bids = nm_setting.get("bids_kopecks") or {}
+        recommendations = bids.get("recommendations")
+        if not isinstance(nm_id, int):
+            continue
+        if not isinstance(recommendations, (int, float)):
+            continue
+        recommendations_bids_by_nmid_kopecks[nm_id] = int(recommendations)
 
     create_time = _ts_str(timestamps.get("created"))
     updated_time = _ts_str(timestamps.get("updated"))
@@ -78,6 +88,7 @@ def v2_advert_item_to_legacy(item: dict[str, Any]) -> dict[str, Any]:
 
     legacy: dict[str, Any] = {
         "advertId": item.get("id", 0),
+        "bidType": bid_type,
         "type": legacy_type,
         "name": settings.get("name", ""),
         "status": status,
@@ -89,5 +100,7 @@ def v2_advert_item_to_legacy(item: dict[str, Any]) -> dict[str, Any]:
         "autoParams": auto_params,
         "unitedParams": united_params,
         "auction_multibids": auction_multibids,
+        # Нужен для redis-кэша auto shelf bid без повторного GET /api/advert/v2/adverts.
+        "recommendationsBidsByNmidKopecks": recommendations_bids_by_nmid_kopecks,
     }
     return legacy

@@ -1,0 +1,172 @@
+"""Синхронизация ``hard_status`` и ``strategy_mode`` для V3-кампаний.
+
+Контракт V3:
+- ручные/массовые смены ``hard_status`` должны сразу выставлять согласованный
+  ``strategy_mode``;
+- для БС и фикс.фраз активный mode берётся из ``AdvSetting.strategy`` (MIN_CPO →
+  ``MIN_CPA``, MAX_CONV → ``MAX_CONVERSION``);
+- изменения ``strategy_mode`` через V3 ladder в ``applier`` уже синхронизируют
+  ``hard_status`` в обратную сторону.
+"""
+
+from __future__ import annotations
+
+from app.modules.common_slaves.wildberries.models import KeywordSetting
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
+
+_V3_AUTOMATIC_VERSION = 3
+
+_HARD_STATUS_BLACK_LIST = 0
+_HARD_STATUS_AUTO_MODE = 1
+_HARD_STATUS_WHITE_LIST = 2
+_HARD_STATUS_TURN_OFF = 3
+_HARD_STATUS_ALWAYS_ON = 4
+
+
+def is_v3_campaign(automatic_version: int | None) -> bool:
+    """True только для кампаний с ``automatic_version == 3``."""
+    return automatic_version == _V3_AUTOMATIC_VERSION
+
+
+def keyword_strategy_mode_for_adv_strategy(
+    adv_strategy: Strategy | str | None,
+) -> KeywordStrategyMode:
+    """Активный ``strategy_mode`` при входе в БС/фикс.фразы по стратегии РК."""
+    if adv_strategy is None:
+        return KeywordStrategyMode.MIN_CPA
+    normalized = (
+        adv_strategy
+        if isinstance(adv_strategy, Strategy)
+        else Strategy(str(adv_strategy))
+    )
+    if normalized == Strategy.MAX_CONV:
+        return KeywordStrategyMode.MAX_CONVERSION
+    return KeywordStrategyMode.MIN_CPA
+
+
+def strategy_mode_for_hard_status_write_v3(
+    hard_status: int,
+    *,
+    adv_strategy: Strategy | str | None = None,
+) -> KeywordStrategyMode:
+    """Целевой ``strategy_mode`` при явной смене ``hard_status`` в V3.
+
+    Используется в write-путях, где ``hard_status`` задается напрямую:
+    - БС / фикс.фразы → mode по ``AdvSetting.strategy``;
+    - авто / ЧС / отключено → ``OFF``.
+    """
+    hs = int(hard_status)
+    if hs in (_HARD_STATUS_WHITE_LIST, _HARD_STATUS_ALWAYS_ON):
+        return keyword_strategy_mode_for_adv_strategy(adv_strategy)
+    if hs in (
+        _HARD_STATUS_AUTO_MODE,
+        _HARD_STATUS_BLACK_LIST,
+        _HARD_STATUS_TURN_OFF,
+    ):
+        return KeywordStrategyMode.OFF
+    raise ValueError(f"Unsupported hard_status for V3 sync: {hard_status}")
+
+
+def is_v3_keyword_eligible_for_cluster_bidding(
+    *,
+    hard_status: int,
+    strategy_mode: KeywordStrategyMode,
+    adv_strategy: Strategy | str | None = None,
+) -> bool:
+    """Может ли ключ участвовать в кластерных торгах V3 (страховка по cache).
+
+    Требует согласованную пару ``hard_status`` / ``strategy_mode`` и активный режим
+    только у белого списка или фикс.фраз. Ключи в авто (1) с дефолтным MIN_CPA
+    не проходят.
+    """
+    if not is_v3_status_mode_consistent(
+        hard_status=hard_status,
+        strategy_mode=strategy_mode,
+        adv_strategy=adv_strategy,
+    ):
+        return False
+    hs = int(hard_status)
+    if hs == _HARD_STATUS_WHITE_LIST:
+        return strategy_mode != KeywordStrategyMode.OFF
+    if hs == _HARD_STATUS_ALWAYS_ON:
+        return strategy_mode == keyword_strategy_mode_for_adv_strategy(adv_strategy)
+    return False
+
+
+def is_v3_status_mode_consistent(
+    *,
+    hard_status: int,
+    strategy_mode: KeywordStrategyMode,
+    adv_strategy: Strategy | str | None = None,
+) -> bool:
+    """Проверка инварианта для существующих V3-записей.
+
+    Допускает ``hard_status=2`` с любым активным mode (MIN/OPT/MAX), т.к. это
+    нормальное состояние после работы лестницы V3.
+    Фикс.фразы (4) должны совпадать с mode по стратегии РК.
+    """
+    hs = int(hard_status)
+    if hs in (
+        _HARD_STATUS_BLACK_LIST,
+        _HARD_STATUS_AUTO_MODE,
+        _HARD_STATUS_TURN_OFF,
+    ):
+        return strategy_mode == KeywordStrategyMode.OFF
+    if hs == _HARD_STATUS_WHITE_LIST:
+        return strategy_mode != KeywordStrategyMode.OFF
+    if hs == _HARD_STATUS_ALWAYS_ON:
+        return strategy_mode == keyword_strategy_mode_for_adv_strategy(adv_strategy)
+    return True
+
+
+def repaired_strategy_mode_for_v3(
+    *,
+    hard_status: int,
+    strategy_mode: KeywordStrategyMode,
+    adv_strategy: Strategy | str | None = None,
+) -> KeywordStrategyMode:
+    """Возвращает mode после repair, если пара ``hard_status``/``strategy_mode`` невалидна."""
+    if is_v3_status_mode_consistent(
+        hard_status=hard_status,
+        strategy_mode=strategy_mode,
+        adv_strategy=adv_strategy,
+    ):
+        return strategy_mode
+    if int(hard_status) == _HARD_STATUS_WHITE_LIST:
+        return keyword_strategy_mode_for_adv_strategy(adv_strategy)
+    return strategy_mode_for_hard_status_write_v3(
+        int(hard_status), adv_strategy=adv_strategy
+    )
+
+
+def sync_keyword_setting_mode_for_v3(
+    keyword_setting: KeywordSetting,
+    *,
+    automatic_version: int | None,
+    hard_status_override: int | None = None,
+    adv_strategy: Strategy | str | None = None,
+) -> bool:
+    """Синхронизировать mode у ``KeywordSetting`` после изменения ``hard_status``.
+
+    Returns:
+        ``True``, если ``strategy_mode`` был изменен.
+    """
+    if not is_v3_campaign(automatic_version):
+        return False
+    hard_status = (
+        int(hard_status_override)
+        if hard_status_override is not None
+        else int(keyword_setting.hard_status)
+    )
+    if adv_strategy is None:
+        adv_setting = getattr(keyword_setting, "adv_setting", None)
+        if adv_setting is not None:
+            adv_strategy = getattr(adv_setting, "strategy", None)
+    expected = strategy_mode_for_hard_status_write_v3(
+        hard_status, adv_strategy=adv_strategy
+    )
+    if keyword_setting.strategy_mode == expected:
+        return False
+    keyword_setting.strategy_mode = expected
+    return True

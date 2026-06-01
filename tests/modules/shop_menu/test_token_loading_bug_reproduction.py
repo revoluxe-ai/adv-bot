@@ -46,7 +46,6 @@ class TestTokenLoadingBugReproduction:
         wb_cabinet.expiration_time = datetime.datetime.now() + datetime.timedelta(
             days=30
         )
-        wb_cabinet.white_list_update_active = False
         wb_cabinet.adv_settings = []
 
         wb_user_cabinet = MagicMock()
@@ -64,6 +63,13 @@ class TestTokenLoadingBugReproduction:
         token_info.is_valid = True
         token_info.is_expired = False
         token_info.is_read_only = False
+        token_info.is_personal = True
+        token_info.categories = {
+            "Контент",
+            "Статистика",
+            "Аналитика",
+            "Продвижение",
+        }
         token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
 
         return TokenStatusReport(

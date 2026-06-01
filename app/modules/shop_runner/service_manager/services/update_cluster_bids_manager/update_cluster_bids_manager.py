@@ -3,14 +3,28 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
-from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
+    NormqueryBidDTO,
+)
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
-from app.modules.predict_keywords_target_place.di import PredictKeywordsTargetPlaceContainer
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.predict_keywords_target_place.di import (
+    PredictKeywordsTargetPlaceContainer,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+)
 from .dto.bidder_update_data import BidderUpdateData
 from .mappers.adv_id_item_map import AdvIdItemCalculateData
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import RedisKeywordBidderStatusManager
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_keyword_bidder_status_manager import (
+    RedisKeywordBidderStatusManager,
+)
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_keyword_eligible_for_cluster_bidding,
+    is_v3_status_mode_consistent,
+)
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisApiClusterBidsManager,
@@ -25,12 +39,15 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
-from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.\
-    new_bids_calculator.update_bids_command import DirectEnum, UpdateBidsCommand, NewBid
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
+    DirectEnum,
+    UpdateBidsCommand,
+    NewBid,
+)
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
 
-from app.modules.shop_runner.tasks_manager.tasks_manager import run_tasks
+from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
 
 # TODO: Внедрить в ректрай WB Api декораторы всплески
 
@@ -70,6 +87,7 @@ class UpdateClusterBidsManager:
         redis_cluster_bids_manager: RedisClusterBidsManager,
         redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
+        tasks_manager: TasksManager,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
@@ -78,9 +96,11 @@ class UpdateClusterBidsManager:
         self._redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager = (
             redis_cluster_bids_timestamp_manager
         )
+        self._tasks_manager = tasks_manager
 
-
-    async def _get_local_data(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
+    async def _get_local_data(
+        self, advs: list[ComplexAdv]
+    ) -> set[AdvIdItemCalculateData]:
         return await self._get_maps(advs)
 
     async def _get_data_from_wb_api(
@@ -92,12 +112,12 @@ class UpdateClusterBidsManager:
 
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
         local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
-        remote_data: BidderUpdateData = await self._get_data_from_wb_api(advs, local_data)
+        remote_data: BidderUpdateData = await self._get_data_from_wb_api(
+            advs, local_data
+        )
         predict_bids_data: dict[
             int, (dict[int, dict[str, dict[int, int]]] | None)
-        ] = await self._get_predict_bids_data(
-            advs, remote_data.min_bids.search
-        )
+        ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -114,10 +134,7 @@ class UpdateClusterBidsManager:
         await self._apply_command(new_bids_command)
         if advs:
             _ = await asyncio.gather(
-                *(
-                    self._redis_cluster_bids_timestamp_manager.set(adv)
-                    for adv in advs
-                ),
+                *(self._redis_cluster_bids_timestamp_manager.set(adv) for adv in advs),
             )
 
     async def _get_bidder_update_data(
@@ -146,6 +163,7 @@ class UpdateClusterBidsManager:
             handlers,
             max_workers=3,
             return_exceptions=False,
+            tasks_manager=self._tasks_manager,
         )
         current_bids = cast(list[NormqueryBidDTO], results[0])
         min_bids = cast(AdvMinNmidsBids, results[1])
@@ -245,6 +263,7 @@ class UpdateClusterBidsManager:
         self, calculate_data: BidderCalculateData
     ) -> list[CalculationInput]:
         from .mappers import Mapper
+
         bidder_update_data = calculate_data.data_from_wb_api
         maps_data: set[AdvIdItemCalculateData] = calculate_data.data_from_local
         mapper = Mapper(bidder_update_data)
@@ -272,7 +291,7 @@ class UpdateClusterBidsManager:
                     continue
                 current_bid = fallback_bid
             current_position = mapper.get_current_position(map_data)
-            target_position: int = mapper.get_target_position(map_data)
+            target_position: int | None = mapper.get_target_position(map_data)
             adv_id = map_data.adv_id
             nmid = map_data.nmid
             state_key = ClusterBidKey(
@@ -299,7 +318,7 @@ class UpdateClusterBidsManager:
                 else None
             )
             calculate_input = CalculationInput(
-                adv_id=adv_id ,
+                adv_id=adv_id,
                 nmid=nmid,
                 current_bid=current_bid,
                 current_position=current_position,
@@ -311,6 +330,7 @@ class UpdateClusterBidsManager:
                 predict_target_bids=predict_target_bids,
                 prev_direct=prev_direct,
                 prev_step=prev_step,
+                snap_to_min_bid_no_keyword_target=map_data.snap_to_min_bid_no_keyword_target,
             )
             inputs.append(calculate_input)
         return inputs
@@ -320,9 +340,17 @@ class UpdateClusterBidsManager:
         adv: ComplexAdv,
         cluster_texts_from_ch: set[str],
     ) -> set[AdvIdItemCalculateData]:
+        """Построить набор карт (nmid × кластер) для расчёта ставок по одной ComplexAdv.
+
+        Поле ``snap_to_min_bid_no_keyword_target`` выставляется в теле метода при
+        ``individual_keywords_target_place_mode`` и отсутствии ``target_place`` у
+        ключевого слова; интерпретация флага в калькуляторе — в ``new_bid_calculate``.
+        В этом snap-случае ``target_position`` в карте — ``None`` (цель РК сюда не
+        подставляется).
+        """
         search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
-            logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
+            logger.warning("Нет поисковой компании у комплекса: %s", adv.adv_id)
             return set()
         texts_in_this_adv = cluster_texts_from_ch
 
@@ -335,6 +363,34 @@ class UpdateClusterBidsManager:
             return set()
         keywords: list[CalculatedKeyword] = keywords_maybe
         keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        # V3: торги только у согласованных БС/фикс.фраз; авто+MIN_CPA и OFF отсекаются.
+        if adv.auto_updater_version == 3:
+            adv_strategy = adv.strategy
+            inconsistent = [
+                kw
+                for kw in keywords_good
+                if not is_v3_status_mode_consistent(
+                    hard_status=int(kw.hard_status),
+                    strategy_mode=kw.strategy_mode,
+                    adv_strategy=adv_strategy,
+                )
+            ]
+            if inconsistent:
+                logger.warning(
+                    "V3 cache inconsistency detected for adv_id=%s: %s keywords "
+                    "(hard_status vs strategy_mode mismatch)",
+                    adv.adv_id,
+                    len(inconsistent),
+                )
+            keywords_good = [
+                kw
+                for kw in keywords_good
+                if is_v3_keyword_eligible_for_cluster_bidding(
+                    hard_status=int(kw.hard_status),
+                    strategy_mode=kw.strategy_mode,
+                    adv_strategy=adv_strategy,
+                )
+            ]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
         matched_in_ch = [
             kw
@@ -350,10 +406,19 @@ class UpdateClusterBidsManager:
                 cluster_for_wb = kw.cluster_stat.text or kw.text
                 kw_cpm = getattr(kw, "cpm", None)
                 current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
-                if adv.individual_keywords_target_place_mode and (keyword_target_place := kw.target_place):
-                    target_position = keyword_target_place
+                # snap_to_min: target_place is None или 0 — торг на минимум WB.
+                # target_place > 0 — индивидуальная позиция из CH/V3.
+                if adv.individual_keywords_target_place_mode:
+                    keyword_target_place = kw.target_place
+                    if keyword_target_place is not None and keyword_target_place > 0:
+                        target_position = keyword_target_place
+                        snap_to_min = False
+                    else:
+                        target_position = None
+                        snap_to_min = True
                 else:
                     target_position = adv.target_place
+                    snap_to_min = False
                 map_data = AdvIdItemCalculateData(
                     adv_id=search_adv_id,
                     nmid=nmid,
@@ -363,14 +428,15 @@ class UpdateClusterBidsManager:
                     target_position=target_position,
                     step=adv.bid_cpm_step,
                     current_cpm=current_cpm,
+                    snap_to_min_bid_no_keyword_target=snap_to_min,
                 )
                 map_datas.add(map_data)
         return map_datas
 
-
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
-        from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
-            .click_house_manager.click_house_manager import ClickHouseManager
+        from app.modules.shop_runner.service_manager.services.minus_phrase_manager.click_house_manager.click_house_manager import (
+            ClickHouseManager,
+        )
 
         auction_ids_unique: list[int] = []
         seen_auction: set[int] = set()
@@ -403,11 +469,14 @@ class UpdateClusterBidsManager:
         results = await run_tasks(
             handlers,
             max_workers=_max_workers_for(len(handlers), cap=16),
+            tasks_manager=self._tasks_manager,
         )
         datas: set[AdvIdItemCalculateData] = set()
         for result in results:
             if isinstance(result, BaseException):
-                logger.error('Ошибка получения данных для расчета новой ставки: %s', result)
+                logger.error(
+                    "Ошибка получения данных для расчета новой ставки: %s", result
+                )
             elif result:
                 datas.update(result)
         return datas
@@ -423,6 +492,7 @@ class UpdateClusterBidsManager:
             handlers,
             max_workers=2,
             return_exceptions=True,
+            tasks_manager=self._tasks_manager,
         )
         wb_error: BaseException | None = None
         for idx, result in enumerate(tasks):
@@ -450,6 +520,7 @@ class UpdateClusterBidsManager:
     @staticmethod
     def _get_bids_command(calculation_inputs: list[CalculationInput]):
         from .new_bids_calculator import new_bid_calculate
+
         new_bids: list[NewBid] = []
         for input_dto in calculation_inputs:
             new_bid: NewBid | None = new_bid_calculate(input_dto)
@@ -486,7 +557,6 @@ class UpdateClusterBidsManager:
                 plan_datas_map[adv.adv_id] = plan
 
         return plan_datas_map
-
 
     @staticmethod
     async def _get_predict_bids_data(
@@ -552,11 +622,11 @@ class UpdateClusterBidsManager:
             async with sem:
                 return await _fetch(item)
 
-        results: list[tuple[int, int, dict[str, dict[int, int]]] | BaseException] = (
-            await asyncio.gather(
-                *(_guarded(w) for w in work),
-                return_exceptions=True,
-            )
+        results: list[
+            tuple[int, int, dict[str, dict[int, int]]] | BaseException
+        ] = await asyncio.gather(
+            *(_guarded(w) for w in work),
+            return_exceptions=True,
         )
         for item, result in zip(work, results, strict=False):
             if isinstance(result, BaseException):
@@ -575,4 +645,3 @@ class UpdateClusterBidsManager:
                 bucket[nmid] = dict_result
 
         return adv_result
-

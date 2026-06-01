@@ -6,14 +6,18 @@
 (auto_budget_watchdog_enabled). Кнопка в меню РК показывается всем — это
 задумано: можно настроить расписание заранее, оно начнёт действовать после
 включения контроля активности.
+
+Callback ACK: глобальный `CallbackAnswerMiddleware` с ``pre=True``; для toast
+после обработки на этом роутере — ``pre=False`` и ``set_callback_toast``.
 """
 from __future__ import annotations
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aiogram import Router, flags
+from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.utils.callback_answer import CallbackAnswer
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +50,7 @@ from .state import (
     normalize_date_enabled,
     set_session_state,
 )
+from app.client_bot.callback_helpers import set_callback_toast
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
@@ -190,23 +195,40 @@ async def _apply_db_patch(
         )
 
 
-async def _redraw(callback: CallbackQuery, only_markup: bool, alert: str | None = None) -> None:
+_STALE_MENU_TOAST = "Откройте актуальное меню"
+
+
+def _apply_edit_toast(
+    callback_answer: CallbackAnswer,
+    changed: bool,
+    alert: str | None = None,
+) -> None:
+    """Toast после edit: пустой при успехе, иначе alert или «Без изменений»."""
+    if changed:
+        set_callback_toast(callback_answer, alert or "")
+    else:
+        set_callback_toast(callback_answer, alert or "Без изменений")
+
+
+async def _redraw(
+    callback: CallbackQuery,
+    only_markup: bool,
+    callback_answer: CallbackAnswer,
+    alert: str | None = None,
+) -> None:
     if callback.message is None:
-        await callback.answer()
+        set_callback_toast(callback_answer, "")
         return
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        set_callback_toast(callback_answer, _STALE_MENU_TOAST)
         return
     text, keyboard = render_screen(session)
     if only_markup:
         changed = await _safe_edit_reply_markup(callback, keyboard=keyboard)
     else:
         changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
-    if changed:
-        await callback.answer(alert or "")
-    else:
-        await callback.answer(alert or "Без изменений", show_alert=False)
+    _apply_edit_toast(callback_answer, changed, alert)
 
 
 @router.message(Command("time_settings"))
@@ -228,14 +250,21 @@ async def time_settings_demo(message: Message) -> None:
     )
 
 
-@router.callback_query(TS.filter())
-@flags.callback_answer(disabled=True)
+@router.callback_query(
+    TS.filter(),
+    flags={"callback_answer": {"pre": False}},
+)
 async def time_settings_callback(
     callback: CallbackQuery,
     callback_data: TS,
+    callback_answer: CallbackAnswer,
 ) -> None:
+    """Обрабатывает callback-события экрана настроек времени.
+
+    Toast после обработки — через ``callback_answer`` (``pre=False`` на роутере).
+    """
     if callback.from_user is None or callback.message is None:
-        await callback.answer()
+        set_callback_toast(callback_answer, "")
         return
 
     action = callback_data.a
@@ -260,18 +289,15 @@ async def time_settings_callback(
         session.state.current_screen = "A"
         text, keyboard = render_screen(session)
         changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
-        if changed:
-            await callback.answer()
-        else:
-            await callback.answer("Без изменений", show_alert=False)
+        _apply_edit_toast(callback_answer, changed)
         return
 
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        set_callback_toast(callback_answer, _STALE_MENU_TOAST)
         return
     if callback_data.sid and callback_data.sid != session.session_id:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
+        set_callback_toast(callback_answer, _STALE_MENU_TOAST)
         return
 
     state = session.state
@@ -279,7 +305,7 @@ async def time_settings_callback(
     alert: str | None = None
 
     if action == "noop":
-        await callback.answer()
+        set_callback_toast(callback_answer, "")
         return
     if action == "to_week":
         state.current_screen = "B"
@@ -450,7 +476,7 @@ async def time_settings_callback(
             clear_date_value(state, mode)
         state.current_screen = "D"
     elif action == "done":
-        await callback.answer("Настройки применены (демо)", show_alert=False)
+        set_callback_toast(callback_answer, "Настройки применены (демо)")
         return
 
     mutating_actions = {
@@ -490,8 +516,14 @@ async def time_settings_callback(
                     await _redraw(
                         callback,
                         only_markup=False,
+                        callback_answer=callback_answer,
                         alert="Не удалось сохранить, попробуйте ещё раз",
                     )
                     return
 
-    await _redraw(callback, only_markup=only_markup, alert=alert)
+    await _redraw(
+        callback,
+        only_markup=only_markup,
+        callback_answer=callback_answer,
+        alert=alert,
+    )

@@ -14,8 +14,9 @@ import dotenv
 
 # TODO: Сделать уведомлятор об исправлении ошибок в боте
 
-dotenv.load_dotenv()
+_ = dotenv.load_dotenv()
 import os
+import sys
 
 
 class Settings:
@@ -74,6 +75,22 @@ class Settings:
         elif value == "true":
             return True
         raise Exception("Не верное значение в TEST_MODE")
+
+    @property
+    def run_local(self) -> bool:
+        """Локальная разработка: kubectl port-forward к PG/CH в k8s (см. app.dev_local.k8s_tunnels).
+
+        По умолчанию False. Включить: RUN_LOCAL=true
+        """
+        value = os.environ.get("RUN_LOCAL")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "false":
+            return False
+        if value == "true":
+            return True
+        raise ValueError("Не верное значение в RUN_LOCAL")
 
     @property
     def polling_mode(self) -> bool:
@@ -362,15 +379,26 @@ class Settings:
             return 100.0
         return float(value)
 
+    @staticmethod
+    def _parse_comma_separated_shop_ids(env_var: str) -> list[str]:
+        value = os.getenv(env_var)
+        if not value:
+            return []
+        return [
+            shop_id.strip()
+            for shop_id in value.split(",")
+            if shop_id.strip()
+        ]
+
     @property
     def SHOP_FILTER_LIST(self) -> list[str]:
-        value = os.getenv("SHOP_FILTER_LIST")
-        if value:
-            shops_ids = value.split(",")
-            shops_ids = [shop_id.strip() for shop_id in shops_ids]
-            return shops_ids
-        else:
-            return []
+        """Whitelist shop_id для shop-runner: только перечисленные магазины в постановке."""
+        return self._parse_comma_separated_shop_ids("SHOP_FILTER_LIST")
+
+    @property
+    def SHOP_EXCLUDE_LIST(self) -> list[str]:
+        """Blacklist shop_id для shop-runner: исключить из постановки (legacy и воркеры)."""
+        return self._parse_comma_separated_shop_ids("SHOP_EXCLUDE_LIST")
 
     @property
     def PAUSE_AFTER_PARSING(self) -> int | None:
@@ -673,6 +701,14 @@ class Settings:
             return 7
         return int(value)
 
+    @property
+    def PROMOTION_HTTP_CONCURRENCY_LIMIT(self) -> int:
+        """Макс. одновременных in-flight PROMOTION HTTP запросов (process-wide)."""
+        value = os.getenv("PROMOTION_HTTP_CONCURRENCY_LIMIT")
+        if not value:
+            return 80
+        return int(value)
+
 
     @property
     def UPDATE_FULL_ADV_STAT_PERIOD(self) -> int:
@@ -693,22 +729,46 @@ class Settings:
         return False
 
     @property
-    def GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE(self) -> int:
-        value = os.getenv("GLOBAL_DEFAULT_KEYWORD_TARGET_PLACE")
-        if not value:
-            return 2
-        parsed = int(value)
-        if parsed <= 0:
-            return 2
-        return parsed
+    def STATS_FRESHNESS_GUARD_ENABLED(self) -> bool:
+        """Guard Redis-фильтрации свежести статы в корутинах shop_runner.
 
+        При ``False`` ``_split_advs_by_stats_freshness`` возвращает все РК как fresh
+        без обращения к Redis.
+        """
+        value = os.getenv("STATS_FRESHNESS_GUARD_ENABLED")
+        if value is None:
+            return True
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise Exception("STATS_FRESHNESS_GUARD_ENABLED env var is not bool")
 
     @property
-    def PROXY(self) -> str:
+    def AUTO_SHELF_BID_CONTROL_DRY_RUN(self) -> bool:
+        """Dry-run для control-модуля полок.
+
+        Важно:
+            - если env-переменная отсутствует, возвращаем False (real mode fallback);
+            - явное значение `true|false` обязательно валидируется.
+        """
+        value = os.getenv("AUTO_SHELF_BID_CONTROL_DRY_RUN")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise Exception("AUTO_SHELF_BID_CONTROL_DRY_RUN env var is not bool")
+
+    @property
+    def PROXY(self) -> str | None:
         value = os.getenv("PROXY")
-        if not value:
-            return "http://xray-client.default.svc.cluster.local:8080"
-        return value
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
 
     @property
     def unisender_go_api_key(self) -> str | None:
@@ -754,4 +814,23 @@ class Settings:
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
+
+
+def _bootstrap_dev_local() -> None:
+    """При RUN_LOCAL=true поднимает kubectl port-forward до импорта БД-клиентов.
+
+    Блокирует до готовности TCP на localhost (PG/CH), чтобы приложение
+    не стартовало раньше port-forward.
+    """
+    if os.environ.get("RUN_LOCAL", "").strip().lower() != "true":
+        return
+    # pytest импортирует settings через conftest — туннели не поднимаем
+    if "pytest" in sys.modules:
+        return
+    from app.dev_local.k8s_tunnels import start_dev_tunnels_monitor
+
+    start_dev_tunnels_monitor()  # внутри — wait_for_dev_tunnels_ready()
+
+
+_bootstrap_dev_local()
 settings = Settings()

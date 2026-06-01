@@ -9,7 +9,10 @@ from typing import Any, AsyncContextManager
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.pricer.pricer import Pricer, TariffDetails
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_advs_stat.wb_common_stat_period_totals import (
+    sum_orders_and_buyouts_last_days_rub,
+)
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as _get_session_maker
 
@@ -32,6 +35,8 @@ class UserCabinetDTO:
     tariff_total_per_day: float | None
     balance_days_left: float | None
     last_30_days_topups: float
+    last_30_days_orders_sum_rub: float
+    last_30_days_buyouts_sum_rub: float
 
     @classmethod
     async def from_wb_user_cabinet(
@@ -66,6 +71,11 @@ class UserCabinetDTO:
         topups = _sum_recent_payments(cabinet.balance_payments, cutoff)
         topups += _sum_recent_payments(cabinet.bonus_payments, cutoff)
 
+        nmids = _cabinet_adv_nmids(cabinet)
+        orders_rub, buyouts_rub = await sum_orders_and_buyouts_last_days_rub(
+            nmids, pass_days=30
+        )
+
         return cls(
             cabinet_name=wb_user_cabinet.name,
             shop_id=cabinet.shop_id,
@@ -81,6 +91,8 @@ class UserCabinetDTO:
             tariff_total_per_day=tariff_details.total_per_day if tariff_details else None,
             balance_days_left=balance_days_left,
             last_30_days_topups=topups,
+            last_30_days_orders_sum_rub=orders_rub,
+            last_30_days_buyouts_sum_rub=buyouts_rub,
         )
 
 
@@ -117,6 +129,19 @@ class UserDTO:
             login=user.username or "",
             cabinets=cabinets_dto,
         )
+
+
+def _cabinet_adv_nmids(cabinet: WBCabinet) -> list[int]:
+    adv_settings = getattr(cabinet, "adv_settings", None) or []
+    seen: set[int] = set()
+    for adv in adv_settings:
+        raw = getattr(adv, "nmids", None) or []
+        for n in raw:
+            try:
+                seen.add(int(n))
+            except (TypeError, ValueError):
+                continue
+    return list(seen)
 
 
 def _to_float(value: Any) -> float:
