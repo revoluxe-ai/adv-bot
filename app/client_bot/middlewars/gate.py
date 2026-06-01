@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
 from app.client_bot.admin_access import is_bot_admin
-from app.client_bot.callback_helpers import safe_callback_answer
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.settings import settings
@@ -32,6 +31,9 @@ def _is_start_command(message: Message) -> bool:
         return False
     first = stripped.split(maxsplit=1)[0]
     return first == "/start" or first.startswith("/start@")
+
+
+# Use centralized safe_callback_answer from callback_helpers for answering callbacks.
 
 
 class GateMiddleware(BaseMiddleware):
@@ -109,8 +111,6 @@ class GateMiddleware(BaseMiddleware):
             bot = data.get("bot")
             if bot is None:
                 return await handler(event, data)
-            if isinstance(event, CallbackQuery):
-                await safe_callback_answer(event)
             await bot.send_message(chat_id, PRESENTATION_ONLY_BLOCKED_TEXT)
             return None
 
@@ -151,9 +151,6 @@ class GateMiddleware(BaseMiddleware):
         bot = data.get("bot")
         if bot is None:
             return await handler(event, data)
-
-        if isinstance(event, CallbackQuery):
-            await safe_callback_answer(event)
 
         text = get_gate_message_text()
         keyboard = get_gate_keyboard()
