@@ -63,24 +63,40 @@ class RedisStatsFreshnessStateCacheManager:
         except (KeyError, TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _cache_updated_at_from_json(raw: str | bytes | None) -> str | None:
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        updated_at = data.get("updated_at")
+        return updated_at if isinstance(updated_at, str) else None
+
     async def mget_entries(
         self, shop_id: str, adv_ids: list[int]
-    ) -> list[tuple[int, StatsFreshnessState | None, EntryKind]]:
+    ) -> list[tuple[int, StatsFreshnessState | None, EntryKind, str | None]]:
         """Batch-read states; classify each key as hit / miss / invalid payload."""
         if not adv_ids:
             return []
         keys = [self.key(shop_id, adv_id) for adv_id in adv_ids]
         raws = await self._client.mget(keys)
-        result: list[tuple[int, StatsFreshnessState | None, EntryKind]] = []
+        result: list[tuple[int, StatsFreshnessState | None, EntryKind, str | None]] = []
         for adv_id, raw in zip(adv_ids, raws, strict=True):
             if raw is None:
-                result.append((adv_id, None, "miss"))
+                result.append((adv_id, None, "miss", None))
                 continue
             state = self._from_json(raw)
+            cache_updated_at = self._cache_updated_at_from_json(raw)
             if state is None:
-                result.append((adv_id, None, "invalid"))
+                result.append((adv_id, None, "invalid", cache_updated_at))
             else:
-                result.append((adv_id, state, "hit"))
+                result.append((adv_id, state, "hit", cache_updated_at))
         return result
 
     async def mset_states(

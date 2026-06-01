@@ -190,6 +190,8 @@ async def process_adv_v3(
     max_last_period: int = 2,
 ) -> None:
     """Один тик V3: in-memory ledger → нетто-flush → target_place."""
+    from app.dev_local.debug_session_probe import probe_v3_adv_result
+
     adv = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
     ledger = V3TickKeywordLedger.from_keywords(keywords)
@@ -228,6 +230,10 @@ async def process_adv_v3(
     preamble_realloc_count = 0
     preamble_expansion_count = 0
     preamble_guard_count = 0
+    up_count = 0
+    down_count = 0
+    force_off_count = 0
+    flushed_to_db = False
 
     try:
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
@@ -251,6 +257,12 @@ async def process_adv_v3(
             logger.info(
                 "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
                 complex_adv.adv_id,
+            )
+            probe_v3_adv_result(
+                adv_id=complex_adv.adv_id,
+                keywords_loaded=len(keywords),
+                campaign_mode=campaign_mode.value,
+                early_return="NOT_READY_FULL_STOP",
             )
             return
 
@@ -537,13 +549,24 @@ async def process_adv_v3(
                 )
 
         if not is_campaign_full_stop(campaign_mode):
-            flushed = await ledger.flush_to_db(complex_adv)
-            if flushed:
+            flushed_to_db = await ledger.flush_to_db(complex_adv)
+            if flushed_to_db:
                 logger.info(
                     "[adv_id=%s] v3: netto flush committed",
                     complex_adv.adv_id,
                 )
             await _sync_target_places_once()
+        probe_v3_adv_result(
+            adv_id=complex_adv.adv_id,
+            keywords_loaded=len(keywords),
+            campaign_mode=campaign_mode.value,
+            preamble_bootstrap=preamble_bootstrap_count,
+            preamble_expansion=preamble_expansion_count,
+            selector_up=up_count,
+            selector_down=down_count,
+            selector_force_off=force_off_count,
+            flushed=flushed_to_db,
+        )
     finally:
         if not is_campaign_full_stop(campaign_mode):
             await _sync_target_places_once()

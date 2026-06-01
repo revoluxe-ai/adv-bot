@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from typing import Any
 
 from app.core.mp.wb.api.adapter.promotion_client.min_bids.command import (
     GetMinBidsCommand,
@@ -111,18 +112,37 @@ def _min_bids_cache_entries_for_adv(
 
 class WBManager(WBBaseManager):
     async def get_current_bids(self, advs: list[ComplexAdv]) -> list[NormqueryBidDTO]:
-        wb_manager_hub = self.wb_manager_hub
-        bids: list[NormqueryBidDTO] | None = (
-            await wb_manager_hub.wb_data_manager.get_current_bids_for_advs(advs)
-        )
-        if bids is None:
-            raise ValueError("Not given min bids data")
-        return bids
+        from app.dev_local.debug_session_probe import probe_span
+
+        async with probe_span(
+            "wb_manager.py:get_current_bids",
+            "wb_api.get_current_bids_for_advs",
+            hypothesis_id="H4",
+            shop_id=self._shop_id,
+            advs=len(advs),
+        ) as span:
+            wb_manager_hub = self.wb_manager_hub
+            bids: list[NormqueryBidDTO] | None = (
+                await wb_manager_hub.wb_data_manager.get_current_bids_for_advs(advs)
+            )
+            if bids is None:
+                raise ValueError("Not given min bids data")
+            span["bids_count"] = len(bids)
+            return bids
 
     async def set_new_cluster_bids(self, update_bids_command: UpdateBidsCommand):
-        await self.wb_manager_hub.wb_modifier.set_cluster_bids_for_adv(
-            update_bids_command
-        )
+        from app.dev_local.debug_session_probe import probe_span
+
+        async with probe_span(
+            "wb_manager.py:set_new_cluster_bids",
+            "wb_api.set_cluster_bids_for_adv",
+            hypothesis_id="H6",
+            shop_id=self._shop_id,
+            new_bids_count=len(update_bids_command.new_bids),
+        ):
+            await self.wb_manager_hub.wb_modifier.set_cluster_bids_for_adv(
+                update_bids_command
+            )
 
     async def refresh_min_bids_cache(self, advs: list[ComplexAdv]) -> None:
         """Загрузить минимальные ставки из WB API и записать в Redis v2 (фоновая корутина).
@@ -350,6 +370,25 @@ class WBManager(WBBaseManager):
         context: str = "",
     ) -> AdvMinNmidsBids:
         """Только Redis v2; при miss — error в лог, ячейка не попадает в результат."""
+        from app.dev_local.debug_session_probe import probe_span
+
+        async with probe_span(
+            "wb_manager.py:get_min_bids_cache_only",
+            "redis.min_bids_v2_batch",
+            hypothesis_id="H3",
+            shop_id=self._shop_id,
+            context=context,
+            advs=len(advs),
+        ) as span:
+            return await self._get_min_bids_cache_only_impl(advs, context=context, span=span)
+
+    async def _get_min_bids_cache_only_impl(
+        self,
+        advs: list[ComplexAdv],
+        *,
+        context: str,
+        span: dict[str, Any],
+    ) -> AdvMinNmidsBids:
         full_command = dto_to_command(advs)
         cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
         hits_auto: dict[int, int] = {}
@@ -364,6 +403,9 @@ class WBManager(WBBaseManager):
                 cells.append((item.adv_id, item.placement_type, nmid))
 
         cached_map = await cache_manager.get_min_bids_v2_batch(cells)
+        span["cells_expected"] = len(cells)
+        span["cells_cached"] = len(cached_map)
+        span["cells_missed"] = len(cells) - len(cached_map)
 
         for item in full_command.items:
             for nmid in item.nmids:
@@ -385,6 +427,8 @@ class WBManager(WBBaseManager):
                 elif item.placement_type == AdvPlacementType.SEARCH_ADV:
                     hits_search[nmid] = cpm
 
+        span["hits_auto_nmids"] = len(hits_auto)
+        span["hits_search_nmids"] = len(hits_search)
         return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
 
     async def get_min_bids(

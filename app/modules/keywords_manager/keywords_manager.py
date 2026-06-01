@@ -52,21 +52,37 @@ class KeywordsManager:
         candidates = list(filter(candidate_filter, keywords))
         return candidates
 
-    async def create_new_keyword_settings_for_complex_advs(self,
-                                                           complex_advs: list[ComplexAdv],
-                                                           stats: list["NormqueryStatsDTO"]):
-        adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
+    async def create_new_keyword_settings_for_complex_advs(
+        self,
+        complex_advs: list[ComplexAdv],
+        stats: list["NormqueryStatsDTO"],
+    ) -> None:
+        adv_id_to_complex_adv = {
+            adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids
+        }
         async with sm(read_only=False) as session:
             for stat in stats:
                 complex_adv = adv_id_to_complex_adv[stat.adv_id]
                 texts: list[str] = [st.norm_query for st in stat.stats]
-                await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
+                await self._add_new_keyword_settings_to_session(
+                    session,
+                    complex_adv,
+                    texts,
+                    probe_source="clusters_normquery_stats",
+                )
             await session.commit()
 
-    async def create_new_keyword_settings(self, complex_adv: ComplexAdv, stats: list[KeywordStat]):
+    async def create_new_keyword_settings(
+        self, complex_adv: ComplexAdv, stats: list[KeywordStat]
+    ) -> None:
         texts: list[str] = [stat.text for stat in stats]
         async with sm(read_only=False) as session:
-            await self._add_new_keyword_settings_to_session(session, complex_adv, texts)
+            await self._add_new_keyword_settings_to_session(
+                session,
+                complex_adv,
+                texts,
+                probe_source="calculated_keywords",
+            )
             await session.commit()
 
     async def _add_new_keyword_settings_to_session(
@@ -74,6 +90,8 @@ class KeywordsManager:
         session: AsyncSession,
         complex_adv: ComplexAdv,
         texts: list[str],
+        *,
+        probe_source: str = "unspecified",
     ) -> None:
         """Единая логика: существующие ключевые слова, new_texts, релевантность, добавление KeywordSetting в session."""
         if not texts:
@@ -83,6 +101,15 @@ class KeywordsManager:
             session, original_adv_id, texts
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
+        from app.dev_local.debug_session_probe import probe_keyword_pg_insert
+
+        probe_keyword_pg_insert(
+            adv_id=complex_adv.adv_id,
+            original_adv_id=original_adv_id,
+            source=probe_source,
+            texts_in=len(texts),
+            new_texts_count=len(new_texts),
+        )
         adv_setting = complex_adv.adv_setting
         is_v3 = is_v3_campaign(adv_setting.automatic_version)
         flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
