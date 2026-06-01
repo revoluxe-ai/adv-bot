@@ -19,7 +19,13 @@ def _unit_mock_v3_clickhouse_deps(request: pytest.FixtureRequest) -> object:
     if request.node.get_closest_marker("unit") is None:
         yield
         return
+    # carts_per_order=0.5 → orders_per_cart=2.0 (см. orders_per_cart_from_wb_carts_per_order_ratio)
+    carts_per_order_mock = AsyncMock(return_value=0.5)
     with (
+        patch(
+            "app.modules.common_advs_stat.clickhouse_manager.get_cart_to_order_ratio_from_common_items_stat",
+            new=carts_per_order_mock,
+        ),
         patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
             new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
@@ -34,6 +40,10 @@ def _unit_mock_v3_clickhouse_deps(request: pytest.FixtureRequest) -> object:
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.cache_worst_costs_for_adv",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view.cache_worst_costs_for_adv",
             new=AsyncMock(return_value=None),
         ),
     ):

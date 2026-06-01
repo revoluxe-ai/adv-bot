@@ -46,7 +46,15 @@ def _stub_v3_orchestrator_baseline_loaders(request: pytest.FixtureRequest):
         return
     with (
         patch(
+            "app.modules.common_advs_stat.clickhouse_manager.get_cart_to_order_ratio_from_common_items_stat",
+            new=AsyncMock(return_value=0.5),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+            new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d",
             new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
         ),
         patch(
