@@ -481,8 +481,18 @@ class UpdateClusterBidsManager:
                 datas.update(result)
         return datas
 
-    async def _apply_command(self, update_bids_command: UpdateBidsCommand):
+    async def _apply_command(self, update_bids_command: UpdateBidsCommand) -> None:
+        """Применить рассчитанные ставки: WB API → статусы ключей → кэш шага биддера в Redis.
 
+        Порядок вызовов последовательный: сначала ``set_new_cluster_bids``, затем
+        ``update_statuses``, затем ``remember_bids``.
+
+        Ошибки ``remember_bids`` **намеренно не перехватываются**: сбой записи в Redis
+        прерывает весь ``update_cluster_bids`` (timestamp последнего цикла не обновится).
+        Это fail-closed: без сохранённого ``prev_step``/``prev_direct`` следующий расчёт
+        может быть некорректным, поэтому цикл считается неуспешным, даже если WB уже
+        принял ставки.
+        """
         await  self._wb_manager.set_new_cluster_bids(update_bids_command)
         await self._redis_keyword_bidder_status_manager.update_statuses(
             update_bids_command
