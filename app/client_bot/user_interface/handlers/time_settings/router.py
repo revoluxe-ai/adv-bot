@@ -7,8 +7,8 @@
 задумано: можно настроить расписание заранее, оно начнёт действовать после
 включения контроля активности.
 
-Callback ACK здесь отдаёт централизованный `CallbackAnswerMiddleware` из
-`global_router`. Локальные `callback.answer()` не нужны.
+Callback ACK: глобальный `CallbackAnswerMiddleware` с ``pre=True``; для toast
+после обработки на этом роутере — ``pre=False`` и ``set_callback_toast``.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.utils.callback_answer import CallbackAnswer
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +50,7 @@ from .state import (
     normalize_date_enabled,
     set_session_state,
 )
+from app.client_bot.callback_helpers import set_callback_toast
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
@@ -193,7 +195,12 @@ async def _apply_db_patch(
         )
 
 
-async def _redraw(callback: CallbackQuery, only_markup: bool, alert: str | None = None) -> None:
+async def _redraw(
+    callback: CallbackQuery,
+    only_markup: bool,
+    callback_answer: CallbackAnswer,
+    alert: str | None = None,
+) -> None:
     if callback.message is None:
         return
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
@@ -204,7 +211,7 @@ async def _redraw(callback: CallbackQuery, only_markup: bool, alert: str | None 
         await _safe_edit_reply_markup(callback, keyboard=keyboard)
     else:
         await _edit_message_content(callback, text=text, keyboard=keyboard)
-    return
+    set_callback_toast(callback_answer, alert if alert is not None else "Без изменений")
 
 
 @router.message(Command("time_settings"))
@@ -226,14 +233,18 @@ async def time_settings_demo(message: Message) -> None:
     )
 
 
-@router.callback_query(TS.filter())
+@router.callback_query(
+    TS.filter(),
+    flags={"callback_answer": {"pre": False}},
+)
 async def time_settings_callback(
     callback: CallbackQuery,
     callback_data: TS,
+    callback_answer: CallbackAnswer,
 ) -> None:
     """Обрабатывает callback-события экрана настроек времени.
 
-    Ответ на callback даёт централизованный middleware в `global_router`.
+    Toast после обработки — через ``callback_answer`` (``pre=False`` на роутере).
     """
     if callback.from_user is None or callback.message is None:
         return
@@ -482,8 +493,14 @@ async def time_settings_callback(
                     await _redraw(
                         callback,
                         only_markup=False,
+                        callback_answer=callback_answer,
                         alert="Не удалось сохранить, попробуйте ещё раз",
                     )
                     return
 
-    await _redraw(callback, only_markup=only_markup, alert=alert)
+    await _redraw(
+        callback,
+        only_markup=only_markup,
+        callback_answer=callback_answer,
+        alert=alert,
+    )
