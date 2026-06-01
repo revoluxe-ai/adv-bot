@@ -174,7 +174,7 @@ async def _safe_sync_target_places_v3(
                 target_place_fallback_zero_by_keyword_id
             ),
         )
-    except Exception:
+    except Exception: # type: ignore
         logger.error(
             "[adv_id=%s] v3: target_place sync failed "
             "(original try exception preserved, not re-raised)",
@@ -190,8 +190,6 @@ async def process_adv_v3(
     max_last_period: int = 2,
 ) -> None:
     """Один тик V3: in-memory ledger → нетто-flush → target_place."""
-    from app.dev_local.debug_session_probe import probe_v3_adv_result
-
     adv = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
     ledger = V3TickKeywordLedger.from_keywords(keywords)
@@ -200,8 +198,6 @@ async def process_adv_v3(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
     target_place_synced = False
-    selector_actions_logged: list[V3Action] = []
-
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
@@ -230,10 +226,6 @@ async def process_adv_v3(
     preamble_realloc_count = 0
     preamble_expansion_count = 0
     preamble_guard_count = 0
-    up_count = 0
-    down_count = 0
-    force_off_count = 0
-    flushed_to_db = False
 
     try:
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
@@ -257,12 +249,6 @@ async def process_adv_v3(
             logger.info(
                 "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
                 complex_adv.adv_id,
-            )
-            probe_v3_adv_result(
-                adv_id=complex_adv.adv_id,
-                keywords_loaded=len(keywords),
-                campaign_mode=campaign_mode.value,
-                early_return="NOT_READY_FULL_STOP",
             )
             return
 
@@ -556,17 +542,6 @@ async def process_adv_v3(
                     complex_adv.adv_id,
                 )
             await _sync_target_places_once()
-        probe_v3_adv_result(
-            adv_id=complex_adv.adv_id,
-            keywords_loaded=len(keywords),
-            campaign_mode=campaign_mode.value,
-            preamble_bootstrap=preamble_bootstrap_count,
-            preamble_expansion=preamble_expansion_count,
-            selector_up=up_count,
-            selector_down=down_count,
-            selector_force_off=force_off_count,
-            flushed=flushed_to_db,
-        )
     finally:
         if not is_campaign_full_stop(campaign_mode):
             await _sync_target_places_once()

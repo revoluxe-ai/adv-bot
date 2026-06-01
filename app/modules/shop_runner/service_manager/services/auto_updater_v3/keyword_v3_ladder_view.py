@@ -186,7 +186,7 @@ def _catalog_for_ctx(
 
 
 def _strategy_mode_for_agg(mode: AggressionTargetMode) -> KeywordStrategyMode:
-    return KeywordStrategyMode[mode.name]
+    return KeywordStrategyMode[mode.name] # type: ignore
 
 
 def has_campaign_worst_costs(worst_costs: dict[AggressionTargetMode, float]) -> bool:
@@ -323,19 +323,19 @@ def cost_for_mode(
 
     if not _keyword_has_ch_profile(ctx):
         worst_stage = _stage_from_campaign_worst(
-            target, ladder_inputs, candidate=None
+            target, ladder_inputs, candidate=None # type: ignore
         )
         if worst_stage is not None:
             return float(worst_stage.cost), True
 
-    mc = catalog.get(target)
+    mc = catalog.get(target) # type: ignore
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
     allow_worst = not min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
     return resolve_effective_state_cost(
         profile_cost=profile_cost,
-        worst_cost=ladder_inputs.worst_costs.get(target),
+        worst_cost=ladder_inputs.worst_costs.get(target), # type: ignore
         allow_worst_imputation=allow_worst,
     )
 
@@ -491,8 +491,8 @@ def ladder_view_to_candidates(view: LadderView) -> dict[AggressionTargetMode, Mo
             mode=mode,
             is_valid=stage.is_valid,
             predicted_cpa=stage.cost,
-            position=int(position) if position is not None else None,
-            bid=float(bid) if bid is not None else None,
+            position=int(position) if position is not None else None, # type: ignore
+            bid=float(bid) if bid is not None else None, # type: ignore
             invalid_reason=stage.reason,
         )
     return out

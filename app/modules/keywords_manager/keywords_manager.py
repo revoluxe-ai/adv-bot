@@ -68,7 +68,6 @@ class KeywordsManager:
                     session,
                     complex_adv,
                     texts,
-                    probe_source="clusters_normquery_stats",
                 )
             await session.commit()
 
@@ -81,7 +80,6 @@ class KeywordsManager:
                 session,
                 complex_adv,
                 texts,
-                probe_source="calculated_keywords",
             )
             await session.commit()
 
@@ -90,8 +88,6 @@ class KeywordsManager:
         session: AsyncSession,
         complex_adv: ComplexAdv,
         texts: list[str],
-        *,
-        probe_source: str = "unspecified",
     ) -> None:
         """Единая логика: существующие ключевые слова, new_texts, релевантность, добавление KeywordSetting в session."""
         if not texts:
@@ -101,15 +97,6 @@ class KeywordsManager:
             session, original_adv_id, texts
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
-        from app.dev_local.debug_session_probe import probe_keyword_pg_insert
-
-        probe_keyword_pg_insert(
-            adv_id=complex_adv.adv_id,
-            original_adv_id=original_adv_id,
-            source=probe_source,
-            texts_in=len(texts),
-            new_texts_count=len(new_texts),
-        )
         adv_setting = complex_adv.adv_setting
         is_v3 = is_v3_campaign(adv_setting.automatic_version)
         flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
