@@ -7,17 +7,15 @@
 задумано: можно настроить расписание заранее, оно начнёт действовать после
 включения контроля активности.
 
-Важно по callback-ответам: в этом модуле осознанно используем прямой
-`callback.answer()` без "safe"-обёрток, чтобы не скрывать транспортные
-аномалии Telegram (например, задержки ответа или дубли callback), а получать
-их в стандартном контуре наблюдаемости/ошибок.
+Callback ACK здесь отдаёт централизованный `CallbackAnswerMiddleware` из
+`global_router`. Локальные `callback.answer()` не нужны.
 """
 from __future__ import annotations
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aiogram import Router, flags
+from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -197,21 +195,16 @@ async def _apply_db_patch(
 
 async def _redraw(callback: CallbackQuery, only_markup: bool, alert: str | None = None) -> None:
     if callback.message is None:
-        await callback.answer()
         return
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
         return
     text, keyboard = render_screen(session)
     if only_markup:
-        changed = await _safe_edit_reply_markup(callback, keyboard=keyboard)
+        await _safe_edit_reply_markup(callback, keyboard=keyboard)
     else:
-        changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
-    if changed:
-        await callback.answer(alert or "")
-    else:
-        await callback.answer(alert or "Без изменений", show_alert=False)
+        await _edit_message_content(callback, text=text, keyboard=keyboard)
+    return
 
 
 @router.message(Command("time_settings"))
@@ -234,20 +227,15 @@ async def time_settings_demo(message: Message) -> None:
 
 
 @router.callback_query(TS.filter())
-@flags.callback_answer(disabled=True)
 async def time_settings_callback(
     callback: CallbackQuery,
     callback_data: TS,
 ) -> None:
     """Обрабатывает callback-события экрана настроек времени.
 
-    Ответ на callback выполняется вручную (через `callback.answer()`), так как
-    для этого роутера отключён автоответ middleware. Ошибки Telegram при ответе
-    не подавляются намеренно: это позволяет явно видеть деградации по времени
-    обработки/дублированию callback в общем error-monitoring.
+    Ответ на callback даёт централизованный middleware в `global_router`.
     """
     if callback.from_user is None or callback.message is None:
-        await callback.answer()
         return
 
     action = callback_data.a
@@ -271,19 +259,13 @@ async def time_settings_callback(
                     )
         session.state.current_screen = "A"
         text, keyboard = render_screen(session)
-        changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
-        if changed:
-            await callback.answer()
-        else:
-            await callback.answer("Без изменений", show_alert=False)
+        await _edit_message_content(callback, text=text, keyboard=keyboard)
         return
 
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
         return
     if callback_data.sid and callback_data.sid != session.session_id:
-        await callback.answer("Откройте актуальное меню", show_alert=False)
         return
 
     state = session.state
@@ -291,7 +273,6 @@ async def time_settings_callback(
     alert: str | None = None
 
     if action == "noop":
-        await callback.answer()
         return
     if action == "to_week":
         state.current_screen = "B"
@@ -462,7 +443,6 @@ async def time_settings_callback(
             clear_date_value(state, mode)
         state.current_screen = "D"
     elif action == "done":
-        await callback.answer("Настройки применены (демо)", show_alert=False)
         return
 
     mutating_actions = {
