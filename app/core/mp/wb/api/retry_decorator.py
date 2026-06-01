@@ -100,7 +100,6 @@ def retry_decorator(
                 state["_pool_timeout_attempts"] = 0
                 state["_attempts"] = 0
                 while True:
-                    time_since_last_query: float | None = None
                     time_to_wait = 0.0
                     last_query_time = state["_last_query_time"]
                     if last_query_time is not None:
