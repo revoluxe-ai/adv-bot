@@ -82,7 +82,7 @@ def _tunnel_specs() -> list[_TunnelSpec]:
     ch_http = _int_env("DEV_TUNNEL_CH_HTTP_PORT", 18123)
     ch_native = _int_env("DEV_TUNNEL_CH_NATIVE_PORT", 19000)
     forward_ch_native = _str_env("DEV_TUNNEL_CH_FORWARD_NATIVE", "false").lower() == "true"
-    pg_resource = _str_env("DEV_TUNNEL_PG_RESOURCE", "pod/postgres-db-0")
+    pg_resource = _str_env("DEV_TUNNEL_PG_RESOURCE", "svc/postgres-db-pooler")
     ch_local_ports: tuple[int, ...] = (ch_http,)
     ch_remote_ports: tuple[int, ...] = (8123,)
     if forward_ch_native:
@@ -275,6 +275,7 @@ def wait_for_dev_tunnels_ready(
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
         if _ports_ready(tunnel_specs):
+            _postgres_select_1_smoke_check(tunnel_specs)
             logger.info("Dev k8s tunnels are ready on localhost")
             return
         time.sleep(_READY_POLL_INTERVAL_SEC)
@@ -282,8 +283,71 @@ def wait_for_dev_tunnels_ready(
     raise TimeoutError(
         "Dev k8s tunnels not ready within "
         f"{timeout_sec}s. Check kubectl access and DEV_TUNNEL_PG_RESOURCE "
-        "(default pod/postgres-db-0)."
+        "(default svc/postgres-db-pooler, fallback pod/postgres-db-0)."
     )
+
+
+def _postgres_select_1_smoke_check(specs: list[_TunnelSpec]) -> None:
+    """Проверяет ``SELECT 1`` через локальный PgBouncer-туннель.
+
+    Проверка выполняется только при наличии переменных подключения к БД.
+    Если ``psycopg``/``psycopg2`` недоступны, проверка пропускается с warning.
+    По умолчанию это best-effort проверка: ошибка не роняет приложение.
+    Для строгого режима установите ``DEV_TUNNEL_PG_SMOKE_STRICT=true``.
+
+    Raises:
+        TimeoutError: TCP-туннель есть, но ``SELECT 1`` не проходит.
+    """
+    pg_spec = next((spec for spec in specs if spec.name == "postgres"), None)
+    if pg_spec is None:
+        return
+
+    dbname = os.environ.get("POSTGRES_DBNAME", "").strip()
+    user = os.environ.get("POSTGRES_USER", "").strip()
+    password = os.environ.get("POSTGRES_PASSWORD", "").strip()
+    sslmode = os.environ.get("POSTGRES_SSL_MODE", "").strip() or "require"
+    if not dbname or not user or not password:
+        logger.info(
+            "Postgres smoke check skipped: set POSTGRES_DBNAME/POSTGRES_USER/POSTGRES_PASSWORD"
+        )
+        return
+
+    connector: Any | None = None
+    strict_mode = _str_env("DEV_TUNNEL_PG_SMOKE_STRICT", "false").lower() == "true"
+    try:
+        import psycopg  # type: ignore[import-not-found]
+
+        connector = psycopg
+    except ImportError:
+        try:
+            import psycopg2  # type: ignore[import-not-found]
+
+            connector = psycopg2
+        except ImportError:
+            logger.warning("Postgres smoke check skipped: psycopg/psycopg2 not installed")
+            return
+
+    try:
+        with connector.connect(  # type: ignore[union-attr]
+            host="127.0.0.1",
+            port=pg_spec.probe_port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            connect_timeout=3,
+            sslmode=sslmode,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+    except Exception as exc:
+        message = (
+            "Dev k8s tunnel TCP is ready, but Postgres smoke SELECT 1 failed on "
+            f"127.0.0.1:{pg_spec.probe_port} via {pg_spec.resource}: {exc}"
+        )
+        if strict_mode:
+            raise TimeoutError(message) from exc
+        logger.warning("%s; continuing because DEV_TUNNEL_PG_SMOKE_STRICT=false", message)
 
 
 def _monitor_loop(kubeconfig: str, specs: list[_TunnelSpec]) -> None:

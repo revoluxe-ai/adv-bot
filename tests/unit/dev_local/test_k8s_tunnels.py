@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -165,9 +166,60 @@ def test_start_tunnel_stops_owned_kubectl_before_external_adopt() -> None:
     assert runtime.proc is None
 
 
-def test_postgres_tunnel_uses_pod_by_default() -> None:
+def test_postgres_tunnel_uses_pooler_service_by_default() -> None:
     spec = k8s_tunnels._tunnel_specs()[0]
-    assert spec.resource == "pod/postgres-db-0"
+    assert spec.resource == "svc/postgres-db-pooler"
+
+
+def test_wait_for_ready_runs_postgres_smoke_check() -> None:
+    specs = k8s_tunnels._tunnel_specs()
+    with (
+        patch.object(k8s_tunnels, "_ports_ready", return_value=True),
+        patch.object(k8s_tunnels, "_postgres_select_1_smoke_check") as smoke,
+    ):
+        k8s_tunnels.wait_for_dev_tunnels_ready(timeout_sec=1, specs=specs)
+    smoke.assert_called_once_with(specs)
+
+
+def test_postgres_smoke_error_non_strict_only_logs_warning() -> None:
+    specs = k8s_tunnels._tunnel_specs()
+    fake_psycopg = types.SimpleNamespace(connect=MagicMock(side_effect=RuntimeError("too many clients")))
+    with (
+        patch.dict(
+            "os.environ",
+            {
+                "POSTGRES_DBNAME": "db",
+                "POSTGRES_USER": "user",
+                "POSTGRES_PASSWORD": "pwd",
+                "DEV_TUNNEL_PG_SMOKE_STRICT": "false",
+            },
+            clear=False,
+        ),
+        patch.object(k8s_tunnels, "logger") as logger_mock,
+        patch.dict("sys.modules", {"psycopg": fake_psycopg}, clear=False),
+    ):
+        k8s_tunnels._postgres_select_1_smoke_check(specs)
+    logger_mock.warning.assert_called()
+
+
+def test_postgres_smoke_error_strict_raises_timeout() -> None:
+    specs = k8s_tunnels._tunnel_specs()
+    fake_psycopg = types.SimpleNamespace(connect=MagicMock(side_effect=RuntimeError("too many clients")))
+    with (
+        patch.dict(
+            "os.environ",
+            {
+                "POSTGRES_DBNAME": "db",
+                "POSTGRES_USER": "user",
+                "POSTGRES_PASSWORD": "pwd",
+                "DEV_TUNNEL_PG_SMOKE_STRICT": "true",
+            },
+            clear=False,
+        ),
+        patch.dict("sys.modules", {"psycopg": fake_psycopg}, clear=False),
+    ):
+        with pytest.raises(TimeoutError, match="Postgres smoke SELECT 1 failed"):
+            k8s_tunnels._postgres_select_1_smoke_check(specs)
 
 
 def test_settings_run_local_default_false(monkeypatch: pytest.MonkeyPatch) -> None:
