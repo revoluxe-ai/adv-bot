@@ -236,7 +236,9 @@ class CoroutinesManager:
         invalid_payloads = 0
         fresh: list[ComplexAdv] = []
         stale_over_6h: list[ComplexAdv] = []
-        for adv, (_adv_id, state, kind) in zip(advs, entries, strict=True):
+        for adv, (_adv_id, state, kind, _cache_updated_at) in zip(
+            advs, entries, strict=True
+        ):
             assert adv.adv_id == _adv_id
             if kind == "hit":
                 cache_hits += 1

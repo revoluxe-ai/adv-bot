@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -167,10 +168,17 @@ async def test_refresh_stats_freshness_cache_writes_redis(fake_redis) -> None:
     cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
     loaded = await cache.mget_entries(manager.shop_id, [10, 20])
     assert len(loaded) == 2
-    assert loaded[0] == (10, StatsFreshnessState(is_fresh=True, is_stale_over_6h=False), "hit")
+    assert loaded[0][0] == 10
+    assert loaded[0][1] == StatsFreshnessState(
+        is_fresh=True, is_stale_over_6h=False
+    )
+    assert loaded[0][2] == "hit"
+    assert loaded[0][3] is not None
+    datetime.fromisoformat(loaded[0][3])
     assert loaded[1][0] == 20
     assert loaded[1][1] is None
     assert loaded[1][2] == "miss"
+    assert loaded[1][3] is None
 
 
 @pytest.mark.asyncio

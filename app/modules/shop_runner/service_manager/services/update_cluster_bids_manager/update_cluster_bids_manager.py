@@ -133,9 +133,9 @@ class UpdateClusterBidsManager:
         new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
         await self._apply_command(new_bids_command)
         if advs:
-            _ = await asyncio.gather(
-                *(self._redis_cluster_bids_timestamp_manager.set(adv) for adv in advs),
-            )
+            for adv in advs:
+                await self._redis_cluster_bids_timestamp_manager.set(adv)
+
 
     async def _get_bidder_update_data(
         self,
@@ -481,41 +481,35 @@ class UpdateClusterBidsManager:
                 datas.update(result)
         return datas
 
-    async def _apply_command(self, update_bids_command: UpdateBidsCommand):
-        handlers: list[Callable[[], Awaitable[Any]]] = [
-            lambda: self._redis_keyword_bidder_status_manager.update_statuses(
-                update_bids_command
-            ),
-            lambda: self._wb_manager.set_new_cluster_bids(update_bids_command),
-        ]
-        tasks = await run_tasks(
-            handlers,
-            max_workers=2,
-            return_exceptions=True,
-            tasks_manager=self._tasks_manager,
+    async def _apply_command(self, update_bids_command: UpdateBidsCommand) -> None:
+        """Применить рассчитанные ставки: WB API → статусы ключей → кэш шага биддера в Redis.
+
+        Порядок вызовов последовательный: сначала ``set_new_cluster_bids``, затем
+        ``update_statuses``, затем ``remember_bids``.
+
+        Ошибки ``remember_bids`` **намеренно не перехватываются**: сбой записи в Redis
+        прерывает весь ``update_cluster_bids`` (timestamp последнего цикла не обновится).
+        Это fail-closed: без сохранённого ``prev_step``/``prev_direct`` следующий расчёт
+        может быть некорректным, поэтому цикл считается неуспешным, даже если WB уже
+        принял ставки.
+        """
+        await  self._wb_manager.set_new_cluster_bids(update_bids_command)
+        await self._redis_keyword_bidder_status_manager.update_statuses(
+            update_bids_command
         )
-        wb_error: BaseException | None = None
-        for idx, result in enumerate(tasks):
-            if isinstance(result, Exception):
-                logger.error("Ошибка применения новых ставок: %s", result)
-                if idx == 1:
-                    wb_error = result
-        if wb_error is None:
-            try:
-                entries = [
-                    ClusterBidEntry(
-                        adv_id=b.adv_id,
-                        nmid=b.nmid,
-                        cluster=b.cluster,
-                        new_bid=b.new_bid,
-                        step=b.step,
-                        direct=b.direct.value,
-                    )
-                    for b in update_bids_command.new_bids
-                ]
-                await self._redis_cluster_bids_manager.remember_bids(entries)
-            except Exception as error:  # noqa: BLE001
-                logger.error("Не удалось сохранить ставки в Redis: %s", error)
+        entries = [
+            ClusterBidEntry(
+                adv_id=b.adv_id,
+                nmid=b.nmid,
+                cluster=b.cluster,
+                new_bid=b.new_bid,
+                step=b.step,
+                direct=b.direct.value,
+            )
+            for b in update_bids_command.new_bids
+        ]
+        await self._redis_cluster_bids_manager.remember_bids(entries)
+
 
     @staticmethod
     def _get_bids_command(calculation_inputs: list[CalculationInput]):

@@ -174,7 +174,7 @@ async def _safe_sync_target_places_v3(
                 target_place_fallback_zero_by_keyword_id
             ),
         )
-    except Exception:
+    except Exception: # type: ignore
         logger.error(
             "[adv_id=%s] v3: target_place sync failed "
             "(original try exception preserved, not re-raised)",
@@ -198,8 +198,6 @@ async def process_adv_v3(
         complex_adv, wb_shop_data_manager=wb_shop_data_manager
     )
     target_place_synced = False
-    selector_actions_logged: list[V3Action] = []
-
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
@@ -537,8 +535,8 @@ async def process_adv_v3(
                 )
 
         if not is_campaign_full_stop(campaign_mode):
-            flushed = await ledger.flush_to_db(complex_adv)
-            if flushed:
+            flushed_to_db = await ledger.flush_to_db(complex_adv)
+            if flushed_to_db:
                 logger.info(
                     "[adv_id=%s] v3: netto flush committed",
                     complex_adv.adv_id,
