@@ -6,6 +6,11 @@
 (auto_budget_watchdog_enabled). Кнопка в меню РК показывается всем — это
 задумано: можно настроить расписание заранее, оно начнёт действовать после
 включения контроля активности.
+
+Важно по callback-ответам: в этом модуле осознанно используем прямой
+`callback.answer()` без "safe"-обёрток, чтобы не скрывать транспортные
+аномалии Telegram (например, задержки ответа или дубли callback), а получать
+их в стандартном контуре наблюдаемости/ошибок.
 """
 from __future__ import annotations
 
@@ -234,6 +239,13 @@ async def time_settings_callback(
     callback: CallbackQuery,
     callback_data: TS,
 ) -> None:
+    """Обрабатывает callback-события экрана настроек времени.
+
+    Ответ на callback выполняется вручную (через `callback.answer()`), так как
+    для этого роутера отключён автоответ middleware. Ошибки Telegram при ответе
+    не подавляются намеренно: это позволяет явно видеть деградации по времени
+    обработки/дублированию callback в общем error-monitoring.
+    """
     if callback.from_user is None or callback.message is None:
         await callback.answer()
         return
