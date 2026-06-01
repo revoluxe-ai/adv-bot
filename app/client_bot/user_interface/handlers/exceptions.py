@@ -13,7 +13,6 @@ from aiogram.types import Update
 from aiogram.types.error_event import ErrorEvent
 
 from app import client_bot as tb
-from app.client_bot.callback_helpers import is_benign_callback_answer_error
 from app.client_bot import const
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.exc import CardNotFoundInDB
@@ -130,12 +129,6 @@ async def error_handler_for_telegram_bad_request_exception(
     exception = error_event.exception
     if not isinstance(exception, TelegramBadRequest):
         raise SkipHandler()
-    if is_benign_callback_answer_error(exception):
-        logger.warning(
-            "Stale or duplicate callback answer ignored: %s",
-            exception,
-        )
-        return
     if not is_telegram_message_too_long(exception):
         raise SkipHandler()
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from aiogram import Dispatcher
 
-from app.client_bot.callback_helpers import install_client_bot_dispatcher_middleware
+
 from app.client_bot.global_router import global_router
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 
@@ -20,6 +20,5 @@ def create_client_bot_dispatcher(
         client_session=client_session,
         billing_event_manager=billing_event_manager,
     )
-    install_client_bot_dispatcher_middleware(dp)
     dp.include_router(global_router)
     return dp
