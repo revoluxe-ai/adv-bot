@@ -482,11 +482,11 @@ class UpdateClusterBidsManager:
         return datas
 
     async def _apply_command(self, update_bids_command: UpdateBidsCommand):
-        await self._redis_keyword_bidder_status_manager.update_statuses(
-                update_bids_command
-            )
-        await  self._wb_manager.set_new_cluster_bids(update_bids_command)
 
+        await  self._wb_manager.set_new_cluster_bids(update_bids_command)
+        await self._redis_keyword_bidder_status_manager.update_statuses(
+            update_bids_command
+        )
         entries = [
             ClusterBidEntry(
                 adv_id=b.adv_id,
