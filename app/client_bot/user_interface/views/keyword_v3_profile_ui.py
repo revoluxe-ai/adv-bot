@@ -64,6 +64,8 @@ _INVALID_REASON_SHORT: dict[str, str] = {
     "no_keyword_conv_views_to_orders": "нет conv показ→заказ",
     "no_rk_conv_carts_to_orders": "нет корз→заказ РК 7д",
     "optimum_score_non_positive": "optimum ≤ 0",
+    "no_valid_ch_ladder": "нет CH ladder",
+    "no_ch_min_only": "нет CH ladder",
 }
 
 
@@ -300,8 +302,16 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
     agg = _MODE_TO_AGG.get(mode)
     assert agg is not None
     cand = data.candidates.get(agg)
+    pfo_source = (data.stage_sources or {}).get(agg) == "pay_for_order"
     if cand is not None and cand.is_valid and cand.predicted_cpa is not None:
         cpo = f"{cand.predicted_cpa:.2f}"
+        if pfo_source and mode == KeywordStrategyMode.MIN_CPA:
+            pfo_label = (
+                f"{data.keyword_pay_for_order:.2f}"
+                if data.keyword_pay_for_order is not None
+                else cpo
+            )
+            return f"{star}{letter} п0|min|CPO{pfo_label}|pay_for_order"
         if cand.position is None or cand.bid is None:
             worst_suffix = _worst_suffix_for_stage(data, agg)
             if worst_suffix:

@@ -28,9 +28,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     resolve_no_ch_operational_pay_for_order_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-    KeywordDataTier,
     KeywordV3Eligibility,
     can_target_mode,
+    min_cpa_operational_via_pay_for_order,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -245,6 +245,25 @@ def operational_cpo_at_keyword_target_place(
     return value if value > 0 else None
 
 
+_NO_CH_LADDER_REASON = "no_ch_min_only"
+_COLLAPSED_CH_LADDER_REASON = "no_valid_ch_ladder"
+
+
+def _min_pay_for_order_oc_reason(
+    ctx: KeywordV3Context,
+    eligibility: KeywordV3Eligibility | None,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> str:
+    """Reason для недоступных O/C при operational MIN через pay_for_order."""
+    if eligibility is not None and min_cpa_operational_via_pay_for_order(
+        ctx, eligibility, catalog
+    ):
+        if _keyword_has_ch_profile(ctx):
+            return _COLLAPSED_CH_LADDER_REASON
+        return _NO_CH_LADDER_REASON
+    return _NO_CH_LADDER_REASON
+
+
 def _stage_from_campaign_worst(
     target: AggressionTargetMode,
     ladder_inputs: LadderInputs,
@@ -286,14 +305,17 @@ def cost_for_mode(
         ``(state_cost, cost_imputed)``; ``inf`` если ступень недоступна.
     """
     target = AggressionTargetMode[to_mode.name]
+    catalog = _catalog_for_ctx(ctx, ladder_inputs)
 
+    if eligibility is not None and min_cpa_operational_via_pay_for_order(
+        ctx, eligibility, catalog
+    ):
+        if to_mode == KeywordStrategyMode.MIN_CPA:
+            pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+            if pfo_cost is not None:
+                return float(pfo_cost), False
+        return float("inf"), False
     if eligibility is not None:
-        if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
-            if to_mode == KeywordStrategyMode.MIN_CPA:
-                pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
-                if pfo_cost is not None:
-                    return float(pfo_cost), False
-            return float("inf"), False
         if not eligibility.participates_in_ladder or not can_target_mode(
             eligibility, to_mode
         ):
@@ -306,15 +328,15 @@ def cost_for_mode(
         if worst_stage is not None:
             return float(worst_stage.cost), True
 
-    catalog = _catalog_for_ctx(ctx, ladder_inputs)
     mc = catalog.get(target)
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
+    allow_worst = not min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
     return resolve_effective_state_cost(
         profile_cost=profile_cost,
         worst_cost=ladder_inputs.worst_costs.get(target),
-        allow_worst_imputation=True,
+        allow_worst_imputation=allow_worst,
     )
 
 
@@ -333,29 +355,31 @@ def _resolve_stage(
     own_conv = ctx.keyword.conv_views_to_orders
     conv_imputed = eff_conv is not None and (own_conv is None or own_conv <= 0)
 
+    if eligibility is not None and min_cpa_operational_via_pay_for_order(
+        ctx, eligibility, catalog
+    ):
+        if target == AggressionTargetMode.MIN_CPA:
+            pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+            if pfo_cost is not None:
+                return LadderStageResult(
+                    mode=target,
+                    is_valid=True,
+                    cost=float(pfo_cost),
+                    source=LadderCostSource.PAY_FOR_ORDER,
+                    conv_imputed=conv_imputed,
+                    cost_imputed=False,
+                    candidate=mc,
+                )
+        return LadderStageResult(
+            mode=target,
+            is_valid=False,
+            cost=None,
+            source=LadderCostSource.NONE,
+            conv_imputed=conv_imputed,
+            reason=_min_pay_for_order_oc_reason(ctx, eligibility, catalog),
+            candidate=mc,
+        )
     if eligibility is not None:
-        if eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV:
-            if target == AggressionTargetMode.MIN_CPA:
-                pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
-                if pfo_cost is not None:
-                    return LadderStageResult(
-                        mode=target,
-                        is_valid=True,
-                        cost=float(pfo_cost),
-                        source=LadderCostSource.PAY_FOR_ORDER,
-                        conv_imputed=conv_imputed,
-                        cost_imputed=False,
-                        candidate=mc,
-                    )
-            return LadderStageResult(
-                mode=target,
-                is_valid=False,
-                cost=None,
-                source=LadderCostSource.NONE,
-                conv_imputed=conv_imputed,
-                reason="no_ch_min_only",
-                candidate=mc,
-            )
         if not eligibility.participates_in_ladder or not can_target_mode(
             eligibility, to_mode
         ):
@@ -379,10 +403,11 @@ def _resolve_stage(
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
+    allow_worst = not min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
     cost_val, cost_imputed = resolve_effective_state_cost(
         profile_cost=profile_cost,
         worst_cost=ladder_inputs.worst_costs.get(target),
-        allow_worst_imputation=True,
+        allow_worst_imputation=allow_worst,
     )
     if profile_cost is not None:
         source = LadderCostSource.PROFILE
@@ -434,22 +459,40 @@ def resolve_ladder_stage_display(
 
 
 def ladder_view_to_candidates(view: LadderView) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Преобразовать ``LadderView`` в ``ModeCandidate`` для Telegram UI."""
+    """Преобразовать ``LadderView`` в ``ModeCandidate`` для Telegram UI.
+
+    ``stage.reason`` (например ``no_valid_ch_ladder``) всегда попадает в
+    ``invalid_reason``, даже если в каталоге уже есть ``ModeCandidate``.
+    """
     out: dict[AggressionTargetMode, ModeCandidate] = {}
     for mode, stage in view.stages.items():
         base = stage.candidate
+        updates: dict[str, object] = {
+            "is_valid": stage.is_valid,
+            "predicted_cpa": stage.cost,
+        }
+        if (
+            stage.source == LadderCostSource.PAY_FOR_ORDER
+            and mode == AggressionTargetMode.MIN_CPA
+            and stage.is_valid
+        ):
+            updates["position"] = 0
+            updates["bid"] = None
+        if stage.reason is not None:
+            updates["invalid_reason"] = stage.reason
+        elif stage.is_valid:
+            updates["invalid_reason"] = None
         if base is not None:
-            out[mode] = base.model_copy(
-                update={
-                    "is_valid": stage.is_valid,
-                    "predicted_cpa": stage.cost,
-                }
-            )
-        else:
-            out[mode] = ModeCandidate(
-                mode=mode,
-                is_valid=stage.is_valid,
-                predicted_cpa=stage.cost,
-                invalid_reason=stage.reason,
-            )
+            out[mode] = base.model_copy(update=updates)
+            continue
+        position = updates.get("position")
+        bid = updates.get("bid")
+        out[mode] = ModeCandidate(
+            mode=mode,
+            is_valid=stage.is_valid,
+            predicted_cpa=stage.cost,
+            position=int(position) if position is not None else None,
+            bid=float(bid) if bid is not None else None,
+            invalid_reason=stage.reason,
+        )
     return out

@@ -93,6 +93,8 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     bootstrap.assert_called_once()
+    _args, kwargs = bootstrap.call_args
+    assert kwargs.get("campaign_orders_per_cart_7d") == 2.0
     expansion.assert_called_once()
     select_mock.assert_not_called()
     flush_mock.assert_awaited_once()
@@ -286,6 +288,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
     dto = MagicMock()
     dto.min_target_position = 5
     sync_mock = AsyncMock()
+    build_fallback = MagicMock(return_value={42: True})
 
     with (
         patch(
@@ -295,6 +298,10 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
             return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_target_place_fallback_zero_by_keyword_id",
+            build_fallback,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
@@ -335,8 +342,15 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
+    build_fallback.assert_called_once()
+    _args, fb_kwargs = build_fallback.call_args
+    assert fb_kwargs.get("campaign_orders_per_cart_7d") == 2.0
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is False
+    assert (
+        sync_mock.await_args.kwargs.get("target_place_fallback_zero_by_keyword_id")
+        == {42: True}
+    )
 
 
 @pytest.mark.unit
@@ -434,7 +448,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    assert build_fallback.call_count >= 2
+    build_fallback.assert_called_once()
     fallback_map = sync_mock.await_args.kwargs[
         "target_place_fallback_zero_by_keyword_id"
     ]

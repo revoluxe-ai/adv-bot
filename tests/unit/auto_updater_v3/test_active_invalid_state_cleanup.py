@@ -137,6 +137,37 @@ def _catalog_all_invalid() -> dict[AggressionTargetMode, ModeCandidate]:
     }
 
 
+def _synthetic_only_profile() -> list[PositionProfilePoint]:
+    """CH raw без usable точек (только синтетика)."""
+    return [
+        PositionProfilePoint(
+            position=1,
+            bid=1000,
+            predicted_conversion=0.1,
+            pay_for_cart=100.0,
+            ch_observed=False,
+        ),
+    ]
+
+
+def _ctx_collapsed_ch_active(
+    *,
+    mode: KeywordStrategyMode,
+    pay_for_order_target: float = 49.0,
+    hard_status: int = 2,
+) -> KeywordV3Context:
+    """Collapsed CH + pay_for_order: stored MIN_CPA, operational cost из PFO."""
+    kw = _calc_kw(
+        ks_id=KS_ID,
+        text="collapsed_ch_pfo",
+        mode=mode,
+        rating=10.0,
+        conv=_conv_for_pay_for_order(pay_for_order_target),
+        hard_status=hard_status,
+    )
+    return KeywordV3Context(keyword=kw, position_profile=_synthetic_only_profile())
+
+
 def _ctx_no_ch_active(
     *,
     mode: KeywordStrategyMode,
@@ -287,6 +318,34 @@ def test_no_ch_opt_active_down_to_min_not_force_off(
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
     assert actions[0].reason == "active_invalid_state_down"
+
+
+@pytest.mark.unit
+def test_collapsed_ch_opt_active_down_to_min(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Collapsed CH + PFO: active OPT → DOWN MIN (не worst cost)."""
+    _patch_catalog(monkeypatch, _catalog_all_invalid())
+    ctx = _ctx_collapsed_ch_active(
+        mode=KeywordStrategyMode.OPTIMUM, pay_for_order_target=49.0
+    )
+    contexts = [ctx]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    elig = resolve_keyword_v3_eligibility(ctx, contexts)
+    assert elig.data_tier == KeywordDataTier.KEYWORD_FULL
+    assert elig.target_place_fallback_zero is True
+
+    actions = plan_active_invalid_state_cleanup(
+        prepared,
+        max_pay_for_order=MAX_PFO,
+        resolve=RESOLVE,
+        ladder_inputs=ladder,
+        eligibility_by_ks_id={KS_ID: elig},
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.DOWN
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit
