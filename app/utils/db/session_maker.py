@@ -1,3 +1,10 @@
+"""Фабрики асинхронных SQLAlchemy-сессий для PostgreSQL домена adv-bot.
+
+Модуль централизует создание read-only/read-write engine и sessionmaker для
+бота, воркеров и фоновых задач. Настройки asyncpg учитывают работу через
+PgBouncer, чтобы prepared statements не конфликтовали при transaction pooling.
+"""
+
 import asyncio
 import logging
 import ssl
@@ -6,6 +13,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from time import time
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -145,7 +153,14 @@ ssl_ctx = get_ssl_context(
 )
 
 # asyncpg при ssl=None может пытаться SSL-handshake; при disable не передаём ключ.
-_pg_connect_args: dict[str, ssl.SSLContext] = {}
+_pg_connect_args: dict[str, Any] = {
+    # PgBouncer transaction mode переиспользует server connections между
+    # клиентами, поэтому отключаем client-side prepared statement caches и
+    # генерируем уникальные server-side statement names.
+    "statement_cache_size": 0,
+    "prepared_statement_cache_size": 0,
+    "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+}
 if ssl_ctx is not None:
     _pg_connect_args["ssl"] = ssl_ctx
 
