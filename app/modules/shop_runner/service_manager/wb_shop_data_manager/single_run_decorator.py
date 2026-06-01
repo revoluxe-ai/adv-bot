@@ -93,6 +93,11 @@ def single_run() -> (
                 result = await func(self, *args, **kwargs)
                 results[key] = ("ok", result)
                 return result
+            except asyncio.CancelledError as exc:
+                # Если first caller отменили, waiters должны получить тот же cancel,
+                # а не падать с KeyError из-за пустого results.
+                results[key] = ("exc", exc)
+                raise
             except NotFoundActiveAdvCompany as exc:
                 results[key] = ("exc", exc)
                 raise

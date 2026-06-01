@@ -128,3 +128,35 @@ async def test_waiter_receives_exception_from_first_caller() -> None:
 
     await asyncio.wait_for(first_task, timeout=1.0)
     assert not key_present(host)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_waiter_receives_cancellation_from_first_caller() -> None:
+    """Waiter must receive CancelledError when first caller is cancelled."""
+    host = _SingleRunHost()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    @single_run()
+    async def cancellable_method(self: _SingleRunHost) -> str:
+        started.set()
+        await release.wait()
+        return "done"
+
+    wrapped = cancellable_method
+
+    first_task = asyncio.create_task(wrapped(host))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    waiter_task = asyncio.create_task(wrapped(host))
+    await asyncio.sleep(0)
+
+    first_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await first_task
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(waiter_task, timeout=1.0)
+
+    assert not key_present(host)
