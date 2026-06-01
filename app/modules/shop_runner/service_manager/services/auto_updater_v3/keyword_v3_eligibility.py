@@ -145,8 +145,15 @@ def _mode_catalog_for_eligibility(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
     campaign_cache: "CampaignV3DecisionCache",
+    *,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Каталог M/O/C для предиката collapsed CH (как на тике ladder)."""
+    """Каталог M/O/C для предиката collapsed CH (паритет с ``LadderInputs`` на тике).
+
+    Args:
+        campaign_orders_per_cart_7d: baseline РК 7d (``wb_common_stat``), как в
+            ``LadderInputs.orders_per_cart_for_ctx``; без него — только key prior.
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
         build_mode_candidates,
     )
@@ -155,7 +162,7 @@ def _mode_catalog_for_eligibility(
     )
 
     opc = resolve_orders_per_cart_for_cpo(
-        campaign_orders_per_cart_7d=None,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         key_orders=ctx.keyword.orders,
         key_carts=ctx.keyword.add_to_cart,
     )
@@ -179,9 +186,16 @@ def _apply_min_only_pay_for_order_override(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
     campaign_cache: "CampaignV3DecisionCache",
+    *,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> KeywordV3Eligibility:
     """Collapsed CH + pay_for_order: MIN-only и ``target_place=0``, ``data_tier`` без смены."""
-    catalog = _mode_catalog_for_eligibility(ctx, contexts, campaign_cache)
+    catalog = _mode_catalog_for_eligibility(
+        ctx,
+        contexts,
+        campaign_cache,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+    )
     if not collapsed_ch_ladder_with_pay_for_order(ctx, catalog):
         return base
     return KeywordV3Eligibility(
@@ -201,6 +215,7 @@ def resolve_keyword_v3_eligibility(
     contexts: list["KeywordV3Context"],
     *,
     campaign_cache: "CampaignV3DecisionCache | None" = None,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> KeywordV3Eligibility:
     """Свести conv/CH decision к продуктовому ``KeywordDataTier``.
 
@@ -209,6 +224,7 @@ def resolve_keyword_v3_eligibility(
 
     Args:
         campaign_cache: предрасчёт агрегата РК (см. ``CampaignV3DecisionCache``).
+        campaign_orders_per_cart_7d: baseline корз→заказ РК 7d для каталога collapsed CH.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache as _CampaignV3DecisionCache,
@@ -221,7 +237,13 @@ def resolve_keyword_v3_eligibility(
     keyword = ctx.keyword
 
     def _with_collapsed_override(base: KeywordV3Eligibility) -> KeywordV3Eligibility:
-        return _apply_min_only_pay_for_order_override(base, ctx, contexts, cache)
+        return _apply_min_only_pay_for_order_override(
+            base,
+            ctx,
+            contexts,
+            cache,
+            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+        )
 
     if not has_ch:
         if keyword_has_v2_cpo(keyword):
@@ -308,6 +330,8 @@ def _invalid_eligibility(decision: object) -> KeywordV3Eligibility:
 
 def build_eligibility_map(
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[int, KeywordV3Eligibility]:
     """Индекс eligibility по ``keyword_setting_original_id`` (один агрегат РК на тик)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
@@ -321,13 +345,18 @@ def build_eligibility_map(
         if ks_id is None:
             continue
         result[int(ks_id)] = resolve_keyword_v3_eligibility(
-            ctx, contexts, campaign_cache=campaign_cache
+            ctx,
+            contexts,
+            campaign_cache=campaign_cache,
+            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
     return result
 
 
 def build_target_place_fallback_zero_by_keyword_id(
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[int, bool]:
     """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
 
@@ -345,7 +374,10 @@ def build_target_place_fallback_zero_by_keyword_id(
         if ks_id is None:
             continue
         elig = resolve_keyword_v3_eligibility(
-            ctx, contexts, campaign_cache=campaign_cache
+            ctx,
+            contexts,
+            campaign_cache=campaign_cache,
+            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
         out[int(ks_id)] = (

@@ -13,6 +13,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     _weighted_campaign_conv,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
     build_eligibility_map,
@@ -22,6 +25,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
+    make_zero_keyword_stat,
 )
 from tests.unit.auto_updater_v3.test_no_data_activation import (
     _kw as _calculated_kw_fixture,
@@ -107,6 +113,51 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
 
     assert weighted_mock.call_count == 1
     assert len(result) == 2
+
+
+@pytest.mark.unit
+def test_eligibility_catalog_uses_campaign_orders_per_cart() -> None:
+    """Каталог collapsed CH в eligibility совпадает с ladder при том же campaign OPC."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+        CampaignV3DecisionCache,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        _mode_catalog_for_eligibility,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+        state_candidates_by_mode_for_ctx,
+    )
+    from tests.unit.auto_updater_v3.test_build_mode_candidates_ch_observed import (
+        _point,
+    )
+
+    profile = [
+        _point(13, 21699, 0.0035, ch_observed=True),
+        _point(40, 4189, 0.0157, ch_observed=True),
+    ]
+    stat = make_zero_keyword_stat("opc_parity").model_copy(
+        update={"orders": 0, "add_to_cart": 0, "conv_views_to_orders": 0.05}
+    )
+    kw = _calculated_kw_fixture(
+        ks_id=8, text="opc_parity", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
+    )
+    kw = kw.model_copy(update={"cluster_stat": stat})
+    ctx = KeywordV3Context(keyword=kw, position_profile=profile)
+    contexts = [ctx]
+    campaign_opc = 0.2618
+    cache = CampaignV3DecisionCache.from_contexts(contexts)
+    ladder = LadderInputs.from_contexts(
+        contexts, campaign_orders_per_cart_7d=campaign_opc
+    )
+    ladder_cat = state_candidates_by_mode_for_ctx(ctx, ladder)
+    elig_cat = _mode_catalog_for_eligibility(
+        ctx, contexts, cache, campaign_orders_per_cart_7d=campaign_opc
+    )
+    for mode in ladder_cat:
+        assert ladder_cat[mode].is_valid == elig_cat[mode].is_valid
+        assert ladder_cat[mode].predicted_cpa == elig_cat[mode].predicted_cpa
+    assert elig_cat[AggressionTargetMode.MIN_CPA].is_valid
 
 
 @pytest.mark.unit

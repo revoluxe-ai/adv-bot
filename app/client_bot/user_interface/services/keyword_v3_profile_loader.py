@@ -348,7 +348,10 @@ async def load_keyword_v3_profile_data(
             ),
         )
 
-    eligibility_map = build_eligibility_map(all_contexts)
+    eligibility_map = build_eligibility_map(
+        all_contexts,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+    )
     ks_id = calculated_keyword.keyword_setting_original_id
     elig = (
         eligibility_map.get(int(ks_id)) if ks_id is not None else None

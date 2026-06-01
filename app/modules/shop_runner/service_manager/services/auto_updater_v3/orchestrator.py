@@ -328,7 +328,10 @@ async def process_adv_v3(
             await cache_worst_costs_for_adv(
                 complex_adv.adv_id, ladder_inputs.worst_costs
             )
-            eligibility = build_eligibility_map(contexts)
+            eligibility = build_eligibility_map(
+                contexts,
+                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+            )
             prepared = build_prepared_from_contexts(contexts)
             cleanup_resolve = resolve if is_resolve_valid(plan, resolve) else None
             cleanup_actions = plan_active_invalid_state_cleanup(
@@ -351,9 +354,13 @@ async def process_adv_v3(
                     raw_profiles,
                 )
                 sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 )
-                eligibility = build_eligibility_map(contexts)
+                eligibility = build_eligibility_map(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
                 prepared = build_prepared_from_contexts(contexts)
                 ladder_inputs = LadderInputs.from_contexts(
                     contexts,
@@ -391,7 +398,10 @@ async def process_adv_v3(
                             realloc_actions,
                             raw_profiles,
                         )
-                        eligibility = build_eligibility_map(contexts)
+                        eligibility = build_eligibility_map(
+                            contexts,
+                            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                        )
                         prepared = build_prepared_from_contexts(contexts)
                         ladder_inputs = LadderInputs.from_contexts(
                             contexts,
@@ -421,8 +431,9 @@ async def process_adv_v3(
                         expansion_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = (
-                        build_target_place_fallback_zero_by_keyword_id(contexts)
+                    sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                        contexts,
+                        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                     )
 
             guard_condition = (
@@ -430,7 +441,10 @@ async def process_adv_v3(
                 and float(fact.pay_for_order) > float(plan.max_pay_for_order)
             )
             if guard_condition:
-                guard_eligibility = build_eligibility_map(contexts)
+                guard_eligibility = build_eligibility_map(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
                 guard_prepared = build_prepared_from_contexts(contexts)
                 guard_ladder_inputs = LadderInputs.from_contexts(
                     contexts,

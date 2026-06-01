@@ -431,7 +431,10 @@ def collect_transition_candidates(
     elig_map: dict[int, KeywordV3Eligibility] = (
         eligibility_by_ks_id
         if eligibility_by_ks_id is not None
-        else build_eligibility_map(ladder.all_contexts)
+        else build_eligibility_map(
+            ladder.all_contexts,
+            campaign_orders_per_cart_7d=ladder.campaign_orders_per_cart_7d,
+        )
     )
     out: list[TransitionCandidate] = []
 
