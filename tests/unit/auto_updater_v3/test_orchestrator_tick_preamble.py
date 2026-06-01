@@ -93,6 +93,8 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     bootstrap.assert_called_once()
+    _args, kwargs = bootstrap.call_args
+    assert kwargs.get("campaign_orders_per_cart_7d") == 2.0
     expansion.assert_called_once()
     select_mock.assert_not_called()
     flush_mock.assert_awaited_once()

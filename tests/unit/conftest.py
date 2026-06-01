@@ -1,7 +1,7 @@
 """Фикстуры только для ``tests/unit/``: без ClickHouse при V3 RK ratio.
 
-``load_rk_orders_per_cart_7d`` (wb_common_stat) вызывается из orchestrator и
-``target_place_sync`` — unit-тесты мокают его здесь, а не поднимают CH на :8124.
+``load_campaign_orders_per_cart_7d`` / ``load_rk_orders_per_cart_7d`` (wb_common_stat)
+вызываются из orchestrator и ``target_place_sync`` — unit-тесты мокают их здесь.
 """
 
 from __future__ import annotations
@@ -22,6 +22,10 @@ def _unit_mock_v3_clickhouse_deps(request: pytest.FixtureRequest) -> object:
     with (
         patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
+            new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d",
             new=AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
         ),
         patch(

@@ -425,8 +425,14 @@ def plan_no_ch_min_bootstrap_actions(
 
 def plan_data_bootstrap_v3(
     contexts: list["KeywordV3Context"],
+    *,
+    campaign_orders_per_cart_7d: float | None = None,
 ) -> list[V3Action]:
-    """CAMPAIGN_NORMAL: INVALID bootstrap + опускание O/C/M до MIN (без NO_CH OFF→MIN)."""
+    """CAMPAIGN_NORMAL: INVALID bootstrap + опускание O/C/M до MIN (без NO_CH OFF→MIN).
+
+    Args:
+        campaign_orders_per_cart_7d: baseline РК 7d для eligibility (паритет с ladder).
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
         build_eligibility_map,
@@ -436,7 +442,10 @@ def plan_data_bootstrap_v3(
 
     prepared = build_prepared_from_contexts(contexts)
     peer_contexts = [ctx for ctx, _ in prepared]
-    eligibility_by_ks_id = build_eligibility_map(peer_contexts)
+    eligibility_by_ks_id = build_eligibility_map(
+        peer_contexts,
+        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+    )
     actions = plan_no_data_keyword_actions(
         prepared, eligibility_by_ks_id=eligibility_by_ks_id
     )

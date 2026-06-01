@@ -205,6 +205,7 @@ async def process_adv_v3(
     sync_fallback_by_id: dict[int, bool] | None = None
     ladder_inputs: LadderInputs | None = None
     policy: SelectionPolicy | None = None
+    campaign_orders_per_cart_7d: float | None = None
 
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
@@ -230,9 +231,6 @@ async def process_adv_v3(
 
     try:
         contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-        sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-            contexts
-        )
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
@@ -256,6 +254,13 @@ async def process_adv_v3(
             )
             return
 
+        if dto is not None and plan is not None:
+            from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+                load_campaign_orders_per_cart_7d,
+            )
+
+            campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv)
+
         # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
         # NO_DATA  → только plan_campaign_no_data_bootstrap_safe + sync_force_zero
         # NORMAL   → plan_data_bootstrap_v3 + realloc / expansion / guard
@@ -278,7 +283,10 @@ async def process_adv_v3(
         elif campaign_mode == CampaignMode.NORMAL and dto is not None:
             assert plan is not None and fact is not None
             # NORMAL-only: не вызывать для NO_DATA / NOT_READY
-            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            keyword_bootstrap_actions = plan_data_bootstrap_v3(
+                contexts,
+                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+            )
             if keyword_bootstrap_actions:
                 preamble_bootstrap_count += len(keyword_bootstrap_actions)
                 logger.info(
@@ -292,7 +300,8 @@ async def process_adv_v3(
                     raw_profiles,
                 )
                 sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 )
 
             shelf_active = complex_adv.shelf_promotion_active
@@ -312,10 +321,8 @@ async def process_adv_v3(
             resolve = compute_resolve_cost_threshold(plan, fact)
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
-                load_campaign_orders_per_cart_7d,
             )
 
-            campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv)
             rec_orders_per_view = await load_rec_orders_per_view_for_v3(
                 adv,
                 rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
@@ -474,8 +481,9 @@ async def process_adv_v3(
                         guard_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = (
-                        build_target_place_fallback_zero_by_keyword_id(contexts)
+                    sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                        contexts,
+                        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                     )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
