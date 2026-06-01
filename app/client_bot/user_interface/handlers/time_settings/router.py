@@ -196,6 +196,7 @@ async def _apply_db_patch(
 
 
 _STALE_MENU_TOAST = "Откройте актуальное меню"
+_SAVE_FAILED_MESSAGE = "Не удалось сохранить, попробуйте ещё раз"
 
 
 def _apply_edit_toast(
@@ -517,8 +518,9 @@ async def time_settings_callback(
                         callback,
                         only_markup=False,
                         callback_answer=callback_answer,
-                        alert="Не удалось сохранить, попробуйте ещё раз",
                     )
+                    await callback.message.answer(_SAVE_FAILED_MESSAGE)
+                    set_callback_toast(callback_answer, "")
                     return
 
     await _redraw(
