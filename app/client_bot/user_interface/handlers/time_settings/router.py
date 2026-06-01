@@ -202,16 +202,21 @@ async def _redraw(
     alert: str | None = None,
 ) -> None:
     if callback.message is None:
+        set_callback_toast(callback_answer, "")
         return
     session = find_session_by_message(callback.from_user.id, callback.message.message_id)
     if session is None:
+        set_callback_toast(callback_answer, "Откройте актуальное меню")
         return
     text, keyboard = render_screen(session)
     if only_markup:
-        await _safe_edit_reply_markup(callback, keyboard=keyboard)
+        changed = await _safe_edit_reply_markup(callback, keyboard=keyboard)
     else:
-        await _edit_message_content(callback, text=text, keyboard=keyboard)
-    set_callback_toast(callback_answer, alert if alert is not None else "Без изменений")
+        changed = await _edit_message_content(callback, text=text, keyboard=keyboard)
+    if changed:
+        set_callback_toast(callback_answer, alert or "")
+    else:
+        set_callback_toast(callback_answer, alert or "Без изменений")
 
 
 @router.message(Command("time_settings"))
