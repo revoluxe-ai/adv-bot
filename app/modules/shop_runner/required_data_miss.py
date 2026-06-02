@@ -44,10 +44,25 @@ def resolve_calculated_keywords_cache(
     shop_id: str,
     adv_id: int,
 ) -> list[CalculatedKeyword]:
-    """Проверить ответ Redis: список или ``ShopRunnerKeywordsCacheMissError``."""
+    """Проверить ответ Redis: список (в т.ч. ``[]``) или miss-исключение."""
     if cached is not None:
         return cached
     raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
+
+
+async def _empty_keywords_from_warmup_meta(adv_id: int) -> list[CalculatedKeyword] | None:
+    """Если snapshot meta фиксирует успешный warmup с 0 keywords — ``[]``, иначе ``None``."""
+    from app.core.redis_manager.redis_client import redis_client
+    from app.snapshot_data_updater.cache_freshness import load_keywords_meta
+
+    meta = await load_keywords_meta(redis_client, adv_id)
+    if meta is None:
+        return None
+    if meta.get("source") == "error":
+        return None
+    if meta.get("keywords_count") == "0":
+        return []
+    return None
 
 
 async def fetch_calculated_keywords_from_redis(
@@ -62,10 +77,10 @@ async def fetch_calculated_keywords_from_redis(
         shop_id: для текста ошибки и логов декоратора.
 
     Returns:
-        Список keywords (в т.ч. пустой ``[]`` при пустом hash).
+        Список keywords; ``[]`` — легитимный пустой результат после warmup.
 
     Raises:
-        ShopRunnerKeywordsCacheMissError: hash отсутствует.
+        ShopRunnerKeywordsCacheMissError: hash отсутствует и нет meta count=0.
     """
     from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
         RedisCalculatedKeywordsCacheManager,
@@ -73,11 +88,12 @@ async def fetch_calculated_keywords_from_redis(
 
     redis_mgr = RedisCalculatedKeywordsCacheManager()
     cached = await redis_mgr.get_all_calculated_keywords_for_adv(adv_id)
-    return resolve_calculated_keywords_cache(
-        cached,
-        shop_id=shop_id,
-        adv_id=adv_id,
-    )
+    if cached is not None:
+        return cached
+    empty_from_meta = await _empty_keywords_from_warmup_meta(adv_id)
+    if empty_from_meta is not None:
+        return empty_from_meta
+    raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
 
 
 def _env_int(name: str, default: str, *, legacy_names: tuple[str, ...] = ()) -> int:
