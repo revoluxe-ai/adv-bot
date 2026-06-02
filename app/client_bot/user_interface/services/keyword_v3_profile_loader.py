@@ -12,9 +12,6 @@ from app.client_bot.user_interface.views.keyword_v3_profile_ui import KeywordV3P
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.di.wb_manager_hub import WBManagerHubFactory
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
@@ -24,7 +21,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
     build_keyword_v3_contexts,
-    load_campaign_v3_contexts,
+    load_campaign_v3_contexts_from_database,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_eligibility_map,
@@ -72,23 +69,8 @@ async def _load_wb_cabinet(wb_cabinet_id: int) -> WBCabinet | None:
         return result.scalar_one_or_none()
 
 
-async def _redis_keywords_for_complex_adv(
-    complex_adv: ComplexAdv,
-    *,
-    cache_only: bool = False,
-) -> list[CalculatedKeyword] | None:
-    """Ключи РК из Redis — для ``load_campaign_v3_contexts`` в карточке Telegram.
-
-    ``cache_only=False`` не пересчитывает V2 в UI (только кеш).
-    """
-    _ = cache_only
-    return await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(
-        complex_adv.adv_id
-    )
-
-
 async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAdv:
-    """Собрать ``ComplexAdv`` с провайдером ключей (нужен для peer pool лестницы)."""
+    """Собрать ``ComplexAdv`` для UI (peer pool лестницы; keywords — отдельно из БД)."""
     search_adv = None
     search_adv_id = adv_setting.search_adv_id
     if search_adv_id:
@@ -100,7 +82,6 @@ async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAd
         adv_setting=adv_setting,
         search_adv=search_adv,
         shop_id=shop_id,
-        get_keywords_func=_redis_keywords_for_complex_adv,
     )
 
 
@@ -276,7 +257,9 @@ async def load_keyword_v3_profile_data(
         )
         return profile_load_failure(calculated_keyword, reason="ошибка запроса CH")
 
-    all_contexts = await load_campaign_v3_contexts(complex_adv, raw_profiles)
+    all_contexts = await load_campaign_v3_contexts_from_database(
+        complex_adv, raw_profiles
+    )
     if not all_contexts:
         single = build_keyword_v3_contexts([calculated_keyword], raw_profiles)
         all_contexts = single if single else []

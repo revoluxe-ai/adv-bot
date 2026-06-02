@@ -1,64 +1,67 @@
-"""Ограничение параллельных запросов к ClickHouse (защита от перегрузки).
+"""Ограничение параллельных запросов к ClickHouse.
 
-Семафор привязывается к текущему event loop при входе в контекст: один глобальный
-`asyncio.Semaphore` при импорте ломает pytest-asyncio и любые тесты с несколькими
-циклами («Semaphore ... is bound to a different event loop»).
-
-``run_ch_with_timeout`` — предпочтительный путь: acquire + operation timeout + release.
+Лимиты и таймауты — из env через ``app.utils.resource_limits`` (см. env.sample).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import weakref
 from collections.abc import Awaitable
 from typing import Any, TypeVar
+
+from app.utils.resource_limits import (
+    clickhouse_query_acquire_timeout_sec,
+    clickhouse_query_concurrency,
+    clickhouse_query_timeout_sec,
+    get_clickhouse_query_semaphore,
+)
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+# Обратная совместимость импортов и тестов
 CH_OPERATION_TIMEOUT_SECONDS = 900.0
 CH_ACQUIRE_TIMEOUT_SECONDS = 120.0
-
-_semaphores: weakref.WeakKeyDictionary[
-    asyncio.AbstractEventLoop, asyncio.Semaphore
-] = weakref.WeakKeyDictionary()
-
-
-def _get_loop_semaphore(loop: asyncio.AbstractEventLoop) -> asyncio.Semaphore:
-    sem = _semaphores.get(loop)
-    if sem is None:
-        sem = asyncio.Semaphore(1)
-        _semaphores[loop] = sem
-    return sem
 
 
 async def run_ch_with_timeout(
     awaitable: Awaitable[T],
     *,
-    timeout: float = CH_OPERATION_TIMEOUT_SECONDS,
-    acquire_timeout: float = CH_ACQUIRE_TIMEOUT_SECONDS,
+    timeout: float | None = None,
+    acquire_timeout: float | None = None,
 ) -> T:
-    """Выполнить CH-операцию под Semaphore(1) с таймаутом acquire и operation."""
+    """Выполнить CH-операцию под семафором запросов с таймаутами acquire и operation."""
+    op_timeout = (
+        clickhouse_query_timeout_sec()
+        if timeout is None
+        else timeout
+    )
+    acq_timeout = (
+        clickhouse_query_acquire_timeout_sec()
+        if acquire_timeout is None
+        else acquire_timeout
+    )
     loop = asyncio.get_running_loop()
-    sem = _get_loop_semaphore(loop)
+    sem = get_clickhouse_query_semaphore(loop)
     try:
-        await asyncio.wait_for(sem.acquire(), timeout=acquire_timeout)
+        await asyncio.wait_for(sem.acquire(), timeout=acq_timeout)
     except asyncio.TimeoutError:
         logger.error(
-            "ClickHouse semaphore acquire timed out after %ss",
-            acquire_timeout,
+            "ClickHouse query semaphore acquire timed out after %ss "
+            "(CLICKHOUSE_QUERY_CONCURRENCY=%s)",
+            acq_timeout,
+            clickhouse_query_concurrency(),
             exc_info=True,
         )
         raise
     try:
-        return await asyncio.wait_for(awaitable, timeout=timeout)
+        return await asyncio.wait_for(awaitable, timeout=op_timeout)
     except asyncio.TimeoutError:
         logger.error(
-            "ClickHouse operation timed out after %ss",
-            timeout,
+            "ClickHouse query timed out after %ss",
+            op_timeout,
             exc_info=True,
         )
         raise
@@ -67,19 +70,18 @@ async def run_ch_with_timeout(
 
 
 class _AntiCHCrashSemaphore:
-    """Контекстный менеджер Semaphore(1); для operation timeout используйте ``run_ch_with_timeout``."""
+    """Контекстный менеджер CH-запроса; для operation timeout — ``run_ch_with_timeout``."""
 
     async def __aenter__(self) -> _AntiCHCrashSemaphore:
         loop = asyncio.get_running_loop()
-        self._sem = _get_loop_semaphore(loop)
+        self._sem = get_clickhouse_query_semaphore(loop)
+        acq_timeout = clickhouse_query_acquire_timeout_sec()
         try:
-            await asyncio.wait_for(
-                self._sem.acquire(), timeout=CH_ACQUIRE_TIMEOUT_SECONDS
-            )
+            await asyncio.wait_for(self._sem.acquire(), timeout=acq_timeout)
         except asyncio.TimeoutError:
             logger.error(
-                "ClickHouse semaphore acquire timed out after %ss (async with)",
-                CH_ACQUIRE_TIMEOUT_SECONDS,
+                "ClickHouse query semaphore acquire timed out after %ss (async with)",
+                acq_timeout,
                 exc_info=True,
             )
             raise

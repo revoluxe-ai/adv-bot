@@ -18,7 +18,6 @@ from app.core.mp.wb.api.excs import (
 from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
 from app.core.mp.wb.api.retry_decorator import (
     POOL_TIMEOUT_MAX_ATTEMPTS,
-    POOL_TIMEOUT_RETRY_PAUSE_SEC,
     retry_decorator,
 )
 
@@ -36,6 +35,16 @@ class _FakeAuthHandler:
 
     async def mark_current_token_invalided(self, *args: object, **kwargs: object) -> None:
         return None
+
+
+@pytest.fixture(autouse=True)
+def _no_real_retry_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Юнит-тесты счётчиков не ждут backoff (2/4/8… с и PT pause 2 с)."""
+
+    async def fake_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("app.core.mp.wb.api.retry_decorator.asyncio.sleep", fake_sleep)
 
 
 # ---------------------------------------------------------------------------
@@ -223,14 +232,9 @@ async def test_success_clears_state_and_next_call_gets_full_budget(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_http_timeout_policy_unaffected(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_http_timeout_policy_unaffected() -> None:
     """read/connect timeout по-прежнему использует max_attempts, не POOL_TIMEOUT_MAX_ATTEMPTS."""
     adapter = _build_adapter()
-
-    async def fake_sleep(_: float) -> None:
-        pass
-
-    monkeypatch.setattr("app.core.mp.wb.api.retry_decorator.asyncio.sleep", fake_sleep)
 
     max_attempts = 5
     call_count = 0

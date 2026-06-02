@@ -47,6 +47,19 @@ MIN_BIDS_RATE_LIMIT=5  # запросов
 MIN_BIDS_RATE_INTERVAL=60  # секунд
 ```
 
+## Redis v2: cache-only чтение (shop-runner / warmup)
+
+После записи через ``MinBidsCacheManager`` consumers читают только Redis:
+
+- ``WBManager.read_min_bids_cache_only`` / ``get_min_bids_cache_only`` — без WB API на hot path.
+- **Cache miss** — ``logger.warning`` с подстрокой ``min_bids cache miss`` (ожидаемо до
+  ``CoroutinesManager.preload_min_bids_cache_miss`` или прогрева ``snapshot_data_updater``).
+  **Не** путать с ERROR ``refresh_min_bids_cache_miss`` (сбой WB refresh).
+- Догрузка: ``preload_min_bids_cache_miss`` в ``service_manager/manager.py``.
+- Ops-алерты: фильтр WARNING + ``min_bids cache miss``, не ERROR по этой строке.
+
+Подробнее: ``docks/snapshot_data_updater.md`` (раздел «Диагностика»), ``env.sample`` (``SNAPSHOT_MIN_BIDS_*``).
+
 ## Troubleshooting
 
 ### Проблема: "Rate limit exceeded"

@@ -14,6 +14,8 @@
 Модуль контракта: [`bid_units.py`](bid_units.py).
 
 **Минимальная ставка WB** — только из кэша `min_bids` (не из CH, не из текущей ставки).
+Cache miss при чтении v2 — **WARNING** ``min_bids cache miss`` (не ERROR); догрузка —
+``preload_min_bids_cache_miss``. См. ``app/core/mp/wb/api/README_min_bids.md``.
 
 ### Тест vs main (семантика)
 

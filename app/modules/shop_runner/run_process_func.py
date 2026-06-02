@@ -18,7 +18,7 @@ from app.modules.token_monitoring.services.cabinet_status_service import (
 )
 from app.modules.shop_runner.modules.wb_api import WBApi
 
-from app.modules.shop_runner.shop_id_filters import apply_shop_id_filters
+from app.modules.shop_runner.shop_id_filters import apply_shop_id_filters, is_shop_id_allowed
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.modules.shop_runner.wb_shop import WBShop
@@ -45,6 +45,13 @@ async def run_shop_task(
     tasks_manager: TasksManager,
     plan_fact_reader: "PlanFactReader",
 ) -> None:
+    if not is_shop_id_allowed(shop_id):
+        logger.info(
+            "Магазин %s не запускается: SHOP_FILTER_LIST / SHOP_EXCLUDE_LIST",
+            shop_id,
+        )
+        await redis_manager.remove_shops([shop_id])
+        return None
     try:
         await _run_shop_task(
             shop_id,

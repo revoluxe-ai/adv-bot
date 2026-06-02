@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import logging
 
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -44,25 +41,21 @@ async def load_campaign_v3_contexts(
     complex_adv: ComplexAdv,
     raw_profiles: dict[str, list[BidPosition]],
 ) -> list[KeywordV3Context]:
-    """Контексты всех ключей РК — тот же источник, что на тике V3 (Redis cache).
+    """Контексты всех ключей РК на тике V3 — strict Redis (``get_keywords``).
 
-    Args:
-        complex_adv: Кампания с ``get_keywords``.
-        raw_profiles: Bid profiles CH для nmid кампании.
-
-    Returns:
-        Список контекстов; пустой, если ключей нет.
+    Raises:
+        ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует.
     """
-    keywords = await complex_adv.get_keywords(cache_only=True)
-    if keywords is None:
-        adv_id = complex_adv.adv_id
-        keywords = await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(
-            adv_id
-        )
-        if keywords is None:
-            logger.warning(
-                "v3 contexts: no keywords in cache adv_id=%s",
-                adv_id,
-            )
-            return []
+    keywords = await complex_adv.get_keywords()
+    return build_keyword_v3_contexts(keywords, raw_profiles)
+
+
+async def load_campaign_v3_contexts_from_database(
+    complex_adv: ComplexAdv,
+    raw_profiles: dict[str, list[BidPosition]],
+) -> list[KeywordV3Context]:
+    """Контексты для Telegram UI — пересчёт из БД, не из Redis-кеша."""
+    from app.modules.wb_adv_updater.keywords_access import fetch_keywords_from_database
+
+    keywords = await fetch_keywords_from_database(complex_adv)
     return build_keyword_v3_contexts(keywords, raw_profiles)

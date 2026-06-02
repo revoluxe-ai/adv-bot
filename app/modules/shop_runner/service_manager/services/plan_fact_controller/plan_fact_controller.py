@@ -46,34 +46,30 @@ class PlanFactController:
     @staticmethod
     async def _resolve_fact_for_pre_adv(
         pre_adv: PreComplexAdv,
-    ) -> FactData:
-        from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-            RedisCalculatedKeywordsCacheManager,
-        )
-        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
+    ) -> FactData | None:
+        """Факт для записи plan_fact_stats: keywords только из Redis (strict).
 
-        complex_adv = ComplexAdv(
-            shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
-            adv_setting=pre_adv.auto_adv,
-            search_adv=pre_adv.search_adv,
-            target_pay_for_order=pre_adv.resolved_target_pay_for_order,
+        При miss ``calculated_keywords`` исключение уходит наверх (required-data-miss).
+        """
+        from app.modules.shop_runner.required_data_miss import (
+            fetch_calculated_keywords_from_redis,
         )
-        redis_kw = RedisCalculatedKeywordsCacheManager()
-        cached_keywords = await redis_kw.get_all_calculated_keywords_for_adv(
-            complex_adv.adv_id
+
+        shop_id = pre_adv.auto_adv.wb_cabinet.shop_id
+        adv_id = pre_adv.adv_id
+        cached_keywords = await fetch_calculated_keywords_from_redis(
+            adv_id,
+            shop_id=shop_id,
         )
-        if cached_keywords:
-            keywords = sorted(
-                cached_keywords,
-                key=lambda kw: kw.rating or 0,
-                reverse=True,
-            )
-        else:
-            keywords = await get_good_bad_phrases(complex_adv)
+
+        keywords = sorted(
+            cached_keywords,
+            key=lambda kw: kw.rating or 0,
+            reverse=True,
+        )
         provider = PlanFactProvider(pre_adv.auto_adv)
         stat = await provider.get_stat_data(keywords)
-        fact = await provider.get_fact_data(stat)
-        return fact
+        return await provider.get_fact_data(stat)
 
     @staticmethod
     async def process_adv(
@@ -114,6 +110,12 @@ class PlanFactController:
         version: float,
     ) -> PlanFactStatDTO | None:
         fact = await PlanFactController._resolve_fact_for_pre_adv(pre_adv)
+        if fact is None:
+            logger.warning(
+                "plan_fact: пропуск adv_id=%s — нет keywords в Redis и нет plan_fact_summary",
+                pre_adv.adv_id,
+            )
+            return None
         return PlanFactStatDTO.create(
             adv_id=pre_adv.adv_id,
             shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,

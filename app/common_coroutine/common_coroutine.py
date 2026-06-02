@@ -15,7 +15,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-async def _run_runtime() -> None:
+async def run_runtime() -> None:
     logger.debug("Starting common coroutine runtime")
     container = CommonCoroutineContainer()
     coroutine_manager: CommonCoroutineManager = container.coroutine_manager()
@@ -44,7 +44,7 @@ async def _run_runtime() -> None:
 
 
 def run() -> None:
-    asyncio.run(_run_runtime())
+    asyncio.run(run_runtime())
 
 
 

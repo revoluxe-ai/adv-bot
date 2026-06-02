@@ -253,6 +253,7 @@
 - **Redis:**
   - Database 1: Celery broker
   - Кеши: calculated_keywords, min_bids, rate_limits, shop_status, keyword_vectors
+  - min_bids read miss: WARNING `min_bids cache miss` (см. `docks/snapshot_data_updater.md`)
   - TTL кешей: от 300s (shop status) до 86400s (job history)
 
 ### Мониторинг и Алертинг

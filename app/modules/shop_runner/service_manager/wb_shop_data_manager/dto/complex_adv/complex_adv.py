@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, overload
+from typing import Protocol
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -24,11 +24,18 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 class GetKeywordsProvider(Protocol):
-    """Провайдер ключей: полный пересчёт или только Redis при ``cache_only=True``."""
+    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``), strict.
+
+    Реализация — ``fetch_calculated_keywords_from_redis``; при miss —
+    ``ShopRunnerKeywordsCacheMissError``. Пересчёт из БД — ``fetch_keywords_from_database``.
+    """
 
     async def __call__(
-        self, complex_adv: ComplexAdv, *, cache_only: bool = False
-    ) -> list[CalculatedKeyword] | None: ...
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        cache_only: bool = True,
+    ) -> list[CalculatedKeyword]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,42 +389,40 @@ class ComplexAdv:
     def auto_update_setting_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
-    @overload
-    async def get_keywords(
-        self, *, cache_only: Literal[True]
-    ) -> list[CalculatedKeyword] | None: ...
-
-    @overload
-    async def get_keywords(
-        self, *, cache_only: Literal[False] = False
-    ) -> list[CalculatedKeyword]: ...
+    def _filter_keywords(
+        self, keywords: list[CalculatedKeyword]
+    ) -> list[CalculatedKeyword]:
+        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
+            return [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        return keywords
 
     async def get_keywords(
-        self, *, cache_only: bool = False
-    ) -> list[CalculatedKeyword] | None:
+        self, *, cache_only: bool = True
+    ) -> list[CalculatedKeyword]:
+        """Keywords только из Redis (прогрев — snapshot updater).
+
+        Args:
+            cache_only: должен быть ``True``; пересчёт из БД в shop-runner запрещён.
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует.
+
+        Для UI / ручного пересчёта — ``fetch_keywords_from_database`` (``keywords_access``).
+        """
         if not self._get_keywords:
             raise RuntimeError("_get_keywords not set")
-        if cache_only:
-            cached = await self._get_keywords(self, cache_only=True)
-            if cached is None:
-                return None
-            if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
-                return [kw for kw in cached if kw.status == KeywordStatus.GOOD]
-            return cached
-        if not self._calculated_keywords:
-            loaded = await self._get_keywords(self, cache_only=False)
-            if loaded is None:
-                raise RuntimeError(
-                    "get_keywords provider returned None with cache_only=False"
-                )
-            self._calculated_keywords = loaded
-        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
-            keywords = [
-                kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD
-            ]
-        else:
-            keywords = self._calculated_keywords
-        return keywords
+        if not cache_only:
+            raise RuntimeError(
+                "get_keywords(cache_only=False) отключён в shop-runner: "
+                "используйте fetch_keywords_from_database() для пересчёта из БД "
+                "или дождитесь snapshot warmup."
+            )
+        if self._calculated_keywords is not None:
+            return self._filter_keywords(self._calculated_keywords)
+
+        cached = await self._get_keywords(self, cache_only=True)
+        self._calculated_keywords = cached
+        return self._filter_keywords(cached)
 
     @property
     def exponet_predict_ctr(self) -> float:

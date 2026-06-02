@@ -9,6 +9,8 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 if typing.TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
+from app.modules.shop_runner.required_data_miss import is_required_data_miss
+
 from .exc import FirstKeyUpdaterError
 
 
@@ -23,6 +25,8 @@ class FirstKeyUpdater:
         try:
             await self._top_key_auto_update(complex_adv)
         except Exception as exc:
+            if is_required_data_miss(exc):
+                raise
             raise FirstKeyUpdaterError from exc
 
     async def _top_key_auto_update(

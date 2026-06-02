@@ -527,7 +527,11 @@ class CoroutinesManager:
             max_workers=self._max_workers_for(len(handlers), cap=16),
         )
 
+        from app.modules.shop_runner.required_data_miss import is_required_data_miss
+
         for adv, result in zip(advs_with_whitelist, results):
+            if isinstance(result, Exception) and is_required_data_miss(result):
+                raise result
             if isinstance(result, FirstKeyUpdaterError):
                 logger.error(
                     "Ошибка обновления верхнего ключа для adv_id %s: %s",
@@ -1011,7 +1015,11 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 60, 60)
     async def preload_min_bids_cache_miss(self) -> None:
-        """Приоритетная догрузка cache miss по min bids; на время запроса блокирует old-ветку через Event."""
+        """Приоритетная догрузка cache miss по min bids; на время запроса блокирует old-ветку через Event.
+
+        До завершения догрузки ``read_min_bids_cache_only`` может писать WARNING
+        ``min_bids cache miss`` (не ERROR) — см. ``docks/snapshot_data_updater.md``.
+        """
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer

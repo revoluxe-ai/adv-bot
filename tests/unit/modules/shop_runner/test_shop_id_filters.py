@@ -7,7 +7,11 @@ import pytest
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from app.modules.shop_runner.shop_id_filters import apply_shop_id_filters
+from app.modules.shop_runner.shop_id_filters import (
+    apply_shop_id_filters,
+    filter_shop_ids,
+    is_shop_id_allowed,
+)
 from app.settings.settings_master import Settings
 
 
@@ -87,6 +91,30 @@ def test_settings_shop_exclude_list_parsing() -> None:
         clear=False,
     ):
         assert settings.SHOP_EXCLUDE_LIST == ["id1", "id2"]
+
+
+@pytest.mark.unit
+def test_is_shop_id_allowed_whitelist_and_exclude() -> None:
+    with patch.dict(
+        os.environ,
+        {
+            "SHOP_FILTER_LIST": "shop_a,shop_b",
+            "SHOP_EXCLUDE_LIST": "shop_b",
+        },
+        clear=False,
+    ):
+        assert is_shop_id_allowed("shop_a") is True
+        assert is_shop_id_allowed("shop_b") is False
+        assert is_shop_id_allowed("shop_c") is False
+        assert filter_shop_ids(["shop_a", "shop_b", "shop_c"]) == ["shop_a"]
+
+
+@pytest.mark.unit
+def test_is_shop_id_allowed_no_lists() -> None:
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("SHOP_FILTER_LIST", None)
+        os.environ.pop("SHOP_EXCLUDE_LIST", None)
+        assert is_shop_id_allowed("any") is True
 
 
 @pytest.mark.unit

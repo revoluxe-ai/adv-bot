@@ -6,7 +6,7 @@
       "name": "Python: new_wb_shop_update_run.py (Poetry)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/new_wb_shop_update_run.py", 
+      "program": "${workspaceFolder}/new_wb_shop_update_run.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
