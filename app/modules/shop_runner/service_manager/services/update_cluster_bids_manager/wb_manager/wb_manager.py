@@ -130,7 +130,8 @@ class WBManager(WBBaseManager):
         """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path).
 
         При miss ячейки — ``logger.warning`` (ожидаемо до ``preload_min_bids_cache_miss`` /
-        snapshot); не ``error``, чтобы не дублировать prod-алерты по ERROR.
+        snapshot). ERROR оставлен для ``refresh_min_bids_cache*`` (сбой WB). Ops: перенести
+        алерты с ERROR ``min_bids cache miss`` на WARNING + подстроку (см. docks).
         """
         full_command = dto_to_command(advs)
         cache_manager = MinBidsCacheManager(redis_client_wrapper)
