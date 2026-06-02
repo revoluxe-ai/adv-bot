@@ -222,7 +222,7 @@ def test_profile_n_state_when_no_v2_cpo_and_no_ch() -> None:
 
 @pytest.mark.unit
 def test_profile_collapsed_ch_pay_for_order_min_line() -> None:
-    """Collapsed CH + pay_for_order: M п0|min|CPO|PFO, O/C нет CH ladder, без maxРК."""
+    """Collapsed CH + pay_for_order: M п0|min|CPO|PFO, O/C «нет валид. CH ladder», без maxРК."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
         AggressionTargetMode,
         ModeCandidate,
@@ -258,7 +258,34 @@ def test_profile_collapsed_ch_pay_for_order_min_line() -> None:
     text = format_keyword_v3_profile_block(data)
     assert "п0|min|CPO382.04|pay_for_order" in text
     assert "maxРК" not in text
-    assert "нет CH ladder" in text
+    assert "нет валид. CH ladder" in text
+    assert "нет CH профиля" not in text
+
+
+@pytest.mark.unit
+def test_profile_invalid_reason_no_ch_min_only_label() -> None:
+    """``no_ch_min_only`` на ступени — отдельная подпись от свёрнутой CH ladder."""
+    data = KeywordV3ProfileData(
+        current_mode=KeywordStrategyMode.MIN_CPA,
+        candidates={
+            AggressionTargetMode.MIN_CPA: ModeCandidate(
+                mode=AggressionTargetMode.MIN_CPA,
+                is_valid=True,
+                predicted_cpa=100.0,
+                position=0,
+            ),
+            AggressionTargetMode.OPTIMUM: ModeCandidate(
+                mode=AggressionTargetMode.OPTIMUM,
+                is_valid=False,
+                invalid_reason="no_ch_min_only",
+            ),
+        },
+        keyword_pay_for_order=100.0,
+        stage_sources={AggressionTargetMode.MIN_CPA: "pay_for_order"},
+    )
+    text = format_keyword_v3_profile_block(data)
+    assert "нет CH профиля" in text
+    assert "нет валид. CH ladder" not in text
 
 
 @pytest.mark.unit

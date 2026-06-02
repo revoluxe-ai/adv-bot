@@ -64,8 +64,8 @@ _INVALID_REASON_SHORT: dict[str, str] = {
     "no_keyword_conv_views_to_orders": "нет conv показ→заказ",
     "no_rk_conv_carts_to_orders": "нет корз→заказ РК 7д",
     "optimum_score_non_positive": "optimum ≤ 0",
-    "no_valid_ch_ladder": "нет CH ladder",
-    "no_ch_min_only": "нет CH ladder",
+    "no_valid_ch_ladder": "нет валид. CH ladder",
+    "no_ch_min_only": "нет CH профиля",
 }
 
 
