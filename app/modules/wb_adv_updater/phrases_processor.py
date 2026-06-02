@@ -325,18 +325,36 @@ _sm = get_async_session_maker
 
 
 
-async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
+async def get_good_bad_phrases(
+    complex_adv: ComplexAdv,
+    *,
+    adv_trace: object | None = None,
+) -> list[CalculatedKeyword]:
+    from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
+        AdvPhaseTrace,
+    )
+
+    trace = adv_trace
+    if trace is None:
+        trace = AdvPhaseTrace.for_complex_adv(
+            coroutine="process_adv_v3", adv=complex_adv
+        )
+    assert isinstance(trace, AdvPhaseTrace)
     from .calculated_keywords_manager import CalculatedKeywordsManager
     keyword_manager = CalculatedKeywordsManager()
     # TODO: Вроде как сейчас WB позволяет внутри РК управлять каждым артикулом отдельно
-    keywords: list[CalculatedKeyword] = await keyword_manager.get_calculated_keywords(
-        complex_adv
-    )
-    keywords = sorted(keywords, key=lambda kw: kw.rating or 0, reverse=True)
+    with trace.phase("ckw_get_calculated_keywords_total"):
+        keywords: list[CalculatedKeyword] = await keyword_manager.get_calculated_keywords(
+            complex_adv, adv_trace=trace
+        )
+    with trace.phase("ckw_sort_keywords"):
+        keywords = sorted(keywords, key=lambda kw: kw.rating or 0, reverse=True)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
-    await keywords_redis_cache_manager.set_calculated_keywords(
-        keywords, complex_adv.adv_id
-    )
+    with trace.phase("ckw_redis_set_calculated_keywords"):
+        await keywords_redis_cache_manager.set_calculated_keywords(
+            keywords, complex_adv.adv_id
+        )
+    trace.marker("ckw_done", extra={"keywords_count": len(keywords)})
     return keywords
 
 

@@ -39,6 +39,7 @@ from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
 )
 
 _COROUTINE_GET_WB_ADVS_DTO = "get_wb_advs_dto"
+_COROUTINE_V3_LOAD = "process_adv_v3"
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
@@ -82,25 +83,37 @@ class WBShopDataManager:
     async def __get_calculated_keywords(
         self, complex_adv: ComplexAdv, *, cache_only: bool = False
     ) -> list[CalculatedKeyword] | None:
+        trace = AdvPhaseTrace.for_complex_adv(
+            coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
+        )
+        trace.marker("kw_provider_enter", extra={"cache_only": cache_only})
         if cache_only:
             from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
                 RedisCalculatedKeywordsCacheManager,
             )
 
             redis_mgr = RedisCalculatedKeywordsCacheManager()
-            return await redis_mgr.get_all_calculated_keywords_for_adv(
-                complex_adv.adv_id
+            with trace.phase("kw_redis_cache_get_all"):
+                cached = await redis_mgr.get_all_calculated_keywords_for_adv(
+                    complex_adv.adv_id
+                )
+            trace.marker(
+                "kw_redis_cache_result",
+                extra={"keywords_count": len(cached) if cached else 0, "hit": cached is not None},
             )
+            return cached
 
         from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
         if not complex_adv:
             raise RuntimeError("Сначала обновить модели")
         try:
-            keywords = await get_good_bad_phrases(complex_adv)
+            with trace.phase("kw_get_good_bad_phrases_total"):
+                keywords = await get_good_bad_phrases(complex_adv, adv_trace=trace)
         except Exception as exc:
             raise exc
 
+        trace.marker("kw_provider_done", extra={"keywords_count": len(keywords)})
         return keywords
 
     @single_run()
@@ -137,6 +150,8 @@ class WBShopDataManager:
         self,
         complex_advs: list[ComplexAdv],
         search_adv_bids_override: dict[int, dict[int, int]] | None = None,
+        *,
+        adv_trace: AdvPhaseTrace | None = None,
     ) -> list[WBAdvDTO]:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs_with_search_adv: list[ComplexAdv] = []
@@ -151,11 +166,20 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
-        trace = ShopBatchPhaseTrace(
-            coroutine=_COROUTINE_GET_WB_ADVS_DTO,
-            shop_id=self.shop_id,
-            adv_ids=[a.adv_id for a in complex_advs],
+        trace = (
+            ShopBatchPhaseTrace.from_complex_advs(
+                coroutine=adv_trace.coroutine if adv_trace else _COROUTINE_GET_WB_ADVS_DTO,
+                advs=complex_advs,
+            )
+            if adv_trace is None
+            else ShopBatchPhaseTrace(
+                coroutine=adv_trace.coroutine,
+                shop_id=adv_trace.shop_id,
+                adv_ids=[a.adv_id for a in complex_advs],
+            )
         )
+        if adv_trace is not None:
+            adv_trace.marker("dto_get_wb_advs_dto_enter", extra={"adv_count": len(complex_advs)})
         reuse_min_bids = self._reuse_shared_min_bids_from_complex_advs(complex_advs)
         trace.marker(
             "dto_min_bids_source",
@@ -216,12 +240,12 @@ class WBShopDataManager:
                 _adv: ComplexAdv = complex_adv,
                 _bids: dict[int, int] | None = search_bids_snapshot,
             ) -> WBAdvDataParts:
-                adv_trace = AdvPhaseTrace.for_complex_adv(
-                    coroutine=_COROUTINE_GET_WB_ADVS_DTO, adv=_adv
+                part_trace = adv_trace or AdvPhaseTrace.for_complex_adv(
+                    coroutine=trace.coroutine, adv=_adv
                 )
-                with adv_trace.phase("dto_collect_adv_data_parts_total"):
+                with part_trace.phase("dto_collect_adv_data_parts_total"):
                     return await self._collect_adv_data_parts(
-                        _adv, _bids, adv_trace=adv_trace
+                        _adv, _bids, adv_trace=part_trace
                     )
 
             handlers.append(_collect_handler)
@@ -294,11 +318,14 @@ class WBShopDataManager:
         trace = adv_trace or AdvPhaseTrace.for_complex_adv(
             coroutine=_COROUTINE_GET_WB_ADVS_DTO, adv=complex_adv
         )
-        with trace.phase("dto_collect_plan_and_keywords"):
-            plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
-            keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
-            plan = await plan_task
-            keywords = await keywords_task
+        with trace.phase("dto_collect_plan_data"):
+            plan = await self._collect_plan_data(complex_adv)
+        trace.marker(
+            "dto_collect_keywords_second_call_start",
+            extra={"note": "duplicate get_keywords inside get_wb_advs_dto"},
+        )
+        with trace.phase("dto_collect_keywords_second_call"):
+            keywords = await self._collect_keywords(complex_adv)
         trace.marker("dto_keywords_loaded", extra={"keywords_count": len(keywords)})
         manager = PlanFactProvider(complex_adv.adv_setting)
         with trace.phase("dto_ch_get_stat_data"):
@@ -445,7 +472,12 @@ class WBShopDataManager:
             await self.attach_min_nmids_bids(complex_advs)
         return complex_advs
 
-    async def backfill_min_bids_for_adv(self, complex_adv: ComplexAdv) -> bool:
+    async def backfill_min_bids_for_adv(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        adv_trace: AdvPhaseTrace | None = None,
+    ) -> bool:
         """Догрузить min_bids в Redis для РК (как ``preload_min_bids_cache_miss``).
 
         Сначала ``refresh_min_bids_cache_miss_cells`` по cache-miss ячейкам;
@@ -455,6 +487,9 @@ class WBShopDataManager:
         Returns:
             True, если после догрузки ``main_nmid`` есть в ``min_bids.search``.
         """
+        trace = adv_trace or AdvPhaseTrace.for_complex_adv(
+            coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
+        )
         if self._wb_manager is None:
             logger.error(
                 "backfill_min_bids_for_adv: WBManager недоступен shop_id=%s adv_id=%s",
@@ -467,25 +502,30 @@ class WBShopDataManager:
         wb_manager = self._wb_manager
 
         async def _main_nmid_cached() -> bool:
-            cached = await wb_manager.get_min_bids_cache_only(
-                [complex_adv],
-                context="v3_min_bids_check",
-            )
+            with trace.phase("min_bids_backfill_cache_check"):
+                cached = await wb_manager.get_min_bids_cache_only(
+                    [complex_adv],
+                    context="v3_min_bids_check",
+                )
             return nmid in cached.search
 
         if await _main_nmid_cached():
+            trace.marker("min_bids_backfill_already_cached", extra={"nmid": nmid})
             return True
 
-        miss_cells = await wb_manager.find_min_bids_cache_miss_cells(
-            [complex_adv],
-            emit_app_log=True,
-            log_label="v3_min_bids_backfill",
-        )
+        with trace.phase("min_bids_backfill_find_miss_cells"):
+            miss_cells = await wb_manager.find_min_bids_cache_miss_cells(
+                [complex_adv],
+                emit_app_log=True,
+                log_label="v3_min_bids_backfill",
+            )
+        trace.marker("min_bids_backfill_miss_cells", extra={"cells": len(miss_cells)})
         if miss_cells:
             try:
-                written = await wb_manager.refresh_min_bids_cache_miss_cells(
-                    miss_cells
-                )
+                with trace.phase("min_bids_backfill_refresh_miss_cells"):
+                    written = await wb_manager.refresh_min_bids_cache_miss_cells(
+                        miss_cells
+                    )
                 logger.info(
                     "v3_min_bids_backfill: refresh miss shop_id=%s adv_id=%s "
                     "cells=%s written=%s",
@@ -514,7 +554,8 @@ class WBShopDataManager:
             nmid,
         )
         try:
-            await wb_manager.refresh_min_bids_cache([complex_adv])
+            with trace.phase("min_bids_backfill_refresh_wb_api"):
+                await wb_manager.refresh_min_bids_cache([complex_adv])
         except Exception:
             logger.error(
                 "v3_min_bids_backfill: refresh_min_bids_cache failed shop_id=%s adv_id=%s",
