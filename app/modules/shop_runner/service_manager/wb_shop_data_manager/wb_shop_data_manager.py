@@ -33,6 +33,12 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
     PreComplexAdv,
 )
+from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
+    AdvPhaseTrace,
+    ShopBatchPhaseTrace,
+)
+
+_COROUTINE_GET_WB_ADVS_DTO = "get_wb_advs_dto"
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
@@ -145,31 +151,48 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
+        trace = ShopBatchPhaseTrace(
+            coroutine=_COROUTINE_GET_WB_ADVS_DTO,
+            shop_id=self.shop_id,
+            adv_ids=[a.adv_id for a in complex_advs],
+        )
         reuse_min_bids = self._reuse_shared_min_bids_from_complex_advs(complex_advs)
+        trace.marker(
+            "dto_min_bids_source",
+            extra={"reuse_min_bids": reuse_min_bids is not None},
+        )
 
         if search_adv_bids_override is not None:
             if reuse_min_bids is not None:
                 min_bids = reuse_min_bids
             else:
-                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+                with trace.phase("dto_get_min_bids"):
+                    min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
             search_adv_bids = search_adv_bids_override
         else:
             if reuse_min_bids is not None:
                 min_bids = reuse_min_bids
-                search_adv_bids = await self._get_search_adv_common_bids(complex_advs)
+                with trace.phase("dto_get_search_adv_common_bids"):
+                    search_adv_bids = await self._get_search_adv_common_bids(
+                        complex_advs
+                    )
             else:
                 async def _timed_min_bids() -> AdvMinNmidsBids | None:
-                    return await self._get_min_bids(
-                        complex_advs, cache_possible=True
-                    )
+                    with trace.phase("dto_parallel_get_min_bids"):
+                        return await self._get_min_bids(
+                            complex_advs, cache_possible=True
+                        )
 
                 async def _timed_search_bids() -> dict[int, dict[int, int]]:
-                    return await self._get_search_adv_common_bids(complex_advs)
+                    with trace.phase("dto_parallel_get_search_bids"):
+                        return await self._get_search_adv_common_bids(complex_advs)
+
                 # TODO: Вынести получение данных по API отсюда
-                result = await asyncio.gather(
-                    _timed_min_bids(),
-                    _timed_search_bids(),
-                )
+                with trace.phase("dto_gather_min_and_search_bids"):
+                    result = await asyncio.gather(
+                        _timed_min_bids(),
+                        _timed_search_bids(),
+                    )
                 min_bids = result[0]
                 search_adv_bids = result[1]
 
@@ -193,7 +216,13 @@ class WBShopDataManager:
                 _adv: ComplexAdv = complex_adv,
                 _bids: dict[int, int] | None = search_bids_snapshot,
             ) -> WBAdvDataParts:
-                return await self._collect_adv_data_parts(_adv, _bids)
+                adv_trace = AdvPhaseTrace.for_complex_adv(
+                    coroutine=_COROUTINE_GET_WB_ADVS_DTO, adv=_adv
+                )
+                with adv_trace.phase("dto_collect_adv_data_parts_total"):
+                    return await self._collect_adv_data_parts(
+                        _adv, _bids, adv_trace=adv_trace
+                    )
 
             handlers.append(_collect_handler)
 
@@ -201,12 +230,13 @@ class WBShopDataManager:
         # Важно: здесь может быть вложенный вызов из handler-а shared TasksManager
         # (adv_settings_auto_update -> process_adv_v3 -> get_wb_advs_dto).
         # Если передать тот же tasks_manager при max_workers=1, получится self-queue deadlock.
-        results = await run_tasks(
-            handlers,
-            max_workers=max_workers,
-            tasks_manager=None,
-            return_exceptions=True,
-        )
+        with trace.phase("dto_parallel_collect_adv_data_parts"):
+            results = await run_tasks(
+                handlers,
+                max_workers=max_workers,
+                tasks_manager=None,
+                return_exceptions=True,
+            )
 
         successful_parts: list[WBAdvDataParts] = []
         for adv, result in zip(complex_advs_with_bids, results):
@@ -258,15 +288,23 @@ class WBShopDataManager:
         self,
         complex_adv: ComplexAdv,
         current_search_bids: dict[int, int] | None,
+        *,
+        adv_trace: AdvPhaseTrace | None = None,
     ) -> WBAdvDataParts:
-        plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
-        keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
-
-        plan = await plan_task
-        keywords = await keywords_task
+        trace = adv_trace or AdvPhaseTrace.for_complex_adv(
+            coroutine=_COROUTINE_GET_WB_ADVS_DTO, adv=complex_adv
+        )
+        with trace.phase("dto_collect_plan_and_keywords"):
+            plan_task = asyncio.create_task(self._collect_plan_data(complex_adv))
+            keywords_task = asyncio.create_task(self._collect_keywords(complex_adv))
+            plan = await plan_task
+            keywords = await keywords_task
+        trace.marker("dto_keywords_loaded", extra={"keywords_count": len(keywords)})
         manager = PlanFactProvider(complex_adv.adv_setting)
-        stat = await manager.get_stat_data(keywords)
-        fact = await manager.get_fact_data(stat)
+        with trace.phase("dto_ch_get_stat_data"):
+            stat = await manager.get_stat_data(keywords)
+        with trace.phase("dto_ch_get_fact_data"):
+            fact = await manager.get_fact_data(stat)
 
         return WBAdvDataParts(
             complex_adv=complex_adv,

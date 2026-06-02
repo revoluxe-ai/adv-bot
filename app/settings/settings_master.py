@@ -766,10 +766,16 @@ class Settings:
 
     @property
     def PROXY(self) -> str | None:
-        value = os.getenv("PROXY")
-        if value is None or not str(value).strip():
-            return None
-        return str(value).strip()
+        """URL прокси для aiogram (Telegram API).
+
+        Явный ``PROXY`` имеет приоритет; иначе берётся ``HTTPS_PROXY`` / ``HTTP_PROXY``
+        (как у деплоев с xray, где заданы только стандартные переменные).
+        """
+        for key in ("PROXY", "HTTPS_PROXY", "HTTP_PROXY"):
+            value = os.getenv(key)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return None
 
     @property
     def unisender_go_api_key(self) -> str | None:

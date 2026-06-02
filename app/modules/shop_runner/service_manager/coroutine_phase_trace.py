@@ -85,6 +85,24 @@ class AdvPhaseTrace:
         self.adv_id = adv_id
         self.enabled = is_trace_adv(adv_id)
 
+    @classmethod
+    def for_complex_adv(cls, *, coroutine: str, adv: Any) -> AdvPhaseTrace:
+        """Собрать trace из ``ComplexAdv`` (``shop_id``, ``adv_id``)."""
+        return cls(coroutine=coroutine, shop_id=adv.shop_id, adv_id=adv.adv_id)
+
+    def marker(self, phase: str, extra: dict[str, object] | None = None) -> None:
+        """Точка без длительности (счётчики, размеры коллекций)."""
+        if not self.enabled:
+            return
+        log_coroutine_phase(
+            coroutine=self.coroutine,
+            phase=phase,
+            step="marker",
+            shop_id=self.shop_id,
+            adv_id=self.adv_id,
+            extra=cast_extra(extra),
+        )
+
     def dbg_phase(self, name: str, extra: dict[str, object] | None = None) -> None:
         """Колбэк для подфаз ``_load_v3_wb_context`` (step=marker, без длительности)."""
         if not self.enabled:
@@ -139,6 +157,40 @@ class ShopBatchPhaseTrace:
         self.shop_id = shop_id
         self.enabled = batch_has_trace_adv(adv_ids)
         self._traced_adv_ids = [aid for aid in adv_ids if is_trace_adv(aid)]
+
+    @classmethod
+    def from_complex_advs(cls, *, coroutine: str, advs: Iterable[Any]) -> ShopBatchPhaseTrace:
+        """Собрать batch-trace из списка ``ComplexAdv``."""
+        adv_list = list(advs)
+        shop_id = adv_list[0].shop_id if adv_list else "unknown"
+        return cls(
+            coroutine=coroutine,
+            shop_id=shop_id,
+            adv_ids=[a.adv_id for a in adv_list],
+        )
+
+    def marker(
+        self,
+        phase: str,
+        *,
+        adv_id: int | None = None,
+        extra: dict[str, object] | None = None,
+    ) -> None:
+        """Точка без длительности на уровне магазина или одной РК."""
+        if not self.enabled:
+            return
+        merged: dict[str, Any] | None = cast_extra(extra)
+        if adv_id is None and self._traced_adv_ids:
+            base = {"traced_adv_ids": self._traced_adv_ids}
+            merged = {**base, **(merged or {})}
+        log_coroutine_phase(
+            coroutine=self.coroutine,
+            phase=phase,
+            step="marker",
+            shop_id=self.shop_id,
+            adv_id=adv_id,
+            extra=merged,
+        )
 
     @contextmanager
     def phase(self, name: str, *, adv_id: int | None = None) -> Iterator[None]:
