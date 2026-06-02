@@ -104,9 +104,10 @@ def retry_decorator(
                     last_query_time = state["_last_query_time"]
                     if last_query_time is not None:
                         current_time = time.time()
-                        time_since_last_query = current_time - last_query_time
                         time_to_wait = max(
-                            state["_current_pause"] - time_since_last_query, 0.0
+                            state["_current_pause"]
+                            - (current_time - last_query_time),
+                            0.0,
                         )
                     await asyncio.sleep(time_to_wait)
 
