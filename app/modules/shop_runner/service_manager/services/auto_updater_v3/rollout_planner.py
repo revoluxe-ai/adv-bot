@@ -970,19 +970,6 @@ def _min_cpa_bound_by_pay_for_order(
     )
 
 
-def _min_cpa_operational_via_pay_for_order_ctx(
-    ctx: "KeywordV3Context",
-    eligibility: "KeywordV3Eligibility | None",
-    catalog: dict[AggressionTargetMode, ModeCandidate] | None,
-) -> bool:
-    """Operational MIN через pay_for_order (NO CH или collapsed CH)."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        min_cpa_operational_via_pay_for_order,
-    )
-
-    return min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
-
-
 def _cleanup_diag(
     *,
     cur_c: ModeCandidate | None,
@@ -1096,13 +1083,16 @@ def _active_state_invalid_for_cleanup(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
         target_place_from_mode_candidate,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        min_cpa_operational_via_pay_for_order,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderCostSource,
         cost_for_mode,
         resolve_ladder_stage_display,
     )
 
-    if _min_cpa_operational_via_pay_for_order_ctx(ctx, eligibility, catalog):
+    if min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog):
         assert eligibility is not None
         return _active_state_invalid_no_ch_for_cleanup(
             ctx,
@@ -1165,6 +1155,7 @@ def _lower_modes_valid_for_cleanup(
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         can_target_mode,
+        min_cpa_operational_via_pay_for_order,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderCostSource,
@@ -1179,7 +1170,7 @@ def _lower_modes_valid_for_cleanup(
     for mode in _modes_below_for_cleanup(current):
         if eligibility is not None and not can_target_mode(eligibility, mode):
             continue
-        if _min_cpa_operational_via_pay_for_order_ctx(ctx, eligibility, catalog):
+        if min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog):
             if mode != KeywordStrategyMode.MIN_CPA:
                 continue
             stage = resolve_ladder_stage_display(
