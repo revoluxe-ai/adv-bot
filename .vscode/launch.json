@@ -3,18 +3,6 @@
   "$schema": "vscode://schemas/launch",
   "configurations": [
     {
-      "name": "Python: run_adv_bot_stack.py (Poetry)",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/run_adv_bot_stack.py",
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
-      "justMyCode": true
-    },
-    {
       "name": "Python: new_wb_shop_update_run.py (Poetry)",
       "type": "debugpy",
       "request": "launch",
