@@ -161,8 +161,7 @@ class UpdateClusterBidsManager:
         await self._apply_command(new_bids_command, batch_trace=trace)
         if advs:
             with trace.phase("manager_set_cluster_bids_timestamp"):
-                for adv in advs:
-                    await self._redis_cluster_bids_timestamp_manager.set(adv)
+                await self._redis_cluster_bids_timestamp_manager.set_many(advs)
 
 
     async def _get_bidder_update_data(
