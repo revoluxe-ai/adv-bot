@@ -33,6 +33,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
     CalculatedKeyword,
 )
 from app.snapshot_data_updater.cache_freshness import (
+    CacheStaleError,
     load_keywords_meta,
     parse_warmed_at,
 )
