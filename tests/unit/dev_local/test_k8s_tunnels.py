@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import types
 from unittest.mock import MagicMock, patch
 
@@ -51,6 +52,21 @@ def test_tcp_port_open_failure() -> None:
         side_effect=OSError("connection refused"),
     ):
         assert k8s_tunnels._tcp_port_open("127.0.0.1", 15432) is False
+
+
+@pytest.mark.unit
+def test_port_bindable_true_when_ipv6_unavailable() -> None:
+    """IPv4-only хост: отказ AF_INET6 не блокирует bind-check и fallback CH."""
+
+    def _bind_stub(port: int, family: int, host: str) -> bool:
+        del port, host
+        return family == socket.AF_INET
+
+    with (
+        patch.object(k8s_tunnels, "_port_is_free", return_value=True),
+        patch.object(k8s_tunnels, "_try_bind_loopback", side_effect=_bind_stub),
+    ):
+        assert k8s_tunnels._port_bindable(18123) is True
 
 
 def test_start_dev_tunnels_skipped_when_disabled(

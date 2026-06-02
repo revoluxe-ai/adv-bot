@@ -404,22 +404,32 @@ def _port_is_free(port: int) -> bool:
     return not _all_listener_pids(port)
 
 
-def _port_bindable(port: int) -> bool:
-    """Проверяет, что локальный порт можно занять под kubectl на IPv4/IPv6."""
-    if not _port_is_free(port):
-        return False
-    sockets: list[socket.socket] = []
+def _try_bind_loopback(port: int, family: int, host: str) -> bool:
+    """Пробует bind на loopback; False при OSError (занят порт или стек недоступен)."""
+    sock: socket.socket | None = None
     try:
-        for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
-            sock = socket.socket(family, socket.SOCK_STREAM)
-            sockets.append(sock)
-            sock.bind((host, port))
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        sock.bind((host, port))
         return True
     except OSError:
         return False
     finally:
-        for sock in sockets:
+        if sock is not None:
             sock.close()
+
+
+def _port_bindable(port: int) -> bool:
+    """Проверяет, что локальный порт можно занять под kubectl (обязательно IPv4).
+
+    Дополнительно пробует IPv6 (::1), если стек есть; отсутствие IPv6 на хосте
+    не считается ошибкой — kubectl port-forward использует 127.0.0.1.
+    """
+    if not _port_is_free(port):
+        return False
+    if not _try_bind_loopback(port, socket.AF_INET, "127.0.0.1"):
+        return False
+    _try_bind_loopback(port, socket.AF_INET6, "::1")
+    return True
 
 
 def _select_clickhouse_fallback_port(current_port: int) -> int | None:
