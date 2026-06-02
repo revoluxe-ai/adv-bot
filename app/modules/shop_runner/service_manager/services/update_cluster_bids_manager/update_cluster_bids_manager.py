@@ -30,7 +30,7 @@ from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
     ShopBatchPhaseTrace,
 )
 
-_COROUTINE_CLUSTER_BIDS = "update_cluster_bids"
+
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisApiClusterBidsManager,
@@ -57,6 +57,8 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, ru
 
 # TODO: Внедрить в ректрай WB Api декораторы всплески
 
+
+_COROUTINE_CLUSTER_BIDS = "update_cluster_bids"
 
 logger = logging.getLogger(__name__)
 
