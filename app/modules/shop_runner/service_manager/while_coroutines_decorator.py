@@ -1,3 +1,8 @@
+"""Декоратор бесконечного цикла для фоновых корутин shop-runner.
+
+Shop-runner использует legacy WB API (``app.core.wb_api``) и новый mp-клиент
+(``app.core.mp.wb.api``); одноимённые исключения в этих пакетах — разные классы.
+"""
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
@@ -6,11 +11,18 @@ from typing import Any, ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 
-from app.core.mp.wb.api.excs import MaxAttemptsError, ApiForbiddenError
+from app.core.mp.wb.api.excs import ApiForbiddenError as MpApiForbiddenError
+from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
+from app.core.wb_api.exceptions import ApiForbiddenError as LegacyApiForbiddenError
+from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
 logger = logging.getLogger(__name__)
+
+# Legacy WB API и mp-клиент поднимают разные классы с одинаковыми именами.
+_API_FORBIDDEN_ERRORS = (LegacyApiForbiddenError, MpApiForbiddenError)
+_MAX_ATTEMPTS_ERRORS = (LegacyMaxAttemptsError, MpMaxAttemptsError)
 
 
 class MainCoroutineRuntimeError(RuntimeError):
@@ -56,7 +68,7 @@ def while_coroutine_decorator(
                 except InterfaceError:
                     logger.exception(f"Корутина: {func.__name__}")
                     await asyncio.sleep(pause_on_error)
-                except ApiForbiddenError:
+                except _API_FORBIDDEN_ERRORS:
                     raise
                 except NotFoundActiveAdvCompany as exc:
                     logger.info("Нет активных кампаний: %s", exc)
@@ -64,7 +76,7 @@ def while_coroutine_decorator(
                 except StopShopUpdateException as exc:
                     logger.info("Коробка остановлена: %s", exc)
                     break
-                except MaxAttemptsError as exc:
+                except _MAX_ATTEMPTS_ERRORS as exc:
                     logger.error(
                         f"Максимальное количество попыток для {func.__name__} достигнуто: {exc}",
                         exc_info=True,

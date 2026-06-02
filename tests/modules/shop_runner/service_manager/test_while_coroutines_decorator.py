@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.mp.wb.api.excs import ApiForbiddenError as MpApiForbiddenError
+from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
+from app.core.wb_api.exceptions import ApiForbiddenError as LegacyApiForbiddenError
+from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
 from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
     _get_shop_id_for_log,
     while_coroutine_decorator,
@@ -160,3 +164,62 @@ async def test_decorator_timeout_runs_finally_before_next_tick() -> None:
                 await wrapped(self_mock)
 
     assert finally_ran.is_set()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "forbidden_error",
+    [
+        LegacyApiForbiddenError("Нет токенов для доступа к API"),
+        MpApiForbiddenError("Нет токенов для доступа к API"),
+    ],
+)
+async def test_decorator_re_raises_api_forbidden_without_retry(
+    forbidden_error: LegacyApiForbiddenError | MpApiForbiddenError,
+) -> None:
+    """ApiForbiddenError (legacy и mp) пробрасывается наверх без sleep/retry."""
+    decorator = while_coroutine_decorator(60, 5)
+
+    async def raise_forbidden(self: object) -> None:
+        raise forbidden_error
+
+    wrapped = decorator(raise_forbidden)
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            with pytest.raises(type(forbidden_error)):
+                await wrapped(MagicMock(shop_id="1"))
+
+    mock_logger.error.assert_not_called()
+    mock_sleep.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "max_attempts_error",
+    [
+        LegacyMaxAttemptsError(),
+        MpMaxAttemptsError(),
+    ],
+)
+async def test_decorator_retries_on_max_attempts_error(
+    max_attempts_error: LegacyMaxAttemptsError | MpMaxAttemptsError,
+) -> None:
+    """MaxAttemptsError (legacy и mp) логируется и приводит к pause_on_error."""
+    decorator = while_coroutine_decorator(60, 5)
+
+    async def raise_max_attempts(self: object) -> None:
+        raise max_attempts_error
+
+    wrapped = decorator(raise_max_attempts)
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_sleep.side_effect = Exception("stop_loop")
+            with pytest.raises(Exception, match="stop_loop"):
+                await wrapped(MagicMock(shop_id="1"))
+
+    mock_logger.error.assert_called_once()
+    mock_sleep.assert_called_once_with(5)
