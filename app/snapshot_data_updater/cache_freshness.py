@@ -15,10 +15,12 @@ from app.snapshot_data_updater.cache_errors import (
     RequiredDataMissError,
 )
 from app.snapshot_data_updater.keys import keywords_meta_key
+from typing import TypeAlias
+
 from redis.asyncio.client import Redis as AsyncRedisClient
 
 # Legacy app Redis (``redis_client`` без decode_responses) — ответы ``bytes``.
-SnapshotRedisClient = AsyncRedisClient[bytes]
+SnapshotRedisClient: TypeAlias = AsyncRedisClient
 
 
 def parse_warmed_at(meta: dict[str, str] | None) -> datetime | None:
