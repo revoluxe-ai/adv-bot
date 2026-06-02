@@ -420,7 +420,7 @@ class ComplexAdv:
                 "пересчёт только в snapshot updater (warmup). "
                 "Используйте cache_only=True."
             )
-        if self._calculated_keywords:
+        if self._calculated_keywords is not None:
             return self._filter_keywords(self._calculated_keywords)
 
         from app.modules.shop_runner.required_data_miss import (
