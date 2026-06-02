@@ -30,9 +30,14 @@ async def test_get_keywords_raises_on_cache_only_false() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_keywords_strict_miss_raises() -> None:
+    """Miss при ``allow_miss=False`` — ответственность провайдера (как у Redis path)."""
     adv_setting = MagicMock()
     adv_setting.id = 1
-    provider = AsyncMock(return_value=None)
+    adv_setting.adv_id = 42
+    miss = ShopRunnerKeywordsCacheMissError(
+        "cache miss", shop_id="shop-1", adv_id=42
+    )
+    provider = AsyncMock(side_effect=miss)
     complex_adv = ComplexAdv(
         shop_id="shop-1",
         adv_setting=adv_setting,

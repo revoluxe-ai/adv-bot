@@ -24,7 +24,13 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 class GetKeywordsProvider(Protocol):
-    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``)."""
+    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``).
+
+    Реализации должны вызывать ``fetch_calculated_keywords_from_redis`` (или
+    эквивалент с ``resolve_calculated_keywords_cache``): при miss и
+    ``allow_miss=False`` — ``ShopRunnerKeywordsCacheMissError``, иначе список
+    или ``None``.
+    """
 
     async def __call__(
         self,
@@ -423,17 +429,7 @@ class ComplexAdv:
         if self._calculated_keywords is not None:
             return self._filter_keywords(self._calculated_keywords)
 
-        from app.modules.shop_runner.required_data_miss import (
-            resolve_calculated_keywords_cache,
-        )
-
-        raw = await self._get_keywords(self, cache_only=True, allow_miss=allow_miss)
-        cached = resolve_calculated_keywords_cache(
-            raw,
-            shop_id=self.shop_id or "",
-            adv_id=self.adv_id,
-            allow_miss=allow_miss,
-        )
+        cached = await self._get_keywords(self, cache_only=True, allow_miss=allow_miss)
         if cached is None:
             return None
         self._calculated_keywords = cached
