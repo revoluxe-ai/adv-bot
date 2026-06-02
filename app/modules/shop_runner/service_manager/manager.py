@@ -95,6 +95,7 @@ from .services.adv_strategy_selector import AdvStrategySelector, StrategySelecti
 from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
+from .coroutine_phase_trace import ShopBatchPhaseTrace
 from .services.v3_status_mode_sync import (
     is_v3_campaign,
     keyword_strategy_mode_for_adv_strategy,
@@ -940,12 +941,24 @@ class CoroutinesManager:
             for adv in advs
             if adv.bidder_active
         ]
-        advs_filtred, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="update_cluster_bids"
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=self.shop_id,
+            adv_ids=[adv.adv_id for adv in advs],
         )
+        with trace.phase("split_by_stats_freshness"):
+            advs_filtred, _ = await self._split_advs_by_stats_freshness(
+                advs, operation_name="update_cluster_bids"
+            )
         if not advs_filtred:
             return None
-        await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=self.shop_id,
+            adv_ids=[adv.adv_id for adv in advs_filtred],
+        )
+        with trace.phase("manager_update_cluster_bids"):
+            await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
         logger.info(
             "heartbeat update_cluster_bids shop_id=%s advs=%s",
             self.shop_id,

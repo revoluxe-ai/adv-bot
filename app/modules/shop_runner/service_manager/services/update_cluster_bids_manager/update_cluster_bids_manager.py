@@ -25,6 +25,9 @@ from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import
     is_v3_keyword_eligible_for_cluster_bidding,
     is_v3_status_mode_consistent,
 )
+from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
+    ShopBatchPhaseTrace,
+)
 from app.modules.cluster_bids_redis import (
     ClusterBidKey,
     RedisApiClusterBidsManager,
@@ -111,13 +114,21 @@ class UpdateClusterBidsManager:
         return await self._get_bidder_update_data(advs, map_datas)
 
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
-        local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
-        remote_data: BidderUpdateData = await self._get_data_from_wb_api(
-            advs, local_data
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=advs[0].shop_id if advs else "unknown",
+            adv_ids=[adv.adv_id for adv in advs],
         )
-        predict_bids_data: dict[
-            int, (dict[int, dict[str, dict[int, int]]] | None)
-        ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
+        with trace.phase("manager_get_local_data"):
+            local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
+        with trace.phase("manager_get_remote_data"):
+            remote_data: BidderUpdateData = await self._get_data_from_wb_api(
+                advs, local_data
+            )
+        with trace.phase("manager_get_predict_bids_data"):
+            predict_bids_data: dict[
+                int, (dict[int, dict[str, dict[int, int]]] | None)
+            ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -126,15 +137,27 @@ class UpdateClusterBidsManager:
         )
 
     async def update_cluster_bids(self, advs: list[ComplexAdv]) -> None:
-        calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
-        calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
-            calculate_data
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=advs[0].shop_id if advs else "unknown",
+            adv_ids=[adv.adv_id for adv in advs],
         )
-        new_bids_command: UpdateBidsCommand = self._get_bids_command(calculation_inputs)
-        await self._apply_command(new_bids_command)
+        with trace.phase("manager_get_calculate_data"):
+            calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
+        with trace.phase("manager_get_calculation_inputs"):
+            calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
+                calculate_data
+            )
+        with trace.phase("manager_get_bids_command"):
+            new_bids_command: UpdateBidsCommand = self._get_bids_command(
+                calculation_inputs
+            )
+        with trace.phase("manager_apply_command"):
+            await self._apply_command(new_bids_command)
         if advs:
-            for adv in advs:
-                await self._redis_cluster_bids_timestamp_manager.set(adv)
+            with trace.phase("manager_set_cluster_bids_timestamp"):
+                for adv in advs:
+                    await self._redis_cluster_bids_timestamp_manager.set(adv)
 
 
     async def _get_bidder_update_data(
@@ -142,6 +165,11 @@ class UpdateClusterBidsManager:
         advs: list[ComplexAdv],
         map_datas: set[AdvIdItemCalculateData],
     ) -> BidderUpdateData:
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=advs[0].shop_id if advs else "unknown",
+            adv_ids=[adv.adv_id for adv in advs],
+        )
         async def _get_cluster_bids() -> list[NormqueryBidDTO]:
             return await self._get_cluster_bids_for_maps(map_datas, advs)
 
@@ -159,16 +187,18 @@ class UpdateClusterBidsManager:
             _get_fact_data,
         ]
 
-        results = await run_tasks(
-            handlers,
-            max_workers=3,
-            return_exceptions=False,
-            tasks_manager=self._tasks_manager,
-        )
+        with trace.phase("manager_load_wb_parallel_data"):
+            results = await run_tasks(
+                handlers,
+                max_workers=3,
+                return_exceptions=False,
+                tasks_manager=self._tasks_manager,
+            )
         current_bids = cast(list[NormqueryBidDTO], results[0])
         min_bids = cast(AdvMinNmidsBids, results[1])
         fact_data = cast(dict[int, FactData], results[2])
-        plan_data = self._get_plan_data(advs)
+        with trace.phase("manager_get_plan_data"):
+            plan_data = self._get_plan_data(advs)
 
         return BidderUpdateData(
             advs=advs,
@@ -445,12 +475,18 @@ class UpdateClusterBidsManager:
             if aid is not None and aid not in seen_auction:
                 seen_auction.add(aid)
                 auction_ids_unique.append(aid)
-        ch_manager = ClickHouseManager()
-        texts_by_adv_id: dict[int, set[str]] = (
-            await ch_manager.get_cluster_texts_for_adv_ids(auction_ids_unique)
-            if auction_ids_unique
-            else {}
+        trace = ShopBatchPhaseTrace(
+            coroutine="update_cluster_bids",
+            shop_id=advs[0].shop_id if advs else "unknown",
+            adv_ids=[adv.adv_id for adv in advs],
         )
+        ch_manager = ClickHouseManager()
+        with trace.phase("manager_get_cluster_texts_from_ch"):
+            texts_by_adv_id: dict[int, set[str]] = (
+                await ch_manager.get_cluster_texts_for_adv_ids(auction_ids_unique)
+                if auction_ids_unique
+                else {}
+            )
         handlers: list[Callable[[], Awaitable[set[AdvIdItemCalculateData]]]] = []
         for adv in advs:
             cluster_texts: set[str] = (
@@ -466,11 +502,12 @@ class UpdateClusterBidsManager:
                 return await self.__get_calculate_data(a, texts)
 
             handlers.append(_run)
-        results = await run_tasks(
-            handlers,
-            max_workers=_max_workers_for(len(handlers), cap=16),
-            tasks_manager=self._tasks_manager,
-        )
+        with trace.phase("manager_collect_calculate_data_parallel"):
+            results = await run_tasks(
+                handlers,
+                max_workers=_max_workers_for(len(handlers), cap=16),
+                tasks_manager=self._tasks_manager,
+            )
         datas: set[AdvIdItemCalculateData] = set()
         for result in results:
             if isinstance(result, BaseException):

@@ -88,6 +88,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
 )
+from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
+    AdvPhaseTrace,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
@@ -239,14 +242,22 @@ async def process_adv_v3(
     max_last_period: int = 2,
 ) -> None:
     """Один тик V3: in-memory ledger → нетто-flush → target_place."""
+    trace = AdvPhaseTrace(
+        coroutine="process_adv_v3",
+        shop_id=complex_adv.shop_id,
+        adv_id=complex_adv.adv_id,
+    )
     adv = complex_adv.adv_setting
-    keywords = await complex_adv.get_keywords()
+    with trace.phase("get_keywords"):
+        keywords = await complex_adv.get_keywords()
     ledger = V3TickKeywordLedger.from_keywords(keywords)
 
-    dto, raw_profiles = await _load_v3_wb_context(
-        complex_adv,
-        wb_shop_data_manager=wb_shop_data_manager,
-    )
+    with trace.phase("load_v3_wb_context"):
+        dto, raw_profiles = await _load_v3_wb_context(
+            complex_adv,
+            wb_shop_data_manager=wb_shop_data_manager,
+            dbg_phase=trace.dbg_phase,
+        )
     target_place_synced = False
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
@@ -278,22 +289,26 @@ async def process_adv_v3(
     preamble_guard_count = 0
 
     try:
-        contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-        plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        with trace.phase("build_keyword_v3_contexts"):
+            contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+        with trace.phase("get_plan_data"):
+            plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
         if plan is None:
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
         else:
-            updater = AdvSettingAutoUpdater(adv, max_last_period)
-            fact, fact_source = await _resolve_v3_fact_data(
-                dto=dto,
-                updater=updater,
-                keywords=ledger.keywords,
-                max_last_period=max_last_period,
-            )
-            state = detect_campaign_state(plan, fact)
-            campaign_mode = resolve_campaign_mode(state)
+            with trace.phase("resolve_fact_data"):
+                updater = AdvSettingAutoUpdater(adv, max_last_period)
+                fact, fact_source = await _resolve_v3_fact_data(
+                    dto=dto,
+                    updater=updater,
+                    keywords=ledger.keywords,
+                    max_last_period=max_last_period,
+                )
+            with trace.phase("detect_campaign_state"):
+                state = detect_campaign_state(plan, fact)
+                campaign_mode = resolve_campaign_mode(state)
             logger.info(
                 "[adv_id=%s] v3: campaign_mode=%s state=%s fact_source=%s",
                 complex_adv.adv_id,
@@ -531,8 +546,11 @@ async def process_adv_v3(
             )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
-            plan_fact_change = ChangePlanFact(adv)
-            plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
+            with trace.phase("plan_fact_cache_check"):
+                plan_fact_change = ChangePlanFact(adv)
+                plan_fact_equal = await plan_fact_change.check_equal_in_cache(
+                    plan, fact
+                )
 
             async def cache_plan_fact_snapshot() -> None:
                 await plan_fact_change.set_new_plan_fact(plan, fact)
@@ -549,18 +567,21 @@ async def process_adv_v3(
                     complex_adv.adv_id,
                 )
             else:
-                shelf_active = complex_adv.shelf_promotion_active
-                selector_actions_logged = select_v3_post_gate_actions(
-                    contexts=contexts,
-                    shelf_promotion_active=shelf_active,
-                    shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
-                    if shelf_active
-                    else None,
-                    ladder_inputs=ladder_inputs,
-                    policy=policy,
-                )
-                _ = ledger.apply_in_memory(selector_actions_logged)
-                await cache_plan_fact_snapshot()
+                with trace.phase("select_post_gate_actions"):
+                    shelf_active = complex_adv.shelf_promotion_active
+                    selector_actions_logged = select_v3_post_gate_actions(
+                        contexts=contexts,
+                        shelf_promotion_active=shelf_active,
+                        shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
+                        if shelf_active
+                        else None,
+                        ladder_inputs=ladder_inputs,
+                        policy=policy,
+                    )
+                with trace.phase("apply_selector_actions"):
+                    _ = ledger.apply_in_memory(selector_actions_logged)
+                with trace.phase("cache_plan_fact_snapshot"):
+                    await cache_plan_fact_snapshot()
                 up_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "UP"
                 )
@@ -591,13 +612,16 @@ async def process_adv_v3(
                 )
 
         if not is_campaign_full_stop(campaign_mode):
-            flushed_to_db = await ledger.flush_to_db(complex_adv)
+            with trace.phase("flush_to_db"):
+                flushed_to_db = await ledger.flush_to_db(complex_adv)
             if flushed_to_db:
                 logger.info(
                     "[adv_id=%s] v3: netto flush committed",
                     complex_adv.adv_id,
                 )
-            await _sync_target_places_once()
+            with trace.phase("sync_target_places_once"):
+                await _sync_target_places_once()
     finally:
         if not is_campaign_full_stop(campaign_mode):
-            await _sync_target_places_once()
+            with trace.phase("sync_target_places_once_finally"):
+                await _sync_target_places_once()
