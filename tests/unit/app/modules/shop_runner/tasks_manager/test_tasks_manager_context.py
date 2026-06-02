@@ -142,6 +142,63 @@ async def test_run_tasks_auto_starts_workers_when_shared_manager_idle() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_run_tasks_ephemeral_does_not_stop_run_queue_workers() -> None:
+    """Ephemeral run_tasks не гасит workers, удерживаемые run_queue."""
+    shared = TasksManager(max_workers=2)
+    stop_event = asyncio.Event()
+    run_queue_task = asyncio.create_task(shared.run_queue(stop_event))
+    await asyncio.sleep(0.01)
+
+    async def handler() -> int:
+        return 42
+
+    results = await run_tasks([handler], max_workers=1, tasks_manager=shared)
+    assert results == [42]
+
+    seen: list[int] = []
+    follow_up = await shared.add_task(lambda: _append_once(seen))
+    await asyncio.wait_for(follow_up, timeout=1.0)
+    assert seen == [1]
+
+    stop_event.set()
+    await run_queue_task
+
+
+async def _append_once(seen: list[int]) -> None:
+    seen.append(1)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_queue_survives_ephemeral_run_tasks_started_first() -> None:
+    """run_queue продолжает обрабатывать очередь после ephemeral run_tasks."""
+    shared = TasksManager(max_workers=2)
+    stop_event = asyncio.Event()
+
+    async def slow_handler() -> int:
+        await asyncio.sleep(0.05)
+        return 1
+
+    run_tasks_task = asyncio.create_task(
+        run_tasks([slow_handler], max_workers=1, tasks_manager=shared)
+    )
+    await asyncio.sleep(0.01)
+
+    run_queue_task = asyncio.create_task(shared.run_queue(stop_event))
+    await asyncio.sleep(0.01)
+    await run_tasks_task
+
+    seen: list[int] = []
+    follow_up = await shared.add_task(lambda: _append_once(seen))
+    await asyncio.wait_for(follow_up, timeout=1.0)
+    assert seen == [1]
+
+    stop_event.set()
+    await run_queue_task
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_wb_manager_hub_context_reached_inside_shared_worker() -> None:
     """get_wb_manager_from_context() внутри shared worker видит hub без fallback."""
     from contextvars import ContextVar
