@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 
+from pydantic import ValidationError
 from redis.asyncio import Redis
 
 from app.snapshot_data_updater.config import get_snapshot_config
@@ -102,7 +103,7 @@ class RedisAdvDataSnapshotStore:
             raw = raw.decode()
         try:
             return ShopAdvSnapshotBatchDTO.model_validate(json.loads(raw))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, ValidationError) as exc:
             logger.warning(
                 "RedisAdvDataSnapshotStore.load_shop_latest invalid payload: %s",
                 exc,
@@ -122,7 +123,7 @@ class RedisAdvDataSnapshotStore:
             raw = raw.decode()
         try:
             return AdvDataSnapshotDTO.model_validate(json.loads(raw))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, ValidationError) as exc:
             logger.warning(
                 "RedisAdvDataSnapshotStore.load_adv_snapshot invalid: shop=%s adv=%s %s",
                 shop_id,

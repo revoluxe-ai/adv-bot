@@ -57,3 +57,35 @@ async def test_collect_keywords_returns_redis_hit() -> None:
     mock_adapter.shadow_log_keywords_delta.assert_awaited_once_with(
         "shop-1", 99, legacy_count=1
     )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_collect_keywords_returns_keywords_when_shadow_fails() -> None:
+    """Успешный get_keywords не теряется при падении shadow_log."""
+    from app.snapshot_data_updater.adapters.wb_adv_dto_adapter import (
+        WBAdvDtoSnapshotAdapter,
+    )
+    from app.snapshot_data_updater.config import SnapshotUpdaterConfig
+
+    kw = MagicMock()
+    adv = MagicMock()
+    adv.shop_id = "shop-1"
+    adv.adv_id = 99
+    adv.get_keywords = AsyncMock(return_value=[kw])
+
+    reader = MagicMock()
+    reader.get_adv_snapshot = AsyncMock(side_effect=RuntimeError("shadow broken"))
+    adapter = WBAdvDtoSnapshotAdapter(
+        reader=reader,
+        config=SnapshotUpdaterConfig(wb_adv_dto_shadow_compare=True),
+    )
+
+    with patch(
+        "app.snapshot_data_updater.adapters.wb_adv_dto_adapter.WBAdvDtoSnapshotAdapter",
+        return_value=adapter,
+    ):
+        result = await WBShopDataManager._collect_keywords(adv)
+
+    assert result == [kw]
+

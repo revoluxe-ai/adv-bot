@@ -41,19 +41,31 @@ class WBAdvDtoSnapshotAdapter:
         *,
         legacy_count: int,
     ) -> None:
-        """Shadow: сравнение числа keywords snapshot vs legacy после load."""
+        """Shadow: сравнение числа keywords snapshot vs legacy после load.
+
+        Ошибки чтения/парсинга snapshot не пробрасываются — только warning в лог.
+        """
         if not self._config.wb_adv_dto_shadow_compare:
             return
-        snapshot = await self._reader.get_adv_snapshot(
-            shop_id, adv_id, enforce_stale=False
-        )
-        if snapshot is None:
-            return
-        snap_count = len(snapshot.keywords)
-        if snap_count != legacy_count:
-            logger.info(
-                "wb_adv_dto shadow keywords adv_id=%s snap=%d legacy=%d",
+        try:
+            snapshot = await self._reader.get_adv_snapshot(
+                shop_id, adv_id, enforce_stale=False
+            )
+            if snapshot is None:
+                return
+            snap_count = len(snapshot.keywords)
+            if snap_count != legacy_count:
+                logger.info(
+                    "wb_adv_dto shadow keywords adv_id=%s snap=%d legacy=%d",
+                    adv_id,
+                    snap_count,
+                    legacy_count,
+                )
+        except Exception:
+            logger.warning(
+                "wb_adv_dto shadow keywords failed shop_id=%s adv_id=%s legacy_count=%d",
+                shop_id,
                 adv_id,
-                snap_count,
                 legacy_count,
+                exc_info=True,
             )

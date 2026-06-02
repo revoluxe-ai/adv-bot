@@ -70,3 +70,14 @@ async def test_redis_store_invalid_json_returns_none() -> None:
     store = RedisAdvDataSnapshotStore(redis_client=client, no_op=False)
     assert await store.load_shop_latest("shop-a") is None
     assert await store.load_adv_snapshot("shop-a", 1) is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_redis_store_validation_error_returns_none() -> None:
+    """Невалидная схема snapshot → None, без исключения наружу."""
+    client = MagicMock()
+    client.get = AsyncMock(return_value='{"adv_id": "not-int"}')
+
+    store = RedisAdvDataSnapshotStore(redis_client=client, no_op=False)
+    assert await store.load_adv_snapshot("shop-a", 1) is None
