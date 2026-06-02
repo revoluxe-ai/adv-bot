@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from app.snapshot_data_updater.cache.redis_adv_data_snapshot_store import (
     RedisAdvDataSnapshotStore,
 )
-from app.snapshot_data_updater.cache_freshness import enforce_cache_max_age
+from app.snapshot_data_updater.freshness_policy import enforce_cache_stale
 from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
 from app.snapshot_data_updater.dto import AdvDataSnapshotDTO
 
@@ -27,18 +27,26 @@ class SnapshotReader:
         self._config = config or DEFAULT_CONFIG
 
     async def get_adv_snapshot(
-        self, shop_id: str, adv_id: int
+        self,
+        shop_id: str,
+        adv_id: int,
+        *,
+        enforce_stale: bool = True,
     ) -> AdvDataSnapshotDTO | None:
         """Загружает per-adv ключ или None при miss / no_op store.
 
+        Args:
+            enforce_stale: при ``False`` не проверять ``snapshot_adv_policy.stale_sec``
+                (shadow-логи и диагностика).
+
         Raises:
-            CacheStaleError: snapshot старше ``SNAPSHOT_CACHE_MAX_AGE_SEC``.
+            CacheStaleError: snapshot старше ``SNAPSHOT_ADV_STALE_SEC``.
         """
         snapshot = await self._store.load_adv_snapshot(shop_id, adv_id)
-        if snapshot is not None:
-            enforce_cache_max_age(
+        if snapshot is not None and enforce_stale:
+            enforce_cache_stale(
                 snapshot.collected_at,
-                self._config.cache_max_age_sec,
+                self._config.snapshot_adv_policy,
                 context=f"snapshot shop_id={shop_id} adv_id={adv_id}",
                 require_timestamp=True,
             )
@@ -56,11 +64,12 @@ class SnapshotReader:
         if snapshot.expires_at is not None:
             if datetime.now(tz=UTC) >= snapshot.expires_at:
                 return False
-        if self._config.cache_max_age_sec > 0:
+        stale_sec = self._config.snapshot_adv_policy.stale_sec
+        if stale_sec > 0:
             from app.snapshot_data_updater.cache_freshness import cache_age_sec
 
             age = cache_age_sec(snapshot.collected_at)
-            if age > self._config.cache_max_age_sec:
+            if age > stale_sec:
                 return False
         completeness = snapshot.section_completeness
         if not completeness.get("settings"):

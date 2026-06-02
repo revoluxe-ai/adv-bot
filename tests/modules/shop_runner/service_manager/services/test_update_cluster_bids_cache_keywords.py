@@ -23,6 +23,16 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from tests.factories import GoodKeywordFactory
 
 
+@pytest.fixture(autouse=True)
+def _snapshot_cluster_bids_flags_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Без adapter path — только mock ``adv.get_keywords`` (не Redis snapshot store)."""
+    monkeypatch.setenv("SNAPSHOT_CLUSTER_BIDS_SHADOW", "0")
+    monkeypatch.setenv("SNAPSHOT_CLUSTER_BIDS_READ", "0")
+    from app.snapshot_data_updater.config import reload_snapshot_config
+
+    reload_snapshot_config()
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None:
@@ -41,7 +51,7 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
 
     result = await manager._UpdateClusterBidsManager__get_calculate_data(adv, set())
     assert result == set()
-    adv.get_keywords.assert_awaited_once_with(cache_only=True)
+    adv.get_keywords.assert_awaited_once_with(cache_only=True, allow_miss=True)
 
 
 @pytest.mark.unit

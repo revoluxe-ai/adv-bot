@@ -53,7 +53,7 @@ async def load_campaign_v3_contexts(
     Returns:
         Список контекстов; пустой, если ключей нет.
     """
-    keywords = await complex_adv.get_keywords(cache_only=True)
+    keywords = await complex_adv.get_keywords(cache_only=True, allow_miss=True)
     if keywords is None:
         adv_id = complex_adv.adv_id
         keywords = await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(

@@ -22,9 +22,18 @@
 | `SNAPSHOT_TICK_POLICY` | `skip` | `skip` — пропуск tick при занятом lock; `wait` — ждать |
 | `SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC` | `30` | Таймаут задач CH / Redis / warmup в ResourceQueue (сек) |
 | `SNAPSHOT_PG_TASK_TIMEOUT_SEC` | *(как RESOURCE)* | Таймаут фазы `pg:shop_load`; для крупных магазинов — `90`–`180` |
-| `SNAPSHOT_KEYWORDS_FRESHNESS_SEC` | `900` | Макс. возраст metadata прогрева keywords |
+| `SNAPSHOT_KEYWORDS_SKIP_REFRESH_SEC` | `300` | Keywords: моложе — не пересчитывать (warmup) |
+| `SNAPSHOT_KEYWORDS_STALE_SEC` | `900` | Keywords: старше — `CacheStaleError` при чтении с meta |
+| `SNAPSHOT_ADV_SKIP_REFRESH_SEC` | `300` | Snapshot adv: моложе — не считается протухшим для read |
+| `SNAPSHOT_ADV_STALE_SEC` | `900` | Snapshot adv: старше — `CacheStaleError` при read consumer |
+| `SNAPSHOT_SHOP_SKIP_REFRESH_SEC` | `300` | Shop batch моложе — пропуск `RefreshShopSnapshotTask` |
+| `SNAPSHOT_PLAN_FACT_*` / `CLUSTER_TEXTS_*` / `MIN_BIDS_*` | `300` / `900` | Зарезервировано для section-skip в collector |
 | `SNAPSHOT_KEYWORDS_STRICT_FRESHNESS` | `0` | Строгий stale без metadata |
-| `SNAPSHOT_CACHE_MAX_AGE_SEC` | `0` | Жёсткий fail при чтении кеша старше N сек (`CacheStaleError`) |
+| `SNAPSHOT_CACHE_MAX_AGE_SEC` | legacy | → `SNAPSHOT_ADV_STALE_SEC` если ADV_STALE не задан |
+| `POSTGRES_QUERY_CONCURRENCY` | `10` | Глобально: макс. PG-запросов на loop (см. env.sample) |
+| `CLICKHOUSE_QUERY_CONCURRENCY` | `2` | Глобально: макс. CH-запросов на loop |
+| `CLICKHOUSE_QUERY_ACQUIRE_TIMEOUT_SEC` | `120` | Ожидание слота CH |
+| `REDIS_QUERY_CONCURRENCY` | `8` | Snapshot collector: Redis batch |
 | `SNAPSHOT_REDIS_TTL_SEC` | `3600` | TTL ключей snapshot |
 | `SNAPSHOT_SCHEMA_VERSION` | `1` | Версия DTO для consumers |
 | `SNAPSHOT_CLUSTER_BIDS_SHADOW` | `0` | Shadow: логи сравнения keywords в update_cluster_bids |
@@ -32,7 +41,9 @@
 | `SNAPSHOT_WB_ADV_DTO_SHADOW` | `0` | Shadow в WBAdvDTO path |
 | `SNAPSHOT_WB_ADV_DTO_READ` | `0` | Зарезервировано для read cutover WBAdvDTO |
 
-**`get_wb_advs_dto`:** keywords **только** из Redis (`calculated_keywords:{adv_id}`). При miss — `KeywordsCacheMissError` (нужен live snapshot updater и warmup). Fallback на `get_good_bad_phrases` нет.
+**Keywords в shop-runner:** `ComplexAdv.get_keywords()` — **только Redis** (`calculated_keywords:{adv_id}`), прогрев — snapshot updater (`get_good_bad_phrases` в warmup). При miss — `KeywordsCacheMissError`. Прямой пересчёт из воркеров (`cache_only=False`) отключён. Для мягкого пропуска: `get_keywords(allow_miss=True)` (cluster_bids).
+
+**Свежесть (5–15 мин):** для каждой секции два порога (сек): `*_SKIP_REFRESH_SEC` (моложе — не refresh) и `*_STALE_SEC` (старше — ошибка при чтении). Между ними данные допустимы. Shadow WBAdvDTO **не** валит задачу при stale snapshot (`enforce_stale=False`).
 
 **Важно:** после изменения `.env` entrypoint должен вызвать `dotenv.load_dotenv()` **до** импорта snapshot или `reload_snapshot_config()` (см. корневой `updater.py`, `cli.py`).
 

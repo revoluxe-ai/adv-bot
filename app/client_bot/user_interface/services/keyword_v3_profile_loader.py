@@ -75,15 +75,22 @@ async def _load_wb_cabinet(wb_cabinet_id: int) -> WBCabinet | None:
 async def _redis_keywords_for_complex_adv(
     complex_adv: ComplexAdv,
     *,
-    cache_only: bool = False,
+    cache_only: bool = True,
+    allow_miss: bool = False,
 ) -> list[CalculatedKeyword] | None:
     """Ключи РК из Redis — для ``load_campaign_v3_contexts`` в карточке Telegram.
 
-    ``cache_only=False`` не пересчитывает V2 в UI (только кеш).
+    UI не пересчитывает CH/PG; при miss и ``allow_miss=True`` — ``None``.
     """
     _ = cache_only
-    return await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(
-        complex_adv.adv_id
+    from app.modules.shop_runner.required_data_miss import (
+        fetch_calculated_keywords_from_redis,
+    )
+
+    return await fetch_calculated_keywords_from_redis(
+        complex_adv.adv_id,
+        shop_id=complex_adv.shop_id or "",
+        allow_miss=allow_miss,
     )
 
 

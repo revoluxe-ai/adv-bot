@@ -9,6 +9,10 @@ from app.core.mp.wb.api.excs import ApiForbiddenError as MpApiForbiddenError
 from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
 from app.core.wb_api.exceptions import ApiForbiddenError as LegacyApiForbiddenError
 from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
+from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
+from app.modules.shop_runner.required_data_miss import (
+    ShopRunnerKeywordsCacheMissError,
+)
 from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
     _get_shop_id_for_log,
     while_coroutine_decorator,
@@ -223,3 +227,73 @@ async def test_decorator_retries_on_max_attempts_error(
 
     mock_logger.error.assert_called_once()
     mock_sleep.assert_called_once_with(5)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_required_data_miss_warning_and_custom_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Required data miss: warning (не error) и sleep(RETRY_SEC)."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "45")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "0")
+    decorator = while_coroutine_decorator(60, 5)
+    call_count = 0
+
+    async def miss_once_then_stop(self: object) -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise ShopRunnerKeywordsCacheMissError(
+                "cache miss",
+                shop_id="5339e9ad",
+                adv_id=37087870,
+            )
+        raise StopShopUpdateException("done")
+
+    wrapped = decorator(miss_once_then_stop)
+    self_mock = MagicMock()
+    self_mock.shop_id = "5339e9ad"
+
+    sleep_calls: list[float] = []
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(
+            f"{MODULE}.asyncio.sleep",
+            new_callable=AsyncMock,
+            side_effect=lambda s: sleep_calls.append(s),
+        ):
+            await wrapped(self_mock)
+
+    mock_logger.warning.assert_called_once()
+    mock_logger.error.assert_not_called()
+    assert sleep_calls == [45]
+    assert call_count == 2
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_required_data_miss_re_raises_after_max_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """После MAX_ATTEMPTS подряд miss — error и проброс исключения."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "1")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "2")
+    decorator = while_coroutine_decorator(60, 5)
+
+    async def always_miss(self: object) -> None:
+        raise ShopRunnerKeywordsCacheMissError(
+            "cache miss",
+            shop_id="5339e9ad",
+            adv_id=1,
+        )
+
+    wrapped = decorator(always_miss)
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
+                await wrapped(MagicMock(shop_id="5339e9ad"))
+
+    assert mock_logger.warning.call_count == 2
+    mock_logger.error.assert_called_once()

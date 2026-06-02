@@ -27,7 +27,9 @@ from app.snapshot_data_updater.cache.redis_adv_data_snapshot_store import (
     RedisAdvDataSnapshotStore,
 )
 from app.snapshot_data_updater.collector import AdvDataSnapshotCollector
+from app.snapshot_data_updater.cache_freshness import cache_age_sec
 from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
+from app.snapshot_data_updater.freshness_policy import should_skip_refresh
 from app.snapshot_data_updater.dto import ShopAdvSnapshotBatchDTO
 from app.snapshot_data_updater.providers import (
     StubClickHouseSnapshotProvider,
@@ -170,10 +172,34 @@ class SnapshotUpdater:
                 shop_ids[:10],
             )
             for shop_id in shop_ids:
-                self._start_shop_task_if_needed(shop_id)
+                await self._start_shop_task_if_needed(shop_id)
             self._prune_inactive_shop_tasks(active)
 
-    def _start_shop_task_if_needed(self, shop_id: str) -> None:
+    async def _should_skip_shop_refresh(self, shop_id: str) -> bool:
+        """Пропуск collect, если последний shop batch ещё «слишком свежий»."""
+        policy = self._config.shop_policy
+        if policy.skip_refresh_sec <= 0:
+            return False
+        store = self._store
+        if not isinstance(store, RedisAdvDataSnapshotStore) or store.is_no_op:
+            return False
+        batch = await store.load_shop_latest(shop_id)
+        if batch is None or not batch.snapshots:
+            return False
+        if any(s.partial for s in batch.snapshots):
+            return False
+        age = cache_age_sec(batch.collected_at)
+        if should_skip_refresh(age, policy):
+            logger.debug(
+                "Snapshot shop task skip fresh shop_id=%s age_sec=%.1f skip_below=%.1f",
+                shop_id,
+                age,
+                policy.skip_refresh_sec,
+            )
+            return True
+        return False
+
+    async def _start_shop_task_if_needed(self, shop_id: str) -> None:
         """Создаёт ``RefreshShopSnapshotTask``, если по shop нет running task."""
         existing = self._shop_tasks.get(shop_id)
         if existing is not None and existing.is_running:
@@ -184,6 +210,9 @@ class SnapshotUpdater:
             return
         if existing is not None and not existing.is_running:
             self._shop_tasks.pop(shop_id, None)
+
+        if await self._should_skip_shop_refresh(shop_id):
+            return
 
         shop_task = RefreshShopSnapshotTask(
             shop_id,

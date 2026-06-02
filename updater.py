@@ -34,9 +34,9 @@ AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
 # Явная аннотация типов для списка корутин
 run_own_process_list: list[AsyncEntry] = [
     # #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
-    run_main_coroutines,
-    # # TODO: привести все процессы к единому интерфейсу
-    common_coroutine.run,  # type: ignore[assignment]  # pyright: ignore
+    # run_main_coroutines,
+    # # # TODO: привести все процессы к единому интерфейсу
+    # common_coroutine.run,  # type: ignore[assignment]  # pyright: ignore
     snapshot_data_updater.run,
 
 ]

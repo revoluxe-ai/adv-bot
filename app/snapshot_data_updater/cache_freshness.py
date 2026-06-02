@@ -9,36 +9,15 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from app.snapshot_data_updater.cache_errors import (
+    CacheStaleError,
+    KeywordsCacheMissError,
+    RequiredDataMissError,
+)
 from app.snapshot_data_updater.keys import keywords_meta_key
 
 # Тип клиента asyncio Redis (get/set).
 RedisClient = object
-
-
-class KeywordsCacheMissError(RuntimeError):
-    """Нет keywords в Redis (``calculated_keywords:{adv_id}``) — нужен прогрев updater."""
-
-    def __init__(self, message: str, *, shop_id: str = "", adv_id: int = 0) -> None:
-        super().__init__(message)
-        self.shop_id = shop_id
-        self.adv_id = adv_id
-
-
-class CacheStaleError(RuntimeError):
-    """Данные в кеше старше допустимого возраста или нет метки времени."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        context: str,
-        age_sec: float | None = None,
-        max_age_sec: float | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.context = context
-        self.age_sec = age_sec
-        self.max_age_sec = max_age_sec
 
 
 def parse_warmed_at(meta: dict[str, str] | None) -> datetime | None:

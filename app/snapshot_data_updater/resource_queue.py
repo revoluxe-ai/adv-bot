@@ -1,14 +1,9 @@
-"""``ResourceQueue`` — ограничение параллелизма к Postgres / Redis / ClickHouse / warmup.
+"""``ResourceQueue`` — ограничение параллельных **Redis**-запросов в snapshot collector.
 
-Зачем
------
-Snapshot updater на одном shop может дергать сотни adv; без лимитов это перегрузит
-PG/CH/Redis. Каждый ``ResourceKind`` имеет свой семафор и таймаут задачи.
+PG и CH лимитируются глобально при запросе (``resource_limits`` + session/CH sem).
+Warmup keywords — через ``anti_ch_crash_semaphore`` внутри ``get_good_bad_phrases``.
 
-Отдельный kind ``CALCULATED_KEYWORDS_WARMUP`` (лимит 1–2) — тяжёлый пересчёт
-``get_good_bad_phrases`` не должен идти неограниченно параллельно.
-
-Без retry: при ошибке/таймауте исключение пробрасывается в collector (диагностика).
+Здесь остаётся только ``ResourceKind.REDIS`` (min_bids batch и т.п.).
 """
 
 from __future__ import annotations
@@ -26,20 +21,23 @@ T = TypeVar("T")
 
 
 class ResourceKind(StrEnum):
-    """Тип внешнего ресурса для отдельной очереди с семафором."""
+    """Тип ресурса для очереди (активно — только Redis)."""
 
+    REDIS = "redis"
+    # Legacy kinds: прямой await в collector, лимит на уровне запроса PG/CH
     POSTGRES = "postgres"
     CLICKHOUSE = "clickhouse"
-    REDIS = "redis"
     CALCULATED_KEYWORDS_WARMUP = "calculated_keywords_warmup"
 
 
-# Стартовые лимиты параллелизма на процесс (можно переопределить в конструкторе).
+def _default_redis_concurrency() -> int:
+    from app.utils.resource_limits import redis_query_concurrency
+
+    return redis_query_concurrency()
+
+
 DEFAULT_CONCURRENCY: dict[ResourceKind, int] = {
-    ResourceKind.POSTGRES: 4,
-    ResourceKind.CLICKHOUSE: 2,
     ResourceKind.REDIS: 8,
-    ResourceKind.CALCULATED_KEYWORDS_WARMUP: 2,
 }
 
 DEFAULT_TASK_TIMEOUT_SEC: float = 30.0
@@ -149,15 +147,15 @@ class ResourceQueueManager:
             task_timeout_sec: таймаут по умолчанию для всех очередей.
             task_timeout_by_kind: переопределение таймаута (например PG отдельно).
         """
-        limits = concurrency or DEFAULT_CONCURRENCY
-        per_kind = task_timeout_by_kind or {}
+        redis_limit = (concurrency or {}).get(
+            ResourceKind.REDIS, _default_redis_concurrency()
+        )
         self._queues: dict[ResourceKind, ResourceQueue] = {
-            kind: ResourceQueue(
-                kind,
-                concurrency=limits.get(kind, 4),
-                task_timeout_sec=per_kind.get(kind, task_timeout_sec),
+            ResourceKind.REDIS: ResourceQueue(
+                ResourceKind.REDIS,
+                concurrency=redis_limit,
+                task_timeout_sec=task_timeout_sec,
             )
-            for kind in ResourceKind
         }
 
     def queue_for(self, kind: ResourceKind) -> ResourceQueue:
@@ -165,8 +163,16 @@ class ResourceQueueManager:
         return self._queues[kind]
 
     def submit(self, task: ResourceTask[T]) -> asyncio.Future[T]:
-        """Маршрутизация задачи в очередь по ``task.kind``."""
-        return self._queues[task.kind].submit(task)
+        """Маршрутизация задачи в очередь по ``task.kind`` (только Redis)."""
+        try:
+            queue = self._queues[task.kind]
+        except KeyError as exc:
+            raise ValueError(
+                f"ResourceQueueManager has no queue for {task.kind!r}; "
+                "PG/CH use global query semaphores (POSTGRES_QUERY_CONCURRENCY, "
+                "CLICKHOUSE_QUERY_CONCURRENCY)."
+            ) from exc
+        return queue.submit(task)
 
     async def stop_all(self) -> None:
         """Остановка всех очередей при shutdown ``SnapshotUpdater``."""
@@ -188,12 +194,7 @@ def build_resource_queue_manager(
     else:
         cfg = get_snapshot_config()
 
-    pg_timeout = (
-        cfg.postgres_task_timeout_sec
-        if cfg.postgres_task_timeout_sec is not None
-        else cfg.resource_task_timeout_sec
-    )
     return ResourceQueueManager(
+        concurrency={ResourceKind.REDIS: _default_redis_concurrency()},
         task_timeout_sec=cfg.resource_task_timeout_sec,
-        task_timeout_by_kind={ResourceKind.POSTGRES: pg_timeout},
     )

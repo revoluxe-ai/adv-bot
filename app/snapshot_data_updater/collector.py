@@ -296,25 +296,9 @@ class AdvDataSnapshotCollector:
         """Один запрос PG: settings + optional ``ComplexAdv`` для warmup (live)."""
         fetch_load = getattr(self._postgres, "fetch_shop_collect_load", None)
         if callable(fetch_load):
-            future = self._queues.submit(
-                ResourceTask(
-                    kind=ResourceKind.POSTGRES,
-                    name=f"pg:shop_load:{shop_id}",
-                    coro_factory=lambda: fetch_load(shop_id),
-                )
-            )
-            return await future
+            return await fetch_load(shop_id)
 
-        future = self._queues.submit(
-            ResourceTask(
-                kind=ResourceKind.POSTGRES,
-                name=f"pg:settings:{shop_id}",
-                coro_factory=lambda: self._postgres.fetch_active_adv_settings(
-                    shop_id
-                ),
-            )
-        )
-        settings = await future
+        settings = await self._postgres.fetch_active_adv_settings(shop_id)
         return PostgresShopSnapshotLoad(shop_id=shop_id, settings=settings)
 
     async def _fetch_plan_facts(
@@ -323,16 +307,7 @@ class AdvDataSnapshotCollector:
         """Batch CH: plan/fact по всем adv_id магазина."""
         if not adv_ids:
             return {}
-        future = self._queues.submit(
-            ResourceTask(
-                kind=ResourceKind.CLICKHOUSE,
-                name=f"ch:plan_fact:{shop_id}",
-                coro_factory=lambda: self._clickhouse.fetch_plan_facts(
-                    shop_id, adv_ids
-                ),
-            )
-        )
-        return await future
+        return await self._clickhouse.fetch_plan_facts(shop_id, adv_ids)
 
     async def _fetch_cluster_texts(
         self, auction_adv_ids: list[int]
@@ -343,14 +318,7 @@ class AdvDataSnapshotCollector:
         )
         if not callable(fetch_fn) or not auction_adv_ids:
             return {}
-        future = self._queues.submit(
-            ResourceTask(
-                kind=ResourceKind.CLICKHOUSE,
-                name=f"ch:cluster_texts:{len(auction_adv_ids)}",
-                coro_factory=lambda: fetch_fn(auction_adv_ids),
-            )
-        )
-        return await future
+        return await fetch_fn(auction_adv_ids)
 
     async def _fetch_min_bids_batch(
         self, settings_list: list[AdvSettingsSnapshotDTO]

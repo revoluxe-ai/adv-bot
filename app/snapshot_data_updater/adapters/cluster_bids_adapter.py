@@ -66,11 +66,11 @@ class ClusterBidsSnapshotAdapter:
             and self._reader.is_snapshot_usable(snapshot)
         ):
             getter = fallback_getter or complex_adv.get_keywords
-            return await getter(complex_adv, cache_only=True)
+            return await getter(cache_only=True, allow_miss=True)
 
         if fallback_getter is not None and callable(fallback_getter):
-            return await fallback_getter(complex_adv, cache_only=True)
-        return await complex_adv.get_keywords(cache_only=True)
+            return await fallback_getter(cache_only=True, allow_miss=True)
+        return await complex_adv.get_keywords(cache_only=True, allow_miss=True)
 
     async def get_cluster_texts_for_adv(
         self,
@@ -98,9 +98,9 @@ class ClusterBidsSnapshotAdapter:
     ) -> None:
         old_kw: list[CalculatedKeyword] | None = None
         if fallback_getter is not None and callable(fallback_getter):
-            old_kw = await fallback_getter(complex_adv, cache_only=True)
+            old_kw = await fallback_getter(cache_only=True, allow_miss=True)
         else:
-            old_kw = await complex_adv.get_keywords(cache_only=True)
+            old_kw = await complex_adv.get_keywords(cache_only=True, allow_miss=True)
         snap_count = len(snapshot.keywords)
         old_count = len(old_kw) if old_kw else 0
         if snap_count != old_count:

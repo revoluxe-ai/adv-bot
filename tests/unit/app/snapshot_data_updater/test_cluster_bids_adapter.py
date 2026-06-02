@@ -28,7 +28,7 @@ async def test_cluster_bids_adapter_legacy_when_flags_off() -> None:
     adv.get_keywords = AsyncMock(return_value=[])
 
     result = await adapter.get_keywords_for_adv(adv)
-    adv.get_keywords.assert_awaited_once_with(cache_only=True)
+    adv.get_keywords.assert_awaited_once_with(cache_only=True, allow_miss=True)
     assert result == []
 
 
@@ -77,5 +77,5 @@ async def test_cluster_bids_adapter_read_uses_cache_only_when_usable() -> None:
     fallback = AsyncMock(return_value=["kw"])
 
     result = await adapter.get_keywords_for_adv(adv, fallback_getter=fallback)
-    fallback.assert_awaited_once()
+    fallback.assert_awaited_once_with(cache_only=True, allow_miss=True)
     assert result == ["kw"]

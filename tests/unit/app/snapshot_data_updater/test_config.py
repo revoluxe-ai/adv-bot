@@ -13,11 +13,22 @@ from app.snapshot_data_updater.config import (
 def test_reload_snapshot_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SNAPSHOT_UPDATER_USE_LIVE", "1")
     monkeypatch.setenv("SNAPSHOT_REFRESH_INTERVAL_SEC", "120")
+    monkeypatch.delenv("SNAPSHOT_ADV_STALE_SEC", raising=False)
     monkeypatch.setenv("SNAPSHOT_CACHE_MAX_AGE_SEC", "300")
     cfg = reload_snapshot_config()
     assert cfg.use_live_updater is True
     assert cfg.refresh_interval_sec == 120.0
+    assert cfg.snapshot_adv_policy.stale_sec == 300.0
     assert cfg.cache_max_age_sec == 300.0
+
+
+@pytest.mark.unit
+def test_freshness_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SNAPSHOT_KEYWORDS_SKIP_REFRESH_SEC", "300")
+    monkeypatch.setenv("SNAPSHOT_KEYWORDS_STALE_SEC", "900")
+    cfg = reload_snapshot_config()
+    assert cfg.keywords_policy.skip_refresh_sec == 300.0
+    assert cfg.keywords_policy.stale_sec == 900.0
 
 
 @pytest.mark.unit

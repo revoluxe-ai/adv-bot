@@ -66,7 +66,11 @@ class ClickHouseSnapshotProviderLive:
     ) -> dict[int, PlanFactSnapshotDTO]:
         if not adv_ids:
             return {}
-        summaries = await self._plan_fact_reader.get_latest_plan_facts(list(adv_ids))
+        from app.utils.ch_semaphore import run_ch_with_timeout
+
+        summaries = await run_ch_with_timeout(
+            self._plan_fact_reader.get_latest_plan_facts(list(adv_ids))
+        )
         out: dict[int, PlanFactSnapshotDTO] = {}
         for adv_id, summary in summaries.items():
             out[adv_id] = PlanFactSnapshotDTO(
@@ -88,6 +92,10 @@ class ClickHouseSnapshotProviderLive:
     ) -> dict[int, set[str]]:
         if not auction_adv_ids:
             return {}
-        return await self._cluster_manager.get_cluster_texts_for_adv_ids(
-            list(auction_adv_ids)
+        from app.utils.ch_semaphore import run_ch_with_timeout
+
+        return await run_ch_with_timeout(
+            self._cluster_manager.get_cluster_texts_for_adv_ids(
+                list(auction_adv_ids)
+            )
         )

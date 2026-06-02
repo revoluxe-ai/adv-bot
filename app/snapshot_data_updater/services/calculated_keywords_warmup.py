@@ -12,7 +12,7 @@ snapshot updater **сам** обеспечивает актуальный Redis 
 - **Не** менять формат legacy hash (только ``RedisCalculatedKeywordsCacheManager``).
 - Пересчёт — через существующий ``get_good_bad_phrases`` (пишет hash как раньше).
 - Freshness — отдельный ключ ``adv_snapshot:v1:keywords_meta:adv:{id}`` (новый namespace).
-- Тяжёлый пересчёт лимитируется ``ResourceKind.CALCULATED_KEYWORDS_WARMUP``.
+- Тяжёлый пересчёт CH лимитируется ``anti_ch_crash_semaphore`` / ``CLICKHOUSE_QUERY_CONCURRENCY``.
 """
 
 from __future__ import annotations
@@ -33,10 +33,12 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
     CalculatedKeyword,
 )
 from app.snapshot_data_updater.cache_freshness import (
-    CacheStaleError,
-    enforce_cache_max_age_from_meta,
     load_keywords_meta,
     parse_warmed_at,
+)
+from app.snapshot_data_updater.freshness_policy import (
+    enforce_cache_stale,
+    should_skip_refresh,
 )
 from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
 from app.snapshot_data_updater.dto import (
@@ -49,11 +51,7 @@ from app.snapshot_data_updater.keys import keywords_meta_key
 from app.snapshot_data_updater.mappers.keyword_mapper import (
     calculated_keywords_to_snapshots,
 )
-from app.snapshot_data_updater.resource_queue import (
-    ResourceKind,
-    ResourceQueueManager,
-    ResourceTask,
-)
+from app.snapshot_data_updater.resource_queue import ResourceQueueManager
 
 logger = logging.getLogger(__name__)
 
@@ -113,17 +111,7 @@ class CalculatedKeywordsWarmupService:
             complex_adv = complex_advs_by_id.get(adv_id)
             if complex_adv is None:
                 continue
-            if self._queues is not None:
-                future = self._queues.submit(
-                    ResourceTask(
-                        kind=ResourceKind.CALCULATED_KEYWORDS_WARMUP,
-                        name=f"warmup:keywords:{shop_id}:{adv_id}",
-                        coro_factory=lambda ca=complex_adv: self.warmup_adv(ca),
-                    )
-                )
-                results[adv_id] = await future
-            else:
-                results[adv_id] = await self.warmup_adv(complex_adv)
+            results[adv_id] = await self.warmup_adv(complex_adv)
         return results
 
     async def warmup_adv(self, complex_adv: ComplexAdv) -> CalculatedKeywordsWarmupResult:
@@ -236,8 +224,12 @@ class CalculatedKeywordsWarmupService:
         if warmed_at is None:
             return False, False, "redis_unknown_freshness"
         age_sec = (datetime.now(tz=UTC) - warmed_at).total_seconds()
-        is_fresh = age_sec <= self._config.keywords_freshness_sec
-        if is_fresh:
+        policy = self._config.keywords_policy
+        if should_skip_refresh(age_sec, policy):
+            return True, False, "redis_hit"
+        if policy.stale_sec > 0 and age_sec > policy.stale_sec:
+            return False, True, "redis_stale"
+        if cached is not None:
             return True, False, "redis_hit"
         return False, True, "redis_stale"
 
@@ -248,17 +240,15 @@ class CalculatedKeywordsWarmupService:
     def _enforce_read_cache_age(
         self, meta: dict[str, str] | None, *, adv_id: int
     ) -> None:
-        """Жёсткая проверка возраста (``SNAPSHOT_CACHE_MAX_AGE_SEC``) только если есть metadata.
-
-        Legacy hash ``calculated_keywords:{adv_id}`` без ``keywords_meta`` — пропуск
-        (возраст неизвестен; решение о пересчёте — ``keywords_freshness_sec``).
-        """
-        if self._config.cache_max_age_sec <= 0 or meta is None:
+        """Жёсткая проверка возраста (``SNAPSHOT_KEYWORDS_STALE_SEC``) при наличии metadata."""
+        if meta is None:
             return
-        enforce_cache_max_age_from_meta(
-            meta,
-            self._config.cache_max_age_sec,
+        warmed_at = parse_warmed_at(meta)
+        enforce_cache_stale(
+            warmed_at,
+            self._config.keywords_policy,
             context=f"keywords cache adv_id={adv_id}",
+            require_timestamp=True,
         )
 
     async def _write_meta(
@@ -281,7 +271,7 @@ class CalculatedKeywordsWarmupService:
         await self._keywords_cache.client.set(
             keywords_meta_key(adv_id),
             json.dumps(payload),
-            ex=int(self._config.keywords_freshness_sec * 4),
+            ex=int(max(self._config.keywords_policy.stale_sec, 300.0) * 4),
         )
 
     @staticmethod

@@ -49,6 +49,11 @@ class RedisAdvDataSnapshotStore:
 
             self._client = RedisCalculatedKeywordsCacheManager().client
 
+    @property
+    def is_no_op(self) -> bool:
+        """Stub path — без записи/чтения Redis."""
+        return self._no_op
+
     async def save(self, batch: ShopAdvSnapshotBatchDTO) -> None:
         """Сохраняет batch + per-adv ключи.
 

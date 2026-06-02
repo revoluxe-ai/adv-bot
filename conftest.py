@@ -650,7 +650,7 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     cabinet_shop_id = seed.adv_setting.wb_cabinet.shop_id
 
     async def get_keywords_func(
-        _: ComplexAdv, *, cache_only: bool = False
+        _: ComplexAdv, *, cache_only: bool = False, allow_miss: bool = False
     ) -> list[CalculatedKeyword] | None:
         if cache_only:
             return seed.calculated_keywords

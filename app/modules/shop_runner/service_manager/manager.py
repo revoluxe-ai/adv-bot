@@ -527,7 +527,11 @@ class CoroutinesManager:
             max_workers=self._max_workers_for(len(handlers), cap=16),
         )
 
+        from app.modules.shop_runner.required_data_miss import is_required_data_miss
+
         for adv, result in zip(advs_with_whitelist, results):
+            if isinstance(result, Exception) and is_required_data_miss(result):
+                raise result
             if isinstance(result, FirstKeyUpdaterError):
                 logger.error(
                     "Ошибка обновления верхнего ключа для adv_id %s: %s",

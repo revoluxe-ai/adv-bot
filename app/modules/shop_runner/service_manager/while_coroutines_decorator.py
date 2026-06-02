@@ -17,6 +17,11 @@ from app.core.wb_api.exceptions import ApiForbiddenError as LegacyApiForbiddenEr
 from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.required_data_miss import (
+    is_required_data_miss,
+    required_data_miss_max_attempts,
+    required_data_miss_retry_sec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,19 +55,38 @@ def _get_shop_id_for_log(args: tuple[Any, ...]) -> str:
 
 
 def while_coroutine_decorator(
-    pause_on_success: int, pause_on_error: int = 5
+    pause_on_success: int,
+    pause_on_error: int = 5,
+    *,
+    pause_on_required_data_miss: int | None = None,
+    max_required_data_miss_attempts: int | None = None,
 ) -> Callable[
     [Callable[F_Spec, Awaitable[T_Result]]],
     Callable[F_Spec, Coroutine[Any, Any, T_Result]],
 ]:
+    """Бесконечный цикл корутины с паузами после успеха/ошибок.
+
+    Args:
+        pause_on_success: sleep (сек) после успешного тика.
+        pause_on_error: sleep (сек) после обычной ошибки.
+        pause_on_required_data_miss: sleep при miss обязательных данных; иначе env
+            ``SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC`` (по умолчанию 60).
+        max_required_data_miss_attempts: подряд miss без успеха, затем re-raise;
+            иначе env ``SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS`` (30); ``<= 0`` — без лимита.
+    """
+
     def decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
     ) -> Callable[F_Spec, Coroutine[Any, Any, T_Result]]:
+        required_data_miss_streak = 0
+
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
+            nonlocal required_data_miss_streak
             while True:
                 try:
                     await func(*args, **kwargs)
+                    required_data_miss_streak = 0
                     await asyncio.sleep(pause_on_success)
                     continue
                 except InterfaceError:
@@ -84,6 +108,47 @@ def while_coroutine_decorator(
                     await asyncio.sleep(pause_on_error)
                 except Exception as exc:
                     shop_id = _get_shop_id_for_log(args)
+                    if is_required_data_miss(exc):
+                        required_data_miss_streak += 1
+                        max_attempts = required_data_miss_max_attempts(
+                            max_required_data_miss_attempts
+                        )
+                        retry_sec = required_data_miss_retry_sec(
+                            pause_on_required_data_miss
+                        )
+                        adv_id = getattr(exc, "adv_id", None)
+                        resource = getattr(exc, "resource", "") or "unknown"
+                        if max_attempts > 0 and required_data_miss_streak > max_attempts:
+                            logger.error(
+                                "Required data miss limit reached "
+                                "(shop_id=%s, coroutine=%s, adv_id=%s, resource=%s, "
+                                "attempts=%s/%s): %s",
+                                shop_id,
+                                func.__name__,
+                                adv_id,
+                                resource,
+                                required_data_miss_streak,
+                                max_attempts,
+                                exc,
+                                exc_info=True,
+                            )
+                            raise
+                        logger.warning(
+                            "Required data miss (shop_id=%s, coroutine=%s, adv_id=%s, "
+                            "resource=%s, attempt=%s/%s): %s; retry in %ss "
+                            "(snapshot updater warmup)",
+                            shop_id,
+                            func.__name__,
+                            adv_id,
+                            resource,
+                            required_data_miss_streak,
+                            max_attempts if max_attempts > 0 else "∞",
+                            exc,
+                            retry_sec,
+                        )
+                        await asyncio.sleep(retry_sec)
+                        continue
+                    required_data_miss_streak = 0
                     logger.error(
                         "Ошибка (shop_id=%s, coroutine=%s): %s",
                         shop_id,

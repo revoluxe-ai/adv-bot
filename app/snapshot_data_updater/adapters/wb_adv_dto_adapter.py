@@ -41,7 +41,9 @@ class WBAdvDtoSnapshotAdapter:
         """Shadow: сравнение числа keywords snapshot vs legacy после load."""
         if not self._config.wb_adv_dto_shadow_compare:
             return
-        snapshot = await self.load_snapshot(shop_id, adv_id)
+        snapshot = await self._reader.get_adv_snapshot(
+            shop_id, adv_id, enforce_stale=False
+        )
         if snapshot is None:
             return
         snap_count = len(snapshot.keywords)

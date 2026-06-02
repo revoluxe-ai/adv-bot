@@ -24,10 +24,14 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 class GetKeywordsProvider(Protocol):
-    """Провайдер ключей: полный пересчёт или только Redis при ``cache_only=True``."""
+    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``)."""
 
     async def __call__(
-        self, complex_adv: ComplexAdv, *, cache_only: bool = False
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        cache_only: bool = True,
+        allow_miss: bool = False,
     ) -> list[CalculatedKeyword] | None: ...
 
 
@@ -382,42 +386,58 @@ class ComplexAdv:
     def auto_update_setting_version(self) -> int | None:
         return self._adv_setting.automatic_version
 
+    def _filter_keywords(
+        self, keywords: list[CalculatedKeyword]
+    ) -> list[CalculatedKeyword]:
+        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
+            return [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
+        return keywords
+
     @overload
     async def get_keywords(
-        self, *, cache_only: Literal[True]
+        self, *, cache_only: Literal[True] = True, allow_miss: Literal[True]
     ) -> list[CalculatedKeyword] | None: ...
 
     @overload
     async def get_keywords(
-        self, *, cache_only: Literal[False] = False
+        self, *, cache_only: Literal[True] = True, allow_miss: Literal[False] = False
     ) -> list[CalculatedKeyword]: ...
 
     async def get_keywords(
-        self, *, cache_only: bool = False
+        self, *, cache_only: bool = True, allow_miss: bool = False
     ) -> list[CalculatedKeyword] | None:
+        """Keywords из Redis-кеша (прогрев — snapshot updater).
+
+        Args:
+            cache_only: должен быть ``True``; ``False`` запрещён в shop-runner.
+            allow_miss: при ``True`` и miss в Redis — ``None``; иначе ``ShopRunnerKeywordsCacheMissError``.
+        """
         if not self._get_keywords:
             raise RuntimeError("_get_keywords not set")
-        if cache_only:
-            cached = await self._get_keywords(self, cache_only=True)
-            if cached is None:
-                return None
-            if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
-                return [kw for kw in cached if kw.status == KeywordStatus.GOOD]
-            return cached
-        if not self._calculated_keywords:
-            loaded = await self._get_keywords(self, cache_only=False)
-            if loaded is None:
-                raise RuntimeError(
-                    "get_keywords provider returned None with cache_only=False"
-                )
-            self._calculated_keywords = loaded
-        if self.keyword_getting_mode == KeywordGettingMode.ONLY_ACTIVE_KEYWORDS:
-            keywords = [
-                kw for kw in self._calculated_keywords if kw.status == KeywordStatus.GOOD
-            ]
-        else:
-            keywords = self._calculated_keywords
-        return keywords
+        if not cache_only:
+            raise RuntimeError(
+                "get_keywords(cache_only=False) отключён в shop-runner: "
+                "пересчёт только в snapshot updater (warmup). "
+                "Используйте cache_only=True."
+            )
+        if self._calculated_keywords:
+            return self._filter_keywords(self._calculated_keywords)
+
+        from app.modules.shop_runner.required_data_miss import (
+            resolve_calculated_keywords_cache,
+        )
+
+        raw = await self._get_keywords(self, cache_only=True, allow_miss=allow_miss)
+        cached = resolve_calculated_keywords_cache(
+            raw,
+            shop_id=self.shop_id or "",
+            adv_id=self.adv_id,
+            allow_miss=allow_miss,
+        )
+        if cached is None:
+            return None
+        self._calculated_keywords = cached
+        return self._filter_keywords(cached)
 
     @property
     def exponet_predict_ctr(self) -> float:

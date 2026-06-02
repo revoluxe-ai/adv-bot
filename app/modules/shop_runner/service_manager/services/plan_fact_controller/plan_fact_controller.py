@@ -47,29 +47,22 @@ class PlanFactController:
     async def _resolve_fact_for_pre_adv(
         pre_adv: PreComplexAdv,
     ) -> FactData:
-        from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-            RedisCalculatedKeywordsCacheManager,
+        from app.modules.shop_runner.required_data_miss import (
+            fetch_calculated_keywords_from_redis,
         )
-        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 
-        complex_adv = ComplexAdv(
-            shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
-            adv_setting=pre_adv.auto_adv,
-            search_adv=pre_adv.search_adv,
-            target_pay_for_order=pre_adv.resolved_target_pay_for_order,
+        shop_id = pre_adv.auto_adv.wb_cabinet.shop_id
+        adv_id = pre_adv.adv_id
+        cached_keywords = await fetch_calculated_keywords_from_redis(
+            adv_id,
+            shop_id=shop_id,
         )
-        redis_kw = RedisCalculatedKeywordsCacheManager()
-        cached_keywords = await redis_kw.get_all_calculated_keywords_for_adv(
-            complex_adv.adv_id
+        assert cached_keywords is not None
+        keywords = sorted(
+            cached_keywords,
+            key=lambda kw: kw.rating or 0,
+            reverse=True,
         )
-        if cached_keywords:
-            keywords = sorted(
-                cached_keywords,
-                key=lambda kw: kw.rating or 0,
-                reverse=True,
-            )
-        else:
-            keywords = await get_good_bad_phrases(complex_adv)
         provider = PlanFactProvider(pre_adv.auto_adv)
         stat = await provider.get_stat_data(keywords)
         fact = await provider.get_fact_data(stat)

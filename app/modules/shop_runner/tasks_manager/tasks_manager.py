@@ -1,3 +1,5 @@
+"""Очередь параллельных handler'ов shop-runner с сохранением ContextVar."""
+
 import asyncio
 import contextvars
 import logging
@@ -132,7 +134,19 @@ class TasksManager:
             except Exception as exc:
                 if not entry.future.done():
                     entry.future.set_exception(exc)
-                logger.exception("Ошибка задачи: %s", exc, exc_info=True)
+                from app.modules.shop_runner.required_data_miss import (
+                    is_required_data_miss,
+                )
+
+                if is_required_data_miss(exc):
+                    # Ожидаемо до warmup snapshot; while_coroutine_decorator — warning + retry.
+                    logger.warning(
+                        "Задача без обязательных данных (handler=%s): %s",
+                        handler_name,
+                        exc,
+                    )
+                else:
+                    logger.exception("Ошибка задачи: %s", exc, exc_info=True)
             else:
                 if not entry.future.done():
                     entry.future.set_result(result)

@@ -108,9 +108,9 @@ class UpdateClusterBidsManager:
         self, adv: ComplexAdv
     ) -> list[CalculatedKeyword] | None:
         """Keywords для расчёта карт: snapshot adapter (shadow/read) или legacy cache_only."""
-        from app.snapshot_data_updater.config import DEFAULT_CONFIG
+        from app.snapshot_data_updater.config import get_snapshot_config
 
-        cfg = DEFAULT_CONFIG
+        cfg = get_snapshot_config()
         if cfg.cluster_bids_read_from_snapshot or cfg.cluster_bids_shadow_compare:
             from app.snapshot_data_updater.adapters.cluster_bids_adapter import (
                 ClusterBidsSnapshotAdapter,
@@ -120,7 +120,7 @@ class UpdateClusterBidsManager:
             return await adapter.get_keywords_for_adv(
                 adv, fallback_getter=adv.get_keywords
             )
-        return await adv.get_keywords(cache_only=True)
+        return await adv.get_keywords(cache_only=True, allow_miss=True)
 
     async def _get_local_data(
         self, advs: list[ComplexAdv]

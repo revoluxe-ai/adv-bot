@@ -81,40 +81,47 @@ class WBShopDataManager:
 
     @single_run()
     async def __get_calculated_keywords(
-        self, complex_adv: ComplexAdv, *, cache_only: bool = False
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        cache_only: bool = True,
+        allow_miss: bool = False,
     ) -> list[CalculatedKeyword] | None:
+        """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: hash отсутствует и ``allow_miss=False``.
+        """
+        if not cache_only:
+            raise RuntimeError(
+                "__get_calculated_keywords(cache_only=False) отключён: "
+                "полный пересчёт — только в app.snapshot_data_updater warmup."
+            )
         trace = AdvPhaseTrace.for_complex_adv(
             coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
         )
-        trace.marker("kw_provider_enter", extra={"cache_only": cache_only})
-        if cache_only:
-            from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-                RedisCalculatedKeywordsCacheManager,
+        trace.marker(
+            "kw_provider_enter",
+            extra={"cache_only": True, "allow_miss": allow_miss},
+        )
+        from app.modules.shop_runner.required_data_miss import (
+            fetch_calculated_keywords_from_redis,
+        )
+
+        with trace.phase("kw_redis_cache_get_all"):
+            cached = await fetch_calculated_keywords_from_redis(
+                complex_adv.adv_id,
+                shop_id=complex_adv.shop_id or self.shop_id,
+                allow_miss=allow_miss,
             )
-
-            redis_mgr = RedisCalculatedKeywordsCacheManager()
-            with trace.phase("kw_redis_cache_get_all"):
-                cached = await redis_mgr.get_all_calculated_keywords_for_adv(
-                    complex_adv.adv_id
-                )
-            trace.marker(
-                "kw_redis_cache_result",
-                extra={"keywords_count": len(cached) if cached else 0, "hit": cached is not None},
-            )
-            return cached
-
-        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
-
-        if not complex_adv:
-            raise RuntimeError("Сначала обновить модели")
-        try:
-            with trace.phase("kw_get_good_bad_phrases_total"):
-                keywords = await get_good_bad_phrases(complex_adv, adv_trace=trace)
-        except Exception as exc:
-            raise exc
-
-        trace.marker("kw_provider_done", extra={"keywords_count": len(keywords)})
-        return keywords
+        trace.marker(
+            "kw_redis_cache_result",
+            extra={
+                "keywords_count": len(cached) if cached else 0,
+                "hit": cached is not None,
+            },
+        )
+        return cached
 
     @single_run()
     async def _get_active_advs(self) -> list[AdvSetting]:
@@ -308,24 +315,15 @@ class WBShopDataManager:
         """Keywords для WBAdvDTO только из Redis (``calculated_keywords:{adv_id}``).
 
         Raises:
-            KeywordsCacheMissError: hash в Redis отсутствует — нужен live snapshot updater.
+            ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует — нужен snapshot updater.
         """
         from app.snapshot_data_updater.adapters.wb_adv_dto_adapter import (
             WBAdvDtoSnapshotAdapter,
         )
-        from app.snapshot_data_updater.cache_freshness import KeywordsCacheMissError
 
         adapter = WBAdvDtoSnapshotAdapter()
         shop_id = complex_adv.shop_id or ""
-        cached = await complex_adv.get_keywords(cache_only=True)
-        if cached is None:
-            raise KeywordsCacheMissError(
-                f"calculated_keywords cache miss shop_id={shop_id} "
-                f"adv_id={complex_adv.adv_id}: запустите snapshot updater (live) "
-                "и дождитесь warmup",
-                shop_id=shop_id,
-                adv_id=complex_adv.adv_id,
-            )
+        cached = await complex_adv.get_keywords()
         await adapter.shadow_log_keywords_delta(
             shop_id, complex_adv.adv_id, legacy_count=len(cached)
         )
