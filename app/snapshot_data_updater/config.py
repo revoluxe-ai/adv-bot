@@ -181,17 +181,18 @@ class SnapshotUpdaterConfig:
     ``wait`` — дождаться завершения предыдущего tick (блокировка на Lock)."""
 
     resource_task_timeout_sec: float = 30.0
-    """Таймаут задач ResourceQueue для CH / Redis / warmup (сек).
+    """Таймаут задач **Redis**-очереди collector (``ResourceQueue``, сек).
 
-    Env: ``SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC``. Для Postgres см.
-    ``postgres_task_timeout_sec`` / ``SNAPSHOT_PG_TASK_TIMEOUT_SEC``.
+    Env: ``SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC``. Ограничивает batch min_bids / keywords
+    в snapshot tick; не относится к PG/CH/warmup (см. ``resource_queue`` module docstring).
     """
 
     postgres_task_timeout_sec: float | None = None
-    """Таймаут фазы ``pg:shop_load`` (сек). Env: ``SNAPSHOT_PG_TASK_TIMEOUT_SEC``.
+    """Зарезервировано. Env: ``SNAPSHOT_PG_TASK_TIMEOUT_SEC``.
 
-    Если не задан — используется ``resource_task_timeout_sec``.
-    Для крупных магазинов в prod часто 90–180.
+    PG в collector не использует ``ResourceQueue`` — лимит запросов через
+    ``POSTGRES_QUERY_CONCURRENCY`` и таймауты ``session_maker``. Поле оставлено для
+    возможного будущего wiring; на поведение snapshot сейчас не влияет.
     """
 
     @property

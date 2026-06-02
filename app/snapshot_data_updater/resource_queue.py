@@ -1,9 +1,32 @@
-"""``ResourceQueue`` — ограничение параллельных **Redis**-запросов в snapshot collector.
+"""Очередь с семафором + таймаутом для тяжёлых фаз snapshot collector.
 
-PG и CH лимитируются глобально при запросе (``resource_limits`` + session/CH sem).
-Warmup keywords — через ``anti_ch_crash_semaphore`` внутри ``get_good_bad_phrases``.
+Зачем
+-----
+При сборке снимка магазина параллельно читаются min_bids и keywords из Redis.
+Без лимита десятки одновременных ``redis.get`` могут забить connection pool.
 
-Здесь остаётся только ``ResourceKind.REDIS`` (min_bids batch и т.п.).
+Что делает ``ResourceQueue``
+----------------------------
+- ``concurrency`` — макс. параллельных задач (env ``REDIS_QUERY_CONCURRENCY``);
+- ``task_timeout_sec`` — ``asyncio.wait_for`` на одну задачу (env
+  ``SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC``), иначе фаза висит в tick.
+
+Что **не** идёт через этот модуль (лимиты в другом месте)
+---------------------------------------------------------
+- **Postgres** (``pg:shop_load``) — прямой ``await`` в collector,
+  слоты ``POSTGRES_QUERY_CONCURRENCY`` + таймаут сессии в ``session_maker``;
+- **ClickHouse** (plan_fact, cluster_texts) — ``run_ch_with_timeout`` /
+  ``CLICKHOUSE_QUERY_*``;
+- **Warmup keywords** — ``get_good_bad_phrases`` + глобальный CH semaphore.
+
+Активная очередь одна: ``ResourceKind.REDIS`` (batch min_bids, fallback keywords).
+
+``task_timeout_by_kind``
+----------------------
+Переопределение таймаута по виду ресурса при **создании** очереди в
+``ResourceQueueManager``. Сейчас в manager только Redis — на практике важен
+``task_timeout_sec`` (или ``task_timeout_by_kind[REDIS]`` в тестах).
+Значения для ``POSTGRES`` / ``CLICKHOUSE`` в dict не создают очередей (legacy enum).
 """
 
 from __future__ import annotations
@@ -21,10 +44,10 @@ T = TypeVar("T")
 
 
 class ResourceKind(StrEnum):
-    """Тип ресурса для очереди (активно — только Redis)."""
+    """Метка задачи для ``ResourceQueueManager.submit`` (очередь есть только у REDIS)."""
 
     REDIS = "redis"
-    # Legacy kinds: прямой await в collector, лимит на уровне запроса PG/CH
+    # Не создают очередь в ResourceQueueManager — оставлены для имён задач / совместимости.
     POSTGRES = "postgres"
     CLICKHOUSE = "clickhouse"
     CALCULATED_KEYWORDS_WARMUP = "calculated_keywords_warmup"
@@ -133,7 +156,10 @@ class ResourceQueue:
 
 
 class ResourceQueueManager:
-    """Набор очередей — по одной на каждый ``ResourceKind``."""
+    """Маршрутизатор ``ResourceTask`` → очередь с семафором.
+
+    В production создаётся только очередь **Redis** (см. ``build_resource_queue_manager``).
+    """
 
     def __init__(
         self,
@@ -143,10 +169,17 @@ class ResourceQueueManager:
         task_timeout_by_kind: dict[ResourceKind, float] | None = None,
     ) -> None:
         """Args:
-            concurrency: переопределение лимитов; иначе ``DEFAULT_CONCURRENCY``.
-            task_timeout_sec: таймаут по умолчанию для всех очередей.
-            task_timeout_by_kind: переопределение таймаута (например PG отдельно).
+            concurrency: лимит параллелизма; для Redis — ``REDIS_QUERY_CONCURRENCY``.
+            task_timeout_sec: таймаут задач Redis, если нет переопределения в ``task_timeout_by_kind``.
+            task_timeout_by_kind: опционально ``{ResourceKind.REDIS: сек}``; ключи PG/CH
+                без очереди в ``_queues`` не используются (не ошибка, просто запас API).
         """
+        by_kind = dict(task_timeout_by_kind or {})
+
+        def _timeout_for(kind: ResourceKind) -> float:
+            # Для единственной Redis-очереди: SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC или override.
+            return by_kind.get(kind, task_timeout_sec)
+
         redis_limit = (concurrency or {}).get(
             ResourceKind.REDIS, _default_redis_concurrency()
         )
@@ -154,7 +187,7 @@ class ResourceQueueManager:
             ResourceKind.REDIS: ResourceQueue(
                 ResourceKind.REDIS,
                 concurrency=redis_limit,
-                task_timeout_sec=task_timeout_sec,
+                task_timeout_sec=_timeout_for(ResourceKind.REDIS),
             )
         }
 
@@ -183,7 +216,12 @@ class ResourceQueueManager:
 def build_resource_queue_manager(
     config: object | None = None,
 ) -> ResourceQueueManager:
-    """Собирает очереди с таймаутами из ``SnapshotUpdaterConfig`` / env."""
+    """Фабрика для ``AdvDataSnapshotCollector``: одна Redis-очередь из env.
+
+    Используется ``cfg.resource_task_timeout_sec`` → ``SNAPSHOT_RESOURCE_TASK_TIMEOUT_SEC``.
+    ``postgres_task_timeout_sec`` / ``SNAPSHOT_PG_TASK_TIMEOUT_SEC`` сюда **не** подключаются:
+    загрузка PG в collector не идёт через ResourceQueue (см. module docstring).
+    """
     from app.snapshot_data_updater.config import (
         SnapshotUpdaterConfig,
         get_snapshot_config,

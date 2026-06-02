@@ -79,7 +79,8 @@ class AdvDataSnapshotCollector:
             clickhouse: stub или live CH (plan/fact, cluster texts).
             redis: stub или live Redis (keywords, min_bids).
             assembler: чистая сборка DTO; по умолчанию ``AdvDataSnapshotAssembler``.
-            resource_queues: лимиты параллелизма PG/CH/Redis/warmup.
+            resource_queues: семафор + таймаут только для Redis-фаз (min_bids, keywords);
+                PG/CH/warmup — см. ``resource_queue`` module docstring.
             keywords_warmup: в live — централизованный прогрев ключей; в stub — ``None``.
             schema_version: пишется в каждый ``AdvDataSnapshotDTO``.
             snapshot_ttl_sec: ``expires_at = collected_at + ttl``.
