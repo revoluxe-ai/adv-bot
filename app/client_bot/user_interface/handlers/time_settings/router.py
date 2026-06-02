@@ -518,9 +518,8 @@ async def time_settings_callback(
                         callback,
                         only_markup=False,
                         callback_answer=callback_answer,
+                        alert=_SAVE_FAILED_MESSAGE,
                     )
-                    await callback.message.answer(_SAVE_FAILED_MESSAGE)
-                    set_callback_toast(callback_answer, "")
                     return
 
     await _redraw(
