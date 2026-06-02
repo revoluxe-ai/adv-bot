@@ -12,8 +12,9 @@ from app.settings.settings_master import Settings
 
 
 @pytest.fixture(autouse=True)
-def _reset_monitor_state() -> None:
+def _reset_monitor_state(monkeypatch: pytest.MonkeyPatch) -> None:
     """Сбрасывает глобальное состояние между тестами."""
+    monkeypatch.setenv("DEV_TUNNELS_ENABLED", "true")
     k8s_tunnels._monitor_started = False
     k8s_tunnels._cleanup_registered = False
     k8s_tunnels._processes_by_name = {}
@@ -50,6 +51,17 @@ def test_tcp_port_open_failure() -> None:
         side_effect=OSError("connection refused"),
     ):
         assert k8s_tunnels._tcp_port_open("127.0.0.1", 15432) is False
+
+
+def test_start_dev_tunnels_skipped_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Без DEV_TUNNELS_ENABLED приложение не трогает kubectl."""
+    monkeypatch.setenv("DEV_TUNNELS_ENABLED", "false")
+    with patch.object(k8s_tunnels.threading, "Thread") as mock_thread:
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
+    mock_thread.assert_not_called()
+    assert k8s_tunnels._monitor_started is False
 
 
 def test_start_missing_kubeconfig_leaves_monitor_not_started() -> None:

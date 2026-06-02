@@ -1,4 +1,7 @@
-"""kubectl port-forward к Postgres и ClickHouse для локальной разработки (RUN_LOCAL=true).
+"""kubectl port-forward к Postgres и ClickHouse (опционально, не из settings).
+
+Включение: ``DEV_TUNNELS_ENABLED=true`` перед вызовом ``start_dev_tunnels_monitor``.
+Автозапуск при импорте ``settings`` отключён — локально используйте IP из .env.
 
 Несколько точек входа (несколько Python-процессов) могут работать параллельно:
 
@@ -1184,8 +1187,15 @@ def _register_cleanup_once() -> None:
     _cleanup_registered = True
 
 
+def _dev_tunnels_enabled() -> bool:
+    """True, если разрешён kubectl port-forward (явный opt-in)."""
+    return _str_env("DEV_TUNNELS_ENABLED", "false").lower() == "true"
+
+
 def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
     """Идемпотентно обеспечивает port-forward для локальной разработки.
+
+    Без ``DEV_TUNNELS_ENABLED=true`` — no-op (приложение не поднимает туннели).
 
     Несколько Python-процессов: здоровый forward другого процесса переиспользуется
     (reuse + smoke), kubectl не поднимается и чужие PID не завершаются.
@@ -1198,6 +1208,13 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
     Args:
         wait_ready: дождаться probe на localhost перед возвратом.
     """
+    if not _dev_tunnels_enabled():
+        logger.info(
+            "Dev k8s tunnels skipped (DEV_TUNNELS_ENABLED is not true). "
+            "Use external DB hosts in .env or scripts/dev-tunnels.ps1"
+        )
+        return
+
     global _monitor_started
 
     kubeconfig = ""
