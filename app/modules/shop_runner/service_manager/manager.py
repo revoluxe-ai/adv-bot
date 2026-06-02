@@ -444,7 +444,7 @@ class CoroutinesManager:
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
 
-    @while_coroutine_decorator(1)
+    @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
