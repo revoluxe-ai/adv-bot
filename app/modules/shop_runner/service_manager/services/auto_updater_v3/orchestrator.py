@@ -128,7 +128,6 @@ async def _resolve_v3_fact_data(
     ):
         return dto.fact, "dto"
     return await updater.get_fact_data(keywords), "updater"
-#
 
 def _apply_v3_phase(
     ledger: V3TickKeywordLedger,
