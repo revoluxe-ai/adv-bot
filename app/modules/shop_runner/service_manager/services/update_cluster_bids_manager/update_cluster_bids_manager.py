@@ -104,6 +104,24 @@ class UpdateClusterBidsManager:
         )
         self._tasks_manager = tasks_manager
 
+    async def _get_keywords_for_cluster_bids(
+        self, adv: ComplexAdv
+    ) -> list[CalculatedKeyword] | None:
+        """Keywords для расчёта карт: snapshot adapter (shadow/read) или legacy cache_only."""
+        from app.snapshot_data_updater.config import DEFAULT_CONFIG
+
+        cfg = DEFAULT_CONFIG
+        if cfg.cluster_bids_read_from_snapshot or cfg.cluster_bids_shadow_compare:
+            from app.snapshot_data_updater.adapters.cluster_bids_adapter import (
+                ClusterBidsSnapshotAdapter,
+            )
+
+            adapter = ClusterBidsSnapshotAdapter(config=cfg)
+            return await adapter.get_keywords_for_adv(
+                adv, fallback_getter=adv.get_keywords
+            )
+        return await adv.get_keywords(cache_only=True)
+
     async def _get_local_data(
         self, advs: list[ComplexAdv]
     ) -> set[AdvIdItemCalculateData]:
@@ -445,7 +463,7 @@ class UpdateClusterBidsManager:
         )
 
         with trace.phase("per_adv_get_keywords_cache_only"):
-            keywords_maybe = await adv.get_keywords(cache_only=True)
+            keywords_maybe = await self._get_keywords_for_cluster_bids(adv)
         if keywords_maybe is None:
             trace.marker("per_adv_keywords_cache_miss")
             logger.debug(

@@ -305,7 +305,31 @@ class WBShopDataManager:
 
     @staticmethod
     async def _collect_keywords(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
-        return await complex_adv.get_keywords()
+        """Keywords для WBAdvDTO только из Redis (``calculated_keywords:{adv_id}``).
+
+        Raises:
+            KeywordsCacheMissError: hash в Redis отсутствует — нужен live snapshot updater.
+        """
+        from app.snapshot_data_updater.adapters.wb_adv_dto_adapter import (
+            WBAdvDtoSnapshotAdapter,
+        )
+        from app.snapshot_data_updater.cache_freshness import KeywordsCacheMissError
+
+        adapter = WBAdvDtoSnapshotAdapter()
+        shop_id = complex_adv.shop_id or ""
+        cached = await complex_adv.get_keywords(cache_only=True)
+        if cached is None:
+            raise KeywordsCacheMissError(
+                f"calculated_keywords cache miss shop_id={shop_id} "
+                f"adv_id={complex_adv.adv_id}: запустите snapshot updater (live) "
+                "и дождитесь warmup",
+                shop_id=shop_id,
+                adv_id=complex_adv.adv_id,
+            )
+        await adapter.shadow_log_keywords_delta(
+            shop_id, complex_adv.adv_id, legacy_count=len(cached)
+        )
+        return cached
 
 
     async def _collect_adv_data_parts(
@@ -320,11 +344,8 @@ class WBShopDataManager:
         )
         with trace.phase("dto_collect_plan_data"):
             plan = await self._collect_plan_data(complex_adv)
-        trace.marker(
-            "dto_collect_keywords_second_call_start",
-            extra={"note": "duplicate get_keywords inside get_wb_advs_dto"},
-        )
-        with trace.phase("dto_collect_keywords_second_call"):
+        trace.marker("dto_collect_keywords_start")
+        with trace.phase("dto_collect_keywords"):
             keywords = await self._collect_keywords(complex_adv)
         trace.marker("dto_keywords_loaded", extra={"keywords_count": len(keywords)})
         manager = PlanFactProvider(complex_adv.adv_setting)

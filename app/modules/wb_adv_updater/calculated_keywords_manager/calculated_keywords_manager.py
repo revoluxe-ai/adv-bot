@@ -592,13 +592,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         if not nmids:
             return None
         hub = await self._get_wb_manager_hub(complex_adv)
-        wb_manager_raw = hub.wb_manager
-        if isinstance(wb_manager_raw, providers.Provider):
-            wb_manager = cast(WBManager, wb_manager_raw())
-        else:
-            wb_manager = wb_manager_raw
-        min_bids = await wb_manager.get_min_bids_cache_only(
+        min_bids = await WBManager.read_min_bids_cache_only(
             [complex_adv],
+            hub.redis_client_wrapper,
+            shop_id=complex_adv.shop_id or "",
             context=f"calculated_keywords adv_id={complex_adv.adv_id}",
         )
         return max_search_min_bid_for_complex_nmids(nmids, min_bids)

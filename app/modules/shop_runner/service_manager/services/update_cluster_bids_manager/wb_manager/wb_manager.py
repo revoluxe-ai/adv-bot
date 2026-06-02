@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
     MinBidsCacheManager,
     MinBidsV2Cell,
 )
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -110,6 +111,51 @@ def _min_bids_cache_entries_for_adv(
 
 
 class WBManager(WBBaseManager):
+    @staticmethod
+    async def read_min_bids_cache_only(
+        advs: list[ComplexAdv],
+        redis_client_wrapper: RedisClient,
+        *,
+        shop_id: str,
+        context: str = "",
+    ) -> AdvMinNmidsBids:
+        """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path)."""
+        full_command = dto_to_command(advs)
+        cache_manager = MinBidsCacheManager(redis_client_wrapper)
+        hits_auto: dict[int, int] = {}
+        hits_search: dict[int, int] = {}
+
+        if not full_command.items:
+            return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
+
+        cells: list[MinBidsV2Cell] = []
+        for item in full_command.items:
+            for nmid in item.nmids:
+                cells.append((item.adv_id, item.placement_type, nmid))
+
+        cached_map = await cache_manager.get_min_bids_v2_batch(cells)
+        for item in full_command.items:
+            for nmid in item.nmids:
+                cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)
+                cpm = cached_map.get(cell)
+                if cpm is None:
+                    logger.warning(
+                        "min_bids cache miss shop_id=%s context=%s adv_id=%s "
+                        "placement=%s nmid=%s",
+                        shop_id,
+                        context,
+                        item.adv_id,
+                        item.placement_type.value,
+                        nmid,
+                    )
+                    continue
+                if item.placement_type == AdvPlacementType.AUTO_ADV:
+                    hits_auto[nmid] = cpm
+                elif item.placement_type == AdvPlacementType.SEARCH_ADV:
+                    hits_search[nmid] = cpm
+
+        return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
+
     async def get_current_bids(self, advs: list[ComplexAdv]) -> list[NormqueryBidDTO]:
         wb_manager_hub = self.wb_manager_hub
         bids: list[NormqueryBidDTO] | None = (
@@ -358,41 +404,12 @@ class WBManager(WBBaseManager):
         *,
         context: str,
     ) -> AdvMinNmidsBids:
-        full_command = dto_to_command(advs)
-        cache_manager = MinBidsCacheManager(self.wb_manager_hub.redis_client_wrapper)
-        hits_auto: dict[int, int] = {}
-        hits_search: dict[int, int] = {}
-
-        if not full_command.items:
-            return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
-
-        cells: list[MinBidsV2Cell] = []
-        for item in full_command.items:
-            for nmid in item.nmids:
-                cells.append((item.adv_id, item.placement_type, nmid))
-
-        cached_map = await cache_manager.get_min_bids_v2_batch(cells)
-        for item in full_command.items:
-            for nmid in item.nmids:
-                cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)
-                cpm = cached_map.get(cell)
-                if cpm is None:
-                    logger.error(
-                        "min_bids cache miss shop_id=%s context=%s adv_id=%s "
-                        "placement=%s nmid=%s",
-                        self._shop_id,
-                        context,
-                        item.adv_id,
-                        item.placement_type.value,
-                        nmid,
-                    )
-                    continue
-                if item.placement_type == AdvPlacementType.AUTO_ADV:
-                    hits_auto[nmid] = cpm
-                elif item.placement_type == AdvPlacementType.SEARCH_ADV:
-                    hits_search[nmid] = cpm
-
-        return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
+        return await WBManager.read_min_bids_cache_only(
+            advs,
+            self.wb_manager_hub.redis_client_wrapper,
+            shop_id=self._shop_id,
+            context=context,
+        )
 
     async def get_min_bids(
         self, advs: list[ComplexAdv], cache_possible: bool
