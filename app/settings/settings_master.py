@@ -16,7 +16,6 @@ import dotenv
 
 _ = dotenv.load_dotenv()
 import os
-import sys
 
 
 class Settings:
@@ -78,9 +77,11 @@ class Settings:
 
     @property
     def run_local(self) -> bool:
-        """Локальная разработка: kubectl port-forward к PG/CH в k8s (см. app.dev_local.k8s_tunnels).
+        """Флаг локального режима (legacy env RUN_LOCAL).
 
-        По умолчанию False. Включить: RUN_LOCAL=true
+        Port-forward PG/CH из приложения отключён; подключение — по IP из .env
+        (см. k8s/network/local-dev-external-access.md). Туннели вручную: DEV_TUNNELS_ENABLED=true
+        и app.dev_local.k8s_tunnels или scripts/dev-tunnels.ps1.
         """
         value = os.environ.get("RUN_LOCAL")
         if value is None:
@@ -815,22 +816,4 @@ class Settings:
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 
-
-def _bootstrap_dev_local() -> None:
-    """При RUN_LOCAL=true поднимает kubectl port-forward до импорта БД-клиентов.
-
-    Блокирует до готовности TCP на localhost (PG/CH), чтобы приложение
-    не стартовало раньше port-forward.
-    """
-    if os.environ.get("RUN_LOCAL", "").strip().lower() != "true":
-        return
-    # pytest импортирует settings через conftest — туннели не поднимаем
-    if "pytest" in sys.modules:
-        return
-    from app.dev_local.k8s_tunnels import start_dev_tunnels_monitor
-
-    start_dev_tunnels_monitor()  # внутри — wait_for_dev_tunnels_ready()
-
-
-_bootstrap_dev_local()
 settings = Settings()

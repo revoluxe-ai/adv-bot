@@ -1,0 +1,38 @@
+# ============================================================================
+# clickhouse-external-lb.yaml
+# ============================================================================
+# Назначение: внешний LoadBalancer (Timeweb K8s) на ClickHouse HTTP/native
+#             для подключения с локали по публичному IP (без kubectl port-forward).
+# Селектор: pod clickhouse-restore (app=clickhouse-restore).
+# Пересоздавать после удаления LB в панели Timeweb: delete svc + kubectl apply.
+#
+# Локальный .env (пример после появления EXTERNAL-IP):
+#   CLICK_HOUSE_HOST=<EXTERNAL-IP>
+#   CLICKHOUSE_PORT=8123
+#   RUN_LOCAL=false
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-external
+  namespace: prod-analytics
+  labels:
+    app: clickhouse-restore
+    adv-bot.external-access: "true"
+    k8s.timeweb.cloud/attached-loadbalancer-algo: roundrobin
+    k8s.timeweb.cloud/attached-loadbalancer-preset-id: "391"
+spec:
+  type: LoadBalancer
+  selector:
+    app: clickhouse-restore
+  ports:
+    - name: http
+      port: 8123
+      targetPort: http
+      protocol: TCP
+      appProtocol: k8s.timeweb.cloud/proto-tcp
+    - name: native
+      port: 9000
+      targetPort: tcp
+      protocol: TCP
+      appProtocol: k8s.timeweb.cloud/proto-tcp
