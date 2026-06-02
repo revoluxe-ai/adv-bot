@@ -119,17 +119,14 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
         """Все keywords из hash ``calculated_keywords:{adv_id}``.
 
         Returns:
-            ``None`` — ключ отсутствует (cache miss).
-            ``[]`` — ключ есть, warmup/расчёт завершён, keywords нет (маркер ``__empty__``).
+            ``None`` — ключ отсутствует, истёк TTL или нет маркера ``__empty__``.
+            ``[]`` — hash с маркером ``__empty__`` (легитимный пустой warmup).
             иначе список ``CalculatedKeyword``.
         """
         key = f"calculated_keywords:{adv_id}"
-        exists = await self.client.exists(key)
-        if not exists:
-            return None
         raw_map = await self.client.hgetall(key)
         if not raw_map:
-            return []
+            return None
         out: list[CalculatedKeyword] = []
         has_empty_marker = False
         for field, raw in raw_map.items():

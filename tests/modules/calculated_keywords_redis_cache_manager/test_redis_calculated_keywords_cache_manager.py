@@ -19,14 +19,24 @@ async def test_get_all_calculated_keywords_for_adv_returns_none_when_key_missing
 ):
     mgr = RedisCalculatedKeywordsCacheManager()
     mock_client = MagicMock()
-    mock_client.exists = AsyncMock(return_value=0)
     mock_client.hgetall = AsyncMock(return_value={})
     mgr._client = mock_client
 
     result = await mgr.get_all_calculated_keywords_for_adv(12345)
     assert result is None
-    mock_client.exists.assert_awaited_once_with("calculated_keywords:12345")
-    mock_client.hgetall.assert_not_awaited()
+    mock_client.hgetall.assert_awaited_once_with("calculated_keywords:12345")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_all_returns_none_when_hash_empty_without_marker() -> None:
+    mgr = RedisCalculatedKeywordsCacheManager()
+    mock_client = MagicMock()
+    mock_client.hgetall = AsyncMock(return_value={b"orphan": b"not-json"})
+    mgr._client = mock_client
+
+    result = await mgr.get_all_calculated_keywords_for_adv(1)
+    assert result is None
 
 
 @pytest.mark.unit
@@ -34,7 +44,6 @@ async def test_get_all_calculated_keywords_for_adv_returns_none_when_key_missing
 async def test_get_all_returns_empty_list_when_empty_marker_present() -> None:
     mgr = RedisCalculatedKeywordsCacheManager()
     mock_client = MagicMock()
-    mock_client.exists = AsyncMock(return_value=1)
     mock_client.hgetall = AsyncMock(
         return_value={_CALCULATED_KEYWORDS_EMPTY_FIELD: b"1"}
     )
