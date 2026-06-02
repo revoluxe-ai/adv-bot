@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -43,6 +43,17 @@ async def test_collect_keywords_returns_redis_hit() -> None:
     adv.adv_id = 99
     adv.get_keywords = AsyncMock(return_value=[kw])
 
-    result = await WBShopDataManager._collect_keywords(adv)
+    mock_adapter = MagicMock()
+    mock_adapter.shadow_log_keywords_delta = AsyncMock()
+
+    with patch(
+        "app.snapshot_data_updater.adapters.wb_adv_dto_adapter.WBAdvDtoSnapshotAdapter",
+        return_value=mock_adapter,
+    ):
+        result = await WBShopDataManager._collect_keywords(adv)
+
     assert result == [kw]
     adv.get_keywords.assert_awaited_once_with()
+    mock_adapter.shadow_log_keywords_delta.assert_awaited_once_with(
+        "shop-1", 99, legacy_count=1
+    )
