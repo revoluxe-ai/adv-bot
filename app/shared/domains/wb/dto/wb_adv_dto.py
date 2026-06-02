@@ -30,6 +30,11 @@ class WBAdvDTO:
         return self._plan
 
     @property
+    def fact(self) -> FactData:
+        """Факт кампании, собранный при построении DTO (plan/fact из ``get_wb_advs_dto``)."""
+        return self._fact
+
+    @property
     def target_position_mode(self) -> TargetPositionMode:
         return self._complex_adv.target_position_mode
 
