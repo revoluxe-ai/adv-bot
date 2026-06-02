@@ -93,7 +93,12 @@ async def test_adv_control_system_process_adv_does_not_touch_other_adv_keywords(
 
     before_b = {ks.id: ks.hard_status for ks in seed_b.keyword_settings}
 
-    async def get_keywords_a(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_keywords_a(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_a.calculated_keywords
 
     complex_a = ComplexAdv(
@@ -186,10 +191,20 @@ async def test_coroutines_manager_adv_settings_auto_update_calls_each_fresh_adv(
     seed_a.adv_setting.bot_active = True
     seed_b.adv_setting.bot_active = True
 
-    async def get_kw_a(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_a(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_a.calculated_keywords
 
-    async def get_kw_b(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_b(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_b.calculated_keywords
 
     adv_a = ComplexAdv(
@@ -268,10 +283,20 @@ async def test_adv_settings_auto_update_stats_freshness_gate_skips_stale_hit(
     seed_a.adv_setting.bot_active = True
     seed_b.adv_setting.bot_active = True
 
-    async def get_kw_a(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_a(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_a.calculated_keywords
 
-    async def get_kw_b(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_b(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_b.calculated_keywords
 
     adv_a = ComplexAdv(
@@ -365,10 +390,20 @@ async def test_adv_settings_auto_update_stats_freshness_gate_fail_open_on_miss_o
     seed_a.adv_setting.bot_active = True
     seed_b.adv_setting.bot_active = True
 
-    async def get_kw_a(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_a(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_a.calculated_keywords
 
-    async def get_kw_b(_: ComplexAdv, *, cache_only: bool = False):
+    async def get_kw_b(
+        _: ComplexAdv,
+        *,
+        cache_only: bool = False,
+        allow_miss: bool = False,
+    ):
         return seed_b.calculated_keywords
 
     adv_a = ComplexAdv(
@@ -396,7 +431,7 @@ async def test_adv_settings_auto_update_stats_freshness_gate_fail_open_on_miss_o
     wb_api = WBApi(access_mock, client_session_mock)
 
     async def _mget(_shop_id: str, adv_ids: list[int]):
-        return [(aid, None, entry_kind) for aid in adv_ids]
+        return [(aid, None, entry_kind, None) for aid in adv_ids]
 
     process_mock = AsyncMock()
 

@@ -124,6 +124,24 @@ async def test_run_tasks_preserves_context_in_shared_manager() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_run_tasks_auto_starts_workers_when_shared_manager_idle() -> None:
+    """Без run_queue/pytest: run_tasks не должен зависать на пустой очереди."""
+    seen: list[int] = []
+
+    async def handler() -> None:
+        seen.append(1)
+
+    shared = TasksManager(max_workers=2)
+    assert not shared._workers
+
+    await run_tasks([handler, handler], max_workers=2, tasks_manager=shared)
+
+    assert seen == [1, 1]
+    assert not shared._workers
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_wb_manager_hub_context_reached_inside_shared_worker() -> None:
     """get_wb_manager_from_context() внутри shared worker видит hub без fallback."""
     from contextvars import ContextVar

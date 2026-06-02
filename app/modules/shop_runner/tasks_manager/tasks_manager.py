@@ -161,8 +161,26 @@ async def run_tasks(
     return_exceptions: bool = True,
     tasks_manager: Optional["TasksManager"] = None,
 ) -> list[Any]:
+    """Выполняет handlers через ``TasksManager``.
+
+    Args:
+        handlers: нулary async callables.
+        max_workers: лимит параллелизма (для shared manager — через semaphore).
+        return_exceptions: как в ``asyncio.gather``.
+        tasks_manager: shared manager shop-runner (воркеры из ``run_queue``);
+            если передан, но воркеры ещё не запущены — стартуем временно
+            (типично в pytest без ``run_process_func``).
+
+    Returns:
+        Результаты handlers в порядке постановки.
+    """
     owns_manager = tasks_manager is None
     manager = tasks_manager or TasksManager(max_workers=max_workers)
+    started_ephemeral_workers = False
+    if tasks_manager is not None and not manager._workers:
+        manager.start()
+        started_ephemeral_workers = True
+
     semaphore = None
     wrapped_handlers: Sequence[Callable[[], Awaitable[Any]]] = handlers
     if tasks_manager is not None:
@@ -174,14 +192,18 @@ async def run_tasks(
 
         wrapped_handlers = [lambda handler_=handler: _bounded(handler_) for handler in handlers]
     futures: deque[asyncio.Future[Any]] = deque()
-    for handler in wrapped_handlers:
-        future = await manager.add_task(handler)
-        futures.append(future)
+    try:
+        for handler in wrapped_handlers:
+            future = await manager.add_task(handler)
+            futures.append(future)
 
-    if owns_manager:
-        await manager.run()
-    else:
-        _ = await asyncio.gather(*futures, return_exceptions=True)
+        if owns_manager:
+            await manager.run()
+        else:
+            _ = await asyncio.gather(*futures, return_exceptions=True)
+    finally:
+        if started_ephemeral_workers:
+            await manager.stop()
 
     results: list[Any] = []
     for future in futures:
