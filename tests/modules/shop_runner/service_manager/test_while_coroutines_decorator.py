@@ -297,3 +297,74 @@ async def test_decorator_required_data_miss_re_raises_after_max_attempts(
 
     assert mock_logger.warning.call_count == 2
     mock_logger.error.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_required_data_miss_streak_is_per_instance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Счётчик miss не общий для всех магазинов на одном decorated method."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "0")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "2")
+    decorator = while_coroutine_decorator(60, 5)
+    miss_counts: dict[str, int] = {"shop_a": 0, "shop_b": 0}
+
+    async def miss_twice_then_stop(self: object) -> None:
+        shop_id = getattr(self, "shop_id", "")
+        miss_counts[shop_id] += 1
+        if miss_counts[shop_id] <= 2:
+            raise ShopRunnerKeywordsCacheMissError(
+                "cache miss",
+                shop_id=shop_id,
+                adv_id=1,
+            )
+        raise StopShopUpdateException("done")
+
+    wrapped = decorator(miss_twice_then_stop)
+    inst_a = MagicMock()
+    inst_a.shop_id = "shop_a"
+    inst_b = MagicMock()
+    inst_b.shop_id = "shop_b"
+
+    with patch(f"{MODULE}.logger"):
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock):
+            await wrapped(inst_a)
+            await wrapped(inst_b)
+
+    assert miss_counts == {"shop_a": 3, "shop_b": 3}
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_required_data_miss_streak_isolated_under_concurrency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Параллельные магазины не суммируют miss в один счётчик."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "0")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "5")
+    decorator = while_coroutine_decorator(60, 5)
+    miss_counts: dict[str, int] = {"shop_a": 0, "shop_b": 0}
+
+    async def miss_three_then_stop(self: object) -> None:
+        shop_id = getattr(self, "shop_id", "")
+        miss_counts[shop_id] += 1
+        if miss_counts[shop_id] <= 3:
+            raise ShopRunnerKeywordsCacheMissError(
+                "cache miss",
+                shop_id=shop_id,
+                adv_id=1,
+            )
+        raise StopShopUpdateException("done")
+
+    wrapped = decorator(miss_three_then_stop)
+    inst_a = MagicMock()
+    inst_a.shop_id = "shop_a"
+    inst_b = MagicMock()
+    inst_b.shop_id = "shop_b"
+
+    with patch(f"{MODULE}.logger"):
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock):
+            await asyncio.gather(wrapped(inst_a), wrapped(inst_b))
+
+    assert miss_counts == {"shop_a": 4, "shop_b": 4}
