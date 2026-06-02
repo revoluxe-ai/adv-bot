@@ -26,6 +26,16 @@ def _build_adapter() -> FinanceAdapter:
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_real_retry_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Юнит-тесты retry не ждут backoff (2/4/8… с и PT pause 2 с)."""
+
+    async def fake_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("app.core.mp.wb.api.retry_decorator.asyncio.sleep", fake_sleep)
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_pool_timeout_not_retried_50_times() -> None:
