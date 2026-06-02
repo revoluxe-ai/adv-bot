@@ -455,13 +455,10 @@ class CoroutinesManager:
         _ = await migrate_v1_auto_updaters_to_v2(advs)
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
-        # Автоуправление настройками относится по сути только к Аукциону (Поиск), поэтому оставляем
-        # в фильтре только проверку активности аукциона
         advs = [adv for adv in advs if adv.search_adv_active_status]
         advs, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )
-        # TODO: Внедрить в бот плату за оборот
         control_system_v2 = AdvControlSystem(max_last_period=2)
         from .services.auto_updater_v3 import process_adv_v3
 

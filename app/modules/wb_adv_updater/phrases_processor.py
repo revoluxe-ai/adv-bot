@@ -326,11 +326,12 @@ _sm = get_async_session_maker
 
 
 async def get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
-
     from .calculated_keywords_manager import CalculatedKeywordsManager
     keyword_manager = CalculatedKeywordsManager()
     # TODO: Вроде как сейчас WB позволяет внутри РК управлять каждым артикулом отдельно
-    keywords: list[CalculatedKeyword]  = await keyword_manager.get_calculated_keywords(complex_adv)
+    keywords: list[CalculatedKeyword] = await keyword_manager.get_calculated_keywords(
+        complex_adv
+    )
     keywords = sorted(keywords, key=lambda kw: kw.rating or 0, reverse=True)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
     await keywords_redis_cache_manager.set_calculated_keywords(

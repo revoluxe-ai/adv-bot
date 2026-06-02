@@ -15,9 +15,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -95,6 +99,33 @@ from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
 
+# ``get_wb_advs_dto`` → ``PlanFactProvider`` использует тот же default last_days.
+_WB_ADV_DTO_FACT_LAST_DAYS = 2
+
+# TODO: централизовать получение план-факта
+async def _resolve_v3_fact_data(
+    *,
+    dto: WBAdvDTO | None,
+    updater: AdvSettingAutoUpdater,
+    keywords: list[CalculatedKeyword],
+    max_last_period: int,
+) -> tuple[FactData, str]:
+    """Fact для V3 ladder без повторного ``get_stat_data``, если fact уже в ``WBAdvDTO``.
+
+    ``get_wb_advs_dto`` собирает fact в ``_collect_adv_data_parts`` (CH). Повторный
+    ``AdvSettingAutoUpdater.get_fact_data`` на том же тике — дубль запроса в ClickHouse.
+
+    Returns:
+        (fact, source) — source ``\"dto\"`` или ``\"updater\"`` для диагностики.
+    """
+    if (
+        dto is not None
+        and isinstance(dto, WBAdvDTO)
+        and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS
+    ):
+        return dto.fact, "dto"
+    return await updater.get_fact_data(keywords), "updater"
+#
 
 def _apply_v3_phase(
     ledger: V3TickKeywordLedger,
@@ -111,13 +142,23 @@ async def _load_v3_wb_context(
     complex_adv: ComplexAdv,
     *,
     wb_shop_data_manager: WBShopDataManager,
+    dbg_phase: Callable[[str, dict[str, object] | None], None] | None = None,
 ) -> tuple[WBAdvDTO | None, dict[str, list[BidPosition]]]:
     """Один запрос WBAdvDTO + bid profiles на цикл V3 (CH)."""
+    def _step(name: str, extra: dict[str, object] | None = None) -> None:
+        if dbg_phase is not None:
+            dbg_phase(name, extra)
+
     shelf_active = complex_adv.shelf_promotion_active
     if shelf_active:
         await TrafficClicksManager().enrich(complex_adv)
+        _step("traffic_enrich_done", {"shelf_active": True})
+    else:
+        _step("traffic_enrich_skipped", {"shelf_active": False})
 
+    _step("before_get_wb_advs_dto")
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
+    _step("get_wb_advs_dto", {"dto_count": len(wb_dtos)})
     if not wb_dtos:
         return None, {}
 
@@ -129,7 +170,9 @@ async def _load_v3_wb_context(
             complex_adv.adv_id,
             nmid,
         )
-        if await wb_shop_data_manager.backfill_min_bids_for_adv(complex_adv):
+        backfill_ok = await wb_shop_data_manager.backfill_min_bids_for_adv(complex_adv)
+        _step("min_bids_backfill", {"ok": backfill_ok, "nmid": nmid})
+        if backfill_ok:
             wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
             if wb_dtos:
                 dto = wb_dtos[0]
@@ -139,10 +182,16 @@ async def _load_v3_wb_context(
                 complex_adv.adv_id,
                 nmid,
             )
+    else:
+        _step("min_bids_cache_hit", {"nmid": nmid})
 
     predictor = build_predict_keywords_target_place()
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
+    )
+    _step(
+        "get_keyword_bid_profiles",
+        {"profiles_count": len(raw_profiles), "min_target_position": dto.min_target_position},
     )
     return dto, raw_profiles
 
@@ -195,7 +244,8 @@ async def process_adv_v3(
     ledger = V3TickKeywordLedger.from_keywords(keywords)
 
     dto, raw_profiles = await _load_v3_wb_context(
-        complex_adv, wb_shop_data_manager=wb_shop_data_manager
+        complex_adv,
+        wb_shop_data_manager=wb_shop_data_manager,
     )
     target_place_synced = False
     campaign_mode = CampaignMode.NOT_READY
@@ -236,14 +286,20 @@ async def process_adv_v3(
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
         else:
             updater = AdvSettingAutoUpdater(adv, max_last_period)
-            fact = await updater.get_fact_data(ledger.keywords)
+            fact, fact_source = await _resolve_v3_fact_data(
+                dto=dto,
+                updater=updater,
+                keywords=ledger.keywords,
+                max_last_period=max_last_period,
+            )
             state = detect_campaign_state(plan, fact)
             campaign_mode = resolve_campaign_mode(state)
             logger.info(
-                "[adv_id=%s] v3: campaign_mode=%s state=%s",
+                "[adv_id=%s] v3: campaign_mode=%s state=%s fact_source=%s",
                 complex_adv.adv_id,
                 campaign_mode.value,
                 state.name if state is not None else "None",
+                fact_source,
             )
         if is_campaign_full_stop(campaign_mode):
             logger.info(

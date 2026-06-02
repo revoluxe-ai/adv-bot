@@ -2,7 +2,6 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from functools import partial
 from typing import cast
 from sqlalchemy import select
 
@@ -159,13 +158,18 @@ class WBShopDataManager:
                 min_bids = reuse_min_bids
                 search_adv_bids = await self._get_search_adv_common_bids(complex_advs)
             else:
-                # mypy 1.19: INTERNAL ERROR на `a, b = await gather(...)`; индексация обходит.
-                _gathered = await asyncio.gather(
-                    self._get_min_bids(complex_advs, cache_possible=True),
-                    self._get_search_adv_common_bids(complex_advs),
+                async def _timed_min_bids() -> AdvMinNmidsBids | None:
+                    return await self._get_min_bids(
+                        complex_advs, cache_possible=True
+                    )
+
+                async def _timed_search_bids() -> dict[int, dict[int, int]]:
+                    return await self._get_search_adv_common_bids(complex_advs)
+                # TODO: Вынести получение данных по API отсюда
+                min_bids, search_adv_bids = await asyncio.gather(
+                    _timed_min_bids(),
+                    _timed_search_bids(),
                 )
-                min_bids = _gathered[0]
-                search_adv_bids = _gathered[1]
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
 
@@ -180,16 +184,24 @@ class WBShopDataManager:
                 else None
             )
             complex_advs_with_bids.append(complex_adv)
-            handler = partial(
-                self._collect_adv_data_parts, complex_adv, current_search_bids
-            )
-            handlers.append(handler)
+            search_bids_snapshot = current_search_bids
+
+            async def _collect_handler(
+                _adv: ComplexAdv = complex_adv,
+                _bids: dict[int, int] | None = search_bids_snapshot,
+            ) -> WBAdvDataParts:
+                return await self._collect_adv_data_parts(_adv, _bids)
+
+            handlers.append(_collect_handler)
 
         max_workers = max(1, min(len(handlers), 16))
+        # Важно: здесь может быть вложенный вызов из handler-а shared TasksManager
+        # (adv_settings_auto_update -> process_adv_v3 -> get_wb_advs_dto).
+        # Если передать тот же tasks_manager при max_workers=1, получится self-queue deadlock.
         results = await run_tasks(
             handlers,
             max_workers=max_workers,
-            tasks_manager=self._tasks_manager,
+            tasks_manager=None,
             return_exceptions=True,
         )
 
@@ -257,7 +269,9 @@ class WBShopDataManager:
 
         plan = await plan_task
         keywords = await keywords_task
-        fact = await self._collect_fact_data(complex_adv, keywords)
+        manager = PlanFactProvider(complex_adv.adv_setting)
+        stat = await manager.get_stat_data(keywords)
+        fact = await manager.get_fact_data(stat)
 
         return WBAdvDataParts(
             complex_adv=complex_adv,
