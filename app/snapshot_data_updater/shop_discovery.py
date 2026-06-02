@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from app.modules.shop_runner.shop_id_filters import filter_shop_ids
 from app.modules.shop_runner.shop_run_worker.redis_manager.redis_manager import (
     RedisShopManager,
 )
@@ -52,5 +53,12 @@ class RedisActiveShopIdDiscovery:
                 out.append(m.decode())
             else:
                 out.append(str(m))
-        logger.debug("RedisActiveShopIdDiscovery shops=%d", len(out))
-        return sorted(out)
+        filtered = filter_shop_ids(out)
+        if len(filtered) != len(out):
+            logger.debug(
+                "RedisActiveShopIdDiscovery filtered shops %d -> %d "
+                "(SHOP_FILTER_LIST / SHOP_EXCLUDE_LIST)",
+                len(out),
+                len(filtered),
+            )
+        return sorted(filtered)

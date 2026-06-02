@@ -444,7 +444,7 @@ class CoroutinesManager:
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
 
-    @while_coroutine_decorator(5 * 60)
+    @while_coroutine_decorator(1)
     async def adv_settings_auto_update(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
@@ -924,7 +924,7 @@ class CoroutinesManager:
         )
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
-    @while_coroutine_decorator(60 * 5, 60)
+    @while_coroutine_decorator(1, 60)
     async def update_cluster_bids(self) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
