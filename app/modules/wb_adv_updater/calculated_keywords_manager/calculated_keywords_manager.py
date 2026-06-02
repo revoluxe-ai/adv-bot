@@ -588,6 +588,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return calculated_keyword_list
 
     async def _fetch_min_search_bid_aggregate(self, complex_adv: "ComplexAdv") -> int | None:
+        """Мин. search CPM из Redis v2 через ``WBManager.read_min_bids_cache_only`` (без WB API).
+
+        При cache miss — WARNING в логах (см. ``wb_manager``), не исключение; агрегат может
+        быть ``None`` до догрузки ``preload_min_bids_cache_miss`` / snapshot.
+        """
         nmids = list(complex_adv.nmids)
         if not nmids:
             return None

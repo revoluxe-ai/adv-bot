@@ -1,3 +1,11 @@
+"""Чтение и запись min_bids в Redis (v2) для cluster bids и warmup.
+
+Cache-only чтение: ``read_min_bids_cache_only`` / ``get_min_bids_cache_only``.
+При miss ячейки — ``logger.warning`` (``min_bids cache miss``), не ERROR: miss
+ожидаем до ``preload_min_bids_cache_miss`` или прогрева snapshot. ERROR — только
+сбои WB refresh (``refresh_min_bids_cache_miss``). См. ``docks/snapshot_data_updater.md``.
+"""
+
 import logging
 from collections import defaultdict
 

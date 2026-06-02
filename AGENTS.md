@@ -46,3 +46,11 @@
 ## Configuration & Security Notes
 - Use `.env` and `env.sample` for configuration; do not commit secrets.
 - Local state and logs (`logs/`, `redis-data/`, `clickhouse-data/`) are disposable.
+
+## Snapshot updater & shop-runner data paths
+- Runbook: `docks/snapshot_data_updater.md` — env flags, rollout, Redis keys, diagnostics.
+- Prod order: Redis `active_shops` → snapshot updater (`SNAPSHOT_UPDATER_USE_LIVE=1`) → shop-runner.
+- Keywords in shop-runner: Redis hash `calculated_keywords:{adv_id}` only; warmup via snapshot updater.
+  Miss → `ShopRunnerKeywordsCacheMissError`; retry/backoff — `SHOP_RUNNER_REQUIRED_DATA_MISS_*` in `env.sample`.
+- **min_bids cache miss** on read-only path: log level **WARNING** (`min_bids cache miss`), not ERROR;
+  WB refresh failures use ERROR (`refresh_min_bids_cache_miss`). See `README_min_bids.md`, `wb_manager.py`.

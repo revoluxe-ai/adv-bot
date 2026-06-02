@@ -41,7 +41,7 @@
 | `SNAPSHOT_WB_ADV_DTO_SHADOW` | `0` | Shadow в WBAdvDTO path |
 | `SNAPSHOT_WB_ADV_DTO_READ` | `0` | Зарезервировано для read cutover WBAdvDTO |
 
-**Keywords в shop-runner:** `ComplexAdv.get_keywords()` — **только Redis** (`calculated_keywords:{adv_id}`), прогрев — snapshot updater (`get_good_bad_phrases` в warmup). При miss — `KeywordsCacheMissError`. Прямой пересчёт из воркеров (`cache_only=False`) отключён. Для мягкого пропуска: `get_keywords(allow_miss=True)` (cluster_bids).
+**Keywords в shop-runner:** `ComplexAdv.get_keywords()` — **только Redis** (`calculated_keywords:{adv_id}`), прогрев — snapshot updater (`get_good_bad_phrases` в warmup). При miss — `ShopRunnerKeywordsCacheMissError` → `RequiredDataMissError`; корутины ждут `SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC` и сдаются после `SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS`. Прямой пересчёт из воркеров (`cache_only=False`) отключён. Для мягкого пропуска: `get_keywords(allow_miss=True)` (cluster_bids).
 
 **Свежесть (5–15 мин):** для каждой секции два порога (сек): `*_SKIP_REFRESH_SEC` (моложе — не refresh) и `*_STALE_SEC` (старше — ошибка при чтении). Между ними данные допустимы. Shadow WBAdvDTO **не** валит задачу при stale snapshot (`enforce_stale=False`).
 
