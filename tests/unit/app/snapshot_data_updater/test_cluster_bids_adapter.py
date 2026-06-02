@@ -79,3 +79,82 @@ async def test_cluster_bids_adapter_read_uses_strict_redis_getter() -> None:
     result = await adapter.get_keywords_for_adv(adv, redis_getter=redis_getter)
     redis_getter.assert_awaited_once_with()
     assert result == ["kw"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cluster_bids_load_snapshot_disables_stale_enforcement() -> None:
+    from app.snapshot_data_updater.adapters.cluster_bids_adapter import (
+        ClusterBidsSnapshotAdapter,
+    )
+    from app.snapshot_data_updater.adapters.snapshot_reader import SnapshotReader
+
+    reader = MagicMock(spec=SnapshotReader)
+    reader.get_adv_snapshot = AsyncMock(return_value=None)
+    adapter = ClusterBidsSnapshotAdapter(
+        reader=reader,
+        config=SnapshotUpdaterConfig(cluster_bids_shadow_compare=True),
+    )
+
+    await adapter.load_snapshot("s1", 42)
+
+    reader.get_adv_snapshot.assert_awaited_once_with("s1", 42, enforce_stale=False)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_shadow_with_stale_snapshot_still_uses_redis_keywords() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.snapshot_data_updater.adapters.cluster_bids_adapter import (
+        ClusterBidsSnapshotAdapter,
+    )
+    from app.snapshot_data_updater.adapters.snapshot_reader import SnapshotReader
+    from app.snapshot_data_updater.cache_errors import CacheStaleError
+    from app.snapshot_data_updater.dto import MinBidsSnapshotDTO
+
+    cfg = SnapshotUpdaterConfig(
+        cluster_bids_shadow_compare=True,
+        snapshot_schema_version=1,
+    )
+    old_ts = datetime.now(tz=UTC) - timedelta(hours=2)
+    settings = AdvSettingsSnapshotDTO(adv_id=1, shop_id="s1")
+    snapshot = AdvDataSnapshotDTO(
+        adv_id=1,
+        shop_id="s1",
+        collected_at=old_ts,
+        expires_at=old_ts + timedelta(hours=1),
+        schema_version=1,
+        partial=False,
+        section_completeness={
+            "settings": True,
+            "keywords": True,
+            "min_bids": True,
+            "plan_fact": True,
+            "cluster_texts": True,
+        },
+        settings=settings,
+        keywords=[],
+        min_bids=MinBidsSnapshotDTO(adv_id=1, coverage_ratio=1.0, cache_hit=True),
+    )
+
+    async def get_adv_snapshot(
+        shop_id: str, adv_id: int, *, enforce_stale: bool = True
+    ) -> AdvDataSnapshotDTO | None:
+        if enforce_stale:
+            raise CacheStaleError("would fail cluster_bids")
+        return snapshot
+
+    reader = SnapshotReader(config=cfg)
+    reader.get_adv_snapshot = get_adv_snapshot  # type: ignore[method-assign]
+    adapter = ClusterBidsSnapshotAdapter(reader=reader, config=cfg)
+
+    adv = MagicMock()
+    adv.shop_id = "s1"
+    adv.adv_id = 1
+    redis_getter = AsyncMock(return_value=["kw"])
+
+    result = await adapter.get_keywords_for_adv(adv, redis_getter=redis_getter)
+
+    assert result == ["kw"]
+    assert redis_getter.await_count == 2

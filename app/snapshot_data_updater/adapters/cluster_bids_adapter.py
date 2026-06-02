@@ -46,7 +46,14 @@ class ClusterBidsSnapshotAdapter:
     async def load_snapshot(
         self, shop_id: str, adv_id: int
     ) -> AdvDataSnapshotDTO | None:
-        return await self._reader.get_adv_snapshot(shop_id, adv_id)
+        """Загрузка snapshot для shadow/diagnostics — без ``enforce_stale``.
+
+        Keywords cluster_bids всегда из strict Redis; stale JSON не должен ронять
+        корутину (аналог ``WBAdvDtoSnapshotAdapter.shadow_log_keywords_delta``).
+        """
+        return await self._reader.get_adv_snapshot(
+            shop_id, adv_id, enforce_stale=False
+        )
 
     async def get_keywords_for_adv(
         self,
@@ -84,6 +91,7 @@ class ClusterBidsSnapshotAdapter:
         if (
             self._config.cluster_bids_read_from_snapshot
             and snapshot is not None
+            and self._reader.is_snapshot_usable(snapshot)
             and snapshot.cluster_texts is not None
             and snapshot.cluster_texts.texts
         ):

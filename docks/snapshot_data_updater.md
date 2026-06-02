@@ -43,7 +43,7 @@
 
 **Keywords в shop-runner:** `ComplexAdv.get_keywords()` — **только Redis** (`calculated_keywords:{adv_id}`), прогрев — snapshot updater (`get_good_bad_phrases` в warmup). При miss — `ShopRunnerKeywordsCacheMissError` → `RequiredDataMissError`; корутины ждут `SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC` и сдаются после `SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS`. Пересчёт из БД в shop-runner запрещён (`cache_only=False` → ошибка). **Telegram UI** — `fetch_keywords_from_database` / `load_campaign_v3_contexts_from_database` (CH/PG, не Redis).
 
-**Свежесть (5–15 мин):** для каждой секции два порога (сек): `*_SKIP_REFRESH_SEC` (моложе — не refresh) и `*_STALE_SEC` (старше — ошибка при чтении). Между ними данные допустимы. Shadow WBAdvDTO **не** валит задачу при stale snapshot (`enforce_stale=False`).
+**Свежесть (5–15 мин):** для каждой секции два порога (сек): `*_SKIP_REFRESH_SEC` (моложе — не refresh) и `*_STALE_SEC` (старше — ошибка при чтении). Между ними данные допустимы. Shadow WBAdvDTO и ``ClusterBidsSnapshotAdapter`` **не** валят shop-runner при stale JSON snapshot (`enforce_stale=False`); keywords cluster_bids — strict Redis.
 
 **Важно:** после изменения `.env` entrypoint должен вызвать `dotenv.load_dotenv()` **до** импорта snapshot или `reload_snapshot_config()` (см. корневой `updater.py`, `cli.py`).
 
