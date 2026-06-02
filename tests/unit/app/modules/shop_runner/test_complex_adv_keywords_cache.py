@@ -58,3 +58,22 @@ async def test_get_keywords_allow_miss_returns_none() -> None:
     )
 
     assert await complex_adv.get_keywords(allow_miss=True) is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_keywords_caches_empty_list_without_refetch() -> None:
+    """Пустой [] из Redis — валидный hit; повторный вызов не дергает провайдер."""
+    provider = AsyncMock(return_value=[])
+    complex_adv = ComplexAdv(
+        shop_id="shop-1",
+        adv_setting=MagicMock(),
+        get_keywords_func=provider,
+    )
+
+    first = await complex_adv.get_keywords()
+    second = await complex_adv.get_keywords()
+
+    assert first == []
+    assert second == []
+    provider.assert_awaited_once()
