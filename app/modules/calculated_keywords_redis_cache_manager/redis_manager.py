@@ -5,6 +5,7 @@ from collections.abc import Awaitable
 from pydantic import ValidationError
 
 from app.core.redis_manager import RedisManager
+from app.snapshot_data_updater.config import calculated_keywords_hash_ttl_sec
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
@@ -24,20 +25,26 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
     async def set_calculated_keywords(
         self, keywords: list[CalculatedKeyword], adv_id: int
     ) -> None:
-        """Сохранение списка keywords в Redis hash ``calculated_keywords:{adv_id}``."""
+        """Сохранение списка keywords в Redis hash ``calculated_keywords:{adv_id}``.
+
+        После записи — ``EXPIRE`` (``CALCULATED_KEYWORDS_REDIS_TTL_SEC`` или
+        ``4 × SNAPSHOT_KEYWORDS_STALE_SEC``). Истёкший hash → cache miss в shop-runner.
+        """
         logger.debug(f"Setting keywords for adv_id {adv_id}, count: {len(keywords)}")
         key = f"calculated_keywords:{adv_id}"
+        ttl_sec = calculated_keywords_hash_ttl_sec()
         if not keywords:
             async with self.client.pipeline() as pipe:
                 pipe.delete(key)
                 pipe.hset(name=key, key=_CALCULATED_KEYWORDS_EMPTY_FIELD, value="1")
+                pipe.expire(key, ttl_sec)
                 await pipe.execute()
             return
         async with self.client.pipeline() as pipe:
             for keyword in keywords:
-                key = f"calculated_keywords:{adv_id}"
                 logger.debug(f"Setting key: {key}, keyword: {keyword.text}")
                 pipe.hset(name=key, key=keyword.text, value=keyword.model_dump_json())
+            pipe.expire(key, ttl_sec)
             await pipe.execute()
 
     async def get_calculated_keyword(

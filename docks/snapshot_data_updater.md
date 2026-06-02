@@ -24,6 +24,7 @@
 | `SNAPSHOT_PG_TASK_TIMEOUT_SEC` | *(как RESOURCE)* | Таймаут фазы `pg:shop_load`; для крупных магазинов — `90`–`180` |
 | `SNAPSHOT_KEYWORDS_SKIP_REFRESH_SEC` | `300` | Keywords: моложе — не пересчитывать (warmup) |
 | `SNAPSHOT_KEYWORDS_STALE_SEC` | `900` | Keywords: старше — `CacheStaleError` при чтении с meta |
+| `CALCULATED_KEYWORDS_REDIS_TTL_SEC` | `4×STALE` | Redis EX на hash `calculated_keywords:{adv_id}`; истёк → miss в shop-runner |
 | `SNAPSHOT_ADV_SKIP_REFRESH_SEC` | `300` | Snapshot adv: моложе — не считается протухшим для read |
 | `SNAPSHOT_ADV_STALE_SEC` | `900` | Snapshot adv: старше — `CacheStaleError` при read consumer |
 | `SNAPSHOT_SHOP_SKIP_REFRESH_SEC` | `300` | Shop batch моложе — пропуск `RefreshShopSnapshotTask` |

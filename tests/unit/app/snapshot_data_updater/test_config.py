@@ -4,6 +4,7 @@ import pytest
 
 from app.snapshot_data_updater.config import (
     SnapshotUpdaterConfig,
+    calculated_keywords_hash_ttl_sec,
     get_snapshot_config,
     reload_snapshot_config,
 )
@@ -29,6 +30,23 @@ def test_freshness_env(monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = reload_snapshot_config()
     assert cfg.keywords_policy.skip_refresh_sec == 300.0
     assert cfg.keywords_policy.stale_sec == 900.0
+
+
+@pytest.mark.unit
+def test_calculated_keywords_hash_ttl_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CALCULATED_KEYWORDS_REDIS_TTL_SEC", raising=False)
+    monkeypatch.setenv("SNAPSHOT_KEYWORDS_STALE_SEC", "900")
+    cfg = reload_snapshot_config()
+    assert calculated_keywords_hash_ttl_sec(cfg) == 3600
+
+
+@pytest.mark.unit
+def test_calculated_keywords_hash_ttl_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CALCULATED_KEYWORDS_REDIS_TTL_SEC", "7200")
+    reload_snapshot_config()
+    assert calculated_keywords_hash_ttl_sec() == 7200
 
 
 @pytest.mark.unit

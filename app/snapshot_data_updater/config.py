@@ -293,6 +293,21 @@ def resolve_snapshot_config(
     return config if config is not None else get_snapshot_config()
 
 
+def calculated_keywords_hash_ttl_sec(
+    config: SnapshotUpdaterConfig | None = None,
+) -> int:
+    """TTL hash ``calculated_keywords:{adv_id}`` в Redis (сек).
+
+    По умолчанию ``max(SNAPSHOT_KEYWORDS_STALE_SEC, 300) * 4`` — как у
+    ``keywords_meta``. Override: ``CALCULATED_KEYWORDS_REDIS_TTL_SEC``.
+    """
+    raw = os.getenv("CALCULATED_KEYWORDS_REDIS_TTL_SEC")
+    if raw is not None and raw.strip() != "":
+        return int(raw)
+    cfg = resolve_snapshot_config(config)
+    return int(max(cfg.keywords_policy.stale_sec, 300.0) * 4)
+
+
 class _SnapshotConfigProxy:
     """Прокси для обратной совместимости с ``DEFAULT_CONFIG.field``."""
 

@@ -51,6 +51,7 @@ async def test_set_calculated_keywords_empty_writes_marker() -> None:
     pipe = MagicMock()
     pipe.delete = MagicMock(return_value=pipe)
     pipe.hset = MagicMock(return_value=pipe)
+    pipe.expire = MagicMock(return_value=pipe)
     pipe.execute = AsyncMock(return_value=[1, 1])
 
     class _PipeCtx:
@@ -72,4 +73,7 @@ async def test_set_calculated_keywords_empty_writes_marker() -> None:
         key=_CALCULATED_KEYWORDS_EMPTY_FIELD,
         value="1",
     )
+    pipe.expire.assert_called_once()
+    assert pipe.expire.call_args[0][0] == "calculated_keywords:77"
+    assert pipe.expire.call_args[0][1] > 0
     pipe.execute.assert_awaited_once()

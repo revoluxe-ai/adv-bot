@@ -265,7 +265,9 @@ class CalculatedKeywordsWarmupService:
         keywords_count: int = 0,
         error: str | None = None,
     ) -> None:
-        """Пишет metadata после recalculate/error (не трогает legacy hash TTL)."""
+        """Пишет metadata после recalculate/error; TTL hash/meta — ``calculated_keywords_hash_ttl_sec``."""
+        from app.snapshot_data_updater.config import calculated_keywords_hash_ttl_sec
+
         payload = {
             "warmed_at": datetime.now(tz=UTC).isoformat(),
             "source": source,
@@ -277,7 +279,7 @@ class CalculatedKeywordsWarmupService:
         await self._redis_client().set(
             keywords_meta_key(adv_id),
             json.dumps(payload),
-            ex=int(max(self._config.keywords_policy.stale_sec, 300.0) * 4),
+            ex=calculated_keywords_hash_ttl_sec(self._config),
         )
 
     @staticmethod
