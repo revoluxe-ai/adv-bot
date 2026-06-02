@@ -601,6 +601,11 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return max_search_min_bid_for_complex_nmids(nmids, min_bids)
 
     @staticmethod
+    async def resolve_wb_manager_hub(complex_adv: "ComplexAdv") -> "WBManagerHub":
+        """Публичный доступ к WBManagerHub (snapshot warmup и внешние caller'ы)."""
+        return await CalculatedKeywordsManager._get_wb_manager_hub(complex_adv)
+
+    @staticmethod
     async def _get_wb_manager_hub(complex_adv: "ComplexAdv") -> "WBManagerHub":
         from app.core.di.wb_manager_hub import WBManagerHubFactory
 

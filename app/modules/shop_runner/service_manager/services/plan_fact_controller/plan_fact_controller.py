@@ -79,6 +79,12 @@ class PlanFactController:
                 pre_adv.auto_adv,
             )
 
+        if cached_keywords is None:
+            return fact_data_from_plan_fact_summary(
+                pre_adv.plan_fact_summary,
+                pre_adv.auto_adv,
+            )
+
         keywords = sorted(
             cached_keywords,
             key=lambda kw: kw.rating or 0,

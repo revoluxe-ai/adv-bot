@@ -23,6 +23,8 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from redis.asyncio import Redis
+
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
@@ -207,12 +209,9 @@ class CalculatedKeywordsWarmupService:
         from app.snapshot_data_updater.bootstrap import ensure_di_bootstrapped
 
         await ensure_di_bootstrapped()
-        hub = await CalculatedKeywordsManager._get_wb_manager_hub(complex_adv)
-        token = WBManagerHubFactory._wb_manager_hub_context_var.set(hub)
-        try:
+        hub = await CalculatedKeywordsManager.resolve_wb_manager_hub(complex_adv)
+        with WBManagerHubFactory.bind_hub_in_context(hub):
             return await get_good_bad_phrases(complex_adv)
-        finally:
-            WBManagerHubFactory._wb_manager_hub_context_var.reset(token)
 
     def _classify_cache(
         self,
@@ -233,13 +232,15 @@ class CalculatedKeywordsWarmupService:
             return True, False, "redis_hit"
         if policy.stale_sec > 0 and age_sec > policy.stale_sec:
             return False, True, "redis_stale"
-        if cached is not None:
-            return True, False, "redis_hit"
-        return False, True, "redis_stale"
+        return True, False, "redis_hit"
+
+    def _redis_client(self) -> Redis:
+        """Типизированный Redis-клиент legacy keywords cache."""
+        return self._keywords_cache.client
 
     async def _read_meta(self, adv_id: int) -> dict[str, str] | None:
         """Читает ``adv_snapshot:v1:keywords_meta:adv:{adv_id}``."""
-        return await load_keywords_meta(self._keywords_cache.client, adv_id)
+        return await load_keywords_meta(self._redis_client(), adv_id)
 
     def _enforce_read_cache_age(
         self, meta: dict[str, str] | None, *, adv_id: int
@@ -272,7 +273,7 @@ class CalculatedKeywordsWarmupService:
         }
         if error:
             payload["error"] = error[:500]
-        await self._keywords_cache.client.set(
+        await self._redis_client().set(
             keywords_meta_key(adv_id),
             json.dumps(payload),
             ex=int(max(self._config.keywords_policy.stale_sec, 300.0) * 4),
