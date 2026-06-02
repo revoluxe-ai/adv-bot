@@ -119,7 +119,11 @@ class WBManager(WBBaseManager):
         shop_id: str,
         context: str = "",
     ) -> AdvMinNmidsBids:
-        """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path)."""
+        """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path).
+
+        При miss ячейки — ``logger.warning`` (ожидаемо до ``preload_min_bids_cache_miss`` /
+        snapshot); не ``error``, чтобы не дублировать prod-алерты по ERROR.
+        """
         full_command = dto_to_command(advs)
         cache_manager = MinBidsCacheManager(redis_client_wrapper)
         hits_auto: dict[int, int] = {}
@@ -395,7 +399,11 @@ class WBManager(WBBaseManager):
         *,
         context: str = "",
     ) -> AdvMinNmidsBids:
-        """Только Redis v2; при miss — error в лог, ячейка не попадает в результат."""
+        """Только Redis v2; при miss — warning в лог, ячейка не попадает в результат.
+
+        См. ``read_min_bids_cache_only``: miss штатны до фоновой догрузки; алерты по
+        ``min_bids cache miss`` — уровень WARNING, не ERROR.
+        """
         return await self._get_min_bids_cache_only_impl(advs, context=context)
 
     async def _get_min_bids_cache_only_impl(

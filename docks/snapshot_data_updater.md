@@ -109,6 +109,10 @@ flowchart LR
 ## Диагностика
 
 - Логи фаз collector: PG, Redis min_bids, warmup, CH, assemble — длительность и ошибки по секциям.
+- **min_bids cache miss** при ``read_min_bids_cache_only`` / ``get_min_bids_cache_only``:
+  **WARNING** (``min_bids cache miss shop_id=…``), не ERROR — miss ожидаем до
+  ``preload_min_bids_cache_miss`` или прогрева snapshot; ERROR оставляем для сбоев WB refresh
+  (``refresh_min_bids_cache_miss: …``). Алерты ops: фильтр по WARNING + этой подстроке, не по ERROR.
 - `partial=True` в snapshot + `SnapshotDiagnostics.errors_by_section` при сбое секции.
 - Global tick skip: warning «previous tick still running» при `tick_policy=skip`.
 - Duplicate shop task: debug «skip duplicate shop_id».
