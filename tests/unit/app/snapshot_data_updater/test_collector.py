@@ -42,3 +42,13 @@ async def test_collect_shop_stub_pipeline() -> None:
     assert snap.plan_fact is not None
     assert snap.plan_fact.fact_orders == 3.0
     assert len(snap.keywords) >= 1
+
+
+@pytest.mark.unit
+def test_coro_factory_lambda_binds_adv_id_per_iteration() -> None:
+    """Регрессия: coro_factory без default= захватывает adv_id по ссылке из цикла."""
+    adv_ids = [10, 20, 30]
+    bad = [lambda: adv_id for adv_id in adv_ids]
+    good = [lambda aid=adv_id: aid for adv_id in adv_ids]
+    assert [f() for f in bad] == [30, 30, 30]
+    assert [f() for f in good] == [10, 20, 30]

@@ -331,7 +331,7 @@ class AdvDataSnapshotCollector:
                 ResourceTask(
                     kind=ResourceKind.REDIS,
                     name=f"redis:min_bids_batch:{len(settings_list)}",
-                    coro_factory=lambda: batch_fn(settings_list),
+                    coro_factory=lambda sl=settings_list, fn=batch_fn: fn(sl),
                 )
             )
             return await future
@@ -349,7 +349,9 @@ class AdvDataSnapshotCollector:
             ResourceTask(
                 kind=ResourceKind.REDIS,
                 name=f"redis:min_bids:{adv_id}",
-                coro_factory=lambda: self._redis.fetch_min_bids(adv_id),
+                coro_factory=lambda aid=adv_id, redis=self._redis: redis.fetch_min_bids(
+                    aid
+                ),
             )
         )
         return await future
@@ -377,7 +379,9 @@ class AdvDataSnapshotCollector:
             ResourceTask(
                 kind=ResourceKind.REDIS,
                 name=f"redis:keywords:{adv_id}",
-                coro_factory=lambda: self._redis.fetch_keywords(adv_id),
+                coro_factory=lambda aid=adv_id, redis=self._redis: redis.fetch_keywords(
+                    aid
+                ),
             )
         )
         return await future
