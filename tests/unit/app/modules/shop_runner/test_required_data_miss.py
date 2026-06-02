@@ -92,6 +92,31 @@ async def test_fetch_from_redis_returns_empty_when_warmup_meta_count_zero() -> N
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_fetch_raises_when_warmup_meta_error_despite_hash_hit() -> None:
+    stale_kw = object()
+    with (
+        patch(
+            "app.modules.calculated_keywords_redis_cache_manager.redis_manager."
+            "RedisCalculatedKeywordsCacheManager.get_all_calculated_keywords_for_adv",
+            new_callable=AsyncMock,
+            return_value=[stale_kw],
+        ),
+        patch(
+            "app.snapshot_data_updater.cache_freshness.load_keywords_meta",
+            new_callable=AsyncMock,
+            return_value={
+                "source": "error",
+                "error": "boom",
+                "keywords_count": "0",
+            },
+        ),
+    ):
+        with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
+            await fetch_calculated_keywords_from_redis(99, shop_id="shop-1")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_fetch_from_redis_raises_on_miss() -> None:
     with (
         patch(

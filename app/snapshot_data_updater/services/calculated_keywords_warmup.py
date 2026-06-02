@@ -187,6 +187,7 @@ class CalculatedKeywordsWarmupService:
             duration_ms = (time.perf_counter() - started) * 1000
             logger.exception("snapshot keywords warmup failed adv_id=%s", adv_id)
             await self._write_meta(adv_id, source="error", error=str(exc))
+            await self._clear_legacy_keywords_hash(adv_id)
             return CalculatedKeywordsWarmupResult(
                 adv_id=adv_id,
                 keywords=[],
@@ -256,6 +257,10 @@ class CalculatedKeywordsWarmupService:
             context=f"keywords cache adv_id={adv_id}",
             require_timestamp=True,
         )
+
+    async def _clear_legacy_keywords_hash(self, adv_id: int) -> None:
+        """Удалить устаревший ``calculated_keywords:{adv_id}`` после ошибки warmup."""
+        await self._redis_client().delete(f"calculated_keywords:{adv_id}")
 
     async def _write_meta(
         self,

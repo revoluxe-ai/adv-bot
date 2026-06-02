@@ -50,19 +50,12 @@ def resolve_calculated_keywords_cache(
     raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
 
 
-async def _empty_keywords_from_warmup_meta(adv_id: int) -> list[CalculatedKeyword] | None:
-    """Если snapshot meta фиксирует успешный warmup с 0 keywords — ``[]``, иначе ``None``."""
+async def _load_keywords_warmup_meta(adv_id: int) -> dict[str, str] | None:
+    """Metadata snapshot warmup ``adv_snapshot:v1:keywords_meta:adv:{id}``."""
     from app.core.redis_manager.redis_client import redis_client
     from app.snapshot_data_updater.cache_freshness import load_keywords_meta
 
-    meta = await load_keywords_meta(redis_client, adv_id)
-    if meta is None:
-        return None
-    if meta.get("source") == "error":
-        return None
-    if meta.get("keywords_count") == "0":
-        return []
-    return None
+    return await load_keywords_meta(redis_client, adv_id)
 
 
 async def fetch_calculated_keywords_from_redis(
@@ -72,6 +65,9 @@ async def fetch_calculated_keywords_from_redis(
 ) -> list[CalculatedKeyword]:
     """Прочитать ``calculated_keywords:{adv_id}`` из Redis (shop-runner, strict).
 
+    Сначала проверяется ``keywords_meta``: при ``source=error`` (warmup упал) hash
+    не используется — miss, даже если legacy hash ещё в Redis.
+
     Args:
         adv_id: идентификатор РК.
         shop_id: для текста ошибки и логов декоратора.
@@ -80,19 +76,24 @@ async def fetch_calculated_keywords_from_redis(
         Список keywords; ``[]`` — легитимный пустой результат после warmup.
 
     Raises:
-        ShopRunnerKeywordsCacheMissError: hash отсутствует и нет meta count=0.
+        ShopRunnerKeywordsCacheMissError: hash/meta не дают валидных данных.
     """
     from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
         RedisCalculatedKeywordsCacheManager,
     )
 
+    meta = await _load_keywords_warmup_meta(adv_id)
+    if meta is not None and meta.get("source") == "error":
+        raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
+
     redis_mgr = RedisCalculatedKeywordsCacheManager()
     cached = await redis_mgr.get_all_calculated_keywords_for_adv(adv_id)
     if cached is not None:
         return cached
-    empty_from_meta = await _empty_keywords_from_warmup_meta(adv_id)
-    if empty_from_meta is not None:
-        return empty_from_meta
+
+    if meta is not None and meta.get("keywords_count") == "0":
+        return []
+
     raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
 
 
