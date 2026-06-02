@@ -886,7 +886,17 @@ def _repair_broken_tunnel(
             spec.probe_port,
             _all_listener_pids(spec.probe_port),
         )
-        _clear_broken_tunnel_listeners(spec)
+        try:
+            _clear_broken_tunnel_listeners(spec)
+        except RuntimeError as exc:
+            logger.error(
+                "Tunnel %s repair cannot clear port %s: %s",
+                spec.name,
+                spec.probe_port,
+                exc,
+            )
+            return None
+
         _stop_tunnel(spec.name)
 
         if _try_reuse_healthy_forward(spec):

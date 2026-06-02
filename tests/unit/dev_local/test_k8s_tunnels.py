@@ -195,8 +195,47 @@ def test_start_tunnel_refuses_foreign_listener() -> None:
         patch.object(k8s_tunnels, "_process_cmdline", return_value="python -m http.server 15432"),
         patch.object(k8s_tunnels, "_find_matching_kubectl_pids", return_value=[]),
     ):
-        with pytest.raises(RuntimeError, match="not matching kubectl"):
-            k8s_tunnels._repair_broken_tunnel(spec, "kubeconfig.yaml")
+        result = k8s_tunnels._repair_broken_tunnel(spec, "kubeconfig.yaml")
+
+    assert result is None
+
+
+@pytest.mark.unit
+def test_monitor_loop_continues_other_tunnels_after_foreign_port() -> None:
+    """RuntimeError при очистке порта одного туннеля не обрывает цикл monitor для остальных."""
+    specs = k8s_tunnels._tunnel_specs()
+    repaired: list[str] = []
+    real_repair = k8s_tunnels._repair_broken_tunnel
+
+    def _repair_track(spec: k8s_tunnels._TunnelSpec, kubeconfig: str) -> object:
+        repaired.append(spec.name)
+        if spec.name == "postgres":
+            return real_repair(spec, kubeconfig)
+        return None
+
+    monitor_interval_sleeps = 0
+
+    def _sleep_stub(seconds: float) -> None:
+        nonlocal monitor_interval_sleeps
+        if seconds == k8s_tunnels._MONITOR_INTERVAL_SEC:
+            monitor_interval_sleeps += 1
+            if monitor_interval_sleeps >= 2:
+                raise StopIteration
+
+    with (
+        patch.object(k8s_tunnels, "_try_reuse_healthy_forward", return_value=False),
+        patch.object(k8s_tunnels, "_record_restart_failure", return_value=True),
+        patch.object(k8s_tunnels, "_all_listener_pids", return_value=[9999]),
+        patch.object(k8s_tunnels, "_is_matching_kubectl_port_forward", return_value=False),
+        patch.object(k8s_tunnels, "_process_cmdline", return_value="python -m http.server 15432"),
+        patch.object(k8s_tunnels, "_find_matching_kubectl_pids", return_value=[]),
+        patch.object(k8s_tunnels, "_repair_broken_tunnel", side_effect=_repair_track),
+        patch("time.sleep", side_effect=_sleep_stub),
+    ):
+        with pytest.raises(StopIteration):
+            k8s_tunnels._monitor_loop("kubeconfig.yaml", specs, bootstrap=False)
+
+    assert repaired == ["postgres", "clickhouse"]
 
 
 @pytest.mark.unit
