@@ -333,6 +333,12 @@ async def process_adv_v3(
                 campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(
                     adv
                 )
+            # Ранний fallback: finally/sync при исключении в preamble до финальной пересборки.
+            with trace.phase("preamble_build_sync_fallback_early"):
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
 
         # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
         # NO_DATA  → только plan_campaign_no_data_bootstrap_safe + sync_force_zero
