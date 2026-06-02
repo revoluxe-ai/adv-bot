@@ -33,9 +33,6 @@ def _is_start_command(message: Message) -> bool:
     return first == "/start" or first.startswith("/start@")
 
 
-# Use centralized safe_callback_answer from callback_helpers for answering callbacks.
-
-
 class GateMiddleware(BaseMiddleware):
     """В режиме presentation_only: админы и passed_gate — полный доступ; иначе whitelist заявки.
 
