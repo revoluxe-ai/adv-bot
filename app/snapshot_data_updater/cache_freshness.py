@@ -15,12 +15,16 @@ from app.snapshot_data_updater.cache_errors import (
     RequiredDataMissError,
 )
 from app.snapshot_data_updater.keys import keywords_meta_key
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from redis.asyncio.client import Redis as AsyncRedisClient
 
 # Legacy app Redis (``redis_client`` без decode_responses) — ответы ``bytes``.
-SnapshotRedisClient: TypeAlias = AsyncRedisClient
+# ``Redis[bytes]`` только для type checker: в runtime redis.Redis не generic.
+if TYPE_CHECKING:
+    SnapshotRedisClient: TypeAlias = AsyncRedisClient[bytes]
+else:
+    SnapshotRedisClient: TypeAlias = AsyncRedisClient
 
 
 def parse_warmed_at(meta: dict[str, str] | None) -> datetime | None:
