@@ -93,6 +93,8 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     bootstrap.assert_called_once()
+    _args, kwargs = bootstrap.call_args
+    assert kwargs.get("campaign_orders_per_cart_7d") == 2.0
     expansion.assert_called_once()
     select_mock.assert_not_called()
     flush_mock.assert_awaited_once()
@@ -286,6 +288,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
     dto = MagicMock()
     dto.min_target_position = 5
     sync_mock = AsyncMock()
+    build_fallback = MagicMock(return_value={42: True})
 
     with (
         patch(
@@ -295,6 +298,10 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
             return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_target_place_fallback_zero_by_keyword_id",
+            build_fallback,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
@@ -335,8 +342,15 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
+    assert build_fallback.call_count == 2
+    _args, fb_kwargs = build_fallback.call_args
+    assert fb_kwargs.get("campaign_orders_per_cart_7d") == 2.0
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is False
+    assert (
+        sync_mock.await_args.kwargs.get("target_place_fallback_zero_by_keyword_id")
+        == {42: True}
+    )
 
 
 @pytest.mark.unit
@@ -434,9 +448,79 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    assert build_fallback.call_count >= 2
+    assert build_fallback.call_count == 2
     fallback_map = sync_mock.await_args.kwargs[
         "target_place_fallback_zero_by_keyword_id"
     ]
     assert fallback_map is not None
     assert fallback_map.get(10) is False
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error() -> None:
+    """При исключении в NORMAL preamble finally sync сохраняет NO_CH fallback."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 100
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = True
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    dto.min_target_position = 5
+    sync_mock = AsyncMock()
+    build_fallback = MagicMock(return_value={99: True})
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_target_place_fallback_zero_by_keyword_id",
+            build_fallback,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            return_value=MagicMock(
+                max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0
+            ),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            return_value=SalesStates.OPTIMAL,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.LadderInputs.from_contexts",
+            side_effect=RuntimeError("preamble boom"),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",
+            sync_mock,
+        ),
+    ):
+        updater_cls.return_value.get_fact_data = AsyncMock(
+            return_value=MagicMock(pay_for_order=50.0, predict_orders=10.0)
+        )
+        with pytest.raises(RuntimeError, match="preamble boom"):
+            await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    build_fallback.assert_called_once()
+    sync_mock.assert_awaited_once()
+    assert (
+        sync_mock.await_args.kwargs.get("target_place_fallback_zero_by_keyword_id")
+        == {99: True}
+    )

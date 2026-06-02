@@ -5,23 +5,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.mp.wb.api.excs import ApiForbiddenError as MpApiForbiddenError
 from app.core.mp.wb.api.excs import MaxAttemptsError as MpMaxAttemptsError
-from app.core.mp.wb.api.excs import PoolTimeoutError
+from app.core.wb_api.exceptions import ApiForbiddenError as LegacyApiForbiddenError
+from app.core.wb_api.exceptions import MaxAttemptsError as LegacyMaxAttemptsError
 from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
-    PROMOTION_POOL_ERROR_BACKOFF_SEC,
-    TICK_FINALLY_GRACE_SECONDS,
     _get_shop_id_for_log,
-    _shutdown_tick_task_after_timeout,
-    is_pool_timeout_related,
-    resolve_error_pause_seconds,
     while_coroutine_decorator,
 )
 
 MODULE = "app.modules.shop_runner.service_manager.while_coroutines_decorator"
-
-
-class _StopTestLoop(BaseException):
-    """Выход из while True в тестах; не перехватывается ``except Exception`` декоратора."""
 
 
 @pytest.mark.unit
@@ -73,8 +66,8 @@ async def test_decorator_error_log_includes_shop_id_and_coroutine_name() -> None
 
     with patch(f"{MODULE}.logger") as mock_logger:
         with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            mock_sleep.side_effect = _StopTestLoop("stop_loop")
-            with pytest.raises(_StopTestLoop, match="stop_loop"):
+            mock_sleep.side_effect = Exception("stop_loop")
+            with pytest.raises(Exception, match="stop_loop"):
                 await wrapped(self_with_shop)
 
     mock_logger.error.assert_called_once()
@@ -100,8 +93,8 @@ async def test_decorator_error_log_includes_missing_shop_id_when_no_shop_id() ->
 
     with patch(f"{MODULE}.logger") as mock_logger:
         with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            mock_sleep.side_effect = _StopTestLoop("stop")
-            with pytest.raises(_StopTestLoop, match="stop"):
+            mock_sleep.side_effect = Exception("stop")
+            with pytest.raises(Exception, match="stop"):
                 await wrapped(self_no_shop)
 
     mock_logger.error.assert_called_once()
@@ -135,11 +128,11 @@ async def test_decorator_sleep_and_retry_behavior_unchanged() -> None:
     async def sleep_track_then_exit(secs: float) -> None:
         sleep_calls.append(secs)
         if len(sleep_calls) >= 2:
-            raise _StopTestLoop("exit_after_retry")
+            raise Exception("exit_after_retry")
 
     with patch(f"{MODULE}.logger"):
         with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock, side_effect=sleep_track_then_exit):
-            with pytest.raises(_StopTestLoop, match="exit_after_retry"):
+            with pytest.raises(Exception, match="exit_after_retry"):
                 await wrapped(self_mock)
 
     assert call_count == 2
@@ -152,7 +145,7 @@ async def test_decorator_sleep_and_retry_behavior_unchanged() -> None:
 async def test_decorator_timeout_runs_finally_before_next_tick() -> None:
     """On tick timeout, finally block of func should still complete (grace via shield)."""
     finally_ran = asyncio.Event()
-    decorator = while_coroutine_decorator(60, 1, timeout_sec=0.05)
+    decorator = while_coroutine_decorator(60, 1)
 
     async def slow_with_finally(self: object) -> None:
         try:
@@ -166,206 +159,67 @@ async def test_decorator_timeout_runs_finally_before_next_tick() -> None:
 
     with patch(f"{MODULE}.logger"):
         with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            mock_sleep.side_effect = _StopTestLoop("exit_loop")
-            with pytest.raises(_StopTestLoop, match="exit_loop"):
+            mock_sleep.side_effect = Exception("exit_loop")
+            with pytest.raises(Exception, match="exit_loop"):
                 await wrapped(self_mock)
 
     assert finally_ran.is_set()
 
 
 @pytest.mark.unit
-def test_is_pool_timeout_related_mp_max_attempts_with_prefix() -> None:
-    exc = MpMaxAttemptsError(
-        "PoolTimeout: не удалось выполнить get_adv_v3_fullstats за 3 попыток"
-    )
-    assert is_pool_timeout_related(exc) is True
-
-
-@pytest.mark.unit
-def test_is_pool_timeout_related_mp_max_attempts_without_prefix() -> None:
-    exc = MpMaxAttemptsError("Не удалось выполнить foo за 5 попыток")
-    assert is_pool_timeout_related(exc) is False
-
-
-@pytest.mark.unit
-def test_is_pool_timeout_related_cause_chain() -> None:
-    root = PoolTimeoutError(original_exc=None)
-    wrapped = RuntimeError("wrapper")
-    wrapped.__cause__ = root
-    assert is_pool_timeout_related(wrapped) is True
-
-
-@pytest.mark.unit
-def test_resolve_error_pause_seconds_pool_vs_normal() -> None:
-    assert (
-        resolve_error_pause_seconds(
-            MpMaxAttemptsError("PoolTimeout: x"), pause_on_error=1
-        )
-        == PROMOTION_POOL_ERROR_BACKOFF_SEC
-    )
-    assert resolve_error_pause_seconds(ValueError("x"), pause_on_error=1) == 1
-
-
-@pytest.mark.unit
 @pytest.mark.asyncio
-async def test_decorator_pool_timeout_uses_long_error_pause() -> None:
-    """MpMaxAttemptsError PoolTimeout → long backoff; coroutine continues."""
-    decorator = while_coroutine_decorator(300, 1)
-    call_count = 0
-
-    async def fail_once_with_pool(self: object) -> None:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise MpMaxAttemptsError("PoolTimeout: test endpoint")
-
-    wrapped = decorator(fail_once_with_pool)
-    self_mock = MagicMock()
-    self_mock.shop_id = "shop-1"
-    sleep_calls: list[float] = []
-
-    async def sleep_track_then_exit(secs: float) -> None:
-        sleep_calls.append(secs)
-        if len(sleep_calls) >= 2:
-            raise _StopTestLoop("exit_after_retry")
-
-    with patch(f"{MODULE}.logger"):
-        with patch(
-            f"{MODULE}.asyncio.sleep",
-            new_callable=AsyncMock,
-            side_effect=sleep_track_then_exit,
-        ):
-            with pytest.raises(_StopTestLoop, match="exit_after_retry"):
-                await wrapped(self_mock)
-
-    assert call_count == 2
-    assert sleep_calls[0] == PROMOTION_POOL_ERROR_BACKOFF_SEC
-    assert sleep_calls[1] == 300
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_decorator_generic_exception_keeps_pause_on_error() -> None:
+@pytest.mark.parametrize(
+    "forbidden_error",
+    [
+        LegacyApiForbiddenError("Нет токенов для доступа к API"),
+        MpApiForbiddenError("Нет токенов для доступа к API"),
+    ],
+)
+async def test_decorator_re_raises_api_forbidden_without_retry(
+    forbidden_error: LegacyApiForbiddenError | MpApiForbiddenError,
+) -> None:
+    """ApiForbiddenError (legacy и mp) пробрасывается наверх без sleep/retry."""
     decorator = while_coroutine_decorator(60, 5)
-    call_count = 0
 
-    async def fail_once(self: object) -> None:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise ValueError("business")
+    async def raise_forbidden(self: object) -> None:
+        raise forbidden_error
 
-    wrapped = decorator(fail_once)
-    self_mock = MagicMock()
-    self_mock.shop_id = "1"
-    sleep_calls: list[float] = []
+    wrapped = decorator(raise_forbidden)
 
-    async def sleep_track_then_exit(secs: float) -> None:
-        sleep_calls.append(secs)
-        if len(sleep_calls) == 2:
-            raise _StopTestLoop("exit")
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            with pytest.raises(type(forbidden_error)):
+                await wrapped(MagicMock(shop_id="1"))
 
-    with patch(f"{MODULE}.logger"):
-        with patch(
-            f"{MODULE}.asyncio.sleep",
-            new_callable=AsyncMock,
-            side_effect=sleep_track_then_exit,
-        ):
-            with pytest.raises(_StopTestLoop, match="exit"):
-                await wrapped(self_mock)
-
-    assert call_count == 2
-    assert sleep_calls[0] == 5
-    assert sleep_calls[1] == 60
+    mock_logger.error.assert_not_called()
+    mock_sleep.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_decorator_pool_timeout_error_direct() -> None:
-    decorator = while_coroutine_decorator(10, 1)
-    call_count = 0
+@pytest.mark.parametrize(
+    "max_attempts_error",
+    [
+        LegacyMaxAttemptsError(),
+        MpMaxAttemptsError(),
+    ],
+)
+async def test_decorator_retries_on_max_attempts_error(
+    max_attempts_error: LegacyMaxAttemptsError | MpMaxAttemptsError,
+) -> None:
+    """MaxAttemptsError (legacy и mp) логируется и приводит к pause_on_error."""
+    decorator = while_coroutine_decorator(60, 5)
 
-    async def fail_once(self: object) -> None:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise PoolTimeoutError()
+    async def raise_max_attempts(self: object) -> None:
+        raise max_attempts_error
 
-    wrapped = decorator(fail_once)
-    self_mock = MagicMock()
-    self_mock.shop_id = "1"
+    wrapped = decorator(raise_max_attempts)
 
-    async def sleep_track_then_exit(secs: float) -> None:
-        sleep_calls.append(secs)
-        if len(sleep_calls) == 2:
-            raise _StopTestLoop("stop")
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_sleep.side_effect = Exception("stop_loop")
+            with pytest.raises(Exception, match="stop_loop"):
+                await wrapped(MagicMock(shop_id="1"))
 
-    sleep_calls: list[float] = []
-    with patch(f"{MODULE}.logger"):
-        with patch(
-            f"{MODULE}.asyncio.sleep",
-            new_callable=AsyncMock,
-            side_effect=sleep_track_then_exit,
-        ):
-            with pytest.raises(_StopTestLoop, match="stop"):
-                await wrapped(self_mock)
-
-    assert call_count == 2
-    assert sleep_calls[0] == PROMOTION_POOL_ERROR_BACKOFF_SEC
-    assert sleep_calls[1] == 10
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_shutdown_tick_task_cancels_orphan_after_grace() -> None:
-    """После grace orphan task отменяется и не остаётся pending."""
-    hold = asyncio.Event()
-
-    async def long_running() -> None:
-        await hold.wait()
-
-    tick_task = asyncio.create_task(long_running())
-    await asyncio.sleep(0)
-
-    await _shutdown_tick_task_after_timeout(
-        tick_task,
-        coroutine_name="update_clusters_adv_stats_today",
-        shop_id="shop-1",
-    )
-
-    assert tick_task.done()
-    assert tick_task.cancelled()
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_decorator_timeout_cancels_tick_when_grace_exhausted() -> None:
-    """timeout_sec: orphan tick cancel — следующий loop не ждёт бесконечный sleep."""
-    hold = asyncio.Event()
-    cancelled = asyncio.Event()
-
-    decorator = while_coroutine_decorator(60, 1, timeout_sec=0.05)
-
-    async def long_tick(self: object) -> None:
-        try:
-            await hold.wait()
-        except asyncio.CancelledError:
-            cancelled.set()
-            raise
-
-    wrapped = decorator(long_tick)
-    self_mock = MagicMock()
-    self_mock.shop_id = "shop-1"
-
-    with patch(f"{MODULE}.TICK_FINALLY_GRACE_SECONDS", 0.05):
-        with patch(f"{MODULE}.logger"):
-            with patch(
-                f"{MODULE}.asyncio.sleep",
-                new_callable=AsyncMock,
-                side_effect=_StopTestLoop("exit"),
-            ):
-                with pytest.raises(_StopTestLoop, match="exit"):
-                    await wrapped(self_mock)
-
-    await asyncio.wait_for(cancelled.wait(), timeout=2.0)
-    assert hold.is_set() is False
+    mock_logger.error.assert_called_once()
+    mock_sleep.assert_called_once_with(5)

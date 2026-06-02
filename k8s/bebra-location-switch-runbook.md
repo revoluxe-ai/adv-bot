@@ -40,14 +40,19 @@ kubectl run proxy-smoke --rm -i --restart=Never -n prod-adv-bot --image=python:3
   python -c "import urllib.request; p='http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080'; o=urllib.request.build_opener(urllib.request.ProxyHandler({'http':p,'https':p})); print(o.open('https://api.telegram.org', timeout=15).status)"
 ```
 
-## 4) Switch bot to green proxy
+## 4) Switch bot and ARQ worker to green proxy
+Telegram (aiogram) использует ``settings.PROXY``; без явного ``PROXY`` запросы в TG не идут через xray.
+
 ```powershell
-kubectl set env deployment/wb-sky-bot -n prod-adv-bot `
-  PROXY="http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080" `
-  HTTPS_PROXY="http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080" `
-  HTTP_PROXY="http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080" `
-  ALL_PROXY="http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080"
-kubectl rollout status deployment/wb-sky-bot -n prod-adv-bot --timeout=180s
+$proxy = "http://bebra-shared-proxy-green.prod-adv-bot.svc.cluster.local:8080"
+foreach ($deploy in @("wb-sky-bot", "adv-bot-asq-worker")) {
+  kubectl set env deployment/$deploy -n prod-adv-bot `
+    PROXY=$proxy `
+    HTTPS_PROXY=$proxy `
+    HTTP_PROXY=$proxy `
+    ALL_PROXY=$proxy
+  kubectl rollout status deployment/$deploy -n prod-adv-bot --timeout=180s
+}
 ```
 
 ## 5) Observe for 10-15 minutes

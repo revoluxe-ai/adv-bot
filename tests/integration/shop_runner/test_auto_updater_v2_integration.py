@@ -222,7 +222,7 @@ async def test_coroutines_manager_adv_settings_auto_update_calls_each_fresh_adv(
     fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
 
     async def _mget(_shop_id: str, adv_ids: list[int]):
-        return [(aid, fresh, "hit") for aid in adv_ids]
+        return [(aid, fresh, "hit", None) for aid in adv_ids]
 
     process_mock = AsyncMock()
 
@@ -309,12 +309,12 @@ async def test_adv_settings_auto_update_stats_freshness_gate_skips_stale_hit(
     )
 
     async def _mget(_shop_id: str, adv_ids: list[int]):
-        out: list[tuple[int, StatsFreshnessState, str]] = []
+        out: list[tuple[int, StatsFreshnessState, str, str | None]] = []
         for aid in adv_ids:
             if aid == seed_a.adv_setting.adv_id:
-                out.append((aid, fresh, "hit"))
+                out.append((aid, fresh, "hit", None))
             else:
-                out.append((aid, stale, "hit"))
+                out.append((aid, stale, "hit", None))
         return out
 
     process_mock = AsyncMock()

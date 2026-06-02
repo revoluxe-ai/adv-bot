@@ -1,0 +1,45 @@
+---
+description: Инструментарий — только logs/timings/metrics, без смены поведения
+globs:
+  - app/**/*.py
+alwaysApply: false
+---
+
+# Diagnostic instrumentation
+
+Применять, когда задача: **«разложить инструментарий»**, **«добавить диагностические логи»**, **«найти где зависает»** — не когда нужен prod-fix.
+
+## Разрешено (только с согласованным scope)
+
+- Менять **только файл(ы)**, явно согласованные в задаче.
+- Добавлять **только**:
+  - structured logs
+  - timings / duration
+  - counters / metrics hooks (без смены бизнес-веток)
+
+### Допустимые поля логов
+
+`step` (`start` | `end` | `stuck` | `error`), `duration`, `shop_id`, `adv_id`, cache `hit` / `miss`, correlation id — по необходимости задачи.
+
+Использовать существующий `logger`; не плодить `print` в production path.
+
+## Запрещено без GO
+
+- изменение бизнес-логики, условий, ветвлений, алгоритмов
+- изменение timeout / retry / backoff / fallback
+- env-флаги, **меняющие поведение** (не только уровень лога)
+- «временный» fail-open / fail-safe / swallow exceptions
+- refactor соседнего кода, переименования, переносы модулей
+- запуск воркера / rollout / deploy после diff — ждать **GO**
+
+## Workflow
+
+1. Уточнить (или зафиксировать из задачи) **один** целевой файл/модуль.
+2. Diff — только instrumentation.
+3. Показать diff пользователю.
+4. **Ждать GO** на: локальный запуск, commit, deploy.
+
+## Сочетание с debug-runtime
+
+- Instrumentation ≠ fix. Root cause и production path — по `debug-runtime.mdc`.
+- Финальный отчёт — формат из `debug-runtime.mdc` + перечень добавленных probe-точек.

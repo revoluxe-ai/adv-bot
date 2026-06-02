@@ -19,6 +19,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     plan_rollout_down_one,
 )
+from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+    resolve_orders_per_cart_for_cpo,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     build_prepared_from_contexts,
 )
@@ -54,7 +57,7 @@ def _profile() -> list[PositionProfilePoint]:
 def test_plan_rollout_down_one_passes_rk_to_build_mode_candidates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DOWN path: ``rk_orders_per_cart`` из ``LadderInputs``, не conv-only fallback."""
+    """DOWN path: ``orders_per_cart`` из ``LadderInputs``, не conv-only fallback."""
     captured: list[float | None] = []
 
     def _spy_build_mode_candidates(
@@ -62,13 +65,15 @@ def test_plan_rollout_down_one_passes_rk_to_build_mode_candidates(
         profile,
         keyword_text: str,
         conv_views_to_orders=None,
+        orders_per_cart=None,
         rk_orders_per_cart=None,
     ):
-        captured.append(rk_orders_per_cart)
+        captured.append(orders_per_cart)
         return build_mode_candidates(
             profile=profile,
             keyword_text=keyword_text,
             conv_views_to_orders=conv_views_to_orders,
+            orders_per_cart=orders_per_cart,
             rk_orders_per_cart=rk_orders_per_cart,
         )
 
@@ -81,6 +86,12 @@ def test_plan_rollout_down_one_passes_rk_to_build_mode_candidates(
     ]
     prepared = build_prepared_from_contexts(contexts)
     ladder = LadderInputs.from_contexts(contexts, rk_orders_per_cart=RK)
+    expected_opc = ladder.orders_per_cart_for_ctx(contexts[0])
+    assert expected_opc == resolve_orders_per_cart_for_cpo(
+        campaign_orders_per_cart_7d=RK,
+        key_orders=contexts[0].keyword.orders,
+        key_carts=contexts[0].keyword.add_to_cart,
+    )
 
     actions = plan_rollout_down_one(
         prepared,
@@ -88,7 +99,7 @@ def test_plan_rollout_down_one_passes_rk_to_build_mode_candidates(
         ladder_inputs=ladder,
     )
 
-    assert captured == [RK]
+    assert captured == [expected_opc]
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.DOWN
     assert actions[0].keyword_setting_id == 3

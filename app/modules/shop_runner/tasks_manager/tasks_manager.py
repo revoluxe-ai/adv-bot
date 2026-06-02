@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import contextvars
 import logging
 from collections import deque
@@ -95,24 +94,9 @@ class TasksManager:
         loop = asyncio.get_running_loop()
         coro = handler()
         task = loop.create_task(coro, context=context)
-        try:
-            if self._handler_timeout_sec is not None:
-                return await asyncio.wait_for(task, timeout=self._handler_timeout_sec)
-            return await task
-        except asyncio.TimeoutError:
-            await self._cancel_task_if_running(task)
-            raise
-        except asyncio.CancelledError:
-            await self._cancel_task_if_running(task)
-            raise
-
-    async def _cancel_task_if_running(self, task: asyncio.Task[Any]) -> None:
-        """Безопасно отменить дочернюю task, если она ещё выполняется."""
-        if task.done():
-            return
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        if self._handler_timeout_sec is not None:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=self._handler_timeout_sec)
+        return await task
 
     async def _worker(self) -> None:
         while True:

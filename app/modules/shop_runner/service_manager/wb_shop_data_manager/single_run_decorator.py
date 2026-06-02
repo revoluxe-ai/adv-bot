@@ -6,6 +6,8 @@ caller очищает key после завершения func.
 
 import asyncio
 import logging
+import os
+import time
 from collections import Counter
 from collections.abc import Awaitable, Callable
 from functools import wraps
@@ -17,6 +19,17 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 logger = logging.getLogger(__name__)
 
 SINGLE_RUN_WAIT_TIMEOUT_SECONDS = 900
+
+_TRACE_TIMING_ENABLED: bool | None = None
+
+
+def _coroutine_trace_enabled() -> bool:
+    """True, если включён whitelist ``COROUTINE_PHASE_TRACE_ADV_IDS``."""
+    global _TRACE_TIMING_ENABLED
+    if _TRACE_TIMING_ENABLED is None:
+        raw = os.environ.get("COROUTINE_PHASE_TRACE_ADV_IDS", "").strip()
+        _TRACE_TIMING_ENABLED = bool(raw)
+    return bool(_TRACE_TIMING_ENABLED)
 
 
 def _to_hashable(val: Any) -> Any:
@@ -58,6 +71,16 @@ def single_run() -> (
             # Уже выполняется — ждём завершения first caller (не удаляем key при timeout).
             if key in events:
                 self._single_run_call_counter[key] += 1
+                wait_started: float | None = None
+                if _coroutine_trace_enabled():
+                    wait_started = time.perf_counter()
+                    logger.info(
+                        "[coroutine_timing] coroutine=single_run phase=%s step=wait_start "
+                        "waiters=%s key=%s",
+                        func.__name__,
+                        self._single_run_call_counter[key],
+                        key[:240],
+                    )
                 try:
                     try:
                         await asyncio.wait_for(
@@ -79,6 +102,15 @@ def single_run() -> (
                     value_type, payload = value
                     if value_type == "exc":
                         raise payload
+                    if wait_started is not None:
+                        wait_ms = (time.perf_counter() - wait_started) * 1000.0
+                        logger.info(
+                            "[coroutine_timing] coroutine=single_run phase=%s step=wait_end "
+                            "duration_ms=%.2f waiters=%s",
+                            func.__name__,
+                            wait_ms,
+                            self._single_run_call_counter[key],
+                        )
                     return payload
                 finally:
                     self._single_run_call_counter[key] -= 1
@@ -90,9 +122,30 @@ def single_run() -> (
             self._single_run_call_counter[key] = 0
 
             try:
+                run_started: float | None = None
+                if _coroutine_trace_enabled():
+                    run_started = time.perf_counter()
+                    logger.info(
+                        "[coroutine_timing] coroutine=single_run phase=%s step=run_start key=%s",
+                        func.__name__,
+                        key[:240],
+                    )
                 result = await func(self, *args, **kwargs)
+                if run_started is not None:
+                    run_ms = (time.perf_counter() - run_started) * 1000.0
+                    logger.info(
+                        "[coroutine_timing] coroutine=single_run phase=%s step=run_end "
+                        "duration_ms=%.2f",
+                        func.__name__,
+                        run_ms,
+                    )
                 results[key] = ("ok", result)
                 return result
+            except asyncio.CancelledError as exc:
+                # Если first caller отменили, waiters должны получить тот же cancel,
+                # а не падать с KeyError из-за пустого results.
+                results[key] = ("exc", exc)
+                raise
             except NotFoundActiveAdvCompany as exc:
                 results[key] = ("exc", exc)
                 raise

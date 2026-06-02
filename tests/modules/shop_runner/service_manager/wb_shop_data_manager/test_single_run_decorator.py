@@ -81,7 +81,7 @@ async def test_waiter_timeout_does_not_break_exclusivity() -> None:
         with pytest.raises(asyncio.TimeoutError):
             await wrapped(host)
 
-    assert key_present(host), "key must remain while first caller runs"
+    assert key_present(host, "slow_method"), "key must remain while first caller runs"
     assert execution_count == 1, "waiter timeout must not start second execution"
 
     # Новый caller без укороченного timeout — должен ждать first, не дублировать.
@@ -94,12 +94,16 @@ async def test_waiter_timeout_does_not_break_exclusivity() -> None:
     assert await asyncio.wait_for(third_task, timeout=1.0) == "done"
 
     assert execution_count == 1
-    assert not key_present(host), "key cleaned up after first caller finishes"
+    assert not key_present(host, "slow_method"), (
+        "key cleaned up after first caller finishes"
+    )
 
 
-def key_present(host: _SingleRunHost) -> bool:
+def key_present(host: _SingleRunHost, func_name: str) -> bool:
+    """True if single_run still holds an in-flight key for ``func_name``."""
     events = getattr(host, "_single_run_events", {})
-    return any(k.startswith("slow_method:") for k in events)
+    prefix = f"{func_name}:"
+    return any(k.startswith(prefix) for k in events)
 
 
 @pytest.mark.unit
@@ -127,4 +131,42 @@ async def test_waiter_receives_exception_from_first_caller() -> None:
         await wrapped(host)
 
     await asyncio.wait_for(first_task, timeout=1.0)
-    assert not key_present(host)
+    assert not key_present(host, "failing_method")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_waiter_receives_cancellation_from_first_caller() -> None:
+    """Waiter must receive CancelledError when first caller is cancelled."""
+    host = _SingleRunHost()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    @single_run()
+    async def cancellable_method(self: _SingleRunHost) -> str:
+        started.set()
+        await release.wait()
+        return "done"
+
+    wrapped = cancellable_method
+
+    first_task = asyncio.create_task(wrapped(host))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    waiter_task = asyncio.create_task(wrapped(host))
+    await asyncio.sleep(0)
+
+    assert key_present(host, "cancellable_method"), (
+        "key must exist while first caller runs"
+    )
+
+    first_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await first_task
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(waiter_task, timeout=1.0)
+
+    assert not key_present(host, "cancellable_method"), (
+        "key cleaned up after cancellation"
+    )

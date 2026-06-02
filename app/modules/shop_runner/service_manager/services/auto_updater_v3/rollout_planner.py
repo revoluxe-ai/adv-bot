@@ -547,10 +547,7 @@ def plan_campaign_trim_by_max_state_cost(
         if ks_id is None:
             continue
         elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        if (
-            elig is not None
-            and elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
-        ):
+        if _min_cpa_bound_by_pay_for_order(elig):
             if keyword_pay_for_order_exceeds_max(
                 ctx, max_pay_for_order=float(max_pay_for_order)
             ):
@@ -959,6 +956,20 @@ def _is_no_ch_profile_with_own_conv(
     )
 
 
+def _min_cpa_bound_by_pay_for_order(
+    eligibility: "KeywordV3Eligibility | None",
+) -> bool:
+    """MIN-only + ``target_place=0``: NO CH или collapsed CH ladder + pay_for_order."""
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+
+    return (
+        eligibility is not None
+        and eligibility.participates_in_ladder
+        and eligibility.target_place_fallback_zero
+        and eligibility.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
+    )
+
+
 def _cleanup_diag(
     *,
     cur_c: ModeCandidate | None,
@@ -1072,13 +1083,16 @@ def _active_state_invalid_for_cleanup(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
         target_place_from_mode_candidate,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        min_cpa_operational_via_pay_for_order,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderCostSource,
         cost_for_mode,
         resolve_ladder_stage_display,
     )
 
-    if _is_no_ch_profile_with_own_conv(eligibility):
+    if min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog):
         assert eligibility is not None
         return _active_state_invalid_no_ch_for_cleanup(
             ctx,
@@ -1141,6 +1155,7 @@ def _lower_modes_valid_for_cleanup(
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         can_target_mode,
+        min_cpa_operational_via_pay_for_order,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderCostSource,
@@ -1155,7 +1170,7 @@ def _lower_modes_valid_for_cleanup(
     for mode in _modes_below_for_cleanup(current):
         if eligibility is not None and not can_target_mode(eligibility, mode):
             continue
-        if _is_no_ch_profile_with_own_conv(eligibility):
+        if min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog):
             if mode != KeywordStrategyMode.MIN_CPA:
                 continue
             stage = resolve_ladder_stage_display(
@@ -1610,10 +1625,7 @@ def diagnose_max_cpa_guard_keyword(
         skip_reasons.append(f"hard_status={hard_status}_not_managed")
     else:
         elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        if (
-            elig is not None
-            and elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
-        ):
+        if _min_cpa_bound_by_pay_for_order(elig):
             if keyword_pay_for_order_exceeds_max(
                 ctx, max_pay_for_order=float(max_pay_for_order)
             ):

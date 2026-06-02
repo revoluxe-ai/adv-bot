@@ -15,9 +15,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -84,6 +88,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
 )
+from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
+    AdvPhaseTrace,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
@@ -95,6 +102,32 @@ from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
 logger = logging.getLogger(__name__)
 
+# ``get_wb_advs_dto`` → ``PlanFactProvider`` использует тот же default last_days.
+_WB_ADV_DTO_FACT_LAST_DAYS = 2
+
+# TODO: централизовать получение план-факта
+async def _resolve_v3_fact_data(
+    *,
+    dto: WBAdvDTO | None,
+    updater: AdvSettingAutoUpdater,
+    keywords: list[CalculatedKeyword],
+    max_last_period: int,
+) -> tuple[FactData, str]:
+    """Fact для V3 ladder без повторного ``get_stat_data``, если fact уже в ``WBAdvDTO``.
+
+    ``get_wb_advs_dto`` собирает fact в ``_collect_adv_data_parts`` (CH). Повторный
+    ``AdvSettingAutoUpdater.get_fact_data`` на том же тике — дубль запроса в ClickHouse.
+
+    Returns:
+        (fact, source) — source ``\"dto\"`` или ``\"updater\"`` для диагностики.
+    """
+    if (
+        dto is not None
+        and isinstance(dto, WBAdvDTO)
+        and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS
+    ):
+        return dto.fact, "dto"
+    return await updater.get_fact_data(keywords), "updater"
 
 def _apply_v3_phase(
     ledger: V3TickKeywordLedger,
@@ -111,13 +144,23 @@ async def _load_v3_wb_context(
     complex_adv: ComplexAdv,
     *,
     wb_shop_data_manager: WBShopDataManager,
+    dbg_phase: Callable[[str, dict[str, object] | None], None] | None = None,
 ) -> tuple[WBAdvDTO | None, dict[str, list[BidPosition]]]:
     """Один запрос WBAdvDTO + bid profiles на цикл V3 (CH)."""
+    def _step(name: str, extra: dict[str, object] | None = None) -> None:
+        if dbg_phase is not None:
+            dbg_phase(name, extra)
+
     shelf_active = complex_adv.shelf_promotion_active
     if shelf_active:
         await TrafficClicksManager().enrich(complex_adv)
+        _step("traffic_enrich_done", {"shelf_active": True})
+    else:
+        _step("traffic_enrich_skipped", {"shelf_active": False})
 
+    _step("before_get_wb_advs_dto")
     wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
+    _step("get_wb_advs_dto", {"dto_count": len(wb_dtos)})
     if not wb_dtos:
         return None, {}
 
@@ -129,7 +172,9 @@ async def _load_v3_wb_context(
             complex_adv.adv_id,
             nmid,
         )
-        if await wb_shop_data_manager.backfill_min_bids_for_adv(complex_adv):
+        backfill_ok = await wb_shop_data_manager.backfill_min_bids_for_adv(complex_adv)
+        _step("min_bids_backfill", {"ok": backfill_ok, "nmid": nmid})
+        if backfill_ok:
             wb_dtos = await wb_shop_data_manager.get_wb_advs_dto([complex_adv])
             if wb_dtos:
                 dto = wb_dtos[0]
@@ -139,10 +184,16 @@ async def _load_v3_wb_context(
                 complex_adv.adv_id,
                 nmid,
             )
+    else:
+        _step("min_bids_cache_hit", {"nmid": nmid})
 
     predictor = build_predict_keywords_target_place()
     raw_profiles = await predictor.get_keyword_bid_profiles(
         dto, dto.min_target_position
+    )
+    _step(
+        "get_keyword_bid_profiles",
+        {"profiles_count": len(raw_profiles), "min_target_position": dto.min_target_position},
     )
     return dto, raw_profiles
 
@@ -174,7 +225,7 @@ async def _safe_sync_target_places_v3(
                 target_place_fallback_zero_by_keyword_id
             ),
         )
-    except Exception:
+    except Exception: # type: ignore
         logger.error(
             "[adv_id=%s] v3: target_place sync failed "
             "(original try exception preserved, not re-raised)",
@@ -190,21 +241,30 @@ async def process_adv_v3(
     max_last_period: int = 2,
 ) -> None:
     """Один тик V3: in-memory ledger → нетто-flush → target_place."""
+    trace = AdvPhaseTrace(
+        coroutine="process_adv_v3",
+        shop_id=complex_adv.shop_id,
+        adv_id=complex_adv.adv_id,
+    )
     adv = complex_adv.adv_setting
-    keywords = await complex_adv.get_keywords()
+    with trace.phase("get_keywords"):
+        keywords = await complex_adv.get_keywords()
+    trace.marker("keywords_loaded", extra={"keywords_count": len(keywords)})
     ledger = V3TickKeywordLedger.from_keywords(keywords)
 
-    dto, raw_profiles = await _load_v3_wb_context(
-        complex_adv, wb_shop_data_manager=wb_shop_data_manager
-    )
+    with trace.phase("load_v3_wb_context"):
+        dto, raw_profiles = await _load_v3_wb_context(
+            complex_adv,
+            wb_shop_data_manager=wb_shop_data_manager,
+            dbg_phase=trace.dbg_phase,
+        )
     target_place_synced = False
-    selector_actions_logged: list[V3Action] = []
-
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
     ladder_inputs: LadderInputs | None = None
     policy: SelectionPolicy | None = None
+    campaign_orders_per_cart_7d: float | None = None
 
     async def _sync_target_places_once() -> None:
         """После flush; в finally — если тик оборвался раньше."""
@@ -212,14 +272,15 @@ async def process_adv_v3(
         if target_place_synced or is_campaign_full_stop(campaign_mode):
             return
         if dto is not None and complex_adv.individual_keywords_target_place_mode:
-            await _safe_sync_target_places_v3(
-                complex_adv,
-                dto,
-                raw_profiles,
-                keywords=ledger.keywords,
-                force_all_target_place_zero=sync_force_zero,
-                target_place_fallback_zero_by_keyword_id=sync_fallback_by_id,
-            )
+            with trace.phase("sync_keyword_target_places_v3"):
+                await _safe_sync_target_places_v3(
+                    complex_adv,
+                    dto,
+                    raw_profiles,
+                    keywords=ledger.keywords,
+                    force_all_target_place_zero=sync_force_zero,
+                    target_place_fallback_zero_by_keyword_id=sync_fallback_by_id,
+                )
             target_place_synced = True
 
     preamble_bootstrap_count = 0
@@ -229,25 +290,32 @@ async def process_adv_v3(
     preamble_guard_count = 0
 
     try:
-        contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-        sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-            contexts
-        )
-        plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        with trace.phase("build_keyword_v3_contexts"):
+            contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
+        with trace.phase("get_plan_data"):
+            plan = AdvSettingAutoUpdater.get_plan_data(adv)
         state: SalesStates | None = None
         fact = None
         if plan is None:
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
         else:
-            updater = AdvSettingAutoUpdater(adv, max_last_period)
-            fact = await updater.get_fact_data(ledger.keywords)
-            state = detect_campaign_state(plan, fact)
-            campaign_mode = resolve_campaign_mode(state)
+            with trace.phase("resolve_fact_data"):
+                updater = AdvSettingAutoUpdater(adv, max_last_period)
+                fact, fact_source = await _resolve_v3_fact_data(
+                    dto=dto,
+                    updater=updater,
+                    keywords=ledger.keywords,
+                    max_last_period=max_last_period,
+                )
+            with trace.phase("detect_campaign_state"):
+                state = detect_campaign_state(plan, fact)
+                campaign_mode = resolve_campaign_mode(state)
             logger.info(
-                "[adv_id=%s] v3: campaign_mode=%s state=%s",
+                "[adv_id=%s] v3: campaign_mode=%s state=%s fact_source=%s",
                 complex_adv.adv_id,
                 campaign_mode.value,
                 state.name if state is not None else "None",
+                fact_source,
             )
         if is_campaign_full_stop(campaign_mode):
             logger.info(
@@ -256,11 +324,28 @@ async def process_adv_v3(
             )
             return
 
+        if dto is not None and plan is not None:
+            from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+                load_campaign_orders_per_cart_7d,
+            )
+
+            with trace.phase("load_campaign_orders_per_cart_7d"):
+                campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(
+                    adv
+                )
+            # Ранний fallback: finally/sync при исключении в preamble до финальной пересборки.
+            with trace.phase("preamble_build_sync_fallback_early"):
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
+
         # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
         # NO_DATA  → только plan_campaign_no_data_bootstrap_safe + sync_force_zero
         # NORMAL   → plan_data_bootstrap_v3 + realloc / expansion / guard
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
-            bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
+            with trace.phase("preamble_no_data_bootstrap"):
+                bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
             if bootstrap_actions:
                 preamble_bootstrap_count += len(bootstrap_actions)
                 logger.info(
@@ -278,7 +363,11 @@ async def process_adv_v3(
         elif campaign_mode == CampaignMode.NORMAL and dto is not None:
             assert plan is not None and fact is not None
             # NORMAL-only: не вызывать для NO_DATA / NOT_READY
-            keyword_bootstrap_actions = plan_data_bootstrap_v3(contexts)
+            with trace.phase("preamble_keyword_bootstrap"):
+                keyword_bootstrap_actions = plan_data_bootstrap_v3(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
             if keyword_bootstrap_actions:
                 preamble_bootstrap_count += len(keyword_bootstrap_actions)
                 logger.info(
@@ -290,9 +379,6 @@ async def process_adv_v3(
                     ledger,
                     keyword_bootstrap_actions,
                     raw_profiles,
-                )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
                 )
 
             shelf_active = complex_adv.shelf_promotion_active
@@ -312,32 +398,39 @@ async def process_adv_v3(
             resolve = compute_resolve_cost_threshold(plan, fact)
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
-                load_campaign_orders_per_cart_7d,
             )
 
-            campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv)
-            rec_orders_per_view = await load_rec_orders_per_view_for_v3(
-                adv,
-                rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
-            )
-            ladder_inputs = LadderInputs.from_contexts(
-                contexts,
-                campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-                rec_orders_per_view=rec_orders_per_view,
-            )
-            await cache_worst_costs_for_adv(
-                complex_adv.adv_id, ladder_inputs.worst_costs
-            )
-            eligibility = build_eligibility_map(contexts)
-            prepared = build_prepared_from_contexts(contexts)
+            with trace.phase("load_rec_orders_per_view_for_v3"):
+                rec_orders_per_view = await load_rec_orders_per_view_for_v3(
+                    adv,
+                    rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
+                )
+            with trace.phase("preamble_build_ladder_inputs"):
+                ladder_inputs = LadderInputs.from_contexts(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                    rec_orders_per_view=rec_orders_per_view,
+                )
+            with trace.phase("preamble_cache_worst_costs"):
+                await cache_worst_costs_for_adv(
+                    complex_adv.adv_id, ladder_inputs.worst_costs
+                )
+            with trace.phase("preamble_build_eligibility"):
+                eligibility = build_eligibility_map(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
+            with trace.phase("preamble_build_prepared"):
+                prepared = build_prepared_from_contexts(contexts)
             cleanup_resolve = resolve if is_resolve_valid(plan, resolve) else None
-            cleanup_actions = plan_active_invalid_state_cleanup(
-                prepared,
-                max_pay_for_order=float(plan.max_pay_for_order),
-                resolve=cleanup_resolve,
-                eligibility_by_ks_id=eligibility,
-                ladder_inputs=ladder_inputs,
-            )
+            with trace.phase("preamble_active_invalid_cleanup"):
+                cleanup_actions = plan_active_invalid_state_cleanup(
+                    prepared,
+                    max_pay_for_order=float(plan.max_pay_for_order),
+                    resolve=cleanup_resolve,
+                    eligibility_by_ks_id=eligibility,
+                    ladder_inputs=ladder_inputs,
+                )
             if cleanup_actions:
                 preamble_cleanup_count = len(cleanup_actions)
                 logger.info(
@@ -350,10 +443,10 @@ async def process_adv_v3(
                     cleanup_actions,
                     raw_profiles,
                 )
-                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
-                    contexts
+                eligibility = build_eligibility_map(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 )
-                eligibility = build_eligibility_map(contexts)
                 prepared = build_prepared_from_contexts(contexts)
                 ladder_inputs = LadderInputs.from_contexts(
                     contexts,
@@ -372,13 +465,14 @@ async def process_adv_v3(
                     fact.pay_for_order is not None
                     and float(fact.pay_for_order) < 0.9 * float(resolve)
                 ):
-                    realloc_actions = plan_cost_reallocation(
-                        prepared,
-                        resolve=resolve,
-                        policy=policy,
-                        eligibility_by_ks_id=eligibility,
-                        ladder_inputs=ladder_inputs,
-                    )
+                    with trace.phase("preamble_cost_reallocation"):
+                        realloc_actions = plan_cost_reallocation(
+                            prepared,
+                            resolve=resolve,
+                            policy=policy,
+                            eligibility_by_ks_id=eligibility,
+                            ladder_inputs=ladder_inputs,
+                        )
                     if realloc_actions:
                         preamble_realloc_count = len(realloc_actions)
                         logger.info(
@@ -391,7 +485,10 @@ async def process_adv_v3(
                             realloc_actions,
                             raw_profiles,
                         )
-                        eligibility = build_eligibility_map(contexts)
+                        eligibility = build_eligibility_map(
+                            contexts,
+                            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                        )
                         prepared = build_prepared_from_contexts(contexts)
                         ladder_inputs = LadderInputs.from_contexts(
                             contexts,
@@ -402,13 +499,14 @@ async def process_adv_v3(
                             complex_adv.adv_id, ladder_inputs.worst_costs
                         )
 
-                expansion_actions = plan_profitable_expansion(
-                    prepared,
-                    resolve=resolve,
-                    policy=policy,
-                    eligibility_by_ks_id=eligibility,
-                    ladder_inputs=ladder_inputs,
-                )
+                with trace.phase("preamble_profitable_expansion"):
+                    expansion_actions = plan_profitable_expansion(
+                        prepared,
+                        resolve=resolve,
+                        policy=policy,
+                        eligibility_by_ks_id=eligibility,
+                        ladder_inputs=ladder_inputs,
+                    )
                 if expansion_actions:
                     preamble_expansion_count = len(expansion_actions)
                     logger.info(
@@ -421,16 +519,16 @@ async def process_adv_v3(
                         expansion_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = (
-                        build_target_place_fallback_zero_by_keyword_id(contexts)
-                    )
 
             guard_condition = (
                 fact.pay_for_order is not None
                 and float(fact.pay_for_order) > float(plan.max_pay_for_order)
             )
             if guard_condition:
-                guard_eligibility = build_eligibility_map(contexts)
+                guard_eligibility = build_eligibility_map(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
                 guard_prepared = build_prepared_from_contexts(contexts)
                 guard_ladder_inputs = LadderInputs.from_contexts(
                     contexts,
@@ -440,14 +538,15 @@ async def process_adv_v3(
                 await cache_worst_costs_for_adv(
                     complex_adv.adv_id, guard_ladder_inputs.worst_costs
                 )
-                guard_actions = plan_max_cpa_guard(
-                    guard_prepared,
-                    max_pay_for_order=float(plan.max_pay_for_order),
-                    shelf_click_mode=click_mode,
-                    aggressiveness=aggr,
-                    eligibility_by_ks_id=guard_eligibility,
-                    ladder_inputs=guard_ladder_inputs,
-                )
+                with trace.phase("preamble_max_cpa_guard"):
+                    guard_actions = plan_max_cpa_guard(
+                        guard_prepared,
+                        max_pay_for_order=float(plan.max_pay_for_order),
+                        shelf_click_mode=click_mode,
+                        aggressiveness=aggr,
+                        eligibility_by_ks_id=guard_eligibility,
+                        ladder_inputs=guard_ladder_inputs,
+                    )
                 if guard_actions:
                     preamble_guard_count = len(guard_actions)
                     logger.info(
@@ -460,13 +559,20 @@ async def process_adv_v3(
                         guard_actions,
                         raw_profiles,
                     )
-                    sync_fallback_by_id = (
-                        build_target_place_fallback_zero_by_keyword_id(contexts)
-                    )
+
+            # Всегда перед sync: даже если bootstrap/cleanup/expansion/guard без actions.
+            with trace.phase("preamble_build_sync_fallback"):
+                sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                    contexts,
+                    campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
-            plan_fact_change = ChangePlanFact(adv)
-            plan_fact_equal = await plan_fact_change.check_equal_in_cache(plan, fact)
+            with trace.phase("plan_fact_cache_check"):
+                plan_fact_change = ChangePlanFact(adv)
+                plan_fact_equal = await plan_fact_change.check_equal_in_cache(
+                    plan, fact
+                )
 
             async def cache_plan_fact_snapshot() -> None:
                 await plan_fact_change.set_new_plan_fact(plan, fact)
@@ -483,18 +589,21 @@ async def process_adv_v3(
                     complex_adv.adv_id,
                 )
             else:
-                shelf_active = complex_adv.shelf_promotion_active
-                selector_actions_logged = select_v3_post_gate_actions(
-                    contexts=contexts,
-                    shelf_promotion_active=shelf_active,
-                    shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
-                    if shelf_active
-                    else None,
-                    ladder_inputs=ladder_inputs,
-                    policy=policy,
-                )
-                _ = ledger.apply_in_memory(selector_actions_logged)
-                await cache_plan_fact_snapshot()
+                with trace.phase("select_post_gate_actions"):
+                    shelf_active = complex_adv.shelf_promotion_active
+                    selector_actions_logged = select_v3_post_gate_actions(
+                        contexts=contexts,
+                        shelf_promotion_active=shelf_active,
+                        shelf_click_mode=resolve_shelf_click_mode_from_adv(complex_adv)
+                        if shelf_active
+                        else None,
+                        ladder_inputs=ladder_inputs,
+                        policy=policy,
+                    )
+                with trace.phase("apply_selector_actions"):
+                    _ = ledger.apply_in_memory(selector_actions_logged)
+                with trace.phase("cache_plan_fact_snapshot"):
+                    await cache_plan_fact_snapshot()
                 up_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "UP"
                 )
@@ -525,13 +634,16 @@ async def process_adv_v3(
                 )
 
         if not is_campaign_full_stop(campaign_mode):
-            flushed = await ledger.flush_to_db(complex_adv)
-            if flushed:
+            with trace.phase("flush_to_db"):
+                flushed_to_db = await ledger.flush_to_db(complex_adv)
+            if flushed_to_db:
                 logger.info(
                     "[adv_id=%s] v3: netto flush committed",
                     complex_adv.adv_id,
                 )
-            await _sync_target_places_once()
+            with trace.phase("sync_target_places_once"):
+                await _sync_target_places_once()
     finally:
         if not is_campaign_full_stop(campaign_mode):
-            await _sync_target_places_once()
+            with trace.phase("sync_target_places_once_finally"):
+                await _sync_target_places_once()

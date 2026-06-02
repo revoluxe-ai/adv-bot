@@ -1,0 +1,83 @@
+---
+description: Debug mode — runtime-диагностика Python/backend (не infra/admin/fix)
+globs:
+  - app/**/*.py
+  - "**/*_run.py"
+  - conftest.py
+alwaysApply: false
+---
+
+# Debug runtime (Python/backend)
+
+## Роль
+
+В **Debug mode** Cursor — **диагност**, не админ инфраструктуры и не автор прод-fix без согласования.
+
+Обязан:
+1. Найти **production path** (точка входа → orchestration → первый сбой).
+2. Найти **первую meaningful exception** (не хвост stack trace).
+3. Отделить **root cause** от следствий.
+4. Собрать **evidence** (файлы, строки, логи, env только для чтения).
+5. Предложить **минимальный fix-кандидат** текстом.
+6. **Не менять** код и инфру без явного **GO** от пользователя.
+
+## Ветка (перед любой работой)
+
+```powershell
+git branch --show-current
+```
+
+| Ветка | Действие |
+|-------|----------|
+| `stage`, `master`, `main` | **STOP.** Не создавать ветку, не менять файлы. Сообщить пользователю. |
+| другая | Продолжать только диагностику в рамках задачи |
+
+Новую ветку — **только по прямой команде** пользователя.
+
+## Порядок диагностики
+
+1. Определить штатную **точку входа** и production/local path (см. `local-production-entrypoints.mdc` при shop-runner).
+2. Воспроизвести через **штатный** запуск, не через одноразовые debug-скрипты.
+3. Зафиксировать: дошёл ли процесс до целевого path.
+4. Извлечь первую ошибку с контекстом (тип, сообщение, кадр).
+5. Построить цепочку причин; пометить, что проверено и **исключено**.
+
+**Запрещено** «чинить вслепую»: менять код, retry, timeout, fallback, env-поведение до root cause и evidence.
+
+## Запрещено без GO
+
+- `git commit` / `push` / `merge` / PR
+- deploy, restart, rollout, scale
+- patch ConfigMap / Deployment / CR / Secret
+- изменения БД, секретов, прав, grants
+- изменение PgBouncer / Postgres / ClickHouse / Redis **deployments** в k8s
+- ручной `kubectl port-forward`
+- ручной `.\scripts\dev-tunnels.ps1`
+- Redis port-forward в k8s
+- отдельные debug-скрипты вместо production entrypoint, если entrypoint подходит
+- retry / fail-open / fail-safe как «fix»
+- изменение timeout / retry / fallback
+- unrelated refactor, форматирование «заодно»
+
+## Разрешено без GO
+
+- чтение кода, логов, конфигов, `git log` / `git diff`
+- локальный запуск **штатной** точки входа (Poetry / `.vscode/launch.json`)
+- объяснения, гипотезы, fix-кандидат в отчёте
+
+## Отчёт (обязателен в конце сессии)
+
+```markdown
+## Debug report
+
+- **Entrypoint / production path:** …
+- **Дошёл до целевого path:** да / нет — …
+- **Первая meaningful ошибка:** …
+- **Root cause (кандидат):** …
+- **Следствия (не root cause):** …
+- **Evidence:** файлы/строки/логи …
+- **Проверено и исключено:** …
+- **Код/инфра менялись:** да / нет
+- **GO был на:** … (если менялись)
+- **Нужен GO на:** … (следующий шаг)
+```

@@ -1,0 +1,60 @@
+---
+description: Локальный debug только через штатные entrypoints (shop-runner)
+globs:
+  - new_wb_shop_update_run.py
+  - app/modules/shop_runner/**
+  - app/dev_local/**
+  - .vscode/launch.json
+  - env.sample
+alwaysApply: false
+---
+
+# Local debug — production entrypoints
+
+## Принцип
+
+Локальный debug = тот же **production path**, что в k8s, через **штатную точку входа**. Не подменять flow ручными туннелями и одноразовыми скриптами.
+
+## `new_wb_shop_update_run.py`
+
+| Правило | Требование |
+|---------|------------|
+| Точка входа | Только `new_wb_shop_update_run.py` в корне репо |
+| Замена | **Не** подменять legacy/other runner, если эта точка подходит |
+| Debug-скрипт | **Не** писать отдельный скрипт, если production entrypoint воспроизводит сбой |
+| Запуск | Poetry: `poetry run python new_wb_shop_update_run.py` или launch **«Python: new_wb_shop_update_run.py (Poetry)»** |
+
+Цепочка: `new_wb_shop_update_run.py` → `DIManager` / `AppContainer` → `run_process_func.run()` → shop-runner.
+
+## PG / ClickHouse с локали
+
+- Подключение по **публичному IP** из `.env` (см. `k8s/network/local-dev-external-access.md`, `RUN_LOCAL=false`).
+- **Port-forward из приложения отключён** (нет автозапуска при импорте `settings`).
+- Опционально вручную: `DEV_TUNNELS_ENABLED=true` + `scripts/dev-tunnels.ps1` или `k8s_tunnels` — только с **GO**.
+
+При сбое подключения к БД:
+1. **STOP**
+2. Вернуть **первую meaningful ошибку** из лога/трейса
+3. Проверить хосты/порты/credentials в `.env`, не включать туннели без согласования
+
+## Redis
+
+| | |
+|-|-|
+| Локально | `127.0.0.1:6379` (`REDIS_HOST` / `REDIS_PORT` из `.env`) |
+| k8s Redis | **Не** port-forward, **не** подключаться к cluster Redis для локального shop-runner debug |
+
+Redis — локальный сервис (`docker-compose` / локальный инстанс), не часть k8s tunnel flow.
+
+## Запрещено без GO
+
+- ручной `kubectl port-forward` (любой сервис)
+- `.\scripts\dev-tunnels.ps1`
+- Redis forward из k8s
+- patch Deployment/ConfigMap/Secret для «починить локальный запуск»
+- отдельный `debug_*.py` / one-off runner вместо `new_wb_shop_update_run.py`
+- подмена entrypoint на устаревший runner «для удобства»
+
+## При открытых файлах
+
+Правило подтягивается при работе с `new_wb_shop_update_run.py`, `app/modules/shop_runner/**`, `app/dev_local/**`, launch-конфигом. Сочетается с `debug-runtime.mdc`.
