@@ -605,14 +605,17 @@ class UpdateClusterBidsManager:
     ) -> None:
         """Применить рассчитанные ставки: WB API → статусы ключей → кэш шага биддера в Redis.
 
-        Порядок вызовов последовательный: сначала ``set_new_cluster_bids``, затем
-        ``update_statuses``, затем ``remember_bids``.
+        Порядок: сначала ``set_new_cluster_bids`` (обязателен), затем ``update_statuses``
+        (best-effort), затем ``remember_bids`` (обязателен после успешного WB).
+
+        Ошибки ``update_statuses`` перехватываются и логируются — сбой статусов не должен
+        блокировать ``remember_bids``: иначе ставки уже на WB, а ``prev_step``/``prev_direct``
+        в Redis не обновятся.
 
         Ошибки ``remember_bids`` **намеренно не перехватываются**: сбой записи в Redis
         прерывает весь ``update_cluster_bids`` (timestamp последнего цикла не обновится).
-        Это fail-closed: без сохранённого ``prev_step``/``prev_direct`` следующий расчёт
-        может быть некорректным, поэтому цикл считается неуспешным, даже если WB уже
-        принял ставки.
+        Это fail-closed: без сохранённого состояния шага следующий расчёт может быть
+        некорректным, поэтому цикл считается неуспешным, даже если WB уже принял ставки.
         """
         adv_ids = list({b.adv_id for b in update_bids_command.new_bids})
         trace = batch_trace or ShopBatchPhaseTrace(
@@ -622,10 +625,13 @@ class UpdateClusterBidsManager:
         )
         with trace.phase("apply_set_new_cluster_bids"):
             await self._wb_manager.set_new_cluster_bids(update_bids_command)
-        with trace.phase("apply_update_keyword_statuses"):
-            await self._redis_keyword_bidder_status_manager.update_statuses(
-                update_bids_command
-            )
+        try:
+            with trace.phase("apply_update_keyword_statuses"):
+                await self._redis_keyword_bidder_status_manager.update_statuses(
+                    update_bids_command
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Не удалось обновить статусы ключей в Redis")
         entries = [
             ClusterBidEntry(
                 adv_id=b.adv_id,
