@@ -149,16 +149,6 @@ def services_in_start_order(services: Sequence[ServiceSpec]) -> list[ServiceSpec
     return ordered
 
 
-def _popen_kwargs(separate_windows: bool) -> dict[str, object]:
-    kwargs: dict[str, object] = {
-        "cwd": REPO_ROOT,
-        "env": os.environ.copy(),
-    }
-    if separate_windows and os.name == "nt":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-    return kwargs
-
-
 def start_process(
     spec: ServiceSpec,
     *,
@@ -171,7 +161,15 @@ def start_process(
         spec.k8s_deployment,
         " ".join(spec.argv),
     )
-    return subprocess.Popen(spec.argv, **_popen_kwargs(separate_windows))
+    env = dict(os.environ)
+    if separate_windows and os.name == "nt":
+        return subprocess.Popen(
+            spec.argv,
+            cwd=REPO_ROOT,
+            env=env,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+    return subprocess.Popen(spec.argv, cwd=REPO_ROOT, env=env)
 
 
 def stop_process(

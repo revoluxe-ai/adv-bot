@@ -40,7 +40,10 @@ from app.snapshot_data_updater.freshness_policy import (
     enforce_cache_stale,
     should_skip_refresh,
 )
-from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
+from app.snapshot_data_updater.config import (
+    SnapshotUpdaterConfig,
+    resolve_snapshot_config,
+)
 from app.snapshot_data_updater.dto import (
     CalculatedKeywordSnapshotDTO,
     FreshnessSnapshotDTO,
@@ -84,7 +87,7 @@ class CalculatedKeywordsWarmupService:
             resource_queues: если задан — каждый adv warmup через CALCULATED_KEYWORDS_WARMUP.
             keywords_cache: Redis client для legacy hash и metadata.
         """
-        self._config = config or DEFAULT_CONFIG
+        self._config = resolve_snapshot_config(config)
         self._queues = resource_queues
         self._keywords_cache = keywords_cache or RedisCalculatedKeywordsCacheManager()
 

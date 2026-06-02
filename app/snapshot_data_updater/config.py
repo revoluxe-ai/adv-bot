@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from app.snapshot_data_updater.freshness_policy import FreshnessPolicy
 
@@ -284,10 +285,17 @@ def reload_snapshot_config() -> SnapshotUpdaterConfig:
     return _cached_config
 
 
+def resolve_snapshot_config(
+    config: SnapshotUpdaterConfig | None,
+) -> SnapshotUpdaterConfig:
+    """Возвращает явный конфиг или актуальный из env-кэша."""
+    return config if config is not None else get_snapshot_config()
+
+
 class _SnapshotConfigProxy:
     """Прокси для обратной совместимости с ``DEFAULT_CONFIG.field``."""
 
-    def __getattr__(self, name: str) -> object:
+    def __getattr__(self, name: str) -> Any:
         return getattr(get_snapshot_config(), name)
 
 

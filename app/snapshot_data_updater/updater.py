@@ -28,7 +28,10 @@ from app.snapshot_data_updater.cache.redis_adv_data_snapshot_store import (
 )
 from app.snapshot_data_updater.collector import AdvDataSnapshotCollector
 from app.snapshot_data_updater.cache_freshness import cache_age_sec
-from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
+from app.snapshot_data_updater.config import (
+    SnapshotUpdaterConfig,
+    resolve_snapshot_config,
+)
 from app.snapshot_data_updater.freshness_policy import should_skip_refresh
 from app.snapshot_data_updater.dto import ShopAdvSnapshotBatchDTO
 from app.snapshot_data_updater.providers import (
@@ -93,7 +96,7 @@ class SnapshotUpdater:
         self._collector = collector
         self._store = store
         self._shop_discovery = shop_discovery
-        self._config = config or DEFAULT_CONFIG
+        self._config = resolve_snapshot_config(config)
         self._queues: ResourceQueueManager = (
             resource_queues or collector.resource_queues
         )

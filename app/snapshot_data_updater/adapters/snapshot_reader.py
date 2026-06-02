@@ -9,7 +9,10 @@ from app.snapshot_data_updater.cache.redis_adv_data_snapshot_store import (
     RedisAdvDataSnapshotStore,
 )
 from app.snapshot_data_updater.freshness_policy import enforce_cache_stale
-from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
+from app.snapshot_data_updater.config import (
+    SnapshotUpdaterConfig,
+    resolve_snapshot_config,
+)
 from app.snapshot_data_updater.dto import AdvDataSnapshotDTO
 
 logger = logging.getLogger(__name__)
@@ -24,7 +27,7 @@ class SnapshotReader:
         config: SnapshotUpdaterConfig | None = None,
     ) -> None:
         self._store = store or RedisAdvDataSnapshotStore(no_op=False)
-        self._config = config or DEFAULT_CONFIG
+        self._config = resolve_snapshot_config(config)
 
     async def get_adv_snapshot(
         self,

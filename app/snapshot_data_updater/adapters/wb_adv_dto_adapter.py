@@ -9,7 +9,10 @@ from __future__ import annotations
 import logging
 
 from app.snapshot_data_updater.adapters.snapshot_reader import SnapshotReader
-from app.snapshot_data_updater.config import DEFAULT_CONFIG, SnapshotUpdaterConfig
+from app.snapshot_data_updater.config import (
+    SnapshotUpdaterConfig,
+    resolve_snapshot_config,
+)
 from app.snapshot_data_updater.dto import AdvDataSnapshotDTO
 
 logger = logging.getLogger(__name__)
@@ -24,7 +27,7 @@ class WBAdvDtoSnapshotAdapter:
         config: SnapshotUpdaterConfig | None = None,
     ) -> None:
         self._reader = reader or SnapshotReader()
-        self._config = config or DEFAULT_CONFIG
+        self._config = resolve_snapshot_config(config)
 
     async def load_snapshot(
         self, shop_id: str, adv_id: int

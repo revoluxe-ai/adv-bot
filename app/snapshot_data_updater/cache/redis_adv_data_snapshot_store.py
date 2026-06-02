@@ -13,7 +13,9 @@ from __future__ import annotations
 import json
 import logging
 
-from app.snapshot_data_updater.config import DEFAULT_CONFIG
+from redis.asyncio import Redis
+
+from app.snapshot_data_updater.config import get_snapshot_config
 from app.snapshot_data_updater.dto import (
     AdvDataSnapshotDTO,
     ShopAdvSnapshotBatchDTO,
@@ -29,17 +31,19 @@ class RedisAdvDataSnapshotStore:
     def __init__(
         self,
         *,
-        redis_client: object | None = None,
+        redis_client: Redis | None = None,
         ttl_sec: int | None = None,
         no_op: bool = True,
     ) -> None:
         """Args:
             redis_client: asyncio Redis; по умолчанию из ``RedisCalculatedKeywordsCacheManager``.
-            ttl_sec: EX для ключей; по умолчанию ``DEFAULT_CONFIG.snapshot_ttl_sec``.
+            ttl_sec: EX для ключей; по умолчанию ``get_snapshot_config().snapshot_ttl_sec``.
             no_op: stub path — не писать в Redis.
         """
         self._no_op = no_op
-        self._ttl_sec = ttl_sec if ttl_sec is not None else DEFAULT_CONFIG.snapshot_ttl_sec
+        self._ttl_sec = (
+            ttl_sec if ttl_sec is not None else get_snapshot_config().snapshot_ttl_sec
+        )
         if redis_client is not None:
             self._client = redis_client
         else:

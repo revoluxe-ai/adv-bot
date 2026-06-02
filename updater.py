@@ -8,7 +8,7 @@ import dotenv
 from typing import Any
 from collections.abc import Callable, Coroutine
 
-from app.common_coroutine import common_coroutine
+from app.common_coroutine.common_coroutine import _run_runtime
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     # run_update_all_keywords_on_wb, # dead code
@@ -36,9 +36,8 @@ run_own_process_list: list[AsyncEntry] = [
     # #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
     run_main_coroutines,
     # # # TODO: привести все процессы к единому интерфейсу
-    common_coroutine.run,  # type: ignore[assignment]  # pyright: ignore
+    _run_runtime,
     snapshot_data_updater.run,
-
 ]
 
 
