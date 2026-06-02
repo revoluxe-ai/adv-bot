@@ -5,7 +5,7 @@ HttpxClientHandler от fallback/leak клиентов внутри отдель
 """
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 
@@ -81,7 +81,7 @@ class WBManagerHubFactory:
 
     @classmethod
     @contextmanager
-    def bind_hub_in_context(cls, hub: WBManagerHub) -> Iterator[None]:
+    def bind_hub_in_context(cls, hub: WBManagerHub) -> Generator[None, None, None]:
         """Временно установить hub в ContextVar (snapshot warmup вне shop-runner)."""
         token = cls._wb_manager_hub_context_var.set(hub)
         try:

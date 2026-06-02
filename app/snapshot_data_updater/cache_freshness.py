@@ -17,6 +17,9 @@ from app.snapshot_data_updater.cache_errors import (
 from app.snapshot_data_updater.keys import keywords_meta_key
 from redis.asyncio.client import Redis as AsyncRedisClient
 
+# Legacy app Redis (``redis_client`` без decode_responses) — ответы ``bytes``.
+SnapshotRedisClient = AsyncRedisClient[bytes]
+
 
 def parse_warmed_at(meta: dict[str, str] | None) -> datetime | None:
     """Извлекает ``warmed_at`` из metadata keywords (ISO UTC)."""
@@ -94,7 +97,7 @@ def enforce_cache_max_age_from_meta(
 
 
 async def load_keywords_meta(
-    client: AsyncRedisClient, adv_id: int
+    client: SnapshotRedisClient, adv_id: int
 ) -> dict[str, str] | None:
     """Читает JSON metadata прогрева keywords для adv_id."""
     raw = await client.get(keywords_meta_key(adv_id))

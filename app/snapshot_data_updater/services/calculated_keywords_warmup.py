@@ -23,8 +23,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from redis.asyncio import Redis
-
+from app.core.redis_manager.redis_client import redis_client as legacy_redis_client
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
@@ -36,6 +35,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 )
 from app.snapshot_data_updater.cache_freshness import (
     CacheStaleError,
+    SnapshotRedisClient,
     load_keywords_meta,
     parse_warmed_at,
 )
@@ -234,9 +234,10 @@ class CalculatedKeywordsWarmupService:
             return False, True, "redis_stale"
         return True, False, "redis_hit"
 
-    def _redis_client(self) -> Redis:
-        """Типизированный Redis-клиент legacy keywords cache."""
-        return self._keywords_cache.client
+    @staticmethod
+    def _redis_client() -> SnapshotRedisClient:
+        """Типизированный Redis-клиент legacy keywords cache (тот же singleton, что у cache manager)."""
+        return legacy_redis_client
 
     async def _read_meta(self, adv_id: int) -> dict[str, str] | None:
         """Читает ``adv_snapshot:v1:keywords_meta:adv:{adv_id}``."""

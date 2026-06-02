@@ -4,9 +4,11 @@ import os
 
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-# Устанавливаем переменные окружения для тестовой БД ДО любых импортов
-os.environ["POSTGRES_MASTER_HOST"] = "localhost"
-os.environ["POSTGRES_REPLICA_HOST"] = "localhost"
+# Устанавливаем переменные окружения для тестовой БД ДО любых импортов.
+# 127.0.0.1: на Windows Docker Desktop localhost (::1) часто даёт WinError 64.
+_TEST_PG_HOST = "127.0.0.1"
+os.environ["POSTGRES_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["POSTGRES_REPLICA_HOST"] = _TEST_PG_HOST
 os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
 os.environ["POSTGRES_USER"] = "test_user"
@@ -35,7 +37,9 @@ os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое з
 os.environ.setdefault("PG_POOL_SIZE", "5")
 os.environ.setdefault("PG_MAX_OVERFLOW", "10")
 
-TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
+TEST_DB_POSTGRES_URL = (
+    f"postgresql://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"
+)
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
 
 import dotenv
@@ -85,11 +89,25 @@ from app.utils.db.base import BaseTable as Base
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
-TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
+TEST_DB_URL = (
+    f"postgresql+asyncpg://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"
+)
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
 
 # Глобальное хранилище для cleanup контейнеров
 _DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
+
+
+def _create_test_async_engine(**kwargs: object):
+    """Движок к тестовому Postgres в Docker; ``ssl=False`` для asyncpg на Windows."""
+    connect_args = dict(kwargs.pop("connect_args", {}))  # type: ignore[arg-type]
+    connect_args.setdefault("ssl", False)
+    return create_async_engine(
+        TEST_DB_URL,
+        poolclass=NullPool,
+        connect_args=connect_args,
+        **kwargs,  # type: ignore[arg-type]
+    )
 
 
 def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
@@ -165,8 +183,30 @@ def setup_test_database(docker_compose_cmd):
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
-    # Используем --force-recreate чтобы гарантировать выполнение init скриптов
-    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", "--force-recreate", timeout=180)
+    # Если test_db уже healthy — только ``up -d`` (без force-recreate: меньше WinError 64 на Windows).
+    compose_up_args = ["up", "-d"]
+    rc, cid_out, _ = _sync_run(
+        *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
+    )
+    if cid_out.strip():
+        rc_inspect, status_out, _ = _sync_run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Health.Status}}",
+            cid_out.strip(),
+            timeout=10,
+        )
+        if rc_inspect == 0 and status_out.strip() == "healthy":
+            print("[OK] Reusing running test_db container (skip --force-recreate).")
+        else:
+            compose_up_args = ["up", "-d", "--build", "--force-recreate"]
+    else:
+        compose_up_args = ["up", "-d", "--build", "--force-recreate"]
+
+    rc, out, err = _sync_run(
+        *docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args, timeout=180
+    )
     if rc != 0:
         raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
@@ -197,7 +237,7 @@ def setup_test_database(docker_compose_cmd):
             # Fallback: если healthcheck по какой-то причине не работает/не успевает,
             # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
             async def _probe() -> bool:
-                engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+                engine = _create_test_async_engine()
                 try:
                     async with engine.connect() as conn:
                         await conn.execute(text("SELECT 1;"))
@@ -243,12 +283,12 @@ def setup_test_database(docker_compose_cmd):
         )
         _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
 
-    # Добавим небольшую задержку перед манипуляциями со схемой (Windows/Docker Desktop).
-    time.sleep(5)
+    # Задержка после health=healthy: на Windows соединение с хоста стабилизируется не сразу.
+    time.sleep(10)
 
     async def init_schema_and_seed() -> None:
         """Пересоздаёт public-схему и сидирует wbcabinet id=1 для integration-тестов."""
-        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        engine = _create_test_async_engine()
         try:
             async with engine.begin() as conn:
                 await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
@@ -358,7 +398,7 @@ def setup_test_database(docker_compose_cmd):
 @pytest.fixture(scope="function", name="async_engine")
 async def _async_engine(setup_test_database):
     """Создаёт async движок для каждого теста."""
-    engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+    engine = _create_test_async_engine(echo=False)
     try:
         yield engine
     finally:
@@ -701,7 +741,7 @@ async def clean_db(request: pytest.FixtureRequest):
     )
 
     async def _truncate() -> None:
-        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        engine = _create_test_async_engine()
         async with engine.begin() as conn:
             await conn.execute(truncate_sql)
         await engine.dispose()
