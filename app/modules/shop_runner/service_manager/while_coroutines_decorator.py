@@ -167,7 +167,7 @@ def while_coroutine_decorator(
                         )
                         adv_id = getattr(exc, "adv_id", None)
                         resource = getattr(exc, "resource", "") or "unknown"
-                        if max_attempts > 0 and streak > max_attempts:
+                        if max_attempts > 0 and streak >= max_attempts:
                             logger.error(
                                 "Required data miss limit reached "
                                 "(shop_id=%s, coroutine=%s, adv_id=%s, resource=%s, "

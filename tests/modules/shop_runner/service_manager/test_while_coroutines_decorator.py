@@ -295,7 +295,7 @@ async def test_decorator_required_data_miss_re_raises_after_max_attempts(
             with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
                 await wrapped(MagicMock(shop_id="5339e9ad"))
 
-    assert mock_logger.warning.call_count == 2
+    assert mock_logger.warning.call_count == 1
     mock_logger.error.assert_called_once()
 
 
@@ -313,7 +313,7 @@ async def test_decorator_required_data_miss_streak_is_per_instance(
     async def miss_twice_then_stop(self: object) -> None:
         shop_id = getattr(self, "shop_id", "")
         miss_counts[shop_id] += 1
-        if miss_counts[shop_id] <= 2:
+        if miss_counts[shop_id] <= 1:
             raise ShopRunnerKeywordsCacheMissError(
                 "cache miss",
                 shop_id=shop_id,
@@ -332,7 +332,7 @@ async def test_decorator_required_data_miss_streak_is_per_instance(
             await wrapped(inst_a)
             await wrapped(inst_b)
 
-    assert miss_counts == {"shop_a": 3, "shop_b": 3}
+    assert miss_counts == {"shop_a": 2, "shop_b": 2}
 
 
 @pytest.mark.unit
