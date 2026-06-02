@@ -1169,8 +1169,15 @@ def _monitor_loop(
 
 
 def _shutdown_signal_handler(signum: int, _frame: object | None) -> None:
+    """Останавливает owned kubectl и пробрасывает стандартное исключение Python.
+
+    SIGINT → ``KeyboardInterrupt`` (как у дефолтного handler), чтобы asyncio/pytest/debugger
+    ловили привычное исключение. SIGTERM → ``SystemExit(128 + signum)``.
+    """
     logger.info("Cleanup: received signal %s", signum)
     _stop_owned_tunnels(reason=f"signal {signum}")
+    if signum == signal.SIGINT:
+        raise KeyboardInterrupt
     raise SystemExit(128 + signum)
 
 

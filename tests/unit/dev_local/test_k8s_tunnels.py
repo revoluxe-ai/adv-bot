@@ -378,3 +378,30 @@ def test_settings_run_local_default_false(monkeypatch: pytest.MonkeyPatch) -> No
 def test_settings_run_local_true(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RUN_LOCAL", "true")
     assert Settings().run_local is True
+
+
+@pytest.mark.unit
+def test_shutdown_signal_handler_sigint_raises_keyboard_interrupt() -> None:
+    import signal
+
+    with (
+        patch.object(k8s_tunnels, "_stop_owned_tunnels") as mock_stop,
+        pytest.raises(KeyboardInterrupt),
+    ):
+        k8s_tunnels._shutdown_signal_handler(signal.SIGINT, None)
+
+    mock_stop.assert_called_once_with(reason="signal 2")
+
+
+@pytest.mark.unit
+def test_shutdown_signal_handler_sigterm_raises_system_exit() -> None:
+    import signal
+
+    with (
+        patch.object(k8s_tunnels, "_stop_owned_tunnels") as mock_stop,
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        k8s_tunnels._shutdown_signal_handler(signal.SIGTERM, None)
+
+    mock_stop.assert_called_once_with(reason=f"signal {signal.SIGTERM}")
+    assert exc_info.value.code == 128 + signal.SIGTERM
