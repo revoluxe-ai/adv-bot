@@ -112,8 +112,9 @@ def while_coroutine_decorator(
         pause_on_error: sleep (сек) после обычной ошибки.
         pause_on_required_data_miss: sleep при miss обязательных данных; иначе env
             ``SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC`` (по умолчанию 60).
-        max_required_data_miss_attempts: подряд miss без успеха, затем re-raise;
+        max_required_data_miss_attempts: подряд miss без успешного тика, затем re-raise;
             иначе env ``SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS`` (30); ``<= 0`` — без лимита.
+            Прочие исключения streak не сбрасывают — только успешный ``await func(...)``.
 
     Счётчик miss хранится на экземпляре ``CoroutinesManager`` (``_required_data_miss_streaks``),
     а не в closure декоратора — иначе все магазины в процессе делят один лимит.
@@ -197,7 +198,6 @@ def while_coroutine_decorator(
                         )
                         await asyncio.sleep(retry_sec)
                         continue
-                    _set_required_data_miss_streak(instance, coroutine_name, 0)
                     logger.error(
                         "Ошибка (shop_id=%s, coroutine=%s): %s",
                         shop_id,

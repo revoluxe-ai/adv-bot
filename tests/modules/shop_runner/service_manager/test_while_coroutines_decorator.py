@@ -301,6 +301,83 @@ async def test_decorator_required_data_miss_re_raises_after_max_attempts(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_decorator_required_data_miss_streak_survives_other_exceptions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PG/прочие ошибки между miss не обнуляют streak — лимит срабатывает."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "0")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "2")
+    decorator = while_coroutine_decorator(60, 5)
+    tick = 0
+
+    async def miss_then_pg_timeout(self: object) -> None:
+        nonlocal tick
+        tick += 1
+        if tick % 2 == 1:
+            raise ShopRunnerKeywordsCacheMissError(
+                "cache miss",
+                shop_id="shop-x",
+                adv_id=1,
+            )
+        raise TimeoutError("postgres connect")
+
+    wrapped = decorator(miss_then_pg_timeout)
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
+                await wrapped(MagicMock(shop_id="shop-x"))
+
+    assert tick == 3
+    assert mock_logger.warning.call_count == 1
+    assert mock_logger.error.call_count == 2
+    limit_msgs = [
+        str(c.args[0]) for c in mock_logger.error.call_args_list if c.args
+    ]
+    assert any("limit reached" in m for m in limit_msgs)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_decorator_required_data_miss_streak_resets_on_successful_tick(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Успешный тик сбрасывает streak; следующие miss снова с 1."""
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_RETRY_SEC", "0")
+    monkeypatch.setenv("SHOP_RUNNER_REQUIRED_DATA_MISS_MAX_ATTEMPTS", "2")
+    decorator = while_coroutine_decorator(60, 5)
+    tick = 0
+
+    async def miss_once_then_ok_then_miss_twice(self: object) -> None:
+        nonlocal tick
+        tick += 1
+        if tick == 1:
+            raise ShopRunnerKeywordsCacheMissError(
+                "cache miss",
+                shop_id="shop-y",
+                adv_id=1,
+            )
+        if tick == 2:
+            return
+        raise ShopRunnerKeywordsCacheMissError(
+            "cache miss again",
+            shop_id="shop-y",
+            adv_id=2,
+        )
+
+    wrapped = decorator(miss_once_then_ok_then_miss_twice)
+
+    with patch(f"{MODULE}.logger"):
+        with patch(f"{MODULE}.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
+            with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss again"):
+                await wrapped(MagicMock(shop_id="shop-y"))
+
+    assert tick == 4
+    assert sleep_mock.await_count >= 3
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_decorator_required_data_miss_streak_is_per_instance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
