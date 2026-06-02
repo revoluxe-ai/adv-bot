@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import logging
 
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -55,14 +52,9 @@ async def load_campaign_v3_contexts(
     """
     keywords = await complex_adv.get_keywords(cache_only=True, allow_miss=True)
     if keywords is None:
-        adv_id = complex_adv.adv_id
-        keywords = await RedisCalculatedKeywordsCacheManager().get_all_calculated_keywords_for_adv(
-            adv_id
+        logger.warning(
+            "v3 contexts: no keywords in cache adv_id=%s",
+            complex_adv.adv_id,
         )
-        if keywords is None:
-            logger.warning(
-                "v3 contexts: no keywords in cache adv_id=%s",
-                adv_id,
-            )
-            return []
+        return []
     return build_keyword_v3_contexts(keywords, raw_profiles)

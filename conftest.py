@@ -196,30 +196,21 @@ def setup_test_database(docker_compose_cmd):
 
             # Fallback: если healthcheck по какой-то причине не работает/не успевает,
             # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
+            async def _probe() -> bool:
+                engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+                try:
+                    async with engine.connect() as conn:
+                        await conn.execute(text("SELECT 1;"))
+                    return True
+                finally:
+                    await engine.dispose()
+
             try:
-                loop_probe = asyncio.new_event_loop()
-
-                async def _probe() -> bool:
-                    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
-                    try:
-                        async with engine.connect() as conn:
-                            await conn.execute(text("SELECT 1;"))
-                        return True
-                    finally:
-                        await engine.dispose()
-
-                if loop_probe.run_until_complete(_probe()):
+                if asyncio.run(_probe()):
                     print("[OK] Test database is reachable (probe SELECT 1).")
                     break
             except Exception:
                 pass
-            finally:
-                try:
-                    loop_probe.close()
-                    # После закрытия временного цикла событий создаём новый дефолтный event loop
-                    asyncio.set_event_loop(asyncio.new_event_loop())
-                except Exception:
-                    pass
 
             print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: {status})")
         else:
@@ -252,90 +243,78 @@ def setup_test_database(docker_compose_cmd):
         )
         _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
 
-    # Добавим небольшую задержку перед манипуляциями со схемой
+    # Добавим небольшую задержку перед манипуляциями со схемой (Windows/Docker Desktop).
     time.sleep(5)
 
-    # --- Подготовка схемы и таблиц через asyncpg (без psycopg2) ---
-    # Важно: после выполнения НЕ оставлять закрытый event loop установленным как current loop,
-    # иначе pytest-asyncio/asyncpg могут начать использовать "закрытый" loop.
-    loop = asyncio.new_event_loop()
-    try:
-        async def init_schema_and_seed():
-            engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
-            try:
-                async with engine.begin() as conn:
-                    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
-                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
-                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
-                    # Расширения
-                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-                    # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
-                    from app.modules.common_slaves.wildberries.models.models import (
-                        AdvSetting,
-                        KeywordSetting,
-                        WBUserCabinet,
-                        WBCard,
-                        WBCategory,
-                        WBToken,
-                        WBBalancePayment,
-                        WBBonusPayment,
-                        WBAutoBudgetTopUp,
-                        AdvKeyword,
-                    )
-                    from app.modules.wb_adv_updater.modules.balance_exp_informer.models import BalanceReminder
-                    from app.modules.billing.event_manager.models import BillingEvent
-                    from app.utils.db.models import User, Invite
-
-                    # Таблицы
-                    await conn.run_sync(Base.metadata.create_all)
-
-                    # Базовые данные
-                    initial_wb_cabinet_data = {
-                        "id": 1,
-                        "shop_id": "test_shop_id",
-                        "active": True,
-                        "expiration_time": datetime.now() + timedelta(days=7),
-                        "balance": 0.0,
-                        "bonus": 0.0,
-                        "demo": True,
-                        "expiration_alarm_days_pass": None,
-                    }
-                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                        index_elements=["id"],
-                        set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-                    )
-                    await conn.execute(on_conflict_stmt)
-                    # При явной вставке id sequence может остаться на 1 -> следующий INSERT даст id=1.
-                    # Проставляем sequence в max(id), чтобы новые кабинеты получали id=2,3,...
-                    await conn.execute(
-                        text(
-                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
-                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
-                        )
-                    )
-            finally:
-                await engine.dispose()
-
-        # Docker Desktop иногда даёт "connection was closed..." сразу после health=healthy.
-        # Делаем несколько попыток инициализации схемы, чтобы интеграционные тесты были стабильными.
-        max_init_retries = 5
-        for attempt in range(1, max_init_retries + 1):
-            try:
-                loop.run_until_complete(init_schema_and_seed())
-                break
-            except Exception as exc:  # noqa: BLE001
-                if attempt >= max_init_retries:
-                    raise
-                print(
-                    f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
-                    f"Retry {attempt}/{max_init_retries}..."
+    async def init_schema_and_seed() -> None:
+        """Пересоздаёт public-схему и сидирует wbcabinet id=1 для integration-тестов."""
+        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                from app.modules.common_slaves.wildberries.models.models import (
+                    AdvSetting,
+                    KeywordSetting,
+                    WBUserCabinet,
+                    WBCard,
+                    WBCategory,
+                    WBToken,
+                    WBBalancePayment,
+                    WBBonusPayment,
+                    WBAutoBudgetTopUp,
+                    AdvKeyword,
                 )
-                time.sleep(2)
-    finally:
-        loop.close()
-        # После закрытия временного цикла событий являем новый дефолтный event loop для тестов
-        asyncio.set_event_loop(asyncio.new_event_loop())
+                from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
+                    BalanceReminder,
+                )
+                from app.modules.billing.event_manager.models import BillingEvent
+                from app.utils.db.models import User, Invite
+
+                await conn.run_sync(Base.metadata.create_all)
+
+                initial_wb_cabinet_data = {
+                    "id": 1,
+                    "shop_id": "test_shop_id",
+                    "active": True,
+                    "expiration_time": datetime.now() + timedelta(days=7),
+                    "balance": 0.0,
+                    "bonus": 0.0,
+                    "demo": True,
+                    "expiration_alarm_days_pass": None,
+                }
+                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                )
+                await conn.execute(on_conflict_stmt)
+                await conn.execute(
+                    text(
+                        "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                        "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    # Docker Desktop / Windows: сразу после health=healthy бывает WinError 64 (connection reset).
+    # asyncio.run() на каждую попытку — отдельный loop, не ломает pytest-asyncio.
+    max_init_retries = 10
+    for attempt in range(1, max_init_retries + 1):
+        try:
+            asyncio.run(init_schema_and_seed())
+            break
+        except Exception as exc:  # noqa: BLE001
+            if attempt >= max_init_retries:
+                raise
+            backoff_sec = min(2 * attempt, 10)
+            print(
+                f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
+                f"Retry {attempt}/{max_init_retries} in {backoff_sec}s..."
+            )
+            time.sleep(backoff_sec)
 
     print("[OK] Test database setup complete.")
 
