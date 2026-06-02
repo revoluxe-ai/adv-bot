@@ -73,9 +73,14 @@ class ClickHouseSnapshotProviderLive:
         )
         out: dict[int, PlanFactSnapshotDTO] = {}
         for adv_id, summary in summaries.items():
+            fact_orders = (
+                summary.fact_original_orders
+                if summary.fact_original_orders is not None
+                else summary.fact_predict_orders
+            )
             out[adv_id] = PlanFactSnapshotDTO(
                 adv_id=adv_id,
-                fact_orders=summary.fact_predict_orders,
+                fact_orders=fact_orders,
                 fact_predict_orders=summary.fact_predict_orders,
                 fact_pay_for_order=summary.fact_pay_for_order,
                 fact_method=summary.fact_method,
