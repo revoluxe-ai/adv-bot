@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, overload
+from typing import Protocol
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -24,12 +24,10 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 class GetKeywordsProvider(Protocol):
-    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``).
+    """Провайдер keywords из Redis (``calculated_keywords:{adv_id}``), strict.
 
-    Реализации должны вызывать ``fetch_calculated_keywords_from_redis`` (или
-    эквивалент с ``resolve_calculated_keywords_cache``): при miss и
-    ``allow_miss=False`` — ``ShopRunnerKeywordsCacheMissError``, иначе список
-    или ``None``.
+    Реализация — ``fetch_calculated_keywords_from_redis``; при miss —
+    ``ShopRunnerKeywordsCacheMissError``. Пересчёт из БД — ``fetch_keywords_from_database``.
     """
 
     async def __call__(
@@ -37,8 +35,7 @@ class GetKeywordsProvider(Protocol):
         complex_adv: ComplexAdv,
         *,
         cache_only: bool = True,
-        allow_miss: bool = False,
-    ) -> list[CalculatedKeyword] | None: ...
+    ) -> list[CalculatedKeyword]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -399,39 +396,31 @@ class ComplexAdv:
             return [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         return keywords
 
-    @overload
     async def get_keywords(
-        self, *, cache_only: Literal[True] = True, allow_miss: Literal[True]
-    ) -> list[CalculatedKeyword] | None: ...
-
-    @overload
-    async def get_keywords(
-        self, *, cache_only: Literal[True] = True, allow_miss: Literal[False] = False
-    ) -> list[CalculatedKeyword]: ...
-
-    async def get_keywords(
-        self, *, cache_only: bool = True, allow_miss: bool = False
-    ) -> list[CalculatedKeyword] | None:
-        """Keywords из Redis-кеша (прогрев — snapshot updater).
+        self, *, cache_only: bool = True
+    ) -> list[CalculatedKeyword]:
+        """Keywords только из Redis (прогрев — snapshot updater).
 
         Args:
-            cache_only: должен быть ``True``; ``False`` запрещён в shop-runner.
-            allow_miss: при ``True`` и miss в Redis — ``None``; иначе ``ShopRunnerKeywordsCacheMissError``.
+            cache_only: должен быть ``True``; пересчёт из БД в shop-runner запрещён.
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует.
+
+        Для UI / ручного пересчёта — ``fetch_keywords_from_database`` (``keywords_access``).
         """
         if not self._get_keywords:
             raise RuntimeError("_get_keywords not set")
         if not cache_only:
             raise RuntimeError(
                 "get_keywords(cache_only=False) отключён в shop-runner: "
-                "пересчёт только в snapshot updater (warmup). "
-                "Используйте cache_only=True."
+                "используйте fetch_keywords_from_database() для пересчёта из БД "
+                "или дождитесь snapshot warmup."
             )
         if self._calculated_keywords is not None:
             return self._filter_keywords(self._calculated_keywords)
 
-        cached = await self._get_keywords(self, cache_only=True, allow_miss=allow_miss)
-        if cached is None:
-            return None
+        cached = await self._get_keywords(self, cache_only=True)
         self._calculated_keywords = cached
         return self._filter_keywords(cached)
 

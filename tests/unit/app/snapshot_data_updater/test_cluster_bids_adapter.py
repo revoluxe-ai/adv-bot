@@ -28,13 +28,13 @@ async def test_cluster_bids_adapter_legacy_when_flags_off() -> None:
     adv.get_keywords = AsyncMock(return_value=[])
 
     result = await adapter.get_keywords_for_adv(adv)
-    adv.get_keywords.assert_awaited_once_with(cache_only=True, allow_miss=True)
+    adv.get_keywords.assert_awaited_once_with()
     assert result == []
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_cluster_bids_adapter_read_uses_cache_only_when_usable() -> None:
+async def test_cluster_bids_adapter_read_uses_strict_redis_getter() -> None:
     from datetime import UTC, datetime
 
     from app.snapshot_data_updater.adapters.cluster_bids_adapter import (
@@ -74,8 +74,8 @@ async def test_cluster_bids_adapter_read_uses_cache_only_when_usable() -> None:
     adv = MagicMock()
     adv.shop_id = "s1"
     adv.adv_id = 1
-    fallback = AsyncMock(return_value=["kw"])
+    redis_getter = AsyncMock(return_value=["kw"])
 
-    result = await adapter.get_keywords_for_adv(adv, fallback_getter=fallback)
-    fallback.assert_awaited_once_with(cache_only=True, allow_miss=True)
+    result = await adapter.get_keywords_for_adv(adv, redis_getter=redis_getter)
+    redis_getter.assert_awaited_once_with()
     assert result == ["kw"]

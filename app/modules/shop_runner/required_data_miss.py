@@ -4,7 +4,7 @@
 ``tasks_manager`` мог импортировать его без цикла через ``service_manager.__init__``.
 
 Единая точка чтения ``calculated_keywords`` — ``fetch_calculated_keywords_from_redis``;
-при miss без ``allow_miss`` — ``ShopRunnerKeywordsCacheMissError`` (подтип
+при miss — ``ShopRunnerKeywordsCacheMissError`` (подтип
 ``RequiredDataMissError``), обрабатывается в ``while_coroutine_decorator``.
 """
 
@@ -43,13 +43,10 @@ def resolve_calculated_keywords_cache(
     *,
     shop_id: str,
     adv_id: int,
-    allow_miss: bool = False,
-) -> list[CalculatedKeyword] | None:
-    """Проверить ответ Redis: список, ``None`` при ``allow_miss`` или исключение."""
+) -> list[CalculatedKeyword]:
+    """Проверить ответ Redis: список или ``ShopRunnerKeywordsCacheMissError``."""
     if cached is not None:
         return cached
-    if allow_miss:
-        return None
     raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
 
 
@@ -57,20 +54,18 @@ async def fetch_calculated_keywords_from_redis(
     adv_id: int,
     *,
     shop_id: str = "",
-    allow_miss: bool = False,
-) -> list[CalculatedKeyword] | None:
-    """Прочитать ``calculated_keywords:{adv_id}`` из Redis (shop-runner).
+) -> list[CalculatedKeyword]:
+    """Прочитать ``calculated_keywords:{adv_id}`` из Redis (shop-runner, strict).
 
     Args:
         adv_id: идентификатор РК.
         shop_id: для текста ошибки и логов декоратора.
-        allow_miss: при отсутствии hash — ``None`` вместо ``ShopRunnerKeywordsCacheMissError``.
 
     Returns:
-        Список keywords или ``None`` только при ``allow_miss=True`` и miss.
+        Список keywords (в т.ч. пустой ``[]`` при пустом hash).
 
     Raises:
-        ShopRunnerKeywordsCacheMissError: hash отсутствует и ``allow_miss=False``.
+        ShopRunnerKeywordsCacheMissError: hash отсутствует.
     """
     from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
         RedisCalculatedKeywordsCacheManager,
@@ -82,7 +77,6 @@ async def fetch_calculated_keywords_from_redis(
         cached,
         shop_id=shop_id,
         adv_id=adv_id,
-        allow_miss=allow_miss,
     )
 
 

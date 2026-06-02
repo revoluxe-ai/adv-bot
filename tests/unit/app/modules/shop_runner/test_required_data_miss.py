@@ -57,9 +57,7 @@ def test_max_attempts_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.unit
 def test_resolve_raises_shop_runner_miss() -> None:
     with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
-        resolve_calculated_keywords_cache(
-            None, shop_id="shop-1", adv_id=99, allow_miss=False
-        )
+        resolve_calculated_keywords_cache(None, shop_id="shop-1", adv_id=99)
 
 
 @pytest.mark.unit

@@ -96,8 +96,7 @@ async def test_adv_control_system_process_adv_does_not_touch_other_adv_keywords(
     async def get_keywords_a(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_a.calculated_keywords
 
@@ -194,16 +193,14 @@ async def test_coroutines_manager_adv_settings_auto_update_calls_each_fresh_adv(
     async def get_kw_a(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_a.calculated_keywords
 
     async def get_kw_b(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_b.calculated_keywords
 
@@ -286,16 +283,14 @@ async def test_adv_settings_auto_update_stats_freshness_gate_skips_stale_hit(
     async def get_kw_a(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_a.calculated_keywords
 
     async def get_kw_b(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_b.calculated_keywords
 
@@ -393,16 +388,14 @@ async def test_adv_settings_auto_update_stats_freshness_gate_fail_open_on_miss_o
     async def get_kw_a(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_a.calculated_keywords
 
     async def get_kw_b(
         _: ComplexAdv,
         *,
-        cache_only: bool = False,
-        allow_miss: bool = False,
+        cache_only: bool = True,
     ):
         return seed_b.calculated_keywords
 

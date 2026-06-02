@@ -85,24 +85,23 @@ class WBShopDataManager:
         complex_adv: ComplexAdv,
         *,
         cache_only: bool = True,
-        allow_miss: bool = False,
-    ) -> list[CalculatedKeyword] | None:
+    ) -> list[CalculatedKeyword]:
         """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
 
         Raises:
-            ShopRunnerKeywordsCacheMissError: hash отсутствует и ``allow_miss=False``.
+            ShopRunnerKeywordsCacheMissError: hash отсутствует.
         """
         if not cache_only:
             raise RuntimeError(
                 "__get_calculated_keywords(cache_only=False) отключён: "
-                "полный пересчёт — только в app.snapshot_data_updater warmup."
+                "полный пересчёт — snapshot updater warmup или fetch_keywords_from_database."
             )
         trace = AdvPhaseTrace.for_complex_adv(
             coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
         )
         trace.marker(
             "kw_provider_enter",
-            extra={"cache_only": True, "allow_miss": allow_miss},
+            extra={"cache_only": True},
         )
         from app.modules.shop_runner.required_data_miss import (
             fetch_calculated_keywords_from_redis,
@@ -112,7 +111,6 @@ class WBShopDataManager:
             cached = await fetch_calculated_keywords_from_redis(
                 complex_adv.adv_id,
                 shop_id=complex_adv.shop_id or self.shop_id,
-                allow_miss=allow_miss,
             )
         trace.marker(
             "kw_redis_cache_result",

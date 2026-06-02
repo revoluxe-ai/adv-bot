@@ -106,8 +106,8 @@ class UpdateClusterBidsManager:
 
     async def _get_keywords_for_cluster_bids(
         self, adv: ComplexAdv
-    ) -> list[CalculatedKeyword] | None:
-        """Keywords для расчёта карт: snapshot adapter (shadow/read) или legacy cache_only."""
+    ) -> list[CalculatedKeyword]:
+        """Keywords для расчёта карт: snapshot adapter (shadow/read) или strict Redis."""
         from app.snapshot_data_updater.config import get_snapshot_config
 
         cfg = get_snapshot_config()
@@ -118,9 +118,9 @@ class UpdateClusterBidsManager:
 
             adapter = ClusterBidsSnapshotAdapter(config=cfg)
             return await adapter.get_keywords_for_adv(
-                adv, fallback_getter=adv.get_keywords
+                adv, redis_getter=adv.get_keywords
             )
-        return await adv.get_keywords(cache_only=True, allow_miss=True)
+        return await adv.get_keywords()
 
     async def _get_local_data(
         self, advs: list[ComplexAdv]
@@ -463,15 +463,9 @@ class UpdateClusterBidsManager:
         )
 
         with trace.phase("per_adv_get_keywords_cache_only"):
-            keywords_maybe = await self._get_keywords_for_cluster_bids(adv)
-        if keywords_maybe is None:
-            trace.marker("per_adv_keywords_cache_miss")
-            logger.debug(
-                "Redis cache miss for calculated keywords, skip bid maps adv_id=%s",
-                adv.adv_id,
+            keywords: list[CalculatedKeyword] = await self._get_keywords_for_cluster_bids(
+                adv
             )
-            return set()
-        keywords: list[CalculatedKeyword] = keywords_maybe
         with trace.phase("per_adv_filter_keywords"):
             keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         # V3: торги только у согласованных БС/фикс.фраз; авто+MIN_CPA и OFF отсекаются.

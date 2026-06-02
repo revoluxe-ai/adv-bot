@@ -161,7 +161,7 @@ class SnapshotUpdaterConfig:
 
     cluster_bids_read_from_snapshot: bool = False
     """Read cutover: при fresh snapshot читать keywords через Redis cache_only
-    (после warmup), иначе fallback на ``adv.get_keywords(cache_only=True)``."""
+    (после warmup), иначе strict ``adv.get_keywords()`` (Redis)."""
 
     # --- get_wb_advs_dto / V3 (consumer) ---
 

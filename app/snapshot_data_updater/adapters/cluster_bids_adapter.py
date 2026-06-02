@@ -1,17 +1,17 @@
-"""Adapter входа ``update_cluster_bids`` из snapshot (shadow / read + fallback).
+"""Adapter входа ``update_cluster_bids`` из snapshot (shadow / read).
 
 Не затрагивает ``_apply_command`` / ``wb_modifier`` — только чтение keywords
-(и в будущем cluster_texts) до расчёта карт.
-
-Read cutover: при usable snapshot вызывается legacy ``get_keywords(cache_only=True)``
-— данные уже в Redis после warmup updater'а.
+до расчёта карт. Источник keywords для shop-runner — strict Redis
+(``adv.get_keywords``); miss → ``ShopRunnerKeywordsCacheMissError``.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
+from app.modules.shop_runner.required_data_miss import ShopRunnerKeywordsCacheMissError
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+
+RedisKeywordsGetter = Callable[..., Awaitable[list[CalculatedKeyword]]]
 
 
 class ClusterBidsSnapshotAdapter:
@@ -50,30 +52,25 @@ class ClusterBidsSnapshotAdapter:
         self,
         complex_adv: ComplexAdv,
         *,
-        fallback_getter: object | None = None,
-    ) -> list[CalculatedKeyword] | None:
-        """Keywords с учётом флагов ``SNAPSHOT_CLUSTER_BIDS_*``.
+        redis_getter: RedisKeywordsGetter | None = None,
+    ) -> list[CalculatedKeyword]:
+        """Keywords для cluster_bids: strict Redis; shadow — сравнение с snapshot JSON.
 
-        Shadow: лог расхождения count snapshot vs legacy.
-        Read: при usable snapshot — ``cache_only`` (Redis после warmup).
-        Иначе — полный fallback на ``adv.get_keywords``.
+        Args:
+            complex_adv: РК shop-runner.
+            redis_getter: обычно ``adv.get_keywords`` (strict cache).
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: нет hash в Redis.
         """
         shop_id = complex_adv.shop_id or ""
         snapshot = await self.load_snapshot(shop_id, complex_adv.adv_id)
 
         if self._config.cluster_bids_shadow_compare and snapshot is not None:
-            await self._shadow_compare_keywords(complex_adv, snapshot, fallback_getter)
+            await self._shadow_compare_keywords(complex_adv, snapshot, redis_getter)
 
-        if (
-            self._config.cluster_bids_read_from_snapshot
-            and self._reader.is_snapshot_usable(snapshot)
-        ):
-            getter = fallback_getter or complex_adv.get_keywords
-            return await getter(cache_only=True, allow_miss=True)
-
-        if fallback_getter is not None and callable(fallback_getter):
-            return await fallback_getter(cache_only=True, allow_miss=True)
-        return await complex_adv.get_keywords(cache_only=True, allow_miss=True)
+        getter = redis_getter or complex_adv.get_keywords
+        return await getter()
 
     async def get_cluster_texts_for_adv(
         self,
@@ -97,13 +94,14 @@ class ClusterBidsSnapshotAdapter:
         self,
         complex_adv: ComplexAdv,
         snapshot: AdvDataSnapshotDTO,
-        fallback_getter: object | None,
+        redis_getter: RedisKeywordsGetter | None,
     ) -> None:
+        getter = redis_getter or complex_adv.get_keywords
         old_kw: list[CalculatedKeyword] | None = None
-        if fallback_getter is not None and callable(fallback_getter):
-            old_kw = await fallback_getter(cache_only=True, allow_miss=True)
-        else:
-            old_kw = await complex_adv.get_keywords(cache_only=True, allow_miss=True)
+        try:
+            old_kw = await getter()
+        except ShopRunnerKeywordsCacheMissError:
+            old_kw = None
         snap_count = len(snapshot.keywords)
         old_count = len(old_kw) if old_kw else 0
         if snap_count != old_count:

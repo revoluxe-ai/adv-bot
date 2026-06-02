@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager import (
     UpdateClusterBidsManager,
 )
+from app.modules.shop_runner.required_data_miss import ShopRunnerKeywordsCacheMissError
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
 )
@@ -35,7 +36,7 @@ def _snapshot_cluster_bids_flags_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None:
+async def test_get_calculate_data_raises_on_keywords_cache_miss() -> None:
     manager = UpdateClusterBidsManager(
         wb_manager=MagicMock(),
         redis_keyword_bidder_status_manager=MagicMock(),
@@ -47,11 +48,15 @@ async def test_get_calculate_data_returns_empty_on_keywords_cache_miss() -> None
     adv = MagicMock()
     adv.auction_adv_id = 10
     adv.adv_id = 1
-    adv.get_keywords = AsyncMock(return_value=None)
+    adv.get_keywords = AsyncMock(
+        side_effect=ShopRunnerKeywordsCacheMissError(
+            "miss", shop_id="s", adv_id=1
+        )
+    )
 
-    result = await manager._UpdateClusterBidsManager__get_calculate_data(adv, set())
-    assert result == set()
-    adv.get_keywords.assert_awaited_once_with(cache_only=True, allow_miss=True)
+    with pytest.raises(ShopRunnerKeywordsCacheMissError):
+        await manager._UpdateClusterBidsManager__get_calculate_data(adv, set())
+    adv.get_keywords.assert_awaited_once()
 
 
 @pytest.mark.unit

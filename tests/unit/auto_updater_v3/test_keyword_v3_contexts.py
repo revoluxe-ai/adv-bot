@@ -6,9 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.shop_runner.required_data_miss import ShopRunnerKeywordsCacheMissError
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
     build_keyword_v3_contexts,
     load_campaign_v3_contexts,
+    load_campaign_v3_contexts_from_database,
 )
 from tests.unit.auto_updater_v3.test_no_data_activation import (
     _kw as _calculated_kw_fixture,
@@ -41,20 +43,33 @@ def test_build_keyword_v3_contexts_merges_profile() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_load_campaign_v3_contexts_miss_returns_empty_without_redis_fallback() -> None:
-    """При cache miss — пустой список; повторного чтения Redis нет."""
+async def test_load_campaign_v3_contexts_strict_redis_miss_raises() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 42
-    complex_adv.get_keywords = AsyncMock(return_value=None)
-
-    with patch(
-        "app.modules.calculated_keywords_redis_cache_manager.redis_manager."
-        "RedisCalculatedKeywordsCacheManager"
-    ) as redis_cls:
-        result = await load_campaign_v3_contexts(complex_adv, raw_profiles={})
-
-    assert result == []
-    complex_adv.get_keywords.assert_awaited_once_with(
-        cache_only=True, allow_miss=True
+    complex_adv.get_keywords = AsyncMock(
+        side_effect=ShopRunnerKeywordsCacheMissError(
+            "miss", shop_id="s", adv_id=42
+        )
     )
-    redis_cls.assert_not_called()
+
+    with pytest.raises(ShopRunnerKeywordsCacheMissError):
+        await load_campaign_v3_contexts(complex_adv, raw_profiles={})
+
+    complex_adv.get_keywords.assert_awaited_once_with()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_load_campaign_v3_contexts_from_database() -> None:
+    kw = MagicMock()
+    complex_adv = MagicMock()
+    with patch(
+        "app.modules.wb_adv_updater.keywords_access.fetch_keywords_from_database",
+        new=AsyncMock(return_value=[kw]),
+    ) as fetch_db:
+        result = await load_campaign_v3_contexts_from_database(
+            complex_adv, raw_profiles={}
+        )
+
+    fetch_db.assert_awaited_once_with(complex_adv)
+    assert len(result) == 1

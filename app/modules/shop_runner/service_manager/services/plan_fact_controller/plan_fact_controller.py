@@ -47,43 +47,20 @@ class PlanFactController:
     async def _resolve_fact_for_pre_adv(
         pre_adv: PreComplexAdv,
     ) -> FactData | None:
-        """Факт для записи plan_fact_stats: keywords из Redis, без CH-пересчёта.
+        """Факт для записи plan_fact_stats: keywords только из Redis (strict).
 
-        При miss ``calculated_keywords`` — fallback на последний ``PlanFactSummary``
-        из CH (уже в ``pre_adv``), иначе ``None`` (кампания пропускается в tick).
+        При miss ``calculated_keywords`` исключение уходит наверх (required-data-miss).
         """
         from app.modules.shop_runner.required_data_miss import (
-            ShopRunnerKeywordsCacheMissError,
             fetch_calculated_keywords_from_redis,
-        )
-        from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-            fact_data_from_plan_fact_summary,
         )
 
         shop_id = pre_adv.auto_adv.wb_cabinet.shop_id
         adv_id = pre_adv.adv_id
-        try:
-            cached_keywords = await fetch_calculated_keywords_from_redis(
-                adv_id,
-                shop_id=shop_id,
-            )
-        except ShopRunnerKeywordsCacheMissError:
-            logger.warning(
-                "plan_fact: keywords cache miss adv_id=%s shop_id=%s; "
-                "fallback plan_fact_summary или пропуск",
-                adv_id,
-                shop_id,
-            )
-            return fact_data_from_plan_fact_summary(
-                pre_adv.plan_fact_summary,
-                pre_adv.auto_adv,
-            )
-
-        if cached_keywords is None:
-            return fact_data_from_plan_fact_summary(
-                pre_adv.plan_fact_summary,
-                pre_adv.auto_adv,
-            )
+        cached_keywords = await fetch_calculated_keywords_from_redis(
+            adv_id,
+            shop_id=shop_id,
+        )
 
         keywords = sorted(
             cached_keywords,

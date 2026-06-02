@@ -135,7 +135,7 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             "app.client_bot.user_interface.services.keyword_v3_profile_loader.build_predict_keywords_target_place",
         ) as build_predictor,
         patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts",
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts_from_database",
             new_callable=AsyncMock,
         ) as load_contexts,
         patch(
@@ -270,7 +270,7 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
             return_value=bids,
         ),
         patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts",
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_campaign_v3_contexts_from_database",
             new_callable=AsyncMock,
             return_value=[],
         ),

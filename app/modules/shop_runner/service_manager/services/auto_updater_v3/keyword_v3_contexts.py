@@ -41,20 +41,21 @@ async def load_campaign_v3_contexts(
     complex_adv: ComplexAdv,
     raw_profiles: dict[str, list[BidPosition]],
 ) -> list[KeywordV3Context]:
-    """Контексты всех ключей РК — тот же источник, что на тике V3 (Redis cache).
+    """Контексты всех ключей РК на тике V3 — strict Redis (``get_keywords``).
 
-    Args:
-        complex_adv: Кампания с ``get_keywords``.
-        raw_profiles: Bid profiles CH для nmid кампании.
-
-    Returns:
-        Список контекстов; пустой, если ключей нет.
+    Raises:
+        ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует.
     """
-    keywords = await complex_adv.get_keywords(cache_only=True, allow_miss=True)
-    if keywords is None:
-        logger.warning(
-            "v3 contexts: no keywords in cache adv_id=%s",
-            complex_adv.adv_id,
-        )
-        return []
+    keywords = await complex_adv.get_keywords()
+    return build_keyword_v3_contexts(keywords, raw_profiles)
+
+
+async def load_campaign_v3_contexts_from_database(
+    complex_adv: ComplexAdv,
+    raw_profiles: dict[str, list[BidPosition]],
+) -> list[KeywordV3Context]:
+    """Контексты для Telegram UI — пересчёт из БД, не из Redis-кеша."""
+    from app.modules.wb_adv_updater.keywords_access import fetch_keywords_from_database
+
+    keywords = await fetch_keywords_from_database(complex_adv)
     return build_keyword_v3_contexts(keywords, raw_profiles)
