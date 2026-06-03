@@ -12,8 +12,14 @@ from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.keyboard import (
+    normalize_automatic_version_ui,
+)
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
+)
+from app.client_bot.user_interface.services.keyword_v3_ui_sort import (
+    sort_keywords_for_v3_ui,
 )
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -144,6 +150,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 if keyword.views != 0:
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
+
+        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+            self._keywords = await sort_keywords_for_v3_ui(
+                self._adv_setting, self._keywords
+            )
 
         plan_fact_provider = PlanFactProvider(self._adv_setting)
         stat_data = await plan_fact_provider.get_stat_data(self._keywords)

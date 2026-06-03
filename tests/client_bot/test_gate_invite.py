@@ -247,6 +247,41 @@ async def test_gate_invite_already_used_does_not_open_access(
     assert "использован" in text or "отозван" in text
 
 
+async def test_gate_invite_non_start_command_keeps_state_and_prompts_code(
+    mock_bot: AsyncMock,
+    mock_state: MagicMock,
+):
+    """Команда /starting не должна обрабатываться как /start в invite-сценарии."""
+    message = MagicMock()
+    message.chat.id = 2005
+    message.from_user = MagicMock(id=2005)
+    message.text = "/starting"
+
+    await gate_invite_process_code(message, mock_bot, mock_state)
+
+    mock_state.clear.assert_not_awaited()
+    mock_bot.send_message.assert_awaited_once()
+    args, kwargs = mock_bot.send_message.call_args
+    text = kwargs.get("text", args[1] if len(args) > 1 else "")
+    assert "ожидается инвайт-код" in text
+
+
+async def test_gate_invite_start_command_is_left_for_global_middleware(
+    mock_bot: AsyncMock,
+    mock_state: MagicMock,
+):
+    """`/start` не должен обрабатываться в gate-хендлере: это зона ReturnToStart."""
+    message = MagicMock()
+    message.chat.id = 2006
+    message.from_user = MagicMock(id=2006)
+    message.text = "/start"
+
+    await gate_invite_process_code(message, mock_bot, mock_state)
+
+    mock_state.clear.assert_not_awaited()
+    mock_bot.send_message.assert_not_awaited()
+
+
 @pytest.fixture
 def mock_bot():
     bot = AsyncMock()
