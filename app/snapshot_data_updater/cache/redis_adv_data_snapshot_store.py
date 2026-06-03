@@ -64,6 +64,8 @@ class RedisAdvDataSnapshotStore:
 
         Side effects:
             Redis SET с TTL (только при ``no_op=False``).
+            Удаляет per-adv ключи РК, которые были в предыдущем batch, но отсутствуют
+            в новом (в т.ч. пустой batch после сбоя PG или отсутствия active ads).
         """
         if self._no_op:
             logger.debug(
@@ -72,6 +74,12 @@ class RedisAdvDataSnapshotStore:
                 len(batch.snapshots),
             )
             return
+        new_adv_ids = {snap.adv_id for snap in batch.snapshots}
+        previous = await self.load_shop_latest(batch.shop_id)
+        stale_adv_ids: set[int] = set()
+        if previous is not None:
+            stale_adv_ids = {snap.adv_id for snap in previous.snapshots} - new_adv_ids
+
         payload = batch.model_dump_json()
         await self._client.set(
             shop_batch_key(batch.shop_id),
@@ -83,6 +91,15 @@ class RedisAdvDataSnapshotStore:
                 adv_snapshot_key(batch.shop_id, snap.adv_id),
                 snap.model_dump_json(),
                 ex=self._ttl_sec,
+            )
+        for adv_id in stale_adv_ids:
+            await self._client.delete(adv_snapshot_key(batch.shop_id, adv_id))
+        if stale_adv_ids:
+            logger.debug(
+                "RedisAdvDataSnapshotStore.save removed stale per-adv keys: "
+                "shop_id=%s adv_ids=%s",
+                batch.shop_id,
+                sorted(stale_adv_ids),
             )
         logger.debug(
             "RedisAdvDataSnapshotStore.save shop_id=%s snapshots=%d",
