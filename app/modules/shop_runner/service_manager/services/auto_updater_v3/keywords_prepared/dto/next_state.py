@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+    KeywordMode,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class NextState:
-    """Запись перехода режима: новый mode и имя executor, выполнившего шаг."""
+    """Запись перехода режима: ``KeywordMode`` и имя executor."""
 
-    new_mode: KeywordStrategyMode
+    new_mode: KeywordMode
     executor_name: str

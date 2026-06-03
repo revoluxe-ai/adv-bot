@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.v3_ladder_stage_kind import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.ladder_state_kind import (
     V3LadderStageKind,
 )
 
