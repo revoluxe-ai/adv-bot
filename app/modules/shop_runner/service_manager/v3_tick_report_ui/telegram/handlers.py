@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 from aiogram import Bot, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
@@ -104,11 +103,12 @@ async def refresh_v3_tick_report(
     callback_data: V3TickReportRefresh,
     bot: Bot,
 ) -> None:
-    """Перечитать Redis и обновить текст отчёта."""
+    """Перечитать Redis и отправить новое сообщение с отчётом (без edit_text)."""
     if callback_query.message is None:
         await callback_query.answer()
         return
     adv_setting_original_id = callback_data.adv_setting_original_id
+    chat_id = callback_query.message.chat.id
     async with sm() as session:
         adv_result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
@@ -119,11 +119,7 @@ async def refresh_v3_tick_report(
         return
     text = await _load_report_text(adv)
     markup = build_v3_tick_report_keyboard(adv_setting_original_id)
-    try:
-        await callback_query.message.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest as exc:
-        if "message is not modified" not in str(exc):
-            raise
+    await bot.send_message(chat_id, text, reply_markup=markup)
     await callback_query.answer("Обновлено")
 
 

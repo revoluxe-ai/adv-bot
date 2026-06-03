@@ -4,7 +4,7 @@
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
   2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — preamble **filter → sync → B → U → S → G → R → enable → calibration(TIGHTEN|LOOSEN)** → post-gate → snapshot.
+  4. ``NORMAL`` — preamble **filter → sync → B → U → S → G → R → enable → calibration(UP|DOWN)** → post-gate → snapshot.
 
 Наблюдаемость: ``v3_selection`` и ``docks/V3_UPDATER_VALIDATION.md``.
 """
@@ -364,7 +364,6 @@ async def process_adv_v3(
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
-    ladder_inputs: LadderInputs | None = None
     policy: SelectionPolicy | None = None
     campaign_orders_per_cart_7d: float | None = None
 
@@ -496,7 +495,7 @@ async def process_adv_v3(
 
         # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
         # NO_DATA  → filter/sync → plan_campaign_no_data_bootstrap_safe + sync_force_zero
-        # NORMAL   → filter/sync → B → U → S → G → R → enable → calibration(TIGHTEN|LOOSEN)
+        # NORMAL   → filter/sync → B → U → S → G → R → enable → calibration(UP|DOWN)
         preamble_no_data_bootstrap_count = 0
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             with trace.phase("preamble_no_data_bootstrap"):

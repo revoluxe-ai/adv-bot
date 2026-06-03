@@ -310,7 +310,7 @@ def test_resolve_calibration_trim_skips_when_state_cost_at_or_below_resolve() ->
 def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_resolve(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LOOSEN: limited UP пока ``state_cost`` target mode ``<= resolve``."""
+    """Калибровка UP: limited UP пока ``state_cost`` target mode ``<= resolve``."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(
@@ -400,6 +400,71 @@ def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_reso
     assert actions[0].action == V3ActionType.UP
     assert actions[0].reason == "resolve_calibration_up"
     assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+
+
+@pytest.mark.unit
+def test_resolve_calibration_up_off_no_data_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Калибровка UP: OFF + NO DATA в пуле (OFF→MIN), как enable gap."""
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=22,
+            bid=500.0,
+            predicted_conversion=0.02,
+            pay_for_cart=1.0,
+            timestamp=ts,
+        ),
+    ]
+
+    def _mc(mode: AggressionTargetMode, place: int) -> ModeCandidate:
+        return ModeCandidate(
+            mode=mode,
+            position=place,
+            bid=float(place * 100),
+            predicted_cpa=50.0,
+            is_valid=True,
+        )
+
+    catalog = {
+        AggressionTargetMode.MIN_CPA: _mc(AggressionTargetMode.MIN_CPA, 22),
+    }
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
+        lambda _ctx, _prepared, _ladder=None: catalog,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking._catalog_for_ctx",
+        lambda _ctx, _prepared, ladder_inputs=None: catalog,
+    )
+
+    off_kw = _calc_kw(
+        ks_id=99,
+        text="off_gap_cal",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        views=0,
+        conv=0.0,
+        hard_status=1,
+    )
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=off_kw, position_profile=prof)]
+    )
+    actions = plan_resolve_calibration(
+        prepared,
+        resolve=550.0,
+        calibration_direct=CalibrationDirect.LOOSEN,
+        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert actions[0].reason in (
+        "resolve_calibration_up",
+        "up_imputed_missing_target_matrix",
+    )
 
 
 @pytest.mark.unit
