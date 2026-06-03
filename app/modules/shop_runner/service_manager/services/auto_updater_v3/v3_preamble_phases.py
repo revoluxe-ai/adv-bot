@@ -164,7 +164,7 @@ def plan_pay_for_order_gap_enable(
     """Фаза enable: NO DATA + OFF → MIN, не более ``max_new_enables`` за тик.
 
     Зона headroom: ``fact_pay_for_order < MAX_PAY_STABILIZATION_RATIO × resolve`` (0.9).
-    Дополнительно gate plan/fact + views (кэш тика).
+    Тиковый gate: хотя бы одно из plan/fact или views изменилось (OR; калибровка — AND).
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
         V3ActionType,
@@ -176,7 +176,7 @@ def plan_pay_for_order_gap_enable(
         return []
     if float(fact_pay_for_order) >= MAX_PAY_STABILIZATION_RATIO * float(resolve):
         return []
-    if not plan_fact_changed or not views_changed:
+    if not plan_fact_changed and not views_changed:
         return []
     if max_new_enables <= 0:
         return []

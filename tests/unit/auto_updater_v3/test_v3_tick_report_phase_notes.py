@@ -36,16 +36,30 @@ def test_enable_gap_fact_above_stabilization_zone() -> None:
 
 
 @pytest.mark.unit
-def test_enable_gap_no_plan_fact_change() -> None:
+def test_enable_gap_both_signals_unchanged() -> None:
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],
         fact_pay_for_order=100.0,
         resolve=550.0,
         plan_fact_changed=False,
-        views_changed=True,
+        views_changed=False,
     )
-    assert "plan/fact" in note
+    assert "plan/fact" in note and "views" in note
+
+
+@pytest.mark.unit
+def test_enable_gap_plan_only_change_not_blocked() -> None:
+    """OR-gate: views unchanged, plan/fact changed — не сообщаем «оба не изменились»."""
+    note = summarize_phase_zero_actions(
+        "pay_for_order_gap_enable",
+        prepared=[],
+        fact_pay_for_order=100.0,
+        resolve=550.0,
+        plan_fact_changed=True,
+        views_changed=False,
+    )
+    assert "не изменились" not in note
 
 
 @pytest.mark.unit
