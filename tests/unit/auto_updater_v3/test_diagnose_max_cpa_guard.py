@@ -186,7 +186,7 @@ def test_should_skip_same_place_when_operational_under_max(
         current=KeywordStrategyMode.OPTIMUM,
         trim_target=KeywordStrategyMode.MIN_CPA,
         catalog=cat,
-        max_pay_for_order=MAX_PFO,
+        cost_ceiling=MAX_PFO,
         ladder_inputs=ladder,
     )
 
@@ -209,7 +209,7 @@ def test_should_not_skip_same_place_when_operational_above_max(
         current=KeywordStrategyMode.OPTIMUM,
         trim_target=KeywordStrategyMode.MIN_CPA,
         catalog=cat,
-        max_pay_for_order=MAX_PFO,
+        cost_ceiling=MAX_PFO,
         ladder_inputs=ladder,
     )
 
