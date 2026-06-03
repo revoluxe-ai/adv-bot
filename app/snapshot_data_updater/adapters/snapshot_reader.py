@@ -58,7 +58,8 @@ class SnapshotReader:
     def is_snapshot_usable(self, snapshot: AdvDataSnapshotDTO | None) -> bool:
         """Проверка для read cutover ``update_cluster_bids``.
 
-        Условия: версия схемы, не истёк TTL, settings/keywords/min_bids complete.
+        Условия: версия схемы, не истёк TTL, settings/keywords/min_bids complete
+        (keywords — успешный warmup/read, пустой список допустим).
         """
         if snapshot is None:
             return False

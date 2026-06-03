@@ -70,9 +70,14 @@ class AdvDataSnapshotAssembler:
         elif keywords:
             diag = diag.model_copy(update={"keywords_cache_hit": True})
 
+        keywords_complete = self._keywords_section_complete(
+            keywords=keywords,
+            warmup_result=warmup_result,
+            diagnostics=diag,
+        )
         section_completeness = {
             "settings": True,
-            "keywords": len(keywords) > 0,
+            "keywords": keywords_complete,
             "min_bids": min_bids is not None and (min_bids.coverage_ratio or 0) > 0,
             "plan_fact": plan_fact is not None,
             "cluster_texts": cluster_texts is not None and bool(cluster_texts.texts),
@@ -94,3 +99,21 @@ class AdvDataSnapshotAssembler:
             cluster_texts=cluster_texts,
             diagnostics=diag,
         )
+
+    @staticmethod
+    def _keywords_section_complete(
+        *,
+        keywords: list[CalculatedKeywordSnapshotDTO],
+        warmup_result: CalculatedKeywordsWarmupResult | None,
+        diagnostics: SnapshotDiagnostics,
+    ) -> bool:
+        """Секция keywords полна при успешном warmup/read; пустой список допустим."""
+        if warmup_result is not None:
+            return warmup_result.source not in {"error", "missing"}
+        if keywords:
+            return True
+        kw = diagnostics.keywords
+        return kw.keywords_cache_hit and kw.keywords_source not in {
+            "error",
+            "missing",
+        }

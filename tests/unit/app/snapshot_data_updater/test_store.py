@@ -13,7 +13,11 @@ from app.snapshot_data_updater.dto import (
     AdvSettingsSnapshotDTO,
     ShopAdvSnapshotBatchDTO,
 )
-from app.snapshot_data_updater.keys import adv_snapshot_key, shop_batch_key
+from app.snapshot_data_updater.keys import (
+    adv_snapshot_key,
+    shop_batch_key,
+    shop_per_adv_snapshot_pattern,
+)
 
 
 @pytest.mark.unit
@@ -32,9 +36,18 @@ async def test_redis_store_save_and_load_roundtrip() -> None:
     async def _delete(key: str) -> None:
         storage.pop(key, None)
 
+    async def _scan(
+        cursor: int = 0, match: str | None = None, count: int | None = None
+    ) -> tuple[int, list[str]]:
+        del count
+        prefix = match.rstrip("*") if match and match.endswith("*") else match
+        batch = [k for k in storage if prefix and k.startswith(prefix)]
+        return 0, batch
+
     client.set = AsyncMock(side_effect=_set)
     client.get = AsyncMock(side_effect=_get)
     client.delete = AsyncMock(side_effect=_delete)
+    client.scan = AsyncMock(side_effect=_scan)
 
     store = RedisAdvDataSnapshotStore(redis_client=client, no_op=False, ttl_sec=60)
     ts = datetime(2026, 6, 2, 12, 0, 0, tzinfo=UTC)
@@ -78,9 +91,18 @@ def _make_store_with_storage() -> tuple[RedisAdvDataSnapshotStore, dict[str, str
     async def _delete(key: str) -> None:
         storage.pop(key, None)
 
+    async def _scan(
+        cursor: int = 0, match: str | None = None, count: int | None = None
+    ) -> tuple[int, list[str]]:
+        del count
+        prefix = match.rstrip("*") if match and match.endswith("*") else match
+        batch = [k for k in storage if prefix and k.startswith(prefix)]
+        return 0, batch
+
     client.set = AsyncMock(side_effect=_set)
     client.get = AsyncMock(side_effect=_get)
     client.delete = AsyncMock(side_effect=_delete)
+    client.scan = AsyncMock(side_effect=_scan)
     store = RedisAdvDataSnapshotStore(redis_client=client, no_op=False, ttl_sec=60)
     return store, storage
 
@@ -147,6 +169,31 @@ async def test_redis_store_save_removes_per_adv_keys_dropped_from_batch() -> Non
     assert adv_snapshot_key(shop_id, 1) in storage
     assert adv_snapshot_key(shop_id, 2) not in storage
     assert await store.load_adv_snapshot(shop_id, 2) is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_redis_store_empty_batch_scans_orphan_per_adv_keys() -> None:
+    """Пустой latest уже в Redis, per-adv остался — SCAN при save([]) чистит."""
+    store, storage = _make_store_with_storage()
+    ts = datetime(2026, 6, 2, 12, 0, 0, tzinfo=UTC)
+    shop_id = "shop-c"
+    storage[shop_batch_key(shop_id)] = ShopAdvSnapshotBatchDTO(
+        shop_id=shop_id, collected_at=ts, snapshots=[]
+    ).model_dump_json()
+    storage[adv_snapshot_key(shop_id, 99)] = _snap(99, shop_id, ts).model_dump_json()
+
+    await store.save(
+        ShopAdvSnapshotBatchDTO(shop_id=shop_id, collected_at=ts, snapshots=[])
+    )
+
+    assert adv_snapshot_key(shop_id, 99) not in storage
+    assert await store.load_adv_snapshot(shop_id, 99) is None
+    client = store._client
+    client.scan.assert_awaited()
+    assert client.scan.await_args.kwargs["match"] == shop_per_adv_snapshot_pattern(
+        shop_id
+    )
 
 
 @pytest.mark.unit

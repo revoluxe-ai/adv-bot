@@ -28,3 +28,8 @@ def shop_batch_key(shop_id: str) -> str:
 def adv_snapshot_key(shop_id: str, adv_id: int) -> str:
     """Один ``AdvDataSnapshotDTO`` для быстрого read consumer adapter."""
     return f"adv_snapshot:{SCHEMA_VERSION}:shop:{shop_id}:adv:{adv_id}"
+
+
+def shop_per_adv_snapshot_pattern(shop_id: str) -> str:
+    """SCAN-шаблон всех per-adv ключей магазина (для очистки при пустом batch)."""
+    return f"adv_snapshot:{SCHEMA_VERSION}:shop:{shop_id}:adv:*"

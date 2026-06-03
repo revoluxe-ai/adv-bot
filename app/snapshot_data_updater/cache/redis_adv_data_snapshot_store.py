@@ -21,7 +21,11 @@ from app.snapshot_data_updater.dto import (
     AdvDataSnapshotDTO,
     ShopAdvSnapshotBatchDTO,
 )
-from app.snapshot_data_updater.keys import adv_snapshot_key, shop_batch_key
+from app.snapshot_data_updater.keys import (
+    adv_snapshot_key,
+    shop_batch_key,
+    shop_per_adv_snapshot_pattern,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +79,11 @@ class RedisAdvDataSnapshotStore:
             )
             return
         new_adv_ids = {snap.adv_id for snap in batch.snapshots}
-        previous = await self.load_shop_latest(batch.shop_id)
         stale_adv_ids: set[int] = set()
-        if previous is not None:
-            stale_adv_ids = {snap.adv_id for snap in previous.snapshots} - new_adv_ids
+        if batch.snapshots:
+            previous = await self.load_shop_latest(batch.shop_id)
+            if previous is not None:
+                stale_adv_ids = {snap.adv_id for snap in previous.snapshots} - new_adv_ids
 
         payload = batch.model_dump_json()
         await self._client.set(
@@ -92,20 +97,49 @@ class RedisAdvDataSnapshotStore:
                 snap.model_dump_json(),
                 ex=self._ttl_sec,
             )
-        for adv_id in stale_adv_ids:
-            await self._client.delete(adv_snapshot_key(batch.shop_id, adv_id))
-        if stale_adv_ids:
-            logger.debug(
-                "RedisAdvDataSnapshotStore.save removed stale per-adv keys: "
-                "shop_id=%s adv_ids=%s",
-                batch.shop_id,
-                sorted(stale_adv_ids),
-            )
+        if not batch.snapshots:
+            orphan_keys = await self._list_shop_per_adv_snapshot_keys(batch.shop_id)
+            for key in orphan_keys:
+                await self._client.delete(key)
+            if orphan_keys:
+                logger.debug(
+                    "RedisAdvDataSnapshotStore.save removed orphan per-adv keys "
+                    "(empty batch): shop_id=%s count=%d",
+                    batch.shop_id,
+                    len(orphan_keys),
+                )
+        else:
+            for adv_id in stale_adv_ids:
+                await self._client.delete(adv_snapshot_key(batch.shop_id, adv_id))
+            if stale_adv_ids:
+                logger.debug(
+                    "RedisAdvDataSnapshotStore.save removed stale per-adv keys: "
+                    "shop_id=%s adv_ids=%s",
+                    batch.shop_id,
+                    sorted(stale_adv_ids),
+                )
         logger.debug(
             "RedisAdvDataSnapshotStore.save shop_id=%s snapshots=%d",
             batch.shop_id,
             len(batch.snapshots),
         )
+
+    async def _list_shop_per_adv_snapshot_keys(self, shop_id: str) -> list[str]:
+        """SCAN per-adv ключей магазина (восстановление после пустого latest без очистки)."""
+        pattern = shop_per_adv_snapshot_pattern(shop_id)
+        keys: list[str] = []
+        cursor: int = 0
+        while True:
+            cursor, batch_keys = await self._client.scan(
+                cursor=cursor,
+                match=pattern,
+                count=200,
+            )
+            for raw in batch_keys:
+                keys.append(raw.decode() if isinstance(raw, bytes) else raw)
+            if cursor == 0:
+                break
+        return keys
 
     async def load_shop_latest(
         self, shop_id: str
