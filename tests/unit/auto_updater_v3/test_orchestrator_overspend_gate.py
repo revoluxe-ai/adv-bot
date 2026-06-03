@@ -151,7 +151,7 @@ async def test_calibration_trim_and_gate_plan_fact_views(
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
     assert float(fact.pay_for_order) <= float(plan.max_pay_for_order)
 
-    _, calibration, _, _, _ = await _run_preamble_with_fact_cpa(
+    _, calibration, _, _, _, _ = await _run_preamble_with_fact_cpa(
         pay_for_order=85.0,
         plan_fact_equal=plan_fact_equal,
         cached_views=cached_views,
@@ -311,8 +311,8 @@ async def _run_preamble_with_fact_cpa(
     plan_fact_equal: bool = False,
     cached_views: int | None = 100,
     current_views: int = 200,
-) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock, MagicMock]:
-    """NORMAL preamble: моки realloc/calibration/guard, fact CPA = ``pay_for_order``."""
+) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock]:
+    """NORMAL preamble: моки realloc/calibration/guard/step cache, fact CPA = ``pay_for_order``."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=pay_for_order)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -407,7 +407,21 @@ async def _run_preamble_with_fact_cpa(
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    return realloc, calibration, guard, plan_fact, views_cache
+    return realloc, calibration, guard, plan_fact, views_cache, step_cache
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_calibration_step_cache_not_updated_when_calibration_skipped() -> None:
+    """Пропуск calibration (unchanged plan/fact и views) — Redis step state не пишется."""
+    _, calibration, _, _, _, step_cache = await _run_preamble_with_fact_cpa(
+        pay_for_order=50.0,
+        plan_fact_equal=True,
+        cached_views=100,
+        current_views=100,
+    )
+    calibration.assert_not_called()
+    step_cache.set_state.assert_not_awaited()
 
 
 @pytest.mark.unit
@@ -517,7 +531,10 @@ async def test_cost_reallocation_runs_when_resolve_valid() -> None:
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+    realloc, calibration, guard, _, _, step_cache = await _run_preamble_with_fact_cpa(
+        pay_for_order=50.0
+    )
+    step_cache.set_state.assert_awaited_once()
 
     realloc.assert_called_once()
     calibration.assert_called_once()
@@ -538,7 +555,7 @@ async def test_cost_reallocation_and_calibration_in_stabilization_zone() -> None
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
     assert float(fact.pay_for_order) <= float(plan.max_pay_for_order)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(
+    realloc, calibration, guard, _, _, step_cache = await _run_preamble_with_fact_cpa(
         pay_for_order=85.0,
         plan_fact_equal=False,
         cached_views=100,
@@ -547,6 +564,7 @@ async def test_cost_reallocation_and_calibration_in_stabilization_zone() -> None
 
     realloc.assert_called_once()
     calibration.assert_called_once()
+    step_cache.set_state.assert_awaited_once()
     assert (
         calibration.call_args.kwargs.get("calibration_direct")
         == CalibrationDirect.TIGHTEN
@@ -563,7 +581,7 @@ async def test_resolve_calibration_loosen_when_fact_below_ninety_percent_resolve
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(
+    realloc, calibration, guard, _, _, _ = await _run_preamble_with_fact_cpa(
         pay_for_order=50.0,
         plan_fact_equal=False,
         cached_views=100,
@@ -588,11 +606,14 @@ async def test_resolve_calibration_skipped_when_fact_above_max() -> None:
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+    realloc, calibration, guard, _, _, step_cache = await _run_preamble_with_fact_cpa(
+        pay_for_order=150.0
+    )
 
     realloc.assert_called_once()
     calibration.assert_not_called()
     guard.assert_called_once()
+    step_cache.set_state.assert_not_awaited()
 
 
 @pytest.mark.unit
@@ -605,7 +626,7 @@ async def test_max_cpa_guard_runs_when_fact_cpa_above_plan_max() -> None:
     assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+    realloc, calibration, guard, _, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
     realloc.assert_called_once()
     calibration.assert_not_called()
