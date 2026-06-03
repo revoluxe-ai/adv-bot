@@ -59,6 +59,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
     filter_operable_v3_contexts,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
+    V3TickReportCollector,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_redis import (
+    persist_v3_tick_report,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_preamble_phases import (
     plan_max_cpa_guard_phase,
     plan_mode_cap_down,
@@ -325,6 +331,9 @@ async def process_adv_v3(
         keywords = await complex_adv.get_keywords()
     trace.marker("keywords_loaded", extra={"keywords_count": len(keywords)})
     ledger = V3TickKeywordLedger.from_keywords(keywords)
+    tick_report = V3TickReportCollector()
+    tick_report.set_aggression_before(ledger.keywords)
+    tick_report_ready = False
 
     with trace.phase("load_v3_wb_context"):
         dto, raw_profiles = await _load_v3_wb_context(
@@ -454,6 +463,12 @@ async def process_adv_v3(
                         complex_adv.adv_id,
                         preamble_hard_status_sync_count,
                     )
+            tick_report.record_filter(
+                total=len(all_contexts),
+                operable=operable_before,
+            )
+            tick_report.record_sync(preamble_hard_status_sync_count)
+            tick_report_ready = True
 
         # Взаимоисключающий campaign preamble (см. docks/V3_UPDATER_VALIDATION.md):
         # NO_DATA  → filter/sync → plan_campaign_no_data_bootstrap_safe + sync_force_zero
@@ -462,6 +477,10 @@ async def process_adv_v3(
         if campaign_mode == CampaignMode.NO_DATA and dto is not None:
             with trace.phase("preamble_no_data_bootstrap"):
                 bootstrap_actions = plan_campaign_no_data_bootstrap_safe(contexts)
+            tick_report.record_phase(
+                "no_data_bootstrap",
+                bootstrap_actions,
+            )
             if bootstrap_actions:
                 preamble_no_data_bootstrap_count = len(bootstrap_actions)
                 logger.info(
@@ -562,6 +581,7 @@ async def process_adv_v3(
                     prepared,
                     eligibility_by_ks_id=eligibility,
                 )
+            tick_report.record_phase("cap_down", cap_actions)
             if cap_actions:
                 preamble_cap_down_count = len(cap_actions)
                 logger.info(
@@ -587,6 +607,7 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
+                tick_report.record_phase("passing_up", passing_up_actions)
                 if passing_up_actions:
                     preamble_passing_up_count = len(passing_up_actions)
                     logger.info(
@@ -602,6 +623,11 @@ async def process_adv_v3(
                         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                         rec_orders_per_view=rec_orders_per_view,
                     )
+            else:
+                tick_report.record_phase(
+                    "passing_up",
+                    skip_reason="resolve_invalid",
+                )
 
             if shelf_active:
                 with trace.phase("preamble_shelf_rec_cleanup"):
@@ -611,6 +637,11 @@ async def process_adv_v3(
                         ladder_inputs=ladder_inputs,
                         policy=policy,
                     )
+                tick_report.record_phase(
+                    "shelf_cleanup",
+                    shelf_actions,
+                    extra={"shelf_active": True},
+                )
                 if shelf_actions:
                     preamble_shelf_count = len(shelf_actions)
                     logger.info(
@@ -626,6 +657,11 @@ async def process_adv_v3(
                         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                         rec_orders_per_view=rec_orders_per_view,
                     )
+            else:
+                tick_report.record_phase(
+                    "shelf_cleanup",
+                    skip_reason="shelf_inactive",
+                )
 
             guard_condition = (
                 fact.pay_for_order is not None
@@ -641,6 +677,7 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
+                tick_report.record_phase("max_cpa_guard", guard_actions)
                 if guard_actions:
                     guard_applied = True
                     preamble_guard_count = len(guard_actions)
@@ -657,6 +694,11 @@ async def process_adv_v3(
                         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                         rec_orders_per_view=rec_orders_per_view,
                     )
+            else:
+                tick_report.record_phase(
+                    "max_cpa_guard",
+                    skip_reason="fact_le_max",
+                )
 
             if is_resolve_valid(plan, resolve):
                 with trace.phase("preamble_cost_reallocation"):
@@ -667,6 +709,7 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
+                tick_report.record_phase("cost_reallocation", realloc_actions)
                 if realloc_actions:
                     preamble_realloc_count = len(realloc_actions)
                     logger.info(
@@ -696,6 +739,7 @@ async def process_adv_v3(
                         plan_fact_changed=not plan_fact_equal,
                         views_changed=not views_equal,
                     )
+                tick_report.record_phase("pay_for_order_gap_enable", enable_actions)
                 if enable_actions:
                     preamble_enable_count = len(enable_actions)
                     logger.info(
@@ -736,6 +780,14 @@ async def process_adv_v3(
                             ladder_inputs=ladder_inputs,
                             max_effective_steps=effective_calibration_steps,
                         )
+                    tick_report.record_phase(
+                        "resolve_calibration",
+                        calibration_actions,
+                        extra={
+                            "calibration_direct": current_calibration_direct.value,
+                            "effective_steps": effective_calibration_steps,
+                        },
+                    )
                     if calibration_actions:
                         preamble_calibration_count = len(calibration_actions)
                         logger.info(
@@ -753,23 +805,49 @@ async def process_adv_v3(
                             rec_orders_per_view=rec_orders_per_view,
                         )
                 elif calibration_in_range and guard_applied:
+                    tick_report.record_phase(
+                        "resolve_calibration",
+                        skip_reason="guard_applied",
+                    )
                     logger.debug(
                         "[adv_id=%s] v3 RESOLVE_CALIBRATION skipped: guard_applied",
                         complex_adv.adv_id,
                     )
                 elif calibration_in_range:
-                    skip_reason = (
+                    cal_skip_reason = (
                         "plan_fact_unchanged_and_views_unchanged"
                         if plan_fact_equal and views_equal
                         else "plan_fact_unchanged"
                         if plan_fact_equal
                         else "views_unchanged"
                     )
+                    tick_report.record_phase(
+                        "resolve_calibration",
+                        skip_reason=cal_skip_reason,
+                    )
                     logger.debug(
                         "[adv_id=%s] v3 RESOLVE_CALIBRATION skipped: %s",
                         complex_adv.adv_id,
-                        skip_reason,
+                        cal_skip_reason,
                     )
+                else:
+                    tick_report.record_phase(
+                        "resolve_calibration",
+                        skip_reason="fact_gt_max",
+                    )
+            else:
+                tick_report.record_phase(
+                    "cost_reallocation",
+                    skip_reason="resolve_invalid",
+                )
+                tick_report.record_phase(
+                    "pay_for_order_gap_enable",
+                    skip_reason="resolve_invalid",
+                )
+                tick_report.record_phase(
+                    "resolve_calibration",
+                    skip_reason="resolve_invalid",
+                )
 
             with trace.phase("preamble_build_sync_fallback"):
                 sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
@@ -860,6 +938,42 @@ async def process_adv_v3(
             with trace.phase("sync_target_places_once"):
                 await _sync_target_places_once()
     finally:
+        if tick_report_ready and not is_campaign_full_stop(campaign_mode):
+            try:
+                resolve_for_report: float | None = None
+                if plan is not None and fact is not None:
+                    candidate = compute_resolve_cost_threshold(plan, fact)
+                    if is_resolve_valid(plan, candidate):
+                        resolve_for_report = float(candidate)
+                fact_cpa = (
+                    float(fact.pay_for_order)
+                    if fact is not None and fact.pay_for_order is not None
+                    else None
+                )
+                max_pfo = (
+                    float(plan.max_pay_for_order)
+                    if plan is not None
+                    else None
+                )
+                adv_name = str(getattr(adv, "name", "") or "")
+                snapshot = tick_report.build_snapshot(
+                    adv_id=int(complex_adv.adv_id),
+                    adv_name=adv_name,
+                    campaign_mode=campaign_mode.name,
+                    sales_state=state.name if state is not None else None,
+                    keywords=ledger.keywords,
+                    applied=ledger.applied_actions(),
+                    fact_cpa=fact_cpa,
+                    resolve=resolve_for_report,
+                    max_pay_for_order=max_pfo,
+                )
+                await persist_v3_tick_report(adv, snapshot)
+            except Exception:
+                logger.warning(
+                    "[adv_id=%s] v3: tick report persist failed",
+                    complex_adv.adv_id,
+                    exc_info=True,
+                )
         if not is_campaign_full_stop(campaign_mode):
             with trace.phase("sync_target_places_once_finally"):
                 await _sync_target_places_once()
