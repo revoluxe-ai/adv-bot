@@ -398,6 +398,7 @@ async def process_adv_v3(
     views_cache: ChangePlanFactViews | None = None
     plan_fact_equal = False
     views_equal = False
+    views_resolve_succeeded = False
     current_views: int | None = None
     calibration_step_cache: V3CalibrationStepState | None = None
     effective_calibration_steps = 1
@@ -556,15 +557,17 @@ async def process_adv_v3(
                     views_equal = (
                         cached_views is not None and cached_views == current_views
                     )
+                    views_resolve_succeeded = True
                 except Exception:
                     logger.warning(
                         "[adv_id=%s] v3: views resolve failed, "
-                        "calibration views gate fail-closed",
+                        "calibration/enable gated off; plan/fact snapshot deferred",
                         complex_adv.adv_id,
                         exc_info=True,
                     )
                     views_equal = True
                     current_views = None
+                    views_resolve_succeeded = False
             calibration_step_cache = V3CalibrationStepState(adv)
             current_calibration_direct = classify_calibration_direct(
                 fact.pay_for_order,
@@ -993,7 +996,7 @@ async def process_adv_v3(
                     )
                 with trace.phase("apply_selector_actions"):
                     _ = ledger.apply_in_memory(selector_actions_logged)
-                if plan_fact_change is not None:
+                if plan_fact_change is not None and views_resolve_succeeded:
                     with trace.phase("cache_plan_fact_snapshot"):
                         await plan_fact_change.set_new_plan_fact(plan, fact)
                 if views_cache is not None and current_views is not None:

@@ -89,6 +89,110 @@ async def test_change_plan_fact_views_roundtrip() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
+    """Сбой CH views: calibration/enable off, plan/fact Redis не обновляется."""
+    from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+        SalesStates,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
+        process_adv_v3,
+    )
+
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 77
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    plan_fact = MagicMock()
+    plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    plan_fact.set_new_plan_fact = AsyncMock()
+    views_cache = MagicMock()
+    views_cache.get_cached_views = AsyncMock(return_value=100)
+    views_cache.set_views = AsyncMock()
+    calibration = MagicMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            return_value=MagicMock(
+                max_pay_for_order=100.0,
+                orders=10,
+                target_pay_for_order=80.0,
+            ),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
+            return_value=plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            return_value=views_cache,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(side_effect=RuntimeError("clickhouse unavailable")),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            return_value=SalesStates.STABLE,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
+            calibration,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState"
+        ) as step_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report",
+            new=AsyncMock(),
+        ),
+    ):
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        updater_cls.return_value.get_fact_data = AsyncMock(
+            return_value=MagicMock(pay_for_order=85.0, predict_orders=10)
+        )
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    calibration.assert_not_called()
+    plan_fact.set_new_plan_fact.assert_not_awaited()
+    views_cache.set_views.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_change_plan_fact_views_missing_key() -> None:
     adv = MagicMock()
     adv.adv_id = 43

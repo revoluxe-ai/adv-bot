@@ -145,7 +145,7 @@ Rec-gate:
 | plan/fact | `ChangePlanFact`: plan + `fact.original_orders` + `fact.pay_for_order` | да |
 | views | `ChangePlanFactViews`: SUM views по `complex_adv.all_adv_ids`, `full_adv_wb_stat`, окно `max_last_period` (как fact V3) | да |
 
-Calibration: **AND** — оба сигнала должны измениться + `fact ≤ max` (без нижней границы 0.9×resolve). Ошибка CH при resolve views → fail-closed (`views_equal=True`, calibration не режем).
+Calibration: **AND** — оба сигнала должны измениться + `fact ≤ max` (без нижней границы 0.9×resolve). Ошибка CH при resolve views → fail-closed (`views_equal=True`, calibration/enable не запускаются); **plan/fact и views snapshots в Redis не пишутся**, пока views снова не прочитаются (нет рассинхрона «кэш plan обновился, а gate views думает что unchanged»).
 
 ### Adaptive calibration steps (Redis `V3CalibrationStepState`)
 
