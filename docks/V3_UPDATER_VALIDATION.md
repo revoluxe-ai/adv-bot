@@ -158,7 +158,7 @@ Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, defaul
 - то же направление → `min(prev × 2, cap)`;
 - смена направления → `max(prev ÷ 2, 1)`.
 
-Снимок в Redis — **конец каждого NORMAL-тика** (`effective_steps`, `direct`), вместе с plan/fact/views.
+Снимок в Redis — **только если calibration выполнилась** (gate plan/views + `fact ≤ max`, без guard): в конце NORMAL-тика вместе с plan/fact/views. Пропуск calibration **не** обновляет `V3CalibrationStepState` (иначе ×2/÷2 без фактического прогона).
 
 **UI:** кнопка `V3 cal. шаг: {N}` в меню РК (только `automatic_version == 3`, рядом с переключателем версии); FSM-ввод 1..50, как `bidder_step`.
 

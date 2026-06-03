@@ -391,6 +391,7 @@ async def process_adv_v3(
     preamble_realloc_count = 0
     preamble_enable_count = 0
     preamble_calibration_count = 0
+    calibration_executed_this_tick = False
     preamble_guard_count = 0
     preamble_hard_status_sync_count = 0
     plan_fact_change: ChangePlanFact | None = None
@@ -870,6 +871,7 @@ async def process_adv_v3(
                     and current_calibration_direct is not None
                 )
                 if calibration_condition:
+                    calibration_executed_this_tick = True
                     with trace.phase("preamble_resolve_calibration"):
                         calibration_actions = plan_resolve_calibration(
                             prepared,
@@ -1000,6 +1002,7 @@ async def process_adv_v3(
                 if (
                     calibration_step_cache is not None
                     and current_calibration_direct is not None
+                    and calibration_executed_this_tick
                 ):
                     with trace.phase("cache_calibration_step_snapshot"):
                         await calibration_step_cache.set_state(
