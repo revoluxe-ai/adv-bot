@@ -27,8 +27,9 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
     ) -> None:
         """Сохранение списка keywords в Redis hash ``calculated_keywords:{adv_id}``.
 
-        После записи — ``EXPIRE`` (``CALCULATED_KEYWORDS_REDIS_TTL_SEC`` или
-        ``4 × SNAPSHOT_KEYWORDS_STALE_SEC``). Истёкший hash → cache miss в shop-runner.
+        Перед записью hash удаляется (``DELETE``), чтобы убрать поля фраз,
+        выпавших из списка. После записи — ``EXPIRE`` (``CALCULATED_KEYWORDS_REDIS_TTL_SEC``
+        или ``4 × SNAPSHOT_KEYWORDS_STALE_SEC``). Истёкший hash → cache miss в shop-runner.
         """
         logger.debug(f"Setting keywords for adv_id {adv_id}, count: {len(keywords)}")
         key = f"calculated_keywords:{adv_id}"
@@ -41,6 +42,7 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
                 await pipe.execute()
             return
         async with self.client.pipeline() as pipe:
+            pipe.delete(key)
             for keyword in keywords:
                 logger.debug(f"Setting key: {key}, keyword: {keyword.text}")
                 pipe.hset(name=key, key=keyword.text, value=keyword.model_dump_json())

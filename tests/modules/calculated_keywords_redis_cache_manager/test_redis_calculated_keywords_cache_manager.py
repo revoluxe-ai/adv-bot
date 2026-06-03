@@ -86,3 +86,43 @@ async def test_set_calculated_keywords_empty_writes_marker() -> None:
     assert pipe.expire.call_args[0][0] == "calculated_keywords:77"
     assert pipe.expire.call_args[0][1] > 0
     pipe.execute.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_calculated_keywords_non_empty_deletes_hash_before_hset() -> None:
+    """Удалённые фразы не должны оставаться в hash до TTL."""
+    mgr = RedisCalculatedKeywordsCacheManager()
+    pipe = MagicMock()
+    pipe.delete = MagicMock(return_value=pipe)
+    pipe.hset = MagicMock(return_value=pipe)
+    pipe.expire = MagicMock(return_value=pipe)
+    pipe.execute = AsyncMock(return_value=[1, 1, 1])
+
+    class _PipeCtx:
+        async def __aenter__(self) -> MagicMock:
+            return pipe
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    mock_client = MagicMock()
+    mock_client.pipeline = MagicMock(return_value=_PipeCtx())
+    mgr._client = mock_client
+
+    kw = MagicMock()
+    kw.text = "phrase_a"
+    kw.model_dump_json.return_value = '{"text":"phrase_a"}'
+
+    await mgr.set_calculated_keywords([kw], adv_id=42)
+
+    pipe.delete.assert_called_once_with("calculated_keywords:42")
+    pipe.hset.assert_called_once_with(
+        name="calculated_keywords:42",
+        key="phrase_a",
+        value='{"text":"phrase_a"}',
+    )
+    pipe.expire.assert_called_once()
+    assert pipe.expire.call_args[0][0] == "calculated_keywords:42"
+    assert pipe.expire.call_args[0][1] > 0
+    pipe.execute.assert_awaited_once()
