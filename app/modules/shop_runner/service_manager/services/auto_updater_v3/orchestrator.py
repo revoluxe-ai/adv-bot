@@ -29,6 +29,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibratio
     ChangePlanFactViews,
     resolve_complex_adv_total_views,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+    CalibrationStepState,
+    classify_calibration_direct,
+    resolve_effective_calibration_steps,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_state_cache import (
+    V3CalibrationStepState,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -300,6 +309,9 @@ async def process_adv_v3(
     plan_fact_equal = False
     views_equal = False
     current_views: int | None = None
+    calibration_step_cache: V3CalibrationStepState | None = None
+    effective_calibration_steps = 1
+    current_calibration_direct: CalibrationDirect | None = None
 
     try:
         with trace.phase("build_keyword_v3_contexts"):
@@ -433,6 +445,29 @@ async def process_adv_v3(
                     )
                     views_equal = True
                     current_views = None
+            calibration_step_cache = V3CalibrationStepState(adv)
+            current_calibration_direct = classify_calibration_direct(
+                fact.pay_for_order,
+                resolve,
+            )
+            with trace.phase("calibration_effective_steps_resolve"):
+                calibration_prev_state = await calibration_step_cache.get_state()
+                effective_calibration_steps = resolve_effective_calibration_steps(
+                    complex_adv.keyword_calibration_max_step,
+                    prev=calibration_prev_state,
+                    current_direct=current_calibration_direct,
+                )
+                logger.debug(
+                    "[adv_id=%s] v3 calibration steps: effective=%s base_max=%s "
+                    "direct=%s prev_direct=%s",
+                    complex_adv.adv_id,
+                    effective_calibration_steps,
+                    complex_adv.keyword_calibration_max_step,
+                    current_calibration_direct.value,
+                    calibration_prev_state.direct.value
+                    if calibration_prev_state is not None
+                    else None,
+                )
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
             )
@@ -557,6 +592,7 @@ async def process_adv_v3(
                             aggressiveness=aggr,
                             eligibility_by_ks_id=eligibility,
                             ladder_inputs=ladder_inputs,
+                            max_effective_steps=effective_calibration_steps,
                         )
                     if calibration_actions:
                         preamble_calibration_count = len(calibration_actions)
@@ -693,6 +729,17 @@ async def process_adv_v3(
                 if views_cache is not None and current_views is not None:
                     with trace.phase("cache_views_snapshot"):
                         await views_cache.set_views(current_views)
+                if (
+                    calibration_step_cache is not None
+                    and current_calibration_direct is not None
+                ):
+                    with trace.phase("cache_calibration_step_snapshot"):
+                        await calibration_step_cache.set_state(
+                            CalibrationStepState(
+                                effective_steps=effective_calibration_steps,
+                                direct=current_calibration_direct,
+                            )
+                        )
                 up_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "UP"
                 )

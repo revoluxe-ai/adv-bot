@@ -480,6 +480,10 @@ class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
     level: int
 
 
+class V3CalibrationStepChange(CallbackData, prefix="v3_cal_step_change"):
+    adv_setting_original_id: int
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):

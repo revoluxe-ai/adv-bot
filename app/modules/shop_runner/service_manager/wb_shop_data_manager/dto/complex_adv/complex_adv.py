@@ -327,6 +327,10 @@ class ComplexAdv:
         return int(self._adv_setting.aggressiveness)
 
     @property
+    def keyword_calibration_max_step(self) -> int:
+        return int(self._adv_setting.keyword_calibration_max_step)
+
+    @property
     def shop_id(self) -> str:
         return self._shop_id
 
