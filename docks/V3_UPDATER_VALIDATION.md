@@ -192,6 +192,7 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 - **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
 - **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
 - **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
+- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …` (фаза не запускалась). **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note` (диагностика `v3_tick_report_phase_notes`, зеркалит `plan_*`). Счётчики `↑/↓/off` только при ненулевом плане фазы. Старые снимки без `outcome_note` — fallback «причина не зафиксирована».
 
 ## UI: порядок ключей в списке (V3)
 

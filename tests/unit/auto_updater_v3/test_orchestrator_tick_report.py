@@ -122,3 +122,7 @@ async def test_process_adv_v3_persists_tick_report_on_normal_tick() -> None:
     assert isinstance(snapshot, V3TickReportSnapshot)
     assert snapshot.campaign_mode == "NORMAL"
     assert any(p.phase_id == "filter" for p in snapshot.phases)
+    cap_phase = next(p for p in snapshot.phases if p.phase_id == "cap_down")
+    assert cap_phase.executed
+    assert cap_phase.outcome_note is not None
+    assert cap_phase.up == 0

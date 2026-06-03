@@ -75,6 +75,30 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "пропуск" in text
     assert "TIGHTEN" in text
     assert "Авто: 40" in text
+    assert "Возможные:" not in text
+
+
+@pytest.mark.unit
+def test_format_zero_calibration_shows_outcome_note_not_counters() -> None:
+    snap = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+        adv_id=1,
+        adv_name="Крем",
+        campaign_mode="NORMAL",
+        phases=[
+            V3PhaseStats(
+                phase_id="resolve_calibration",
+                title_ru="8 · calibration",
+                executed=True,
+                outcome_note="нет ключей для UP: 200 operable — потолок режима",
+                extra={"calibration_direct": "loosen", "effective_steps": 1},
+            ),
+        ],
+    )
+    text = format_v3_tick_report_text(snap)
+    assert "LOOSEN" in text
+    assert "без изменений — нет ключей для UP" in text
+    assert "↑0" not in text
 
 
 @pytest.mark.unit
