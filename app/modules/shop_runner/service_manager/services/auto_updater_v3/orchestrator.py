@@ -4,8 +4,8 @@
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
   2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — keyword bootstrap → active invalid cleanup → [resolve valid: realloc → calibration trim → expansion] → MAX_CPA_GUARD
-     (по ``plan.max``, вне ``is_resolve_valid``) → gate.
+  4. ``NORMAL`` — keyword bootstrap → active invalid cleanup → [resolve valid: realloc → calibration trim (AND plan/fact + views) → expansion] → MAX_CPA_GUARD
+     (по ``plan.max``, вне ``is_resolve_valid``) → post-gate (без gate) → snapshot plan/fact + views.
   5. NO_CH OFF→MIN только через ``PROFITABLE_EXPANSION`` (V2 CPO ≤ resolve).
   6. Нетто-flush + ``target_place`` только если режим не ``NOT_READY``.
 
@@ -24,6 +24,10 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_views_cache import (
+    ChangePlanFactViews,
+    resolve_complex_adv_total_views,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater import (
     AdvSettingAutoUpdater,
@@ -291,6 +295,11 @@ async def process_adv_v3(
     preamble_calibration_count = 0
     preamble_expansion_count = 0
     preamble_guard_count = 0
+    plan_fact_change: ChangePlanFact | None = None
+    views_cache: ChangePlanFactViews | None = None
+    plan_fact_equal = False
+    views_equal = False
+    current_views: int | None = None
 
     try:
         with trace.phase("build_keyword_v3_contexts"):
@@ -399,6 +408,31 @@ async def process_adv_v3(
                 aggressiveness=aggr,
             )
             resolve = compute_resolve_cost_threshold(plan, fact)
+            plan_fact_change = ChangePlanFact(adv)
+            with trace.phase("plan_fact_cache_check"):
+                plan_fact_equal = await plan_fact_change.check_equal_in_cache(
+                    plan, fact
+                )
+            views_cache = ChangePlanFactViews(adv)
+            with trace.phase("calibration_views_resolve"):
+                try:
+                    current_views = await resolve_complex_adv_total_views(
+                        complex_adv,
+                        max_last_period=max_last_period,
+                    )
+                    cached_views = await views_cache.get_cached_views()
+                    views_equal = (
+                        cached_views is not None and cached_views == current_views
+                    )
+                except Exception:
+                    logger.warning(
+                        "[adv_id=%s] v3: views resolve failed, "
+                        "calibration views gate fail-closed",
+                        complex_adv.adv_id,
+                        exc_info=True,
+                    )
+                    views_equal = True
+                    current_views = None
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
             )
@@ -502,12 +536,17 @@ async def process_adv_v3(
                             complex_adv.adv_id, ladder_inputs.worst_costs
                         )
 
-                calibration_condition = (
+                calibration_cpa_zone = (
                     fact.pay_for_order is not None
                     and float(fact.pay_for_order)
                     >= MAX_PAY_STABILIZATION_RATIO * float(resolve)
                     and float(fact.pay_for_order)
                     <= float(plan.max_pay_for_order)
+                )
+                calibration_condition = (
+                    not plan_fact_equal
+                    and not views_equal
+                    and calibration_cpa_zone
                 )
                 if calibration_condition:
                     with trace.phase("preamble_resolve_calibration_trim"):
@@ -544,6 +583,19 @@ async def process_adv_v3(
                         await cache_worst_costs_for_adv(
                             complex_adv.adv_id, ladder_inputs.worst_costs
                         )
+                elif calibration_cpa_zone:
+                    skip_reason = (
+                        "plan_fact_unchanged_and_views_unchanged"
+                        if plan_fact_equal and views_equal
+                        else "plan_fact_unchanged"
+                        if plan_fact_equal
+                        else "views_unchanged"
+                    )
+                    logger.debug(
+                        "[adv_id=%s] v3 RESOLVE_CALIBRATION_TRIM skipped: %s",
+                        complex_adv.adv_id,
+                        skip_reason,
+                    )
 
                 with trace.phase("preamble_profitable_expansion"):
                     expansion_actions = plan_profitable_expansion(
@@ -614,23 +666,10 @@ async def process_adv_v3(
                 )
 
         if plan is not None and allows_ladder_phases(campaign_mode):
-            with trace.phase("plan_fact_cache_check"):
-                plan_fact_change = ChangePlanFact(adv)
-                plan_fact_equal = await plan_fact_change.check_equal_in_cache(
-                    plan, fact
-                )
-
-            async def cache_plan_fact_snapshot() -> None:
-                await plan_fact_change.set_new_plan_fact(plan, fact)
-
-            if plan_fact_equal and state != SalesStates.OVERSPEND:
-                logger.debug(
-                    "[adv_id=%s] v3: plan/fact unchanged, skip selector",
-                    complex_adv.adv_id,
-                )
-            elif dto is None:
+            assert fact is not None
+            if dto is None:
                 logger.warning(
-                    "[adv_id=%s] v3: no WBAdvDTO, plan/fact cache not updated "
+                    "[adv_id=%s] v3: no WBAdvDTO, skip post-gate and snapshot "
                     "(retry next cycle)",
                     complex_adv.adv_id,
                 )
@@ -648,8 +687,12 @@ async def process_adv_v3(
                     )
                 with trace.phase("apply_selector_actions"):
                     _ = ledger.apply_in_memory(selector_actions_logged)
-                with trace.phase("cache_plan_fact_snapshot"):
-                    await cache_plan_fact_snapshot()
+                if plan_fact_change is not None:
+                    with trace.phase("cache_plan_fact_snapshot"):
+                        await plan_fact_change.set_new_plan_fact(plan, fact)
+                if views_cache is not None and current_views is not None:
+                    with trace.phase("cache_views_snapshot"):
+                        await views_cache.set_views(current_views)
                 up_count = sum(
                     1 for a in selector_actions_logged if a.action.value == "UP"
                 )

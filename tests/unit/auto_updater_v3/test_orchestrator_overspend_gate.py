@@ -49,6 +49,9 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
     plan_fact.set_new_plan_fact = AsyncMock()
+    views_cache = MagicMock()
+    views_cache.get_cached_views = AsyncMock(return_value=100)
+    views_cache.set_views = AsyncMock()
 
     select_mock = MagicMock(return_value=[])
 
@@ -67,6 +70,14 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
             return_value=plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            return_value=views_cache,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
@@ -104,6 +115,44 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
 
     select_mock.assert_called_once()
     plan_fact.set_new_plan_fact.assert_awaited_once()
+    views_cache.set_views.assert_awaited_once_with(100)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("plan_fact_equal", "cached_views", "current_views", "expect_calibration"),
+    [
+        (True, 100, 100, False),
+        (False, 100, 100, False),
+        (True, 100, 200, False),
+        (False, 100, 200, True),
+    ],
+)
+async def test_calibration_trim_and_gate_plan_fact_views(
+    plan_fact_equal: bool,
+    cached_views: int | None,
+    current_views: int,
+    expect_calibration: bool,
+) -> None:
+    """AND-gate: calibration только если plan/fact и views оба изменились."""
+    plan = _plan_for_cpa_gates()
+    fact = _fact_for_cpa_gates(pay_for_order=85.0)
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    assert float(fact.pay_for_order) >= 0.9 * float(resolve)
+    assert float(fact.pay_for_order) <= float(plan.max_pay_for_order)
+
+    _, calibration, _, _, _ = await _run_preamble_with_fact_cpa(
+        pay_for_order=85.0,
+        plan_fact_equal=plan_fact_equal,
+        cached_views=cached_views,
+        current_views=current_views,
+    )
+
+    if expect_calibration:
+        calibration.assert_called_once()
+    else:
+        calibration.assert_not_called()
 
 
 @pytest.mark.unit
@@ -230,7 +279,13 @@ def _fact_for_cpa_gates(*, pay_for_order: float) -> FactData:
     )
 
 
-async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMock, MagicMock, MagicMock]:
+async def _run_preamble_with_fact_cpa(
+    *,
+    pay_for_order: float,
+    plan_fact_equal: bool = False,
+    cached_views: int | None = 100,
+    current_views: int = 200,
+) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock, MagicMock]:
     """NORMAL preamble: моки realloc/calibration/guard, fact CPA = ``pay_for_order``."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=pay_for_order)
@@ -249,6 +304,10 @@ async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMoc
     realloc = MagicMock(return_value=[])
     calibration = MagicMock(return_value=[])
     guard = MagicMock(return_value=[])
+
+    views_cache = MagicMock()
+    views_cache.get_cached_views = AsyncMock(return_value=cached_views)
+    views_cache.set_views = AsyncMock()
 
     with (
         patch(
@@ -290,19 +349,27 @@ async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMoc
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
         ) as pfc_cls,
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            return_value=views_cache,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=current_views),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
         ),
     ):
         plan_fact = MagicMock()
-        plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=plan_fact_equal)
         plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
         updater_cls.get_plan_data.return_value = plan
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    return realloc, calibration, guard
+    return realloc, calibration, guard, plan_fact, views_cache
 
 
 @pytest.mark.unit
@@ -314,7 +381,7 @@ async def test_cost_reallocation_runs_when_fact_cpa_below_ninety_percent_resolve
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
 
     realloc.assert_called_once()
     calibration.assert_not_called()
@@ -331,7 +398,12 @@ async def test_cost_reallocation_skipped_when_fact_cpa_near_resolve_but_below_ma
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
     assert float(fact.pay_for_order) <= float(plan.max_pay_for_order)
 
-    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=85.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(
+        pay_for_order=85.0,
+        plan_fact_equal=False,
+        cached_views=100,
+        current_views=200,
+    )
 
     realloc.assert_not_called()
     calibration.assert_called_once()
@@ -347,7 +419,7 @@ async def test_resolve_calibration_trim_skipped_when_fact_below_ninety_percent_r
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
 
     realloc.assert_called_once()
     calibration.assert_not_called()
@@ -363,7 +435,7 @@ async def test_resolve_calibration_trim_skipped_when_fact_above_max() -> None:
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
 
-    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
     realloc.assert_not_called()
     calibration.assert_not_called()
@@ -380,7 +452,7 @@ async def test_max_cpa_guard_runs_when_fact_cpa_above_plan_max() -> None:
     assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
 
-    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
     realloc.assert_not_called()
     calibration.assert_not_called()
