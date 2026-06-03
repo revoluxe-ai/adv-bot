@@ -12,6 +12,7 @@ from app.client_bot.user_interface.views.messages.v3_tick_report_informer import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
     V3PhaseStats,
     V3TickReportSnapshot,
+    WhiteListCostLeader,
 )
 
 
@@ -73,7 +74,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "ИТОГ тика" in text
     assert "+7" in text
     assert "пропуск" in text
-    assert "TIGHTEN" in text
+    assert "DOWN" in text
     assert "Авто: 40" in text
     assert "Возможные:" not in text
 
@@ -96,9 +97,39 @@ def test_format_zero_calibration_shows_outcome_note_not_counters() -> None:
         ],
     )
     text = format_v3_tick_report_text(snap)
-    assert "LOOSEN" in text
-    assert "без изменений — нет ключей для UP" in text
+    assert "UP" in text
+    assert "без изменений —" in text
+    assert "LOOSEN" not in text
     assert "↑0" not in text
+
+
+@pytest.mark.unit
+def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
+    snap = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+        adv_id=1,
+        adv_name="Крем",
+        campaign_mode="NORMAL",
+        calibration_effective_steps=4,
+        calibration_direct="up",
+        calibration_prev_effective_steps=2,
+        white_list_cost_leader=WhiteListCostLeader(
+            keyword_text="крем антивозрастной",
+            keyword_setting_id=10,
+            data_tier="keyword_pfo",
+            strategy_mode="OPTIMUM",
+            cost_source="pfo",
+            decision_cpo=420.0,
+            state_cpo=380.0,
+            pfo_cpo=420.0,
+        ),
+    )
+    text = format_v3_tick_report_text(snap)
+    assert "Калибровка: UP" in text
+    assert "adaptive" not in text.lower()
+    assert "БС max (PFO" in text
+    assert "420" in text
+    assert "крем антивозрастной" in text
 
 
 @pytest.mark.unit

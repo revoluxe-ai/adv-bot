@@ -398,7 +398,7 @@ def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_reso
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].reason == "resolve_calibration_loosen"
+    assert actions[0].reason == "resolve_calibration_up"
     assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
 
 

@@ -6,9 +6,10 @@ Collector накапливает фазы в ``process_adv_v3``; snapshot пиш
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,22 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordV3Eligibility,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+        KeywordV3Context,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        PreparedList,
+    )
+
+_HARD_STATUS_WHITE_LIST = 2
 
 _HARD_STATUS_LABELS: dict[int, str] = {
     0: "Не релевантные",
@@ -68,6 +85,118 @@ def count_hard_status_distribution(
         label = hard_status_label_ru(kw.hard_status)
         counts[label] = counts.get(label, 0) + 1
     return {k: v for k, v in counts.items() if v > 0}
+
+
+class WhiteListCostLeader(BaseModel):
+    """Самый дорогой ключ белого списка (hard_status=2) для отчёта тика."""
+
+    keyword_text: str
+    keyword_setting_id: int | None = None
+    data_tier: str = ""
+    strategy_mode: str = ""
+    cost_source: str = ""
+    decision_cpo: float = 0.0
+    state_cpo: float | None = None
+    pfo_cpo: float | None = None
+
+    model_config = {"extra": "forbid"}
+
+
+def find_white_list_cost_leader(
+    contexts: list[KeywordV3Context],
+    *,
+    prepared: PreparedList,
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
+    ladder_inputs: LadderInputs | None,
+) -> WhiteListCostLeader | None:
+    """Ключ БС с максимальным decision CPO (state для FULL, PFO для keyword_pfo).
+
+    Args:
+        contexts: контексты кампании (после preamble).
+        prepared: operable snapshot для ``resolve_effective_state_cost``.
+        eligibility_by_ks_id: tier/eligibility по ks_id.
+        ladder_inputs: RK/rec лестница; без неё state CPO не считается.
+
+    Returns:
+        Лидер или ``None``, если нет БС с измеримым CPO.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+        stored_strategy_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+        resolve_effective_state_cost_for_mode,
+    )
+
+    if ladder_inputs is None:
+        return None
+
+    best: WhiteListCostLeader | None = None
+    best_cpo = -1.0
+
+    for ctx in contexts:
+        if int(ctx.keyword.hard_status) != _HARD_STATUS_WHITE_LIST:
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        mode = stored_strategy_mode(ctx.keyword)
+        pfo_raw = ctx.keyword.pay_for_order
+        pfo_cpo: float | None = None
+        if pfo_raw is not None and math.isfinite(float(pfo_raw)) and float(pfo_raw) > 0:
+            pfo_cpo = float(pfo_raw)
+
+        state_cpo: float | None = None
+        if mode != KeywordStrategyMode.OFF:
+            cost, _ = resolve_effective_state_cost_for_mode(
+                ctx=ctx,
+                to_mode=mode,
+                prepared=prepared,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+                ladder_inputs=ladder_inputs,
+            )
+            if cost != float("inf") and math.isfinite(float(cost)) and float(cost) > 0:
+                state_cpo = float(cost)
+
+        elig = (
+            eligibility_by_ks_id.get(int(ks_id))
+            if eligibility_by_ks_id is not None and ks_id is not None
+            else None
+        )
+        tier = elig.data_tier.value if elig is not None else ""
+        cost_source = ""
+        decision: float | None = None
+        if elig is not None and elig.data_tier == KeywordDataTier.KEYWORD_PFO:
+            if pfo_cpo is not None:
+                decision = pfo_cpo
+                cost_source = "pfo"
+        elif elig is not None and elig.data_tier == KeywordDataTier.KEYWORD_FULL:
+            if state_cpo is not None:
+                decision = state_cpo
+                cost_source = "state"
+        else:
+            for value, source in ((state_cpo, "state"), (pfo_cpo, "pfo")):
+                if value is not None and value > (decision or -1.0):
+                    decision = value
+                    cost_source = source
+
+        if decision is None or decision <= best_cpo:
+            continue
+        best_cpo = decision
+        text = (ctx.keyword.text or "").strip()
+        if len(text) > 48:
+            text = text[:45] + "…"
+        best = WhiteListCostLeader(
+            keyword_text=text or f"ks_id={ks_id}",
+            keyword_setting_id=int(ks_id) if ks_id is not None else None,
+            data_tier=tier,
+            strategy_mode=mode.name,
+            cost_source=cost_source,
+            decision_cpo=decision,
+            state_cpo=state_cpo,
+            pfo_cpo=pfo_cpo,
+        )
+    return best
 
 
 @dataclass(frozen=True)
@@ -165,6 +294,10 @@ class V3TickReportSnapshot(BaseModel):
     net_up: int = 0
     net_down: int = 0
     net_force_off: int = 0
+    calibration_effective_steps: int | None = None
+    calibration_direct: str | None = None
+    calibration_prev_effective_steps: int | None = None
+    white_list_cost_leader: WhiteListCostLeader | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -291,6 +424,10 @@ class V3TickReportCollector:
         resolve: float | None = None,
         max_pay_for_order: float | None = None,
         tick_at: datetime | None = None,
+        calibration_effective_steps: int | None = None,
+        calibration_direct: str | None = None,
+        calibration_prev_effective_steps: int | None = None,
+        white_list_cost_leader: WhiteListCostLeader | None = None,
     ) -> V3TickReportSnapshot:
         """Собрать финальный snapshot для Redis."""
         aggression_after = campaign_aggression_score(keywords)
@@ -317,4 +454,8 @@ class V3TickReportCollector:
             net_up=applied_bd.up,
             net_down=applied_bd.down,
             net_force_off=applied_bd.force_off,
+            calibration_effective_steps=calibration_effective_steps,
+            calibration_direct=calibration_direct,
+            calibration_prev_effective_steps=calibration_prev_effective_steps,
+            white_list_cost_leader=white_list_cost_leader,
         )

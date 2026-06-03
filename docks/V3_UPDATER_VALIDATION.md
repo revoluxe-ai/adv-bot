@@ -33,7 +33,7 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter/sync → B → U → S → G → R → enable → calibration(TIGHTEN|LOOSEN)
+NORMAL    → filter/sync → B → U → S → G → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
@@ -47,7 +47,7 @@ NORMAL    → filter/sync → B → U → S → G → R → enable → calibrati
 4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
 5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
 6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate plan+views и **fact < 0.9×resolve**.
-7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **TIGHTEN** (DOWN) или **LOOSEN** (UP) к `0.9×resolve`; gate `fact ≤ max` + plan/views; skip если G applied; adaptive steps ×2/÷2.
+7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN.
 8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
 9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
@@ -129,8 +129,8 @@ Rec-gate:
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
 2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
 3. **COST_REALLOCATION** — DOWN-only rebalance (headroom); gate `fact < 0.9×resolve`.
-4. **RESOLVE_CALIBRATION** — limited **TIGHTEN** (DOWN до `state_cost <= resolve`) или **LOOSEN** (UP пока `state_cost <= resolve`) при `fact ≤ max` **и**
-   `not plan_fact_equal` **и** `not views_equal` (AND-gate). Направление: `fact < 0.9×resolve` → LOOSEN, иначе TIGHTEN.
+4. **RESOLVE_CALIBRATION** — **DOWN** (limited trim до `state_cost <= resolve`) или **UP** (один ключ, следующий effective-шаг, min CPO) при `fact ≤ max` **и**
+   `not plan_fact_equal` **и** `not views_equal` (AND-gate). Направление: `fact < 0.9×resolve` → UP, иначе DOWN.
    За тик — не более `max_effective_steps` effective ladder-шагов на ключ; early stop по cost ceiling.
    Guard / realloc / expansion — full-trim без лимита.
 5. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
@@ -150,8 +150,8 @@ Calibration: **AND** — оба сигнала должны измениться
 ### Adaptive calibration steps (Redis `V3CalibrationStepState`)
 
 Направление по зоне fact vs resolve:
-- **TIGHTEN** — `fact >= 0.9×resolve` (в зоне калибровки, подтягиваем расход);
-- **LOOSEN** — `fact < 0.9×resolve`.
+- **DOWN** (`tighten`) — `fact >= 0.9×resolve`; limited trim к resolve; adaptive steps.
+- **UP** (`loosen`) — `fact < 0.9×resolve`; один ключ, следующий effective-шаг, min CPO.
 
 Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, default 1):
 - первый тик / нет Redis-истории → `1`;
@@ -193,6 +193,7 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 - **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
 - **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
 - **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …` (фаза не запускалась). **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note` (диагностика `v3_tick_report_phase_notes`, зеркалит `plan_*`). Счётчики `↑/↓/off` только при ненулевом плане фазы. Старые снимки без `outcome_note` — fallback «причина не зафиксирована».
+- **Шапка:** adaptive calibration (`calibration_effective_steps`, `calibration_direct`, `calibration_prev_effective_steps` из Redis resolver); **БС max** — самый дорогой ключ `hard_status=2` по decision CPO (FULL → state, PFO → `pay_for_order`), с обоими CPO если доступны.
 
 ## UI: порядок ключей в списке (V3)
 

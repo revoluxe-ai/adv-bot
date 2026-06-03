@@ -38,14 +38,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     _HARD_STATUS_AUTO_MODE,
     _HARD_STATUS_WHITE_LIST,
     _eligibility_for_ctx,
-    _find_boost_target_mode_limited_steps,
     _find_trim_target_mode_limited_steps,
     _hard_status_allows_up,
     _min_cpa_bound_by_pay_for_order,
     _mode_catalog_for_ctx,
-    candidate_for_strategy_mode,
     ladder_inputs_for_prepared,
-    mode_candidates_same_effective_target,
     resolve_effective_state_cost_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
@@ -327,14 +324,12 @@ def _note_resolve_calibration(
     click = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
     aggr = aggressiveness or V3RolloutAggressiveness.MID
     if direct == CalibrationDirect.LOOSEN:
-        return _note_calibration_loosen(
+        return _note_calibration_up(
             prepared,
-            cost_ceiling=float(resolve),
             shelf_click_mode=click,
             aggressiveness=aggr,
             eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
-            max_effective_steps=max_effective_steps,
         )
     if direct == CalibrationDirect.TIGHTEN:
         return _note_calibration_tighten(
@@ -349,83 +344,33 @@ def _note_resolve_calibration(
     return "направление калибровки не задано"
 
 
-def _note_calibration_loosen(
+def _note_calibration_up(
     prepared: PreparedList,
     *,
-    cost_ceiling: float,
     shelf_click_mode: ShelfClickMode,
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
-    max_effective_steps: int,
 ) -> str:
+    """Причина нулевого UP: нет ключа со следующим effective-шагом."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+        collect_calibration_up_next_step_candidates,
+    )
+
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    off_skip = 0
-    not_operable = 0
-    ladder_skip = 0
-    min_cpa_bound = 0
-    no_up_step = 0
-    same_target = 0
-    operable = 0
-    for ctx, current in prepared:
-        if current == KeywordStrategyMode.OFF:
-            off_skip += 1
-            continue
-        hard_status = int(ctx.keyword.hard_status)
-        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
-            not_operable += 1
-            continue
-        operable += 1
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            not_operable += 1
-            continue
-        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        if elig is not None and not elig.participates_in_ladder:
-            ladder_skip += 1
-            continue
-        if _min_cpa_bound_by_pay_for_order(elig):
-            min_cpa_bound += 1
-            continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        target = _find_boost_target_mode_limited_steps(
-            ctx,
-            current,
-            catalog=catalog,
-            cost_ceiling=float(cost_ceiling),
-            ladder_inputs=ladder,
-            policy=policy,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-            max_effective_steps=max_effective_steps,
-        )
-        if target == current:
-            no_up_step += 1
-            continue
-        current_c = candidate_for_strategy_mode(current, catalog)
-        target_c = candidate_for_strategy_mode(target, catalog)
-        if mode_candidates_same_effective_target(current_c, target_c):
-            same_target += 1
-            continue
-    if operable == 0:
-        return "нет operable ключей (все OFF или не auto/БС)"
-    parts: list[str] = []
-    if no_up_step:
-        parts.append(f"{no_up_step} без шага UP в пределах resolve")
-    if same_target:
-        parts.append(f"{same_target} уже на целевом effective-режиме")
-    if ladder_skip:
-        parts.append(f"{ladder_skip} rec/ladder gate")
-    if min_cpa_bound:
-        parts.append(f"{min_cpa_bound} min_cpa bound")
-    detail = ", ".join(parts) if parts else "потолок режима / нет effective-шага"
-    return (
-        f"нет ключей для UP: {operable} operable — {detail} "
-        f"(adaptive ≤{max_effective_steps})"
+    pool = collect_calibration_up_next_step_candidates(
+        prepared,
+        policy=policy,
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=eligibility_by_ks_id,
     )
+    if not pool:
+        return "нет ключа с допустимым следующим шагом UP (state/PFO)"
+    return f"пул UP: {len(pool)} кандидатов, действие не сформировано"
 
 
 def _note_calibration_tighten(
@@ -486,7 +431,7 @@ def _note_calibration_tighten(
     if operable == 0:
         return "нет operable ключей"
     if already_ok == operable:
-        return f"все {operable} operable уже с state_cost ≤ resolve"
+        return f"все {operable} operable уже с CPO ≤ resolve"
     return (
         f"нет ключей для DOWN: {operable} operable "
         f"({already_ok} уже ≤ resolve, {no_down} без шага DOWN)"

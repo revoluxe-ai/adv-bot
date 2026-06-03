@@ -50,6 +50,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3Action,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordV3Eligibility,
     build_eligibility_map,
     build_target_place_fallback_zero_by_keyword_id,
 )
@@ -61,6 +62,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
     V3TickReportCollector,
+    find_white_list_cost_leader,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_phase_notes import (
     summarize_phase_zero_actions,
@@ -90,9 +92,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     plan_resolve_calibration,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
     SelectionPolicy,
     build_prepared_from_contexts,
-    plan_shelf_rec_false_cleanup_down, PreparedList,
+    plan_shelf_rec_false_cleanup_down,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -398,6 +401,9 @@ async def process_adv_v3(
     calibration_step_cache: V3CalibrationStepState | None = None
     effective_calibration_steps = 1
     current_calibration_direct: CalibrationDirect | None = None
+    calibration_prev_effective_steps: int | None = None
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None
+    ladder_inputs: LadderInputs | None = None
 
     try:
         with trace.phase("build_keyword_v3_contexts"):
@@ -565,6 +571,11 @@ async def process_adv_v3(
             )
             with trace.phase("calibration_effective_steps_resolve"):
                 calibration_prev_state = await calibration_step_cache.get_state()
+                calibration_prev_effective_steps = (
+                    calibration_prev_state.effective_steps
+                    if calibration_prev_state is not None
+                    else None
+                )
                 effective_calibration_steps = resolve_effective_calibration_steps(
                     complex_adv.keyword_calibration_max_step,
                     prev=calibration_prev_state,
@@ -956,6 +967,7 @@ async def process_adv_v3(
                     all_contexts,
                     campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
                 )
+            eligibility_by_ks_id = eligibility
 
         if plan is not None and allows_ladder_phases(campaign_mode):
             assert fact is not None
@@ -1058,6 +1070,15 @@ async def process_adv_v3(
                     else None
                 )
                 adv_name = str(getattr(adv, "name", "") or "")
+                wl_leader = None
+                if ladder_inputs is not None and contexts:
+                    prepared_for_report = build_prepared_from_contexts(contexts)
+                    wl_leader = find_white_list_cost_leader(
+                        contexts,
+                        prepared=prepared_for_report,
+                        eligibility_by_ks_id=eligibility_by_ks_id,
+                        ladder_inputs=ladder_inputs,
+                    )
                 snapshot = tick_report.build_snapshot(
                     adv_id=int(complex_adv.adv_id),
                     adv_name=adv_name,
@@ -1068,6 +1089,18 @@ async def process_adv_v3(
                     fact_cpa=fact_cpa,
                     resolve=resolve_for_report,
                     max_pay_for_order=max_pfo,
+                    calibration_effective_steps=(
+                        effective_calibration_steps
+                        if current_calibration_direct is not None
+                        else None
+                    ),
+                    calibration_direct=(
+                        current_calibration_direct.value
+                        if current_calibration_direct is not None
+                        else None
+                    ),
+                    calibration_prev_effective_steps=calibration_prev_effective_steps,
+                    white_list_cost_leader=wl_leader,
                 )
                 await persist_v3_tick_report(adv, snapshot)
             except Exception:

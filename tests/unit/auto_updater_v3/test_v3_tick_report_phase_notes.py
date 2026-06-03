@@ -56,7 +56,7 @@ def test_calibration_loosen_empty_prepared() -> None:
         resolve=550.0,
         calibration_direct=CalibrationDirect.LOOSEN,
     )
-    assert "operable" in note.lower()
+    assert "следующим шагом UP" in note
 
 
 @pytest.mark.unit
@@ -81,5 +81,4 @@ def test_calibration_loosen_operable_at_ceiling() -> None:
         calibration_direct=CalibrationDirect.LOOSEN,
         max_effective_steps=1,
     )
-    assert "нет ключей для UP" in note
-    assert "operable" in note
+    assert "следующим шагом UP" in note
