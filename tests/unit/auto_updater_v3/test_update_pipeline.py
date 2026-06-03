@@ -134,9 +134,9 @@ def test_build_normal_preamble_executors_order() -> None:
     assert names == [
         "validate_state_by_hard_status",
         "validate_not_full_state",
-        "passing_up",
+        "raise_state_to_target_cpo",
+        "reset_over_max_cpo_on_overspend",
         "shelf_cleanup",
-        "max_cpa_guard",
         "cost_reallocation",
         "pay_for_order_gap_enable",
         "resolve_calibration",

@@ -102,6 +102,15 @@ def summarize_phase_zero_actions(
     handlers = {
         "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
+        "raise_state_to_target_cpo": lambda: _note_raise_state_to_target_cpo(
+            prepared,
+            resolve=resolve,
+        ),
+        "reset_over_max_cpo_on_overspend": lambda: _note_reset_over_max_cpo(
+            prepared,
+            max_pay_for_order=max_pay_for_order,
+            fact_pay_for_order=fact_pay_for_order,
+        ),
         "passing_up": lambda: _note_passing_up(
             prepared,
             resolve=resolve,
@@ -163,6 +172,35 @@ def _note_validate_not_full(prepared: PreparedList) -> str:
         if not bool(ctx.position_profile):
             return "NOT FULL active уже MIN + target_place=0"
     return "нет NOT FULL active ключей"
+
+
+def _note_raise_state_to_target_cpo(
+    prepared: PreparedList,
+    *,
+    resolve: float | None,
+) -> str:
+    if resolve is None or float(resolve) <= 0:
+        return "resolve недоступен"
+    if not prepared:
+        return "нет operable ключей"
+    return "нет ключей для подъёма до resolve (все ступени выше resolve или уже на max)"
+
+
+def _note_reset_over_max_cpo(
+    prepared: PreparedList,
+    *,
+    max_pay_for_order: float | None,
+    fact_pay_for_order: float | None,
+) -> str:
+    if max_pay_for_order is None:
+        return "max недоступен"
+    if fact_pay_for_order is None:
+        return "fact pay_for_order недоступен"
+    if float(fact_pay_for_order) <= float(max_pay_for_order):
+        return "fact ≤ plan max (overspend gate)"
+    if not prepared:
+        return "нет operable ключей"
+    return "нет GAP/active ключей с ladder CPO > max для сброса"
 
 
 def _note_passing_up(

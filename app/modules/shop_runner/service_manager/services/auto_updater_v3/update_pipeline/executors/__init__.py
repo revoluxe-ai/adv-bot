@@ -4,7 +4,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     UpdateExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation import (
-    CostReallocationExecutor,
+    RebalanceExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
@@ -21,8 +21,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable import (
     PayForOrderGapEnableExecutor,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import \
-    RaiseStateToTargetCpoExecutor
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
+    RaiseStateToTargetCpoExecutor,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.reset_over_max_cpo_on_overspend import (
+    ResetOverMaxCpoOnOverspendExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
     ResolveCalibrationExecutor,
 )
@@ -32,26 +36,28 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 def build_normal_preamble_executors() -> list[UpdateExecutor]:
-    """Стандартный порядок NORMAL preamble: V → NF → U → S → G → R → enable → calibration."""
+    """Стандартный порядок NORMAL preamble: V → NF → raise → reset → S → R → enable → calibration."""
     return [
-        HardStatusValidateExecutor(), # новый
-        NotFullValidateExecutor(), # новый
-        RaiseStateToTargetCpoExecutor(), # новый
-        ResetOverMaxCPOOnOverSpend(), # новый
+        HardStatusValidateExecutor(),
+        NotFullValidateExecutor(),
+        RaiseStateToTargetCpoExecutor(),
+        ResetOverMaxCpoOnOverspendExecutor(),
         ShelfCleanupExecutor(),
-        CostReallocationExecutor(),
+        RebalanceExecutor(),
         PayForOrderGapEnableExecutor(),
         ResolveCalibrationExecutor(),
     ]
 
 
 __all__ = [
-    "CostReallocationExecutor",
+    "RebalanceExecutor",
     "HardStatusValidateExecutor",
     "MaxCpaGuardExecutor",
     "NotFullValidateExecutor",
     "PassingUpExecutor",
     "PayForOrderGapEnableExecutor",
+    "RaiseStateToTargetCpoExecutor",
+    "ResetOverMaxCpoOnOverspendExecutor",
     "ResolveCalibrationExecutor",
     "ShelfCleanupExecutor",
     "UpdateExecutor",

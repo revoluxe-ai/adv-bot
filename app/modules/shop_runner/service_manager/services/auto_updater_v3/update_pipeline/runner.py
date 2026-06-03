@@ -34,6 +34,8 @@ class PreamblePipelineRunResult:
     cap_down_count: int = 0
     validate_not_full_count: int = 0
     validate_count: int = 0
+    raise_state_count: int = 0
+    reset_over_max_cpo_count: int = 0
     passing_up_count: int = 0
     shelf_count: int = 0
     guard_count: int = 0

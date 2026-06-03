@@ -1,4 +1,4 @@
-"""Unit: raise_state_to_target_cpo executor, NSM и KeywordDTO ladder helpers."""
+"""Unit: raise_state_to_target_cpo executor, NSM и ladder_state_pick."""
 
 from __future__ import annotations
 
@@ -26,6 +26,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
     build_normal_preamble_executors,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+    has_operable_cpo,
+    pick_max_ladder_state_at_or_below_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
     RaiseStateToTargetCpoExecutor,
@@ -94,42 +98,33 @@ def _dto(
 
 
 @pytest.mark.unit
-def test_available_ladder_states_excludes_off_and_none_cpo() -> None:
+def test_has_operable_cpo_excludes_off_and_none_cpo() -> None:
     dto = _dto()
-    available = dto.available_ladder_states
-    assert len(available) == 3
-    assert all(state.cpo is not None for state in available)
-    assert all(
-        state.stage
-        in (
-            V3LadderStageKind.MIN_CPA,
-            V3LadderStageKind.OPTIMUM,
-            V3LadderStageKind.MAX_CONVERSION,
-        )
-        for state in available
-    )
+    assert has_operable_cpo(dto) is True
+    dto_empty = _dto(ladder=_ladder_states(1, min_cpo=None, opt_cpo=None, max_cpo=None))
+    assert has_operable_cpo(dto_empty) is False
 
 
 @pytest.mark.unit
-def test_max_ladder_state_at_or_below_cpo_picks_highest_passing() -> None:
+def test_pick_max_ladder_state_at_or_below_cpo_picks_highest_passing() -> None:
     dto = _dto()
-    winner = dto.max_ladder_state_at_or_below_cpo(500.0)
+    winner = pick_max_ladder_state_at_or_below_cpo(dto, 500.0)
     assert winner is not None
     assert winner.strategy_mode == KeywordStrategyMode.OPTIMUM
     assert winner.cpo == 400.0
 
 
 @pytest.mark.unit
-def test_max_ladder_state_at_or_below_cpo_returns_none_when_all_above() -> None:
+def test_pick_max_ladder_state_at_or_below_cpo_returns_none_when_all_above() -> None:
     dto = _dto()
-    assert dto.max_ladder_state_at_or_below_cpo(250.0) is None
+    assert pick_max_ladder_state_at_or_below_cpo(dto, 250.0) is None
 
 
 @pytest.mark.unit
-def test_max_ladder_state_at_or_below_cpo_returns_none_when_no_operable_cpo() -> None:
+def test_pick_max_ladder_state_at_or_below_cpo_returns_none_when_no_operable_cpo() -> None:
     dto = _dto(ladder=_ladder_states(1, min_cpo=None, opt_cpo=None, max_cpo=None))
-    assert dto.available_ladder_states == ()
-    assert dto.max_ladder_state_at_or_below_cpo(500.0) is None
+    assert has_operable_cpo(dto) is False
+    assert pick_max_ladder_state_at_or_below_cpo(dto, 500.0) is None
 
 
 @pytest.mark.unit
@@ -151,7 +146,9 @@ def test_apply_ladder_state_sets_mode_and_target_place() -> None:
 def test_nsm_raise_state_to_target_cpo_applies_winner() -> None:
     nsm = NextStateManager(RaiseStateToTargetCpoExecutor)
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
-    nsm.raise_state_to_target_cpo(dto, 500.0)
+    winner = pick_max_ladder_state_at_or_below_cpo(dto, 500.0)
+    assert winner is not None
+    nsm.raise_state_to_target_cpo(dto, winner)
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
     assert dto.target_place == 20
 
@@ -160,7 +157,7 @@ def test_nsm_raise_state_to_target_cpo_applies_winner() -> None:
 def test_nsm_raise_state_to_target_cpo_noop_when_no_candidate() -> None:
     nsm = NextStateManager(RaiseStateToTargetCpoExecutor)
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
-    nsm.raise_state_to_target_cpo(dto, 250.0)
+    nsm.raise_state_to_target_cpo(dto, None)
     assert dto.next_state == []
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
 
@@ -184,13 +181,7 @@ def test_raise_state_executor_mutates_matching_keywords_only() -> None:
 
 
 @pytest.mark.unit
-def test_raise_state_executor_not_in_preamble() -> None:
+def test_raise_state_executor_in_preamble() -> None:
     executors = build_normal_preamble_executors()
     assert executors[0].phase_name == "validate_state_by_hard_status"
-    assert not any(
-        isinstance(ex, RaiseStateToTargetCpoExecutor) for ex in executors
-    )
-    assert not any(
-        getattr(ex, "phase_name", "") == "raise_state_to_target_cpo"
-        for ex in executors
-    )
+    assert executors[2].phase_name == "raise_state_to_target_cpo"

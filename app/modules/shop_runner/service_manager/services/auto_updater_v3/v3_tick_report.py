@@ -307,12 +307,14 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "validate_not_full_state": ("2 · NF · validate_not_full", "DOWN"),
-    "passing_up": ("3 · U · passing_up", "UP"),
-    "shelf_cleanup": ("4 · S · shelf cleanup", "DOWN, OFF"),
-    "max_cpa_guard": ("5 · G · max CPA guard", "DOWN, OFF"),
-    "cost_reallocation": ("6 · R · cost_reallocation", "DOWN, REBALANCE"),
-    "pay_for_order_gap_enable": ("7 · enable · gap", "UP"),
-    "resolve_calibration": ("8 · calibration", "UP, DOWN"),
+    "raise_state_to_target_cpo": ("3 · R↑ · raise to resolve", "UP"),
+    "reset_over_max_cpo_on_overspend": ("4 · R↓ · reset over max CPO", "DOWN, OFF"),
+    "passing_up": ("5 · U · passing_up", "UP"),
+    "shelf_cleanup": ("6 · S · shelf cleanup", "DOWN, OFF"),
+    "max_cpa_guard": ("7 · G · max CPA guard", "DOWN, OFF"),
+    "cost_reallocation": ("8 · R · cost_reallocation", "DOWN, REBALANCE"),
+    "pay_for_order_gap_enable": ("9 · enable · gap", "UP"),
+    "resolve_calibration": ("10 · calibration", "UP, DOWN"),
 }
 
 
