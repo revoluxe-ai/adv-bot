@@ -1,9 +1,9 @@
 """In-memory ladder state за один тик V3 и нетто-flush в БД.
 
 Фазы (M1, trim, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
-in-memory; в конце тика — один commit только ``strategy_mode`` + ``hard_status`` для
-ключей, у которых нетто-режим отличается от baseline, с bulk-проверкой свежего
-``hard_status`` в БД (отбрасываем ``hard_status`` не in {1, 2}).
+in-memory; в конце тика — один commit ``strategy_mode`` + ``hard_status`` для ключей,
+у которых нетто-состояние отличается от baseline (в т.ч. ``hard_status_mode_sync``).
+Bulk-проверка свежего ``hard_status`` в БД — только operable {1, 2}.
 """
 
 from __future__ import annotations
@@ -20,12 +20,16 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     AppliedV3Action,
     V3_ACTION_APPLY_ORDER,
-    can_persist_netto_mode_change,
+    can_persist_v3_keyword_state_change,
     hard_status_for_strategy_mode,
     hard_status_allows_force_off,
     hard_status_allows_up,
     persist_last_applied_v3,
     resolve_v3_action_target_mode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
+    HARD_STATUS_MODE_SYNC_REASON,
+    is_v3_operable_hard_status,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
@@ -54,6 +58,7 @@ class V3TickKeywordLedger:
     keywords: list[CalculatedKeyword]
     _by_id: dict[int, CalculatedKeyword] = field(default_factory=dict)
     _baseline_mode: dict[int, KeywordStrategyMode] = field(default_factory=dict)
+    _baseline_hard_status: dict[int, int] = field(default_factory=dict)
     _last_reason: dict[int, str] = field(default_factory=dict)
     _netto_action_type: dict[int, V3ActionType] = field(default_factory=dict)
     _tick_applied: list[AppliedV3Action] = field(default_factory=list)
@@ -74,6 +79,7 @@ class V3TickKeywordLedger:
         ledger = cls(keywords=list(keywords))
         for ks_id, kw in ledger._by_id.items():
             ledger._baseline_mode[int(ks_id)] = kw.keyword_setting.strategy_mode
+            ledger._baseline_hard_status[int(ks_id)] = int(kw.keyword_setting.hard_status)
         return ledger
 
     def baseline_mode_for(self, ks_id: int) -> KeywordStrategyMode | None:
@@ -113,6 +119,28 @@ class V3TickKeywordLedger:
                 self.keywords[idx] = updated
                 break
         self._by_id[ks_id] = updated
+
+    def sync_operable_hard_status_with_strategy_mode(self) -> int:
+        """Привести ``hard_status`` operable-ключей в соответствие с ``strategy_mode``.
+
+        OFF → 1, active mode → 2. In-memory only; flush — ``flush_to_db``.
+
+        Returns:
+            Число ключей с исправленным ``hard_status``.
+        """
+        fixed = 0
+        for ks_id, kw in list(self._by_id.items()):
+            current_hs = int(kw.keyword_setting.hard_status)
+            if not is_v3_operable_hard_status(current_hs):
+                continue
+            mode = kw.keyword_setting.strategy_mode
+            expected_hs = hard_status_for_strategy_mode(mode)
+            if current_hs == expected_hs:
+                continue
+            self._set_keyword_mode(ks_id, mode, new_hard_status=expected_hs)
+            self._last_reason[ks_id] = HARD_STATUS_MODE_SYNC_REASON
+            fixed += 1
+        return fixed
 
     def _record_applied(
         self,
@@ -252,16 +280,31 @@ class V3TickKeywordLedger:
         )
         return True
 
-    def _netto_changes(self) -> dict[int, KeywordStrategyMode]:
-        """``ks_id`` → желаемый ``strategy_mode``, если отличается от baseline тика."""
-        out: dict[int, KeywordStrategyMode] = {}
-        for ks_id, baseline in self._baseline_mode.items():
+    def _pending_db_state_changes(
+        self,
+    ) -> dict[int, tuple[KeywordStrategyMode, int]]:
+        """``ks_id`` → (desired mode, desired hard_status), если отличается от baseline."""
+        out: dict[int, tuple[KeywordStrategyMode, int]] = {}
+        for ks_id, baseline_mode in self._baseline_mode.items():
             kw = self._by_id.get(ks_id)
             if kw is None:
                 continue
-            desired = kw.keyword_setting.strategy_mode
-            if desired != baseline:
-                out[ks_id] = desired
+            desired_mode = kw.keyword_setting.strategy_mode
+            desired_hs = int(kw.keyword_setting.hard_status)
+            baseline_hs = self._baseline_hard_status.get(ks_id)
+            if desired_mode != baseline_mode or (
+                baseline_hs is not None and desired_hs != baseline_hs
+            ):
+                out[ks_id] = (desired_mode, desired_hs)
+        return out
+
+    def _netto_changes(self) -> dict[int, KeywordStrategyMode]:
+        """``ks_id`` → желаемый ``strategy_mode``, если отличается от baseline тика."""
+        out: dict[int, KeywordStrategyMode] = {}
+        for ks_id, (desired_mode, _desired_hs) in self._pending_db_state_changes().items():
+            baseline = self._baseline_mode.get(ks_id)
+            if baseline is not None and desired_mode != baseline:
+                out[ks_id] = desired_mode
         return out
 
     @staticmethod
@@ -281,46 +324,58 @@ class V3TickKeywordLedger:
         Returns:
             True, если хотя бы одна строка обновлена в БД.
         """
-        netto = self._netto_changes()
-        if not netto:
+        pending = self._pending_db_state_changes()
+        if not pending:
             return False
 
-        ks_ids = list(netto.keys())
+        ks_ids = list(pending.keys())
         db_applied: list[AppliedV3Action] = []
 
         async with sm(read_only=False) as session:
             rows = await self._fetch_keyword_rows(session, ks_ids)
             for ks_id, db_mode, db_hs, _text in rows:
-                desired = netto.get(ks_id)
-                if desired is None:
+                desired_pair = pending.get(ks_id)
+                if desired_pair is None:
                     continue
-                if not can_persist_netto_mode_change(db_mode, desired, db_hs):
+                desired_mode, desired_hs = desired_pair
+                if db_mode == desired_mode and int(db_hs) == desired_hs:
+                    continue
+                if not can_persist_v3_keyword_state_change(
+                    db_mode,
+                    desired_mode,
+                    db_hs,
+                    desired_hs,
+                ):
                     logger.debug(
-                        "v3 flush skip: id=%s db_mode=%s desired=%s hard_status=%s",
+                        "v3 flush skip: id=%s db_mode=%s desired_mode=%s "
+                        "db_hs=%s desired_hs=%s",
                         ks_id,
                         db_mode,
-                        desired,
+                        desired_mode,
                         db_hs,
+                        desired_hs,
                     )
                     continue
-                hs = hard_status_for_strategy_mode(desired)
                 _ = await session.execute(
                     update(KeywordSetting)
                     .where(KeywordSetting.id == ks_id)
-                    .values(strategy_mode=desired, hard_status=hs)
+                    .values(strategy_mode=desired_mode, hard_status=desired_hs)
                 )
                 reason = self._last_reason.get(ks_id, "v3_tick_flush")
-                action_type = self._netto_action_type.get(
-                    ks_id,
-                    self._action_type_for_netto(db_mode, desired),
-                )
+                if db_mode == desired_mode:
+                    action_type = V3ActionType.DO_NOTHING
+                else:
+                    action_type = self._netto_action_type.get(
+                        ks_id,
+                        self._action_type_for_netto(db_mode, desired_mode),
+                    )
                 db_applied.append(
                     AppliedV3Action(
                         action=action_type,
                         keyword_setting_id=ks_id,
                         keyword_text=self._keyword_text(ks_id),
                         from_mode=db_mode,
-                        to_mode=desired,
+                        to_mode=desired_mode,
                         reason=reason,
                     )
                 )

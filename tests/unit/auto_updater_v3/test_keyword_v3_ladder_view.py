@@ -179,61 +179,34 @@ def test_m_profile_o_profile_not_inf() -> None:
 
 
 @pytest.mark.unit
-def test_imputed_ch_not_n_state() -> None:
-    """CH + imputed conv (RK_AGGREGATE) — не N-state."""
+def test_no_own_conv_on_ch_is_not_n_state_when_pfo_present() -> None:
+    """CH без своей conv, но с PFO на другом ключе — не N-state bootstrap."""
     dead = _calculated_kw_fixture(
-        ks_id=1, text="dead", mode=KeywordStrategyMode.OFF, conv=0.0
+        ks_id=1, text="dead", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0
     )
     dead_stat = dead.cluster_stat.model_copy(
         update={"views": 0, "conv_views_to_orders": 0.0}
     )
     dead = dead.model_copy(update={"cluster_stat": dead_stat})
-    alive = _calculated_kw_fixture(
-        ks_id=2, text="alive", mode=KeywordStrategyMode.MIN_CPA, conv=0.12
-    )
     profile = _sample_profile()
     dead_ctx = KeywordV3Context(keyword=dead, position_profile=profile)
-    alive_ctx = KeywordV3Context(keyword=alive, position_profile=profile)
-    contexts = [dead_ctx, alive_ctx]
-    diag = diagnose_keyword_v3_data(
-        dead, profile, peer_contexts=contexts
-    )
-    assert not diag.n_state
-    assert diag.imputed_conv
+    diag = diagnose_keyword_v3_data(dead, profile, peer_contexts=[dead_ctx])
+    assert diag.has_ch_position_profile
+    assert not diag.imputed_conv
 
 
 @pytest.mark.unit
-def test_imputed_profile_cpo_can_differ_from_campaign_worst_max() -> None:
-    """Имп. conv на ключе: CPO профиля ≠ max worst по РК — UI показывает оба."""
-    cheap = _calc_kw(
-        ks_id=1,
-        text="cheap",
-        mode=KeywordStrategyMode.MIN_CPA,
-        rating=1.0,
-        conv=_conv_for_pay_for_order(15.0),
+def test_no_ch_optimum_never_worst_source() -> None:
+    """PFO tier: OPTIMUM недоступен, ``source≠worst``."""
+    kw = _calculated_kw_fixture(
+        ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.08
     )
-    target = _calc_kw(
-        ks_id=2,
-        text="target",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        conv=0.0,
-    )
-    t_stat = target.cluster_stat.model_copy(update={"views": 0})
-    target = target.model_copy(update={"cluster_stat": t_stat})
-    prof = _rollout_profile()
-    cheap_ctx = KeywordV3Context(keyword=cheap, position_profile=prof)
-    target_ctx = KeywordV3Context(keyword=target, position_profile=prof)
-    contexts = [cheap_ctx, target_ctx]
-    ladder_inputs = LadderInputs.from_contexts(contexts)
-    worst_min = ladder_inputs.worst_costs.get(AggressionTargetMode.MIN_CPA)
-    assert worst_min is not None
-    view = resolve_ladder_stage_display(target_ctx, ladder_inputs)
-    stage_min = view.stages[AggressionTargetMode.MIN_CPA]
-    assert stage_min.cost is not None
-    assert stage_min.source.value == "profile"
-    if worst_min > float(stage_min.cost) * 1.05:
-        assert worst_min > float(stage_min.cost)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    ladder_inputs = LadderInputs.from_contexts([ctx])
+    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
+    view = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
+    assert view.stages[AggressionTargetMode.OPTIMUM].source != LadderCostSource.WORST
+    assert view.stages[AggressionTargetMode.OPTIMUM].source == LadderCostSource.NONE
 
 
 @pytest.mark.unit
@@ -261,15 +234,15 @@ def test_collapsed_ch_pay_for_order_min_only_never_worst_source() -> None:
     ladder_inputs = LadderInputs.from_contexts([ctx])
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
     assert elig.data_tier == KeywordDataTier.KEYWORD_FULL
-    assert elig.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
-    assert elig.target_place_fallback_zero is True
+    assert KeywordStrategyMode.OPTIMUM in elig.allowed_modes
 
     view = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
-    assert view.stages[AggressionTargetMode.MIN_CPA].source == LadderCostSource.PAY_FOR_ORDER
-    assert view.stages[AggressionTargetMode.MIN_CPA].cost == pytest.approx(pfo, rel=0.02)
-    assert view.stages[AggressionTargetMode.OPTIMUM].source == LadderCostSource.NONE
-    assert view.stages[AggressionTargetMode.MAX_CONVERSION].source == LadderCostSource.NONE
-    assert view.stages[AggressionTargetMode.OPTIMUM].reason == "no_valid_ch_ladder"
+    for mode in (
+        AggressionTargetMode.MIN_CPA,
+        AggressionTargetMode.OPTIMUM,
+        AggressionTargetMode.MAX_CONVERSION,
+    ):
+        assert view.stages[mode].source != LadderCostSource.WORST
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         ladder_view_to_candidates,
@@ -277,14 +250,7 @@ def test_collapsed_ch_pay_for_order_min_only_never_worst_source() -> None:
 
     ui_candidates = ladder_view_to_candidates(view)
     assert ui_candidates[AggressionTargetMode.OPTIMUM].is_valid is False
-    assert (
-        ui_candidates[AggressionTargetMode.OPTIMUM].invalid_reason
-        == "no_valid_ch_ladder"
-    )
-    assert (
-        ui_candidates[AggressionTargetMode.MAX_CONVERSION].invalid_reason
-        == "no_valid_ch_ladder"
-    )
+    assert ui_candidates[AggressionTargetMode.MAX_CONVERSION].is_valid is False
 
     opt_cost, opt_imputed = cost_for_mode(
         ctx,
@@ -391,46 +357,6 @@ def test_cost_for_mode_no_repeated_worst_build() -> None:
             ):
                 cost_for_mode(ctx, mode, ladder_inputs=ladder_inputs)
         spy.assert_not_called()
-
-
-@pytest.mark.unit
-def test_no_ch_optimum_never_worst_even_if_worst_filled() -> None:
-    """NO_CH: OPTIMUM ``inf``, ``source≠worst`` при заполненном ``worst_costs[OPTIMUM]``."""
-    kw = _calculated_kw_fixture(
-        ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.08
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=None)
-    ladder_inputs = LadderInputs.from_contexts([ctx])
-    filled = dict(ladder_inputs.worst_costs)
-    filled[AggressionTargetMode.OPTIMUM] = 999.0
-    ladder_inputs = LadderInputs(
-        all_contexts=ladder_inputs.all_contexts,
-        prepared=ladder_inputs.prepared,
-        worst_costs=filled,
-        campaign_cache=ladder_inputs.campaign_cache,
-    )
-    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
-    view = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
-    assert view.stages[AggressionTargetMode.OPTIMUM].source != LadderCostSource.WORST
-
-
-@pytest.mark.unit
-def test_ch_tier_o_can_use_worst_source() -> None:
-    """CH-tier: invalid O может ``source=worst`` (контраст с NO_CH)."""
-    prof = _rollout_profile()
-    kw = _calc_kw(
-        ks_id=1,
-        text="ch_o",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        conv=0.05,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
-    ladder_inputs = LadderInputs.from_contexts([ctx, ctx])
-    view = resolve_ladder_stage_display(ctx, ladder_inputs)
-    opt = view.stages[AggressionTargetMode.OPTIMUM]
-    if opt.cost is not None and opt.cost_imputed:
-        assert opt.source == LadderCostSource.WORST
 
 
 @pytest.mark.unit

@@ -240,13 +240,19 @@ def count_effective_released_aggression_steps(
     to_mode: KeywordStrategyMode | None,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> int:
-    """Сколько «снято агрессии» одним DOWN: 1 только если place изменился или OFF.
+    """Сколько «снято агрессии» одним DOWN: 1 только если place изменился или OFF."""
+    return count_effective_aggression_steps_between(from_mode, to_mode, catalog)
 
-    Логический MAX→OPT при том же ``target_place`` = 0 (alias, не шаг ребаланса).
-    """
+
+def count_effective_aggression_steps_between(
+    from_mode: KeywordStrategyMode,
+    to_mode: KeywordStrategyMode | None,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> int:
+    """1 если ``target_place`` изменился между режимами (или OFF); 0 для alias-only."""
     if to_mode is None or to_mode == from_mode:
         return 0
-    if to_mode == KeywordStrategyMode.OFF:
+    if to_mode == KeywordStrategyMode.OFF or from_mode == KeywordStrategyMode.OFF:
         return 1
     from_c = candidate_for_strategy_mode(from_mode, catalog)
     to_c = candidate_for_strategy_mode(to_mode, catalog)

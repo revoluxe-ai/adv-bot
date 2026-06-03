@@ -126,8 +126,10 @@ def test_expansion_off_to_min_when_m_o_c_collapsed(monkeypatch: pytest.MonkeyPat
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
     _patch_catalog(monkeypatch, cat)
     kw = _calc_kw(ks_id=2, text="off", mode=KeywordStrategyMode.OFF, rating=5.0, conv=0.05)
+    from tests.unit.auto_updater_v3.test_no_data_activation import _sample_profile
+
     prepared = build_prepared_from_contexts(
-        [KeywordV3Context(keyword=kw, position_profile=[])]
+        [KeywordV3Context(keyword=kw, position_profile=_sample_profile())]
     )
     actions = plan_profitable_expansion(
         prepared, resolve=10_000.0, policy=_policy()

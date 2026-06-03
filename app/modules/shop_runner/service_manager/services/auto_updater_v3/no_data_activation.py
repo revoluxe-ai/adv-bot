@@ -103,11 +103,7 @@ class KeywordV3DataDiagnostic:
             return not self.has_v2_cpo
         if self.imputed_conv:
             return False
-        if self.decision_tier in (
-            KeywordV3DecisionTier.FULL,
-            KeywordV3DecisionTier.RK_AGGREGATE,
-            KeywordV3DecisionTier.PEER_MAX,
-        ):
+        if self.decision_tier == KeywordV3DecisionTier.FULL:
             return False
         return not self.has_v2_cpo
 
@@ -125,7 +121,7 @@ class KeywordV3DataDiagnostic:
             self.has_ch_position_profile
             and self.decision_tier == KeywordV3DecisionTier.NO_CONV
         ):
-            labels.append("conv: max CPO по РК (без имп. conv)")
+            labels.append("conv: нет своей conv на ключе")
         elif not self.has_v2_cpo:
             labels.append(self.v2_cpo_gap or "нет V2 CPO (себес. заказа)")
         if not self.has_ch_position_profile:

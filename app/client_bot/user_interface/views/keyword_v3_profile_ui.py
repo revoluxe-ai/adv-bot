@@ -115,31 +115,22 @@ def _format_pct_compact(value: float | None, *, decimals: int = 2) -> str:
 def _stage_uses_campaign_max_rk(
     data: KeywordV3ProfileData, agg: AggressionTargetMode
 ) -> bool:
-    """Показывать maxРК только если CPO ступени из worst по РК, не из профиля ключа."""
-    if data.campaign_worst_only:
-        return True
-    return (data.stage_sources or {}).get(agg) == "worst"
+    """Deprecated: worst-imputation удалён; maxРК в UI не показываем."""
+    _ = data, agg
+    return False
 
 
 def _worst_suffix_for_stage(
     data: KeywordV3ProfileData, agg: AggressionTargetMode
 ) -> str:
-    """Суффикс ``|maxРК…`` для ступени с cost из worst по РК."""
-    if not _stage_uses_campaign_max_rk(data, agg) or data.campaign_worst_costs is None:
-        return ""
-    worst_val = data.campaign_worst_costs.get(agg)
-    if worst_val is None:
-        return ""
-    return f"|maxРК{worst_val:.0f}"
+    """Deprecated: worst-imputation удалён."""
+    _ = data, agg
+    return ""
 
 
 def _profile_shows_max_rk_legend(data: KeywordV3ProfileData) -> bool:
-    """Нужна строка легенды про maxРК хотя бы для одной ступени M/O/C."""
-    if data.campaign_worst_only:
-        return True
-    for agg in AggressionTargetMode:
-        if _stage_uses_campaign_max_rk(data, agg):
-            return True
+    """Deprecated: worst-imputation удалён."""
+    _ = data
     return False
 
 
@@ -257,15 +248,8 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
     elif data.campaign_worst_only:
         header = "📊 *Профиль ключа (V3):* max CPO по РК (нет CH на ключе)"
     elif data.diagnostic is not None and data.diagnostic.has_ch_position_profile:
-        if data.diagnostic.imputed_conv:
-            if data.diagnostic.decision_tier == KeywordV3DecisionTier.RK_AGGREGATE:
-                header = "📊 *Профиль ключа (V3):* CH + имп. conv (РК)"
-            elif data.diagnostic.decision_tier == KeywordV3DecisionTier.PEER_MAX:
-                header = "📊 *Профиль ключа (V3):* CH + имп. conv (max ключ)"
-            else:
-                header = "📊 *Профиль ключа (V3):* CH + имп. conv"
-        elif data.diagnostic.decision_tier == KeywordV3DecisionTier.NO_CONV:
-            header = "📊 *Профиль ключа (V3):* CH + max CPO по РК (нет conv)"
+        if data.diagnostic.decision_tier == KeywordV3DecisionTier.NO_CONV:
+            header = "📊 *Профиль ключа (V3):* CH (нет своей conv)"
         # FULL и прочие — обычный заголовок без «импутации»
     lines = [header]
     if data.diagnostic is not None:

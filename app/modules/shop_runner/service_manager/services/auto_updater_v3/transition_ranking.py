@@ -351,17 +351,13 @@ def _rec_tier_for_keyword(
 def _resolve_state_cost(
     mc: ModeCandidate,
     target: AggressionTargetMode,
-    worst_costs: dict[AggressionTargetMode, float],
     *,
-    use_imputation: bool,
+    use_imputation: bool = False,
 ) -> tuple[float, bool]:
-    """Вернуть state_cost только из профиля CH или worst-imputation."""
+    """Вернуть state_cost только из профиля CH (worst-imputation удалён)."""
+    _ = target, use_imputation
     if mc.is_valid and mc.predicted_cpa is not None:
         return float(mc.predicted_cpa), False
-    if use_imputation:
-        w = worst_costs.get(target)
-        if w is not None:
-            return w, True
     return float("inf"), False
 
 
@@ -372,40 +368,9 @@ def build_worst_per_state_costs(
     campaign_orders_per_cart_7d: float | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> dict[AggressionTargetMode, float]:
-    """Worst (max) predicted CPA per M/O/C среди доноров с valid CH-каталогом (per-key smoothed)."""
-    if ladder_inputs is not None:
-        return dict(ladder_inputs.worst_costs)
-
-    campaign_opc = (
-        campaign_orders_per_cart_7d
-        if campaign_orders_per_cart_7d is not None
-        else rk_orders_per_cart
-    )
-
-    worst: dict[AggressionTargetMode, float] = {}
-    for ctx, _mode in prepared:
-        catalog = _catalog_for_ctx(
-            ctx,
-            prepared,
-            campaign_orders_per_cart_7d=campaign_opc,
-        )
-        if missing_target_matrix_from_catalog(catalog):
-            continue
-        if not _has_valid_target_place_data(catalog):
-            continue
-        for target in (
-            AggressionTargetMode.MIN_CPA,
-            AggressionTargetMode.OPTIMUM,
-            AggressionTargetMode.MAX_CONVERSION,
-        ):
-            mc = catalog.get(target)
-            if mc is None or not mc.is_valid or mc.predicted_cpa is None:
-                continue
-            cost = float(mc.predicted_cpa)
-            prev = worst.get(target)
-            if prev is None or cost > prev:
-                worst[target] = cost
-    return worst
+    """Deprecated: worst-imputation удалён; возвращает пустой словарь."""
+    _ = prepared, rk_orders_per_cart, campaign_orders_per_cart_7d, ladder_inputs
+    return {}
 
 
 def collect_transition_candidates(
@@ -427,7 +392,6 @@ def collect_transition_candidates(
     )
 
     ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
-    worst_costs = ladder.worst_costs
     elig_map: dict[int, KeywordV3Eligibility] = (
         eligibility_by_ks_id
         if eligibility_by_ks_id is not None
@@ -486,7 +450,7 @@ def collect_transition_candidates(
                 max_target_mode=policy.max_target_mode,
             ):
                 continue
-            if pfo_operational:
+            if pfo_operational or elig is not None:
                 cost, imputed = cost_for_mode(
                     ctx,
                     to_mode,
@@ -494,12 +458,7 @@ def collect_transition_candidates(
                     eligibility=elig,
                 )
             else:
-                cost, imputed = _resolve_state_cost(
-                    mc,
-                    target,
-                    worst_costs,
-                    use_imputation=use_matrix_imputation,
-                )
+                cost, imputed = _resolve_state_cost(mc, target)
             if cost == float("inf"):
                 continue
             out.append(

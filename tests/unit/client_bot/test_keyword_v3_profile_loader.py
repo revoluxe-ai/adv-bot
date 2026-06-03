@@ -147,13 +147,6 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             return_value=_sample_profile(),
         ),
         patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.cache_worst_costs_for_adv",
-            new_callable=AsyncMock,
-        ),
-        patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
-        ) as worst_cache_cls,
-        patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
             new_callable=AsyncMock,
             return_value=2.0,
@@ -168,7 +161,6 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             KeywordV3Context,
         )
 
-        worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)
         kw = _calculated_keyword()
         stat = kw.cluster_stat.model_copy(update={"views": 100})
         kw = kw.model_copy(update={"cluster_stat": stat})
@@ -275,13 +267,6 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
             return_value=[],
         ),
         patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.cache_worst_costs_for_adv",
-            new_callable=AsyncMock,
-        ),
-        patch(
-            "app.client_bot.user_interface.services.keyword_v3_profile_loader.V3WorstCostsRedisCache",
-        ) as worst_cache_cls,
-        patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
             new_callable=AsyncMock,
             return_value=2.0,
@@ -292,7 +277,6 @@ async def test_load_keyword_v3_profile_data_ch_without_v2_not_n_state() -> None:
             return_value=None,
         ),
     ):
-        worst_cache_cls.return_value.get_worst_costs = AsyncMock(return_value=None)
         container = MagicMock()
         hub = MagicMock()
         hub.wb_manager.get_min_bids_cache_only = AsyncMock(

@@ -32,6 +32,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
+    count_effective_aggression_steps_between,
     count_effective_released_aggression_steps,
     iter_effective_upper_mode_groups,
     iter_effective_upper_modes,
@@ -546,6 +547,68 @@ def _find_trim_target_mode_limited_steps(
         mode = step.next_mode
 
 
+def _find_boost_target_mode_limited_steps(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    cost_ceiling: float,
+    ladder_inputs: "LadderInputs",
+    policy: SelectionPolicy,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    max_effective_steps: int,
+) -> KeywordStrategyMode:
+    """Не более ``max_effective_steps`` effective UP; stop если ``state_cost > ceiling``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        can_target_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        rec_gate_allows_up,
+        state_rec_gate_status_for_mode,
+    )
+
+    mode = current
+    used = 0
+    step_budget = max(1, int(max_effective_steps))
+    elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+    while True:
+        if mode_level(mode) >= mode_level(policy.max_target_mode):
+            return mode
+        step = resolve_next_effective_step_up(mode, catalog)
+        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+        if step.next_mode is None:
+            return mode
+        candidate_mode = step.next_mode
+        if elig is not None and not can_target_mode(elig, candidate_mode):
+            return mode
+        gate_status = state_rec_gate_status_for_mode(
+            catalog,
+            candidate_mode,
+            policy,
+            rec_orders_per_view=ladder_inputs.rec_orders_per_view,
+            orders_per_cart=ladder_inputs.orders_per_cart_for_ctx(ctx),
+        )
+        if not rec_gate_allows_up(gate_status):
+            return mode
+        next_cost, _ = _trim_state_cost_for_mode(
+            ctx,
+            candidate_mode,
+            current=current,
+            ladder_inputs=ladder_inputs,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if next_cost == float("inf") or next_cost > cost_ceiling:
+            return mode
+        gained = count_effective_aggression_steps_between(
+            mode, candidate_mode, catalog
+        )
+        if gained > 0:
+            used += gained
+        mode = candidate_mode
+        if used >= step_budget:
+            return mode
+
+
 def _append_trim_to_mode(
     actions: list[V3Action],
     *,
@@ -713,6 +776,133 @@ def plan_campaign_trim_by_max_state_cost(
     )
 
 
+def _plan_calibration_tighten(
+    prepared: PreparedList,
+    *,
+    cost_ceiling: float,
+    trim_reason: str,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int,
+) -> list[V3Action]:
+    """TIGHTEN: limited DOWN до ``state_cost <= cost_ceiling``."""
+    return _plan_trim_by_cost_ceiling(
+        prepared,
+        cost_ceiling=cost_ceiling,
+        trim_reason=trim_reason,
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder_inputs,
+        max_effective_steps=max_effective_steps,
+    )
+
+
+def _plan_calibration_loosen(
+    prepared: PreparedList,
+    *,
+    cost_ceiling: float,
+    up_reason: str,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int,
+) -> list[V3Action]:
+    """LOOSEN: limited UP, пока ``state_cost`` target mode ``<= cost_ceiling``."""
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+    )
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+    actions: list[V3Action] = []
+    for ctx, current in prepared:
+        if current == KeywordStrategyMode.OFF:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+        if elig is not None and not elig.participates_in_ladder:
+            continue
+        if _min_cpa_bound_by_pay_for_order(elig):
+            continue
+        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
+        target = _find_boost_target_mode_limited_steps(
+            ctx,
+            current,
+            catalog=catalog,
+            cost_ceiling=float(cost_ceiling),
+            ladder_inputs=ladder,
+            policy=policy,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            max_effective_steps=max_effective_steps,
+        )
+        if target == current:
+            continue
+        current_c = candidate_for_strategy_mode(current, catalog)
+        target_c = candidate_for_strategy_mode(target, catalog)
+        if mode_candidates_same_effective_target(current_c, target_c):
+            continue
+        actions.append(
+            V3Action(
+                action=V3ActionType.UP,
+                keyword_setting_id=ks_id,
+                target_strategy_mode=target,
+                reason=up_reason,
+            )
+        )
+    return actions
+
+
+def plan_resolve_calibration(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    calibration_direct: "CalibrationDirect",
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int = 1,
+) -> list[V3Action]:
+    """Калибровка к ``0.9×resolve``: одна ветка за тик — TIGHTEN (DOWN) или LOOSEN (UP).
+
+    Gate кампании (plan/views, ``fact <= max``) — в orchestrator; ``max_effective_steps`` —
+    adaptive cap effective ladder-шагов на ключ.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+        CalibrationDirect,
+    )
+
+    if calibration_direct == CalibrationDirect.TIGHTEN:
+        return _plan_calibration_tighten(
+            prepared,
+            cost_ceiling=float(resolve),
+            trim_reason="resolve_calibration_tighten",
+            shelf_click_mode=shelf_click_mode,
+            aggressiveness=aggressiveness,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder_inputs,
+            max_effective_steps=max_effective_steps,
+        )
+    return _plan_calibration_loosen(
+        prepared,
+        cost_ceiling=float(resolve),
+        up_reason="resolve_calibration_loosen",
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder_inputs,
+        max_effective_steps=max_effective_steps,
+    )
+
+
 def plan_resolve_calibration_trim(
     prepared: PreparedList,
     *,
@@ -723,15 +913,15 @@ def plan_resolve_calibration_trim(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """DOWN при fact в [90% resolve, max]: limited trim до ``state_cost <= resolve``.
+    """Legacy alias: TIGHTEN-only calibration (``resolve_calibration_tighten``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+        CalibrationDirect,
+    )
 
-    Зона кампании и adaptive step — gate в orchestrator; ``max_effective_steps`` —
-    effective ladder DOWN на ключ за тик.
-    """
-    return _plan_trim_by_cost_ceiling(
+    return plan_resolve_calibration(
         prepared,
-        cost_ceiling=float(resolve),
-        trim_reason="resolve_calibration_trim",
+        resolve=resolve,
+        calibration_direct=CalibrationDirect.TIGHTEN,
         shelf_click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,
