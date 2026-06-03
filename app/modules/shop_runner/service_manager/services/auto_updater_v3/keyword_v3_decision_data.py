@@ -111,6 +111,23 @@ def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float |
     return None if result is None else float(result)
 
 
+def resolve_no_ch_operational_pay_for_order_cost(
+    keyword: CalculatedKeyword,
+) -> float | None:
+    """Операционная себестоимость NO CH: ``keyword.pay_for_order`` (как в карточке UI).
+
+    Используется в сортировке UI и границах NO CH tier вместо
+    ``resolve_keyword_v2_pay_for_order_cost`` (rating CPM без bid_log).
+    """
+    pfo = keyword.pay_for_order
+    if pfo is None:
+        return None
+    value = float(pfo)
+    if value <= 0:
+        return None
+    return value
+
+
 def resolve_keyword_v3_decision(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
