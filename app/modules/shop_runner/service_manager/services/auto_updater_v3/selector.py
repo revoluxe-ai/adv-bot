@@ -4,6 +4,8 @@
 
 1. **Production (orchestrator):** preamble (bootstrap, realloc, expansion,
    ``plan_max_cpa_guard`` при OVERSPEND) → ``select_v3_post_gate_actions`` (только полка).
+   Post-gate **без** plan/fact gate — каждый NORMAL-тик. Gate AND (plan/fact + views)
+   только у ``RESOLVE_CALIBRATION_TRIM`` в orchestrator.
    ``select_v3_actions`` с ``plan``/``fact`` **не** выполняет ladder/OVERSPEND.
 
 2. **Legacy / тесты без plan/fact:** полный ``select_v3_actions`` — OVERSPEND через

@@ -25,7 +25,7 @@ from tests.unit.auto_updater_v3.test_no_data_activation import _kw
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cache() -> None:
+async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_cache_equal() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 11
     complex_adv.adv_setting = MagicMock()
@@ -42,6 +42,9 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
     plan_fact.set_new_plan_fact = AsyncMock()
+    views_cache = MagicMock()
+    views_cache.get_cached_views = AsyncMock(return_value=500)
+    views_cache.set_views = AsyncMock()
 
     with (
         patch(
@@ -76,6 +79,14 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
             return_value=plan_fact,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            return_value=views_cache,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=500),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
         ),
@@ -96,9 +107,11 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
     _args, kwargs = bootstrap.call_args
     assert kwargs.get("campaign_orders_per_cart_7d") == 2.0
     expansion.assert_called_once()
-    select_mock.assert_not_called()
+    select_mock.assert_called_once()
     flush_mock.assert_awaited_once()
     plan_fact.check_equal_in_cache.assert_awaited_once()
+    plan_fact.set_new_plan_fact.assert_awaited_once()
+    views_cache.set_views.assert_awaited_once_with(500)
 
 
 @pytest.mark.unit
@@ -326,6 +339,13 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
         ) as pfc_cls,
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews"
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
         ),
@@ -336,7 +356,12 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
     ):
         plan_fact = MagicMock()
         plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=100)
+        views_cache.set_views = AsyncMock()
+        views_cls.return_value = views_cache
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
         )
@@ -504,6 +529,16 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
             return_value=SalesStates.OPTIMAL,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews"
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.LadderInputs.from_contexts",
             side_effect=RuntimeError("preamble boom"),
         ),
@@ -512,6 +547,12 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
             sync_mock,
         ),
     ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+        pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=None)
+        views_cls.return_value = views_cache
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10.0)
         )
