@@ -318,16 +318,35 @@ def get_advs_keyboard_with_paginator(
     return keyboard
 
 
-def sorting_keywords_for_v3(keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
-    """V3: дешёвые ключи сверху (``pay_for_order`` asc, tie-break ``keyword_setting_id``)."""
+def sorting_keywords_for_v3(
+    keywords: list[CalculatedKeyword],
+    *,
+    contexts: list | None = None,
+    ladder_inputs: object | None = None,
+    eligibility_by_ks_id: dict[int, object] | None = None,
+) -> list[CalculatedKeyword]:
+    """V3: state_cost текущего режима (OFF → MIN); без ladder-контекста — ``pay_for_order`` asc.
 
-    def _pay_sort_key(kw: CalculatedKeyword) -> tuple[float, int]:
-        pfo = kw.pay_for_order
-        pay = float("inf") if pfo is None else float(pfo)
-        ks_id = int(kw.keyword_setting_original_id or 0)
-        return (pay, ks_id)
+    Список в prod сортируется в ``AdvKeywordsSetting`` через ``sort_keywords_for_v3_ui``.
+    Опциональные ``contexts`` / ``ladder_inputs`` / ``eligibility_by_ks_id`` — для unit-тестов SSOT.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.sort_utils import (
+        pay_for_order_sort_key,
+        sort_keywords_by_current_state_cost,
+    )
 
-    return sorted(keywords, key=_pay_sort_key)
+    if (
+        contexts is not None
+        and ladder_inputs is not None
+        and eligibility_by_ks_id is not None
+    ):
+        return sort_keywords_by_current_state_cost(
+            keywords,
+            contexts,  # type: ignore[arg-type]
+            ladder_inputs,  # type: ignore[arg-type]
+            eligibility_by_ks_id,  # type: ignore[arg-type]
+        )
+    return sorted(keywords, key=pay_for_order_sort_key)
 
 
 def get_keywords_setting_keyboard(
@@ -369,9 +388,7 @@ def get_keywords_setting_keyboard(
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
-    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
-        keywords = sorting_keywords_for_v3(keywords)
-    else:
+    if normalize_automatic_version_ui(adv_setting.automatic_version) != 3:
         keywords = sorting_keywords(keywords, sort_mode)
 
     bottoms: list[list[InlineKeyboardButton]] = []
