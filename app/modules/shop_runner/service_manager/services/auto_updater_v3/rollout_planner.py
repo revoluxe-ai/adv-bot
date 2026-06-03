@@ -473,6 +473,79 @@ def _find_trim_target_mode(
         mode = step.next_mode
 
 
+def _find_trim_target_mode_limited_steps(
+    ctx: "KeywordV3Context",
+    current: KeywordStrategyMode,
+    *,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    cost_ceiling: float,
+    ladder_inputs: "LadderInputs",
+    policy: SelectionPolicy,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    max_effective_steps: int,
+) -> KeywordStrategyMode:
+    """Не более ``max_effective_steps`` effective DOWN; stop early if ``state_cost <= ceiling``."""
+    mode = current
+    used = 0
+    step_budget = max(1, int(max_effective_steps))
+    while True:
+        if mode == KeywordStrategyMode.OFF:
+            return KeywordStrategyMode.OFF
+        if mode_level(mode) > mode_level(policy.max_target_mode):
+            if used >= step_budget:
+                return mode
+            step = resolve_next_effective_step_down(mode, catalog)
+            log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+            if step.next_mode is None:
+                return KeywordStrategyMode.OFF
+            released = count_effective_released_aggression_steps(
+                mode, step.next_mode, catalog
+            )
+            if released > 0:
+                used += released
+            mode = step.next_mode
+            continue
+        cost, _ = _trim_state_cost_for_mode(
+            ctx,
+            mode,
+            current=current,
+            ladder_inputs=ladder_inputs,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if cost != float("inf") and cost <= cost_ceiling:
+            return mode
+        if used >= step_budget:
+            return mode
+        step = resolve_next_effective_step_down(mode, catalog)
+        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+        if step.next_mode is None:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                cost_ceiling=cost_ceiling,
+                ladder_inputs=ladder_inputs,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            return fb if fb is not None else KeywordStrategyMode.OFF
+        if step.next_mode == KeywordStrategyMode.OFF:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                cost_ceiling=cost_ceiling,
+                ladder_inputs=ladder_inputs,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            if fb is not None:
+                return fb
+            return KeywordStrategyMode.OFF
+        released = count_effective_released_aggression_steps(
+            mode, step.next_mode, catalog
+        )
+        if released > 0:
+            used += released
+        mode = step.next_mode
+
+
 def _append_trim_to_mode(
     actions: list[V3Action],
     *,
@@ -528,11 +601,12 @@ def _plan_trim_by_cost_ceiling(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int | None = None,
 ) -> list[V3Action]:
-    """Снизить режим до ближайшего с ``state_cost <= cost_ceiling``.
+    """Снизить режим до ``state_cost <= cost_ceiling``.
 
-    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` (нет CH-матрицы): сравниваем
-    ``keyword.pay_for_order`` с ``cost_ceiling`` и при превышении → OFF.
+    ``max_effective_steps=None`` — full trim (guard/max). Иначе — limited DOWN
+    (calibration).
     """
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
@@ -564,15 +638,27 @@ def _plan_trim_by_cost_ceiling(
                 )
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        target = _find_trim_target_mode(
-            ctx,
-            current,
-            catalog=catalog,
-            cost_ceiling=float(cost_ceiling),
-            ladder_inputs=ladder,
-            policy=policy,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-        )
+        if max_effective_steps is None:
+            target = _find_trim_target_mode(
+                ctx,
+                current,
+                catalog=catalog,
+                cost_ceiling=float(cost_ceiling),
+                ladder_inputs=ladder,
+                policy=policy,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+        else:
+            target = _find_trim_target_mode_limited_steps(
+                ctx,
+                current,
+                catalog=catalog,
+                cost_ceiling=float(cost_ceiling),
+                ladder_inputs=ladder,
+                policy=policy,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+                max_effective_steps=max_effective_steps,
+            )
         skip_reasons: list[str] = []
         if target == current:
             skip_reasons.append("trim_target_eq_current")
@@ -635,11 +721,12 @@ def plan_resolve_calibration_trim(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """DOWN при fact в [90% resolve, max]: trim до ``state_cost <= resolve``.
+    """DOWN при fact в [90% resolve, max]: limited trim до ``state_cost <= resolve``.
 
-    Зона кампании задаётся gate в orchestrator; порог trim — **resolve**, не max.
-    NO_CH tier: ``keyword.pay_for_order`` vs resolve.
+    Зона кампании и adaptive step — gate в orchestrator; ``max_effective_steps`` —
+    effective ladder DOWN на ключ за тик.
     """
     return _plan_trim_by_cost_ceiling(
         prepared,
@@ -649,6 +736,7 @@ def plan_resolve_calibration_trim(
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,
         ladder_inputs=ladder_inputs,
+        max_effective_steps=max_effective_steps,
     )
 
 

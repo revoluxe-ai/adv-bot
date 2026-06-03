@@ -40,6 +40,7 @@ source_modules =
     app.modules.bidder_auto_mode
     app.modules.balance_manager
     app.modules.bidder_step_setting
+    app.modules.v3_calibration_step_setting
     app.modules.adv_creator.telegram
     app.modules.user_message_sender
     app.modules.sales_plan_settings.telegram

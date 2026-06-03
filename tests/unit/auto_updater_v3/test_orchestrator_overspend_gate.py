@@ -35,6 +35,7 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
@@ -107,7 +108,12 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
         ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
     ):
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=150.0, predict_orders=5)
         )
@@ -181,6 +187,7 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
@@ -245,6 +252,16 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
         ) as pfc_cls,
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
         ),
@@ -253,6 +270,12 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
         plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
         plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=100)
+        views_cache.set_views = AsyncMock()
+        views_cls.return_value = views_cache
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
@@ -298,6 +321,7 @@ async def _run_preamble_with_fact_cpa(
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
@@ -308,6 +332,9 @@ async def _run_preamble_with_fact_cpa(
     views_cache = MagicMock()
     views_cache.get_cached_views = AsyncMock(return_value=cached_views)
     views_cache.set_views = AsyncMock()
+    step_cache = MagicMock()
+    step_cache.get_state = AsyncMock(return_value=None)
+    step_cache.set_state = AsyncMock()
 
     with (
         patch(
@@ -357,6 +384,10 @@ async def _run_preamble_with_fact_cpa(
             new=AsyncMock(return_value=current_views),
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+            return_value=step_cache,
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
         ),
@@ -370,6 +401,96 @@ async def _run_preamble_with_fact_cpa(
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     return realloc, calibration, guard, plan_fact, views_cache
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> None:
+    """При calibration gate planner получает ``max_effective_steps`` из resolver."""
+    plan = _plan_for_cpa_gates()
+    fact = _fact_for_cpa_gates(pay_for_order=85.0)
+
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 31
+    complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+
+    dto = MagicMock()
+    calibration = MagicMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            new=AsyncMock(return_value=(dto, {})),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+        ) as updater_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            calibration,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews"
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=200),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState"
+        ) as step_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_effective_calibration_steps",
+            return_value=4,
+        ) as resolve_steps,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+        plan_fact.set_new_plan_fact = AsyncMock()
+        pfc_cls.return_value = plan_fact
+        views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
+        views_cls.return_value.set_views = AsyncMock()
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
+        updater_cls.get_plan_data.return_value = plan
+        updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
+        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
+
+    resolve_steps.assert_called_once()
+    calibration.assert_called_once()
+    assert calibration.call_args.kwargs.get("max_effective_steps") == 4
 
 
 @pytest.mark.unit

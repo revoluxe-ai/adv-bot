@@ -691,6 +691,13 @@ class AdvSetting(BaseTable):
         server_default=text("3"),
         comment="AutoUpdater v3: 1=min_cpm_first / 2=optimal_first / 3=max_conv_first (only outside shelf phase)",
     )
+    keyword_calibration_max_step: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+        comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
+    )
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,

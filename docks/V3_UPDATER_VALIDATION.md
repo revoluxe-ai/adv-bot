@@ -44,7 +44,7 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
 2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF). Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: отсутствие CH-кандидата не invalid; MIN при ``pay_for_order`` ≤ max не трогаем; OPT/MAX без operational cost → DOWN на MIN по ``PAY_FOR_ORDER``, иначе FORCE_OFF.
 3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP). Gate: `fact.pay_for_order < 0.9×resolve`.
-4. **RESOLVE_CALIBRATION_TRIM** (`plan_resolve_calibration_trim`) — DOWN до `state_cost <= resolve` при `0.9×resolve ≤ fact ≤ max` **и** изменились plan/fact **и** views (AND); при `fact > max` — только MAX_CPA_GUARD.
+4. **RESOLVE_CALIBRATION_TRIM** (`plan_resolve_calibration_trim`) — **limited** effective ladder DOWN до `state_cost <= resolve` (не full-jump за тик); adaptive steps ×2/÷2 по `CalibrationDirect` (TIGHTEN/LOOSEN); cap `AdvSetting.keyword_calibration_max_step`. Gate: `0.9×resolve ≤ fact ≤ max` **и** изменились plan/fact **и** views (AND); при `fact > max` — только MAX_CPA_GUARD.
 5. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
 6. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
 7. **Post-gate selector** — shelf cleanup (`select_v3_post_gate_actions`); каждый NORMAL-тик; M2/M3/FINAL_TUNING отключены.
@@ -128,8 +128,10 @@ Rec-gate:
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
 2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
 3. **COST_REALLOCATION** — DOWN-only rebalance (headroom); gate `fact < 0.9×resolve`.
-4. **RESOLVE_CALIBRATION_TRIM** — trim по `resolve` при `0.9×resolve ≤ fact ≤ max` **и**
-   `not plan_fact_equal` **и** `not views_equal` (AND-gate).
+4. **RESOLVE_CALIBRATION_TRIM** — **limited** trim по `resolve` при `0.9×resolve ≤ fact ≤ max` **и**
+   `not plan_fact_equal` **и** `not views_equal` (AND-gate). За тик — не более `max_effective_steps`
+   effective DOWN на ключ (alias с тем же `target_place` не считается шагом); early stop если
+   промежуточный mode уже `state_cost <= resolve`. Guard / realloc / expansion — full-trim без лимита.
 5. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
 6. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
 7. **Post-gate selector** — shelf cleanup (`select_v3_post_gate_actions`); **каждый** NORMAL-тик, без plan/fact gate.
@@ -143,6 +145,21 @@ Rec-gate:
 | views | `ChangePlanFactViews`: SUM views по `complex_adv.all_adv_ids`, `full_adv_wb_stat`, окно `max_last_period` (как fact V3) | да |
 
 Calibration: **AND** — оба сигнала должны измениться + CPA zone. Ошибка CH при resolve views → fail-closed (`views_equal=True`, calibration не режем).
+
+### Adaptive calibration steps (Redis `V3CalibrationStepState`)
+
+Направление по зоне fact vs resolve:
+- **TIGHTEN** — `fact >= 0.9×resolve` (в зоне калибровки, подтягиваем расход);
+- **LOOSEN** — `fact < 0.9×resolve`.
+
+Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, default 1):
+- первый тик / нет Redis-истории → `1`;
+- то же направление → `min(prev × 2, cap)`;
+- смена направления → `max(prev ÷ 2, 1)`.
+
+Снимок в Redis — **конец каждого NORMAL-тика** (`effective_steps`, `direct`), вместе с plan/fact/views.
+
+**UI:** кнопка `V3 cal. шаг: {N}` в меню РК (только `automatic_version == 3`, рядом с переключателем версии); FSM-ввод 1..50, как `bidder_step`.
 
 Realloc / expansion / guard — **без** plan/fact/views gate.
 
