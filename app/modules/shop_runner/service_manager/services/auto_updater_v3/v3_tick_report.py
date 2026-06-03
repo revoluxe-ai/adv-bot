@@ -304,7 +304,7 @@ class V3TickReportSnapshot(BaseModel):
 
 PHASE_TITLES: dict[str, tuple[str, str]] = {
     "filter": ("0 · Фильтр operable", "—"),
-    "hard_status_sync": ("1 · Sync hard_status ↔ mode", "sync"),
+    "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "cap_down": ("2 · B · cap_down", "DOWN"),
     "passing_up": ("3 · U · passing_up", "UP"),
@@ -338,26 +338,6 @@ class V3TickReportCollector:
                 title_ru=title,
                 possible_actions_ru=possible,
                 extra={"total": total, "operable": operable},
-            )
-        )
-
-    def record_sync(
-        self,
-        sync_count: int,
-        *,
-        outcome_note: str | None = None,
-    ) -> None:
-        title, possible = PHASE_TITLES["hard_status_sync"]
-        note = outcome_note
-        if sync_count == 0 and note is None:
-            note = "режимы уже соответствуют hard_status"
-        self._phases.append(
-            V3PhaseStats(
-                phase_id="hard_status_sync",
-                title_ru=title,
-                possible_actions_ru=possible,
-                sync=sync_count,
-                outcome_note=note if sync_count == 0 else None,
             )
         )
 

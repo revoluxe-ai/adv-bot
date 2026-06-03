@@ -101,7 +101,7 @@ def summarize_phase_zero_actions(
         Русский текст для UI (без префикса «без изменений —»).
     """
     handlers = {
-        "hard_status_sync": lambda: "режимы уже соответствуют hard_status",
+        "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
         "cap_down": lambda: _note_cap_down(prepared, eligibility_by_ks_id),
         "passing_up": lambda: _note_passing_up(
             prepared,

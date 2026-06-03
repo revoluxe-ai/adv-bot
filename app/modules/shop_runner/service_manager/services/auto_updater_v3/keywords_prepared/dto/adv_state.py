@@ -1,0 +1,112 @@
+"""Состояние кампании на тик V3 для executors ``UpdatePipeline``."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
+
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordV3Eligibility,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
+)
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+    )
+
+
+@dataclass
+class AdvState:
+    """Параметры кампании и gates preamble NORMAL — живут в ``UpdateContext``."""
+
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility]
+    ladder_inputs: LadderInputs
+    resolve: float
+    policy: SelectionPolicy
+    shelf_click_mode: ShelfClickMode
+    aggressiveness: V3RolloutAggressiveness
+    max_pay_for_order: float
+    fact_pay_for_order: float | None
+    plan_fact_equal: bool
+    views_equal: bool
+    resolve_valid: bool
+    shelf_active: bool
+    guard_condition: bool
+    calibration_direct: CalibrationDirect | None
+    max_effective_steps: int
+    calibration_phase_extra: dict[str, object] = field(default_factory=dict)
+    guard_applied: bool = False
+
+    @property
+    def plan_fact_changed(self) -> bool:
+        return not self.plan_fact_equal
+
+    @property
+    def views_changed(self) -> bool:
+        return not self.views_equal
+
+    @property
+    def calibration_in_range(self) -> bool:
+        if self.fact_pay_for_order is None:
+            return False
+        return float(self.fact_pay_for_order) <= float(self.max_pay_for_order)
+
+    def copy(self) -> AdvState:
+        """Поверхностная копия для ``UpdateContext.copy``."""
+        return replace(self)
+
+    def with_tick_inputs(
+        self,
+        *,
+        eligibility_by_ks_id: dict[int, KeywordV3Eligibility],
+        ladder_inputs: LadderInputs,
+    ) -> AdvState:
+        """Обновить eligibility/ladder после apply фазы к ledger."""
+        return replace(
+            self,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder_inputs,
+        )
+
+    @classmethod
+    def empty(cls) -> AdvState:
+        """Минимальный state для unit-тестов без полного preamble."""
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+            LadderInputs,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+            SelectionPolicy,
+        )
+
+        return cls(
+            eligibility_by_ks_id={},
+            ladder_inputs=LadderInputs.from_contexts([]),
+            resolve=0.0,
+            policy=SelectionPolicy.from_aggressiveness(
+                click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+                aggressiveness=V3RolloutAggressiveness.MID,
+            ),
+            shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+            aggressiveness=V3RolloutAggressiveness.MID,
+            max_pay_for_order=0.0,
+            fact_pay_for_order=None,
+            plan_fact_equal=True,
+            views_equal=True,
+            resolve_valid=False,
+            shelf_active=False,
+            guard_condition=False,
+            calibration_direct=None,
+            max_effective_steps=1,
+        )

@@ -1,8 +1,8 @@
-"""Operable keywords V3: фильтр hard_status 1|2 и синхронизация hard_status ↔ strategy_mode.
+"""Operable keywords V3: фильтр hard_status 1|2.
 
 Перед preamble NORMAL (фаза 0):
 1. ``filter_operable_v3_contexts`` — только ключи, с которыми ladder может работать;
-2. ``sync_operable_hard_status_with_strategy_mode`` на ledger — OFF→1, active→2.
+2. ``validate_state_by_hard_status`` (executor) — авто (1) → OFF через ``NextState``.
 
 Fixed/manual (hard_status 3/4/…) остаются в полном списке для target_place, но не в preamble.
 """

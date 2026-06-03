@@ -37,9 +37,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
-    build_prepared_from_contexts,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+    KeywordsPreparedList,
+    build_keywords_prepared_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ class LadderInputs:
     """Предрасчёт на список contexts; переиспользуется всеми ``cost_for_mode`` на тике."""
 
     all_contexts: list[KeywordV3Context]
-    prepared: PreparedList
+    prepared: KeywordsPreparedList
     campaign_cache: CampaignV3DecisionCache
     campaign_orders_per_cart_7d: float | None = None
     rec_orders_per_view: float | None = None
@@ -121,7 +121,7 @@ class LadderInputs:
             if campaign_orders_per_cart_7d is not None
             else rk_orders_per_cart
         )
-        prepared = build_prepared_from_contexts(contexts)
+        prepared = build_keywords_prepared_list(contexts)
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,

@@ -42,6 +42,10 @@ from tests.unit.test_auto_updater_v3 import _calc_kw
 _REALLOC_LOGGER = (
     "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner"
 )
+_RESOLVE_EFFECTIVE = (
+    "app.modules.shop_runner.service_manager.services.auto_updater_v3"
+    ".step_manager.resolve_effective"
+)
 
 
 def _policy() -> SelectionPolicy:
@@ -77,7 +81,11 @@ def _track_released_in_planner(
         recorded.append((from_mode, to_mode, n))
         return n
 
-    monkeypatch.setattr(f"{_REALLOC_LOGGER}.count_effective_released_aggression_steps", _wrapped)
+    for module_path in (_REALLOC_LOGGER, _RESOLVE_EFFECTIVE):
+        monkeypatch.setattr(
+            f"{module_path}.count_effective_released_aggression_steps",
+            _wrapped,
+        )
     return recorded
 
 
@@ -313,10 +321,11 @@ def test_cost_realloc_m_o_c_hollow_phase_released_steps_zero(
             )
         return _resolve_down_orig(current, catalog)
 
-    monkeypatch.setattr(
-        f"{_REALLOC_LOGGER}.resolve_next_effective_step_down",
-        _hollow_opt_to_min,
-    )
+    for module_path in (_REALLOC_LOGGER, _RESOLVE_EFFECTIVE):
+        monkeypatch.setattr(
+            f"{module_path}.resolve_next_effective_step_down",
+            _hollow_opt_to_min,
+        )
     recorded = _track_released_in_planner(monkeypatch)
     _install_realloc_collectors(
         monkeypatch,
@@ -492,10 +501,11 @@ def test_state_rebalance_m_o_c_hollow_phase_released_steps_zero(
             )
         return _resolve_down_orig(current, catalog)
 
-    monkeypatch.setattr(
-        f"{_REALLOC_LOGGER}.resolve_next_effective_step_down",
-        _hollow_opt_to_min,
-    )
+    for module_path in (_REALLOC_LOGGER, _RESOLVE_EFFECTIVE):
+        monkeypatch.setattr(
+            f"{module_path}.resolve_next_effective_step_down",
+            _hollow_opt_to_min,
+        )
     recorded = _track_released_in_planner(monkeypatch)
     _install_m2_collectors(
         monkeypatch,

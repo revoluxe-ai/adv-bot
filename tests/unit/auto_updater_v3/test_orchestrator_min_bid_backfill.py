@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
-    _load_v3_wb_context,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.loaders import (
+    load_v3_wb_context,
 )
 
 
@@ -38,10 +38,10 @@ async def test_load_v3_wb_context_retries_dto_after_min_bid_backfill() -> None:
     predictor.get_keyword_bid_profiles = AsyncMock(return_value={"kw": []})
 
     with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_predict_keywords_target_place",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.loaders.build_predict_keywords_target_place",
         return_value=predictor,
     ):
-        dto, profiles = await _load_v3_wb_context(
+        dto, profiles = await load_v3_wb_context(
             complex_adv, wb_shop_data_manager=wb_manager
         )
 

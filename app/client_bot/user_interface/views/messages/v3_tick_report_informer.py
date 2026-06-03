@@ -81,9 +81,11 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         operable = phase.extra.get("operable", 0)
         lines.append(f"  Управляемых: {operable} из {total}")
         return lines
-    if phase.phase_id == "hard_status_sync":
-        lines.append(f"  Синхронизировано: {phase.sync}")
-        if phase.sync == 0 and phase.outcome_note:
+    if phase.phase_id == "validate_state_by_hard_status":
+        touched = phase.extra.get("hs1_touched", 0)
+        if touched:
+            lines.append(f"  ключей авто (hs=1): {touched}")
+        elif phase.outcome_note:
             lines.append(f"  без изменений — {phase.outcome_note}")
         return lines
     if not phase.executed and phase.skip_reason:

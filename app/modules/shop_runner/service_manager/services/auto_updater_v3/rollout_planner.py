@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -44,6 +45,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+    UpdateContext,
+    update_context_from_prepared,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.step_manager import (
+    StepCandidate,
+    StepManager,
+    bump_prepared_list_only,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     effective_conv_for_v3,
@@ -626,11 +636,6 @@ class _CalibrationDownPick:
     pay_for_order: float
 
 
-def _calibration_down_pick_sort_key(pick: _CalibrationDownPick) -> tuple[float, float, int]:
-    """Сортировка: max ``state_cost``, затем max CPO, затем ``ks_id``."""
-    return (-pick.state_cost, -pick.pay_for_order, pick.keyword_setting_id)
-
-
 def collect_calibration_down_next_step_candidates(
     prepared: PreparedList,
     *,
@@ -730,15 +735,25 @@ def _bump_prepared_mode(
     keyword_setting_id: int,
     new_mode: KeywordStrategyMode,
 ) -> PreparedList:
-    """Локально обновить режим ключа в ``PreparedList`` (между итерациями CAL UP/DOWN)."""
-    bumped: list[tuple["KeywordV3Context", KeywordStrategyMode]] = []
-    for ctx, mode in prepared:
+    """Re-export: bump ``active_mode`` без history (legacy)."""
+    return bump_prepared_list_only(prepared, keyword_setting_id, new_mode)
+
+
+def _step_candidate_sort_key(candidate: StepCandidate) -> tuple[float, float, int]:
+    """Сортировка DOWN: max ``state_cost``, затем max CPO, затем ``ks_id``."""
+    return (
+        -candidate.state_cost,
+        -candidate.pay_for_order,
+        candidate.keyword_setting_id,
+    )
+
+
+def _hard_status_for_ks(prepared: PreparedList, keyword_setting_id: int) -> int:
+    for ctx, _mode in prepared:
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is not None and int(ks_id) == keyword_setting_id:
-            bumped.append((ctx, new_mode))
-        else:
-            bumped.append((ctx, mode))
-    return bumped
+            return int(ctx.keyword.hard_status)
+    return _HARD_STATUS_AUTO_MODE
 
 
 def _append_trim_to_mode(
@@ -918,7 +933,7 @@ def _plan_calibration_down(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int,
 ) -> list[V3Action]:
-    """CAL DOWN: до ``max_effective_steps`` итераций «самый дорогой state → один DOWN».
+    """CAL DOWN: до ``max_effective_steps`` итераций «самый дорогой state → один DOWN``.
 
     На каждой итерации: пул ``collect_calibration_down_next_step_candidates``,
     выбор max ``state_cost`` (tie-break CPO), одно DOWN/FORCE_OFF, пересбор пула.
@@ -928,38 +943,45 @@ def _plan_calibration_down(
         aggressiveness=aggressiveness,
     )
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-
-    step_budget = max(1, int(max_effective_steps))
-    working = prepared
     actions: list[V3Action] = []
+    update_ctx = update_context_from_prepared(prepared)
 
-    for _ in range(step_budget):
-        picks = collect_calibration_down_next_step_candidates(
-            working,
+    def _collect(working_ctx: UpdateContext) -> list[StepCandidate]:
+        raw = collect_calibration_down_next_step_candidates(
+            working_ctx.prepared,
             cost_ceiling=float(cost_ceiling),
             policy=policy,
             ladder_inputs=ladder,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
-        if not picks:
-            break
-        best = min(picks, key=_calibration_down_pick_sort_key)
-        hard_status = _HARD_STATUS_AUTO_MODE
-        for ctx, _mode in working:
-            ks_id = ctx.keyword.keyword_setting_original_id
-            if ks_id is not None and int(ks_id) == best.keyword_setting_id:
-                hard_status = int(ctx.keyword.hard_status)
-                break
+        return [
+            StepCandidate(
+                keyword_setting_id=pick.keyword_setting_id,
+                from_mode=pick.from_mode,
+                to_mode=pick.to_mode,
+                state_cost=pick.state_cost,
+                pay_for_order=pick.pay_for_order,
+            )
+            for pick in raw
+        ]
+
+    def _on_pick(pick: StepCandidate, working_ctx: UpdateContext, _pool_size: int) -> None:
         _append_trim_to_mode(
             actions,
-            ks_id=best.keyword_setting_id,
-            current=best.from_mode,
-            target=best.to_mode,
-            hard_status=hard_status,
+            ks_id=pick.keyword_setting_id,
+            current=pick.from_mode,
+            target=pick.to_mode,
+            hard_status=_hard_status_for_ks(working_ctx.prepared, pick.keyword_setting_id),
             reason=_CAL_DOWN_REASON,
         )
-        working = _bump_prepared_mode(working, best.keyword_setting_id, best.to_mode)
 
+    StepManager.down(
+        update_ctx,
+        max_effective_steps,
+        collect=_collect,
+        sort_key=_step_candidate_sort_key,
+        on_pick=_on_pick,
+    )
     return actions
 
 
@@ -972,13 +994,14 @@ def _plan_calibration_up(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Калибровка UP: до ``max_effective_steps`` итераций «самый дешёвый state → один UP».
+    """Калибровка UP: до ``max_effective_steps`` итераций «самый дешёвый state → один UP``.
 
     На каждой итерации: пул ``collect_calibration_up_next_step_candidates``,
     выбор min ``state_cost`` (tie-break CPO), одно UP-действие, обновление
     ``prepared`` для следующей переоценки. Бюджет — ``resolve_effective_calibration_steps``.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        TransitionCandidate,
         _candidate_sort_key,
         _candidate_to_action,
     )
@@ -988,33 +1011,41 @@ def _plan_calibration_up(
         aggressiveness=aggressiveness,
     )
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-
-    step_budget = max(1, int(max_effective_steps))
-    working = prepared
     actions: list[V3Action] = []
+    update_ctx = update_context_from_prepared(prepared)
 
-    for _ in range(step_budget):
-        candidates = collect_calibration_up_next_step_candidates(
-            working,
+    def _collect(working_ctx: UpdateContext) -> list[TransitionCandidate]:
+        return collect_calibration_up_next_step_candidates(
+            working_ctx.prepared,
             policy=policy,
             ladder_inputs=ladder,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
-        if not candidates:
-            break
-        best = min(candidates, key=_candidate_sort_key)
-        to_mode = best.to_mode
-        if to_mode is None or to_mode == best.from_mode:
-            break
+
+    def _on_pick(
+        best: TransitionCandidate,
+        _working_ctx: UpdateContext,
+        pool_size: int,
+    ) -> None:
         actions.append(
             _candidate_to_action(
                 best,
-                pool_size=len(candidates),
+                pool_size=pool_size,
                 reason_prefix="resolve_calibration_up",
             )
         )
-        working = _bump_prepared_mode(working, best.keyword_setting_id, to_mode)
 
+    StepManager.up(
+        update_ctx,
+        max_effective_steps,
+        collect=_collect,
+        sort_key=_candidate_sort_key,
+        keyword_setting_id_of=lambda c: c.keyword_setting_id,
+        to_mode_of=lambda c: c.to_mode,
+        from_mode_of=lambda c: c.from_mode,
+        is_valid_pick=lambda c: c.to_mode is not None and c.to_mode != c.from_mode,
+        on_pick=_on_pick,
+    )
     return actions
 
 
@@ -2274,35 +2305,27 @@ def plan_cost_reallocation(
         if ctx_worst is None:
             break
         catalog = _mode_catalog_for_ctx(ctx_worst, prepared, ladder)
-        step = resolve_next_effective_step_down(
-            worst_active.strategy_mode,
-            catalog,
-        )
+        step = StepManager.resolve_down(worst_active.strategy_mode, catalog)
         log_skipped_aliases(ctx_worst.keyword.text, step.skipped_aliases)
-        if step.next_mode is None:
+        if step.to_mode is None:
             break
-        released = count_effective_released_aggression_steps(
-            worst_active.strategy_mode,
-            step.next_mode,
-            catalog,
-        )
-        if released == 0:
+        if step.released_aggression_steps == 0:
             logger.debug(
                 "v3 realloc hollow down kw=%s: %s -> %s same target_place, stop",
                 ctx_worst.keyword.text,
                 worst_active.strategy_mode.name,
-                step.next_mode.name,
+                step.to_mode.name,
             )
             break
         step_sig = (
             worst_active.ks_id,
             worst_active.strategy_mode.name,
-            step.next_mode.name,
+            step.to_mode.name,
         )
         if last_down_sig == step_sig:
             break
-        released_steps += released
-        overrides[worst_active.ks_id] = step.next_mode
+        released_steps += step.released_aggression_steps
+        overrides[worst_active.ks_id] = step.to_mode
         last_down_sig = step_sig
 
     if released_steps:
