@@ -12,6 +12,19 @@ trim, shelf cleanup):
 (``_highest_passing_mode_in_upper_groups``), не для N отдельных действий по alias.
 
 OFF не сравнивается по ``target_place`` — отдельный уровень лестницы.
+
+OFF → первый effective UP (важно для eligibility)
+-------------------------------------------------
+При ``current == OFF`` первый шаг не фиксирован как ``MIN_CPA``: после ``step_up(OFF)``
+берётся ``target_place`` первой ступени и **схлопываются** все M/O/C на этом place
+в max ``mode_level`` (например OFF→``MAX_CONVERSION``, если M=O=C на pos40).
+
+Collectors с ослабленным gate (calibration UP ``off_no_data_bootstrap``) проверяют
+``to_mode == MIN_CPA`` буквально. Если collapsed target — ``OPTIMUM``/``MAX_CONVERSION``,
+а ``can_target_mode`` запрещает (MIN-only tier, пустой ``allowed_modes`` у NO DATA
+без bootstrap-ветки), ключ **выпадает из пула без fallback** на ``MIN_CPA``.
+Enable (``plan_pay_for_order_gap_enable``) всегда целится в ``MIN_CPA`` и не затронут.
+См. ``collect_calibration_up_next_step_candidates`` и ``V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
@@ -121,6 +134,10 @@ def resolve_next_effective_step_up(
 
     DOWN по-прежнему пропускает alias; UP внутри группы с одним place выбирает
     самый высокий логический режим (например MIN→MAX при O=C на pos1).
+
+    Ветка ``current == OFF``: см. module docstring — collapse на первом place может
+    вернуть режим выше ``MIN_CPA``; callers с MIN-only bootstrap должны учитывать
+    рассинхрон с ``can_target_mode`` / ``off_no_data_bootstrap``.
     """
     if current == KeywordStrategyMode.OFF:
         nxt = step_up(KeywordStrategyMode.OFF)

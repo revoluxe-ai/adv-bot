@@ -521,6 +521,16 @@ def collect_calibration_up_next_step_candidates(
           preamble-путь включить OFF при наличии операционных данных на ключе.
         - На практике таких ключей мало; основной объём ветки UP — OFF NO DATA.
 
+    OFF collapse vs MIN-only bootstrap (``resolve_next_effective_step_up``)
+    -----------------------------------------------------------------------
+    Effective UP с ``OFF`` схлопляет alias на **первом** ``target_place`` до max M/O/C
+    (не обязательно ``MIN_CPA``). Ослабление ``off_no_data_bootstrap`` ниже срабатывает
+    **только** при ``to_mode == MIN_CPA`` (NO DATA). Если collapsed target —
+    ``OPTIMUM``/``MAX_CONVERSION``, ``can_target_mode(elig, to_mode)`` ложен и bootstrap
+    не применяется → ``continue`` (ключ не попадает в пул, **fallback на MIN нет**).
+    Типичный кейс: MIN-only tier (``allowed_modes={MIN_CPA}``) + M=O=C на одном place.
+    Фаза enable всегда шлёт OFF→MIN и этим ограничением не страдает.
+
     Отличие от фазы enable (``plan_pay_for_order_gap_enable``)
     ----------------------------------------------------------
     | | enable (7) | calibration UP (8) |
@@ -600,6 +610,9 @@ def collect_calibration_up_next_step_candidates(
         mc = catalog.get(target)
         if mc is None:
             continue
+        # Bootstrap NO DATA: ослабление can_target_mode только для OFF→MIN_CPA.
+        # Если resolve_next_effective_step_up вернул collapsed OPT/MAX (alias на place),
+        # to_mode != MIN_CPA → bootstrap False → ключ выпадает (см. docstring).
         off_no_data_bootstrap = (
             is_off_gap_enable
             and to_mode == KeywordStrategyMode.MIN_CPA

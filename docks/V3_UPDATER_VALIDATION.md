@@ -165,6 +165,8 @@ Calibration: **AND** — оба сигнала должны измениться
 - Enable и calibration UP **не дублируют** друг друга: разные gate (OR vs AND), лимит отбора (ks_id vs min CPO), reason (`pay_for_order_gap_enable` vs `resolve_calibration_up`).
 - Порядок в тике: enable → refresh `prepared` → calibration; за тик возможны два разных OFF NO DATA, если оба gate прошли.
 
+**OFF collapse и calibration UP (ограничение):** `resolve_next_effective_step_up(OFF)` схлопляет M/O/C на первом `target_place` до max режима (не обязательно MIN). В `collect_calibration_up_next_step_candidates` ослабление `can_target_mode` (`off_no_data_bootstrap`) действует **только** при `to_mode == MIN_CPA` (OFF + NO DATA). Если collapsed target — OPT/MAX, а tier MIN-only или bootstrap не применим, ключ **не попадает в пул** (fallback на MIN нет). Enable (`plan_pay_for_order_gap_enable`) всегда OFF→MIN и не зависит от collapse. См. `effective_ladder_steps.py` module docstring.
+
 Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, default 1):
 - первый тик / нет Redis-истории → `1`;
 - то же направление → `min(prev × 2, cap)`;
