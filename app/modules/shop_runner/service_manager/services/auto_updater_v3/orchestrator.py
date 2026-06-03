@@ -595,6 +595,11 @@ async def process_adv_v3(
                     if calibration_prev_state is not None
                     else None,
                 )
+            calibration_phase_extra: dict[str, object] = {
+                "calibration_direct": current_calibration_direct.value,
+                "effective_steps": effective_calibration_steps,
+                "prev_effective_steps": calibration_prev_effective_steps,
+            }
             from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
                 load_rec_orders_per_view_for_v3,
             )
@@ -888,10 +893,7 @@ async def process_adv_v3(
                     tick_report.record_phase(
                         "resolve_calibration",
                         calibration_actions,
-                        extra={
-                            "calibration_direct": current_calibration_direct.value,
-                            "effective_steps": effective_calibration_steps,
-                        },
+                        extra=calibration_phase_extra,
                         outcome_note=_phase_outcome_note_if_empty(
                             "resolve_calibration",
                             calibration_actions,
@@ -925,6 +927,7 @@ async def process_adv_v3(
                     tick_report.record_phase(
                         "resolve_calibration",
                         skip_reason="guard_applied",
+                        extra=calibration_phase_extra,
                     )
                     logger.debug(
                         "[adv_id=%s] v3 RESOLVE_CALIBRATION skipped: guard_applied",
@@ -941,6 +944,7 @@ async def process_adv_v3(
                     tick_report.record_phase(
                         "resolve_calibration",
                         skip_reason=cal_skip_reason,
+                        extra=calibration_phase_extra,
                     )
                     logger.debug(
                         "[adv_id=%s] v3 RESOLVE_CALIBRATION skipped: %s",
@@ -951,6 +955,7 @@ async def process_adv_v3(
                     tick_report.record_phase(
                         "resolve_calibration",
                         skip_reason="fact_gt_max",
+                        extra=calibration_phase_extra,
                     )
             else:
                 tick_report.record_phase(
@@ -964,6 +969,7 @@ async def process_adv_v3(
                 tick_report.record_phase(
                     "resolve_calibration",
                     skip_reason="resolve_invalid",
+                    extra=calibration_phase_extra,
                 )
 
             with trace.phase("preamble_build_sync_fallback"):

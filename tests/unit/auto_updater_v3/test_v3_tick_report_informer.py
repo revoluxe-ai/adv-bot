@@ -57,6 +57,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
                 extra={
                     "calibration_direct": "tighten",
                     "effective_steps": 2,
+                    "prev_effective_steps": 1,
                 },
             ),
         ],
@@ -75,6 +76,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "+7" in text
     assert "пропуск" in text
     assert "DOWN" in text
+    assert "бюджет 2 (было 1)" in text
     assert "Авто: 40" in text
     assert "Возможные:" not in text
 

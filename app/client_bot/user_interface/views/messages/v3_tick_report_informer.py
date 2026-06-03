@@ -70,7 +70,9 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
             title = f"{title} · {branch}"
         eff_raw = phase.extra.get("effective_steps")
         eff = int(eff_raw) if eff_raw is not None else None
-        budget = _format_calibration_budget(eff, None)
+        prev_raw = phase.extra.get("prev_effective_steps")
+        prev = int(prev_raw) if prev_raw is not None else None
+        budget = _format_calibration_budget(eff, prev)
         if budget:
             title = f"{title} · {budget}"
     lines = [f"▸ {title}"]

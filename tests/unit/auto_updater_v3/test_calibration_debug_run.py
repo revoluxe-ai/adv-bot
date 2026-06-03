@@ -1,4 +1,4 @@
-"""Дебаг-прогон: цепочка resolver ×2 и planner CAL UP/DOWN (пишет debug-de9fc0.log)."""
+"""Дебаг-прогон: цепочка resolver ×2 и planner CAL UP/DOWN (опционально calibration_debug.log)."""
 
 from __future__ import annotations
 
@@ -19,9 +19,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     plan_resolve_calibration,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_debug_agent_log import (
-    v3_agent_debug_log,
-)
+from tests.unit.auto_updater_v3.calibration_debug_log import write_calibration_debug_log
 from tests.unit.auto_updater_v3.test_calibration_adaptive_integration import (
     _patch_ladder_costs,
     _three_place_profile,
@@ -51,7 +49,7 @@ def test_debug_run_resolver_chain_loosen_cap8(
             prev=prev,
             current_direct=CalibrationDirect.LOOSEN,
         )
-        v3_agent_debug_log(
+        write_calibration_debug_log(
             location="test_calibration_debug_run.py:resolver_chain",
             message="simulated_tick",
             hypothesis_id="H-chain",
@@ -80,7 +78,7 @@ def test_debug_run_flip_loosen_to_tighten(
     down = resolve_effective_calibration_steps(
         8, prev=prev, current_direct=CalibrationDirect.TIGHTEN
     )
-    v3_agent_debug_log(
+    write_calibration_debug_log(
         location="test_calibration_debug_run.py:flip",
         message="loosen_to_tighten",
         hypothesis_id="H-flip",
@@ -123,7 +121,7 @@ def test_debug_run_planner_budgets_match_actions(
             aggressiveness=V3RolloutAggressiveness.MAX,
             max_effective_steps=budget,
         )
-        v3_agent_debug_log(
+        write_calibration_debug_log(
             location="test_calibration_debug_run.py:planner",
             message="budget_vs_actions",
             hypothesis_id="H-planner",
