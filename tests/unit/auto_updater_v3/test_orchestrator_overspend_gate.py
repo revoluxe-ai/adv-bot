@@ -87,10 +87,6 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=SalesStates.OVERSPEND,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
             return_value=[],
         ),
@@ -212,10 +208,6 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -351,10 +343,6 @@ async def _run_preamble_with_fact_cpa(
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.plan_pay_for_order_gap_enable",
             return_value=[],
         ),
@@ -452,10 +440,6 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
             return_value=[],
         ),
         patch(

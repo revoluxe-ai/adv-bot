@@ -5,6 +5,9 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+    KeywordMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
     KeywordDTO,
     NextState,
@@ -13,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_p
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.v3_ladder_stage_kind import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.ladder_state_kind import (
     V3LadderStageKind,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -70,7 +73,7 @@ def test_empty_next_state_reads_stored_mode() -> None:
 def test_current_mode_setter_appends_next_state() -> None:
     dto = _dto()
     dto.current_mode = NextState(
-        new_mode=KeywordStrategyMode.OFF,
+        new_mode=KeywordMode.OFF,
         executor_name="TestExecutor",
     )
     assert len(dto.next_state) == 1
@@ -79,14 +82,14 @@ def test_current_mode_setter_appends_next_state() -> None:
 
 
 @pytest.mark.unit
-def test_nsm_validate_hs1_always_appends() -> None:
+def test_nsm_validate_hs1_dedup_when_already_off() -> None:
     nsm = NextStateManager(HardStatusValidateExecutor)
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA, hard_status=HARD_STATUS_AUTO_MODE)
     nsm.validate_state_by_hard_status(dto)
     assert len(dto.next_state) == 1
     assert dto.current_mode == KeywordStrategyMode.OFF
     nsm.validate_state_by_hard_status(dto)
-    assert len(dto.next_state) == 2
+    assert len(dto.next_state) == 1
 
 
 @pytest.mark.unit

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_mode import (
     KeywordMode,
 )
 

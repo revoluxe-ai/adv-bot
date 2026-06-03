@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 _PHASE_LOG: dict[str, tuple[str, str]] = {
     "validate_state_by_hard_status": ("v3 VALIDATE_HARD_STATUS", "validate_count"),
-    "cap_down": ("v3 MODE_CAP_DOWN", "cap_down_count"),
+    "validate_not_full_state": ("v3 VALIDATE_NOT_FULL", "validate_not_full_count"),
     "passing_up": ("v3 PASSING_UP", "passing_up_count"),
     "shelf_cleanup": ("v3 SHELF_REC_CLEANUP", "shelf_count"),
     "max_cpa_guard": ("v3 MAX_CPA_GUARD", "guard_count"),

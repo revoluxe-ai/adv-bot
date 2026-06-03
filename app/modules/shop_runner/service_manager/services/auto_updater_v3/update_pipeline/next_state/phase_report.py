@@ -42,12 +42,12 @@ def steps_to_v3_actions(
     prior = dto.stored_mode
     idx_before = len(dto.next_state) - len(steps)
     if idx_before > 0:
-        prior = dto.next_state[idx_before - 1].new_mode
+        prior = dto.next_state[idx_before - 1].new_mode.to_strategy_mode()
     for step in steps:
         action = _step_to_action(ks_id, prior_mode=prior, step=step)
         if action is not None:
             actions.append(action)
-        prior = step.new_mode
+        prior = step.new_mode.to_strategy_mode()
     return actions
 
 
@@ -57,7 +57,7 @@ def _step_to_action(
     prior_mode: KeywordStrategyMode,
     step: NextState,
 ) -> V3Action | None:
-    new_mode = step.new_mode
+    new_mode = step.new_mode.to_strategy_mode()
     if prior_mode == new_mode:
         return None
     reason = step.executor_name

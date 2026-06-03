@@ -12,24 +12,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
     KeywordV3Eligibility,
-    can_target_mode,
-    clamp_target_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
     is_keyword_no_data,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    mode_level,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-    _append_force_off_then_up,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    _HARD_STATUS_AUTO_MODE,
-    _HARD_STATUS_WHITE_LIST,
     _hard_status_allows_up,
     plan_max_cpa_guard,
     plan_profitable_expansion,
@@ -47,75 +37,6 @@ if TYPE_CHECKING:
         LadderInputs,
     )
 
-
-def plan_mode_cap_down(
-    prepared: PreparedList,
-    *,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility],
-    covered: set[int] | None = None,
-) -> list[V3Action]:
-    """Фаза B: опустить ``strategy_mode`` выше cap по tier (FULL/PFO/NO DATA active)."""
-    actions: list[V3Action] = []
-    min_level = mode_level(KeywordStrategyMode.MIN_CPA)
-    skip_ids = covered or set()
-
-    for ctx, mode in prepared:
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None or int(ks_id) in skip_ids:
-            continue
-        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        elig = eligibility_by_ks_id.get(int(ks_id))
-        if elig is None:
-            continue
-
-        if elig.data_tier == KeywordDataTier.KEYWORD_NO_DATA:
-            if mode == KeywordStrategyMode.OFF:
-                continue
-            if mode_level(mode) > min_level:
-                target = KeywordStrategyMode.MIN_CPA
-                _append_cap_down(actions, ks_id=int(ks_id), target=target, hard_status=int(ctx.keyword.hard_status))
-            continue
-
-        if mode_level(mode) <= min_level:
-            continue
-        cap = clamp_target_mode(elig, mode)
-        if mode_level(cap) >= mode_level(mode):
-            continue
-        if not can_target_mode(elig, cap):
-            cap = KeywordStrategyMode.MIN_CPA
-        _append_cap_down(actions, ks_id=int(ks_id), target=cap, hard_status=int(ctx.keyword.hard_status))
-
-    return actions
-
-
-def _append_cap_down(
-    actions: list[V3Action],
-    *,
-    ks_id: int,
-    target: KeywordStrategyMode,
-    hard_status: int,
-) -> None:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
-        V3ActionType,
-    )
-
-    if hard_status == _HARD_STATUS_WHITE_LIST:
-        actions.append(
-            V3Action(
-                action=V3ActionType.DOWN,
-                keyword_setting_id=ks_id,
-                target_strategy_mode=target,
-                reason="cap_bootstrap_down",
-            )
-        )
-    elif hard_status == _HARD_STATUS_AUTO_MODE:
-        _append_force_off_then_up(
-            actions,
-            ks_id=ks_id,
-            target_strategy_mode=target,
-            reason="cap_bootstrap_down",
-        )
 
 
 def plan_passing_up(

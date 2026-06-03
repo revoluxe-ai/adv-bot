@@ -65,7 +65,7 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             new=AsyncMock(return_value=100),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
             side_effect=_ROOT_ERROR,
         ),
         patch(

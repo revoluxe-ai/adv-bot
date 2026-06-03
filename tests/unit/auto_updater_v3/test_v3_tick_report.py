@@ -71,7 +71,7 @@ def test_collector_build_snapshot() -> None:
         extra={"hs1_touched": 2},
     )
     coll.record_phase(
-        "cap_down",
+        "validate_not_full_state",
         [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1)],
     )
     snap = coll.build_snapshot(

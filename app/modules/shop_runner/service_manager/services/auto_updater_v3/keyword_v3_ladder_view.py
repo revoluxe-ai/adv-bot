@@ -39,7 +39,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
     KeywordsPreparedList,
-    build_keywords_prepared_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,11 +120,24 @@ class LadderInputs:
             if campaign_orders_per_cart_7d is not None
             else rk_orders_per_cart
         )
-        prepared = build_keywords_prepared_list(contexts)
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared._prepared_builder import (
+            _bootstrap_ladder_inputs,
+            build_keywords_prepared_list,
+        )
+
+        bootstrap = _bootstrap_ladder_inputs(contexts)
+        bootstrap = LadderInputs(
+            all_contexts=bootstrap.all_contexts,
+            prepared=KeywordsPreparedList(keywords=[]),
+            campaign_cache=bootstrap.campaign_cache,
+            campaign_orders_per_cart_7d=campaign_opc,
+            rec_orders_per_view=rec_orders_per_view,
+        )
+        prepared = build_keywords_prepared_list(contexts, ladder_inputs=bootstrap)
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,
-            campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
+            campaign_cache=bootstrap.campaign_cache,
             campaign_orders_per_cart_7d=campaign_opc,
             rec_orders_per_view=rec_orders_per_view,
         )

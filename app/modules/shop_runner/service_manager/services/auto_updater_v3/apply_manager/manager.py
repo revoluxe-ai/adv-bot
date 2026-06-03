@@ -238,7 +238,7 @@ class ApplyManager:
         )
         logger.info(
             "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
-            "validate=%s cap_down=%s passing_up=%s shelf=%s "
+            "validate=%s validate_not_full=%s passing_up=%s shelf=%s "
             "realloc=%s enable=%s calibration=%s guard=%s "
             "post_gate up=%s down=%s off=%s",
             tick.complex_adv.adv_id,
@@ -246,7 +246,7 @@ class ApplyManager:
             compute_resolve_cost_threshold(plan, fact) if plan and fact else None,
             fact.pay_for_order if fact else None,
             pipeline.validate_count if pipeline else 0,
-            pipeline.cap_down_count if pipeline else 0,
+            pipeline.validate_not_full_count if pipeline else 0,
             pipeline.passing_up_count if pipeline else 0,
             pipeline.shelf_count if pipeline else 0,
             pipeline.realloc_count if pipeline else 0,

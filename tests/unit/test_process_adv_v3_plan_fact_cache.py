@@ -122,7 +122,6 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
             f"{_TC}.prepare_v3_operable_ladder_contexts": lambda *a, **k: ([], [], 0),
             f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
             f"{_V3_CPO}.load_rec_orders_per_view_for_v3": AsyncMock(return_value=None),
-            f"{_UP}.cap_down.plan_mode_cap_down": lambda *a, **k: [],
             f"{_UP}.passing_up.plan_passing_up": lambda *a, **k: [],
             f"{_UP}.cost_reallocation.plan_cost_reallocation": lambda *a, **k: [],
             f"{_UP}.pay_for_order_gap_enable.plan_pay_for_order_gap_enable": lambda *a, **k: [],

@@ -56,7 +56,6 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
             [],
             0,
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down": lambda *a, **k: [],
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.is_resolve_valid": lambda *a, **k: True,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up": lambda *a, **k: [],
@@ -122,7 +121,5 @@ async def test_process_adv_v3_persists_tick_report_on_normal_tick() -> None:
     assert isinstance(snapshot, V3TickReportSnapshot)
     assert snapshot.campaign_mode == "NORMAL"
     assert any(p.phase_id == "filter" for p in snapshot.phases)
-    cap_phase = next(p for p in snapshot.phases if p.phase_id == "cap_down")
-    assert cap_phase.executed
-    assert cap_phase.outcome_note is not None
-    assert cap_phase.up == 0
+    nf_phase = next(p for p in snapshot.phases if p.phase_id == "validate_not_full_state")
+    assert nf_phase.executed

@@ -57,7 +57,7 @@ def test_run_step_down_picks_max_state_cost_and_records_history() -> None:
     assert result.context.prepared[1][1] == KeywordStrategyMode.MAX_CONVERSION
     dto = result.context.keywords[1]
     assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
-    assert [s.new_mode for s in dto.next_state] == [
+    assert [s.new_mode.to_strategy_mode() for s in dto.next_state] == [
         KeywordStrategyMode.MAX_CONVERSION,
     ]
 
@@ -88,7 +88,7 @@ def test_run_steps_down_applies_budget_and_appends_history() -> None:
     assert len(batch.picks) == 2
     dto = batch.context.keywords[0]
     assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
-    assert [s.new_mode for s in dto.next_state] == [
+    assert [s.new_mode.to_strategy_mode() for s in dto.next_state] == [
         KeywordStrategyMode.OPTIMUM,
         KeywordStrategyMode.MAX_CONVERSION,
     ]

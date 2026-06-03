@@ -32,8 +32,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     UpdatePipeline,
     build_normal_preamble_executors,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down import (
-    CapDownExecutor,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
+    NotFullValidateExecutor,
 )
 from tests.unit.test_auto_updater_v3 import _calc_kw
 
@@ -91,7 +91,7 @@ def _legacy_context(**adv_overrides: object) -> UpdateContext:
 @pytest.mark.unit
 def test_update_pipeline_mutates_context_in_place() -> None:
     ctx = _legacy_context()
-    executor = CapDownExecutor()
+    executor = NotFullValidateExecutor()
     pipeline = UpdatePipeline([executor])
     result_ctx = pipeline.update(ctx)
     assert result_ctx is ctx
@@ -133,7 +133,7 @@ def test_build_normal_preamble_executors_order() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
     assert names == [
         "validate_state_by_hard_status",
-        "cap_down",
+        "validate_not_full_state",
         "passing_up",
         "shelf_cleanup",
         "max_cpa_guard",

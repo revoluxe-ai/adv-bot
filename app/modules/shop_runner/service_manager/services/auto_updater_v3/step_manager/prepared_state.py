@@ -10,6 +10,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_p
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
     NextState,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+    KeywordMode,
+)
 
 
 def bump_prepared_mode(
@@ -22,7 +25,10 @@ def bump_prepared_mode(
     """In-place: append ``NextState`` для одного ключа."""
     for dto in ctx.keywords:
         if dto.keyword_setting_id == keyword_setting_id:
-            dto.current_mode = NextState(new_mode=new_mode, executor_name=executor_name)
+            dto.current_mode = NextState(
+                new_mode=KeywordMode.from_strategy_mode(new_mode),
+                executor_name=executor_name,
+            )
             break
     return ctx
 
@@ -37,6 +43,9 @@ def bump_prepared_list_only(
     """In-place: append ``NextState`` без ``UpdateContext``."""
     for dto in prepared.keywords:
         if dto.keyword_setting_id == keyword_setting_id:
-            dto.current_mode = NextState(new_mode=new_mode, executor_name=executor_name)
+            dto.current_mode = NextState(
+                new_mode=KeywordMode.from_strategy_mode(new_mode),
+                executor_name=executor_name,
+            )
             break
     return prepared

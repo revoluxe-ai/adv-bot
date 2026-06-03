@@ -461,10 +461,6 @@ async def test_orchestrator_up_branch_passes_resolver_budget_to_real_planner() -
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
             return_value=[],
         ),

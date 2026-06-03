@@ -14,6 +14,7 @@ class HardStatusValidateExecutor:
     """VALIDATE hard_status: авто-ключи (1) → ``OFF``."""
 
     phase_name = "validate_state_by_hard_status"
+    _skip_reason: str | None = None
 
     def __init__(self) -> None:
         self._next_state_manager = NextStateManager(HardStatusValidateExecutor)
@@ -22,4 +23,7 @@ class HardStatusValidateExecutor:
         self._skip_reason = None
         for dto in context.keywords:
             self._next_state_manager.validate_state_by_hard_status(dto)
-        return None # значит не пропускаем
+
+    @property
+    def skip_reason(self) -> str | None:
+        return self._skip_reason

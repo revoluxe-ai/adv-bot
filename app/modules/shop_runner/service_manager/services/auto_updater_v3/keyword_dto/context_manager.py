@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared._prepared_builder import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
     assemble_update_context,
     update_context_from_prepared,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     KeywordsPreparedList,
     UpdateContext,

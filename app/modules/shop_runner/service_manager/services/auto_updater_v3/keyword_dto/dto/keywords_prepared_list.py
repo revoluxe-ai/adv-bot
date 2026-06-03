@@ -6,16 +6,16 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_dto import (
     KeywordDTO,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_prepared_row import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_prepared_row import (
     KeywordPreparedRow,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.keyword_batch import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.keyword_batch import (
     KeywordBatch,
 )
 

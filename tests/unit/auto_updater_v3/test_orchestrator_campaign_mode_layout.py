@@ -9,16 +9,17 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[3] / "app" / "modules" / "shop_runner" / "service_manager" / "services" / "auto_updater_v3"
 _ORCHESTRATOR = _ROOT / "orchestrator.py"
 _DATA_MANAGER = _ROOT / "data_update_manager" / "manager.py"
-_CAP_DOWN = _ROOT / "update_pipeline" / "executors" / "cap_down.py"
+_NOT_FULL_VALIDATE = _ROOT / "update_pipeline" / "executors" / "not_full_validate.py"
 
 
 @pytest.mark.unit
-def test_plan_mode_cap_down_not_in_orchestrator() -> None:
-    """``plan_mode_cap_down`` живёт в pipeline executor, не в orchestrator."""
+def test_validate_not_full_in_pipeline_not_orchestrator() -> None:
+    """``NotFullValidateExecutor`` в pipeline, не в orchestrator."""
     orch = _ORCHESTRATOR.read_text(encoding="utf-8")
-    cap = _CAP_DOWN.read_text(encoding="utf-8")
+    nf = _NOT_FULL_VALIDATE.read_text(encoding="utf-8")
     assert "plan_mode_cap_down(" not in orch
-    assert "plan_mode_cap_down(" in cap
+    assert "NotFullValidateExecutor" in nf
+    assert "validate_not_full_state" in nf
     assert "UpdatePipelineManager" in orch
     assert "elif tick_data.campaign_mode == CampaignMode.NORMAL" in orch
 

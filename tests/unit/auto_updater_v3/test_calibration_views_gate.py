@@ -149,10 +149,6 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
             return_value=SalesStates.STABLE,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
             return_value=[],
         ),

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import (
     BidPosition,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.update_context_input import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.update_context_input import (
     UpdateContextInput,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (

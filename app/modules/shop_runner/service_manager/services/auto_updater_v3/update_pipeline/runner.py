@@ -32,6 +32,7 @@ class PreamblePipelineRunResult:
     eligibility: dict[int, KeywordV3Eligibility]
     ladder_inputs: LadderInputs
     cap_down_count: int = 0
+    validate_not_full_count: int = 0
     validate_count: int = 0
     passing_up_count: int = 0
     shelf_count: int = 0

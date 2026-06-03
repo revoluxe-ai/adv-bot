@@ -49,7 +49,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     SelectionPolicy,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_preamble_phases import (
-    plan_mode_cap_down,
     plan_passing_up,
 )
 
@@ -102,7 +101,7 @@ def summarize_phase_zero_actions(
     """
     handlers = {
         "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
-        "cap_down": lambda: _note_cap_down(prepared, eligibility_by_ks_id),
+        "validate_not_full_state": lambda: _note_validate_not_full(prepared),
         "passing_up": lambda: _note_passing_up(
             prepared,
             resolve=resolve,
@@ -155,17 +154,15 @@ def summarize_phase_zero_actions(
     return handler()
 
 
-def _note_cap_down(
-    prepared: PreparedList,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
-) -> str:
+def _note_validate_not_full(prepared: PreparedList) -> str:
     if not prepared:
         return "нет operable ключей"
-    if eligibility_by_ks_id is None:
-        return "нет ключей выше tier-cap"
-    if plan_mode_cap_down(prepared, eligibility_by_ks_id=eligibility_by_ks_id):
-        return "планировщик не выбрал ключей"
-    return "нет ключей выше tier-cap"
+    for ctx, mode in prepared:
+        if mode == KeywordStrategyMode.OFF:
+            continue
+        if not bool(ctx.position_profile):
+            return "NOT FULL active уже MIN + target_place=0"
+    return "нет NOT FULL active ключей"
 
 
 def _note_passing_up(

@@ -306,7 +306,7 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "filter": ("0 · Фильтр operable", "—"),
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
-    "cap_down": ("2 · B · cap_down", "DOWN"),
+    "validate_not_full_state": ("2 · NF · validate_not_full", "DOWN"),
     "passing_up": ("3 · U · passing_up", "UP"),
     "shelf_cleanup": ("4 · S · shelf cleanup", "DOWN, OFF"),
     "max_cpa_guard": ("5 · G · max CPA guard", "DOWN, OFF"),

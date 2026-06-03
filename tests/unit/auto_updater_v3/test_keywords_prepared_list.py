@@ -5,6 +5,9 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+    KeywordMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
     KeywordsPreparedList,
     NextState,
@@ -76,7 +79,7 @@ def test_next_state_on_dto_updates_current_mode() -> None:
     prepared = build_keywords_prepared_list([_ctx(1)])
     dto = prepared.keywords[0]
     dto.current_mode = NextState(
-        new_mode=KeywordStrategyMode.OPTIMUM,
+        new_mode=KeywordMode.OPTIMUM,
         executor_name="Test",
     )
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
@@ -114,7 +117,7 @@ def test_build_update_context_keywords() -> None:
 def test_update_context_from_prepared_preserves_next_state() -> None:
     prepared = build_keywords_prepared_list([_ctx(1)])
     prepared.keywords[0].current_mode = NextState(
-        new_mode=KeywordStrategyMode.MAX_CONVERSION,
+        new_mode=KeywordMode.MAX_CONVERSION,
         executor_name="Test",
     )
     ctx = update_context_from_prepared(prepared)

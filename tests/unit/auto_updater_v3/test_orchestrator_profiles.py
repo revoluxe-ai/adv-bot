@@ -86,10 +86,6 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             return_value=SalesStates.UNDERPERFORM,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cap_down.plan_mode_cap_down",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
             return_value=[],
         ),
