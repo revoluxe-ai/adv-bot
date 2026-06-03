@@ -1,32 +1,37 @@
 """
-Tests for the "Add New Token" button in ShopMenu
-Verifies that the button is correctly displayed in the keyboard
+Unit-тесты кнопки «Добавить токен» в ShopMenu.
+
+Проверяют `build_shop_main_keyboard` через свойство `keyboard` без `_load_all_data`
+(без Postgres, Redis и TokenInfoService).
 """
 
+from __future__ import annotations
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from unittest.mock import AsyncMock, MagicMock
 
-from app.modules.shop_menu.message import ShopMenu
-from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
-)
-from app.utils.db.models import User
 from app.client_bot.user_interface.views.callbacks import AddNewToken
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.shop_menu.message import ShopMenu
+from app.utils.db.models import User
+
+pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
-def mock_bot():
-    """Create a mock Bot instance"""
+def mock_bot() -> MagicMock:
+    """Мок Bot с async send_message."""
     bot = MagicMock(spec=Bot)
     bot.send_message = AsyncMock()
     return bot
 
 
 @pytest.fixture
-def mock_state():
-    """Create a mock FSMContext"""
+def mock_state() -> MagicMock:
+    """Мок FSMContext."""
     state = MagicMock(spec=FSMContext)
     state.update_data = AsyncMock()
     state.get_data = AsyncMock(return_value={})
@@ -34,8 +39,8 @@ def mock_state():
 
 
 @pytest.fixture
-def mock_user():
-    """Create a mock User"""
+def mock_user() -> MagicMock:
+    """Мок User."""
     user = MagicMock(spec=User)
     user.id = 1
     user.user_telegram_id = 12345
@@ -43,27 +48,17 @@ def mock_user():
 
 
 @pytest.fixture
-def mock_wb_cabinet():
-    """Create a mock WBCabinet"""
-    # Avoid spec to prevent SQLAlchemy hybrid attributes being accessed during mock creation
+def mock_wb_cabinet() -> MagicMock:
+    """Мок WBCabinet (без spec — иначе SQLAlchemy hybrid-атрибуты)."""
     cabinet = MagicMock()
     cabinet.id = 1
     cabinet.shop_id = "test_shop_123"
-    cabinet.calculated_balance = 1000.0
-    cabinet.calculated_bonus = 100.0
-    cabinet.adv_settings = []
-
-    # Mock expiration time
-    from datetime import datetime, timedelta
-
-    cabinet.expiration_time = datetime.now() + timedelta(days=30)
-
     return cabinet
 
 
 @pytest.fixture
-def mock_wb_user_cabinet(mock_wb_cabinet, mock_user):
-    """Create a mock WBUserCabinet"""
+def mock_wb_user_cabinet(mock_wb_cabinet: MagicMock, mock_user: MagicMock) -> MagicMock:
+    """Мок WBUserCabinet, связанный с кабинетом и пользователем."""
     user_cabinet = MagicMock(spec=WBUserCabinet)
     user_cabinet.id = 1
     user_cabinet.name = "Test Shop"
@@ -72,353 +67,171 @@ def mock_wb_user_cabinet(mock_wb_cabinet, mock_user):
     return user_cabinet
 
 
+def _shop_menu_with_loaded_cabinets(
+    mock_bot: MagicMock,
+    mock_state: MagicMock,
+    mock_wb_user_cabinet: MagicMock,
+    *,
+    chat_id: int = 12345,
+    wb_user_cabinet_original_id: int | None = None,
+) -> ShopMenu:
+    """ShopMenu с подставленными кабинетами — как после загрузки данных, без I/O."""
+    cabinet_id = wb_user_cabinet_original_id or mock_wb_user_cabinet.id
+    shop_menu = ShopMenu(
+        bot=mock_bot,
+        chat_id=chat_id,
+        state=mock_state,
+        wb_user_cabinet_original_id=cabinet_id,
+    )
+    shop_menu._wb_user_cabinet = mock_wb_user_cabinet
+    shop_menu._wb_cabinet = mock_wb_user_cabinet.wb_cabinet
+    return shop_menu
+
+
+def _iter_buttons(
+    keyboard: InlineKeyboardMarkup,
+) -> list[tuple[int, InlineKeyboardButton]]:
+    """Плоский список (индекс_строки, кнопка)."""
+    return [
+        (row_idx, button)
+        for row_idx, row in enumerate(keyboard.inline_keyboard)
+        for button in row
+    ]
+
+
+def _find_add_token(
+    keyboard: InlineKeyboardMarkup,
+) -> tuple[int, InlineKeyboardButton, AddNewToken] | None:
+    """Кнопка AddNewToken или None."""
+    for row_idx, button in _iter_buttons(keyboard):
+        try:
+            callback_data = AddNewToken.unpack(button.callback_data)
+        except Exception:
+            continue
+        return row_idx, button, callback_data
+    return None
+
+
+def _row_index_by_text(keyboard: InlineKeyboardMarkup, text_part: str) -> int | None:
+    """Индекс строки с кнопкой, содержащей подстроку в text."""
+    for row_idx, button in _iter_buttons(keyboard):
+        if text_part in button.text:
+            return row_idx
+    return None
+
+
 class TestShopMenuAddTokenButton:
-    """Test suite for Add New Token button in ShopMenu"""
+    """Кнопка «Добавить токен» в главном меню магазина."""
 
-    @pytest.mark.asyncio
-    async def test_add_token_button_exists_in_keyboard(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that Add New Token button is present in the keyboard"""
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            # Mock database session
-            mock_session = MagicMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one.return_value = mock_wb_user_cabinet
-            mock_session.execute = AsyncMock(return_value=mock_result)
+    def test_add_token_button_exists_in_keyboard(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """Кнопка Add New Token есть в клавиатуре с корректным callback."""
+        shop_menu = _shop_menu_with_loaded_cabinets(
+            mock_bot, mock_state, mock_wb_user_cabinet
+        )
+        found = _find_add_token(shop_menu.keyboard)
 
-            mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sm.return_value.__aexit__ = AsyncMock()
+        assert found is not None, "Add New Token button not found in keyboard"
+        _, _, callback_data = found
+        assert callback_data.wb_user_cabinet_original_id == 1
 
-            # Mock Pricer (use patch.object with create=True to avoid AttributeError if attribute isn't present)
-            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                with patch(
-                    "app.modules.shop_menu.message.TokenInfoService"
-                ) as mock_token_service:
-                    mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(
-                        return_value=None
-                    )
-                    mock_token_service.return_value = mock_token_service_instance
+    def test_add_token_button_positioned_before_balance(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """Кнопка токена выше кнопки «Пополнить баланс» (меньший индекс строки)."""
+        shop_menu = _shop_menu_with_loaded_cabinets(
+            mock_bot, mock_state, mock_wb_user_cabinet
+        )
+        keyboard = shop_menu.keyboard
 
-                    # Create ShopMenu instance
-                    shop_menu = ShopMenu(
-                        bot=mock_bot,
-                        chat_id=12345,
-                        state=mock_state,
-                        wb_user_cabinet_original_id=1,
-                    )
+        add_token_row = _find_add_token(keyboard)
+        balance_row = _row_index_by_text(keyboard, "Пополнить баланс")
 
-                    # Load data
-                    await shop_menu._load_all_data()
+        assert balance_row is not None, "Balance button not found"
+        assert add_token_row is not None, "Add Token button not found"
+        assert add_token_row[0] < balance_row, (
+            "Add Token button should be positioned before Balance button"
+        )
 
-                    # Get keyboard
-                    keyboard = shop_menu.keyboard
+    def test_add_token_button_callback_data_format(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """callback_data начинается с add_new_token: и содержит id кабинета."""
+        mock_wb_user_cabinet.id = 42
+        shop_menu = _shop_menu_with_loaded_cabinets(
+            mock_bot,
+            mock_state,
+            mock_wb_user_cabinet,
+            wb_user_cabinet_original_id=42,
+        )
+        found = _find_add_token(shop_menu.keyboard)
 
-                    # Find Add New Token button by callback_data (more stable than text)
-                    add_token_button_found = False
-                    for row in keyboard.inline_keyboard:
-                        for button in row:
-                            try:
-                                callback_data = AddNewToken.unpack(button.callback_data)
-                            except Exception:
-                                continue
-                            # If unpack succeeded, it's the add-token button
-                            add_token_button_found = True
-                            assert callback_data.wb_user_cabinet_original_id == 1
-                            break
+        assert found is not None, "Add New Token button not found"
+        _, button, callback_data = found
+        assert callback_data.wb_user_cabinet_original_id == 42
+        assert button.callback_data.startswith("add_new_token:")
 
-                    assert (
-                        add_token_button_found
-                    ), "Add New Token button not found in keyboard"
-
-    @pytest.mark.asyncio
-    async def test_add_token_button_positioned_after_balance(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that Add New Token button is positioned after Add Balance button"""
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            # Mock database session
-            mock_session = MagicMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one.return_value = mock_wb_user_cabinet
-            mock_session.execute = AsyncMock(return_value=mock_result)
-
-            mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sm.return_value.__aexit__ = AsyncMock()
-
-            # Mock Pricer
-            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                with patch(
-                    "app.modules.shop_menu.message.TokenInfoService"
-                ) as mock_token_service:
-                    mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(
-                        return_value=None
-                    )
-                    mock_token_service.return_value = mock_token_service_instance
-
-                    # Create ShopMenu instance
-                    shop_menu = ShopMenu(
-                        bot=mock_bot,
-                        chat_id=12345,
-                        state=mock_state,
-                        wb_user_cabinet_original_id=1,
-                    )
-
-                    # Load data
-                    await shop_menu._load_all_data()
-
-                    # Get keyboard
-                    keyboard = shop_menu.keyboard
-
-                    # Find button positions by callback_data for add-token and by text for balance
-                    balance_button_position = None
-                    add_token_button_position = None
-
-                    for idx, row in enumerate(keyboard.inline_keyboard):
-                        for button in row:
-                            if "Пополнить баланс" in button.text:
-                                balance_button_position = idx
-                            try:
-                                callback_data = AddNewToken.unpack(button.callback_data)
-                                add_token_button_position = idx
-                            except Exception:
-                                pass
-
-                assert balance_button_position is not None, "Balance button not found"
-                assert (
-                    add_token_button_position is not None
-                ), "Add Token button not found"
-                # В текущей реализации кнопка добавления токена располагается перед кнопкой пополнения баланса
-                assert (
-                    add_token_button_position < balance_button_position
-                ), "Add Token button should be positioned before Balance button"
-
-    @pytest.mark.asyncio
-    async def test_add_token_button_callback_data_format(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that Add New Token button has correctly formatted callback data"""
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            # Mock database session
-            mock_session = MagicMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one.return_value = mock_wb_user_cabinet
-            mock_session.execute = AsyncMock(return_value=mock_result)
-
-            mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sm.return_value.__aexit__ = AsyncMock()
-
-            # Mock TokenInfoService
-            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                with patch(
-                    "app.modules.shop_menu.message.TokenInfoService"
-                ) as mock_token_service:
-                    mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(
-                        return_value=None
-                    )
-                    mock_token_service.return_value = mock_token_service_instance
-
-                    # Create ShopMenu instance
-                    shop_menu = ShopMenu(
-                        bot=mock_bot,
-                        chat_id=12345,
-                        state=mock_state,
-                        wb_user_cabinet_original_id=42,  # Use specific ID
-                    )
-
-                    # Load data
-                    mock_wb_user_cabinet.id = 42
-                    await shop_menu._load_all_data()
-
-                    # Get keyboard
-                    keyboard = shop_menu.keyboard
-
-                    # Find and verify Add New Token button
-                    for row in keyboard.inline_keyboard:
-                        for button in row:
-                            try:
-                                callback_data = AddNewToken.unpack(button.callback_data)
-                            except Exception:
-                                continue
-                            # Unpack and verify callback data
-                            assert callback_data.wb_user_cabinet_original_id == 42
-                            assert button.callback_data.startswith("add_new_token:")
-                            return
-
-                pytest.fail("Add New Token button not found")
-
-    @pytest.mark.asyncio
-    async def test_add_token_button_for_admin_user(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that Add New Token button is visible for admin users"""
-        # Set user as admin
+    def test_add_token_button_for_admin_user(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """Кнопка видна админу (клавиатура не скрывает её по роли)."""
         mock_wb_user_cabinet.user.user_telegram_id = 12345
+        shop_menu = _shop_menu_with_loaded_cabinets(
+            mock_bot, mock_state, mock_wb_user_cabinet
+        )
 
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            with patch("app.client_bot.const.ADMINS", [12345]):
-                # Mock database session
-                mock_session = MagicMock()
-                mock_result = MagicMock()
-                mock_result.scalar_one.return_value = mock_wb_user_cabinet
-                mock_session.execute = AsyncMock(return_value=mock_result)
+        assert _find_add_token(shop_menu.keyboard) is not None, (
+            "Add New Token button should be visible for admins"
+        )
 
-                mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-                mock_sm.return_value.__aexit__ = AsyncMock()
-
-                # Mock TokenInfoService
-                with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                    with patch(
-                        "app.modules.shop_menu.message.TokenInfoService"
-                    ) as mock_token_service:
-                        mock_token_service_instance = MagicMock()
-                        mock_token_service_instance.get_shop_token_status = AsyncMock(
-                            return_value=None
-                        )
-                        mock_token_service.return_value = mock_token_service_instance
-
-                        # Create ShopMenu instance
-                        shop_menu = ShopMenu(
-                            bot=mock_bot,
-                            chat_id=12345,
-                            state=mock_state,
-                            wb_user_cabinet_original_id=1,
-                        )
-
-                        # Load data
-                        await shop_menu._load_all_data()
-
-                        # Get keyboard
-                        keyboard = shop_menu.keyboard
-
-                        # Find Add New Token button by callback_data
-                        add_token_button_found = False
-                        for row in keyboard.inline_keyboard:
-                            for button in row:
-                                try:
-                                    _ = AddNewToken.unpack(button.callback_data)
-                                except Exception:
-                                    continue
-                                add_token_button_found = True
-                                break
-
-                    assert (
-                        add_token_button_found
-                    ), "Add New Token button should be visible for admins"
-
-    @pytest.mark.asyncio
-    async def test_add_token_button_for_regular_user(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that Add New Token button is visible for regular users"""
-        # Set user as regular (not admin)
+    def test_add_token_button_for_regular_user(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """Кнопка видна обычному пользователю."""
         mock_wb_user_cabinet.user.user_telegram_id = 99999
+        shop_menu = _shop_menu_with_loaded_cabinets(
+            mock_bot,
+            mock_state,
+            mock_wb_user_cabinet,
+            chat_id=99999,
+        )
 
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            with patch("app.client_bot.const.ADMINS", [12345]):  # Different admin
-                # Mock database session
-                mock_session = MagicMock()
-                mock_result = MagicMock()
-                mock_result.scalar_one.return_value = mock_wb_user_cabinet
-                mock_session.execute = AsyncMock(return_value=mock_result)
+        assert _find_add_token(shop_menu.keyboard) is not None, (
+            "Add New Token button should be visible for regular users"
+        )
 
-                mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-                mock_sm.return_value.__aexit__ = AsyncMock()
+    def test_keyboard_structure_integrity(
+        self,
+        mock_bot: MagicMock,
+        mock_state: MagicMock,
+        mock_wb_user_cabinet: MagicMock,
+    ) -> None:
+        """Клавиатура непустая; у каждой кнопки есть text и callback_data."""
+        keyboard = _shop_menu_with_loaded_cabinets(
+            mock_bot, mock_state, mock_wb_user_cabinet
+        ).keyboard
 
-                # Mock TokenInfoService
-                with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                    with patch(
-                        "app.modules.shop_menu.message.TokenInfoService"
-                    ) as mock_token_service:
-                        mock_token_service_instance = MagicMock()
-                        mock_token_service_instance.get_shop_token_status = AsyncMock(
-                            return_value=None
-                        )
-                        mock_token_service.return_value = mock_token_service_instance
+        assert keyboard is not None
+        assert len(keyboard.inline_keyboard) > 0
 
-                        # Create ShopMenu instance (using user's telegram id as chat_id)
-                        shop_menu = ShopMenu(
-                            bot=mock_bot,
-                            chat_id=99999,
-                            state=mock_state,
-                            wb_user_cabinet_original_id=1,
-                        )
-
-                        # Load data
-                        await shop_menu._load_all_data()
-
-                        # Get keyboard
-                        keyboard = shop_menu.keyboard
-
-                        # Find Add New Token button by callback_data
-                        add_token_button_found = False
-                        for row in keyboard.inline_keyboard:
-                            for button in row:
-                                try:
-                                    _ = AddNewToken.unpack(button.callback_data)
-                                except Exception:
-                                    continue
-                                add_token_button_found = True
-                                break
-
-                    assert (
-                        add_token_button_found
-                    ), "Add New Token button should be visible for regular users"
-
-    @pytest.mark.asyncio
-    async def test_keyboard_structure_integrity(
-        self, mock_bot, mock_state, mock_wb_user_cabinet
-    ):
-        """Test that adding the new button doesn't break keyboard structure"""
-        with patch("app.modules.shop_menu.message.sm") as mock_sm:
-            # Mock database session
-            mock_session = MagicMock()
-            mock_result = MagicMock()
-            mock_result.scalar_one.return_value = mock_wb_user_cabinet
-            mock_session.execute = AsyncMock(return_value=mock_result)
-
-            mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sm.return_value.__aexit__ = AsyncMock()
-
-            # Mock TokenInfoService
-            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
-                with patch(
-                    "app.modules.shop_menu.message.TokenInfoService"
-                ) as mock_token_service:
-                    mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(
-                        return_value=None
-                    )
-                    mock_token_service.return_value = mock_token_service_instance
-
-                    # Create ShopMenu instance
-                    shop_menu = ShopMenu(
-                        bot=mock_bot,
-                        chat_id=12345,
-                        state=mock_state,
-                        wb_user_cabinet_original_id=1,
-                    )
-
-                    # Load data
-                    await shop_menu._load_all_data()
-
-                    # Get keyboard
-                    keyboard = shop_menu.keyboard
-
-                    # Verify keyboard is not None
-                    assert keyboard is not None
-
-                    # Verify keyboard has rows
-                    assert len(keyboard.inline_keyboard) > 0
-
-                    # Verify each row has at least one button
-                    for row in keyboard.inline_keyboard:
-                        assert len(row) > 0
-
-                        # Verify each button has text and callback data
-                        for button in row:
-                            assert button.text is not None
-                            assert button.callback_data is not None
+        for row in keyboard.inline_keyboard:
+            assert len(row) > 0
+            for button in row:
+                assert button.text is not None
+                assert button.callback_data is not None

@@ -19,7 +19,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
-from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
+from app.modules.wb_adv_updater.keywords_access import fetch_keywords_from_database
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -74,7 +74,9 @@ async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedK
         search_adv=search_adv,
         target_pay_for_order=resolved_target_pay_for_order,
     )
-    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(complex_adv)
+    all_phrases: list[CalculatedKeyword] = await fetch_keywords_from_database(
+        complex_adv
+    )
     return all_phrases
 
 

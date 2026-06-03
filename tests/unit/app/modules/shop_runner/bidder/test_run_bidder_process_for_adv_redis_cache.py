@@ -1,15 +1,11 @@
+"""Юнит-тесты: bidder пишет last_views и stamp в Redis (fakeredis + DI)."""
+
+from __future__ import annotations
+
 import datetime
 import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock
-
-from tests.factories.keyword_pipeline import make_calculated_keyword, HardStatus
-
-if "matplotlib" not in sys.modules:
-    try:
-        import matplotlib  # noqa: F401
-    except ModuleNotFoundError:
-        sys.modules["matplotlib"] = MagicMock()
 
 import pytest
 from dependency_injector import providers
@@ -21,10 +17,13 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.shop_runner.bidder import bidder_func
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
-import logging
+from tests.factories.keyword_pipeline import HardStatus, make_calculated_keyword
 
-logger = logging.getLogger(__name__)
-
+if "matplotlib" not in sys.modules:
+    try:
+        import matplotlib  # noqa: F401
+    except ModuleNotFoundError:
+        sys.modules["matplotlib"] = MagicMock()
 
 
 def make_auction_adv(bid: int, advert_id: int, nmid: int) -> AuctionAdv:
@@ -63,25 +62,26 @@ def _stamp_key(keyword_id: int) -> str:
     return f"last_keyword_stamp_timestamp_cache:{keyword_id}"
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_run_bidder_process_for_adv_stores_redis_values(
-    fake_redis: FakeRedis, monkeypatch
+    fake_redis: FakeRedis, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Проверяет что bidder сохраняет значения в Redis через RedisClient."""
+    """Bidder сохраняет total_views и timestamp ключевого слова в Redis-кэши."""
+    monkeypatch.setattr(
+        "app.core.di.databases.redis.RedisLifecycle.init",
+        AsyncMock(return_value=None),
+    )
 
-    # Создаём DIManager для правильной инициализации контейнера
     di_manager = await DIManager.create(AppContainer)
     async with di_manager as app_container:
-        # Создаём RedisClient обёртку над fake_redis
         fake_redis_client = RedisClient(redis_client=fake_redis)
 
-        # Override базовых зависимостей
         app_container.settings.override(providers.Object(Mock()))
         app_container.redis_client.override(providers.Object(fake_redis))
         app_container.redis_client_wrapper.override(providers.Object(fake_redis_client))
 
         try:
-            # Получаем redis кэши (они теперь будут использовать fake_redis_client)
             redis_last_views_cache = (
                 app_container.module_resources.bidder_container.redis_last_total_views()
             )
@@ -89,10 +89,9 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
                 app_container.module_resources.bidder_container.last_keyword_stamp_timestamp_cache()
             )
 
-            # Создаём keywords с явными значениями для теста
-            # hard_status=2 (WHITELIST) нужен для попадания в white_list
-            # total_views=150 - значение которое будет сохранено в Redis
-            expected_timestamp = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+            expected_timestamp = datetime.datetime(
+                2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc
+            )
             best_keyword = make_calculated_keyword(
                 hard_status=HardStatus.WHITELIST,
                 total_views=150,
@@ -101,8 +100,16 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
             )
             keywords = [
                 best_keyword,
-                make_calculated_keyword(hard_status=HardStatus.WHITELIST, total_views=100, final_rating=50.0),
-                make_calculated_keyword(hard_status=HardStatus.WHITELIST, total_views=50, final_rating=25.0),
+                make_calculated_keyword(
+                    hard_status=HardStatus.WHITELIST,
+                    total_views=100,
+                    final_rating=50.0,
+                ),
+                make_calculated_keyword(
+                    hard_status=HardStatus.WHITELIST,
+                    total_views=50,
+                    final_rating=25.0,
+                ),
             ]
 
             monkeypatch.setattr(
@@ -129,28 +136,24 @@ async def test_run_bidder_process_for_adv_stores_redis_values(
             )
 
             wb_api = SimpleNamespace(
-                shop_id='89798uksljhkhk',
+                shop_id="89798uksljhkhk",
                 access=SimpleNamespace(wb_cabinet=SimpleNamespace(id=1000)),
                 update_cpm=AsyncMock(),
             )
 
             await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-            # Проверяем что значения сохранены в кэшах
             assert await redis_last_views_cache.get(best_keyword) == 150
             stamp = await stamp_cache.get(best_keyword)
             assert stamp == expected_timestamp
 
-            # Проверяем что ключи существуют в Redis (формат не важен, главное что сохранено)
-            assert await fake_redis.exists(_last_views_key(best_keyword.keyword_setting_original_id))
-            assert await fake_redis.exists(_stamp_key(best_keyword.keyword_setting_original_id))
-        except Exception:
-            logger.error('', exc_info=True)
-            raise
+            assert await fake_redis.exists(
+                _last_views_key(best_keyword.keyword_setting_original_id)
+            )
+            assert await fake_redis.exists(
+                _stamp_key(best_keyword.keyword_setting_original_id)
+            )
         finally:
-            # Сброс overrides
             app_container.redis_client_wrapper.reset_override()
             app_container.redis_client.reset_override()
             app_container.settings.reset_override()
-
-

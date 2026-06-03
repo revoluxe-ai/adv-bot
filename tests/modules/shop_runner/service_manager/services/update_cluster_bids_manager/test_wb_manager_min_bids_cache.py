@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -136,6 +137,34 @@ async def test_full_miss_no_api_empty_auto() -> None:
     assert out.auto == {}
     hub.wb_data_manager.get_min_bids.assert_not_called()
     hub.wb_data_manager.get_min_bids_for_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_logs_warning_not_error(caplog: pytest.LogCaptureFixture) -> None:
+    """Read-only miss — WARNING (штатно до preload/snapshot), не ERROR для ops-алертов."""
+    redis_wrapper = MagicMock()
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(return_value={})
+
+    with (
+        caplog.at_level(logging.WARNING),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        out = await WBManager.read_min_bids_cache_only(
+            [_make_adv(nmids=[1], auto_id=500)],
+            redis_wrapper,
+            shop_id="shop-x",
+            context="test",
+        )
+
+    assert out.auto == {}
+    miss_records = [r for r in caplog.records if "min_bids cache miss" in r.getMessage()]
+    assert miss_records
+    assert all(r.levelno == logging.WARNING for r in miss_records)
+    assert not any(r.levelno >= logging.ERROR for r in miss_records)
 
 
 @pytest.mark.asyncio

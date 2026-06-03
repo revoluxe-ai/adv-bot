@@ -588,20 +588,27 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         return calculated_keyword_list
 
     async def _fetch_min_search_bid_aggregate(self, complex_adv: "ComplexAdv") -> int | None:
+        """Мин. search CPM из Redis v2 через ``WBManager.read_min_bids_cache_only`` (без WB API).
+
+        При cache miss — WARNING в логах (см. ``wb_manager``), не исключение; агрегат может
+        быть ``None`` до догрузки ``preload_min_bids_cache_miss`` / snapshot.
+        """
         nmids = list(complex_adv.nmids)
         if not nmids:
             return None
         hub = await self._get_wb_manager_hub(complex_adv)
-        wb_manager_raw = hub.wb_manager
-        if isinstance(wb_manager_raw, providers.Provider):
-            wb_manager = cast(WBManager, wb_manager_raw())
-        else:
-            wb_manager = wb_manager_raw
-        min_bids = await wb_manager.get_min_bids_cache_only(
+        min_bids = await WBManager.read_min_bids_cache_only(
             [complex_adv],
+            hub.redis_client_wrapper,
+            shop_id=complex_adv.shop_id or "",
             context=f"calculated_keywords adv_id={complex_adv.adv_id}",
         )
         return max_search_min_bid_for_complex_nmids(nmids, min_bids)
+
+    @staticmethod
+    async def resolve_wb_manager_hub(complex_adv: "ComplexAdv") -> "WBManagerHub":
+        """Публичный доступ к WBManagerHub (snapshot warmup и внешние caller'ы)."""
+        return await CalculatedKeywordsManager._get_wb_manager_hub(complex_adv)
 
     @staticmethod
     async def _get_wb_manager_hub(complex_adv: "ComplexAdv") -> "WBManagerHub":

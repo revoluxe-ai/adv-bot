@@ -4,9 +4,11 @@ import os
 
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-# Устанавливаем переменные окружения для тестовой БД ДО любых импортов
-os.environ["POSTGRES_MASTER_HOST"] = "localhost"
-os.environ["POSTGRES_REPLICA_HOST"] = "localhost"
+# Устанавливаем переменные окружения для тестовой БД ДО любых импортов.
+# 127.0.0.1: на Windows Docker Desktop localhost (::1) часто даёт WinError 64.
+_TEST_PG_HOST = "127.0.0.1"
+os.environ["POSTGRES_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["POSTGRES_REPLICA_HOST"] = _TEST_PG_HOST
 os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
 os.environ["POSTGRES_USER"] = "test_user"
@@ -35,7 +37,9 @@ os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое з
 os.environ.setdefault("PG_POOL_SIZE", "5")
 os.environ.setdefault("PG_MAX_OVERFLOW", "10")
 
-TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
+TEST_DB_POSTGRES_URL = (
+    f"postgresql://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"
+)
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
 
 import dotenv
@@ -85,11 +89,25 @@ from app.utils.db.base import BaseTable as Base
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
-TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
+TEST_DB_URL = (
+    f"postgresql+asyncpg://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"
+)
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
 
 # Глобальное хранилище для cleanup контейнеров
 _DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
+
+
+def _create_test_async_engine(**kwargs: object):
+    """Движок к тестовому Postgres в Docker; ``ssl=False`` для asyncpg на Windows."""
+    connect_args = dict(kwargs.pop("connect_args", {}))  # type: ignore[arg-type]
+    connect_args.setdefault("ssl", False)
+    return create_async_engine(
+        TEST_DB_URL,
+        poolclass=NullPool,
+        connect_args=connect_args,
+        **kwargs,  # type: ignore[arg-type]
+    )
 
 
 def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
@@ -165,8 +183,30 @@ def setup_test_database(docker_compose_cmd):
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
-    # Используем --force-recreate чтобы гарантировать выполнение init скриптов
-    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", "--force-recreate", timeout=180)
+    # Если test_db уже healthy — только ``up -d`` (без force-recreate: меньше WinError 64 на Windows).
+    compose_up_args = ["up", "-d"]
+    rc, cid_out, _ = _sync_run(
+        *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
+    )
+    if cid_out.strip():
+        rc_inspect, status_out, _ = _sync_run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Health.Status}}",
+            cid_out.strip(),
+            timeout=10,
+        )
+        if rc_inspect == 0 and status_out.strip() == "healthy":
+            print("[OK] Reusing running test_db container (skip --force-recreate).")
+        else:
+            compose_up_args = ["up", "-d", "--build", "--force-recreate"]
+    else:
+        compose_up_args = ["up", "-d", "--build", "--force-recreate"]
+
+    rc, out, err = _sync_run(
+        *docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args, timeout=180
+    )
     if rc != 0:
         raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
@@ -196,30 +236,21 @@ def setup_test_database(docker_compose_cmd):
 
             # Fallback: если healthcheck по какой-то причине не работает/не успевает,
             # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
+            async def _probe() -> bool:
+                engine = _create_test_async_engine()
+                try:
+                    async with engine.connect() as conn:
+                        await conn.execute(text("SELECT 1;"))
+                    return True
+                finally:
+                    await engine.dispose()
+
             try:
-                loop_probe = asyncio.new_event_loop()
-
-                async def _probe() -> bool:
-                    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
-                    try:
-                        async with engine.connect() as conn:
-                            await conn.execute(text("SELECT 1;"))
-                        return True
-                    finally:
-                        await engine.dispose()
-
-                if loop_probe.run_until_complete(_probe()):
+                if asyncio.run(_probe()):
                     print("[OK] Test database is reachable (probe SELECT 1).")
                     break
             except Exception:
                 pass
-            finally:
-                try:
-                    loop_probe.close()
-                    # После закрытия временного цикла событий создаём новый дефолтный event loop
-                    asyncio.set_event_loop(asyncio.new_event_loop())
-                except Exception:
-                    pass
 
             print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: {status})")
         else:
@@ -252,90 +283,78 @@ def setup_test_database(docker_compose_cmd):
         )
         _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
 
-    # Добавим небольшую задержку перед манипуляциями со схемой
-    time.sleep(5)
+    # Задержка после health=healthy: на Windows соединение с хоста стабилизируется не сразу.
+    time.sleep(10)
 
-    # --- Подготовка схемы и таблиц через asyncpg (без psycopg2) ---
-    # Важно: после выполнения НЕ оставлять закрытый event loop установленным как current loop,
-    # иначе pytest-asyncio/asyncpg могут начать использовать "закрытый" loop.
-    loop = asyncio.new_event_loop()
-    try:
-        async def init_schema_and_seed():
-            engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
-            try:
-                async with engine.begin() as conn:
-                    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
-                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
-                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
-                    # Расширения
-                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-                    # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
-                    from app.modules.common_slaves.wildberries.models.models import (
-                        AdvSetting,
-                        KeywordSetting,
-                        WBUserCabinet,
-                        WBCard,
-                        WBCategory,
-                        WBToken,
-                        WBBalancePayment,
-                        WBBonusPayment,
-                        WBAutoBudgetTopUp,
-                        AdvKeyword,
-                    )
-                    from app.modules.wb_adv_updater.modules.balance_exp_informer.models import BalanceReminder
-                    from app.modules.billing.event_manager.models import BillingEvent
-                    from app.utils.db.models import User, Invite
-
-                    # Таблицы
-                    await conn.run_sync(Base.metadata.create_all)
-
-                    # Базовые данные
-                    initial_wb_cabinet_data = {
-                        "id": 1,
-                        "shop_id": "test_shop_id",
-                        "active": True,
-                        "expiration_time": datetime.now() + timedelta(days=7),
-                        "balance": 0.0,
-                        "bonus": 0.0,
-                        "demo": True,
-                        "expiration_alarm_days_pass": None,
-                    }
-                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                        index_elements=["id"],
-                        set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-                    )
-                    await conn.execute(on_conflict_stmt)
-                    # При явной вставке id sequence может остаться на 1 -> следующий INSERT даст id=1.
-                    # Проставляем sequence в max(id), чтобы новые кабинеты получали id=2,3,...
-                    await conn.execute(
-                        text(
-                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
-                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
-                        )
-                    )
-            finally:
-                await engine.dispose()
-
-        # Docker Desktop иногда даёт "connection was closed..." сразу после health=healthy.
-        # Делаем несколько попыток инициализации схемы, чтобы интеграционные тесты были стабильными.
-        max_init_retries = 5
-        for attempt in range(1, max_init_retries + 1):
-            try:
-                loop.run_until_complete(init_schema_and_seed())
-                break
-            except Exception as exc:  # noqa: BLE001
-                if attempt >= max_init_retries:
-                    raise
-                print(
-                    f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
-                    f"Retry {attempt}/{max_init_retries}..."
+    async def init_schema_and_seed() -> None:
+        """Пересоздаёт public-схему и сидирует wbcabinet id=1 для integration-тестов."""
+        engine = _create_test_async_engine()
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                from app.modules.common_slaves.wildberries.models.models import (
+                    AdvSetting,
+                    KeywordSetting,
+                    WBUserCabinet,
+                    WBCard,
+                    WBCategory,
+                    WBToken,
+                    WBBalancePayment,
+                    WBBonusPayment,
+                    WBAutoBudgetTopUp,
+                    AdvKeyword,
                 )
-                time.sleep(2)
-    finally:
-        loop.close()
-        # После закрытия временного цикла событий являем новый дефолтный event loop для тестов
-        asyncio.set_event_loop(asyncio.new_event_loop())
+                from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
+                    BalanceReminder,
+                )
+                from app.modules.billing.event_manager.models import BillingEvent
+                from app.utils.db.models import User, Invite
+
+                await conn.run_sync(Base.metadata.create_all)
+
+                initial_wb_cabinet_data = {
+                    "id": 1,
+                    "shop_id": "test_shop_id",
+                    "active": True,
+                    "expiration_time": datetime.now() + timedelta(days=7),
+                    "balance": 0.0,
+                    "bonus": 0.0,
+                    "demo": True,
+                    "expiration_alarm_days_pass": None,
+                }
+                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                )
+                await conn.execute(on_conflict_stmt)
+                await conn.execute(
+                    text(
+                        "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                        "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    # Docker Desktop / Windows: сразу после health=healthy бывает WinError 64 (connection reset).
+    # asyncio.run() на каждую попытку — отдельный loop, не ломает pytest-asyncio.
+    max_init_retries = 10
+    for attempt in range(1, max_init_retries + 1):
+        try:
+            asyncio.run(init_schema_and_seed())
+            break
+        except Exception as exc:  # noqa: BLE001
+            if attempt >= max_init_retries:
+                raise
+            backoff_sec = min(2 * attempt, 10)
+            print(
+                f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
+                f"Retry {attempt}/{max_init_retries} in {backoff_sec}s..."
+            )
+            time.sleep(backoff_sec)
 
     print("[OK] Test database setup complete.")
 
@@ -379,7 +398,7 @@ def setup_test_database(docker_compose_cmd):
 @pytest.fixture(scope="function", name="async_engine")
 async def _async_engine(setup_test_database):
     """Создаёт async движок для каждого теста."""
-    engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+    engine = _create_test_async_engine(echo=False)
     try:
         yield engine
     finally:
@@ -650,10 +669,10 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     cabinet_shop_id = seed.adv_setting.wb_cabinet.shop_id
 
     async def get_keywords_func(
-        _: ComplexAdv, *, cache_only: bool = False
-    ) -> list[CalculatedKeyword] | None:
-        if cache_only:
-            return seed.calculated_keywords
+        _: ComplexAdv, *, cache_only: bool = True
+    ) -> list[CalculatedKeyword]:
+        if not cache_only:
+            raise RuntimeError("cache_only=False disabled in tests")
         return seed.calculated_keywords
 
     complex_adv = ComplexAdv(
@@ -722,7 +741,7 @@ async def clean_db(request: pytest.FixtureRequest):
     )
 
     async def _truncate() -> None:
-        engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+        engine = _create_test_async_engine()
         async with engine.begin() as conn:
             await conn.execute(truncate_sql)
         await engine.dispose()

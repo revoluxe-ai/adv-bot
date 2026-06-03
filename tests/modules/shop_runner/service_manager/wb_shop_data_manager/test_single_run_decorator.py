@@ -5,9 +5,14 @@ from unittest.mock import patch
 
 import pytest
 
+from app.modules.shop_runner.required_data_miss import ShopRunnerKeywordsCacheMissError
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     make_key,
     single_run,
+)
+
+MODULE = (
+    "app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator"
 )
 
 
@@ -170,3 +175,24 @@ async def test_waiter_receives_cancellation_from_first_caller() -> None:
     assert not key_present(host, "cancellable_method"), (
         "key cleaned up after cancellation"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_single_run_required_data_miss_logs_warning() -> None:
+    host = _SingleRunHost()
+
+    @single_run()
+    async def kw_method(self: _SingleRunHost) -> None:
+        raise ShopRunnerKeywordsCacheMissError(
+            "cache miss",
+            shop_id="shop-1",
+            adv_id=99,
+        )
+
+    with patch(f"{MODULE}.logger") as mock_logger:
+        with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
+            await kw_method(host)
+
+    mock_logger.warning.assert_called_once()
+    mock_logger.error.assert_not_called()

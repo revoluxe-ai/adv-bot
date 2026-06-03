@@ -5,7 +5,10 @@ from asyncio import Task
 from aiohttp import ClientSession
 
 
+from collections.abc import Callable
+
 from ...run_process_func import run_shop_task
+from ...shop_id_filters import is_shop_id_allowed
 from ..redis_manager import RedisShopManager
 from .excs import ShopNotFoundInRedisQueueError
 from ...service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
@@ -13,7 +16,8 @@ from ...tasks_manager.tasks_manager import TasksManager
 
 logger = logging.getLogger(__name__)
 
-from collections.abc import Callable
+# Защита от бесконечного цикла, если в Redis остались «чужие» shop_id.
+_MAX_SHOP_ACQUIRE_ATTEMPTS = 128
 
 
 class ShopWorker:
@@ -48,12 +52,35 @@ class ShopWorker:
         await redis_manager.remove_shops([shop_id])
         logger.debug(f"Магазин {shop_id} удалён из активных после завершения задачи")
 
+    async def _acquire_allowed_free_shop_id(
+        self,
+        redis_manager: RedisShopManager,
+    ) -> str | None:
+        """Взять lock на свободный shop_id из Redis с учётом SHOP_FILTER/EXCLUDE."""
+        for attempt in range(_MAX_SHOP_ACQUIRE_ATTEMPTS):
+            shop_id = await redis_manager.get_next_free_shop_id()
+            if shop_id is None:
+                return None
+            if is_shop_id_allowed(shop_id):
+                return shop_id
+            logger.info(
+                "Магазин %s пропущен воркером (SHOP_FILTER_LIST / SHOP_EXCLUDE_LIST), "
+                "удаление из active_shops",
+                shop_id,
+            )
+            await redis_manager.remove_shops([shop_id])
+        logger.warning(
+            "Не найден допустимый магазин за %s попыток (проверьте SHOP_FILTER_LIST / "
+            "SHOP_EXCLUDE_LIST и состав active_shops в Redis)",
+            _MAX_SHOP_ACQUIRE_ATTEMPTS,
+        )
+        return None
+
     async def _update_active_shop_update_tasks_update(self, tasks: dict[str, Task]) -> None:
         redis_manager = self._redis_manager
-        new_free_shop_id: str | None = await redis_manager.get_next_free_shop_id()
+        new_free_shop_id = await self._acquire_allowed_free_shop_id(redis_manager)
         if not new_free_shop_id:
             raise ShopNotFoundInRedisQueueError("Нет магазина")
-        assert new_free_shop_id is not None
         if new_free_shop_id not in tasks:
             task: asyncio.Task[None] = asyncio.create_task(
                 run_shop_task(

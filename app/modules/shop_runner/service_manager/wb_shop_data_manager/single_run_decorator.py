@@ -150,9 +150,22 @@ def single_run() -> (
                 results[key] = ("exc", exc)
                 raise
             except Exception as exc:
-                logger.error(
-                    f"Ошибка обернутой функции: {func.__name__}", exc_info=True
+                from app.modules.shop_runner.required_data_miss import (
+                    is_required_data_miss,
                 )
+
+                if is_required_data_miss(exc):
+                    logger.warning(
+                        "Обернутая функция %s: нет обязательных данных в кеше: %s",
+                        func.__name__,
+                        exc,
+                    )
+                else:
+                    logger.error(
+                        "Ошибка обернутой функции: %s",
+                        func.__name__,
+                        exc_info=True,
+                    )
                 results[key] = ("exc", exc)
                 raise
             finally:

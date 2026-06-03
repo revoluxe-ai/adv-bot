@@ -45,7 +45,21 @@ async def gate_invite_process_code(
     """Приём инвайт-кода: атомарная активация или ошибка + gate."""
     if not message.text or not message.from_user:
         return
-    code = normalize_invite_code(message.text)
+    text = message.text.strip()
+    first_token = text.split(maxsplit=1)[0].lower() if text else ""
+    is_start_command = first_token == "/start" or first_token.startswith("/start@")
+    if is_start_command:
+        # /start централизованно перехватывается ReturnToStart middleware на global_router.
+        return
+    if first_token.startswith("/"):
+        _ = await bot.send_message(
+            message.chat.id,
+            "Сейчас ожидается инвайт-код одним сообщением. "
+            "Отправьте код или нажмите /start для возврата в меню.",
+            reply_markup=get_gate_keyboard(),
+        )
+        return
+    code = normalize_invite_code(text)
     if not code:
         _ = await bot.send_message(
             message.chat.id,

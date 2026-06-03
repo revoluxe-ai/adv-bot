@@ -81,40 +81,45 @@ class WBShopDataManager:
 
     @single_run()
     async def __get_calculated_keywords(
-        self, complex_adv: ComplexAdv, *, cache_only: bool = False
-    ) -> list[CalculatedKeyword] | None:
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        cache_only: bool = True,
+    ) -> list[CalculatedKeyword]:
+        """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: hash отсутствует.
+        """
+        if not cache_only:
+            raise RuntimeError(
+                "__get_calculated_keywords(cache_only=False) отключён: "
+                "полный пересчёт — snapshot updater warmup или fetch_keywords_from_database."
+            )
         trace = AdvPhaseTrace.for_complex_adv(
             coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
         )
-        trace.marker("kw_provider_enter", extra={"cache_only": cache_only})
-        if cache_only:
-            from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-                RedisCalculatedKeywordsCacheManager,
+        trace.marker(
+            "kw_provider_enter",
+            extra={"cache_only": True},
+        )
+        from app.modules.shop_runner.required_data_miss import (
+            fetch_calculated_keywords_from_redis,
+        )
+
+        with trace.phase("kw_redis_cache_get_all"):
+            cached = await fetch_calculated_keywords_from_redis(
+                complex_adv.adv_id,
+                shop_id=complex_adv.shop_id or self.shop_id,
             )
-
-            redis_mgr = RedisCalculatedKeywordsCacheManager()
-            with trace.phase("kw_redis_cache_get_all"):
-                cached = await redis_mgr.get_all_calculated_keywords_for_adv(
-                    complex_adv.adv_id
-                )
-            trace.marker(
-                "kw_redis_cache_result",
-                extra={"keywords_count": len(cached) if cached else 0, "hit": cached is not None},
-            )
-            return cached
-
-        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
-
-        if not complex_adv:
-            raise RuntimeError("Сначала обновить модели")
-        try:
-            with trace.phase("kw_get_good_bad_phrases_total"):
-                keywords = await get_good_bad_phrases(complex_adv, adv_trace=trace)
-        except Exception as exc:
-            raise exc
-
-        trace.marker("kw_provider_done", extra={"keywords_count": len(keywords)})
-        return keywords
+        trace.marker(
+            "kw_redis_cache_result",
+            extra={
+                "keywords_count": len(cached) if cached else 0,
+                "hit": cached is not None,
+            },
+        )
+        return cached
 
     @single_run()
     async def _get_active_advs(self) -> list[AdvSetting]:
@@ -305,7 +310,22 @@ class WBShopDataManager:
 
     @staticmethod
     async def _collect_keywords(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
-        return await complex_adv.get_keywords()
+        """Keywords для WBAdvDTO только из Redis (``calculated_keywords:{adv_id}``).
+
+        Raises:
+            ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует — нужен snapshot updater.
+        """
+        from app.snapshot_data_updater.adapters.wb_adv_dto_adapter import (
+            WBAdvDtoSnapshotAdapter,
+        )
+
+        adapter = WBAdvDtoSnapshotAdapter()
+        shop_id = complex_adv.shop_id or ""
+        cached = await complex_adv.get_keywords()
+        await adapter.shadow_log_keywords_delta(
+            shop_id, complex_adv.adv_id, legacy_count=len(cached)
+        )
+        return cached
 
 
     async def _collect_adv_data_parts(
@@ -320,11 +340,8 @@ class WBShopDataManager:
         )
         with trace.phase("dto_collect_plan_data"):
             plan = await self._collect_plan_data(complex_adv)
-        trace.marker(
-            "dto_collect_keywords_second_call_start",
-            extra={"note": "duplicate get_keywords inside get_wb_advs_dto"},
-        )
-        with trace.phase("dto_collect_keywords_second_call"):
+        trace.marker("dto_collect_keywords_start")
+        with trace.phase("dto_collect_keywords"):
             keywords = await self._collect_keywords(complex_adv)
         trace.marker("dto_keywords_loaded", extra={"keywords_count": len(keywords)})
         manager = PlanFactProvider(complex_adv.adv_setting)

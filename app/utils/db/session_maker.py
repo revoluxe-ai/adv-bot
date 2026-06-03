@@ -32,9 +32,6 @@ conn_counter = 0
 pool_size = settings.PG_POOL_SIZE
 max_overflow = settings.PG_MAX_OVERFLOW
 
-count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
-global_semaphore = asyncio.Semaphore(count_sem)
-
 
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
@@ -205,7 +202,9 @@ async def get_async_session_maker(
     session_start = time()
     current_task = asyncio.current_task()
 
-    semaphore = global_semaphore
+    from app.utils.resource_limits import get_postgres_query_semaphore
+
+    semaphore = get_postgres_query_semaphore()
 
     # Выбор нужной фабрики сессий
     session_maker = read_only_session_maker if read_only else read_write_session_maker

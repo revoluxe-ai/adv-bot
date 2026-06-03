@@ -1,3 +1,5 @@
+"""Очередь параллельных handler'ов shop-runner с сохранением ContextVar."""
+
 import asyncio
 import contextvars
 import logging
@@ -35,22 +37,24 @@ class TasksManager:
         self._queue: asyncio.Queue[_TaskEntry] = asyncio.Queue()
         self._max_workers = max_workers
         self._workers: list[asyncio.Task[None]] = []
+        # Число активных держателей worker pool (run_queue, ephemeral run_tasks, run()).
+        self._worker_holders = 0
         self._handler_timeout_sec = handler_timeout_sec
 
     def start(self) -> None:
-        self._start_workers()
+        self._acquire_workers()
 
     async def stop(self) -> None:
-        await self._stop_workers()
+        await self._release_workers()
 
     async def run_queue(self, stop_event: asyncio.Event) -> None:
         logger.debug(f"Starting task queue with {self._max_workers} workers")
-        self._start_workers()
+        self._acquire_workers()
         try:
             _ = await stop_event.wait()
         finally:
             logger.debug("Stopping task queue")
-            await self._stop_workers()
+            await self._release_workers()
 
     async def add_task(self, handler: Callable[[], Awaitable[Any]]) -> asyncio.Future[Any]:
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
@@ -61,18 +65,30 @@ class TasksManager:
         return future
 
     async def run(self) -> None:
-        self._start_workers()
+        self._acquire_workers()
         try:
             await self._queue.join()
         finally:
-            await self._stop_workers()
+            await self._release_workers()
 
-    def _start_workers(self) -> None:
-        if self._workers:
-            return
-        for index in range(self._max_workers):
-            worker = asyncio.create_task(self._worker(), name=f"tasks-manager-{index}")
-            self._workers.append(worker)
+    def _purge_done_workers(self) -> None:
+        self._workers = [worker for worker in self._workers if not worker.done()]
+
+    def _acquire_workers(self) -> None:
+        """Гарантировать живых workers и увеличить счётчик держателей pool."""
+        self._purge_done_workers()
+        if not self._workers:
+            for index in range(self._max_workers):
+                worker = asyncio.create_task(self._worker(), name=f"tasks-manager-{index}")
+                self._workers.append(worker)
+        self._worker_holders += 1
+
+    async def _release_workers(self) -> None:
+        """Уменьшить счётчик; остановить workers только когда держателей не осталось."""
+        if self._worker_holders > 0:
+            self._worker_holders -= 1
+        if self._worker_holders == 0:
+            await self._stop_workers()
 
     async def _stop_workers(self) -> None:
         for worker in self._workers:
@@ -132,7 +148,19 @@ class TasksManager:
             except Exception as exc:
                 if not entry.future.done():
                     entry.future.set_exception(exc)
-                logger.exception("Ошибка задачи: %s", exc, exc_info=True)
+                from app.modules.shop_runner.required_data_miss import (
+                    is_required_data_miss,
+                )
+
+                if is_required_data_miss(exc):
+                    # Ожидаемо до warmup snapshot; while_coroutine_decorator — warning + retry.
+                    logger.warning(
+                        "Задача без обязательных данных (handler=%s): %s",
+                        handler_name,
+                        exc,
+                    )
+                else:
+                    logger.exception("Ошибка задачи: %s", exc, exc_info=True)
             else:
                 if not entry.future.done():
                     entry.future.set_result(result)
@@ -147,8 +175,26 @@ async def run_tasks(
     return_exceptions: bool = True,
     tasks_manager: Optional["TasksManager"] = None,
 ) -> list[Any]:
+    """Выполняет handlers через ``TasksManager``.
+
+    Args:
+        handlers: нулary async callables.
+        max_workers: лимит параллелизма (для shared manager — через semaphore).
+        return_exceptions: как в ``asyncio.gather``.
+        tasks_manager: shared manager shop-runner (воркеры из ``run_queue``);
+            если передан, но pool ещё не удержан — временно acquire/release
+            (типично в pytest без ``run_process_func``).
+
+    Returns:
+        Результаты handlers в порядке постановки.
+    """
     owns_manager = tasks_manager is None
     manager = tasks_manager or TasksManager(max_workers=max_workers)
+    started_ephemeral_workers = False
+    if tasks_manager is not None and manager._worker_holders == 0:
+        manager.start()
+        started_ephemeral_workers = True
+
     semaphore = None
     wrapped_handlers: Sequence[Callable[[], Awaitable[Any]]] = handlers
     if tasks_manager is not None:
@@ -160,14 +206,18 @@ async def run_tasks(
 
         wrapped_handlers = [lambda handler_=handler: _bounded(handler_) for handler in handlers]
     futures: deque[asyncio.Future[Any]] = deque()
-    for handler in wrapped_handlers:
-        future = await manager.add_task(handler)
-        futures.append(future)
+    try:
+        for handler in wrapped_handlers:
+            future = await manager.add_task(handler)
+            futures.append(future)
 
-    if owns_manager:
-        await manager.run()
-    else:
-        _ = await asyncio.gather(*futures, return_exceptions=True)
+        if owns_manager:
+            await manager.run()
+        else:
+            _ = await asyncio.gather(*futures, return_exceptions=True)
+    finally:
+        if started_ephemeral_workers:
+            await manager.stop()
 
     results: list[Any] = []
     for future in futures:

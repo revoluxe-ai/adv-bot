@@ -10,14 +10,17 @@ pytestmark = pytest.mark.circular_imports
 
 # Список всех точек входа из документации
 ENTRY_POINTS = [
-    "app/arq_workers/workers.py",  # ARQ worker
-    "updater.py",  # Старый модуль обновления данных
+    "run_adv_bot_stack.py",  # Локальный supervisor prod-стека
+    "run_update_active_shop_ids.py",  # k8s run-update-active-shop-ids
+    "run_shop_update_worker.py",  # k8s run-shop-update-worker
+    "app/arq_workers/workers.py",  # ARQ worker (k8s adv-bot-asq-worker)
+    "updater.py",  # k8s adv-bot-updater
     "run_update_model.py",  # Обновление модели
-    "new_wb_shop_update_run.py",  # Новый модуль обновления магазинов Wildberries
+    "new_wb_shop_update_run.py",  # Альтернативный shop-runner (не в prod k8s)
     "run_send_info_message_to_users_process.py",  # Отправка сообщений
     "run_update_keyword_vectors_in_redis.py",  # Обновление векторов ключевых слов
     "trunc_system_log_in_clickhouse.py",  # Очистка системных логов
-    "client_bot_run.py",  # Клиентский бот
+    "client_bot_run.py",  # k8s wb-sky-bot
 ]
 
 # Директории, которые следует игнорировать при проверке циклических зависимостей

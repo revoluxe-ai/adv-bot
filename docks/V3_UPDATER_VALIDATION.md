@@ -151,6 +151,17 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 
 Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
 
+## UI: порядок ключей в списке (V3)
+
+Для `automatic_version == 3` список ключей в Telegram сортируется **до** пагинации
+(`AdvKeywordsSetting` → `sort_keywords_for_v3_ui`, SSOT `sort_utils.sort_keywords_by_current_state_cost`):
+
+1. По возрастанию **своего** `state_cost` из CH-профиля для **текущего** `strategy_mode` (`state_candidates_by_mode_for_ctx`); для `OFF` — ступень `MIN_CPA`.
+2. Нет валидной точки / проблемы со стейтами (NO CH, collapsed ladder, нет матрицы) — **NO DATA для сортировки**: `keyword.pay_for_order` (как в operational tier). **Worst-импутация по РК не используется.**
+3. Ключи без метрики и без `pay_for_order` — в конец, по алфавиту `keyword.text` (case-insensitive); tie-break при равной метрике — тоже по `text`.
+
+При сбое CH/min_bids — fallback: сортировка по `pay_for_order` asc (как раньше). `LadderInputs` для eligibility строятся по **всей** РК; Redis `v3_worst_costs` из списка ключей **не читается и не пишется**. V2 (`automatic_version` 2) — прежние `sort_mode` (`by_adv`, `white_list`, …).
+
 ## State-first контракт (resolve / state_cost)
 
 В V3 решения принимаются по `state_cost` — прогноз **себестоимости заказа** для режима
@@ -215,6 +226,7 @@ Unit: `tests\unit\test_keyword_target_place_updater_v3.py`, `tests\unit\auto_upd
 - Блок «Профиль ключа (V3)»: ступени OFF → MIN_CPA → OPTIMUM → MAX_CONVERSION; `🌟` на текущем `strategy_mode`.
 - Метрики M/O/C — `build_mode_candidates` (позиция, CPM, CPO, цель по режиму) на том же CH-профиле, что updater (`load_bid_profiles_for_nmid` + `resolve_keyword_bid_profile`).
 - Загрузка: `min_bid` из Redis (`get_min_bids_cache_only`), без полного `get_wb_advs_dto` на клик.
+- Cache miss min_bids в логах — **WARNING** (`min_bids cache miss`), не ERROR; догрузка — `preload_min_bids_cache_miss`.
 - Нет CH / min_bid в кеше — «недоступен» (техн.); нет строки ключа в CH при загруженном профиле nmid — **N-state** (нет матрицы CH).
 
 Unit: `tests\unit\client_bot\test_keyword_v3_profile_ui.py`, `tests\unit\client_bot\test_keyword_v3_profile_loader.py`.
