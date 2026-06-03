@@ -51,22 +51,13 @@ def _pay_for_cart_at_point(row: PositionProfilePoint) -> float | None:
 def resolve_effective_state_cost(
     *,
     profile_cost: float | None,
-    worst_cost: float | None,
+    worst_cost: float | None = None,
     allow_worst_imputation: bool = True,
 ) -> tuple[float, bool]:
-    """Единая логика state_cost CH-tier: профиль → per-mode worst → ``inf``.
-
-    ``profile_cost`` — CPO из CH-матрицы для конкретного режима M/O/C. Если его нет,
-    подставляется ``worst_cost`` по этому же режиму (пессимистичный CPA РК), без gate
-    «вся матрица invalid». Fallback на ``keyword.pay_for_order`` не используется.
-
-    Args:
-        allow_worst_imputation: если ``False``, worst не подставляется (legacy call sites).
-    """
+    """Единая логика state_cost: profile CPO → ``inf`` (worst imputation удалён)."""
+    _ = worst_cost, allow_worst_imputation
     if profile_cost is not None:
         return float(profile_cost), False
-    if allow_worst_imputation and worst_cost is not None:
-        return float(worst_cost), True
     return float("inf"), False
 
 

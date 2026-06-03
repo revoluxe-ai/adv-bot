@@ -90,11 +90,11 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
@@ -212,7 +212,7 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
             bootstrap,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             expansion,
         ),
         patch(

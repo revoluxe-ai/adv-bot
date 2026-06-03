@@ -13,6 +13,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
     process_adv_v3,
 )
@@ -85,7 +88,7 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=SalesStates.OVERSPEND,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -93,11 +96,11 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
@@ -213,7 +216,7 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch.object(PlanFactProvider, "get_plan_data", return_value=plan),
@@ -233,15 +236,15 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
             realloc,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             expansion,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard_phase",
             guard,
         ),
         patch(
@@ -346,7 +349,11 @@ async def _run_preamble_with_fact_cpa(
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable",
             return_value=[],
         ),
         patch(
@@ -357,15 +364,15 @@ async def _run_preamble_with_fact_cpa(
             realloc,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
             calibration,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard_phase",
             guard,
         ),
         patch(
@@ -432,7 +439,11 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable",
             return_value=[],
         ),
         patch(
@@ -443,11 +454,11 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
             calibration,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
@@ -495,8 +506,8 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_cost_reallocation_runs_when_fact_cpa_below_ninety_percent_resolve() -> None:
-    """``fact.pay_for_order < 0.9 * resolve`` — portfolio DOWN (запас по CPA)."""
+async def test_cost_reallocation_runs_when_resolve_valid() -> None:
+    """При valid resolve realloc вызывается каждый NORMAL-тик."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=50.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -505,14 +516,18 @@ async def test_cost_reallocation_runs_when_fact_cpa_below_ninety_percent_resolve
     realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
 
     realloc.assert_called_once()
-    calibration.assert_not_called()
+    calibration.assert_called_once()
+    assert (
+        calibration.call_args.kwargs.get("calibration_direct")
+        == CalibrationDirect.LOOSEN
+    )
     guard.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_cost_reallocation_skipped_when_fact_cpa_near_resolve_but_below_max() -> None:
-    """``0.9 * resolve <= fact <= max`` — calibration trim, realloc/guard нет."""
+async def test_cost_reallocation_and_calibration_in_stabilization_zone() -> None:
+    """``0.9 * resolve <= fact <= max`` — realloc + calibration (plan/views changed)."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=85.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -526,30 +541,43 @@ async def test_cost_reallocation_skipped_when_fact_cpa_near_resolve_but_below_ma
         current_views=200,
     )
 
-    realloc.assert_not_called()
+    realloc.assert_called_once()
     calibration.assert_called_once()
+    assert (
+        calibration.call_args.kwargs.get("calibration_direct")
+        == CalibrationDirect.TIGHTEN
+    )
     guard.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_resolve_calibration_trim_skipped_when_fact_below_ninety_percent_resolve() -> None:
-    """``fact < 0.9 * resolve`` — realloc да, calibration нет."""
+async def test_resolve_calibration_loosen_when_fact_below_ninety_percent_resolve() -> None:
+    """``fact < 0.9 * resolve`` — realloc + calibration LOOSEN (plan/views changed)."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=50.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+    realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(
+        pay_for_order=50.0,
+        plan_fact_equal=False,
+        cached_views=100,
+        current_views=200,
+    )
 
     realloc.assert_called_once()
-    calibration.assert_not_called()
+    calibration.assert_called_once()
+    assert (
+        calibration.call_args.kwargs.get("calibration_direct")
+        == CalibrationDirect.LOOSEN
+    )
     guard.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_resolve_calibration_trim_skipped_when_fact_above_max() -> None:
+async def test_resolve_calibration_skipped_when_fact_above_max() -> None:
     """``fact > max`` — guard да, calibration нет."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=150.0)
@@ -558,7 +586,7 @@ async def test_resolve_calibration_trim_skipped_when_fact_above_max() -> None:
 
     realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
-    realloc.assert_not_called()
+    realloc.assert_called_once()
     calibration.assert_not_called()
     guard.assert_called_once()
 
@@ -575,6 +603,6 @@ async def test_max_cpa_guard_runs_when_fact_cpa_above_plan_max() -> None:
 
     realloc, calibration, guard, _, _ = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
-    realloc.assert_not_called()
+    realloc.assert_called_once()
     calibration.assert_not_called()
     guard.assert_called_once()

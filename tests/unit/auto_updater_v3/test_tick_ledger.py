@@ -96,6 +96,69 @@ def test_apply_in_memory_updates_dto_for_next_phase() -> None:
 
 
 @pytest.mark.unit
+def test_sync_operable_hard_status_with_strategy_mode() -> None:
+    """MIN при hard_status=1 → 2 in-memory без смены mode."""
+    kw = _kw(ks_id=11, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+    fixed = ledger.sync_operable_hard_status_with_strategy_mode()
+    assert fixed == 1
+    assert ledger.keywords[0].keyword_setting.hard_status == 2
+    assert ledger.keywords[0].keyword_setting.strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_sync_skips_non_operable_hard_status() -> None:
+    kw = _kw(ks_id=12, mode=KeywordStrategyMode.OPTIMUM, hard_status=3)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+    assert ledger.sync_operable_hard_status_with_strategy_mode() == 0
+    assert ledger.keywords[0].keyword_setting.hard_status == 3
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_flush_persists_hard_status_only_sync(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mode не менялся, только hard_status 1→2 для MIN."""
+    kw = _kw(ks_id=13, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+    assert ledger.sync_operable_hard_status_with_strategy_mode() == 1
+
+    async def _execute(stmt: object) -> MagicMock:
+        sql = str(stmt)
+        result = MagicMock()
+        if sql.startswith("SELECT"):
+            result.all.return_value = [
+                (13, KeywordStrategyMode.MIN_CPA, 1, "k13"),
+            ]
+        return result
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.sm",
+        _patched_sm(session_cm),
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.persist_last_applied_v3",
+        AsyncMock(),
+    )
+
+    flushed = await ledger.flush_to_db(MagicMock(adv_setting=MagicMock()))
+    assert flushed is True
+    stmts = _update_stmts(session.execute)
+    assert len(stmts) == 1
+    compiled = stmts[0].compile(dialect=postgresql.dialect())
+    assert compiled.params["hard_status"] == 2
+    assert compiled.params["strategy_mode"] == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_flush_skips_hard_status_not_auto_or_white_list(
     monkeypatch: pytest.MonkeyPatch,

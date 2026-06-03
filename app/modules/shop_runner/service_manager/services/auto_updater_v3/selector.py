@@ -5,7 +5,7 @@
 1. **Production (orchestrator):** preamble (bootstrap, realloc, expansion,
    ``plan_max_cpa_guard`` при OVERSPEND) → ``select_v3_post_gate_actions`` (только полка).
    Post-gate **без** plan/fact gate — каждый NORMAL-тик. Gate AND (plan/fact + views)
-   только у ``RESOLVE_CALIBRATION_TRIM`` в orchestrator.
+   только у ``RESOLVE_CALIBRATION`` в orchestrator.
    ``select_v3_actions`` с ``plan``/``fact`` **не** выполняет ladder/OVERSPEND.
 
 2. **Legacy / тесты без plan/fact:** полный ``select_v3_actions`` — OVERSPEND через
@@ -84,32 +84,13 @@ def select_v3_post_gate_actions(
     ladder_inputs: "LadderInputs | None" = None,
     policy: "SelectionPolicy | None" = None,
 ) -> list[V3Action]:
-    """Post-gate: shelf rec cleanup по state-level gate (без M2/M3/FINAL_TUNING)."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-        LadderInputs,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        SelectionPolicy,
+    """Post-gate: shelf cleanup перенесён в preamble (фаза S); здесь только DO_NOTHING."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+        V3ActionType,
     )
 
-    if not shelf_promotion_active:
-        return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_shelf")]
-    prepared = build_prepared_from_contexts(contexts)
-    click_mode = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    gate_policy = policy or SelectionPolicy.from_aggressiveness(
-        click_mode=click_mode,
-        aggressiveness=3,
-    )
-    gate_ladder = ladder_inputs or LadderInputs.from_contexts(contexts)
-    cleanup = plan_shelf_rec_false_cleanup_down(
-        prepared,
-        click_mode=click_mode,
-        ladder_inputs=gate_ladder,
-        policy=gate_policy,
-    )
-    if cleanup:
-        return cleanup
-    return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_no_actions")]
+    _ = contexts, shelf_promotion_active, shelf_click_mode, ladder_inputs, policy
+    return [V3Action(action=V3ActionType.DO_NOTHING, reason="post_gate_preamble_only")]
 
 
 def _select_v3_actions_with_plan_fact(

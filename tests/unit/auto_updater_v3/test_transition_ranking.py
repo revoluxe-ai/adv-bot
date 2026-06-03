@@ -45,6 +45,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
     PositionProfilePoint,
 )
 from tests.unit.auto_updater_v3.conftest import calc_kw, ctx, sample_profile
+from tests.unit.test_auto_updater_v3 import _conv_for_pay_for_order
 
 
 def _policy(
@@ -181,23 +182,17 @@ def test_missing_above_rec_allows_effective_jump_on_shelf() -> None:
 
 @pytest.mark.unit
 def test_collapsed_ch_with_pay_for_order_no_imputed_oc_up() -> None:
-    """Collapsed CH + PFO: только OFF→MIN, без imputed UP на O/C."""
-    synthetic_only = [
-        PositionProfilePoint(
-            position=1,
-            bid=1000,
-            predicted_conversion=0.1,
-            pay_for_cart=100.0,
-            ch_observed=False,
-        ),
-    ]
-    donor_prof = sample_profile(min_pay=20.0, high_pay=30.0)
-    collapsed_ctx = ctx(
-        ks_id=3,
-        mode=KeywordStrategyMode.OFF,
-        profile=synthetic_only,
-        above_rec=True,
+    """PFO tier: OFF→MIN через pay_for_order, без UP на O/C."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        build_eligibility_map,
     )
+    from tests.unit.auto_updater_v3.test_no_data_activation import _kw as _calculated_kw_fixture
+
+    pfo_kw = _calculated_kw_fixture(
+        ks_id=3, text="pfo_kw", mode=KeywordStrategyMode.OFF, conv=0.08
+    )
+    donor_prof = sample_profile(min_pay=20.0, high_pay=30.0)
+    pfo_ctx = KeywordV3Context(keyword=pfo_kw, position_profile=None)
     prepared = [
         (
             ctx(
@@ -208,28 +203,24 @@ def test_collapsed_ch_with_pay_for_order_no_imputed_oc_up() -> None:
             ),
             KeywordStrategyMode.OFF,
         ),
-        (collapsed_ctx, KeywordStrategyMode.OFF),
+        (pfo_ctx, KeywordStrategyMode.OFF),
     ]
     ladder = _ladder_for_prepared(prepared)
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
         ladder_inputs=ladder,
+        eligibility_by_ks_id=build_eligibility_map([c for c, _ in prepared]),
     )
     to_modes = {c.to_mode for c in candidates if c.keyword_setting_id == 3}
     assert KeywordStrategyMode.MIN_CPA in to_modes
     assert KeywordStrategyMode.OPTIMUM not in to_modes
     assert KeywordStrategyMode.MAX_CONVERSION not in to_modes
-    assert not any(
-        c.imputed and c.to_mode != KeywordStrategyMode.MIN_CPA
-        for c in candidates
-        if c.keyword_setting_id == 3
-    )
 
 
 @pytest.mark.unit
-def test_missing_target_matrix_imputed_uses_worst() -> None:
-    """Collapsed CH без pay_for_order: worst-imputation и ``imputed=True`` в UP."""
+def test_missing_target_matrix_no_worst_imputation() -> None:
+    """Collapsed CH без pay_for_order: worst-imputation удалён — нет imputed UP."""
     synthetic_only = [
         PositionProfilePoint(
             position=1,
@@ -251,21 +242,14 @@ def test_missing_target_matrix_imputed_uses_worst() -> None:
         ),
         (no_matrix, KeywordStrategyMode.OFF),
     ]
-    cat = build_mode_candidates(
-        profile=synthetic_only,
-        keyword_text=no_matrix.keyword.text,
-        conv_views_to_orders=0.0,
-    )
-    assert missing_target_matrix_from_catalog(cat)
-    worst = build_worst_per_state_costs(prepared)
-    assert AggressionTargetMode.MIN_CPA in worst
+    assert build_worst_per_state_costs(prepared) == {}
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
         ladder_inputs=_ladder_for_prepared(prepared),
     )
     imputed = [c for c in candidates if c.imputed and c.keyword_setting_id == 2]
-    assert imputed
+    assert not imputed
 
 
 @pytest.mark.unit
@@ -681,9 +665,8 @@ def test_collect_candidates_skips_invalid_target_without_keyword_fallback() -> N
 
 
 @pytest.mark.unit
-def test_build_worst_uses_per_key_smoothed_excludes_non_donors() -> None:
-    """Worst = max CPO с per-key smoothed; ключ без CH-матрицы не донор."""
-    campaign = 0.10
+def test_build_worst_per_state_costs_returns_empty() -> None:
+    """Worst-imputation удалён — ``build_worst_per_state_costs`` всегда ``{}``."""
     prof = sample_profile(min_pay=25.0, high_pay=40.0)
     ctx_low = KeywordV3Context(
         keyword=calc_kw(
@@ -695,39 +678,5 @@ def test_build_worst_uses_per_key_smoothed_excludes_non_donors() -> None:
         ),
         position_profile=prof,
     )
-    ctx_high = KeywordV3Context(
-        keyword=calc_kw(
-            ks_id=2,
-            text="high",
-            mode=KeywordStrategyMode.MIN_CPA,
-            orders=15,
-            add_to_cart=20,
-        ),
-        position_profile=prof,
-    )
-    ctx_no_ch = ctx(ks_id=3, mode=KeywordStrategyMode.MIN_CPA, profile=None)
-    prepared = [
-        (ctx_low, KeywordStrategyMode.MIN_CPA),
-        (ctx_high, KeywordStrategyMode.MIN_CPA),
-        (ctx_no_ch, KeywordStrategyMode.MIN_CPA),
-    ]
-    ladder = LadderInputs.from_contexts(
-        [ctx_low, ctx_high, ctx_no_ch],
-        campaign_orders_per_cart_7d=campaign,
-    )
-    worst = ladder.worst_costs
-    cat_low = build_mode_candidates(
-        profile=prof,
-        keyword_text="low",
-        orders_per_cart=ladder.orders_per_cart_for_ctx(ctx_low),
-    )
-    cat_high = build_mode_candidates(
-        profile=prof,
-        keyword_text="high",
-        orders_per_cart=ladder.orders_per_cart_for_ctx(ctx_high),
-    )
-    cpo_low = cat_low[AggressionTargetMode.MIN_CPA].predicted_cpa
-    cpo_high = cat_high[AggressionTargetMode.MIN_CPA].predicted_cpa
-    assert cpo_low is not None and cpo_high is not None
-    assert cpo_low > cpo_high
-    assert worst[AggressionTargetMode.MIN_CPA] == pytest.approx(float(cpo_low))
+    prepared = [(ctx_low, KeywordStrategyMode.MIN_CPA)]
+    assert build_worst_per_state_costs(prepared) == {}

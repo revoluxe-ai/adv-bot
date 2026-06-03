@@ -52,7 +52,20 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             side_effect=_ROOT_ERROR,
         ),
         patch(
@@ -60,6 +73,13 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             new=AsyncMock(side_effect=OSError("db down")),
         ),
     ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        pfc_cls.return_value = plan_fact
+        views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
+        views_cls.return_value.set_views = AsyncMock()
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
         )

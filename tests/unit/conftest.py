@@ -38,13 +38,5 @@ def _unit_mock_v3_clickhouse_deps(request: pytest.FixtureRequest) -> object:
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
             new=AsyncMock(return_value=None),
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.cache_worst_costs_for_adv",
-            new=AsyncMock(return_value=None),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view.cache_worst_costs_for_adv",
-            new=AsyncMock(return_value=None),
-        ),
     ):
         yield

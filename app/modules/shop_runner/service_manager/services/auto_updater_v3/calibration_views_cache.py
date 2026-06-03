@@ -1,4 +1,4 @@
-"""Redis-снимок суммы показов РК для gate RESOLVE_CALIBRATION_TRIM.
+"""Redis-снимок суммы показов РК для gate RESOLVE_CALIBRATION.
 
 Сравнивается сумма ``views`` по ``ComplexAdv.all_adv_ids`` (авто + поиск) за окно
 ``max_last_period`` — тот же источник, что fact V3 (``full_adv_wb_stat``).

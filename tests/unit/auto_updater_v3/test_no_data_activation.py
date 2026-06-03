@@ -160,9 +160,8 @@ def test_keyword_v2_pay_for_order_available_when_only_bid_log_cascade() -> None:
             ),
         }
     )
+    assert resolve_keyword_v2_pay_for_order_cost(kw) is None
     assert kw.pay_for_order is not None
-    assert resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=None) is None
-    assert not keyword_v2_pay_for_order_unavailable(kw)
 
 
 @pytest.mark.unit

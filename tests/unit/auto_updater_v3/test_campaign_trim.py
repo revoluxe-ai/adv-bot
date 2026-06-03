@@ -23,11 +23,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_ag
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     compute_resolve_cost_threshold,
     is_resolve_valid,
     plan_campaign_trim_by_max_state_cost,
     plan_mass_cheap_promotion,
+    plan_resolve_calibration,
     plan_resolve_calibration_trim,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
@@ -132,7 +136,7 @@ def test_resolve_calibration_trim_lowers_mode_when_state_cost_above_resolve() ->
         aggressiveness=V3RolloutAggressiveness.MAX,
     )
     assert len(actions) >= 1
-    assert all(a.reason == "resolve_calibration_trim" for a in actions)
+    assert all(a.reason == "resolve_calibration_tighten" for a in actions)
     assert actions[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
 
 
@@ -276,7 +280,7 @@ def test_resolve_calibration_trim_no_ch_min_to_off_when_pfo_above_resolve() -> N
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.FORCE_OFF
-    assert actions[0].reason == "resolve_calibration_trim"
+    assert actions[0].reason == "resolve_calibration_tighten"
 
 
 @pytest.mark.unit
@@ -300,6 +304,102 @@ def test_resolve_calibration_trim_skips_when_state_cost_at_or_below_resolve() ->
         aggressiveness=V3RolloutAggressiveness.MAX,
     )
     assert actions == []
+
+
+@pytest.mark.unit
+def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LOOSEN: limited UP пока ``state_cost`` target mode ``<= resolve``."""
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=1,
+            bid=10_000.0,
+            predicted_conversion=0.1,
+            pay_for_cart=1.0,
+            timestamp=ts,
+        ),
+        PositionProfilePoint(
+            position=5,
+            bid=2_000.0,
+            predicted_conversion=0.05,
+            pay_for_cart=1.0,
+            timestamp=ts,
+        ),
+        PositionProfilePoint(
+            position=22,
+            bid=500.0,
+            predicted_conversion=0.02,
+            pay_for_cart=1.0,
+            timestamp=ts,
+        ),
+    ]
+
+    def _mc(mode: AggressionTargetMode, place: int) -> ModeCandidate:
+        return ModeCandidate(
+            mode=mode,
+            position=place,
+            bid=float(place * 100),
+            predicted_cpa=100.0,
+            is_valid=True,
+        )
+
+    catalog = {
+        AggressionTargetMode.MIN_CPA: _mc(AggressionTargetMode.MIN_CPA, 22),
+        AggressionTargetMode.OPTIMUM: _mc(AggressionTargetMode.OPTIMUM, 5),
+        AggressionTargetMode.MAX_CONVERSION: _mc(
+            AggressionTargetMode.MAX_CONVERSION, 1
+        ),
+    }
+    costs: dict[KeywordStrategyMode, tuple[float, bool]] = {
+        KeywordStrategyMode.MIN_CPA: (10.0, False),
+        KeywordStrategyMode.OPTIMUM: (25.0, False),
+        KeywordStrategyMode.MAX_CONVERSION: (50.0, False),
+    }
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
+        lambda _ctx, _prepared, _ladder=None: catalog,
+    )
+
+    def _fake_cost(
+        *,
+        ctx: KeywordV3Context,
+        to_mode: KeywordStrategyMode,
+        **_: object,
+    ) -> tuple[float, bool]:
+        _ = ctx
+        return costs.get(to_mode, (float("inf"), False))
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        _fake_cost,
+    )
+
+    kw = _calc_kw(
+        ks_id=14,
+        text="cheap_loosen",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(10.0),
+        hard_status=2,
+    )
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=kw, position_profile=prof)]
+    )
+    actions = plan_resolve_calibration(
+        prepared,
+        resolve=30.0,
+        calibration_direct=CalibrationDirect.LOOSEN,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+        max_effective_steps=99,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.UP
+    assert actions[0].reason == "resolve_calibration_loosen"
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit

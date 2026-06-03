@@ -1,4 +1,11 @@
-"""Adaptive effective steps для RESOLVE_CALIBRATION_TRIM (×2/÷2 по направлению)."""
+"""Adaptive effective steps для resolve calibration (×2/÷2 по направлению).
+
+Калибровка — самостоятельный степ: одна ветка за тик (UP **или** DOWN), цель — CPA
+кампании у **0.9×resolve** (``MAX_PAY_STABILIZATION_RATIO``).
+
+- **LOOSEN** — ``fact < 0.9×resolve``: limited UP (нарастить расход);
+- **TIGHTEN** — ``fact >= 0.9×resolve``: limited DOWN trim (снизить ``state_cost > resolve``).
+"""
 
 from __future__ import annotations
 
@@ -11,10 +18,10 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 
 
 class CalibrationDirect(StrEnum):
-    """Направление калибровки по fact CPA относительно ``0.9×resolve``."""
+    """Направление калибровки относительно пола ``0.9×resolve``."""
 
-    TIGHTEN = "tighten"
-    LOOSEN = "loosen"
+    LOOSEN = "loosen"  # fact ниже пола → UP
+    TIGHTEN = "tighten"  # fact на/выше пола → DOWN trim
 
 
 @dataclass(frozen=True)
@@ -51,7 +58,7 @@ def resolve_effective_calibration_steps(
         current_direct: Направление текущего тика.
 
     Returns:
-        Число effective ladder DOWN-шагов на ключ за calibration trim.
+        Число effective ladder-шагов (UP или DOWN) на ключ за calibration.
     """
     cap = max(1, int(base_max))
     if prev is None:

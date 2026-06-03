@@ -118,6 +118,23 @@ def can_persist_netto_mode_change(
     return False
 
 
+def can_persist_v3_keyword_state_change(
+    db_mode: KeywordStrategyMode,
+    desired_mode: KeywordStrategyMode,
+    db_hard_status: object,
+    desired_hard_status: int,
+) -> bool:
+    """Flush mode и/или hard_status sync для operable ключей (1|2)."""
+    h = int(cast(int, db_hard_status))
+    if h not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+        return False
+    if desired_mode != db_mode:
+        return can_persist_netto_mode_change(db_mode, desired_mode, db_hard_status)
+    if int(desired_hard_status) == h:
+        return False
+    return int(desired_hard_status) == hard_status_for_strategy_mode(db_mode)
+
+
 async def _keyword_text_by_id(
     session: AsyncSession,
     cache: dict[int, str],

@@ -130,10 +130,10 @@ def test_collect_transition_rk_skips_opt_alias_matches_expansion() -> None:
 
 
 @pytest.mark.unit
-def test_collect_uses_ladder_worst_costs_not_conv_rebuild(
+def test_collect_does_not_rebuild_worst_when_ladder_provided(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``collect_transition_candidates`` не пересобирает worst без RK (SSOT ``ladder``)."""
+    """``collect_transition_candidates`` не вызывает ``build_worst_per_state_costs``."""
     prof = _o_eq_m_profile()
     contexts = [ctx(ks_id=21, mode=KeywordStrategyMode.MIN_CPA, profile=prof)]
     prepared = build_prepared_from_contexts(contexts)
@@ -142,7 +142,7 @@ def test_collect_uses_ladder_worst_costs_not_conv_rebuild(
 
     def _spy_build_worst(*_a: object, **_k: object) -> dict[AggressionTargetMode, float]:
         rebuild_calls.append(1)
-        return build_worst_per_state_costs(*_a, **_k)  # type: ignore[arg-type]
+        return {}
 
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking.build_worst_per_state_costs",
@@ -152,4 +152,4 @@ def test_collect_uses_ladder_worst_costs_not_conv_rebuild(
         prepared, policy=_policy(), ladder_inputs=ladder
     )
     assert rebuild_calls == []
-    assert build_worst_per_state_costs(prepared, ladder_inputs=ladder) == ladder.worst_costs
+    assert build_worst_per_state_costs(prepared, ladder_inputs=ladder) == {}
