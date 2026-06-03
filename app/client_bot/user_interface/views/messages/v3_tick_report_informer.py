@@ -30,6 +30,10 @@ def _skip_reason_display(code: str | None) -> str:
     return _SKIP_REASON_RU.get(code, code)
 
 
+def _phase_has_planned_actions(phase: V3PhaseStats) -> bool:
+    return (phase.up + phase.down + phase.force_off + phase.rebalance) > 0
+
+
 def _format_phase_line(phase: V3PhaseStats) -> list[str]:
     """Строки одного блока стадии."""
     title = phase.title_ru
@@ -38,8 +42,6 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         if direct:
             title = f"{title} · {str(direct).upper()}"
     lines = [f"▸ {title}"]
-    if phase.possible_actions_ru:
-        lines.append(f"  Возможные: {phase.possible_actions_ru}")
     if phase.phase_id == "filter":
         total = phase.extra.get("total", 0)
         operable = phase.extra.get("operable", 0)
@@ -47,20 +49,24 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         return lines
     if phase.phase_id == "hard_status_sync":
         lines.append(f"  Синхронизировано: {phase.sync}")
+        if phase.sync == 0 and phase.outcome_note:
+            lines.append(f"  без изменений — {phase.outcome_note}")
         return lines
     if not phase.executed and phase.skip_reason:
         lines.append(f"  пропуск — {_skip_reason_display(phase.skip_reason)}")
         return lines
-    parts = [f"↑{phase.up}", f"↓{phase.down}", f"off{phase.force_off}"]
-    if phase.rebalance:
-        parts.append(f"reb{phase.rebalance}")
-    lines.append(f"  {'  '.join(parts)}")
+    if phase.executed and not _phase_has_planned_actions(phase):
+        note = phase.outcome_note or "причина не зафиксирована"
+        lines.append(f"  без изменений — {note}")
+    else:
+        parts = [f"↑{phase.up}", f"↓{phase.down}", f"off{phase.force_off}"]
+        if phase.rebalance:
+            parts.append(f"reb{phase.rebalance}")
+        lines.append(f"  {'  '.join(parts)}")
     if phase.phase_id == "resolve_calibration" and phase.executed:
         steps = phase.extra.get("effective_steps")
         if steps is not None:
             lines.append(f"  шагов: {steps} (adaptive)")
-    if phase.phase_id == "shelf_cleanup" and phase.extra.get("shelf_active"):
-        lines.append("  (полка активна)")
     return lines
 
 

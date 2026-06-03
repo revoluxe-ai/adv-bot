@@ -62,6 +62,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
     V3TickReportCollector,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_phase_notes import (
+    summarize_phase_zero_actions,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_redis import (
     persist_v3_tick_report,
 )
@@ -89,7 +92,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
     build_prepared_from_contexts,
-    plan_shelf_rec_false_cleanup_down,
+    plan_shelf_rec_false_cleanup_down, PreparedList,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -126,6 +129,19 @@ logger = logging.getLogger(__name__)
 
 # ``get_wb_advs_dto`` → ``PlanFactProvider`` использует тот же default last_days.
 _WB_ADV_DTO_FACT_LAST_DAYS = 2
+
+
+def _phase_outcome_note_if_empty(
+    phase_id: str,
+    actions: list[V3Action],
+    *,
+    prepared: PreparedList,
+    **kwargs: object,
+) -> str | None:
+    """Русская причина нулевого исхода фазы; ``None`` если есть действия."""
+    if actions:
+        return None
+    return summarize_phase_zero_actions(phase_id, prepared=prepared, **kwargs)
 
 # TODO: централизовать получение план-факта
 async def _resolve_v3_fact_data(
@@ -480,6 +496,11 @@ async def process_adv_v3(
             tick_report.record_phase(
                 "no_data_bootstrap",
                 bootstrap_actions,
+                outcome_note=_phase_outcome_note_if_empty(
+                    "no_data_bootstrap",
+                    bootstrap_actions,
+                    prepared=[],
+                ),
             )
             if bootstrap_actions:
                 preamble_no_data_bootstrap_count = len(bootstrap_actions)
@@ -581,7 +602,16 @@ async def process_adv_v3(
                     prepared,
                     eligibility_by_ks_id=eligibility,
                 )
-            tick_report.record_phase("cap_down", cap_actions)
+            tick_report.record_phase(
+                "cap_down",
+                cap_actions,
+                outcome_note=_phase_outcome_note_if_empty(
+                    "cap_down",
+                    cap_actions,
+                    prepared=prepared,
+                    eligibility_by_ks_id=eligibility,
+                ),
+            )
             if cap_actions:
                 preamble_cap_down_count = len(cap_actions)
                 logger.info(
@@ -607,7 +637,19 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
-                tick_report.record_phase("passing_up", passing_up_actions)
+                tick_report.record_phase(
+                    "passing_up",
+                    passing_up_actions,
+                    outcome_note=_phase_outcome_note_if_empty(
+                        "passing_up",
+                        passing_up_actions,
+                        prepared=prepared,
+                        resolve=resolve,
+                        policy=policy,
+                        eligibility_by_ks_id=eligibility,
+                        ladder_inputs=ladder_inputs,
+                    ),
+                )
                 if passing_up_actions:
                     preamble_passing_up_count = len(passing_up_actions)
                     logger.info(
@@ -641,6 +683,14 @@ async def process_adv_v3(
                     "shelf_cleanup",
                     shelf_actions,
                     extra={"shelf_active": True},
+                    outcome_note=_phase_outcome_note_if_empty(
+                        "shelf_cleanup",
+                        shelf_actions,
+                        prepared=prepared,
+                        shelf_active=True,
+                        shelf_click_mode=click_mode,
+                        ladder_inputs=ladder_inputs,
+                    ),
                 )
                 if shelf_actions:
                     preamble_shelf_count = len(shelf_actions)
@@ -677,7 +727,20 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
-                tick_report.record_phase("max_cpa_guard", guard_actions)
+                tick_report.record_phase(
+                    "max_cpa_guard",
+                    guard_actions,
+                    outcome_note=_phase_outcome_note_if_empty(
+                        "max_cpa_guard",
+                        guard_actions,
+                        prepared=prepared,
+                        max_pay_for_order=float(plan.max_pay_for_order),
+                        shelf_click_mode=click_mode,
+                        aggressiveness=aggr,
+                        eligibility_by_ks_id=eligibility,
+                        ladder_inputs=ladder_inputs,
+                    ),
+                )
                 if guard_actions:
                     guard_applied = True
                     preamble_guard_count = len(guard_actions)
@@ -709,7 +772,17 @@ async def process_adv_v3(
                         eligibility_by_ks_id=eligibility,
                         ladder_inputs=ladder_inputs,
                     )
-                tick_report.record_phase("cost_reallocation", realloc_actions)
+                tick_report.record_phase(
+                    "cost_reallocation",
+                    realloc_actions,
+                    outcome_note=_phase_outcome_note_if_empty(
+                        "cost_reallocation",
+                        realloc_actions,
+                        prepared=prepared,
+                        resolve=resolve,
+                        policy=policy,
+                    ),
+                )
                 if realloc_actions:
                     preamble_realloc_count = len(realloc_actions)
                     logger.info(
@@ -739,7 +812,24 @@ async def process_adv_v3(
                         plan_fact_changed=not plan_fact_equal,
                         views_changed=not views_equal,
                     )
-                tick_report.record_phase("pay_for_order_gap_enable", enable_actions)
+                tick_report.record_phase(
+                    "pay_for_order_gap_enable",
+                    enable_actions,
+                    outcome_note=_phase_outcome_note_if_empty(
+                        "pay_for_order_gap_enable",
+                        enable_actions,
+                        prepared=prepared,
+                        eligibility_by_ks_id=eligibility,
+                        fact_pay_for_order=(
+                            float(fact.pay_for_order)
+                            if fact.pay_for_order is not None
+                            else None
+                        ),
+                        resolve=float(resolve),
+                        plan_fact_changed=not plan_fact_equal,
+                        views_changed=not views_equal,
+                    ),
+                )
                 if enable_actions:
                     preamble_enable_count = len(enable_actions)
                     logger.info(
@@ -787,6 +877,18 @@ async def process_adv_v3(
                             "calibration_direct": current_calibration_direct.value,
                             "effective_steps": effective_calibration_steps,
                         },
+                        outcome_note=_phase_outcome_note_if_empty(
+                            "resolve_calibration",
+                            calibration_actions,
+                            prepared=prepared,
+                            resolve=float(resolve),
+                            calibration_direct=current_calibration_direct,
+                            shelf_click_mode=click_mode,
+                            aggressiveness=aggr,
+                            eligibility_by_ks_id=eligibility,
+                            ladder_inputs=ladder_inputs,
+                            max_effective_steps=effective_calibration_steps,
+                        ),
                     )
                     if calibration_actions:
                         preamble_calibration_count = len(calibration_actions)

@@ -97,6 +97,28 @@ def test_collector_build_snapshot() -> None:
 
 
 @pytest.mark.unit
+def test_collector_record_phase_stores_outcome_note_on_zero_actions() -> None:
+    coll = V3TickReportCollector()
+    coll.record_phase(
+        "resolve_calibration",
+        [],
+        outcome_note="нет ключей для UP: 10 operable",
+        extra={"calibration_direct": "loosen", "effective_steps": 1},
+    )
+    snap = coll.build_snapshot(
+        adv_id=1,
+        adv_name="x",
+        campaign_mode="NORMAL",
+        sales_state=None,
+        keywords=[],
+        applied=[],
+    )
+    phase = snap.phases[0]
+    assert phase.outcome_note == "нет ключей для UP: 10 operable"
+    assert phase.up == 0
+
+
+@pytest.mark.unit
 def test_applied_breakdown() -> None:
     applied = [
         AppliedV3Action(

@@ -132,6 +132,7 @@ class V3PhaseStats(BaseModel):
     possible_actions_ru: str = ""
     executed: bool = True
     skip_reason: str | None = None
+    outcome_note: str | None = None
     planned: int = 0
     up: int = 0
     down: int = 0
@@ -207,14 +208,23 @@ class V3TickReportCollector:
             )
         )
 
-    def record_sync(self, sync_count: int) -> None:
+    def record_sync(
+        self,
+        sync_count: int,
+        *,
+        outcome_note: str | None = None,
+    ) -> None:
         title, possible = PHASE_TITLES["hard_status_sync"]
+        note = outcome_note
+        if sync_count == 0 and note is None:
+            note = "режимы уже соответствуют hard_status"
         self._phases.append(
             V3PhaseStats(
                 phase_id="hard_status_sync",
                 title_ru=title,
                 possible_actions_ru=possible,
                 sync=sync_count,
+                outcome_note=note if sync_count == 0 else None,
             )
         )
 
@@ -226,9 +236,10 @@ class V3TickReportCollector:
         skip_reason: str | None = None,
         executed: bool = True,
         sync_count: int = 0,
+        outcome_note: str | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """Зафиксировать фазу с breakdown действий или причиной пропуска."""
+        """Зафиксировать фазу с breakdown действий, пропуска или нулевого исхода."""
         meta = PHASE_TITLES.get(phase_id)
         if meta is None:
             title, possible = phase_id, ""
@@ -247,6 +258,9 @@ class V3TickReportCollector:
             )
             return
         breakdown = V3ActionBreakdown.from_actions(actions)
+        note = outcome_note
+        if breakdown.planned == 0 and note is None:
+            note = "планировщик не выбрал ключей"
         self._phases.append(
             V3PhaseStats(
                 phase_id=phase_id,
@@ -259,6 +273,7 @@ class V3TickReportCollector:
                 force_off=breakdown.force_off,
                 rebalance=breakdown.rebalance,
                 sync=sync_count,
+                outcome_note=note if breakdown.planned == 0 else None,
                 extra=extra or {},
             )
         )
