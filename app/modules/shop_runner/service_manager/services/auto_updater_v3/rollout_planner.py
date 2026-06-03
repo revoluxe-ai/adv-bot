@@ -2222,15 +2222,8 @@ def plan_cost_reallocation(
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
-    """COST_REALLOCATION: схлопнутое итоговое действие на ключ.
-
-    WL: один DOWN до ``final_target``; авто: FORCE_OFF (+ технический UP до
-    ``final_target``, если не OFF). Активные дороже ``min(potential passing cost)``;
-    если potential пуст — headroom fallback: дороже ``resolve``.
-
-    Внутренний цикл: один ``resolve_next_effective_step_down`` на итерацию; alias-режимы
-    с тем же ``target_place`` не увеличивают ``released_steps`` (см.
-    ``count_effective_released_aggression_steps``).
+    """COST_REALLOCATION: - перераспределение стейтов, чтобы агрессивность осталась та же,
+    но стейты перераспределились от дорогих к дешевым.
     """
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     stored_by_ks: dict[int, tuple[KeywordStrategyMode, int]] = {}
