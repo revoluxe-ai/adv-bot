@@ -37,7 +37,7 @@ def build_normal_preamble_executors() -> list[UpdateExecutor]:
         HardStatusValidateExecutor(), # новый
         NotFullValidateExecutor(), # новый
         RaiseStateToTargetCpoExecutor(), # новый
-        ResetOverMaxCPOOnOverSpend(),
+        ResetOverMaxCPOOnOverSpend(), # новый
 
         ShelfCleanupExecutor(),
         MaxCpaGuardExecutor(),
