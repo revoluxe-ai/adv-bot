@@ -5,14 +5,13 @@ from __future__ import annotations
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
     UpdateContext,
 )
-
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
 
 
 class HardStatusValidateExecutor:
-    """VALIDATE hard_status: авто-ключи (1) → ``OFF``; всегда append в ``_next_state``."""
+    """VALIDATE hard_status: авто-ключи (1) → ``OFF``."""
 
     phase_name = "validate_state_by_hard_status"
 
@@ -20,5 +19,7 @@ class HardStatusValidateExecutor:
         self._next_state_manager = NextStateManager(HardStatusValidateExecutor)
 
     def execute(self, context: UpdateContext) -> None:
+        self._skip_reason = None
         for dto in context.keywords:
             self._next_state_manager.validate_state_by_hard_status(dto)
+        return None # значит не пропускаем
