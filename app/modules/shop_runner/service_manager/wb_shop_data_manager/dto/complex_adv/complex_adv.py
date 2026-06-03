@@ -407,6 +407,9 @@ class ComplexAdv:
         Raises:
             ShopRunnerKeywordsCacheMissError: hash в Redis отсутствует.
 
+        Непустой ответ кэшируется на инстансе; пустой ``[]`` (маркер ``__empty__``)
+        при каждом вызове перечитывается из Redis, чтобы подхватить warmup.
+
         Для UI / ручного пересчёта — ``fetch_keywords_from_database`` (``keywords_access``).
         """
         if not self._get_keywords:
@@ -421,7 +424,10 @@ class ComplexAdv:
             return self._filter_keywords(self._calculated_keywords)
 
         cached = await self._get_keywords(self, cache_only=True)
-        self._calculated_keywords = cached
+        # Пустой [] (__empty__ в Redis) не кэшируем на инстансе: snapshot warmup
+        # может записать keywords после первого чтения.
+        if cached:
+            self._calculated_keywords = cached
         return self._filter_keywords(cached)
 
     @property
