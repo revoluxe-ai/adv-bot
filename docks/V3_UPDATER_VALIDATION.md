@@ -47,7 +47,7 @@ NORMAL    → filter/sync → B → U → S → G → R → enable → calibrati
 4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
 5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
 6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
-7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN.
+7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + **AND** plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN. Пул UP: `collect_calibration_up_next_step_candidates` (в т.ч. OFF→MIN — см. ниже).
 8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
 9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
@@ -149,9 +149,22 @@ Calibration: **AND** — оба сигнала должны измениться
 
 ### Adaptive calibration steps (Redis `V3CalibrationStepState`)
 
-Направление по зоне fact vs resolve:
-- **DOWN** (`tighten`) — `fact >= 0.9×resolve`; limited trim к resolve; adaptive steps.
-- **UP** (`loosen`) — `fact < 0.9×resolve`; один ключ, следующий effective-шаг, min CPO.
+Направление по зоне fact vs resolve (одна ветка калибровки за тик):
+- **ветка DOWN** — `fact >= 0.9×resolve`; limited trim к resolve; adaptive steps.
+- **ветка UP** — `fact < 0.9×resolve`; один ключ, следующий effective-шаг, min CPO.
+
+В Redis/UI legacy-строки `tighten` / `loosen` (`CalibrationDirect`) соответствуют веткам DOWN/UP.
+
+#### Калибровка UP и ключи OFF (контракт)
+
+| Категория | Enable (6) | Calibration UP (7) |
+|-----------|------------|---------------------|
+| OFF + NO DATA | да, ≤1/тик, OR gate plan/views, без rec-gate | да, min CPO из пула, AND gate, с rec-gate; ослаблены `participates_in_ladder` / `can_target_mode`; при `cost=inf` — imputed из каталога |
+| OFF + FULL/PFO | нет | да, полный ladder UP (rec-gate, cost, eligibility) — единственный preamble-путь «включить» OFF с данными на ключе |
+
+- Снят исторический skip «все OFF» в `collect_calibration_up_next_step_candidates`: иначе при массе OFF NO DATA ветка UP давала пустой пул при `fact << resolve`.
+- Enable и calibration UP **не дублируют** друг друга: разные gate (OR vs AND), лимит отбора (ks_id vs min CPO), reason (`pay_for_order_gap_enable` vs `resolve_calibration_up`).
+- Порядок в тике: enable → refresh `prepared` → calibration; за тик возможны два разных OFF NO DATA, если оба gate прошли.
 
 Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, default 1):
 - первый тик / нет Redis-истории → `1`;

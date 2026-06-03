@@ -486,13 +486,59 @@ def collect_calibration_up_next_step_candidates(
     ladder_inputs: "LadderInputs | None" = None,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> list[TransitionCandidate]:
-    """Следующий effective-шаг UP на ключ; без потолка resolve (калибровка UP).
+    """Пул кандидатов для калибровки UP (``plan_resolve_calibration``, ветка UP).
 
-    Один переход на ключ — ``resolve_next_effective_step_up``; итоговый выбор
-    ключа — ``pick_one_up_cost_first`` (минимальный state_cost / PFO).
+    Контракт выбора
+    ----------------
+    - На ключ — не более одного перехода ``resolve_next_effective_step_up`` (следующий
+      effective-шаг по лестнице M/O/C).
+    - Потолка ``resolve`` по ``state_cost`` нет (в отличие от passing_up / expansion).
+    - Итоговое действие — ``pick_one_up_cost_first``: один ключ с минимальным
+      ``state_cost``, tie-break ``pay_for_order``.
 
-    OFF + NO DATA: как ``plan_pay_for_order_gap_enable`` — OFF→MIN при отсутствии
-    ``participates_in_ladder`` / ``can_target_mode`` для tier NO DATA.
+    Ключи в режиме OFF (намеренно не отфильтровываются целиком)
+    -----------------------------------------------------------
+    Раньше все OFF отсекались в начале цикла — при ``fact << resolve`` калибровка UP
+    никогда не «включала» массу OFF NO DATA при ветке UP, хотя enable даёт ≤1 такого
+    ключа за тик.
+
+    **OFF + NO DATA** (``participates_in_ladder=False``, tier ``KEYWORD_NO_DATA``):
+        - Тот же смысл, что ``plan_pay_for_order_gap_enable``: первый шаг OFF→MIN.
+        - Ослаблены проверки eligibility: не требуются ``participates_in_ladder`` и
+          ``can_target_mode`` (у NO DATA ``allowed_modes`` пустой).
+        - При ``state_cost=inf`` без CH-профиля — fallback на ``predicted_cpa`` каталога
+          (imputed), иначе ключ без валидного MIN в каталоге не попадает в пул.
+        - Дальше действуют общие фильтры: ``rec_gate_allows_up``, ``max_target_mode``,
+          ``hard_status`` 1|2.
+
+    **OFF + FULL / PFO** (``participates_in_ladder=True``):
+        - Enable их **не** трогает (фаза 7 только NO DATA + OFF).
+        - Калибровка — нормальный ladder UP: catalog, ``cost_for_mode``, rec-gate,
+          ``can_target_mode`` без ослаблений. Это не «обход enable», а единственный
+          preamble-путь включить OFF при наличии операционных данных на ключе.
+        - На практике таких ключей мало; основной объём ветки UP — OFF NO DATA.
+
+    Отличие от фазы enable (``plan_pay_for_order_gap_enable``)
+    ----------------------------------------------------------
+    | | enable (7) | calibration UP (8) |
+    |---|------------|----------------------|
+    | Кого OFF→MIN | только NO DATA | NO DATA (ослабления) + FULL/PFO (полный контракт) |
+    | Лимит за тик | ≤1, детерминированная сортировка ks_id | ≤1 из пула, min CPO |
+    | Gate тика | plan/fact **OR** views; ``fact < 0.9×resolve`` | plan/fact **AND** views; ``fact ≤ max`` |
+    | rec-gate | нет | да |
+    | reason | ``pay_for_order_gap_enable`` | ``resolve_calibration_up`` / imputed |
+
+    В одном NORMAL-тике сначала enable (7), затем calibration (8) на обновлённом
+    ``prepared`` — могут включиться разные OFF NO DATA, если оба gate прошли.
+
+    Args:
+        prepared: operable контексты и текущие режимы.
+        policy: shelf + aggressiveness (cap ``max_target_mode``).
+        ladder_inputs: SSOT профиля / orders_per_cart.
+        eligibility_by_ks_id: tier FULL/PFO/NO DATA; опционально prebuilt.
+
+    Returns:
+        Кандидаты UP; пустой список → ``_plan_calibration_up`` не формирует действие.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
@@ -526,6 +572,7 @@ def collect_calibration_up_next_step_candidates(
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
+        # OFF: см. docstring — NO DATA (bootstrap) и FULL/PFO (полная лестница).
         is_off_gap_enable = current_mode == KeywordStrategyMode.OFF
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
@@ -550,6 +597,7 @@ def collect_calibration_up_next_step_candidates(
         mc = catalog.get(target)
         if mc is None:
             continue
+        # Ослабления eligibility/cost только для OFF→MIN + KEYWORD_NO_DATA.
         off_no_data_bootstrap = (
             is_off_gap_enable
             and to_mode == KeywordStrategyMode.MIN_CPA

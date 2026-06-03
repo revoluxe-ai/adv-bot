@@ -310,7 +310,7 @@ def test_resolve_calibration_trim_skips_when_state_cost_at_or_below_resolve() ->
 def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_resolve(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LOOSEN: limited UP пока ``state_cost`` target mode ``<= resolve``."""
+    """Калибровка UP: limited UP пока ``state_cost`` target mode ``<= resolve``."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(
@@ -406,7 +406,7 @@ def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_reso
 def test_resolve_calibration_up_off_no_data_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LOOSEN: OFF + NO DATA попадает в пул калибровки UP (OFF→MIN), как enable gap."""
+    """Калибровка UP: OFF + NO DATA в пуле (OFF→MIN), как enable gap."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(

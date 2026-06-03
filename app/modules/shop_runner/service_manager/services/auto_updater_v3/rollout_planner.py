@@ -789,7 +789,7 @@ def _plan_calibration_tighten(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int,
 ) -> list[V3Action]:
-    """TIGHTEN: limited DOWN до ``state_cost <= cost_ceiling``."""
+    """Калибровка DOWN: limited trim до ``state_cost <= cost_ceiling``."""
     return _plan_trim_by_cost_ceiling(
         prepared,
         cost_ceiling=cost_ceiling,
@@ -810,9 +810,11 @@ def _plan_calibration_up(
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
-    """UP-калибровка: один ключ — минимальный CPO следующего effective-шага (state/PFO).
+    """Калибровка UP: один ключ из пула ``collect_calibration_up_next_step_candidates``.
 
-    Без потолка resolve и без лимита «размера» шага; только один переход вверх по лестнице.
+    Выбор — минимальный ``state_cost`` следующего effective-шага; без потолка ``resolve``.
+    Пул может включать OFF→MIN (см. docstring collector): NO DATA — параллельный канал
+    к ``plan_pay_for_order_gap_enable``; FULL/PFO OFF — только через калибровку UP с rec-gate.
     """
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
@@ -844,7 +846,10 @@ def plan_resolve_calibration(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Калибровка к ``0.9×resolve``: одна ветка за тик — DOWN (TIGHTEN) или UP.
+    """Калибровка к ``0.9×resolve``: одна ветка за тик — UP **или** DOWN.
+
+    Ветку выбирает ``classify_calibration_direct`` (``CalibrationDirect`` в Redis/logs:
+    значения ``loosen`` / ``tighten`` — legacy-строки для веток UP/DOWN).
 
     Gate кампании (plan/views, ``fact <= max``) — в orchestrator.
     UP: один ключ, следующий effective-шаг, минимальный CPO. DOWN: limited trim к resolve.
@@ -884,7 +889,7 @@ def plan_resolve_calibration_trim(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Legacy alias: TIGHTEN-only calibration (``resolve_calibration_tighten``)."""
+    """Legacy alias: только ветка DOWN калибровки (``resolve_calibration_tighten``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
         CalibrationDirect,
     )

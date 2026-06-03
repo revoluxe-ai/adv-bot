@@ -1,10 +1,12 @@
-"""Adaptive effective steps для resolve calibration (×2/÷2 по направлению).
+"""Adaptive effective steps для калибровки (×2/÷2 по ветке UP/DOWN).
 
-Калибровка — самостоятельный степ: одна ветка за тик (UP **или** DOWN), цель — CPA
-кампании у **0.9×resolve** (``MAX_PAY_STABILIZATION_RATIO``).
+Калибровка — самостоятельный степ preamble: за тик выполняется **одна** ветка,
+цель — CPA кампании у **0.9×resolve** (``MAX_PAY_STABILIZATION_RATIO``):
 
-- **LOOSEN** — ``fact < 0.9×resolve``: limited UP (нарастить расход);
-- **TIGHTEN** — ``fact >= 0.9×resolve``: limited DOWN trim (снизить ``state_cost > resolve``).
+- **ветка UP** — ``fact < 0.9×resolve``: один ключ, следующий effective-шаг (min CPO);
+- **ветка DOWN** — ``fact >= 0.9×resolve``: limited trim к ``resolve`` (adaptive steps).
+
+``CalibrationDirect`` (``loosen`` / ``tighten`` в Redis и логах) — legacy-имена веток UP/DOWN.
 """
 
 from __future__ import annotations
@@ -18,10 +20,10 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 
 
 class CalibrationDirect(StrEnum):
-    """Направление калибровки относительно пола ``0.9×resolve``."""
+    """Ветка калибровки за тик (строки ``loosen``/``tighten`` — legacy в Redis/UI)."""
 
-    LOOSEN = "loosen"  # fact ниже пола → UP
-    TIGHTEN = "tighten"  # fact на/выше пола → DOWN trim
+    LOOSEN = "loosen"  # ветка UP: fact < 0.9×resolve
+    TIGHTEN = "tighten"  # ветка DOWN: fact >= 0.9×resolve
 
 
 @dataclass(frozen=True)
@@ -36,7 +38,7 @@ def classify_calibration_direct(
     fact_pay_for_order: float | None,
     resolve: float,
 ) -> CalibrationDirect:
-    """``LOOSEN`` если fact ниже 90% resolve, иначе ``TIGHTEN``."""
+    """Ветка UP, если fact ниже 90% resolve; иначе ветка DOWN (``CalibrationDirect``)."""
     if fact_pay_for_order is None:
         return CalibrationDirect.TIGHTEN
     if float(fact_pay_for_order) < MAX_PAY_STABILIZATION_RATIO * float(resolve):

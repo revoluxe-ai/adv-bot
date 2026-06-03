@@ -165,6 +165,12 @@ def plan_pay_for_order_gap_enable(
 
     Зона headroom: ``fact_pay_for_order < MAX_PAY_STABILIZATION_RATIO × resolve`` (0.9).
     Тиковый gate: хотя бы одно из plan/fact или views изменилось (OR; калибровка — AND).
+
+    Только ``KEYWORD_NO_DATA``; OFF с FULL/PFO enable не поднимает — см.
+    ``collect_calibration_up_next_step_candidates`` (калибровка, ветка UP).
+
+    При ``fact < 0.9×resolve`` тот же OFF NO DATA может дополнительно попасть в
+    калибровку, ветку UP (фаза 8, min CPO, rec-gate, gate AND plan/views) после enable.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
         V3ActionType,

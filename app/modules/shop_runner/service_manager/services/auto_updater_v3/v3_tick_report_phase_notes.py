@@ -94,7 +94,7 @@ def summarize_phase_zero_actions(
         shelf_click_mode: режим полки.
         aggressiveness: агрессивность rollout.
         shelf_active: полка включена в РК.
-        calibration_direct: TIGHTEN или LOOSEN для resolve_calibration.
+        calibration_direct: ветка калибровки UP или DOWN (``CalibrationDirect``).
         max_effective_steps: adaptive cap калибровки.
         policy: SelectionPolicy для passing/realloc (опционально).
 
@@ -350,7 +350,11 @@ def _note_calibration_up(
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
 ) -> str:
-    """Причина нулевого UP: нет ключа со следующим effective-шагом."""
+    """Причина нулевого UP: нет ключа со следующим effective-шагом.
+
+    Пул строит ``collect_calibration_up_next_step_candidates`` (OFF NO DATA и
+    FULL/PFO OFF допустимы — см. docstring collector).
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
         SelectionPolicy,
         collect_calibration_up_next_step_candidates,
