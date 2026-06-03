@@ -77,7 +77,7 @@ def log_coroutine_phase(
 
 
 class AdvPhaseTrace:
-    """Тайминг фаз одной РК (``process_adv_v3`` и per-adv шаги bidder)."""
+    """Тайминг фаз одной РК (per-adv шаги ``update_cluster_bids`` и др.)."""
 
     def __init__(self, *, coroutine: str, shop_id: str, adv_id: int) -> None:
         self.coroutine = coroutine
