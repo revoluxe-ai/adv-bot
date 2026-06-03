@@ -183,6 +183,16 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 
 Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
 
+## UI: отчёт «Последние действия с ключами» (V3)
+
+Кнопка в меню РК (только `automatic_version == 3`): отдельное сообщение с отчётом стадий последнего тика.
+
+- **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
+- **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
+- **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
+- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
+- **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
+
 ## UI: порядок ключей в списке (V3)
 
 Для `automatic_version == 3` список ключей в Telegram сортируется **до** пагинации
