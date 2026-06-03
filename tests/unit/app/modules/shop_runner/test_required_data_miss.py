@@ -67,13 +67,38 @@ def test_resolve_raises_shop_runner_miss() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_fetch_from_redis_returns_empty_when_warmup_meta_count_zero() -> None:
+async def test_fetch_raises_when_hash_gone_but_meta_count_zero() -> None:
+    """Stale keywords_meta не подменяет отсутствующий hash — нужен retry warmup."""
     with (
         patch(
             "app.modules.calculated_keywords_redis_cache_manager.redis_manager."
             "RedisCalculatedKeywordsCacheManager.get_all_calculated_keywords_for_adv",
             new_callable=AsyncMock,
             return_value=None,
+        ),
+        patch(
+            "app.snapshot_data_updater.cache_freshness.load_keywords_meta",
+            new_callable=AsyncMock,
+            return_value={
+                "keywords_count": "0",
+                "source": "recalculated",
+                "warmed_at": "2026-01-01T00:00:00+00:00",
+            },
+        ),
+    ):
+        with pytest.raises(ShopRunnerKeywordsCacheMissError, match="cache miss"):
+            await fetch_calculated_keywords_from_redis(99, shop_id="shop-1")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_fetch_from_redis_returns_empty_when_hash_has_empty_marker() -> None:
+    with (
+        patch(
+            "app.modules.calculated_keywords_redis_cache_manager.redis_manager."
+            "RedisCalculatedKeywordsCacheManager.get_all_calculated_keywords_for_adv",
+            new_callable=AsyncMock,
+            return_value=[],
         ),
         patch(
             "app.snapshot_data_updater.cache_freshness.load_keywords_meta",

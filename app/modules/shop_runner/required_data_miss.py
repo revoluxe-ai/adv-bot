@@ -73,7 +73,7 @@ async def fetch_calculated_keywords_from_redis(
         shop_id: для текста ошибки и логов декоратора.
 
     Returns:
-        Список keywords; ``[]`` — легитимный пустой результат после warmup.
+        Список keywords; ``[]`` — только при hash с маркером ``__empty__`` (warmup).
 
     Raises:
         ShopRunnerKeywordsCacheMissError: hash/meta не дают валидных данных.
@@ -91,9 +91,8 @@ async def fetch_calculated_keywords_from_redis(
     if cached is not None:
         return cached
 
-    if meta is not None and meta.get("keywords_count") == "0":
-        return []
-
+    # Пустой результат только при hash с маркером ``__empty__`` (cached == []).
+    # keywords_meta с count "0" при отсутствии hash — устаревший meta после TTL hash.
     raise make_keywords_cache_miss_error(shop_id=shop_id, adv_id=adv_id)
 
 
