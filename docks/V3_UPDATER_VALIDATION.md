@@ -46,7 +46,7 @@ NORMAL    → filter/sync → B → U → S → G → R → enable → calibrati
 3. **S** (`plan_shelf_rec_false_cleanup_down`) — shelf active + rec FAIL → DOWN.
 4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
 5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
-6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate plan+views и **fact < 0.9×resolve**.
+6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
 7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN.
 8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
 9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.

@@ -276,10 +276,8 @@ def _note_enable_gap(
             f"fact ≥ {MAX_PAY_STABILIZATION_RATIO:.0%}×resolve "
             "(зона стабилизации, enable не нужен)"
         )
-    if not plan_fact_changed:
-        return "plan/fact не изменились"
-    if not views_changed:
-        return "views не изменились"
+    if not plan_fact_changed and not views_changed:
+        return "plan/fact и views не изменились (нужен сдвиг хотя бы одного сигнала)"
     if eligibility_by_ks_id is None:
         return "нет NO DATA ключей в OFF"
     candidates = 0

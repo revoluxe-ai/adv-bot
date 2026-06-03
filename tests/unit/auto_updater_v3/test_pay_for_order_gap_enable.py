@@ -114,6 +114,22 @@ def test_gap_enable_requires_fact_below_90pct_resolve() -> None:
 
 
 @pytest.mark.unit
+def test_gap_enable_or_gate_plan_or_views() -> None:
+    prepared = [(_ctx(ks_id=3), KeywordStrategyMode.OFF)]
+    elig = {3: _no_data_elig()}
+    kwargs = dict(
+        prepared=prepared,
+        eligibility_by_ks_id=elig,
+        fact_pay_for_order=50.0,
+        resolve=100.0,
+    )
+
+    assert len(plan_pay_for_order_gap_enable(**kwargs, plan_fact_changed=True, views_changed=False)) == 1
+    assert len(plan_pay_for_order_gap_enable(**kwargs, plan_fact_changed=False, views_changed=True)) == 1
+    assert plan_pay_for_order_gap_enable(**kwargs, plan_fact_changed=False, views_changed=False) == []
+
+
+@pytest.mark.unit
 def test_gap_enable_skips_when_fact_missing() -> None:
     prepared = [(_ctx(ks_id=2), KeywordStrategyMode.OFF)]
     elig = {2: _no_data_elig()}
