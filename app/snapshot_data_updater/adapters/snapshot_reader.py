@@ -13,6 +13,7 @@ from app.snapshot_data_updater.config import (
     SnapshotUpdaterConfig,
     resolve_snapshot_config,
 )
+from app.snapshot_data_updater.assembler import AdvDataSnapshotAssembler
 from app.snapshot_data_updater.dto import AdvDataSnapshotDTO
 
 logger = logging.getLogger(__name__)
@@ -78,13 +79,9 @@ class SnapshotReader:
         completeness = snapshot.section_completeness
         if not completeness.get("settings"):
             return False
-        if not completeness.get("keywords"):
-            return False
-        kw = snapshot.diagnostics.keywords
-        if not kw.keywords_cache_hit and kw.keywords_source in {
-            "missing",
-            "error",
-        }:
+        if not AdvDataSnapshotAssembler.keywords_section_complete_from_snapshot(
+            snapshot
+        ):
             return False
         min_bids = snapshot.min_bids
         if min_bids is None or min_bids.coverage_ratio <= 0:

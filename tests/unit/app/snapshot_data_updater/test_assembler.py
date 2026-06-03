@@ -12,10 +12,13 @@ from app.snapshot_data_updater.adapters.snapshot_reader import SnapshotReader
 from app.snapshot_data_updater.config import SnapshotUpdaterConfig
 from app.snapshot_data_updater.freshness_policy import FreshnessPolicy
 from app.snapshot_data_updater.dto import (
+    AdvDataSnapshotDTO,
     AdvSettingsSnapshotDTO,
     CalculatedKeywordSnapshotDTO,
+    KeywordsWarmupDiagnostics,
     MinBidsSnapshotDTO,
     PlanFactSnapshotDTO,
+    SnapshotDiagnostics,
 )
 from app.snapshot_data_updater.services.calculated_keywords_warmup import (
     CalculatedKeywordsWarmupResult,
@@ -99,6 +102,47 @@ def test_snapshot_usable_with_empty_keywords_after_cache_hit() -> None:
             snapshot_adv_policy=FreshnessPolicy(skip_refresh_sec=300.0, stale_sec=0.0),
         )
     )
+    assert reader.is_snapshot_usable(snapshot) is True
+
+
+@pytest.mark.unit
+def test_snapshot_usable_legacy_false_completeness_with_cache_hit_diagnostics() -> None:
+    """Снимки до fix assembler: keywords=False в completeness, но hit в diagnostics."""
+    ts = datetime.now(tz=UTC)
+    settings = AdvSettingsSnapshotDTO(adv_id=10, shop_id="shop-a")
+    snapshot = AdvDataSnapshotDTO(
+        adv_id=10,
+        shop_id="shop-a",
+        collected_at=ts,
+        expires_at=ts + timedelta(hours=1),
+        schema_version=1,
+        partial=True,
+        section_completeness={
+            "settings": True,
+            "keywords": False,
+            "min_bids": True,
+            "plan_fact": True,
+            "cluster_texts": False,
+        },
+        settings=settings,
+        keywords=[],
+        min_bids=MinBidsSnapshotDTO(adv_id=10, coverage_ratio=1.0, cache_hit=True),
+        diagnostics=SnapshotDiagnostics(
+            keywords_cache_hit=True,
+            keywords=KeywordsWarmupDiagnostics(
+                keywords_cache_hit=True,
+                keywords_source="redis_hit",
+                keywords_count=0,
+            ),
+        ),
+    )
+    reader = SnapshotReader(
+        config=SnapshotUpdaterConfig(
+            snapshot_schema_version=1,
+            snapshot_adv_policy=FreshnessPolicy(skip_refresh_sec=300.0, stale_sec=0.0),
+        )
+    )
+    assert AdvDataSnapshotAssembler.keywords_section_complete_from_snapshot(snapshot)
     assert reader.is_snapshot_usable(snapshot) is True
 
 

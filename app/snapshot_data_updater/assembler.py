@@ -100,6 +100,17 @@ class AdvDataSnapshotAssembler:
             diagnostics=diag,
         )
 
+    @classmethod
+    def keywords_section_complete_from_snapshot(
+        cls, snapshot: AdvDataSnapshotDTO
+    ) -> bool:
+        """Проверка keywords по сохранённому DTO (Redis); warmup_result не сериализуется."""
+        return cls._keywords_section_complete(
+            keywords=snapshot.keywords,
+            warmup_result=None,
+            diagnostics=snapshot.diagnostics,
+        )
+
     @staticmethod
     def _keywords_section_complete(
         *,
