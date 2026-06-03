@@ -39,9 +39,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3SelectionLog,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    candidate_for_strategy_mode,
     iter_effective_upper_modes,
     log_skipped_aliases,
+    mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
+    resolve_next_effective_step_up,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -473,6 +476,113 @@ def collect_transition_candidates(
                     imputed=imputed,
                 )
             )
+    return out
+
+
+def collect_calibration_up_next_step_candidates(
+    prepared: PreparedList,
+    *,
+    policy: SelectionPolicy,
+    ladder_inputs: "LadderInputs | None" = None,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> list[TransitionCandidate]:
+    """Следующий effective-шаг UP на ключ; без потолка resolve (калибровка UP).
+
+    Один переход на ключ — ``resolve_next_effective_step_up``; итоговый выбор
+    ключа — ``pick_one_up_cost_first`` (минимальный state_cost / PFO).
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordV3Eligibility,
+        build_eligibility_map,
+        can_target_mode,
+        min_cpa_operational_via_pay_for_order,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        cost_for_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+        rec_gate_allows_up,
+        state_rec_gate_status_for_mode,
+    )
+
+    ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
+    elig_map: dict[int, KeywordV3Eligibility] = (
+        eligibility_by_ks_id
+        if eligibility_by_ks_id is not None
+        else build_eligibility_map(
+            ladder.all_contexts,
+            campaign_orders_per_cart_7d=ladder.campaign_orders_per_cart_7d,
+        )
+    )
+    out: list[TransitionCandidate] = []
+
+    for ctx, current_mode in prepared:
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        if current_mode == KeywordStrategyMode.OFF:
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
+        elig = elig_map.get(int(ks_id))
+        if elig is not None and not elig.participates_in_ladder:
+            continue
+        step = resolve_next_effective_step_up(current_mode, catalog)
+        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+        to_mode = step.next_mode
+        if to_mode is None:
+            continue
+        target = _target_mode_for_strategy(to_mode)
+        mc = catalog.get(target)
+        if mc is None:
+            continue
+        if elig is not None and not can_target_mode(elig, to_mode):
+            continue
+        gate_status = state_rec_gate_status_for_mode(
+            catalog,
+            to_mode,
+            policy,
+            rec_orders_per_view=ladder.rec_orders_per_view,
+            orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
+        )
+        if not rec_gate_allows_up(gate_status):
+            continue
+        if not _target_allowed(to_mode=to_mode, max_target_mode=policy.max_target_mode):
+            continue
+        pfo_operational = min_cpa_operational_via_pay_for_order(ctx, elig, catalog)
+        tier = _rec_tier_for_keyword(
+            ctx.keyword.above_rec_conversion,
+            click_mode=policy.click_mode,
+        )
+        pfo = float(ctx.keyword.pay_for_order or 0.0)
+        if pfo_operational or elig is not None:
+            cost, imputed = cost_for_mode(
+                ctx,
+                to_mode,
+                ladder_inputs=ladder,
+                eligibility=elig,
+            )
+        else:
+            cost, imputed = _resolve_state_cost(mc, target)
+        if cost == float("inf"):
+            continue
+        current_c = candidate_for_strategy_mode(current_mode, catalog)
+        target_c = candidate_for_strategy_mode(to_mode, catalog)
+        if mode_candidates_same_effective_target(current_c, target_c):
+            continue
+        out.append(
+            TransitionCandidate(
+                keyword_setting_id=int(ks_id),
+                from_mode=current_mode,
+                to_mode=to_mode,
+                move_kind=move_kind_for(current_mode, to_mode),
+                state_cost=cost,
+                pay_for_order=pfo,
+                rec_tier=tier,
+                imputed=imputed,
+            )
+        )
     return out
 
 

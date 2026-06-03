@@ -54,8 +54,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
+    collect_calibration_up_next_step_candidates,
     collect_transition_candidates,
     missing_target_matrix_from_catalog,
+    pick_one_up_cost_first,
     plan_one_up_by_policy,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -800,64 +802,35 @@ def _plan_calibration_tighten(
     )
 
 
-def _plan_calibration_loosen(
+def _plan_calibration_up(
     prepared: PreparedList,
     *,
-    cost_ceiling: float,
-    up_reason: str,
     shelf_click_mode: "ShelfClickMode",
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
-    max_effective_steps: int,
 ) -> list[V3Action]:
-    """LOOSEN: limited UP, пока ``state_cost`` target mode ``<= cost_ceiling``."""
+    """UP-калибровка: один ключ — минимальный CPO следующего effective-шага (state/PFO).
+
+    Без потолка resolve и без лимита «размера» шага; только один переход вверх по лестнице.
+    """
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    actions: list[V3Action] = []
-    for ctx, current in prepared:
-        if current == KeywordStrategyMode.OFF:
-            continue
-        hard_status = int(ctx.keyword.hard_status)
-        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
-            continue
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        if elig is not None and not elig.participates_in_ladder:
-            continue
-        if _min_cpa_bound_by_pay_for_order(elig):
-            continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        target = _find_boost_target_mode_limited_steps(
-            ctx,
-            current,
-            catalog=catalog,
-            cost_ceiling=float(cost_ceiling),
-            ladder_inputs=ladder,
-            policy=policy,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-            max_effective_steps=max_effective_steps,
-        )
-        if target == current:
-            continue
-        current_c = candidate_for_strategy_mode(current, catalog)
-        target_c = candidate_for_strategy_mode(target, catalog)
-        if mode_candidates_same_effective_target(current_c, target_c):
-            continue
-        actions.append(
-            V3Action(
-                action=V3ActionType.UP,
-                keyword_setting_id=ks_id,
-                target_strategy_mode=target,
-                reason=up_reason,
-            )
-        )
-    return actions
+    candidates = collect_calibration_up_next_step_candidates(
+        prepared,
+        policy=policy,
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+    )
+    action = pick_one_up_cost_first(
+        candidates,
+        reason_prefix="resolve_calibration_up",
+    )
+    if action is None:
+        return []
+    return [action]
 
 
 def plan_resolve_calibration(
@@ -871,10 +844,10 @@ def plan_resolve_calibration(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Калибровка к ``0.9×resolve``: одна ветка за тик — TIGHTEN (DOWN) или LOOSEN (UP).
+    """Калибровка к ``0.9×resolve``: одна ветка за тик — DOWN (TIGHTEN) или UP.
 
-    Gate кампании (plan/views, ``fact <= max``) — в orchestrator; ``max_effective_steps`` —
-    adaptive cap effective ladder-шагов на ключ.
+    Gate кампании (plan/views, ``fact <= max``) — в orchestrator.
+    UP: один ключ, следующий effective-шаг, минимальный CPO. DOWN: limited trim к resolve.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
         CalibrationDirect,
@@ -891,15 +864,13 @@ def plan_resolve_calibration(
             ladder_inputs=ladder_inputs,
             max_effective_steps=max_effective_steps,
         )
-    return _plan_calibration_loosen(
+    _ = max_effective_steps
+    return _plan_calibration_up(
         prepared,
-        cost_ceiling=float(resolve),
-        up_reason="resolve_calibration_loosen",
         shelf_click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,
         ladder_inputs=ladder_inputs,
-        max_effective_steps=max_effective_steps,
     )
 
 

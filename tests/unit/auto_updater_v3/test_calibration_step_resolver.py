@@ -105,6 +105,21 @@ def test_resolve_loosen_to_tighten_halves() -> None:
 
 
 @pytest.mark.unit
+def test_resolve_three_loosen_ticks_double_sequence() -> None:
+    """Цепочка LOOSEN: 1 → 2 → 4 при cap=8 (как в production Redis)."""
+    steps = 1
+    prev = None
+    for expected in (1, 2, 4):
+        steps = resolve_effective_calibration_steps(
+            8,
+            prev=prev,
+            current_direct=CalibrationDirect.LOOSEN,
+        )
+        assert steps == expected
+        prev = CalibrationStepState(effective_steps=steps, direct=CalibrationDirect.LOOSEN)
+
+
+@pytest.mark.unit
 def test_resolve_halve_never_below_one() -> None:
     prev = CalibrationStepState(effective_steps=1, direct=CalibrationDirect.TIGHTEN)
     assert (

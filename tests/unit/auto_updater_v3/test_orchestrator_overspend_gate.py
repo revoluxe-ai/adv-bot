@@ -502,6 +502,10 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
     resolve_steps.assert_called_once()
     calibration.assert_called_once()
     assert calibration.call_args.kwargs.get("max_effective_steps") == 4
+    step_mock = step_cls.return_value
+    step_mock.set_state.assert_awaited_once()
+    saved = step_mock.set_state.await_args[0][0]
+    assert saved.effective_steps == 4
 
 
 @pytest.mark.unit

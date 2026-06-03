@@ -12,6 +12,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_re
 
 _TELEGRAM_MAX_LEN = 4096
 
+_CALIBRATION_BRANCH_RU: dict[str, str] = {
+    "loosen": "UP",
+    "tighten": "DOWN",
+    "up": "UP",
+    "down": "DOWN",
+}
+
+
+def _calibration_branch_ru(direct: str | None) -> str | None:
+    """Отображение ветки калибровки: UP/DOWN (не loosen/tighten)."""
+    if not direct:
+        return None
+    return _CALIBRATION_BRANCH_RU.get(str(direct).lower(), str(direct).upper())
+
+
 _SKIP_REASON_RU: dict[str, str] = {
     "resolve_invalid": "resolve недоступен",
     "shelf_inactive": "полка неактивна",
@@ -38,9 +53,9 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
     """Строки одного блока стадии."""
     title = phase.title_ru
     if phase.phase_id == "resolve_calibration":
-        direct = phase.extra.get("calibration_direct")
-        if direct:
-            title = f"{title} · {str(direct).upper()}"
+        branch = _calibration_branch_ru(phase.extra.get("calibration_direct"))
+        if branch:
+            title = f"{title} · {branch}"
     lines = [f"▸ {title}"]
     if phase.phase_id == "filter":
         total = phase.extra.get("total", 0)
@@ -63,10 +78,6 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         if phase.rebalance:
             parts.append(f"reb{phase.rebalance}")
         lines.append(f"  {'  '.join(parts)}")
-    if phase.phase_id == "resolve_calibration" and phase.executed:
-        steps = phase.extra.get("effective_steps")
-        if steps is not None:
-            lines.append(f"  шагов: {steps} (adaptive)")
     return lines
 
 
@@ -101,6 +112,27 @@ def format_v3_tick_report_text(snapshot: V3TickReportSnapshot | None) -> str:
         f"Ключей: {snapshot.total_keywords} всего → "
         f"{snapshot.operable_keywords} управляемых (hard_status 1|2)"
     )
+    cal_branch = _calibration_branch_ru(snapshot.calibration_direct)
+    if cal_branch:
+        lines.append(f"Калибровка: {cal_branch}")
+    leader = snapshot.white_list_cost_leader
+    if leader is not None:
+        src = "state" if leader.cost_source == "state" else "PFO"
+        tier = leader.data_tier or "—"
+        line = (
+            f"БС max ({src}, tier {tier}): «{leader.keyword_text}» "
+            f"{leader.decision_cpo:.0f} ₽"
+        )
+        extras: list[str] = []
+        if leader.state_cpo is not None:
+            extras.append(f"state {leader.state_cpo:.0f} ₽")
+        if leader.pfo_cpo is not None:
+            extras.append(f"PFO {leader.pfo_cpo:.0f} ₽")
+        if extras:
+            line += f" ({', '.join(extras)})"
+        if leader.strategy_mode:
+            line += f" · {leader.strategy_mode}"
+        lines.append(line)
     lines.append("")
     lines.append("────────────────────────")
     for phase in snapshot.phases:
