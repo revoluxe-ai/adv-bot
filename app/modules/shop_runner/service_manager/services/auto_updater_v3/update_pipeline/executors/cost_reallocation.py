@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
 )
 
 
-class CostReallocationExecutor(UpdateExecutor):
+class RebalanceExecutor(UpdateExecutor):
     """COST_REALLOCATION."""
 
     phase_name = "cost_reallocation"
