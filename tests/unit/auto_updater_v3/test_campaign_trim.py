@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     is_resolve_valid,
     plan_campaign_trim_by_max_state_cost,
     plan_mass_cheap_promotion,
+    plan_resolve_calibration_trim,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
@@ -93,6 +94,87 @@ def test_trim_no_ch_min_to_off_when_keyword_pay_for_order_above_max() -> None:
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.FORCE_OFF
     assert actions[0].reason == "trim_max_state_cost"
+
+
+@pytest.mark.unit
+def test_resolve_calibration_trim_lowers_mode_when_state_cost_above_resolve() -> None:
+    prof = _sample_profile()
+    kw = _calc_kw(
+        ks_id=11,
+        text="expensive_cal",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(200.0),
+    )
+    kw = kw.model_copy(
+        update={
+            "keyword_setting": kw.keyword_setting.model_copy(
+                update={"hard_status": 2}
+            )
+        }
+    )
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=kw, position_profile=prof)]
+    )
+    actions = plan_resolve_calibration_trim(
+        prepared,
+        resolve=30.0,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    assert len(actions) >= 1
+    assert all(a.reason == "resolve_calibration_trim" for a in actions)
+    assert actions[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
+
+
+@pytest.mark.unit
+def test_resolve_calibration_trim_no_ch_min_to_off_when_pfo_above_resolve() -> None:
+    """NO CH tier: calibration trim по ``keyword.pay_for_order`` vs resolve."""
+    kw = _calc_kw(
+        ks_id=21,
+        text="no_ch_cal",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(435.0),
+        hard_status=2,
+    )
+    assert kw.pay_for_order is not None
+    assert kw.pay_for_order > 300.0
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=kw, position_profile=None)]
+    )
+    actions = plan_resolve_calibration_trim(
+        prepared,
+        resolve=300.0,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    assert len(actions) == 1
+    assert actions[0].action == V3ActionType.FORCE_OFF
+    assert actions[0].reason == "resolve_calibration_trim"
+
+
+@pytest.mark.unit
+def test_resolve_calibration_trim_skips_when_state_cost_at_or_below_resolve() -> None:
+    prof = _sample_profile()
+    kw = _calc_kw(
+        ks_id=12,
+        text="cheap_cal",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(10.0),
+        hard_status=2,
+    )
+    prepared = build_prepared_from_contexts(
+        [KeywordV3Context(keyword=kw, position_profile=prof)]
+    )
+    actions = plan_resolve_calibration_trim(
+        prepared,
+        resolve=500.0,
+        shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
+    )
+    assert actions == []
 
 
 @pytest.mark.unit

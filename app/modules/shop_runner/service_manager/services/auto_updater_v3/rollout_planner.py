@@ -253,12 +253,12 @@ def plan_rollout_underperform_one(
     return plan_one_up_by_policy(prepared, policy=policy)
 
 
-def keyword_pay_for_order_exceeds_max(
+def keyword_pay_for_order_exceeds(
     ctx: "KeywordV3Context",
     *,
-    max_pay_for_order: float,
+    ceiling: float,
 ) -> bool:
-    """True, если ``keyword.pay_for_order`` (как в UI) строго выше ``plan.max_pay_for_order``.
+    """True, если ``keyword.pay_for_order`` (как в UI) строго выше ``ceiling``.
 
     Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — основной критерий FORCE_OFF при
     OVERSPEND/trim (нет CH ``state_cost``; imputed conv не используется).
@@ -266,7 +266,16 @@ def keyword_pay_for_order_exceeds_max(
     pfo = ctx.keyword.pay_for_order
     if pfo is None:
         return False
-    return float(pfo) > float(max_pay_for_order)
+    return float(pfo) > float(ceiling)
+
+
+def keyword_pay_for_order_exceeds_max(
+    ctx: "KeywordV3Context",
+    *,
+    max_pay_for_order: float,
+) -> bool:
+    """True, если ``keyword.pay_for_order`` строго выше ``plan.max_pay_for_order``."""
+    return keyword_pay_for_order_exceeds(ctx, ceiling=max_pay_for_order)
 
 
 def plan_overspend_force_off_over_max(
@@ -360,13 +369,13 @@ def should_skip_trim_for_same_effective_target(
     current: KeywordStrategyMode,
     trim_target: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
-    max_pay_for_order: float,
+    cost_ceiling: float,
     ladder_inputs: "LadderInputs",
 ) -> bool:
-    """Совпадает ли trim-skip «тот же target_place», что в ``plan_campaign_trim_by_max_state_cost``.
+    """Совпадает ли trim-skip «тот же target_place», что в ``_plan_trim_by_cost_ceiling``.
 
     True только если режимы ведут в одну точку каталога **и** операционный CPO на
-    ``keyword.target_place`` отсутствует или ``<= max_pay_for_order``. При CPO выше max
+    ``keyword.target_place`` отсутствует или ``<= cost_ceiling``. При CPO выше ceiling
     live guard **не** пропускает trim (режим меняется, ставка может остаться на месте).
     """
     if trim_target == current:
@@ -382,18 +391,18 @@ def should_skip_trim_for_same_effective_target(
     operational = operational_cpo_at_keyword_target_place(
         ctx, ladder_inputs=ladder_inputs
     )
-    return operational is None or float(operational) <= float(max_pay_for_order)
+    return operational is None or float(operational) <= float(cost_ceiling)
 
 
 def _fallback_min_instead_of_off_trim(
     ctx: "KeywordV3Context",
     current: KeywordStrategyMode,
     *,
-    max_pay_for_order: float,
+    cost_ceiling: float,
     ladder_inputs: "LadderInputs",
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> KeywordStrategyMode | None:
-    """Если effective DOWN ушёл в OFF, но MIN по CPO проходит max — trim в MIN (WL-кейс O=M)."""
+    """Если effective DOWN ушёл в OFF, но MIN по CPO проходит ceiling — trim в MIN (WL O=M)."""
     if current == KeywordStrategyMode.MIN_CPA:
         return None
     min_cost, _ = _trim_state_cost_for_mode(
@@ -403,7 +412,7 @@ def _fallback_min_instead_of_off_trim(
         ladder_inputs=ladder_inputs,
         eligibility_by_ks_id=eligibility_by_ks_id,
     )
-    if min_cost != float("inf") and min_cost <= max_pay_for_order:
+    if min_cost != float("inf") and min_cost <= cost_ceiling:
         return KeywordStrategyMode.MIN_CPA
     return None
 
@@ -413,12 +422,12 @@ def _find_trim_target_mode(
     current: KeywordStrategyMode,
     *,
     catalog: dict[AggressionTargetMode, ModeCandidate],
-    max_pay_for_order: float,
+    cost_ceiling: float,
     ladder_inputs: "LadderInputs",
     policy: SelectionPolicy,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> KeywordStrategyMode:
-    """Ближайший режим ≤ current, где ``state_cost <= max_pay_for_order``; иначе OFF."""
+    """Ближайший режим ≤ current, где ``state_cost <= cost_ceiling``; иначе OFF."""
     mode = current
     while True:
         if mode == KeywordStrategyMode.OFF:
@@ -437,7 +446,7 @@ def _find_trim_target_mode(
             ladder_inputs=ladder_inputs,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
-        if cost != float("inf") and cost <= max_pay_for_order:
+        if cost != float("inf") and cost <= cost_ceiling:
             return mode
         step = resolve_next_effective_step_down(mode, catalog)
         log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
@@ -445,7 +454,7 @@ def _find_trim_target_mode(
             fb = _fallback_min_instead_of_off_trim(
                 ctx,
                 current,
-                max_pay_for_order=max_pay_for_order,
+                cost_ceiling=cost_ceiling,
                 ladder_inputs=ladder_inputs,
                 eligibility_by_ks_id=eligibility_by_ks_id,
             )
@@ -454,7 +463,7 @@ def _find_trim_target_mode(
             fb = _fallback_min_instead_of_off_trim(
                 ctx,
                 current,
-                max_pay_for_order=max_pay_for_order,
+                cost_ceiling=cost_ceiling,
                 ladder_inputs=ladder_inputs,
                 eligibility_by_ks_id=eligibility_by_ks_id,
             )
@@ -471,9 +480,9 @@ def _append_trim_to_mode(
     current: KeywordStrategyMode,
     target: KeywordStrategyMode,
     hard_status: int,
+    reason: str = "trim_max_state_cost",
 ) -> None:
     """WL: DOWN; авто: FORCE_OFF (+ UP до целевого режима, если не OFF)."""
-    reason = "trim_max_state_cost"
     if target == KeywordStrategyMode.OFF:
         actions.append(
             V3Action(
@@ -510,27 +519,21 @@ def _append_trim_to_mode(
     )
 
 
-def plan_campaign_trim_by_max_state_cost(
+def _plan_trim_by_cost_ceiling(
     prepared: PreparedList,
     *,
-    max_pay_for_order: float,
+    cost_ceiling: float,
+    trim_reason: str,
     shelf_click_mode: "ShelfClickMode",
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> list[V3Action]:
-    """Снизить режим до ближайшего с ``state_cost <= plan.max_pay_for_order`` (не resolve).
+    """Снизить режим до ближайшего с ``state_cost <= cost_ceiling``.
 
-    Вызывается из orchestrator, когда ``fact.pay_for_order > plan.max_pay_for_order``.
-
-    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` (нет CH-матрицы): не пропускаем tier —
-    сравниваем ``keyword.pay_for_order`` с max и при превышении → OFF. Imputed conv
-    и ``resolve_keyword_v2_pay_for_order_cost`` здесь не участвуют.
+    Для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` (нет CH-матрицы): сравниваем
+    ``keyword.pay_for_order`` с ``cost_ceiling`` и при превышении → OFF.
     """
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        KeywordDataTier,
-    )
-
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
@@ -548,8 +551,8 @@ def plan_campaign_trim_by_max_state_cost(
             continue
         elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
         if _min_cpa_bound_by_pay_for_order(elig):
-            if keyword_pay_for_order_exceeds_max(
-                ctx, max_pay_for_order=float(max_pay_for_order)
+            if keyword_pay_for_order_exceeds(
+                ctx, ceiling=float(cost_ceiling)
             ):
                 _append_trim_to_mode(
                     actions,
@@ -557,6 +560,7 @@ def plan_campaign_trim_by_max_state_cost(
                     current=current,
                     target=KeywordStrategyMode.OFF,
                     hard_status=hard_status,
+                    reason=trim_reason,
                 )
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
@@ -564,7 +568,7 @@ def plan_campaign_trim_by_max_state_cost(
             ctx,
             current,
             catalog=catalog,
-            max_pay_for_order=float(max_pay_for_order),
+            cost_ceiling=float(cost_ceiling),
             ladder_inputs=ladder,
             policy=policy,
             eligibility_by_ks_id=eligibility_by_ks_id,
@@ -577,7 +581,7 @@ def plan_campaign_trim_by_max_state_cost(
             current=current,
             trim_target=target,
             catalog=catalog,
-            max_pay_for_order=float(max_pay_for_order),
+            cost_ceiling=float(cost_ceiling),
             ladder_inputs=ladder,
         ):
             skip_reasons.append("same_target_place")
@@ -594,8 +598,58 @@ def plan_campaign_trim_by_max_state_cost(
                 current=current,
                 target=target,
                 hard_status=hard_status,
+                reason=trim_reason,
             )
     return actions
+
+
+def plan_campaign_trim_by_max_state_cost(
+    prepared: PreparedList,
+    *,
+    max_pay_for_order: float,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+) -> list[V3Action]:
+    """Снизить режим до ближайшего с ``state_cost <= plan.max_pay_for_order`` (не resolve).
+
+    Вызывается из orchestrator, когда ``fact.pay_for_order > plan.max_pay_for_order``.
+    """
+    return _plan_trim_by_cost_ceiling(
+        prepared,
+        cost_ceiling=float(max_pay_for_order),
+        trim_reason="trim_max_state_cost",
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder_inputs,
+    )
+
+
+def plan_resolve_calibration_trim(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    shelf_click_mode: "ShelfClickMode",
+    aggressiveness: V3RolloutAggressiveness,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+) -> list[V3Action]:
+    """DOWN при fact в [90% resolve, max]: trim до ``state_cost <= resolve``.
+
+    Зона кампании задаётся gate в orchestrator; порог trim — **resolve**, не max.
+    NO_CH tier: ``keyword.pay_for_order`` vs resolve.
+    """
+    return _plan_trim_by_cost_ceiling(
+        prepared,
+        cost_ceiling=float(resolve),
+        trim_reason="resolve_calibration_trim",
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder_inputs,
+    )
 
 
 def plan_rollout_down_one(
@@ -1637,7 +1691,7 @@ def diagnose_max_cpa_guard_keyword(
                 ctx,
                 current,
                 catalog=catalog,
-                max_pay_for_order=float(max_pay_for_order),
+                cost_ceiling=float(max_pay_for_order),
                 ladder_inputs=ladder,
                 policy=policy,
                 eligibility_by_ks_id=eligibility_by_ks_id,
@@ -1656,7 +1710,7 @@ def diagnose_max_cpa_guard_keyword(
                     current=current,
                     trim_target=trim_target,
                     catalog=catalog,
-                    max_pay_for_order=float(max_pay_for_order),
+                    cost_ceiling=float(max_pay_for_order),
                     ladder_inputs=ladder,
                 ):
                     skip_reasons.append("same_target_place")

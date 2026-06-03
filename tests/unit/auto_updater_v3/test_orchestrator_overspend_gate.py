@@ -81,6 +81,10 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
             return_value=[],
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            return_value=[],
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
             return_value=[],
         ),
@@ -173,6 +177,10 @@ async def test_max_cpa_guard_runs_when_resolve_invalid() -> None:
             realloc,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            return_value=[],
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
             expansion,
         ),
@@ -222,8 +230,8 @@ def _fact_for_cpa_gates(*, pay_for_order: float) -> FactData:
     )
 
 
-async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMock, MagicMock]:
-    """NORMAL preamble: моки realloc/guard, fact CPA = ``pay_for_order``."""
+async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMock, MagicMock, MagicMock]:
+    """NORMAL preamble: моки realloc/calibration/guard, fact CPA = ``pay_for_order``."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=pay_for_order)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -239,6 +247,7 @@ async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMoc
 
     dto = MagicMock()
     realloc = MagicMock(return_value=[])
+    calibration = MagicMock(return_value=[])
     guard = MagicMock(return_value=[])
 
     with (
@@ -260,6 +269,10 @@ async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMoc
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
             realloc,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration_trim",
+            calibration,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
@@ -289,7 +302,7 @@ async def _run_preamble_with_fact_cpa(*, pay_for_order: float) -> tuple[MagicMoc
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    return realloc, guard
+    return realloc, calibration, guard
 
 
 @pytest.mark.unit
@@ -301,26 +314,60 @@ async def test_cost_reallocation_runs_when_fact_cpa_below_ninety_percent_resolve
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) < 0.9 * float(resolve)
 
-    realloc, guard = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
 
     realloc.assert_called_once()
+    calibration.assert_not_called()
     guard.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_cost_reallocation_skipped_when_fact_cpa_near_resolve_but_below_max() -> None:
-    """``0.9 * resolve <= fact <= max`` — realloc не вызывается, guard тоже."""
+    """``0.9 * resolve <= fact <= max`` — calibration trim, realloc/guard нет."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=85.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
     assert float(fact.pay_for_order) <= float(plan.max_pay_for_order)
 
-    realloc, guard = await _run_preamble_with_fact_cpa(pay_for_order=85.0)
+    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=85.0)
 
     realloc.assert_not_called()
+    calibration.assert_called_once()
     guard.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_resolve_calibration_trim_skipped_when_fact_below_ninety_percent_resolve() -> None:
+    """``fact < 0.9 * resolve`` — realloc да, calibration нет."""
+    plan = _plan_for_cpa_gates()
+    fact = _fact_for_cpa_gates(pay_for_order=50.0)
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    assert float(fact.pay_for_order) < 0.9 * float(resolve)
+
+    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=50.0)
+
+    realloc.assert_called_once()
+    calibration.assert_not_called()
+    guard.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_resolve_calibration_trim_skipped_when_fact_above_max() -> None:
+    """``fact > max`` — guard да, calibration нет."""
+    plan = _plan_for_cpa_gates()
+    fact = _fact_for_cpa_gates(pay_for_order=150.0)
+    resolve = compute_resolve_cost_threshold(plan, fact)
+    assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
+
+    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+
+    realloc.assert_not_called()
+    calibration.assert_not_called()
+    guard.assert_called_once()
 
 
 @pytest.mark.unit
@@ -333,7 +380,8 @@ async def test_max_cpa_guard_runs_when_fact_cpa_above_plan_max() -> None:
     assert float(fact.pay_for_order) > float(plan.max_pay_for_order)
     assert float(fact.pay_for_order) >= 0.9 * float(resolve)
 
-    realloc, guard = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
+    realloc, calibration, guard = await _run_preamble_with_fact_cpa(pay_for_order=150.0)
 
     realloc.assert_not_called()
+    calibration.assert_not_called()
     guard.assert_called_once()

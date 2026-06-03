@@ -4,7 +4,7 @@
   1. CH bid profiles; plan/fact → ``detect_campaign_state`` → ``resolve_campaign_mode``.
   2. ``NOT_READY`` — full stop (без bootstrap, realloc, selector, flush, sync).
   3. ``NO_DATA`` — campaign DATA_BOOTSTRAP → flush → target_place (force 0).
-  4. ``NORMAL`` — keyword bootstrap → active invalid cleanup → [resolve valid: realloc + expansion] → MAX_CPA_GUARD
+  4. ``NORMAL`` — keyword bootstrap → active invalid cleanup → [resolve valid: realloc → calibration trim → expansion] → MAX_CPA_GUARD
      (по ``plan.max``, вне ``is_resolve_valid``) → gate.
   5. NO_CH OFF→MIN только через ``PROFITABLE_EXPANSION`` (V2 CPO ≤ resolve).
   6. Нетто-flush + ``target_place`` только если режим не ``NOT_READY``.
@@ -29,6 +29,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.se
     AdvSettingAutoUpdater,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+    MAX_PAY_STABILIZATION_RATIO,
     SalesStates,
     detect_campaign_state,
 )
@@ -64,6 +65,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     plan_cost_reallocation,
     plan_max_cpa_guard,
     plan_profitable_expansion,
+    plan_resolve_calibration_trim,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -286,6 +288,7 @@ async def process_adv_v3(
     preamble_bootstrap_count = 0
     preamble_cleanup_count = 0
     preamble_realloc_count = 0
+    preamble_calibration_count = 0
     preamble_expansion_count = 0
     preamble_guard_count = 0
 
@@ -499,6 +502,49 @@ async def process_adv_v3(
                             complex_adv.adv_id, ladder_inputs.worst_costs
                         )
 
+                calibration_condition = (
+                    fact.pay_for_order is not None
+                    and float(fact.pay_for_order)
+                    >= MAX_PAY_STABILIZATION_RATIO * float(resolve)
+                    and float(fact.pay_for_order)
+                    <= float(plan.max_pay_for_order)
+                )
+                if calibration_condition:
+                    with trace.phase("preamble_resolve_calibration_trim"):
+                        calibration_actions = plan_resolve_calibration_trim(
+                            prepared,
+                            resolve=float(resolve),
+                            shelf_click_mode=click_mode,
+                            aggressiveness=aggr,
+                            eligibility_by_ks_id=eligibility,
+                            ladder_inputs=ladder_inputs,
+                        )
+                    if calibration_actions:
+                        preamble_calibration_count = len(calibration_actions)
+                        logger.info(
+                            "[adv_id=%s] v3 RESOLVE_CALIBRATION_TRIM: actions=%s",
+                            complex_adv.adv_id,
+                            preamble_calibration_count,
+                        )
+                        contexts = _apply_v3_phase(
+                            ledger,
+                            calibration_actions,
+                            raw_profiles,
+                        )
+                        eligibility = build_eligibility_map(
+                            contexts,
+                            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                        )
+                        prepared = build_prepared_from_contexts(contexts)
+                        ladder_inputs = LadderInputs.from_contexts(
+                            contexts,
+                            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                            rec_orders_per_view=rec_orders_per_view,
+                        )
+                        await cache_worst_costs_for_adv(
+                            complex_adv.adv_id, ladder_inputs.worst_costs
+                        )
+
                 with trace.phase("preamble_profitable_expansion"):
                     expansion_actions = plan_profitable_expansion(
                         prepared,
@@ -615,7 +661,7 @@ async def process_adv_v3(
                 )
                 logger.info(
                     "[adv_id=%s] v3_cycle state=%s resolve=%s fact_cpa=%s "
-                    "bootstrap=%s cleanup=%s realloc=%s expansion=%s guard=%s "
+                    "bootstrap=%s cleanup=%s realloc=%s calibration=%s expansion=%s guard=%s "
                     "post_gate up=%s down=%s off=%s",
                     complex_adv.adv_id,
                     state.name if state else "None",
@@ -626,6 +672,7 @@ async def process_adv_v3(
                     preamble_bootstrap_count,
                     preamble_cleanup_count,
                     preamble_realloc_count,
+                    preamble_calibration_count,
                     preamble_expansion_count,
                     preamble_guard_count,
                     up_count,

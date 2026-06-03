@@ -32,7 +32,7 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP → [resolve valid: realloc + expansion]
+NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP → [resolve valid: realloc → calibration trim → expansion]
             → MAX_CPA_GUARD (если fact > plan.max; вне is_resolve_valid) → plan/fact gate
             → shelf cleanup (post-gate) → flush → target_place
 ```
@@ -43,10 +43,11 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 
 1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
 2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF). Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: отсутствие CH-кандидата не invalid; MIN при ``pay_for_order`` ≤ max не трогаем; OPT/MAX без operational cost → DOWN на MIN по ``PAY_FOR_ORDER``, иначе FORCE_OFF.
-3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
-4. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
-5. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
-6. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
+3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP). Gate: `fact.pay_for_order < 0.9×resolve`.
+4. **RESOLVE_CALIBRATION_TRIM** (`plan_resolve_calibration_trim`) — DOWN до `state_cost <= resolve` при `0.9×resolve ≤ fact ≤ max`; при `fact > max` — только MAX_CPA_GUARD.
+5. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
+6. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
+7. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
 
 ## Structured logs
 
@@ -69,7 +70,7 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 Исключения: UI-строка «РК 7д»; ``target_place_sync`` без ``CalculatedKeyword`` → campaign fallback;
 ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` → ``pay_for_order``, не CH×orders_per_cart.
 
-UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
+UI (Telegram) и updater (COST_REALLOCATION / RESOLVE_CALIBRATION_TRIM / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
 
 | Модуль | Роль |
 |--------|------|
@@ -125,9 +126,10 @@ Rec-gate:
 
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
 2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
-3. **COST_REALLOCATION** — DOWN-only rebalance (headroom).
-4. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
-5. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
+3. **COST_REALLOCATION** — DOWN-only rebalance (headroom); gate `fact < 0.9×resolve`.
+4. **RESOLVE_CALIBRATION_TRIM** — trim по `resolve` при `0.9×resolve ≤ fact ≤ max`.
+5. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
+6. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
 
 Selector после gate: **только shelf cleanup** (rec-false DOWN / FORCE_OFF), без M2/M3/FINAL_TUNING.
 
