@@ -47,7 +47,7 @@ NORMAL    → filter/sync → B → U → S → G → R → enable → calibrati
 4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
 5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
 6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
-7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + **AND** plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN. Пул UP: `collect_calibration_up_next_step_candidates` (в т.ч. OFF→MIN — см. ниже).
+7. **Effective step (глобально, `effective_ladder_steps`)**: одно V3-действие = collapsed `resolve_next_effective_step_up/down` (alias на том же `target_place`, OFF→max в группе); **passing_up / realloc passing** — `resolve_furthest_passing_up_mode` (alias на текущем place + sequential новые place, 1 UP). **pooled / calibration**: один collapsed target на ключ за итерацию. Passing: `state_cost ≤ resolve` (при плане выполнен — `target_pay_for_order`, иначе `max`).
 8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
 9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
@@ -129,9 +129,8 @@ Rec-gate:
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
 2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
 3. **COST_REALLOCATION** — DOWN-only rebalance (headroom); gate `fact < 0.9×resolve`.
-4. **RESOLVE_CALIBRATION** — **DOWN** (limited trim до `state_cost <= resolve`) или **UP** (один ключ, следующий effective-шаг, min CPO) при `fact ≤ max` **и**
+4. **RESOLVE_CALIBRATION** — **CAL DOWN** (max `state_cost` → один DOWN, до `max_effective_steps`) или **CAL UP** (min `state_cost` → один UP) при `fact ≤ max` **и**
    `not plan_fact_equal` **и** `not views_equal` (AND-gate). Направление: `fact < 0.9×resolve` → UP, иначе DOWN.
-   За тик — не более `max_effective_steps` effective ladder-шагов на ключ; early stop по cost ceiling.
    Guard / realloc / expansion — full-trim без лимита.
 5. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
 6. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
@@ -150,8 +149,8 @@ Calibration: **AND** — оба сигнала должны измениться
 ### Adaptive calibration steps (Redis `V3CalibrationStepState`)
 
 Направление по зоне fact vs resolve (одна ветка калибровки за тик):
-- **ветка DOWN** — `fact >= 0.9×resolve`; limited trim к resolve; adaptive steps.
-- **ветка UP** — `fact < 0.9×resolve`; один ключ, следующий effective-шаг, min CPO.
+- **CAL DOWN** — `fact >= 0.9×resolve`; итерации max `state_cost` → один DOWN; adaptive steps.
+- **ветка UP** — `fact < 0.9×resolve`; до `effective_steps` итераций «самый дешёвый следующий state → один UP» (adaptive ×2/÷2, cap `keyword_calibration_max_step`).
 
 В Redis/UI legacy-строки `tighten` / `loosen` (`CalibrationDirect`) соответствуют веткам DOWN/UP.
 

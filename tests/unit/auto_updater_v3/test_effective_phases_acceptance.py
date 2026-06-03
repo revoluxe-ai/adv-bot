@@ -214,8 +214,11 @@ def test_realloc_m_o_c_all_place_max_force_off_not_hollow_down(
     ladder = LadderInputs.from_contexts([c for c, _ in prepared])
 
     def _active(
-        _prepared: object, **_kwargs: object
+        _prepared: object, **kwargs: object
     ) -> list[_StateView]:
+        overrides: dict[int, KeywordStrategyMode] = kwargs.get("overrides") or {}
+        if overrides.get(30) is not None:
+            return []
         return [
             _StateView(
                 ks_id=30,

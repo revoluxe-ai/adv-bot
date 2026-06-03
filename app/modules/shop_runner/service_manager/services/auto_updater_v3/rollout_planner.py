@@ -35,11 +35,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_
     count_effective_aggression_steps_between,
     count_effective_released_aggression_steps,
     iter_effective_upper_mode_groups,
-    iter_effective_upper_modes,
     log_skipped_aliases,
+    logical_modes_at_target_place_above,
     mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
     resolve_next_effective_step_up,
+    target_place_from_mode_candidate,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
@@ -57,7 +58,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     collect_calibration_up_next_step_candidates,
     collect_transition_candidates,
     missing_target_matrix_from_catalog,
-    pick_one_up_cost_first,
+    move_kind_for,
     plan_one_up_by_policy,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -611,6 +612,135 @@ def _find_boost_target_mode_limited_steps(
             return mode
 
 
+_CAL_DOWN_REASON = "resolve_calibration_down"
+
+
+@dataclass(frozen=True)
+class _CalibrationDownPick:
+    """Один шаг CAL DOWN: самый дорогой ``state_cost`` текущего режима → следующий режим."""
+
+    keyword_setting_id: int
+    from_mode: KeywordStrategyMode
+    to_mode: KeywordStrategyMode
+    state_cost: float
+    pay_for_order: float
+
+
+def _calibration_down_pick_sort_key(pick: _CalibrationDownPick) -> tuple[float, float, int]:
+    """Сортировка: max ``state_cost``, затем max CPO, затем ``ks_id``."""
+    return (-pick.state_cost, -pick.pay_for_order, pick.keyword_setting_id)
+
+
+def collect_calibration_down_next_step_candidates(
+    prepared: PreparedList,
+    *,
+    cost_ceiling: float,
+    policy: SelectionPolicy,
+    ladder_inputs: "LadderInputs | None" = None,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+) -> list[_CalibrationDownPick]:
+    """Пул CAL DOWN: один схлопнутый effective DOWN на ключ (``resolve_next_effective_step_down``).
+
+    Alias с тем же ``target_place`` схлопываются в одно действие = 1 шаг бюджета.
+    Сортировка итераций — max ``state_cost`` **текущего** режима. NO CH MIN: FORCE_OFF.
+    """
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+    out: list[_CalibrationDownPick] = []
+
+    for ctx, current in prepared:
+        if current == KeywordStrategyMode.OFF:
+            continue
+        hard_status = int(ctx.keyword.hard_status)
+        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+        pfo = float(ctx.keyword.pay_for_order or 0.0)
+        if _min_cpa_bound_by_pay_for_order(elig):
+            if keyword_pay_for_order_exceeds(ctx, ceiling=float(cost_ceiling)):
+                out.append(
+                    _CalibrationDownPick(
+                        keyword_setting_id=int(ks_id),
+                        from_mode=current,
+                        to_mode=KeywordStrategyMode.OFF,
+                        state_cost=pfo,
+                        pay_for_order=pfo,
+                    )
+                )
+            continue
+        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
+        cost, _ = _trim_state_cost_for_mode(
+            ctx,
+            current,
+            current=current,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if cost != float("inf") and float(cost) <= float(cost_ceiling):
+            continue
+        step = resolve_next_effective_step_down(current, catalog)
+        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+        resolved = step.next_mode
+        if resolved is None:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                cost_ceiling=float(cost_ceiling),
+                ladder_inputs=ladder,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            resolved = fb if fb is not None else KeywordStrategyMode.OFF
+        elif resolved == KeywordStrategyMode.OFF:
+            fb = _fallback_min_instead_of_off_trim(
+                ctx,
+                current,
+                cost_ceiling=float(cost_ceiling),
+                ladder_inputs=ladder,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            if fb is not None:
+                resolved = fb
+        if resolved == current:
+            continue
+        if should_skip_trim_for_same_effective_target(
+            ctx=ctx,
+            current=current,
+            trim_target=resolved,
+            catalog=catalog,
+            cost_ceiling=float(cost_ceiling),
+            ladder_inputs=ladder,
+        ):
+            continue
+        out.append(
+            _CalibrationDownPick(
+                keyword_setting_id=int(ks_id),
+                from_mode=current,
+                to_mode=resolved,
+                state_cost=float(cost),
+                pay_for_order=pfo,
+            )
+        )
+    return out
+
+
+def _bump_prepared_mode(
+    prepared: PreparedList,
+    keyword_setting_id: int,
+    new_mode: KeywordStrategyMode,
+) -> PreparedList:
+    """Локально обновить режим ключа в ``PreparedList`` (между итерациями CAL UP/DOWN)."""
+    bumped: list[tuple["KeywordV3Context", KeywordStrategyMode]] = []
+    for ctx, mode in prepared:
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is not None and int(ks_id) == keyword_setting_id:
+            bumped.append((ctx, new_mode))
+        else:
+            bumped.append((ctx, mode))
+    return bumped
+
+
 def _append_trim_to_mode(
     actions: list[V3Action],
     *,
@@ -778,28 +908,59 @@ def plan_campaign_trim_by_max_state_cost(
     )
 
 
-def _plan_calibration_tighten(
+def _plan_calibration_down(
     prepared: PreparedList,
     *,
     cost_ceiling: float,
-    trim_reason: str,
     shelf_click_mode: "ShelfClickMode",
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int,
 ) -> list[V3Action]:
-    """Калибровка DOWN: limited trim до ``state_cost <= cost_ceiling``."""
-    return _plan_trim_by_cost_ceiling(
-        prepared,
-        cost_ceiling=cost_ceiling,
-        trim_reason=trim_reason,
-        shelf_click_mode=shelf_click_mode,
+    """CAL DOWN: до ``max_effective_steps`` итераций «самый дорогой state → один DOWN».
+
+    На каждой итерации: пул ``collect_calibration_down_next_step_candidates``,
+    выбор max ``state_cost`` (tie-break CPO), одно DOWN/FORCE_OFF, пересбор пула.
+    """
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
-        eligibility_by_ks_id=eligibility_by_ks_id,
-        ladder_inputs=ladder_inputs,
-        max_effective_steps=max_effective_steps,
     )
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+
+    step_budget = max(1, int(max_effective_steps))
+    working = prepared
+    actions: list[V3Action] = []
+
+    for _ in range(step_budget):
+        picks = collect_calibration_down_next_step_candidates(
+            working,
+            cost_ceiling=float(cost_ceiling),
+            policy=policy,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if not picks:
+            break
+        best = min(picks, key=_calibration_down_pick_sort_key)
+        hard_status = _HARD_STATUS_AUTO_MODE
+        for ctx, _mode in working:
+            ks_id = ctx.keyword.keyword_setting_original_id
+            if ks_id is not None and int(ks_id) == best.keyword_setting_id:
+                hard_status = int(ctx.keyword.hard_status)
+                break
+        _append_trim_to_mode(
+            actions,
+            ks_id=best.keyword_setting_id,
+            current=best.from_mode,
+            target=best.to_mode,
+            hard_status=hard_status,
+            reason=_CAL_DOWN_REASON,
+        )
+        working = _bump_prepared_mode(working, best.keyword_setting_id, best.to_mode)
+
+    return actions
 
 
 def _plan_calibration_up(
@@ -809,30 +970,52 @@ def _plan_calibration_up(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
+    max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Калибровка UP: один ключ из пула ``collect_calibration_up_next_step_candidates``.
+    """Калибровка UP: до ``max_effective_steps`` итераций «самый дешёвый state → один UP».
 
-    Выбор — минимальный ``state_cost`` следующего effective-шага; без потолка ``resolve``.
-    Пул может включать OFF→MIN (см. docstring collector): NO DATA — параллельный канал
-    к ``plan_pay_for_order_gap_enable``; FULL/PFO OFF — только через калибровку UP с rec-gate.
+    На каждой итерации: пул ``collect_calibration_up_next_step_candidates``,
+    выбор min ``state_cost`` (tie-break CPO), одно UP-действие, обновление
+    ``prepared`` для следующей переоценки. Бюджет — ``resolve_effective_calibration_steps``.
     """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        _candidate_sort_key,
+        _candidate_to_action,
+    )
+
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    candidates = collect_calibration_up_next_step_candidates(
-        prepared,
-        policy=policy,
-        ladder_inputs=ladder_inputs,
-        eligibility_by_ks_id=eligibility_by_ks_id,
-    )
-    action = pick_one_up_cost_first(
-        candidates,
-        reason_prefix="resolve_calibration_up",
-    )
-    if action is None:
-        return []
-    return [action]
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+
+    step_budget = max(1, int(max_effective_steps))
+    working = prepared
+    actions: list[V3Action] = []
+
+    for _ in range(step_budget):
+        candidates = collect_calibration_up_next_step_candidates(
+            working,
+            policy=policy,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if not candidates:
+            break
+        best = min(candidates, key=_candidate_sort_key)
+        to_mode = best.to_mode
+        if to_mode is None or to_mode == best.from_mode:
+            break
+        actions.append(
+            _candidate_to_action(
+                best,
+                pool_size=len(candidates),
+                reason_prefix="resolve_calibration_up",
+            )
+        )
+        working = _bump_prepared_mode(working, best.keyword_setting_id, to_mode)
+
+    return actions
 
 
 def plan_resolve_calibration(
@@ -852,30 +1035,30 @@ def plan_resolve_calibration(
     значения ``loosen`` / ``tighten`` — legacy-строки для веток UP/DOWN).
 
     Gate кампании (plan/views, ``fact <= max``) — в orchestrator.
-    UP: один ключ, следующий effective-шаг, минимальный CPO. DOWN: limited trim к resolve.
+    CAL UP: до ``max_effective_steps`` итераций min ``state_cost`` → один UP → пересбор пула.
+    CAL DOWN: до ``max_effective_steps`` итераций max ``state_cost`` → один DOWN → пересбор пула.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
         CalibrationDirect,
     )
 
     if calibration_direct == CalibrationDirect.TIGHTEN:
-        return _plan_calibration_tighten(
+        return _plan_calibration_down(
             prepared,
             cost_ceiling=float(resolve),
-            trim_reason="resolve_calibration_tighten",
             shelf_click_mode=shelf_click_mode,
             aggressiveness=aggressiveness,
             eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
             max_effective_steps=max_effective_steps,
         )
-    _ = max_effective_steps
     return _plan_calibration_up(
         prepared,
         shelf_click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,
         ladder_inputs=ladder_inputs,
+        max_effective_steps=max_effective_steps,
     )
 
 
@@ -889,7 +1072,7 @@ def plan_resolve_calibration_trim(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Legacy alias: только ветка DOWN калибровки (``resolve_calibration_tighten``)."""
+    """Legacy alias: только CAL DOWN (``resolve_calibration_down``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
         CalibrationDirect,
     )
@@ -1050,6 +1233,360 @@ def resolve_effective_state_cost_for_mode(
     )
 
 
+def _best_passing_in_mode_group(
+    modes_group: tuple[KeywordStrategyMode, ...],
+    *,
+    ctx: "KeywordV3Context",
+    state_candidates: dict[AggressionTargetMode, ModeCandidate],
+    elig: "KeywordV3Eligibility | None",
+    policy: SelectionPolicy,
+    resolve: float,
+    ladder_inputs: "LadderInputs | None",
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None,
+) -> tuple[KeywordStrategyMode | None, float | None, bool]:
+    """Max ``mode_level`` в группе с ``state_cost <= resolve`` и rec-gate."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        can_target_mode,
+        clamp_target_mode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+        LadderInputs as _LadderInputs,
+    )
+
+    ladder = (
+        ladder_inputs
+        if ladder_inputs is not None
+        else _LadderInputs.from_contexts([ctx])
+    )
+    rec = ladder.rec_orders_per_view
+    opc = ladder.orders_per_cart_for_ctx(ctx)
+    group_best: KeywordStrategyMode | None = None
+    group_cost: float | None = None
+    group_imputed = False
+    for to_mode in modes_group:
+        capped = clamp_target_mode(elig, to_mode) if elig is not None else to_mode
+        gate_status = state_rec_gate_status_for_mode(
+            state_candidates,
+            capped,
+            policy,
+            rec_orders_per_view=rec,
+            orders_per_cart=opc,
+        )
+        if not rec_gate_allows_up(gate_status):
+            continue
+        if elig is not None and not can_target_mode(elig, capped):
+            continue
+        if mode_level(capped) > mode_level(policy.max_target_mode):
+            continue
+        cost, imputed = resolve_effective_state_cost_for_mode(
+            ctx=ctx,
+            to_mode=capped,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder,
+        )
+        if cost == float("inf") or cost > resolve:
+            continue
+        if group_best is None or mode_level(capped) > mode_level(group_best):
+            group_best = capped
+            group_cost = cost
+            group_imputed = imputed
+    return group_best, group_cost, group_imputed
+
+
+def resolve_furthest_passing_up_mode(
+    current: KeywordStrategyMode,
+    *,
+    ctx: "KeywordV3Context",
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    elig: "KeywordV3Eligibility | None",
+    policy: SelectionPolicy,
+    resolve: float,
+    ladder_inputs: "LadderInputs | None",
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None,
+) -> tuple[KeywordStrategyMode | None, float | None, bool]:
+    """До упора passing UP: alias на текущем place + sequential новые place.
+
+    Один итоговый ``to_mode`` на ключ (1 действие). Alias с тем же ``target_place``
+    не считаются отдельными шагами.
+    """
+    furthest_mode: KeywordStrategyMode | None = None
+    furthest_cost: float | None = None
+    furthest_imputed = False
+
+    def _take(
+        mode: KeywordStrategyMode | None,
+        cost: float | None,
+        imputed: bool,
+    ) -> None:
+        nonlocal furthest_mode, furthest_cost, furthest_imputed
+        if mode is None or cost is None or mode == current:
+            return
+        if mode_level(mode) <= mode_level(current):
+            return
+        if furthest_mode is None or mode_level(mode) > mode_level(furthest_mode):
+            furthest_mode = mode
+            furthest_cost = cost
+            furthest_imputed = imputed
+
+    if current != KeywordStrategyMode.OFF:
+        current_c = candidate_for_strategy_mode(current, catalog)
+        place = target_place_from_mode_candidate(current_c)
+        if place is not None:
+            same_place = logical_modes_at_target_place_above(current, place, catalog)
+            sg, sc, si = _best_passing_in_mode_group(
+                same_place,
+                ctx=ctx,
+                state_candidates=catalog,
+                elig=elig,
+                policy=policy,
+                resolve=resolve,
+                ladder_inputs=ladder_inputs,
+                eligibility_by_ks_id=eligibility_by_ks_id,
+            )
+            _take(sg, sc, si)
+
+    for group in iter_effective_upper_mode_groups(current, catalog):
+        gb, gc, gi = _best_passing_in_mode_group(
+            group,
+            ctx=ctx,
+            state_candidates=catalog,
+            elig=elig,
+            policy=policy,
+            resolve=resolve,
+            ladder_inputs=ladder_inputs,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if gb is None:
+            break
+        _take(gb, gc, gi)
+
+    return furthest_mode, furthest_cost, furthest_imputed
+
+
+def diagnose_passing_up_blockers(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    policy: SelectionPolicy,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    sample_limit: int = 6,
+) -> list[dict[str, object]]:
+    """Dry-run: почему ключ не попал в passing pool (для debug-логов)."""
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+    samples: list[dict[str, object]] = []
+    for ctx, current in prepared:
+        if len(samples) >= sample_limit:
+            break
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id is None:
+            continue
+        text = (ctx.keyword.text or "")[:40]
+        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+            samples.append({"ks_id": ks_id, "text": text, "reason": "hard_status"})
+            continue
+        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
+        if elig is not None and not elig.participates_in_ladder:
+            samples.append({"ks_id": ks_id, "text": text, "reason": "no_ladder"})
+            continue
+        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
+        capped, cost, _ = resolve_furthest_passing_up_mode(
+            current,
+            ctx=ctx,
+            catalog=catalog,
+            elig=elig,
+            policy=policy,
+            resolve=resolve,
+            ladder_inputs=ladder,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+        )
+        if capped is None:
+            samples.append(
+                {
+                    "ks_id": ks_id,
+                    "text": text,
+                    "from": current.name,
+                    "reason": "no_passing_target",
+                    "resolve": resolve,
+                }
+            )
+            continue
+        if capped == current:
+            samples.append(
+                {
+                    "ks_id": ks_id,
+                    "text": text,
+                    "from": current.name,
+                    "reason": "already_at_furthest",
+                    "cost": cost,
+                }
+            )
+            continue
+        samples.append(
+            {
+                "ks_id": ks_id,
+                "text": text,
+                "from": current.name,
+                "to": capped.name,
+                "cost": cost,
+                "reason": "would_pass",
+            }
+        )
+    return samples
+
+
+def _state_view_debug_row(view: _StateView) -> dict[str, object]:
+    """Сериализация ``_StateView`` для NDJSON debug."""
+    return {
+        "ks_id": view.ks_id,
+        "from": view.from_mode.name,
+        "to": view.to_mode.name,
+        "cost": view.cost,
+        "imputed": view.imputed,
+    }
+
+
+def diagnose_cost_reallocation_snapshot(
+    prepared: PreparedList,
+    *,
+    resolve: float,
+    policy: SelectionPolicy,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: "LadderInputs | None" = None,
+    head_limit: int = 8,
+) -> dict[str, object]:
+    """Dry-run COST_REALLOCATION (фаза R): potential vs active и причина простоя.
+
+    Контракт rebalance в prod — ``plan_cost_reallocation`` (не ``plan_state_rebalance``).
+    Порог: ``max(active state_cost) > min(potential passing cost)``; если potential пуст,
+    fallback headroom — ``max(active) > resolve`` (нет UP-целей при ``state_cost ≤ resolve``).
+    """
+    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
+    potential = collect_potential_passing_states(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder,
+    )
+    active_above_resolve = _collect_active_expensive(
+        prepared,
+        resolve=resolve,
+        policy=policy,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder,
+    )
+    max_active_above_resolve = active_above_resolve[0] if active_above_resolve else None
+
+    floor_source = "potential"
+    if potential:
+        min_potential = potential[0]
+        min_cost = float(min_potential.cost)
+    elif active_above_resolve:
+        floor_source = "resolve_headroom"
+        min_potential = None
+        min_cost = float(resolve)
+    else:
+        floor_source = "none"
+        min_potential = None
+        min_cost = float("inf")
+
+    active = _collect_active_more_expensive_than(
+        prepared,
+        min_cost=min_cost,
+        policy=policy,
+        eligibility_by_ks_id=eligibility_by_ks_id,
+        ladder_inputs=ladder,
+    )
+    max_active = active[0] if active else None
+
+    stop_reason = "would_iterate"
+    if floor_source == "none":
+        stop_reason = "no_potential_passing"
+    elif not active:
+        stop_reason = "no_active_above_min_potential"
+    elif max_active is not None:
+        if float(max_active.cost) <= min_cost:
+            stop_reason = "gap_closed"
+
+    first_step: dict[str, object] | None = None
+    if active and max_active is not None and stop_reason == "would_iterate":
+        ctx_worst: KeywordV3Context | None = None
+        for c, _m in prepared:
+            ks = c.keyword.keyword_setting_original_id
+            if ks is not None and int(ks) == max_active.ks_id:
+                ctx_worst = c
+                break
+        if ctx_worst is not None:
+            catalog = _mode_catalog_for_ctx(ctx_worst, prepared, ladder)
+            step = resolve_next_effective_step_down(
+                max_active.strategy_mode,
+                catalog,
+            )
+            released = count_effective_released_aggression_steps(
+                max_active.strategy_mode,
+                step.next_mode,
+                catalog,
+            )
+            first_step = {
+                "ks_id": max_active.ks_id,
+                "from": max_active.from_mode.name,
+                "to": step.next_mode.name if step.next_mode else None,
+                "released_steps": released,
+                "hollow": released == 0,
+            }
+            if released == 0 and step.next_mode is not None:
+                stop_reason = "hollow_effective_down"
+
+    min_potential_row: dict[str, object] | None
+    if min_potential is not None:
+        min_potential_row = _state_view_debug_row(min_potential)
+    elif floor_source == "resolve_headroom":
+        min_potential_row = {
+            "synthetic": True,
+            "floor": floor_source,
+            "cost": float(resolve),
+        }
+    else:
+        min_potential_row = None
+
+    result: dict[str, object] = {
+        "resolve": float(resolve),
+        "potential_count": len(potential),
+        "floor_source": floor_source,
+        "min_potential": min_potential_row,
+        "active_above_min_count": len(active),
+        "max_active": _state_view_debug_row(max_active) if max_active else None,
+        "cost_gap": (
+            float(max_active.cost) - min_cost
+            if max_active is not None
+            else None
+        ),
+        "stop_reason": stop_reason,
+        "first_step_preview": first_step,
+        "potential_head": [
+            _state_view_debug_row(p) for p in potential[:head_limit]
+        ],
+        "active_head": [_state_view_debug_row(a) for a in active[:head_limit]],
+        "active_above_resolve_count": len(active_above_resolve),
+        "max_active_above_resolve": (
+            _state_view_debug_row(max_active_above_resolve)
+            if max_active_above_resolve is not None
+            else None
+        ),
+    }
+    if not potential:
+        result["passing_blocker_samples"] = diagnose_passing_up_blockers(
+            prepared,
+            resolve=resolve,
+            policy=policy,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            ladder_inputs=ladder,
+            sample_limit=head_limit,
+        )
+    return result
+
+
 def _highest_passing_mode_in_upper_groups(
     modes_groups: tuple[tuple[KeywordStrategyMode, ...], ...],
     *,
@@ -1061,7 +1598,11 @@ def _highest_passing_mode_in_upper_groups(
     ladder_inputs: "LadderInputs | None",
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None,
 ) -> tuple[KeywordStrategyMode | None, float | None, bool]:
-    """Max ``mode_level`` среди passing режимов в каждой alias-группе нового ``target_place``.
+    """Furthest passing mode: sequential effective groups, alias collapsed per group.
+
+    Обходит ``modes_groups`` по порядку (OFF→…→MAX). В каждой группе — max
+    ``mode_level`` с ``state_cost <= resolve``. Останавливается на первой группе без
+    passing (нельзя перепрыгнуть через непроходимый ``target_place``).
 
     Args:
         state_candidates: уже вычисленный M/O/C catalog (``_mode_catalog_for_ctx`` у caller).
@@ -1081,9 +1622,9 @@ def _highest_passing_mode_in_upper_groups(
     )
     rec = ladder.rec_orders_per_view
     opc = ladder.orders_per_cart_for_ctx(ctx)
-    best_mode: KeywordStrategyMode | None = None
-    best_cost: float | None = None
-    best_imputed = False
+    furthest_mode: KeywordStrategyMode | None = None
+    furthest_cost: float | None = None
+    furthest_imputed = False
     for modes_group in modes_groups:
         group_best: KeywordStrategyMode | None = None
         group_cost: float | None = None
@@ -1118,12 +1659,11 @@ def _highest_passing_mode_in_upper_groups(
                 group_cost = cost
                 group_imputed = imputed
         if group_best is None:
-            continue
-        if best_mode is None or mode_level(group_best) > mode_level(best_mode):
-            best_mode = group_best
-            best_cost = group_cost
-            best_imputed = group_imputed
-    return best_mode, best_cost, best_imputed
+            break
+        furthest_mode = group_best
+        furthest_cost = group_cost
+        furthest_imputed = group_imputed
+    return furthest_mode, furthest_cost, furthest_imputed
 
 
 def collect_potential_passing_states(
@@ -1154,20 +1694,26 @@ def collect_potential_passing_states(
             continue
         current = overrides.get(int(ks_id), stored_mode)
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        groups = iter_effective_upper_mode_groups(current, catalog)
-        if not groups:
-            continue
-        capped, cost, imputed = _highest_passing_mode_in_upper_groups(
-            (groups[0],),
+        capped, cost, imputed = resolve_furthest_passing_up_mode(
+            current,
             ctx=ctx,
-            state_candidates=catalog,
+            catalog=catalog,
             elig=elig,
             policy=policy,
             resolve=resolve,
             ladder_inputs=ladder,
             eligibility_by_ks_id=eligibility_by_ks_id,
         )
-        if capped is None or cost is None:
+        if capped is None or cost is None or capped == current:
+            continue
+        current_c = candidate_for_strategy_mode(current, catalog)
+        capped_c = candidate_for_strategy_mode(capped, catalog)
+        if (
+            current_c is not None
+            and capped_c is not None
+            and mode_candidates_same_effective_target(current_c, capped_c)
+            and mode_level(capped) <= mode_level(current)
+        ):
             continue
         out.append(
             _StateView(
@@ -1679,7 +2225,8 @@ def plan_cost_reallocation(
     """COST_REALLOCATION: схлопнутое итоговое действие на ключ.
 
     WL: один DOWN до ``final_target``; авто: FORCE_OFF (+ технический UP до
-    ``final_target``, если не OFF). Активные дороже ``min(potential passing cost)``.
+    ``final_target``, если не OFF). Активные дороже ``min(potential passing cost)``;
+    если potential пуст — headroom fallback: дороже ``resolve``.
 
     Внутренний цикл: один ``resolve_next_effective_step_down`` на итерацию; alias-режимы
     с тем же ``target_place`` не увеличивают ``released_steps`` (см.
@@ -1694,6 +2241,7 @@ def plan_cost_reallocation(
 
     overrides: dict[int, KeywordStrategyMode] = {}
     released_steps = 0
+    last_down_sig: tuple[int, str, str] | None = None
     for _ in range(50):
         potential_passing = collect_potential_passing_states(
             prepared,
@@ -1703,9 +2251,10 @@ def plan_cost_reallocation(
             overrides=overrides,
             ladder_inputs=ladder,
         )
-        if not potential_passing:
-            break
-        min_potential_cost = potential_passing[0].cost
+        if potential_passing:
+            min_potential_cost = potential_passing[0].cost
+        else:
+            min_potential_cost = float(resolve)
         active_expensive = _collect_active_more_expensive_than(
             prepared,
             min_cost=min_potential_cost,
@@ -1752,8 +2301,16 @@ def plan_cost_reallocation(
                 step.next_mode.name,
             )
             break
+        step_sig = (
+            worst_active.ks_id,
+            worst_active.strategy_mode.name,
+            step.next_mode.name,
+        )
+        if last_down_sig == step_sig:
+            break
         released_steps += released
         overrides[worst_active.ks_id] = step.next_mode
+        last_down_sig = step_sig
 
     if released_steps:
         logger.debug("v3 cost_reallocation released_steps=%s", released_steps)
@@ -1817,12 +2374,10 @@ def plan_profitable_expansion(
         if elig is not None and not elig.participates_in_ladder:
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        current_c = candidate_for_strategy_mode(current_mode, catalog)
-        mode_groups = iter_effective_upper_mode_groups(current_mode, catalog)
-        best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
-            mode_groups,
+        best_mode, best_cost, best_imputed = resolve_furthest_passing_up_mode(
+            current_mode,
             ctx=ctx,
-            state_candidates=catalog,
+            catalog=catalog,
             elig=elig,
             policy=policy,
             resolve=resolve,
@@ -1831,8 +2386,7 @@ def plan_profitable_expansion(
         )
         if best_mode is None or best_mode == current_mode:
             continue
-        best_c = candidate_for_strategy_mode(best_mode, catalog)
-        if mode_candidates_same_effective_target(current_c, best_c):
+        if mode_level(best_mode) <= mode_level(current_mode):
             continue
         actions.append(
             V3Action(
@@ -2075,12 +2629,10 @@ def plan_mass_cheap_promotion(
         if ks_id is None:
             continue
         catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        current_c = candidate_for_strategy_mode(current_mode, catalog)
-        mode_groups = iter_effective_upper_mode_groups(current_mode, catalog)
-        best_mode, best_cost, best_imputed = _highest_passing_mode_in_upper_groups(
-            mode_groups,
+        best_mode, best_cost, best_imputed = resolve_furthest_passing_up_mode(
+            current_mode,
             ctx=ctx,
-            state_candidates=catalog,
+            catalog=catalog,
             elig=None,
             policy=policy,
             resolve=resolve,
@@ -2089,8 +2641,7 @@ def plan_mass_cheap_promotion(
         )
         if best_mode is None or best_mode == current_mode:
             continue
-        best_c = candidate_for_strategy_mode(best_mode, catalog)
-        if mode_candidates_same_effective_target(current_c, best_c):
+        if mode_level(best_mode) <= mode_level(current_mode):
             continue
         actions.append(
             V3Action(
@@ -2163,9 +2714,11 @@ def _collect_active_expensive(
     *,
     resolve: float,
     policy: SelectionPolicy,
+    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
     ladder_inputs: "LadderInputs | None" = None,
     overrides: dict[int, KeywordStrategyMode] | None = None,
 ) -> list[_StateView]:
+    """Активные ключи с ``state_cost(current) > resolve`` (тот же cost SSOT, что realloc DOWN)."""
     ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
     overrides = overrides or {}
     out: list[_StateView] = []
@@ -2175,21 +2728,22 @@ def _collect_active_expensive(
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
-        current = overrides.get(ks_id, stored_mode)
+        current = overrides.get(int(ks_id), stored_mode)
         if current == KeywordStrategyMode.OFF:
             continue
         if mode_level(current) > mode_level(policy.max_target_mode):
             continue
-        cost, imputed = _resolve_state_cost_for_mode(
+        cost, imputed = resolve_effective_state_cost_for_mode(
             ctx=ctx,
             to_mode=current,
+            eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder,
         )
         if cost == float("inf") or cost <= resolve:
             continue
         out.append(
             _StateView(
-                ks_id=ks_id,
+                ks_id=int(ks_id),
                 strategy_mode=current,
                 cost=cost,
                 from_mode=current,

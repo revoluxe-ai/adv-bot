@@ -1,7 +1,7 @@
 """Unified pooled UP ranking for V3 updater.
 
 Контракт выбора UP:
-- формируем общий пул кандидатов ``to_mode > current_mode``;
+- формируем общий пул: на ключ один схлопнутый effective UP (``resolve_next_effective_step_up``);
 - в пул попадают только target-состояния, разрешённые ``aggressiveness``:
   ``1 -> MIN``, ``2 -> MIN/OPT``, ``3 -> MIN/OPT/C``;
 - на полке rec-gate блокирует только ``above_rec=False`` (при ``shelf>=organic``/``UNKNOWN``);
@@ -40,7 +40,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
-    iter_effective_upper_modes,
     log_skipped_aliases,
     mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
@@ -383,7 +382,7 @@ def collect_transition_candidates(
     ladder_inputs: "LadderInputs | None" = None,
     eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
 ) -> list[TransitionCandidate]:
-    """Все допустимые UP-переходы с метриками (effective upper modes + RK catalog)."""
+    """Один схлопнутый effective UP на ключ (alias = 1 шаг, см. ``effective_ladder_steps``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordV3Eligibility,
         build_eligibility_map,
@@ -427,55 +426,59 @@ def collect_transition_candidates(
         )
         pfo = float(ctx.keyword.pay_for_order or 0.0)
 
-        for to_mode in iter_effective_upper_modes(current_mode, catalog):
-            target = _target_mode_for_strategy(to_mode)
-            mc = catalog.get(target)
-            if mc is None:
-                continue
-            if elig is not None and not can_target_mode(elig, to_mode):
-                continue
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
-                rec_gate_allows_up,
-                state_rec_gate_status_for_mode,
-            )
+        step = resolve_next_effective_step_up(current_mode, catalog)
+        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
+        to_mode = step.next_mode
+        if to_mode is None:
+            continue
+        target = _target_mode_for_strategy(to_mode)
+        mc = catalog.get(target)
+        if mc is None:
+            continue
+        if elig is not None and not can_target_mode(elig, to_mode):
+            continue
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
+            rec_gate_allows_up,
+            state_rec_gate_status_for_mode,
+        )
 
-            gate_status = state_rec_gate_status_for_mode(
-                catalog,
+        gate_status = state_rec_gate_status_for_mode(
+            catalog,
+            to_mode,
+            policy,
+            rec_orders_per_view=ladder.rec_orders_per_view,
+            orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
+        )
+        if not rec_gate_allows_up(gate_status):
+            continue
+        if not _target_allowed(
+            to_mode=to_mode,
+            max_target_mode=policy.max_target_mode,
+        ):
+            continue
+        if pfo_operational or elig is not None:
+            cost, imputed = cost_for_mode(
+                ctx,
                 to_mode,
-                policy,
-                rec_orders_per_view=ladder.rec_orders_per_view,
-                orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
+                ladder_inputs=ladder,
+                eligibility=elig,
             )
-            if not rec_gate_allows_up(gate_status):
-                continue
-            if not _target_allowed(
+        else:
+            cost, imputed = _resolve_state_cost(mc, target)
+        if cost == float("inf"):
+            continue
+        out.append(
+            TransitionCandidate(
+                keyword_setting_id=ks_id,
+                from_mode=current_mode,
                 to_mode=to_mode,
-                max_target_mode=policy.max_target_mode,
-            ):
-                continue
-            if pfo_operational or elig is not None:
-                cost, imputed = cost_for_mode(
-                    ctx,
-                    to_mode,
-                    ladder_inputs=ladder,
-                    eligibility=elig,
-                )
-            else:
-                cost, imputed = _resolve_state_cost(mc, target)
-            if cost == float("inf"):
-                continue
-            out.append(
-                TransitionCandidate(
-                    keyword_setting_id=ks_id,
-                    from_mode=current_mode,
-                    to_mode=to_mode,
-                    move_kind=move_kind_for(current_mode, to_mode),
-                    state_cost=cost,
-                    pay_for_order=pfo,
-                    rec_tier=tier,
-                    imputed=imputed,
-                )
+                move_kind=move_kind_for(current_mode, to_mode),
+                state_cost=cost,
+                pay_for_order=pfo,
+                rec_tier=tier,
+                imputed=imputed,
             )
+        )
     return out
 
 
@@ -490,11 +493,11 @@ def collect_calibration_up_next_step_candidates(
 
     Контракт выбора
     ----------------
-    - На ключ — не более одного перехода ``resolve_next_effective_step_up`` (следующий
-      effective-шаг по лестнице M/O/C).
+    - На ключ — один схлопнутый effective UP (``resolve_next_effective_step_up``): alias M/O/C
+      с одним ``target_place`` = одно действие = 1 шаг бюджета.
     - Потолка ``resolve`` по ``state_cost`` нет (в отличие от passing_up / expansion).
-    - Итоговое действие — ``pick_one_up_cost_first``: один ключ с минимальным
-      ``state_cost``, tie-break ``pay_for_order``.
+    - CAL UP: до ``max_effective_steps`` итераций — глобальный min ``state_cost`` целевого
+      state → один UP → пересбор пула.
 
     Ключи в режиме OFF (намеренно не отфильтровываются целиком)
     -----------------------------------------------------------
@@ -597,7 +600,6 @@ def collect_calibration_up_next_step_candidates(
         mc = catalog.get(target)
         if mc is None:
             continue
-        # Ослабления eligibility/cost только для OFF→MIN + KEYWORD_NO_DATA.
         off_no_data_bootstrap = (
             is_off_gap_enable
             and to_mode == KeywordStrategyMode.MIN_CPA
@@ -639,10 +641,6 @@ def collect_calibration_up_next_step_candidates(
                 imputed = True
             else:
                 continue
-        current_c = candidate_for_strategy_mode(current_mode, catalog)
-        target_c = candidate_for_strategy_mode(to_mode, catalog)
-        if mode_candidates_same_effective_target(current_c, target_c):
-            continue
         out.append(
             TransitionCandidate(
                 keyword_setting_id=int(ks_id),

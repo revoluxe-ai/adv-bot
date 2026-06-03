@@ -126,6 +126,7 @@ def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     )
     text = format_v3_tick_report_text(snap)
     assert "Калибровка: UP" in text
+    assert "бюджет 4 (было 2)" in text
     assert "adaptive" not in text.lower()
     assert "БС max (PFO" in text
     assert "420" in text

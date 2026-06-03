@@ -26,6 +26,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
     collect_potential_passing_states,
+    diagnose_cost_reallocation_snapshot,
     plan_cost_reallocation,
     plan_max_cpa_guard,
     plan_profitable_expansion,
@@ -93,6 +94,126 @@ def test_plan_cost_reallocation_emits_down_only() -> None:
 
 
 @pytest.mark.unit
+def test_diagnose_cost_reallocation_snapshot_detects_gap() -> None:
+    """Snapshot: active дороже min potential → cost_gap > 0."""
+    prof = _sample_profile()
+    active = _calc_kw(
+        ks_id=80,
+        text="active",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(80.0),
+    )
+    off = _calc_kw(
+        ks_id=81,
+        text="potential",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(30.0),
+    )
+    contexts = [
+        KeywordV3Context(keyword=active, position_profile=prof),
+        KeywordV3Context(keyword=off, position_profile=prof),
+    ]
+    prepared = build_prepared_from_contexts(contexts)
+    elig_map = {
+        80: resolve_keyword_v3_eligibility(contexts[0], contexts),
+        81: resolve_keyword_v3_eligibility(contexts[1], contexts),
+    }
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
+    snap = diagnose_cost_reallocation_snapshot(
+        prepared,
+        resolve=200.0,
+        policy=_policy(),
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=elig_map,
+    )
+    assert snap["potential_count"] >= 1
+    assert snap["active_above_min_count"] >= 1
+    assert snap["stop_reason"] in ("would_iterate", "hollow_effective_down")
+    assert snap["cost_gap"] is not None
+    assert float(snap["cost_gap"]) > 0
+
+
+@pytest.mark.unit
+def test_cost_reallocation_resolve_headroom_when_no_potential(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Headroom fallback: potential пуст, active state_cost > resolve → DOWN."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+        _StateView,
+    )
+
+    prof = _sample_profile()
+    expensive_max = _calc_kw(
+        ks_id=90,
+        text="expensive_max",
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(900.0),
+    )
+    contexts = [KeywordV3Context(keyword=expensive_max, position_profile=prof)]
+    prepared = build_prepared_from_contexts(contexts)
+    ladder_inputs = LadderInputs.from_contexts([ctx for ctx, _ in prepared])
+    policy = _policy()
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.collect_potential_passing_states",
+        lambda *args, **kwargs: [],
+    )
+
+    expensive_view = _StateView(
+        ks_id=90,
+        strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+        cost=8943.0,
+        from_mode=KeywordStrategyMode.MAX_CONVERSION,
+        to_mode=KeywordStrategyMode.MAX_CONVERSION,
+        imputed=False,
+    )
+
+    def _active_above_resolve(
+        _prepared: object, *, resolve: float, **kwargs: object
+    ) -> list[_StateView]:
+        if float(resolve) < 8943.0:
+            return [expensive_view]
+        return []
+
+    def _active_more_expensive(
+        _prepared: object, *, min_cost: float, **kwargs: object
+    ) -> list[_StateView]:
+        if float(min_cost) <= 8943.0:
+            return [expensive_view]
+        return []
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._collect_active_expensive",
+        _active_above_resolve,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._collect_active_more_expensive_than",
+        _active_more_expensive,
+    )
+
+    snap = diagnose_cost_reallocation_snapshot(
+        prepared,
+        resolve=550.0,
+        policy=policy,
+        ladder_inputs=ladder_inputs,
+    )
+    assert snap["floor_source"] == "resolve_headroom"
+    assert snap["stop_reason"] in ("would_iterate", "hollow_effective_down")
+
+    actions = plan_cost_reallocation(
+        prepared,
+        resolve=550.0,
+        policy=policy,
+        ladder_inputs=ladder_inputs,
+    )
+    assert actions
+    assert any(a.keyword_setting_id == 90 for a in actions)
+
+
+@pytest.mark.unit
 def test_plan_profitable_expansion_respects_max_allowed_mode() -> None:
     """Eligibility cap MIN-only: expansion не поднимает выше MIN_CPA."""
     prof = _sample_profile()
@@ -127,6 +248,31 @@ def test_plan_profitable_expansion_respects_max_allowed_mode() -> None:
     assert actions[0].action == V3ActionType.UP
     assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
     assert actions[0].reason == "profitable_expansion"
+
+
+@pytest.mark.unit
+def test_collect_potential_passing_off_jumps_to_furthest_passing_group() -> None:
+    """OFF: passing realloc — до упора по place, не только первый group[0]."""
+    prof = _sample_profile()
+    kw = _calc_kw(
+        ks_id=31,
+        text="off_passing",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(10.0),
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    ladder_inputs = LadderInputs.from_contexts([c for c, _ in prepared])
+    passing = collect_potential_passing_states(
+        prepared,
+        resolve=10_000.0,
+        policy=_policy(),
+        ladder_inputs=ladder_inputs,
+    )
+    assert len(passing) == 1
+    assert passing[0].from_mode == KeywordStrategyMode.OFF
+    assert passing[0].to_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 @pytest.mark.unit
