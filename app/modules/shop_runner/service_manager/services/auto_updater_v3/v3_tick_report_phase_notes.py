@@ -38,7 +38,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     _HARD_STATUS_AUTO_MODE,
     _HARD_STATUS_WHITE_LIST,
     _eligibility_for_ctx,
-    _find_trim_target_mode_limited_steps,
     _hard_status_allows_up,
     _min_cpa_bound_by_pay_for_order,
     _mode_catalog_for_ctx,
@@ -330,14 +329,13 @@ def _note_resolve_calibration(
             ladder_inputs=ladder_inputs,
         )
     if direct == CalibrationDirect.TIGHTEN:
-        return _note_calibration_tighten(
+        return _note_calibration_down(
             prepared,
             cost_ceiling=float(resolve),
             shelf_click_mode=click,
             aggressiveness=aggr,
             eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
-            max_effective_steps=max_effective_steps,
         )
     return "направление калибровки не задано"
 
@@ -375,7 +373,7 @@ def _note_calibration_up(
     return f"пул UP: {len(pool)} кандидатов, действие не сформировано"
 
 
-def _note_calibration_tighten(
+def _note_calibration_down(
     prepared: PreparedList,
     *,
     cost_ceiling: float,
@@ -383,58 +381,26 @@ def _note_calibration_tighten(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
-    max_effective_steps: int,
 ) -> str:
+    """Причина нулевого CAL DOWN: нет ключа с state выше resolve и шагом вниз."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+        collect_calibration_down_next_step_candidates,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+        SelectionPolicy,
+    )
+
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    operable = 0
-    already_ok = 0
-    no_down = 0
-    for ctx, current in prepared:
-        if current == KeywordStrategyMode.OFF:
-            continue
-        hard_status = int(ctx.keyword.hard_status)
-        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
-            continue
-        operable += 1
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        if _min_cpa_bound_by_pay_for_order(elig):
-            cost, _ = resolve_effective_state_cost_for_mode(
-                ctx=ctx,
-                to_mode=current,
-                prepared=prepared,
-                eligibility_by_ks_id=eligibility_by_ks_id,
-                ladder_inputs=ladder,
-            )
-            if cost != float("inf") and float(cost) <= float(cost_ceiling):
-                already_ok += 1
-            continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        target = _find_trim_target_mode_limited_steps(
-            ctx,
-            current,
-            catalog=catalog,
-            cost_ceiling=float(cost_ceiling),
-            ladder_inputs=ladder,
-            policy=policy,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-            max_effective_steps=max_effective_steps,
-        )
-        if target == current:
-            already_ok += 1
-        else:
-            no_down += 1
-    if operable == 0:
-        return "нет operable ключей"
-    if already_ok == operable:
-        return f"все {operable} operable уже с CPO ≤ resolve"
-    return (
-        f"нет ключей для DOWN: {operable} operable "
-        f"({already_ok} уже ≤ resolve, {no_down} без шага DOWN)"
+    pool = collect_calibration_down_next_step_candidates(
+        prepared,
+        cost_ceiling=float(cost_ceiling),
+        policy=policy,
+        ladder_inputs=ladder_inputs,
+        eligibility_by_ks_id=eligibility_by_ks_id,
     )
+    if not pool:
+        return "нет ключа с state > resolve и допустимым шагом CAL DOWN"
+    return f"пул CAL DOWN: {len(pool)} кандидатов, действие не сформировано"

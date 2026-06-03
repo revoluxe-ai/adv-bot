@@ -18,6 +18,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
     count_effective_released_aggression_steps,
+    iter_effective_lower_modes,
     iter_effective_upper_mode_groups,
     iter_effective_upper_modes,
     mode_candidates_same_effective_target,
@@ -106,16 +107,43 @@ def test_example_1_min_opt_same_place_step_up_to_max() -> None:
 
 @pytest.mark.unit
 def test_example_2_opt_max_same_place_up_min_to_max() -> None:
-    """MIN=40, OPT=1, MAX=1 → UP MIN→MAX (alias OPT); из OPT effective UP нет."""
+    """MIN=40, OPT=1, MAX=1 → MIN/OPT alias UP → MAX (один collapsed шаг)."""
     cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
     up_min = resolve_next_effective_step_up(KeywordStrategyMode.MIN_CPA, cat)
     assert up_min.next_mode == KeywordStrategyMode.MAX_CONVERSION
     assert any("OPTIMUM" in msg for msg in up_min.skipped_aliases)
-    assert resolve_next_effective_step_up(
-        KeywordStrategyMode.OPTIMUM, cat
-    ).next_mode is None
+    assert (
+        resolve_next_effective_step_up(KeywordStrategyMode.OPTIMUM, cat).next_mode
+        == KeywordStrategyMode.MAX_CONVERSION
+    )
     assert iter_effective_upper_modes(KeywordStrategyMode.MIN_CPA, cat) == [
         KeywordStrategyMode.MAX_CONVERSION
+    ]
+
+
+@pytest.mark.unit
+def test_iter_effective_lower_modes_skips_alias_same_place() -> None:
+    """MAX=1, OPT=1, MIN=40 → DOWN из MAX: OPT alias, MIN, затем OFF."""
+    cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
+    assert iter_effective_lower_modes(KeywordStrategyMode.MAX_CONVERSION, cat) == [
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OFF,
+    ]
+    down_max = resolve_next_effective_step_down(
+        KeywordStrategyMode.MAX_CONVERSION, cat
+    )
+    assert down_max.next_mode == KeywordStrategyMode.MIN_CPA
+    assert any("OPTIMUM" in msg for msg in down_max.skipped_aliases)
+
+
+@pytest.mark.unit
+def test_iter_effective_lower_modes_full_chain() -> None:
+    """MIN=22, OPT=5, MAX=1 → DOWN из MAX: OPT, MIN, OFF."""
+    cat = _fake_catalog_places(min_place=22, opt_place=5, max_place=1)
+    assert iter_effective_lower_modes(KeywordStrategyMode.MAX_CONVERSION, cat) == [
+        KeywordStrategyMode.OPTIMUM,
+        KeywordStrategyMode.MIN_CPA,
+        KeywordStrategyMode.OFF,
     ]
 
 
@@ -144,12 +172,20 @@ def test_off_up_fallback_single_mode_when_target_place_unknown() -> None:
 
 
 @pytest.mark.unit
-def test_example_3_all_same_place_no_steps() -> None:
-    """MIN=OPT=MAX=1 → между M/O/C действий нет."""
+def test_example_3_all_same_place_collapsed_up() -> None:
+    """MIN=OPT=MAX=1: alias UP внутри place MIN/OPT → MAX; с MAX шагов нет."""
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
-    assert resolve_next_effective_step_up(KeywordStrategyMode.MIN_CPA, cat).next_mode is None
-    assert resolve_next_effective_step_up(KeywordStrategyMode.OPTIMUM, cat).next_mode is None
-    assert iter_effective_upper_modes(KeywordStrategyMode.MIN_CPA, cat) == []
+    assert (
+        resolve_next_effective_step_up(KeywordStrategyMode.MIN_CPA, cat).next_mode
+        == KeywordStrategyMode.MAX_CONVERSION
+    )
+    assert (
+        resolve_next_effective_step_up(KeywordStrategyMode.OPTIMUM, cat).next_mode
+        == KeywordStrategyMode.MAX_CONVERSION
+    )
+    assert resolve_next_effective_step_up(
+        KeywordStrategyMode.MAX_CONVERSION, cat
+    ).next_mode is None
 
 
 @pytest.mark.unit
@@ -297,14 +333,15 @@ def test_logical_step_up_differs_when_place_alias() -> None:
 
 
 @pytest.mark.unit
-def test_edge_off_to_min_ignores_target_place_alias() -> None:
-    """OFF → MIN: не сравниваем place; MIN даже при MIN=OPT=MAX на одном place."""
+def test_edge_off_to_max_collapsed_when_moc_same_place() -> None:
+    """OFF при M=O=C на одном place → MAX одним effective UP (alias схлопнуты)."""
     cat = _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
-    assert resolve_next_effective_step_up(KeywordStrategyMode.OFF, cat).next_mode == (
-        KeywordStrategyMode.MIN_CPA
+    assert (
+        resolve_next_effective_step_up(KeywordStrategyMode.OFF, cat).next_mode
+        == KeywordStrategyMode.MAX_CONVERSION
     )
     assert iter_effective_upper_modes(KeywordStrategyMode.OFF, cat) == [
-        KeywordStrategyMode.MIN_CPA
+        KeywordStrategyMode.MAX_CONVERSION
     ]
 
 
@@ -329,13 +366,14 @@ def test_edge_no_ch_invalid_catalog_min_only_upper_modes() -> None:
 
 @pytest.mark.unit
 def test_edge_o_eq_c_single_step_up_chain() -> None:
-    """O=C: MIN→MAX один шаг; OPT alias; OPT→MAX нет."""
+    """O=C: MIN/OPT→MAX один collapsed шаг на place."""
     cat = _fake_catalog_places(min_place=40, opt_place=1, max_place=1)
     chain = iter_effective_upper_modes(KeywordStrategyMode.MIN_CPA, cat)
     assert chain == [KeywordStrategyMode.MAX_CONVERSION]
-    assert resolve_next_effective_step_up(
-        KeywordStrategyMode.OPTIMUM, cat
-    ).next_mode is None
+    assert (
+        resolve_next_effective_step_up(KeywordStrategyMode.OPTIMUM, cat).next_mode
+        == KeywordStrategyMode.MAX_CONVERSION
+    )
 
 
 @pytest.mark.unit

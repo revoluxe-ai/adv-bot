@@ -57,6 +57,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
                 extra={
                     "calibration_direct": "tighten",
                     "effective_steps": 2,
+                    "prev_effective_steps": 1,
                 },
             ),
         ],
@@ -75,6 +76,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "+7" in text
     assert "пропуск" in text
     assert "DOWN" in text
+    assert "бюджет 2 (было 1)" in text
     assert "Авто: 40" in text
     assert "Возможные:" not in text
 
@@ -126,6 +128,7 @@ def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     )
     text = format_v3_tick_report_text(snap)
     assert "Калибровка: UP" in text
+    assert "бюджет 4 (было 2)" in text
     assert "adaptive" not in text.lower()
     assert "БС max (PFO" in text
     assert "420" in text

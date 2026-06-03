@@ -1,9 +1,30 @@
-"""Effective STEP_UP / STEP_DOWN: пропуск логических режимов с тем же target_place.
+"""Effective STEP_UP / STEP_DOWN: SSOT схлопывания alias по ``target_place``.
 
-Логические режимы MIN_CPA / OPTIMUM / MAX_CONVERSION сохраняются в модели;
-переход создаётся только если ``target_place`` (позиция CH-кандидата) реально меняется.
+Контракт исполнения **любого** шага V3 (pooled UP, passing, calibration, realloc,
+trim, shelf cleanup):
+- одно действие = один вызов ``resolve_next_effective_step_up`` / ``resolve_next_effective_step_down``;
+- режимы M/O/C с тем же ``target_place``, что у якоря шага, схлопываются (UP → max
+  ``mode_level`` в группе, DOWN → пройти alias-цепочку до следующего place или OFF);
+- это **не** увеличивает бюджет шагов (×2 calibration, released_steps realloc и т.д.).
 
-OFF не сравнивается по target_place — это выключение ключа.
+``iter_effective_upper_modes`` / ``iter_effective_lower_modes`` / ``iter_effective_upper_mode_groups``
+— перечисление смен ``target_place`` для анализа и «до упора» в **одном** UP
+(``_highest_passing_mode_in_upper_groups``), не для N отдельных действий по alias.
+
+OFF не сравнивается по ``target_place`` — отдельный уровень лестницы.
+
+OFF → первый effective UP (важно для eligibility)
+-------------------------------------------------
+При ``current == OFF`` первый шаг не фиксирован как ``MIN_CPA``: после ``step_up(OFF)``
+берётся ``target_place`` первой ступени и **схлопываются** все M/O/C на этом place
+в max ``mode_level`` (например OFF→``MAX_CONVERSION``, если M=O=C на pos40).
+
+Collectors с ослабленным gate (calibration UP ``off_no_data_bootstrap``) проверяют
+``to_mode == MIN_CPA`` буквально. Если collapsed target — ``OPTIMUM``/``MAX_CONVERSION``,
+а ``can_target_mode`` запрещает (MIN-only tier, пустой ``allowed_modes`` у NO DATA
+без bootstrap-ветки), ключ **выпадает из пула без fallback** на ``MIN_CPA``.
+Enable (``plan_pay_for_order_gap_enable``) всегда целится в ``MIN_CPA`` и не затронут.
+См. ``collect_calibration_up_next_step_candidates`` и ``V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
@@ -113,15 +134,45 @@ def resolve_next_effective_step_up(
 
     DOWN по-прежнему пропускает alias; UP внутри группы с одним place выбирает
     самый высокий логический режим (например MIN→MAX при O=C на pos1).
+
+    Ветка ``current == OFF``: см. module docstring — collapse на первом place может
+    вернуть режим выше ``MIN_CPA``; callers с MIN-only bootstrap должны учитывать
+    рассинхрон с ``can_target_mode`` / ``off_no_data_bootstrap``.
     """
     if current == KeywordStrategyMode.OFF:
         nxt = step_up(KeywordStrategyMode.OFF)
-        return EffectiveStepResult(nxt, ())
+        if nxt is None:
+            return EffectiveStepResult(None, ())
+        nxt_c = candidate_for_strategy_mode(nxt, catalog)
+        if nxt_c is None or not nxt_c.is_valid:
+            return EffectiveStepResult(nxt, ())
+        place = target_place_from_mode_candidate(nxt_c)
+        if place is None:
+            return EffectiveStepResult(nxt, ())
+        group = logical_modes_at_target_place_above(
+            KeywordStrategyMode.OFF, place, catalog
+        )
+        if not group:
+            return EffectiveStepResult(nxt, ())
+        highest = max(group, key=mode_level)
+        skipped_off: list[str] = []
+        for mode in group:
+            if mode != highest:
+                skipped_off.append(
+                    skipped_mode_alias_reason(
+                        mode,
+                        highest,
+                        target_place=place,
+                    )
+                )
+        return EffectiveStepResult(highest, tuple(skipped_off))
     skipped: list[str] = []
     cursor = current
     while True:
         nxt = step_up(cursor)
         if nxt is None:
+            if mode_level(cursor) > mode_level(current):
+                return EffectiveStepResult(cursor, tuple(skipped))
             return EffectiveStepResult(None, tuple(skipped))
         nxt_c = candidate_for_strategy_mode(nxt, catalog)
         if nxt_c is None or not nxt_c.is_valid:
@@ -160,7 +211,7 @@ def resolve_next_effective_step_down(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> EffectiveStepResult:
-    """Первый режим ниже ``current`` с другим ``target_place``."""
+    """Один effective DOWN: alias ниже ``current`` с тем же place пропускаются (до OFF)."""
     if current == KeywordStrategyMode.OFF:
         return EffectiveStepResult(None, ())
     skipped: list[str] = []
@@ -221,7 +272,7 @@ def iter_effective_upper_modes(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> list[KeywordStrategyMode]:
-    """По одному режиму на каждый новый ``target_place`` (max logical в alias-группе)."""
+    """Цепочка collapsed UP-целей (по place); не для N действий за тик — см. module docstring."""
     out: list[KeywordStrategyMode] = []
     cursor = current
     while True:
@@ -231,6 +282,28 @@ def iter_effective_upper_modes(
         if res.next_mode is None:
             return out
         out.append(res.next_mode)
+        cursor = res.next_mode
+    return out
+
+
+def iter_effective_lower_modes(
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> list[KeywordStrategyMode]:
+    """Цепочка collapsed DOWN-целей; не для N действий за тик — см. module docstring."""
+    out: list[KeywordStrategyMode] = []
+    if current == KeywordStrategyMode.OFF:
+        return out
+    cursor = current
+    while True:
+        res = resolve_next_effective_step_down(cursor, catalog)
+        for msg in res.skipped_aliases:
+            logger.debug("%s", msg)
+        if res.next_mode is None:
+            return out
+        out.append(res.next_mode)
+        if res.next_mode == KeywordStrategyMode.OFF:
+            return out
         cursor = res.next_mode
     return out
 

@@ -124,6 +124,63 @@ def test_edge_off_to_min_expansion_when_m_o_c_same_place() -> None:
 
 
 @pytest.mark.unit
+def test_opt_same_place_moc_promotes_to_max() -> None:
+    """OPT при M=O=C на п40: passing_up → MAX (alias на текущем place)."""
+    prof = [
+        PositionProfilePoint(
+            position=40, bid=510.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    kw = _calc_kw(
+        ks_id=95,
+        text="opt_alias",
+        mode=KeywordStrategyMode.OPTIMUM,
+        rating=5.0,
+        conv=0.01,
+        hard_status=2,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    actions = plan_profitable_expansion(
+        prepared,
+        resolve=10_000.0,
+        policy=_policy(),
+    )
+    assert len(actions) == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
+def test_min_same_place_alias_promotes_to_max() -> None:
+    """MIN при O=M place, MAX новый place: passing_up → MAX (не блокировать alias)."""
+    prof = [
+        PositionProfilePoint(
+            position=40, bid=510.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
+        ),
+        PositionProfilePoint(
+            position=1, bid=1000.0, predicted_conversion=0.2, pay_for_cart=1.0, timestamp=TS
+        ),
+    ]
+    kw = _calc_kw(
+        ks_id=94,
+        text="min_alias",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=5.0,
+        conv=0.01,
+        hard_status=2,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
+    prepared = build_prepared_from_contexts([ctx])
+    actions = plan_profitable_expansion(
+        prepared,
+        resolve=10_000.0,
+        policy=_policy(),
+    )
+    assert len(actions) == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
 def test_edge_no_ch_off_to_min_only_no_opt_max() -> None:
     """NO_CH MIN-only: OFF→MIN, без OPT/MAX в expansion."""
     no_ch_kw = _calc_kw(
@@ -176,8 +233,8 @@ def test_edge_o_eq_c_expansion_single_up_to_max() -> None:
 
 
 @pytest.mark.unit
-def test_degenerate_m_o_c_no_up_from_min() -> None:
-    """M=O=C: expansion не создаёт UP."""
+def test_degenerate_m_o_c_up_from_min_to_max() -> None:
+    """M=O=C: expansion MIN→MAX одним UP."""
     prof = [
         PositionProfilePoint(
             position=1, bid=510.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
@@ -191,4 +248,5 @@ def test_degenerate_m_o_c_no_up_from_min() -> None:
         resolve=10_000.0,
         policy=_policy(),
     )
-    assert actions == []
+    assert len(actions) == 1
+    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION

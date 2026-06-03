@@ -98,7 +98,7 @@ def test_move_kind_off_to_max() -> None:
 
 @pytest.mark.unit
 def test_jump_off_collects_effective_targets_only() -> None:
-    """OFF → только режимы с разным effective target (без alias OPT)."""
+    """OFF → один collapsed effective UP (первый новый place), без alias OPT в пуле."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(
@@ -118,11 +118,11 @@ def test_jump_off_collects_effective_targets_only() -> None:
         prepared,
         policy=_policy(click_mode=ShelfClickMode.ORGANIC_DOMINANT),
     )
-    kinds = {c.move_kind for c in candidates}
-    to_modes = {c.to_mode for c in candidates}
-    assert UpMoveKind.OFF_TO_MIN in kinds
-    assert len(to_modes) >= 2
-    assert KeywordStrategyMode.OPTIMUM in to_modes or KeywordStrategyMode.MAX_CONVERSION in to_modes
+    off_cands = [c for c in candidates if c.from_mode == KeywordStrategyMode.OFF]
+    assert len(off_cands) == 1
+    assert off_cands[0].move_kind == UpMoveKind.OFF_TO_MIN
+    assert off_cands[0].to_mode == KeywordStrategyMode.MIN_CPA
+    assert KeywordStrategyMode.OPTIMUM not in {c.to_mode for c in candidates}
 
 
 @pytest.mark.unit
