@@ -38,9 +38,7 @@ def build_normal_preamble_executors() -> list[UpdateExecutor]:
         NotFullValidateExecutor(), # новый
         RaiseStateToTargetCpoExecutor(), # новый
         ResetOverMaxCPOOnOverSpend(), # новый
-
         ShelfCleanupExecutor(),
-        MaxCpaGuardExecutor(),
         CostReallocationExecutor(),
         PayForOrderGapEnableExecutor(),
         ResolveCalibrationExecutor(),
