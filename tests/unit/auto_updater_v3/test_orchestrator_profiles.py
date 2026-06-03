@@ -60,11 +60,33 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             return_value=plan_fact,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard_phase",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
+            return_value=[],
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.UNDERPERFORM,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -72,7 +94,7 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
@@ -84,6 +106,10 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             new=AsyncMock(return_value=False),
         ),
     ):
+        views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
+        views_cls.return_value.set_views = AsyncMock()
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=5)
         )

@@ -411,8 +411,8 @@ def test_profile_full_tier_hides_max_rk_when_own_profile() -> None:
 
 
 @pytest.mark.unit
-def test_profile_worst_source_shows_max_rk_suffix() -> None:
-    """NO_CONV / worst: CPO из РК + суффикс |maxРК."""
+def test_profile_worst_source_no_longer_shows_max_rk_suffix() -> None:
+    """Worst-imputation удалён — ``|maxРК`` не показывается."""
     data = _profile_data(
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=False,
@@ -424,17 +424,16 @@ def test_profile_worst_source_shows_max_rk_suffix() -> None:
                 AggressionTargetMode.MIN_CPA, 1, 100.0, 814.0
             ),
         },
-        campaign_worst_costs={AggressionTargetMode.MIN_CPA: 814.0},
         stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
     )
     text = format_keyword_v3_profile_block(data)
-    assert "|maxРК814" in text
-    assert "maxРК — max CPO" in text
+    assert "|maxРК" not in text
+    assert "maxРК — max CPO" not in text
 
 
 @pytest.mark.unit
-def test_profile_worst_source_simplified_line_shows_max_rk_suffix() -> None:
-    """CH + worst, без поз/ставки: упрощённая строка с ``|maxРК``, как полный формат."""
+def test_profile_worst_simplified_line_without_max_rk() -> None:
+    """Упрощённая строка без суффикса maxРК после удаления worst."""
     data = _profile_data(
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=False,
@@ -454,13 +453,12 @@ def test_profile_worst_source_simplified_line_shows_max_rk_suffix() -> None:
         stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
     )
     text = format_keyword_v3_profile_block(data)
-    assert "M CPO=814.00|maxРК814" in text
-    assert " (max РК)" not in text
+    assert "|maxРК" not in text
 
 
 @pytest.mark.unit
-def test_profile_no_conv_tier_shows_max_rk_header() -> None:
-    """NO_CONV + CH: заголовок про max CPO по РК, не про имп. conv."""
+def test_profile_no_conv_tier_no_max_rk_header() -> None:
+    """NO_CONV + CH: без заголовка max CPO по РК (worst удалён)."""
     diag = KeywordV3DataDiagnostic(
         has_v2_cpo=False,
         has_ch_position_profile=True,
@@ -476,5 +474,4 @@ def test_profile_no_conv_tier_shows_max_rk_header() -> None:
         },
     )
     text = format_keyword_v3_profile_block(data)
-    assert "max CPO по РК (нет conv)" in text
-    assert "имп. conv" not in text.split("\n")[0]
+    assert "max CPO по РК" not in text

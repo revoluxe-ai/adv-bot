@@ -28,13 +28,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
-    cache_worst_costs_for_adv,
-    has_campaign_worst_costs,
     ladder_view_to_candidates,
     resolve_ladder_stage_display,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_worst_costs_cache import (
-    V3WorstCostsRedisCache,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     diagnose_keyword_v3_data,
@@ -147,6 +142,7 @@ def _profile_fields_from_diagnostic(
         KeywordV3DataDiagnostic,
     )
 
+    _ = worst_costs
     assert isinstance(diagnostic, KeywordV3DataDiagnostic)
     return {
         "n_state": diagnostic.n_state,
@@ -154,9 +150,7 @@ def _profile_fields_from_diagnostic(
         "diagnostic": diagnostic,
         "conv_views_to_cart": conv_views_to_cart,
         "conv_views_to_orders": conv_views_to_orders,
-        "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(
-            calculated_keyword, worst_costs=worst_costs
-        ),
+        "v2_pay_for_order": resolve_keyword_v2_pay_for_order_cost(calculated_keyword),
         "keyword_pay_for_order": _keyword_pay_for_order_field(calculated_keyword),
     }
 
@@ -285,14 +279,6 @@ async def load_keyword_v3_profile_data(
         key_orders=calculated_keyword.orders,
         key_carts=calculated_keyword.add_to_cart,
     )
-    if not ladder_inputs.worst_costs:
-        cached_worst = await V3WorstCostsRedisCache().get_worst_costs(
-            adv_setting.adv_id
-        )
-        if cached_worst:
-            ladder_inputs = replace(ladder_inputs, worst_costs=cached_worst)
-    await cache_worst_costs_for_adv(adv_setting.adv_id, ladder_inputs.worst_costs)
-    has_worst = has_campaign_worst_costs(ladder_inputs.worst_costs)
 
     bids = resolve_keyword_bid_profile(raw_profiles, calculated_keyword.text)
     profile_points = (
@@ -317,7 +303,6 @@ async def load_keyword_v3_profile_data(
         diagnostic.n_state
         and not diagnostic.no_ch_min_only
         and not diagnostic.has_ch_position_profile
-        and not has_worst
     ):
         return KeywordV3ProfileData(
             current_mode=calculated_keyword.strategy_mode,
@@ -327,7 +312,6 @@ async def load_keyword_v3_profile_data(
                 diagnostic,
                 conv_views_to_cart=conv_views_to_cart,
                 conv_views_to_orders=conv_views_to_orders,
-                worst_costs=ladder_inputs.worst_costs,
             ),
         )
 
@@ -355,24 +339,15 @@ async def load_keyword_v3_profile_data(
         if complex_adv.shelf_promotion_active
         else ShelfClickMode.ORGANIC_DOMINANT
     )
-    campaign_worst_only = (
-        not diagnostic.has_ch_position_profile
-        and has_worst
-        and not diagnostic.no_ch_min_only
-    )
     fields = _profile_fields_from_diagnostic(
         calculated_keyword,
         diagnostic,
         conv_views_to_cart=conv_views_to_cart,
         conv_views_to_orders=conv_views_to_orders,
-        worst_costs=ladder_inputs.worst_costs,
     )
-    fields["n_state"] = bool(fields["n_state"]) and not has_worst
     return KeywordV3ProfileData(
         current_mode=calculated_keyword.strategy_mode,
         candidates=candidates,
-        campaign_worst_only=campaign_worst_only,
-        campaign_worst_costs=dict(ladder_inputs.worst_costs),
         stage_sources=stage_sources,
         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         key_orders_7d=opc_snapshot.key_orders_7d,

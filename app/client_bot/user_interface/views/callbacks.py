@@ -480,6 +480,22 @@ class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
     level: int
 
 
+class V3CalibrationStepChange(CallbackData, prefix="v3_cal_step_change"):
+    adv_setting_original_id: int
+
+
+class V3TickReportOpen(CallbackData, prefix="v3_tick_report_open"):
+    adv_setting_original_id: int
+
+
+class V3TickReportRefresh(CallbackData, prefix="v3_tick_report_refresh"):
+    adv_setting_original_id: int
+
+
+class V3TickReportBack(CallbackData, prefix="v3_tick_report_back"):
+    pass
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):

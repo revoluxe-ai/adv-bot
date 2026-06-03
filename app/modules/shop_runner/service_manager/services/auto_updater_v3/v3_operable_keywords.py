@@ -1,0 +1,62 @@
+"""Operable keywords V3: фильтр hard_status 1|2 и синхронизация hard_status ↔ strategy_mode.
+
+Перед preamble NORMAL (фаза 0):
+1. ``filter_operable_v3_contexts`` — только ключи, с которыми ladder может работать;
+2. ``sync_operable_hard_status_with_strategy_mode`` на ledger — OFF→1, active→2.
+
+Fixed/manual (hard_status 3/4/…) остаются в полном списке для target_place, но не в preamble.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
+    hard_status_for_strategy_mode,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+        KeywordV3Context,
+    )
+
+HARD_STATUS_AUTO_MODE = 1
+HARD_STATUS_WHITE_LIST = 2
+HARD_STATUS_MODE_SYNC_REASON = "hard_status_mode_sync"
+
+
+def is_v3_operable_hard_status(hard_status: int) -> bool:
+    """Ladder UP/DOWN/FORCE_OFF: только авто (1) и белый список (2)."""
+    return int(hard_status) in (HARD_STATUS_AUTO_MODE, HARD_STATUS_WHITE_LIST)
+
+
+def is_v3_operable_keyword(keyword: CalculatedKeyword) -> bool:
+    """Ключ участвует в V3 ladder-фазах."""
+    return is_v3_operable_hard_status(keyword.hard_status)
+
+
+def expected_hard_status_for_strategy_mode(
+    mode: KeywordStrategyMode,
+) -> int:
+    """OFF → 1, любой активный mode → 2 (контракт applier)."""
+    return hard_status_for_strategy_mode(mode)
+
+
+def hard_status_matches_strategy_mode(
+    *,
+    strategy_mode: KeywordStrategyMode,
+    hard_status: int,
+) -> bool:
+    """``hard_status`` согласован с ``strategy_mode`` для operable-ключей."""
+    return int(hard_status) == expected_hard_status_for_strategy_mode(strategy_mode)
+
+
+def filter_operable_v3_contexts(
+    contexts: list[KeywordV3Context],
+) -> list[KeywordV3Context]:
+    """Оставить только контексты с ``hard_status in {1, 2}``."""
+    return [ctx for ctx in contexts if is_v3_operable_keyword(ctx.keyword)]

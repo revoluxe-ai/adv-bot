@@ -63,8 +63,8 @@ def test_rating_aligned_cpm_skips_zero_set_bid_uses_stats() -> None:
 
 
 @pytest.mark.unit
-def test_resolve_v2_cpo_uses_worst_min_when_no_rating_cpm() -> None:
-    """Нет rating CPM → pessimistic MIN CPA с других ключей, не ``pay_for_order``/bid_log."""
+def test_resolve_v2_cpo_none_when_no_rating_cpm() -> None:
+    """Нет rating CPM → ``None`` (worst fallback удалён)."""
     kw = _kw(
         ks_id=5,
         text="no_cpm",
@@ -86,10 +86,7 @@ def test_resolve_v2_cpo_uses_worst_min_when_no_rating_cpm() -> None:
         }
     )
     assert rating_aligned_cpm(kw) is None
-    worst = {AggressionTargetMode.MIN_CPA: 120.0}
-    cost = resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=worst)
-    assert cost == 120.0
-    assert resolve_keyword_v2_pay_for_order_cost(kw, worst_costs=None) is None
+    assert resolve_keyword_v2_pay_for_order_cost(kw) is None
 
 
 @pytest.mark.unit

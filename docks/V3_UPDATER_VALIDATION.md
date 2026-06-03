@@ -10,20 +10,21 @@
 |-------|---------|-----------|
 | **NOT_READY** | `detect_campaign_state(...) is None` | full stop — без bootstrap, sync, cache |
 | **NO_DATA** | `SalesStates.NO_DATA` (`fact.pay_for_order is None`) | только `plan_campaign_no_data_bootstrap_safe` → flush → sync с `force_all_target_place_zero=True` (управляемые ключи) |
-| **NORMAL** | OVERSPEND / UNDERPERFORM / STABLE / OPTIMAL | полный preamble + gate + shelf cleanup |
+| **NORMAL** | OVERSPEND / UNDERPERFORM / STABLE / OPTIMAL | полный preamble + post-gate (без gate) + snapshots |
 
-При **NO_DATA** запрещены: COST_REALLOCATION, PROFITABLE_EXPANSION, MAX_CPA_GUARD, selector, `ChangePlanFact` gate.
+При **NO_DATA** запрещены: COST_REALLOCATION, PROFITABLE_EXPANSION, MAX_CPA_GUARD, selector, plan/fact/views snapshots.
 
 ### Keyword-level (`KeywordDataTier`, `keyword_v3_eligibility.py`)
 
-| Tier | UP/realloc targets | Лестница |
-|------|-------------------|----------|
-| **KEYWORD_FULL** | MIN, OPT, MAX | да |
-| **KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV** | только MIN | да (MIN-only), `target_place=0` |
-| **KEYWORD_PESSIMISTIC_FALLBACK** | MIN, OPT, MAX | да (imputed conv) |
-| **KEYWORD_INVALID** | ∅ | нет |
+| Tier | UP/realloc targets | Cost |
+|------|-------------------|------|
+| **KEYWORD_FULL** | MIN, OPT, MAX | CH profile CPO |
+| **KEYWORD_PFO** | только MIN | `keyword.pay_for_order` |
+| **KEYWORD_NO_DATA** | ∅ (enable → MIN отдельной фазой) | нет |
 
-`OFF` **не** target mode: `can_target_mode(_, OFF) == False`. UP/realloc фильтруют через `can_target_mode` и `max_allowed_mode`.
+Legacy aliases: `KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV` → PFO, `KEYWORD_INVALID` → NO DATA.
+
+`OFF` **не** target mode: `can_target_mode(_, OFF) == False`.
 
 ## Порядок тика (`process_adv_v3`)
 
@@ -32,21 +33,23 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP → [resolve valid: realloc + expansion]
-            → MAX_CPA_GUARD (если fact > plan.max; вне is_resolve_valid) → plan/fact gate
-            → shelf cleanup (post-gate) → flush → target_place
+NORMAL    → filter/sync → B → U → S → G → R → enable → calibration(DOWN|UP)
+            → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
-Каждая фаза NORMAL: `_apply_v3_phase` → rebuild contexts → пересчёт eligibility.
+Каждая фаза NORMAL с actions: `_apply_v3_phase` → `_refresh_v3_tick_state`.
 
 Фазы NORMAL (только `allows_ladder_phases`):
 
-1. **DATA_BOOTSTRAP** (`plan_data_bootstrap_v3`) — выровнять caps по tier перед ladder.
-2. **ACTIVE_INVALID_CLEANUP** (`plan_active_invalid_state_cleanup`) — сброс active MIN/OPT/MAX при invalid/worst-only текущей ступени (WL: DOWN; иначе FORCE_OFF). Для tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: отсутствие CH-кандидата не invalid; MIN при ``pay_for_order`` ≤ max не трогаем; OPT/MAX без operational cost → DOWN на MIN по ``PAY_FOR_ORDER``, иначе FORCE_OFF.
-3. **COST_REALLOCATION** (`plan_cost_reallocation`) — схлопнутое итоговое действие на ключ (WL: DOWN; авто: FORCE_OFF + технический UP).
-4. **PROFITABLE_EXPANSION** (`plan_profitable_expansion`) — UP до max passing mode; NO_CH OFF→MIN только при V2 CPO ≤ resolve.
-5. **MAX_CPA_GUARD** (`plan_max_cpa_guard`) — trim по `plan.max_pay_for_order` (не зависит от `resolve`; при `resolve=0` всё равно выполняется).
-6. **Post-gate selector** — только shelf cleanup (`select_v3_post_gate_actions`); M2/M3/FINAL_TUNING отключены.
+1. **B** (`plan_mode_cap_down`) — cap DOWN active выше tier cap (FULL/PFO/NO DATA).
+2. **U** (`plan_passing_up`) — UP до max passing при cost/PFO ≤ resolve.
+3. **S** (`plan_shelf_rec_false_cleanup_down`) — shelf active + rec FAIL → DOWN.
+4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
+5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
+6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
+7. **calibration** (`plan_resolve_calibration`) — одна ветка за тик: **DOWN** (trim к resolve) или **UP** (один ключ — минимальный CPO следующего effective-шага, без потолка resolve); gate `fact ≤ max` + plan/views; skip если G applied; adaptive steps ×2/÷2 только для DOWN.
+8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
+9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
 ## Structured logs
 
@@ -69,7 +72,7 @@ NORMAL    → DATA_BOOTSTRAP (без NO_CH OFF→MIN) → ACTIVE_INVALID_CLEANUP
 Исключения: UI-строка «РК 7д»; ``target_place_sync`` без ``CalculatedKeyword`` → campaign fallback;
 ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` → ``pay_for_order``, не CH×orders_per_cart.
 
-UI (Telegram) и updater (COST_REALLOCATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
+UI (Telegram) и updater (COST_REALLOCATION / RESOLVE_CALIBRATION / PROFITABLE_EXPANSION / MAX_CPA_GUARD) используют **одну** модель:
 
 | Модуль | Роль |
 |--------|------|
@@ -121,18 +124,47 @@ Rec-gate:
 
 ## Preamble (NORMAL) и post-gate selector
 
-На каждом тике **NORMAL**, **до** `check_equal_in_cache`:
+На каждом тике **NORMAL**:
 
 1. **DATA_BOOTSTRAP** — tier-aware MIN/выравнивание.
 2. **ACTIVE_INVALID_CLEANUP** — invalid/worst-only active state → DOWN или FORCE_OFF.
-3. **COST_REALLOCATION** — DOWN-only rebalance (headroom).
-4. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
-5. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
+3. **COST_REALLOCATION** — DOWN-only rebalance (headroom); gate `fact < 0.9×resolve`.
+4. **RESOLVE_CALIBRATION** — **DOWN** (limited trim до `state_cost <= resolve`) или **UP** (один ключ, следующий effective-шаг, min CPO) при `fact ≤ max` **и**
+   `not plan_fact_equal` **и** `not views_equal` (AND-gate). Направление: `fact < 0.9×resolve` → UP, иначе DOWN.
+   За тик — не более `max_effective_steps` effective ladder-шагов на ключ; early stop по cost ceiling.
+   Guard / realloc / expansion — full-trim без лимита.
+5. **PROFITABLE_EXPANSION** — mass cheap UP (M1 successor).
+6. **MAX_CPA_GUARD** — trim если `fact.pay_for_order > plan.max_pay_for_order`.
+7. **Post-gate selector** — shelf cleanup (`select_v3_post_gate_actions`); **каждый** NORMAL-тик, без plan/fact gate.
+8. **Snapshots (конец тика)** — `ChangePlanFact` + `ChangePlanFactViews` (sum views `all_adv_ids`).
 
-Selector после gate: **только shelf cleanup** (rec-false DOWN / FORCE_OFF), без M2/M3/FINAL_TUNING.
+### Gates calibration vs post-gate
 
-При `SalesStates.OVERSPEND` селектор по-прежнему **не** режется cache gate
-(`test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend`).
+| Сигнал | Источник | Equal = skip calibration |
+|--------|----------|--------------------------|
+| plan/fact | `ChangePlanFact`: plan + `fact.original_orders` + `fact.pay_for_order` | да |
+| views | `ChangePlanFactViews`: SUM views по `complex_adv.all_adv_ids`, `full_adv_wb_stat`, окно `max_last_period` (как fact V3) | да |
+
+Calibration: **AND** — оба сигнала должны измениться + `fact ≤ max` (без нижней границы 0.9×resolve). Ошибка CH при resolve views → fail-closed (`views_equal=True`, calibration/enable не запускаются); **plan/fact и views snapshots в Redis не пишутся**, пока views снова не прочитаются (нет рассинхрона «кэш plan обновился, а gate views думает что unchanged»).
+
+### Adaptive calibration steps (Redis `V3CalibrationStepState`)
+
+Направление по зоне fact vs resolve:
+- **DOWN** (`tighten`) — `fact >= 0.9×resolve`; limited trim к resolve; adaptive steps.
+- **UP** (`loosen`) — `fact < 0.9×resolve`; один ключ, следующий effective-шаг, min CPO.
+
+Effective steps за NORMAL-тик (cap = `keyword_calibration_max_step`, default 1):
+- первый тик / нет Redis-истории → `1`;
+- то же направление → `min(prev × 2, cap)`;
+- смена направления → `max(prev ÷ 2, 1)`.
+
+Снимок в Redis — **только если calibration выполнилась** (gate plan/views + `fact ≤ max`, без guard): в конце NORMAL-тика вместе с plan/fact/views. Пропуск calibration **не** обновляет `V3CalibrationStepState` (иначе ×2/÷2 без фактического прогона).
+
+**UI:** кнопка `V3 cal. шаг: {N}` в меню РК (только `automatic_version == 3`, рядом с переключателем версии); FSM-ввод 1..50, как `bidder_step`.
+
+Realloc / expansion / guard — **без** plan/fact/views gate.
+
+Post-gate selector: **без** gate (раньше пропускался при unchanged plan/fact, кроме OVERSPEND — исключение снято).
 
 Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_plan_fact``
 (post-gate only; ``plan_max_pay_for_order`` игнорируется). OVERSPEND trim — в preamble
@@ -150,6 +182,18 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 - **Нет снимка:** «Нет данных» (цикл без изменений в БД или ещё не было apply).
 
 Строки «цел.поз +/-» и «топ в БС» для V3 без изменений.
+
+## UI: отчёт «Последние действия с ключами» (V3)
+
+Кнопка в меню РК (только `automatic_version == 3`): отдельное сообщение с отчётом стадий последнего тика.
+
+- **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
+- **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
+- **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
+- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
+- **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
+- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …` (фаза не запускалась). **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note` (диагностика `v3_tick_report_phase_notes`, зеркалит `plan_*`). Счётчики `↑/↓/off` только при ненулевом плане фазы. Старые снимки без `outcome_note` — fallback «причина не зафиксирована».
+- **Шапка:** adaptive calibration (`calibration_effective_steps`, `calibration_direct`, `calibration_prev_effective_steps` из Redis resolver); **БС max** — самый дорогой ключ `hard_status=2` по decision CPO (FULL → state, PFO → `pay_for_order`), с обоими CPO если доступны.
 
 ## UI: порядок ключей в списке (V3)
 

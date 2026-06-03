@@ -25,23 +25,30 @@ from tests.unit.auto_updater_v3.test_no_data_activation import _kw
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cache() -> None:
+async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_cache_equal() -> None:
     complex_adv = MagicMock()
     complex_adv.adv_id = 11
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
     dto.min_target_position = 5
 
     bootstrap = MagicMock(return_value=[])
-    expansion = MagicMock(return_value=[])
+    passing_up = MagicMock(return_value=[])
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
     plan_fact.set_new_plan_fact = AsyncMock()
+    views_cache = MagicMock()
+    views_cache.get_cached_views = AsyncMock(return_value=500)
+    views_cache.set_views = AsyncMock()
+    step_cache = MagicMock()
+    step_cache.get_state = AsyncMock(return_value=None)
+    step_cache.set_state = AsyncMock()
 
     with (
         patch(
@@ -53,12 +60,12 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             bootstrap,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
-            expansion,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
+            passing_up,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
@@ -74,6 +81,18 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
             return_value=plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            return_value=views_cache,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=500),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+            return_value=step_cache,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
@@ -93,12 +112,13 @@ async def test_process_adv_v3_normal_runs_preamble_when_selector_skipped_by_cach
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
     bootstrap.assert_called_once()
-    _args, kwargs = bootstrap.call_args
-    assert kwargs.get("campaign_orders_per_cart_7d") == 2.0
-    expansion.assert_called_once()
-    select_mock.assert_not_called()
+    passing_up.assert_called_once()
+    select_mock.assert_called_once()
     flush_mock.assert_awaited_once()
     plan_fact.check_equal_in_cache.assert_awaited_once()
+    plan_fact.set_new_plan_fact.assert_awaited_once()
+    views_cache.set_views.assert_awaited_once_with(500)
+    step_cache.set_state.assert_awaited_once()
 
 
 @pytest.mark.unit
@@ -110,13 +130,13 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
     bootstrap = MagicMock(return_value=[])
     keyword_bootstrap = MagicMock(return_value=[])
     sync_mock = AsyncMock()
-    expansion = MagicMock(return_value=[])
 
     with (
         patch(
@@ -124,7 +144,7 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             keyword_bootstrap,
         ),
         patch(
@@ -132,8 +152,8 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
             bootstrap,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
-            expansion,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
+            MagicMock(return_value=[]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
@@ -162,7 +182,6 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
 
     keyword_bootstrap.assert_not_called()
     bootstrap.assert_called_once()
-    expansion.assert_not_called()
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is True
 
@@ -193,7 +212,7 @@ async def test_process_adv_v3_not_ready_full_stop() -> None:
             return_value={},
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             keyword_bootstrap,
         ),
         patch(
@@ -251,7 +270,7 @@ async def test_process_adv_v3_no_plan_full_stop() -> None:
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             keyword_bootstrap,
         ),
         patch(
@@ -283,6 +302,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
@@ -304,7 +324,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             build_fallback,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -312,7 +332,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
@@ -326,6 +346,16 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
         ) as pfc_cls,
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews"
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
         ),
@@ -336,7 +366,14 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
     ):
         plan_fact = MagicMock()
         plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=100)
+        views_cache.set_views = AsyncMock()
+        views_cls.return_value = views_cache
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
         )
@@ -373,6 +410,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[kw])
 
     dto = MagicMock()
@@ -391,7 +429,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -399,11 +437,11 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_profitable_expansion",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_max_cpa_guard_phase",
             return_value=[guard_action],
         ),
         patch(
@@ -423,6 +461,13 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
         ) as pfc_cls,
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
         ),
@@ -430,6 +475,9 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
             return_value=[],
         ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",
             sync_mock,
@@ -443,6 +491,12 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
         plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=100)
+        views_cache.set_views = AsyncMock()
+        views_cls.return_value = views_cache
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=150.0, predict_orders=10.0)
         )
@@ -466,6 +520,7 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = True
     complex_adv.v3_rollout_aggressiveness = 2
+    complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
 
     dto = MagicMock()
@@ -487,7 +542,7 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
             build_fallback,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
             return_value=[],
         ),
         patch(
@@ -504,6 +559,19 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
             return_value=SalesStates.OPTIMAL,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact"
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews"
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.LadderInputs.from_contexts",
             side_effect=RuntimeError("preamble boom"),
         ),
@@ -512,6 +580,13 @@ async def test_process_adv_v3_finally_sync_uses_early_fallback_on_preamble_error
             sync_mock,
         ),
     ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+        pfc_cls.return_value = plan_fact
+        views_cache = MagicMock()
+        views_cache.get_cached_views = AsyncMock(return_value=None)
+        views_cls.return_value = views_cache
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10.0)
         )
