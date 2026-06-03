@@ -14,7 +14,7 @@ FSM_V3_TICK_REPORT_ADV_SETTING_ID = "v3_tick_report_adv_setting_id"
 
 
 def build_v3_tick_report_keyboard(adv_setting_original_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура: обновить + назад к меню РК."""
+    """Клавиатура: новый отчёт из Redis + назад к меню РК."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
