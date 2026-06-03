@@ -1,17 +1,22 @@
-"""Сортировка ключей V3: shop-runner (MIN_CPO) и Telegram UI (state_cost текущего режима)."""
+"""Сортировка ключей V3: shop-runner (MIN_CPO) и Telegram UI (профиль CH или pay_for_order)."""
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     resolve_no_ch_operational_pay_for_order_cost,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    min_cpa_operational_via_pay_for_order,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
-    cost_for_mode,
+    state_candidates_by_mode_for_ctx,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
@@ -57,25 +62,37 @@ def resolve_v3_ui_sort_cost(
     ladder_inputs: LadderInputs,
     eligibility: KeywordV3Eligibility | None,
 ) -> float | None:
-    """Себестоимость для сортировки списка: ``cost_for_mode`` текущего/OFF→MIN state, иначе PFO.
+    """Метрика сортировки UI: свой ``state_cost`` из CH-профиля или NO DATA → ``pay_for_order``.
+
+    Worst-импутация по РК **не** используется (выпилена из prod-контракта сортировки):
+    нет валидной точки M/O/C на ключе → операционный ``pay_for_order``, иначе хвост по алфавиту.
 
     Args:
         ctx: Контекст ключа с ``position_profile``.
-        ladder_inputs: Предрасчёт лестницы на РК.
-        eligibility: Tier/allowed_modes для ``cost_for_mode``.
+        ladder_inputs: Предрасчёт лестницы на РК (peer/eligibility).
+        eligibility: Tier для NO CH / collapsed CH (MIN через PFO).
 
     Returns:
         Конечная метрика сортировки или ``None`` (хвост списка по алфавиту).
     """
     sort_mode = resolve_v3_ui_sort_mode(ctx.keyword)
-    cost, _imputed = cost_for_mode(
-        ctx,
-        sort_mode,
-        ladder_inputs=ladder_inputs,
-        eligibility=eligibility,
-    )
-    if math.isfinite(cost):
-        return float(cost)
+    target = AggressionTargetMode[sort_mode.name]
+    catalog = state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
+
+    if eligibility is not None and min_cpa_operational_via_pay_for_order(
+        ctx, eligibility, catalog
+    ):
+        if sort_mode == KeywordStrategyMode.MIN_CPA:
+            pfo = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+            if pfo is not None:
+                return float(pfo)
+        pfo = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+        return float(pfo) if pfo is not None else None
+
+    mc = catalog.get(target)
+    if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
+        return float(mc.predicted_cpa)
+
     pfo = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
     if pfo is not None:
         return float(pfo)
@@ -114,7 +131,7 @@ def sort_keywords_by_current_state_cost(
     ladder_inputs: LadderInputs,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility],
 ) -> list[CalculatedKeyword]:
-    """Список ключей UI V3: asc по ``state_cost`` текущего режима (OFF → MIN), хвост — алфавит.
+    """Список ключей UI V3: asc по CH ``state_cost`` или ``pay_for_order`` (NO DATA), хвост — алфавит.
 
     Args:
         keywords: Отображаемые ключи (уже отфильтрованы в UI).

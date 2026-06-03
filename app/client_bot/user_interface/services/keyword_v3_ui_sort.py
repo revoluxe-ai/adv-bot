@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from typing import cast
 
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
@@ -18,16 +17,13 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
     build_keyword_v3_contexts,
+    load_campaign_v3_contexts_from_database,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_eligibility_map,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
-    cache_worst_costs_for_adv,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_worst_costs_cache import (
-    V3WorstCostsRedisCache,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.sort_utils import (
     pay_for_order_sort_key,
@@ -47,6 +43,9 @@ async def sort_keywords_for_v3_ui(
     """Отсортировать ключи для клавиатуры V3: state_cost текущего режима (OFF → MIN).
 
     При недоступности CH/min_bids — fallback на ``pay_for_order`` asc (прежнее UI).
+
+    ``LadderInputs`` строятся по **всей** РК (eligibility/peers); для сортировки только
+    CH-профиль ключа или ``pay_for_order`` (без worst-импутации). Redis ``v3_worst_costs`` не трогаем.
 
     Args:
         adv_setting: РК из UI.
@@ -123,9 +122,15 @@ async def sort_keywords_for_v3_ui(
         )
         return sorted(keywords, key=pay_for_order_sort_key)
 
-    contexts = build_keyword_v3_contexts(keywords, raw_profiles)
-    if not contexts:
-        return sorted(keywords, key=pay_for_order_sort_key)
+    # Worst/peers — по всей РК (как profile loader / orchestrator), не по отфильтрованному UI.
+    all_contexts = await load_campaign_v3_contexts_from_database(
+        complex_adv, raw_profiles
+    )
+    if not all_contexts:
+        display_contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+        if not display_contexts:
+            return sorted(keywords, key=pay_for_order_sort_key)
+        all_contexts = display_contexts
 
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
         load_campaign_orders_per_cart_7d,
@@ -138,23 +143,32 @@ async def sort_keywords_for_v3_ui(
         rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
     )
     ladder_inputs = LadderInputs.from_contexts(
-        contexts,
+        all_contexts,
         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         rec_orders_per_view=rec_orders_per_view,
     )
-    if not ladder_inputs.worst_costs:
-        cached_worst = await V3WorstCostsRedisCache().get_worst_costs(adv_setting.adv_id)
-        if cached_worst:
-            ladder_inputs = replace(ladder_inputs, worst_costs=cached_worst)
-    await cache_worst_costs_for_adv(adv_setting.adv_id, ladder_inputs.worst_costs)
+
+    display_ks_ids = {
+        int(ks_id)
+        for kw in keywords
+        if (ks_id := kw.keyword_setting_original_id) is not None
+    }
+    display_contexts = [
+        ctx
+        for ctx in all_contexts
+        if ctx.keyword.keyword_setting_original_id is not None
+        and int(ctx.keyword.keyword_setting_original_id) in display_ks_ids
+    ]
+    if not display_contexts:
+        display_contexts = build_keyword_v3_contexts(keywords, raw_profiles)
 
     eligibility_by_ks_id = build_eligibility_map(
-        contexts,
+        all_contexts,
         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
     )
     return sort_keywords_by_current_state_cost(
         keywords,
-        contexts,
+        display_contexts,
         ladder_inputs,
         eligibility_by_ks_id,
     )

@@ -8,6 +8,9 @@ import pytest
 
 from app.client_bot.user_interface.views.keyboards import sorting_keywords_for_v3
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     build_prepared_from_contexts,
 )
@@ -157,6 +160,40 @@ def test_v3_sort_off_uses_min_state_cost_no_ch() -> None:
         elig_map,  # type: ignore[arg-type]
     )
     assert [k.keyword_setting.id for k in sorted_kws] == [20, 21]
+
+
+@pytest.mark.unit
+def test_v3_sort_no_ch_uses_pay_for_order_not_campaign_worst() -> None:
+    """Без CH-профиля сортировка по своему PFO, не по worst донора с дорогим MIN."""
+    prof = _sample_profile()
+    donor = _calc_kw(
+        ks_id=25,
+        text="donor",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(200.0),
+    )
+    no_ch = _calc_kw(
+        ks_id=26,
+        text="no_ch",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=_conv_for_pay_for_order(45.0),
+    )
+    contexts = [
+        KeywordV3Context(keyword=donor, position_profile=prof),
+        KeywordV3Context(keyword=no_ch, position_profile=None),
+    ]
+    ladder_inputs, elig_map = _ladder_bundle(contexts)
+    assert ladder_inputs.worst_costs.get(AggressionTargetMode.MIN_CPA) is not None
+    sorted_kws = sort_keywords_by_current_state_cost(
+        [donor, no_ch],
+        contexts,
+        ladder_inputs,
+        elig_map,  # type: ignore[arg-type]
+    )
+    assert sorted_kws[0].text == "no_ch"
+    assert sorted_kws[1].text == "donor"
 
 
 @pytest.mark.unit
