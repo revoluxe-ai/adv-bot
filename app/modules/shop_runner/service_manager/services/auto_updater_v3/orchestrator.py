@@ -364,7 +364,6 @@ async def process_adv_v3(
     campaign_mode = CampaignMode.NOT_READY
     sync_force_zero = False
     sync_fallback_by_id: dict[int, bool] | None = None
-    ladder_inputs: LadderInputs | None = None
     policy: SelectionPolicy | None = None
     campaign_orders_per_cart_7d: float | None = None
 

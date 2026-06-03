@@ -490,12 +490,19 @@ def collect_calibration_up_next_step_candidates(
 
     Один переход на ключ — ``resolve_next_effective_step_up``; итоговый выбор
     ключа — ``pick_one_up_cost_first`` (минимальный state_cost / PFO).
+
+    OFF + NO DATA: как ``plan_pay_for_order_gap_enable`` — OFF→MIN при отсутствии
+    ``participates_in_ladder`` / ``can_target_mode`` для tier NO DATA.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        KeywordDataTier,
         KeywordV3Eligibility,
         build_eligibility_map,
         can_target_mode,
         min_cpa_operational_via_pay_for_order,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+        is_keyword_no_data,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         cost_for_mode,
@@ -519,15 +526,21 @@ def collect_calibration_up_next_step_candidates(
     for ctx, current_mode in prepared:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
-        if current_mode == KeywordStrategyMode.OFF:
-            continue
+        is_off_gap_enable = current_mode == KeywordStrategyMode.OFF
         ks_id = ctx.keyword.keyword_setting_original_id
         if ks_id is None:
             continue
         catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
         elig = elig_map.get(int(ks_id))
         if elig is not None and not elig.participates_in_ladder:
-            continue
+            if is_off_gap_enable:
+                if (
+                    elig.data_tier != KeywordDataTier.KEYWORD_NO_DATA
+                    or not is_keyword_no_data(ctx.keyword)
+                ):
+                    continue
+            else:
+                continue
         step = resolve_next_effective_step_up(current_mode, catalog)
         log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
         to_mode = step.next_mode
@@ -537,8 +550,15 @@ def collect_calibration_up_next_step_candidates(
         mc = catalog.get(target)
         if mc is None:
             continue
+        off_no_data_bootstrap = (
+            is_off_gap_enable
+            and to_mode == KeywordStrategyMode.MIN_CPA
+            and elig is not None
+            and elig.data_tier == KeywordDataTier.KEYWORD_NO_DATA
+        )
         if elig is not None and not can_target_mode(elig, to_mode):
-            continue
+            if not off_no_data_bootstrap:
+                continue
         gate_status = state_rec_gate_status_for_mode(
             catalog,
             to_mode,
@@ -566,7 +586,11 @@ def collect_calibration_up_next_step_candidates(
         else:
             cost, imputed = _resolve_state_cost(mc, target)
         if cost == float("inf"):
-            continue
+            if off_no_data_bootstrap and mc is not None:
+                cost = float(mc.predicted_cpa or 0.0)
+                imputed = True
+            else:
+                continue
         current_c = candidate_for_strategy_mode(current_mode, catalog)
         target_c = candidate_for_strategy_mode(to_mode, catalog)
         if mode_candidates_same_effective_target(current_c, target_c):
