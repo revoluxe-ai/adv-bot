@@ -82,10 +82,11 @@ async def open_v3_rollout_menu(
         )
         adv = adv_result.scalar_one_or_none()
         if adv is None or normalize_automatic_version_ui(adv.automatic_version) != 3:
-            await callback_query.answer(
-                "Доступно только при версии АвтоАпдейтера V3.",
-                show_alert=True,
-            )
+            if callback_query.message is not None:
+                await bot.send_message(
+                    callback_query.message.chat.id,
+                    "Доступно только при версии АвтоАпдейтера V3.",
+                )
             return
         markup = build_v3_rollout_submenu_markup(adv)
 
@@ -99,7 +100,6 @@ async def open_v3_rollout_menu(
         }
     )
     await bot.send_message(chat_id, v3_rollout_submenu_caption(), reply_markup=markup)
-    await callback_query.answer()
 
 
 @router.callback_query(V3RolloutAggMenuBack.filter())
@@ -109,7 +109,6 @@ async def close_v3_rollout_menu(
     state: FSMContext,
 ) -> None:
     if callback_query.message is None:
-        await callback_query.answer("Нет сообщения.", show_alert=True)
         await _clear_v3_rollout_fsm(state)
         return
 
@@ -117,7 +116,6 @@ async def close_v3_rollout_menu(
     fsm_data = await state.get_data()
     adv_setting_original_id = fsm_data.get(FSM_V3_ROLLOUT_MENU_ADV_SETTING_ID)
 
-    await callback_query.answer()
     await _clear_v3_rollout_fsm(state)
 
     if adv_setting_original_id is None:
@@ -153,7 +151,10 @@ async def set_v3_rollout_level(
     level = callback_data.level
     adv_setting_original_id = callback_data.adv_setting_original_id
     if level not in _ALLOWED_LEVELS:
-        await callback_query.answer("Недопустимое значение.", show_alert=True)
+        if callback_query.message is not None:
+            await bot.send_message(
+                callback_query.message.chat.id, "Недопустимое значение."
+            )
         return
 
     async with sm() as session:
@@ -162,13 +163,18 @@ async def set_v3_rollout_level(
         )
         adv_before = adv_result.scalar_one_or_none()
         if adv_before is None:
-            await callback_query.answer("Кампания не найдена.", show_alert=True)
+            if callback_query.message is not None:
+                await bot.send_message(
+                    callback_query.message.chat.id, "Кампания не найдена."
+                )
             return
         if normalize_automatic_version_ui(adv_before.automatic_version) != 3:
-            await callback_query.answer("Только для V3.", show_alert=True)
+            if callback_query.message is not None:
+                await bot.send_message(
+                    callback_query.message.chat.id, "Только для V3."
+                )
             return
         if int(adv_before.aggressiveness) == level:
-            await callback_query.answer("Уже выбрано", show_alert=False)
             return
         await session.execute(
             update(AdvSetting)
@@ -204,7 +210,6 @@ async def set_v3_rollout_level(
 
     submenu_msg = callback_query.message
     if submenu_msg is None:
-        await callback_query.answer(f"Уровень {level}", show_alert=False)
         return
     chat_id = submenu_msg.chat.id
 
@@ -233,10 +238,8 @@ async def set_v3_rollout_level(
             )
 
     if parent_failed:
-        await callback_query.answer(
+        await bot.send_message(
+            chat_id,
             f"Уровень {level} сохранён. Если кнопка в главном меню не обновилась — "
             "нажмите «Назад» и откройте настройки РК снова.",
-            show_alert=True,
         )
-    else:
-        await callback_query.answer(f"Уровень {level}", show_alert=False)

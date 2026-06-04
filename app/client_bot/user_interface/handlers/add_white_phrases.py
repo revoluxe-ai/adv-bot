@@ -81,7 +81,6 @@ async def add_relevant_phrases(
     callback_data: callbacks.AddRelevantPhrases,
     state: FSMContext,
 ):
-    await callback.answer("Добавление фраз в релевантный список")
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddRelevantPhrases.waiting_for_relevant_phrases)
@@ -185,4 +184,3 @@ async def reset_non_relevant_phrases(
         "Нерелевантные фразы сброшены, возвращаю меню кампании...",
     )
     await AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()
-    await callback.answer()

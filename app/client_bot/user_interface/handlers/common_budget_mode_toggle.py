@@ -80,7 +80,6 @@ async def toggle_common_budget_mode(
     chat_id = msg.chat.id
     message_id = msg.message_id
 
-    await callback_query.answer()
     menu = messages.CampaignActivityMenu(bot, chat_id, adv_setting)
     text = menu.text
     keyboard = keyboards.get_campaign_activity_menu_keyboard(adv_setting)

@@ -50,10 +50,7 @@ async def toggle_hide_zero_views(
         else "Скрытие ключей без рекламных просмотров отключено"
     )
 
-    # Всплывающая надпись и снятие индикатора с кнопки
-    await callback_query.answer(text=status_str)
-
-    # Дублируем надпись в чат, затем загружаем страницу с ключами
+    # Снятие индикатора с кнопки — глобальный CallbackAnswerMiddleware; статус в чат:
     await bot.send_message(chat_id, status_str)
 
     # Перерисовываем страницу ключей

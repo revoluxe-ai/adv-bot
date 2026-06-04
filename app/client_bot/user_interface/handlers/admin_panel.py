@@ -31,7 +31,6 @@ async def show_admin_panel(
 ) -> None:
     """Показать экран выбора: пополнение кабинетов / пользователей / гейт."""
     await state.clear()
-    await callback.answer()
     if callback.message:
         await callback.message.edit_text(
             "Выберите действие:",
@@ -49,7 +48,6 @@ async def admin_grant_gate_start(
 ) -> None:
     """Запрос Telegram ID пользователя для открытия гейта."""
     await state.set_state(AdminGrantGate.waiting_telegram_id)
-    await callback.answer()
     if callback.message is None:
         return
     cancel_kb = InlineKeyboardMarkup(

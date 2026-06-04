@@ -454,7 +454,6 @@ async def wb_update_minus_keywords(
     chat_id = callback.message.chat.id
     adv_setting_original_id = callback_data.adv_setting_original_id
 
-    await callback.answer()
     await bot.send_message(chat_id, "Обновляю минус-слова…")
 
     async with sm(read_only=True) as session:

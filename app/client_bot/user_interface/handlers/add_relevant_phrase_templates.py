@@ -59,7 +59,6 @@ async def add_relevant_phrase_templates_start(
         bot,
         callback.from_user.id,
     )(adv_setting_id)
-    await callback.answer()
 
 
 @router.message(
@@ -107,7 +106,6 @@ async def test_relevant_phrase_templates_start(
         text=prompt,
         reply_markup=_exit_test_keyboard(adv_setting_id).as_markup(),
     )
-    await callback.answer()
 
 
 @router.callback_query(callbacks.ExitRelevantPhraseTemplatesTest.filter())
@@ -126,7 +124,6 @@ async def exit_relevant_phrase_templates_test(
     await messages.WaitingForRelevantPhraseTemplates(bot, callback.from_user.id)(
         adv_setting_id
     )
-    await callback.answer()
 
 
 @router.message(
@@ -188,14 +185,14 @@ async def reset_relevant_phrase_templates(
     async with sm(read_only=True) as session:
         adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_original_id)
     if adv is None:
-        await callback.answer("Кампания не найдена.", show_alert=True)
+        if callback.message is not None:
+            await callback.message.answer("Кампания не найдена.")
         return
     await dm_reset_relevant_phrases_templates(adv_setting_original_id)
     assert callback.from_user
     await messages.WaitingForRelevantPhraseTemplates(bot, callback.from_user.id)(
         callback_data.adv_setting_id
     )
-    await callback.answer()
 
 
 @router.callback_query(callbacks.ExportRelevantPhraseTemplates.filter())
@@ -208,7 +205,8 @@ async def export_relevant_phrase_templates(
     async with sm(read_only=True) as session:
         adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
     if adv is None:
-        await callback.answer("Кампания не найдена.", show_alert=True)
+        if callback.message is not None:
+            await callback.message.answer("Кампания не найдена.")
         return
 
     rel_manager = RelevantPhraseManager(adv)
@@ -221,4 +219,3 @@ async def export_relevant_phrase_templates(
         document=document,
         caption="Выгрузка шаблонов релевантных фраз",
     )
-    await callback.answer()

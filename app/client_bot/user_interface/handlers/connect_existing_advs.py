@@ -986,7 +986,6 @@ async def connect_existing_card_not_found_retry_full_list(
     if callback_data.action != "retry_full_list":
         return
 
-    await callback.answer()
     if callback.message is None:
         return
 
@@ -1069,7 +1068,6 @@ async def connect_existing_choose_auction(
     state: FSMContext,
 ) -> None:
     """Меню выбора способа для аукционной РК: ввести ID, список, создать, назад."""
-    await callback.answer()
     if callback.message is None:
         return
     chat_id = callback.message.chat.id
@@ -1238,7 +1236,6 @@ async def connect_existing_confirm_type1(
     state: FSMContext,
 ) -> None:
     """Выбор аукционной РК из списка → показать меню способа для авто (шаг 2)."""
-    await callback.answer()
     if callback.message is None:
         return
     data = await state.get_data()
@@ -1268,7 +1265,6 @@ async def connect_existing_confirm_type2(
     state: FSMContext,
 ) -> None:
     """Подтверждение/создание по второму типу (авто) → сохранить в AdvSetting."""
-    await callback.answer()
     if callback.message is None:
         return
     data = await state.get_data()
@@ -1352,7 +1348,6 @@ async def connect_existing_choose_auto(
     state: FSMContext,
 ) -> None:
     """Меню выбора способа для авто-РК: ввести ID, список, создать, назад."""
-    await callback.answer()
     if callback.message is None:
         return
     chat_id = callback.message.chat.id
@@ -1525,7 +1520,6 @@ async def connect_existing_create_both(
     state: FSMContext,
 ) -> None:
     """Подтверждение создания обеих кампаний (create_complex_advs) или отмена."""
-    await callback.answer()
     if callback.message is None:
         return
     if callback_data.action == "cancel":
@@ -1588,7 +1582,6 @@ async def connect_existing_continue_despite_invalid(
     state: FSMContext,
 ) -> None:
     """Продолжить создание при наличии только авто без поиска: деактивация старых + create_complex_advs (hard_mode)."""
-    await callback.answer()
     if callback.message is None:
         return
     if callback_data.action == "cancel":
@@ -1659,7 +1652,6 @@ async def connect_existing_change_nmid(
     state: FSMContext,
 ) -> None:
     """Снова запросить артикул (например, при уже подключённых к этому nm id РК)."""
-    await callback.answer()
     if callback.message is None:
         return
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -1680,7 +1672,6 @@ async def connect_existing_advs_back_to_shop(
     state: FSMContext,
 ) -> None:
     """Вернуться в меню магазина из сценария «подключить существующие» (уже есть РК или отмена)."""
-    await callback.answer()
     await state.clear()
     if callback.message is None:
         return

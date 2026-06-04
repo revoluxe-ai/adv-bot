@@ -82,7 +82,10 @@ async def open_v3_tick_report(
         )
         adv = adv_result.scalar_one_or_none()
     if adv is None or callback_query.message is None:
-        await callback_query.answer("Кампания не найдена.", show_alert=True)
+        if callback_query.message is not None:
+            await bot.send_message(
+                callback_query.message.chat.id, "Кампания не найдена."
+            )
         return
     text = await _load_report_text(adv)
     markup = build_v3_tick_report_keyboard(adv_setting_original_id)
@@ -94,7 +97,6 @@ async def open_v3_tick_report(
         }
     )
     await bot.send_message(chat_id, text, reply_markup=markup)
-    await callback_query.answer()
 
 
 @router.callback_query(V3TickReportRefresh.filter())
@@ -105,7 +107,6 @@ async def refresh_v3_tick_report(
 ) -> None:
     """Перечитать Redis и отправить новое сообщение с отчётом (без edit_text)."""
     if callback_query.message is None:
-        await callback_query.answer()
         return
     adv_setting_original_id = callback_data.adv_setting_original_id
     chat_id = callback_query.message.chat.id
@@ -115,12 +116,11 @@ async def refresh_v3_tick_report(
         )
         adv = adv_result.scalar_one_or_none()
     if adv is None:
-        await callback_query.answer("Кампания не найдена.", show_alert=True)
+        await bot.send_message(chat_id, "Кампания не найдена.")
         return
     text = await _load_report_text(adv)
     markup = build_v3_tick_report_keyboard(adv_setting_original_id)
     await bot.send_message(chat_id, text, reply_markup=markup)
-    await callback_query.answer("Обновлено")
 
 
 @router.callback_query(V3TickReportBack.filter())
@@ -131,13 +131,11 @@ async def back_from_v3_tick_report(
 ) -> None:
     """Вернуться к главному меню настроек РК."""
     if callback_query.message is None:
-        await callback_query.answer()
         await _clear_tick_report_fsm(state)
         return
     chat_id = callback_query.message.chat.id
     fsm_data = await state.get_data()
     adv_setting_original_id = fsm_data.get(FSM_V3_TICK_REPORT_ADV_SETTING_ID)
-    await callback_query.answer()
     await _clear_tick_report_fsm(state)
     if adv_setting_original_id is None:
         return

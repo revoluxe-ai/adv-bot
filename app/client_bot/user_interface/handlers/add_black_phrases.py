@@ -94,7 +94,6 @@ async def test_black_phrases_start(
         text=prompt,
         reply_markup=_exit_test_keyboard(adv_setting_id).as_markup(),
     )
-    await callback.answer()
 
 
 @router.callback_query(callbacks.ExitBlackPhrasesTest.filter())
@@ -109,7 +108,6 @@ async def exit_black_phrases_test(
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases)
     assert callback.from_user
     await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(adv_setting_id)
-    await callback.answer()
 
 
 @router.message(StateFilter(states.AddBlackPhrasesTemplates.waiting_for_black_phrases_test))
@@ -183,7 +181,8 @@ async def export_black_phrases(
     async with sm(read_only=True) as session:
         adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
     if adv is None:
-        await callback.answer("Кампания не найдена.", show_alert=True)
+        if callback.message is not None:
+            await callback.message.answer("Кампания не найдена.")
         return
 
     rel_manager = RelevantPhraseManager(adv)
@@ -196,4 +195,3 @@ async def export_black_phrases(
         document=document,
         caption="Выгрузка черного списка фраз",
     )
-    await callback.answer()

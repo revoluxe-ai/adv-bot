@@ -1,9 +1,11 @@
 """Хелперы для toast/alert при ответе на CallbackQuery.
 
-При ``CallbackAnswerMiddleware(pre=True)`` в ``global_router`` повторный
-``callback.answer()`` из хендлера невозможен — Telegram принимает один ответ.
-Для кастомного текста после обработки используйте ``pre=False`` на роутере
-(``flags={"callback_answer": {"pre": False}}``) и ``set_callback_toast``.
+В ``global_router`` включён ``CallbackAnswerMiddleware(pre=True)`` — ACK и toast
+«Запрос в обработке» до хендлера. Из хендлеров ``callback.answer()`` не вызываем.
+
+Для кастомного toast после обработки: ``flags={"callback_answer": {"pre": False}}``
+на хендлере/роутере и ``set_callback_toast``. Для ошибок — ``callback.message.answer``
+или ``bot.send_message`` в чат.
 """
 
 from __future__ import annotations
