@@ -154,17 +154,18 @@ class UpdatePipelineManager:
             state = current_ctx.adv_state
             extra = _executor_extra(current_ctx, executor)
 
-            if executor.skip_reason is not None:
+            skip_reason = getattr(executor, "skip_reason", None)
+            if skip_reason is not None:
                 rt.tick_report.record_phase(
                     executor.phase_name,
-                    skip_reason=executor.skip_reason,
+                    skip_reason=skip_reason,
                     extra=extra,
                 )
                 if executor.phase_name == "resolve_calibration":
                     logger.debug(
                         "[adv_id=%s] v3 RESOLVE_CALIBRATION skipped: %s",
                         rt.adv_id,
-                        executor.skip_reason,
+                        skip_reason,
                     )
                 continue
 
