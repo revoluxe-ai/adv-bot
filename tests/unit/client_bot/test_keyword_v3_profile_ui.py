@@ -6,8 +6,14 @@ import pytest
 
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     KeywordV3ProfileData,
+    format_keyword_v3_enable_blockers,
     format_keyword_v3_profile_block,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
+    V3PhaseStats,
+    V3TickReportSnapshot,
+)
+from datetime import datetime, timezone
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
@@ -475,3 +481,33 @@ def test_profile_no_conv_tier_no_max_rk_header() -> None:
     )
     text = format_keyword_v3_profile_block(data)
     assert "max CPO по РК" not in text
+
+
+@pytest.mark.unit
+def test_enable_blockers_shows_raise_skip_and_bad_rating() -> None:
+    """OFF + авто + skip R↑ + bad → две причины в карточке."""
+    snapshot = V3TickReportSnapshot(
+        tick_at=datetime.now(timezone.utc),
+        adv_id=1,
+        campaign_mode="NORMAL",
+        fact_cpa=701.0,
+        max_pay_for_order=550.0,
+        phases=[
+            V3PhaseStats(
+                phase_id="raise_state_to_target_cpo",
+                title_ru="R↑",
+                executed=False,
+                skip_reason="fact_cpo_ge_90pct_plan_max",
+            ),
+        ],
+    )
+    text = format_keyword_v3_enable_blockers(
+        hard_status=1,
+        current_mode=KeywordStrategyMode.OFF,
+        status_value="bad",
+        reason_value="less_then_rating_by_orders",
+        tick_snapshot=snapshot,
+    )
+    assert "R↑ пропущен" in text
+    assert "701" in text
+    assert "рейтинг ниже порога" in text

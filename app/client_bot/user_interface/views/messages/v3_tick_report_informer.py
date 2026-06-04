@@ -50,6 +50,9 @@ _SKIP_REASON_RU: dict[str, str] = {
     "fact_gt_max": "fact > max",
     "no_potential_up": "нет ступеней выше текущих (potential пуст)",
     "no_current_active": "нет active ключей для среза (все OFF)",
+    "fact_cpo_ge_90pct_plan_max": (
+        "fact CPA РК ≥ 90% от max — фаза R↑ пропущена (авто-ключи остаются OFF)"
+    ),
 }
 
 

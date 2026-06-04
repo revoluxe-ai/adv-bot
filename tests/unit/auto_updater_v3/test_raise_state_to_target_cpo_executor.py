@@ -38,11 +38,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     NextStateManager,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    pfo_off_plan_headroom_floor,
-    raise_state_plan_max_floor,
-    should_skip_raise_state_to_target_cpo,
+    pfo_off_plan_headroom_floor, raise_state_plan_max_floor, should_skip_raise_state_to_target_cpo,
+
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
+
 from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
 
 
@@ -250,6 +249,7 @@ def test_raise_state_skips_phase_when_fact_ge_90pct_plan_max() -> None:
 
 @pytest.mark.unit
 def test_raise_state_runs_when_fact_below_90pct_plan_max() -> None:
+    """При fact < 90 % plan.max фаза R↑ выполняется и поднимает ключ до OPTIMUM."""
     max_cpo = 550.0
     fact = raise_state_plan_max_floor(max_cpo) - 1.0
     dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA)
@@ -263,7 +263,9 @@ def test_raise_state_runs_when_fact_below_90pct_plan_max() -> None:
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    RaiseStateToTargetCpoExecutor().execute(ctx)
+    executor = RaiseStateToTargetCpoExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason is None
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
     assert len(dto.next_state) == 1
 
