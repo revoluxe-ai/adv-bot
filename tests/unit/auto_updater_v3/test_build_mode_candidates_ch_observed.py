@@ -1,4 +1,4 @@
-"""Unit: M/O/C не схлопываются на синтетике _fill_positions (ch_observed=False)."""
+"""Unit: M/O/C и синтетика _fill_positions (ch_observed=False) vs INCLUDE_SYNTHETIC."""
 
 from __future__ import annotations
 
@@ -46,6 +46,7 @@ def test_synthetic_plateau_excluded_moc_not_all_same() -> None:
         profile=profile,
         keyword_text="kw",
         rk_orders_per_cart=rk,
+        include_synthetic=False,
     )
     assert cat[AggressionTargetMode.MIN_CPA].position == 40
     assert cat[AggressionTargetMode.OPTIMUM].position != 1
@@ -66,6 +67,46 @@ def test_only_synthetic_points_invalid_ladder() -> None:
         profile=profile,
         keyword_text="kw",
         rk_orders_per_cart=0.25,
+        include_synthetic=False,
     )
     assert not cat[AggressionTargetMode.MIN_CPA].is_valid
     assert cat[AggressionTargetMode.MIN_CPA].invalid_reason == "no_conversion_points"
+
+
+@pytest.mark.unit
+def test_synthetic_plateau_included_when_flag_true() -> None:
+    """Синтетика участвует: prior-conv на pos=1 может выиграть MAX."""
+    profile = [
+        _point(1, 21699, 0.094, ch_observed=False),
+        _point(13, 21699, 0.0035, ch_observed=True),
+        _point(14, 20533, 0.0058, ch_observed=True),
+        _point(40, 4189, 0.0157, ch_observed=True),
+        _point(49, 590, 0.002, ch_observed=True),
+    ]
+    rk = 0.2618
+    cat = build_mode_candidates(
+        profile=profile,
+        keyword_text="kw",
+        rk_orders_per_cart=rk,
+        include_synthetic=True,
+    )
+    assert cat[AggressionTargetMode.MAX_CONVERSION].is_valid
+    assert cat[AggressionTargetMode.MAX_CONVERSION].position == 1
+    assert cat[AggressionTargetMode.MIN_CPA].is_valid
+
+
+@pytest.mark.unit
+def test_only_synthetic_points_valid_when_flag_true() -> None:
+    """Только синтетика с conv — valid MIN при включённом флаге."""
+    profile = [
+        _point(1, 1000, 0.1, ch_observed=False),
+        _point(2, 1000, 0.2, ch_observed=False),
+    ]
+    cat = build_mode_candidates(
+        profile=profile,
+        keyword_text="kw",
+        rk_orders_per_cart=0.25,
+        include_synthetic=True,
+    )
+    assert cat[AggressionTargetMode.MIN_CPA].is_valid
+    assert cat[AggressionTargetMode.MIN_CPA].position == 2

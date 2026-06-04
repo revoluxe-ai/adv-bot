@@ -747,6 +747,25 @@ class Settings:
         raise Exception("STATS_FRESHNESS_GUARD_ENABLED env var is not bool")
 
     @property
+    def include_synthetic_position_profile(self) -> bool:
+        """M/O/C V3: учитывать синтетические позиции ``_fill_positions`` (``ch_observed=False``).
+
+        По умолчанию True. Выключить (только buckets ``bid_decision_log``):
+        ``INCLUDE_SYNTHETIC_POSITION_PROFILE=false``
+        """
+        value = os.environ.get("INCLUDE_SYNTHETIC_POSITION_PROFILE")
+        if value is None or not str(value).strip():
+            return True
+        value = str(value).strip().lower()
+        if value == "false":
+            return False
+        if value == "true":
+            return True
+        raise ValueError(
+            "Не верное значение в INCLUDE_SYNTHETIC_POSITION_PROFILE"
+        )
+
+    @property
     def AUTO_SHELF_BID_CONTROL_DRY_RUN(self) -> bool:
         """Dry-run для control-модуля полок.
 
