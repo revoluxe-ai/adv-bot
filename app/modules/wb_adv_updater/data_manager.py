@@ -812,12 +812,14 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                     keyword_setting,
                     automatic_version=adv.automatic_version,
                     hard_status_override=1,
+                    adv_strategy=adv.strategy,
                 )
             elif created:
                 _ = sync_keyword_setting_mode_for_v3(
                     keyword_setting,
                     automatic_version=adv.automatic_version,
                     hard_status_override=1,
+                    adv_strategy=adv.strategy,
                 )
         await session.commit()
 

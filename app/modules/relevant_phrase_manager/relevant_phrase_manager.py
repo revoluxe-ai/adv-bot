@@ -86,6 +86,7 @@ class RelevantPhraseManager:
                         keyword_setting,
                         automatic_version=self._adv.automatic_version,
                         hard_status_override=0,
+                        adv_strategy=self._adv.strategy,
                     )
 
             await session.commit()

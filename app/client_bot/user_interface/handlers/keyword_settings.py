@@ -682,6 +682,7 @@ async def change_keyword_hard_status(
                     keyword_setting,
                     automatic_version=adv_setting.automatic_version,
                     hard_status_override=new_hard_status,
+                    adv_strategy=adv_setting.strategy,
                 )
                 if new_hard_status == 2 or new_hard_status == const.ALWAYS_ON:
                     keyword_setting.relevant = True  # type: ignore[attr-defined]

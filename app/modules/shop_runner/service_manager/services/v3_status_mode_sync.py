@@ -149,6 +149,10 @@ def sync_keyword_setting_mode_for_v3(
 ) -> bool:
     """Синхронизировать mode у ``KeywordSetting`` после изменения ``hard_status``.
 
+    ``adv_strategy`` передаётся явно из загруженного ``AdvSetting`` (без lazy-load
+    relationship в async-контуре). Для V3 при ``hard_status`` 2 (БС) и 4 (фикс.фразы)
+    вызывающий код должен передать стратегию РК; для 0/1/3 можно ``None`` (режим OFF).
+
     Returns:
         ``True``, если ``strategy_mode`` был изменен.
     """
@@ -159,10 +163,6 @@ def sync_keyword_setting_mode_for_v3(
         if hard_status_override is not None
         else int(keyword_setting.hard_status)
     )
-    if adv_strategy is None:
-        adv_setting = getattr(keyword_setting, "adv_setting", None)
-        if adv_setting is not None:
-            adv_strategy = getattr(adv_setting, "strategy", None)
     expected = strategy_mode_for_hard_status_write_v3(
         hard_status, adv_strategy=adv_strategy
     )
