@@ -28,7 +28,9 @@ def build_v3_tick_report_keyboard(adv_setting_original_id: int) -> InlineKeyboar
             [
                 InlineKeyboardButton(
                     text="◀ Назад к меню РК",
-                    callback_data=V3TickReportBack().pack(),
+                    callback_data=V3TickReportBack(
+                        adv_setting_original_id=adv_setting_original_id
+                    ).pack(),
                 )
             ],
         ]

@@ -493,7 +493,7 @@ class V3TickReportRefresh(CallbackData, prefix="v3_tick_report_refresh"):
 
 
 class V3TickReportBack(CallbackData, prefix="v3_tick_report_back"):
-    pass
+    adv_setting_original_id: int
 
 
 class ChangeAutoUpdateExponentStatus(
