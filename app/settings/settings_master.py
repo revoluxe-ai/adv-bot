@@ -747,6 +747,30 @@ class Settings:
         raise Exception("STATS_FRESHNESS_GUARD_ENABLED env var is not bool")
 
     @property
+    def V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO(self) -> float:
+        """Доля ``plan.max_pay_for_order`` для skip ``PayForOrderGapEnableExecutor``.
+
+        Зона «1 от MAX плана»: при ``fact >= ratio × plan.max`` enable не выполняется.
+        По умолчанию ``0.9`` (как ``MAX_PAY_STABILIZATION_RATIO`` в sales_states).
+        """
+        value = os.getenv("V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO")
+        if not value:
+            return 0.9
+        return float(value)
+
+    @property
+    def V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO(self) -> float:
+        """Доля ``plan.max_pay_for_order`` для gate ``PayForOrderOverMaxOffOnDeepOverspend``.
+
+        При ``fact >= ratio × plan.max`` — OFF ключей с ``keyword.pay_for_order > max``.
+        По умолчанию ``0.9``.
+        """
+        value = os.getenv("V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO")
+        if not value:
+            return 0.9
+        return float(value)
+
+    @property
     def include_synthetic_position_profile(self) -> bool:
         """M/O/C V3: учитывать синтетические позиции ``_fill_positions`` (``ch_observed=False``).
 

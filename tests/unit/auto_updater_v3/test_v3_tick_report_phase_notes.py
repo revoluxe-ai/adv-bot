@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    gap_enable_plan_headroom_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
@@ -24,7 +24,7 @@ from tests.unit.test_auto_updater_v3 import _calc_kw
 def test_enable_gap_fact_above_plan_max_stabilization_zone() -> None:
     max_cpo = 550.0
     resolve = 200.0
-    fact = MAX_PAY_STABILIZATION_RATIO * max_cpo
+    fact = gap_enable_plan_headroom_floor(max_cpo)
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],

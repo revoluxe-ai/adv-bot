@@ -7,13 +7,11 @@ from dataclasses import replace
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     is_campaign_at_plan_headroom_plus_one,
     is_deep_overspend,
     keyword_pay_for_order_over_plan_max,
+    pfo_off_plan_headroom_floor,
     plan_max_stabilization_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
@@ -133,7 +131,7 @@ def test_skip_when_fact_lt_90pct_plan_max() -> None:
 def test_off_active_keyword_when_at_plan_headroom_and_pfo_gt_max() -> None:
     max_cpo = 550.0
     dto = _dto(pfo_target=600.0)
-    fact = MAX_PAY_STABILIZATION_RATIO * max_cpo
+    fact = pfo_off_plan_headroom_floor(max_cpo)
     ctx = _context([dto], _adv_state(fact=fact, max_cpo=max_cpo))
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF

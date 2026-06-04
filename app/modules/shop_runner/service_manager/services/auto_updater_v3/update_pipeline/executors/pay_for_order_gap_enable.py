@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    gap_enable_plan_headroom_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.adv_state import (
     AdvState,
@@ -66,8 +66,8 @@ def _phase_skip_reason(adv_state: AdvState) -> str | None:
     fact = float(adv_state.fact_pay_for_order)
     if fact > float(adv_state.max_pay_for_order):
         return "fact_gt_max_cpo"
-    if fact >= MAX_PAY_STABILIZATION_RATIO * float(adv_state.max_pay_for_order):
-        return "fact_ge_90pct_plan_max"
+    if fact >= gap_enable_plan_headroom_floor(float(adv_state.max_pay_for_order)):
+        return "fact_ge_plan_headroom_ratio"
     return None
 
 

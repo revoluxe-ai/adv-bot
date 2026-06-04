@@ -37,8 +37,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    pfo_off_plan_headroom_floor,
 )
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
@@ -209,7 +209,7 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
 def test_raise_state_raises_under_plan_headroom_when_pfo_gt_max() -> None:
     """При fact ≥ 0.9×plan.max raise не блокируется — финальный OFF делает pfo_off."""
     max_cpo = 550.0
-    fact = MAX_PAY_STABILIZATION_RATIO * max_cpo
+    fact = pfo_off_plan_headroom_floor(max_cpo)
     dto_high_pfo = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.MIN_CPA,
