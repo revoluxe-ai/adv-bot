@@ -42,6 +42,7 @@ class PreamblePipelineRunResult:
     guard_count: int = 0
     realloc_count: int = 0
     enable_count: int = 0
+    pfo_off_count: int = 0
     calibration_count: int = 0
     guard_applied: bool = False
     calibration_executed: bool = False
