@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     KeywordV3DecisionTier,
     keyword_has_own_conv,
     resolve_keyword_v3_decision,
+    resolve_no_ch_operational_pay_for_order_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
     is_keyword_no_data,
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
+    )
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+        PositionProfilePoint,
     )
 
 FallbackKind = Literal["none", "v2_cpo"]
@@ -84,16 +88,49 @@ def can_target_mode(
     return mode in eligibility.allowed_modes
 
 
+def _profile_has_ch_observed_usable_points(
+    profile: list["PositionProfilePoint"],
+) -> bool:
+    """Есть ли в профиле CH-наблюдаемая точка с conv и bid (не синтетика ``_fill_positions``)."""
+    for point in profile:
+        if (
+            point.ch_observed
+            and point.predicted_conversion is not None
+            and point.bid >= 0
+        ):
+            return True
+    return False
+
+
+def collapsed_ch_ladder_with_pay_for_order(
+    ctx: "KeywordV3Context",
+    catalog: dict[AggressionTargetMode, ModeCandidate] | None = None,
+) -> bool:
+    """CH-профиль есть, нет CH-observed M/O/C matrix, operational cost — ``pay_for_order``.
+
+    Не смотрим на prod-каталог с ``include_synthetic_position_profile`` (синтетика
+    может дать valid OPT/MAX при ``ch_observed=False``). Stored MIN → PFO в ladder/UI.
+    """
+    _ = catalog
+    profile = ctx.position_profile
+    if not profile:
+        return False
+    if _profile_has_ch_observed_usable_points(profile):
+        return False
+    return resolve_no_ch_operational_pay_for_order_cost(ctx.keyword) is not None
+
+
 def min_cpa_operational_via_pay_for_order(
     ctx: "KeywordV3Context",
     eligibility: KeywordV3Eligibility | None,
     catalog: dict[AggressionTargetMode, ModeCandidate] | None = None,
 ) -> bool:
-    """MIN через ``keyword.pay_for_order``: tier PFO или collapsed CH + PFO."""
-    _ = catalog
+    """MIN через ``keyword.pay_for_order``: tier PFO или collapsed CH ladder + own PFO."""
     if eligibility is not None and eligibility.data_tier == KeywordDataTier.KEYWORD_PFO:
         return keyword_pfo_value(ctx.keyword) is not None
-    return False
+    if catalog is None:
+        return False
+    return collapsed_ch_ladder_with_pay_for_order(ctx, catalog)
 
 
 def clamp_target_mode(
