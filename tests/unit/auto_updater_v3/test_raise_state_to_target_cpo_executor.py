@@ -39,10 +39,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     pfo_off_plan_headroom_floor,
-    raise_state_plan_max_floor,
-    should_skip_raise_state_to_target_cpo,
+
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
+
 from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
 
 
@@ -264,8 +263,10 @@ def test_raise_state_runs_when_fact_below_90pct_plan_max() -> None:
         adv_state=adv_state,
     )
     RaiseStateToTargetCpoExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
-    assert len(dto.next_state) == 1
+    # При fact > 90% от max — R↑ пропускает ключи с PFO > max
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit

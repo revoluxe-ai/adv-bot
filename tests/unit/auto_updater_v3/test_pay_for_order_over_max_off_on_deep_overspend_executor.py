@@ -214,10 +214,12 @@ def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> 
     adv = _adv_state(fact=700.0, max_cpo=max_cpo)
     ctx = _context([dto], adv)
     RaiseStateToTargetCpoExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    # При fact > 90% от max — R↑ пропускает ключи с PFO > max, остаёмся в OFF
+    assert dto.current_mode == KeywordStrategyMode.OFF
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
-    assert len(dto.next_state) == 1
+    # Фаза pfo_off ничего не делает для уже OFF ключа
+    assert dto.current_mode == KeywordStrategyMode.OFF
+    assert len(dto.next_state) == 0
 
 
 @pytest.mark.unit
