@@ -18,6 +18,8 @@ from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 
+# Pre-answer must run before GateMiddleware/DB work to avoid stale callbacks.
+
 _ = global_router.callback_query.middleware(
     callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
 )

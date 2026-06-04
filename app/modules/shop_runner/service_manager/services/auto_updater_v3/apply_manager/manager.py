@@ -219,6 +219,14 @@ class ApplyManager:
                     "[adv_id=%s] v3: netto flush committed",
                     complex_adv.adv_id,
                 )
+                from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+                    RedisCalculatedKeywordsCacheManager,
+                )
+
+                await RedisCalculatedKeywordsCacheManager().set_calculated_keywords(
+                    ledger.keywords,
+                    int(complex_adv.adv_id),
+                )
 
         target_place_synced = await self.sync_target_places_if_needed(
             tick,

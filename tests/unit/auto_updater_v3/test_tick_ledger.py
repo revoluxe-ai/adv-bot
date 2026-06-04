@@ -96,6 +96,28 @@ def test_apply_in_memory_updates_dto_for_next_phase() -> None:
 
 
 @pytest.mark.unit
+def test_force_off_records_applied_when_already_off_in_memory() -> None:
+    """Preamble уже выставил OFF на DTO — netto FORCE_OFF всё равно в applied."""
+    kw = _kw(ks_id=11, mode=KeywordStrategyMode.MAX_CONVERSION, hard_status=2)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+    ledger._set_keyword_mode(11, KeywordStrategyMode.OFF)
+    applied = ledger.apply_in_memory(
+        [
+            V3Action(
+                action=V3ActionType.FORCE_OFF,
+                keyword_setting_id=11,
+                reason="next_state_netto",
+            )
+        ]
+    )
+    assert applied == 1
+    recorded = ledger.applied_actions()
+    assert len(recorded) == 1
+    assert recorded[0].action == V3ActionType.FORCE_OFF
+    assert recorded[0].from_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
 def test_normalize_operable_hard_status_for_persist() -> None:
     """Перед flush: OFF→1, active→2 по финальному mode."""
     off_wrong = _kw(ks_id=11, mode=KeywordStrategyMode.OFF, hard_status=2)
