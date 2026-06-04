@@ -152,7 +152,7 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
-        ),
+        ) as flush_mock,
     ):
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=None, predict_orders=3.0)
@@ -161,6 +161,7 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
 
     keyword_bootstrap.assert_not_called()
     bootstrap.assert_called_once()
+    flush_mock.assert_awaited_once()
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is True
 

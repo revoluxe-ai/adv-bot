@@ -11,6 +11,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
     CampaignMode,
     allows_ladder_phases,
     is_campaign_full_stop,
+    needs_apply_manager,
     resolve_campaign_mode,
 )
 
@@ -28,9 +29,11 @@ def test_resolve_campaign_mode_not_ready() -> None:
 def test_resolve_campaign_mode_no_data() -> None:
     assert resolve_campaign_mode(SalesStates.NO_DATA) == CampaignMode.NO_DATA
     assert not allows_ladder_phases(CampaignMode.NO_DATA)
+    assert needs_apply_manager(CampaignMode.NO_DATA)
 
 
 @pytest.mark.unit
 def test_resolve_campaign_mode_normal() -> None:
     assert resolve_campaign_mode(SalesStates.OPTIMAL) == CampaignMode.NORMAL
     assert allows_ladder_phases(CampaignMode.NORMAL)
+    assert needs_apply_manager(CampaignMode.NORMAL)

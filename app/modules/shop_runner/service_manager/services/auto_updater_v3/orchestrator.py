@@ -52,8 +52,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode import (
     CampaignMode,
-    allows_ladder_phases,
     is_campaign_full_stop,
+    needs_apply_manager,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
     V3TickReportCollector,
@@ -177,7 +177,7 @@ async def process_adv_v3(
 
         if (
             tick_data.tick_input is not None
-            and allows_ladder_phases(tick_data.campaign_mode)
+            and needs_apply_manager(tick_data.campaign_mode)
         ):
             if tick_data.dto is None:
                 logger.warning(
