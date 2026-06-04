@@ -24,8 +24,9 @@ class RaiseStateToTargetCpoExecutor:
     def __init__(self) -> None:
         self._next_state_manager = NextStateManager(RaiseStateToTargetCpoExecutor)
 
-    def execute(self, context: UpdateContext) -> None:
-        self._skip_reason = None
+    def execute(self, context: UpdateContext) -> str | None:
+        if self._skip(context):
+            return 'fact cpo > 0.9 max'
         target_cpo = float(context.adv_state.resolve)
         for dto in context.keywords:
             if dto.is_not_full():
@@ -40,3 +41,12 @@ class RaiseStateToTargetCpoExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
+
+    def _skip(self, context: UpdateContext) -> bool:
+        if context.adv_state.fact_pay_for_order is None:
+            self._skip_reason = 'fact pay is None'
+            return True
+        if context.adv_state.fact_pay_for_order > 0.9:
+            self._skip_reason = 'fact cpo > 0.9 max'
+            return True
+        return False
