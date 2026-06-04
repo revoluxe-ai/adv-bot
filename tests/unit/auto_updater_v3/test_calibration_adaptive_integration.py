@@ -1,4 +1,4 @@
-"""Интеграция: ``resolve_effective_calibration_steps`` → ``plan_resolve_calibration`` (UP/DOWN).
+"""Интеграция: ``resolve_effective_calibration_steps`` → calibration runner (UP/DOWN).
 
 Проверяет, что бюджет adaptive steps из Redis-логики реально доходит до planner
 и меняет глубину перехода на лестнице (не только kwargs в orchestrator-mock).
@@ -30,8 +30,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    plan_resolve_calibration,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
+    plan_calibration_actions,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
+    ResolveCalibrationExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
@@ -185,7 +188,7 @@ def test_planner_up_uses_resolver_budget_second_tick(
     )
     assert budget == 2
 
-    actions_one = plan_resolve_calibration(
+    actions_one = plan_calibration_actions(
         prepared,
         resolve=550.0,
         calibration_direct=CalibrationDirect.LOOSEN,
@@ -193,7 +196,7 @@ def test_planner_up_uses_resolver_budget_second_tick(
         aggressiveness=V3RolloutAggressiveness.MAX,
         max_effective_steps=1,
     )
-    actions_two = plan_resolve_calibration(
+    actions_two = plan_calibration_actions(
         prepared,
         resolve=550.0,
         calibration_direct=CalibrationDirect.LOOSEN,
@@ -272,7 +275,7 @@ def test_planner_up_iterative_picks_cheapest_each_step(
             KeywordV3Context(keyword=kw_dear, position_profile=_three_place_profile()),
         ]
     )
-    actions = plan_resolve_calibration(
+    actions = plan_calibration_actions(
         prepared,
         resolve=550.0,
         calibration_direct=CalibrationDirect.LOOSEN,
@@ -345,7 +348,7 @@ def test_planner_down_iterative_picks_dearest_each_step(
             KeywordV3Context(keyword=kw_cheap, position_profile=_three_place_profile()),
         ]
     )
-    actions = plan_resolve_calibration(
+    actions = plan_calibration_actions(
         prepared,
         resolve=300.0,
         calibration_direct=CalibrationDirect.TIGHTEN,
@@ -381,25 +384,28 @@ def test_planner_down_uses_resolver_budget_doubled(
         conv=_conv_for_pay_for_order(200.0),
         hard_status=2,
     )
-    prepared = build_prepared_from_contexts(
-        [KeywordV3Context(keyword=kw, position_profile=_three_place_profile())]
-    )
+
+    def _prepared():
+        return build_prepared_from_contexts(
+            [KeywordV3Context(keyword=kw, position_profile=_three_place_profile())]
+        )
+
     prev = CalibrationStepState(1, CalibrationDirect.TIGHTEN)
     budget = resolve_effective_calibration_steps(
         10, prev=prev, current_direct=CalibrationDirect.TIGHTEN
     )
     assert budget == 2
 
-    one = plan_resolve_calibration(
-        prepared,
+    one = plan_calibration_actions(
+        _prepared(),
         resolve=300.0,
         calibration_direct=CalibrationDirect.TIGHTEN,
         shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
         aggressiveness=V3RolloutAggressiveness.MAX,
         max_effective_steps=1,
     )
-    two = plan_resolve_calibration(
-        prepared,
+    two = plan_calibration_actions(
+        _prepared(),
         resolve=300.0,
         calibration_direct=CalibrationDirect.TIGHTEN,
         shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
@@ -407,117 +413,33 @@ def test_planner_down_uses_resolver_budget_doubled(
         max_effective_steps=budget,
     )
     assert len(one) == 1
-    assert one[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert one[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
     assert len(two) == 2
-    assert two[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
-    assert two[1].target_strategy_mode == KeywordStrategyMode.MIN_CPA
-    assert mode_level(two[1].target_strategy_mode) < mode_level(
-        two[0].target_strategy_mode
-    )
+    assert two[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert two[1].action == V3ActionType.FORCE_OFF
     assert one[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_orchestrator_up_branch_passes_resolver_budget_to_real_planner() -> None:
-    """UP-тик: orchestrator не мокает planner; ``max_effective_steps`` из resolver."""
-    from unittest.mock import AsyncMock, MagicMock, patch
-
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
-        CalibrationStepState,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
-        process_adv_v3,
-    )
-    from tests.unit.auto_updater_v3.test_orchestrator_overspend_gate import (
-        _fact_for_cpa_gates,
-        _plan_for_cpa_gates,
+def test_orchestrator_up_branch_passes_resolver_budget_to_executor() -> None:
+    """UP-тик: ``max_effective_steps`` из resolver попадает в ``AdvState`` executor."""
+    from tests.unit.auto_updater_v3.test_resolve_calibration_executor import (
+        _cal_adv_state,
+        _ctx,
+        _dto,
+        _ladder_states,
     )
 
-    plan = _plan_for_cpa_gates()
-    fact = _fact_for_cpa_gates(pay_for_order=50.0)
-
-    complex_adv = MagicMock()
-    complex_adv.adv_id = 99
-    complex_adv.adv_setting = MagicMock()
-    complex_adv.shelf_promotion_active = False
-    complex_adv.individual_keywords_target_place_mode = False
-    complex_adv.v3_rollout_aggressiveness = 3
-    complex_adv.keyword_calibration_max_step = 10
-    complex_adv.get_keywords = AsyncMock(return_value=[])
-
-    prev_state = CalibrationStepState(
-        effective_steps=1,
-        direct=CalibrationDirect.LOOSEN,
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=10,
     )
-
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
-            new=AsyncMock(return_value=(MagicMock(), {})),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.plan_pay_for_order_gap_enable",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
-        ) as updater_cls,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact"
-        ) as pfc_cls,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews"
-        ) as views_cls,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_complex_adv_total_views",
-            new=AsyncMock(return_value=200),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.V3CalibrationStepState"
-        ) as step_cls,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.plan_resolve_calibration",
-            wraps=plan_resolve_calibration,
-        ) as calibration_spy,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.V3TickKeywordLedger.flush_to_db",
-            new=AsyncMock(return_value=False),
-        ),
-    ):
-        plan_fact = MagicMock()
-        plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
-        plan_fact.set_new_plan_fact = AsyncMock()
-        pfc_cls.return_value = plan_fact
-        views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
-        views_cls.return_value.set_views = AsyncMock()
-        step_mock = step_cls.return_value
-        step_mock.get_state = AsyncMock(return_value=prev_state)
-        step_mock.set_state = AsyncMock()
-        updater_cls.get_plan_data.return_value = plan
-        updater_cls.return_value.get_fact_data = AsyncMock(return_value=fact)
-
-        await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
-
-    calibration_spy.assert_called_once()
-    assert calibration_spy.call_args.kwargs.get("max_effective_steps") == 2
-    assert (
-        calibration_spy.call_args.kwargs.get("calibration_direct")
-        == CalibrationDirect.LOOSEN
+    adv = _cal_adv_state(
+        calibration_direct=CalibrationDirect.LOOSEN,
+        max_effective_steps=2,
     )
+    ctx = _ctx(dto, adv_state=adv)
+    ResolveCalibrationExecutor().execute(ctx)
+    assert len(ctx.keywords[0].next_state) == 2

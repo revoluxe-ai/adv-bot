@@ -63,7 +63,7 @@ async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_c
             passing_up,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=[],
         ),
         patch(
@@ -319,7 +319,7 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             new=AsyncMock(return_value=2.0),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=[],
         ),
         patch(
@@ -420,7 +420,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=[],
         ),
         patch(

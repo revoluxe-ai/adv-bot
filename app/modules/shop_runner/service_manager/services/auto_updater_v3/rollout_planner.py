@@ -65,7 +65,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
-    collect_calibration_up_next_step_candidates,
     collect_transition_candidates,
     missing_target_matrix_from_catalog,
     move_kind_for,
@@ -622,114 +621,6 @@ def _find_boost_target_mode_limited_steps(
             return mode
 
 
-_CAL_DOWN_REASON = "resolve_calibration_down"
-
-
-@dataclass(frozen=True)
-class _CalibrationDownPick:
-    """Один шаг CAL DOWN: самый дорогой ``state_cost`` текущего режима → следующий режим."""
-
-    keyword_setting_id: int
-    from_mode: KeywordStrategyMode
-    to_mode: KeywordStrategyMode
-    state_cost: float
-    pay_for_order: float
-
-
-def collect_calibration_down_next_step_candidates(
-    prepared: PreparedList,
-    *,
-    cost_ceiling: float,
-    policy: SelectionPolicy,
-    ladder_inputs: "LadderInputs | None" = None,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
-) -> list[_CalibrationDownPick]:
-    """Пул CAL DOWN: один схлопнутый effective DOWN на ключ (``resolve_next_effective_step_down``).
-
-    Alias с тем же ``target_place`` схлопываются в одно действие = 1 шаг бюджета.
-    Сортировка итераций — max ``state_cost`` **текущего** режима. NO CH MIN: FORCE_OFF.
-    """
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    out: list[_CalibrationDownPick] = []
-
-    for ctx, current in prepared:
-        if current == KeywordStrategyMode.OFF:
-            continue
-        hard_status = int(ctx.keyword.hard_status)
-        if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
-            continue
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        elig = _eligibility_for_ctx(ctx, eligibility_by_ks_id)
-        pfo = float(ctx.keyword.pay_for_order or 0.0)
-        if _min_cpa_bound_by_pay_for_order(elig):
-            if keyword_pay_for_order_exceeds(ctx, ceiling=float(cost_ceiling)):
-                out.append(
-                    _CalibrationDownPick(
-                        keyword_setting_id=int(ks_id),
-                        from_mode=current,
-                        to_mode=KeywordStrategyMode.OFF,
-                        state_cost=pfo,
-                        pay_for_order=pfo,
-                    )
-                )
-            continue
-        catalog = _mode_catalog_for_ctx(ctx, prepared, ladder)
-        cost, _ = _trim_state_cost_for_mode(
-            ctx,
-            current,
-            current=current,
-            ladder_inputs=ladder,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-        )
-        if cost != float("inf") and float(cost) <= float(cost_ceiling):
-            continue
-        step = resolve_next_effective_step_down(current, catalog)
-        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
-        resolved = step.next_mode
-        if resolved is None:
-            fb = _fallback_min_instead_of_off_trim(
-                ctx,
-                current,
-                cost_ceiling=float(cost_ceiling),
-                ladder_inputs=ladder,
-                eligibility_by_ks_id=eligibility_by_ks_id,
-            )
-            resolved = fb if fb is not None else KeywordStrategyMode.OFF
-        elif resolved == KeywordStrategyMode.OFF:
-            fb = _fallback_min_instead_of_off_trim(
-                ctx,
-                current,
-                cost_ceiling=float(cost_ceiling),
-                ladder_inputs=ladder,
-                eligibility_by_ks_id=eligibility_by_ks_id,
-            )
-            if fb is not None:
-                resolved = fb
-        if resolved == current:
-            continue
-        if should_skip_trim_for_same_effective_target(
-            ctx=ctx,
-            current=current,
-            trim_target=resolved,
-            catalog=catalog,
-            cost_ceiling=float(cost_ceiling),
-            ladder_inputs=ladder,
-        ):
-            continue
-        out.append(
-            _CalibrationDownPick(
-                keyword_setting_id=int(ks_id),
-                from_mode=current,
-                to_mode=resolved,
-                state_cost=float(cost),
-                pay_for_order=pfo,
-            )
-        )
-    return out
-
-
 def _bump_prepared_mode(
     prepared: PreparedList,
     keyword_setting_id: int,
@@ -737,15 +628,6 @@ def _bump_prepared_mode(
 ) -> PreparedList:
     """Re-export: bump ``active_mode`` без history (legacy)."""
     return bump_prepared_list_only(prepared, keyword_setting_id, new_mode)
-
-
-def _step_candidate_sort_key(candidate: StepCandidate) -> tuple[float, float, int]:
-    """Сортировка DOWN: max ``state_cost``, затем max CPO, затем ``ks_id``."""
-    return (
-        -candidate.state_cost,
-        -candidate.pay_for_order,
-        candidate.keyword_setting_id,
-    )
 
 
 def _hard_status_for_ks(prepared: PreparedList, keyword_setting_id: int) -> int:
@@ -923,176 +805,6 @@ def plan_campaign_trim_by_max_state_cost(
     )
 
 
-def _plan_calibration_down(
-    prepared: PreparedList,
-    *,
-    cost_ceiling: float,
-    shelf_click_mode: "ShelfClickMode",
-    aggressiveness: V3RolloutAggressiveness,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
-    ladder_inputs: "LadderInputs | None" = None,
-    max_effective_steps: int,
-) -> list[V3Action]:
-    """CAL DOWN: до ``max_effective_steps`` итераций «самый дорогой state → один DOWN``.
-
-    На каждой итерации: пул ``collect_calibration_down_next_step_candidates``,
-    выбор max ``state_cost`` (tie-break CPO), одно DOWN/FORCE_OFF, пересбор пула.
-    """
-    policy = SelectionPolicy.from_aggressiveness(
-        click_mode=shelf_click_mode,
-        aggressiveness=aggressiveness,
-    )
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    actions: list[V3Action] = []
-    update_ctx = update_context_from_prepared(prepared)
-
-    def _collect(working_ctx: UpdateContext) -> list[StepCandidate]:
-        raw = collect_calibration_down_next_step_candidates(
-            working_ctx.prepared,
-            cost_ceiling=float(cost_ceiling),
-            policy=policy,
-            ladder_inputs=ladder,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-        )
-        return [
-            StepCandidate(
-                keyword_setting_id=pick.keyword_setting_id,
-                from_mode=pick.from_mode,
-                to_mode=pick.to_mode,
-                state_cost=pick.state_cost,
-                pay_for_order=pick.pay_for_order,
-            )
-            for pick in raw
-        ]
-
-    def _on_pick(pick: StepCandidate, working_ctx: UpdateContext, _pool_size: int) -> None:
-        _append_trim_to_mode(
-            actions,
-            ks_id=pick.keyword_setting_id,
-            current=pick.from_mode,
-            target=pick.to_mode,
-            hard_status=_hard_status_for_ks(working_ctx.prepared, pick.keyword_setting_id),
-            reason=_CAL_DOWN_REASON,
-        )
-
-    StepManager.down(
-        update_ctx,
-        max_effective_steps,
-        collect=_collect,
-        sort_key=_step_candidate_sort_key,
-        on_pick=_on_pick,
-    )
-    return actions
-
-
-def _plan_calibration_up(
-    prepared: PreparedList,
-    *,
-    shelf_click_mode: "ShelfClickMode",
-    aggressiveness: V3RolloutAggressiveness,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
-    ladder_inputs: "LadderInputs | None" = None,
-    max_effective_steps: int = 1,
-) -> list[V3Action]:
-    """Калибровка UP: до ``max_effective_steps`` итераций «самый дешёвый state → один UP``.
-
-    На каждой итерации: пул ``collect_calibration_up_next_step_candidates``,
-    выбор min ``state_cost`` (tie-break CPO), одно UP-действие, обновление
-    ``prepared`` для следующей переоценки. Бюджет — ``resolve_effective_calibration_steps``.
-    """
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        TransitionCandidate,
-        _candidate_sort_key,
-        _candidate_to_action,
-    )
-
-    policy = SelectionPolicy.from_aggressiveness(
-        click_mode=shelf_click_mode,
-        aggressiveness=aggressiveness,
-    )
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    actions: list[V3Action] = []
-    update_ctx = update_context_from_prepared(prepared)
-
-    def _collect(working_ctx: UpdateContext) -> list[TransitionCandidate]:
-        return collect_calibration_up_next_step_candidates(
-            working_ctx.prepared,
-            policy=policy,
-            ladder_inputs=ladder,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-        )
-
-    def _on_pick(
-        best: TransitionCandidate,
-        _working_ctx: UpdateContext,
-        pool_size: int,
-    ) -> None:
-        actions.append(
-            _candidate_to_action(
-                best,
-                pool_size=pool_size,
-                reason_prefix="resolve_calibration_up",
-            )
-        )
-
-    StepManager.up(
-        update_ctx,
-        max_effective_steps,
-        collect=_collect,
-        sort_key=_candidate_sort_key,
-        keyword_setting_id_of=lambda c: c.keyword_setting_id,
-        to_mode_of=lambda c: c.to_mode,
-        from_mode_of=lambda c: c.from_mode,
-        is_valid_pick=lambda c: c.to_mode is not None and c.to_mode != c.from_mode,
-        on_pick=_on_pick,
-    )
-    return actions
-
-
-def plan_resolve_calibration(
-    prepared: PreparedList,
-    *,
-    resolve: float,
-    calibration_direct: "CalibrationDirect",
-    shelf_click_mode: "ShelfClickMode",
-    aggressiveness: V3RolloutAggressiveness,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
-    ladder_inputs: "LadderInputs | None" = None,
-    max_effective_steps: int = 1,
-) -> list[V3Action]:
-    """Калибровка к ``0.9×resolve``: одна ветка за тик — UP **или** DOWN.
-
-    Ветку выбирает ``classify_calibration_direct`` (``CalibrationDirect`` в Redis/logs:
-    значения ``loosen`` / ``tighten`` — legacy-строки для веток UP/DOWN).
-
-    Gate кампании (plan/views, ``fact <= max``) — в orchestrator.
-    CAL UP: до ``max_effective_steps`` итераций min ``state_cost`` → один UP → пересбор пула.
-    CAL DOWN: до ``max_effective_steps`` итераций max ``state_cost`` → один DOWN → пересбор пула.
-    """
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
-        CalibrationDirect,
-    )
-
-    if calibration_direct == CalibrationDirect.TIGHTEN:
-        return _plan_calibration_down(
-            prepared,
-            cost_ceiling=float(resolve),
-            shelf_click_mode=shelf_click_mode,
-            aggressiveness=aggressiveness,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-            ladder_inputs=ladder_inputs,
-            max_effective_steps=max_effective_steps,
-        )
-    return _plan_calibration_up(
-        prepared,
-        shelf_click_mode=shelf_click_mode,
-        aggressiveness=aggressiveness,
-        eligibility_by_ks_id=eligibility_by_ks_id,
-        ladder_inputs=ladder_inputs,
-        max_effective_steps=max_effective_steps,
-    )
-
-
 def plan_resolve_calibration_trim(
     prepared: PreparedList,
     *,
@@ -1103,15 +815,14 @@ def plan_resolve_calibration_trim(
     ladder_inputs: "LadderInputs | None" = None,
     max_effective_steps: int = 1,
 ) -> list[V3Action]:
-    """Legacy alias: только CAL DOWN (``resolve_calibration_down``)."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
-        CalibrationDirect,
+    """Legacy alias: CAL DOWN через ``calibration_runner`` (для unit-тестов trim)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
+        plan_calibration_trim_actions,
     )
 
-    return plan_resolve_calibration(
+    return plan_calibration_trim_actions(
         prepared,
         resolve=resolve,
-        calibration_direct=CalibrationDirect.TIGHTEN,
         shelf_click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
         eligibility_by_ks_id=eligibility_by_ks_id,

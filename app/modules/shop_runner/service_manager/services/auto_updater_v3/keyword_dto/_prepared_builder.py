@@ -297,14 +297,25 @@ def assemble_update_context(
 
 
 def update_context_from_prepared(
-    prepared: KeywordsPreparedList,
+    prepared: KeywordsPreparedList | list[tuple["KeywordV3Context", KeywordStrategyMode]],
     *,
     adv_state: AdvState | None = None,
 ) -> UpdateContext:
-    """Обернуть существующий ``KeywordsPreparedList`` в ``UpdateContext``."""
+    """Обернуть ``KeywordsPreparedList`` или legacy ``PreparedList`` в ``UpdateContext``."""
+    state = adv_state if adv_state is not None else AdvState.empty()
+    if not isinstance(prepared, KeywordsPreparedList):
+        if isinstance(prepared, list):
+            contexts = [ctx for ctx, _ in prepared]
+            prepared = build_keywords_prepared_list(
+                contexts,
+                eligibility_by_ks_id=state.eligibility_by_ks_id,
+                ladder_inputs=state.ladder_inputs,
+            )
+        else:
+            raise TypeError(f"unsupported prepared type: {type(prepared)!r}")
     return UpdateContext(
         prepared=prepared,
-        adv_state=adv_state if adv_state is not None else AdvState.empty(),
+        adv_state=state,
     )
 
 

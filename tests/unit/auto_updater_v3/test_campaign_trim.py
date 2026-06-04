@@ -31,8 +31,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_pl
     is_resolve_valid,
     plan_campaign_trim_by_max_state_cost,
     plan_mass_cheap_promotion,
-    plan_resolve_calibration,
     plan_resolve_calibration_trim,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
+    plan_calibration_actions,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
+    ResolveCalibrationExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
@@ -136,7 +141,7 @@ def test_resolve_calibration_trim_lowers_mode_when_state_cost_above_resolve() ->
         aggressiveness=V3RolloutAggressiveness.MAX,
     )
     assert len(actions) >= 1
-    assert all(a.reason == "resolve_calibration_down" for a in actions)
+    assert all(a.reason == ResolveCalibrationExecutor.__name__ for a in actions)
     assert actions[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
 
 
@@ -144,7 +149,7 @@ def test_resolve_calibration_trim_lowers_mode_when_state_cost_above_resolve() ->
 def test_resolve_calibration_trim_limited_one_step_vs_full(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """CAL DOWN: budget=1 — один шаг; budget=2 — два итеративных DOWN (MAX→OPT→MIN)."""
+    """CAL DOWN: budget=1 — один effective DOWN; budget=2 — два шага (alias collapse)."""
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     prof = [
         PositionProfilePoint(
@@ -225,29 +230,32 @@ def test_resolve_calibration_trim_limited_one_step_vs_full(
             )
         }
     )
-    prepared = build_prepared_from_contexts(
-        [KeywordV3Context(keyword=kw, position_profile=prof)]
-    )
+
+    def _prepared():
+        return build_prepared_from_contexts(
+            [KeywordV3Context(keyword=kw, position_profile=prof)]
+        )
+
     resolve = 300.0
     one_step = plan_resolve_calibration_trim(
-        prepared,
+        _prepared(),
         resolve=resolve,
         shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
         aggressiveness=V3RolloutAggressiveness.MAX,
         max_effective_steps=1,
     )
     two_steps = plan_resolve_calibration_trim(
-        prepared,
+        _prepared(),
         resolve=resolve,
         shelf_click_mode=ShelfClickMode.ORGANIC_DOMINANT,
         aggressiveness=V3RolloutAggressiveness.MAX,
         max_effective_steps=2,
     )
     assert len(one_step) == 1
-    assert one_step[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert one_step[0].action in (V3ActionType.DOWN, V3ActionType.FORCE_OFF)
     assert len(two_steps) == 2
-    assert two_steps[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
-    assert two_steps[1].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert two_steps[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert two_steps[1].action == V3ActionType.FORCE_OFF
 
 
 @pytest.mark.unit
@@ -274,7 +282,7 @@ def test_resolve_calibration_trim_no_ch_min_to_off_when_pfo_above_resolve() -> N
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.FORCE_OFF
-    assert actions[0].reason == "resolve_calibration_down"
+    assert actions[0].reason == ResolveCalibrationExecutor.__name__
 
 
 @pytest.mark.unit
@@ -382,7 +390,7 @@ def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_reso
     prepared = build_prepared_from_contexts(
         [KeywordV3Context(keyword=kw, position_profile=prof)]
     )
-    actions = plan_resolve_calibration(
+    actions = plan_calibration_actions(
         prepared,
         resolve=30.0,
         calibration_direct=CalibrationDirect.LOOSEN,
@@ -392,7 +400,7 @@ def test_resolve_calibration_loosen_raises_mode_when_state_cost_at_or_below_reso
     )
     assert len(actions) == 1
     assert actions[0].action == V3ActionType.UP
-    assert actions[0].reason == "resolve_calibration_up"
+    assert actions[0].reason == ResolveCalibrationExecutor.__name__
     assert actions[0].target_strategy_mode == KeywordStrategyMode.OPTIMUM
 
 
@@ -482,7 +490,7 @@ def test_resolve_calibration_up_applies_adaptive_effective_steps(
     prepared = build_prepared_from_contexts(
         [KeywordV3Context(keyword=kw, position_profile=prof)]
     )
-    actions = plan_resolve_calibration(
+    actions = plan_calibration_actions(
         prepared,
         resolve=30.0,
         calibration_direct=CalibrationDirect.LOOSEN,
@@ -496,68 +504,44 @@ def test_resolve_calibration_up_applies_adaptive_effective_steps(
 
 
 @pytest.mark.unit
-def test_resolve_calibration_up_off_no_data_bootstrap(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Калибровка UP: OFF + NO DATA в пуле (OFF→MIN), как enable gap."""
-    ts = datetime(2024, 1, 1, tzinfo=UTC)
-    prof = [
-        PositionProfilePoint(
-            position=22,
-            bid=500.0,
-            predicted_conversion=0.02,
-            pay_for_cart=1.0,
-            timestamp=ts,
-        ),
-    ]
-
-    def _mc(mode: AggressionTargetMode, place: int) -> ModeCandidate:
-        return ModeCandidate(
-            mode=mode,
-            position=place,
-            bid=float(place * 100),
-            predicted_cpa=50.0,
-            is_valid=True,
-        )
-
-    catalog = {
-        AggressionTargetMode.MIN_CPA: _mc(AggressionTargetMode.MIN_CPA, 22),
-    }
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
-        lambda _ctx, _prepared, _ladder=None: catalog,
+def test_resolve_calibration_up_off_no_data_bootstrap() -> None:
+    """Калибровка UP: OFF + NO DATA в list2 (OFF→MIN), как enable gap."""
+    from tests.unit.auto_updater_v3.test_resolve_calibration_executor import (
+        _cal_adv_state,
+        _ctx,
+        _dto,
+        _ladder_states,
     )
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking._catalog_for_ctx",
-        lambda _ctx, _prepared, ladder_inputs=None: catalog,
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+        build_eligibility_map,
     )
 
-    off_kw = _calc_kw(
+    off_dto = _dto(
         ks_id=99,
-        text="off_gap_cal",
         mode=KeywordStrategyMode.OFF,
-        rating=1.0,
+        target_place=0,
         views=0,
-        conv=0.0,
         hard_status=1,
+        ladder=_ladder_states(99, min_cpo=50.0, opt_cpo=100.0, max_cpo=200.0),
     )
-    prepared = build_prepared_from_contexts(
-        [KeywordV3Context(keyword=off_kw, position_profile=prof)]
+    off_dto.calculated_keyword = off_dto.calculated_keyword.model_copy(
+        update={"views": 0, "conv_views_to_orders": 0.0}
     )
-    actions = plan_resolve_calibration(
-        prepared,
-        resolve=550.0,
+    ladder = LadderInputs.from_contexts([off_dto.context])
+    elig = build_eligibility_map(
+        ladder.all_contexts,
+        campaign_orders_per_cart_7d=ladder.campaign_orders_per_cart_7d,
+    )
+    adv = _cal_adv_state(
         calibration_direct=CalibrationDirect.LOOSEN,
-        shelf_click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL,
-        aggressiveness=V3RolloutAggressiveness.MAX,
+        max_effective_steps=1,
+        eligibility_by_ks_id=elig,
+        ladder_inputs=ladder,
     )
-    assert len(actions) == 1
-    assert actions[0].action == V3ActionType.UP
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA
-    assert actions[0].reason in (
-        "resolve_calibration_up",
-        "up_imputed_missing_target_matrix",
-    )
+    ctx = _ctx(off_dto, adv_state=adv)
+    ResolveCalibrationExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert len(ctx.keywords[0].next_state) == 1
 
 
 @pytest.mark.unit

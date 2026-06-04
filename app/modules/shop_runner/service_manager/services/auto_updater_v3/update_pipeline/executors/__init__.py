@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.reset_over_max_cpo_on_overspend import (
     ResetOverMaxCpoOnOverspendExecutor,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.skip_up_target_place import (
+    SkipUpTargetPlaceExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
     ResolveCalibrationExecutor,
 )
@@ -36,10 +39,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 def build_normal_preamble_executors() -> list[UpdateExecutor]:
-    """Стандартный порядок NORMAL preamble: V → NF → raise → reset → S → R → enable → calibration."""
+    """Стандартный порядок NORMAL preamble: V → NF → skip_up → raise → reset → S → R → enable → cal."""
     return [
         HardStatusValidateExecutor(),
         NotFullValidateExecutor(),
+        SkipUpTargetPlaceExecutor(),
         RaiseStateToTargetCpoExecutor(),
         ResetOverMaxCpoOnOverspendExecutor(),
         ShelfCleanupExecutor(),
@@ -60,6 +64,7 @@ __all__ = [
     "ResetOverMaxCpoOnOverspendExecutor",
     "ResolveCalibrationExecutor",
     "ShelfCleanupExecutor",
+    "SkipUpTargetPlaceExecutor",
     "UpdateExecutor",
     "build_normal_preamble_executors",
 ]

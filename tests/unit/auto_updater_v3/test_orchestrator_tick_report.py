@@ -59,9 +59,9 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.is_resolve_valid": lambda *a, **k: True,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.plan_cost_reallocation": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.plan_pay_for_order_gap_enable": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.plan_resolve_calibration": lambda *a, **k: [],
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact": lambda *a, **k: pfc,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews": lambda *a, **k: views,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_complex_adv_total_views": AsyncMock(

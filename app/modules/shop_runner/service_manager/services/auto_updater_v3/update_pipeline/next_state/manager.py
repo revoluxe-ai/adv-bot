@@ -8,12 +8,18 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
     resolve_v3_action_target_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    AggressionTargetMode,
+    ModeCandidate,
     V3Action,
     V3ActionType,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    resolve_alias_collapse_up_at_same_target_place,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
     KeywordDTO,
     NextState,
+    NextTargetPlace,
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
@@ -21,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_p
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+    ladder_state_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
     HARD_STATUS_AUTO_MODE,
@@ -53,12 +62,45 @@ class NextStateManager:
             executor_name=self._executor_name,
         )
 
+    def enable_gap_to_min_cpa(self, keyword: KeywordDTO) -> None:
+        """GAP OFF → ``MIN_CPA`` + ``target_place=0`` (legacy enable UP без MIN в матрице)."""
+        if keyword.current_mode != KeywordStrategyMode.OFF:
+            return
+        keyword.current_mode = NextState(
+            new_mode=KeywordMode.MIN_CPA,
+            executor_name=self._executor_name,
+        )
+        setting = keyword.calculated_keyword.keyword_setting
+        setting.strategy_mode = KeywordStrategyMode.MIN_CPA
+        setting.target_place = 0
+        keyword.current_target_place = NextTargetPlace(
+            new_target_place=0,
+            executor_name=self._executor_name,
+        )
+
     def raise_state_to_target_cpo(
         self,
         keyword: KeywordDTO,
         state: KeywordV3LadderState | None,
     ) -> None:
         """Применить ladder-state; ``None`` — no-op."""
+        if state is None:
+            return
+        keyword.apply_ladder_state(state, executor_name=self._executor_name)
+
+    def skip_up_same_target_place(
+        self,
+        keyword: KeywordDTO,
+        catalog: dict[AggressionTargetMode, ModeCandidate],
+    ) -> None:
+        """Alias UP на текущем ``target_place`` → max режим группы через ``apply_ladder_state``."""
+        target_mode = resolve_alias_collapse_up_at_same_target_place(
+            keyword.current_mode,
+            catalog,
+        )
+        if target_mode is None:
+            return
+        state = ladder_state_for_mode(keyword, target_mode)
         if state is None:
             return
         keyword.apply_ladder_state(state, executor_name=self._executor_name)

@@ -29,37 +29,32 @@ def test_enable_gap_fact_above_stabilization_zone() -> None:
         prepared=[],
         fact_pay_for_order=fact,
         resolve=resolve,
-        plan_fact_changed=True,
-        views_changed=True,
     )
     assert "0.9" in note or "90%" in note or "стабилизации" in note
 
 
 @pytest.mark.unit
-def test_enable_gap_both_signals_unchanged() -> None:
+def test_enable_gap_fact_above_max() -> None:
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],
-        fact_pay_for_order=100.0,
+        fact_pay_for_order=600.0,
         resolve=550.0,
-        plan_fact_changed=False,
-        views_changed=False,
+        max_pay_for_order=550.0,
     )
-    assert "plan/fact" in note and "views" in note
+    assert "max" in note
 
 
 @pytest.mark.unit
-def test_enable_gap_plan_only_change_not_blocked() -> None:
-    """OR-gate: views unchanged, plan/fact changed — не сообщаем «оба не изменились»."""
+def test_enable_gap_no_candidates_without_eligibility() -> None:
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],
         fact_pay_for_order=100.0,
         resolve=550.0,
-        plan_fact_changed=True,
-        views_changed=False,
+        eligibility_by_ks_id=None,
     )
-    assert "не изменились" not in note
+    assert "GAP" in note or "NO DATA" in note
 
 
 @pytest.mark.unit

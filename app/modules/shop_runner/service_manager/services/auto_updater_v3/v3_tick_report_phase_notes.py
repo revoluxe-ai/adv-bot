@@ -1,6 +1,6 @@
 """Диагностика нулевого исхода preamble-фаз для отчёта V3-тика (Telegram UI).
 
-Зеркалит условия ``plan_*`` / ``_plan_calibration_*`` без построения действий:
+Зеркалит условия ``plan_*`` / executor skip-gates без построения действий:
 возвращает короткую русскую фразу для ``V3PhaseStats.outcome_note``.
 """
 
@@ -142,8 +142,7 @@ def summarize_phase_zero_actions(
             eligibility_by_ks_id=eligibility_by_ks_id,
             fact_pay_for_order=fact_pay_for_order,
             resolve=resolve,
-            plan_fact_changed=plan_fact_changed,
-            views_changed=views_changed,
+            max_pay_for_order=max_pay_for_order,
         ),
         "resolve_calibration": lambda: _note_resolve_calibration(
             prepared,
@@ -289,7 +288,7 @@ def _note_cost_reallocation(
         return "resolve недоступен"
     if not prepared:
         return "нет operable ключей"
-    return "нет пар для перераспределения (дорогие active / дешёвые passing)"
+    return "нет пар donor/recipient с CPO-разрывом для ребаланса"
 
 
 def _note_enable_gap(
@@ -298,22 +297,24 @@ def _note_enable_gap(
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     fact_pay_for_order: float | None,
     resolve: float | None,
-    plan_fact_changed: bool,
-    views_changed: bool,
+    max_pay_for_order: float | None = None,
 ) -> str:
     if fact_pay_for_order is None:
         return "fact pay_for_order недоступен"
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
+    if (
+        max_pay_for_order is not None
+        and float(fact_pay_for_order) > float(max_pay_for_order)
+    ):
+        return "fact > max (overspend, enable не нужен)"
     if float(fact_pay_for_order) >= MAX_PAY_STABILIZATION_RATIO * float(resolve):
         return (
             f"fact ≥ {MAX_PAY_STABILIZATION_RATIO:.0%}×resolve "
             "(зона стабилизации, enable не нужен)"
         )
-    if not plan_fact_changed and not views_changed:
-        return "plan/fact и views не изменились (нужен сдвиг хотя бы одного сигнала)"
     if eligibility_by_ks_id is None:
-        return "нет NO DATA ключей в OFF"
+        return "нет NO DATA GAP-ключей в OFF"
     candidates = 0
     for ctx, mode in prepared:
         if mode != KeywordStrategyMode.OFF:
@@ -330,8 +331,8 @@ def _note_enable_gap(
             continue
         candidates += 1
     if candidates == 0:
-        return "нет NO DATA ключей в OFF"
-    return "планировщик не выбрал ключей"
+        return "нет NO DATA GAP-ключей в OFF"
+    return "нет подходящего GAP-кандидата для enable"
 
 
 def _note_resolve_calibration(
@@ -383,29 +384,43 @@ def _note_calibration_up(
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
 ) -> str:
-    """Причина нулевого UP: нет ключа со следующим effective-шагом.
+    """Причина нулевого UP: пустой list2 ``StatesListGenerator`` (``for_calibration=True``)."""
+    from dataclasses import replace
 
-    Пул строит ``collect_calibration_up_next_step_candidates`` (OFF NO DATA и
-    FULL/PFO OFF допустимы — см. docstring collector).
-    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        AdvState,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
+        update_context_from_prepared,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
         SelectionPolicy,
-        collect_calibration_up_next_step_candidates,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
+        StatesListGenerator,
     )
 
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    pool = collect_calibration_up_next_step_candidates(
-        prepared,
+    ladder = ladder_inputs or ladder_inputs_for_prepared(prepared)
+    adv_state = replace(
+        AdvState.empty(),
+        eligibility_by_ks_id=eligibility_by_ks_id or {},
+        ladder_inputs=ladder,
         policy=policy,
-        ladder_inputs=ladder_inputs,
-        eligibility_by_ks_id=eligibility_by_ks_id,
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
     )
-    if not pool:
+    context = update_context_from_prepared(prepared, adv_state=adv_state)
+    _current, potential = StatesListGenerator(
+        adv_state,
+        for_calibration=True,
+    ).get_current_states(context.keywords)
+    if not potential:
         return "нет ключа с допустимым следующим шагом UP (state/PFO)"
-    return f"пул UP: {len(pool)} кандидатов, действие не сформировано"
+    return f"пул UP: {len(potential)} кандидатов, действие не сформировано"
 
 
 def _note_calibration_down(
@@ -417,25 +432,42 @@ def _note_calibration_down(
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
 ) -> str:
-    """Причина нулевого CAL DOWN: нет ключа с state выше resolve и шагом вниз."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-        collect_calibration_down_next_step_candidates,
+    """Причина нулевого CAL DOWN: нет ключа с CPO > resolve в list1."""
+    from dataclasses import replace
+
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        AdvState,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
+        update_context_from_prepared,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
         SelectionPolicy,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
+        StatesListGenerator,
     )
 
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=shelf_click_mode,
         aggressiveness=aggressiveness,
     )
-    pool = collect_calibration_down_next_step_candidates(
-        prepared,
-        cost_ceiling=float(cost_ceiling),
+    ladder = ladder_inputs or ladder_inputs_for_prepared(prepared)
+    adv_state = replace(
+        AdvState.empty(),
+        eligibility_by_ks_id=eligibility_by_ks_id or {},
+        ladder_inputs=ladder,
         policy=policy,
-        ladder_inputs=ladder_inputs,
-        eligibility_by_ks_id=eligibility_by_ks_id,
+        shelf_click_mode=shelf_click_mode,
+        aggressiveness=aggressiveness,
     )
-    if not pool:
+    context = update_context_from_prepared(prepared, adv_state=adv_state)
+    current, _potential = StatesListGenerator(
+        adv_state,
+        for_calibration=True,
+    ).get_current_states(context.keywords)
+    ceiling = float(cost_ceiling)
+    donors = [binding for binding in current if binding[2] > ceiling]
+    if not donors:
         return "нет ключа с state > resolve и допустимым шагом CAL DOWN"
-    return f"пул CAL DOWN: {len(pool)} кандидатов, действие не сформировано"
+    return f"пул CAL DOWN: {len(donors)} кандидатов, действие не сформировано"

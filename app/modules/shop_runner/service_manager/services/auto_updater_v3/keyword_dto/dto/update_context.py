@@ -54,7 +54,7 @@ class UpdateContext:
 
     @property
     def keyword_batch(self) -> KeywordBatch:
-        """Фасад для legacy planner projections."""
+        """Legacy batch API для ``UpdatePipelineManager``."""
         return self.prepared.batch
 
     @property
