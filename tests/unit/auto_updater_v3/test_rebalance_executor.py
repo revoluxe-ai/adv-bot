@@ -140,6 +140,46 @@ def _alias_ladder_states(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
     )
 
 
+def _alias_up_ladder_states(
+    ks_id: int,
+    *,
+    min_cpo: float = 280.0,
+    opt_cpo: float = 320.0,
+    max_cpo: float = 350.0,
+) -> tuple[KeywordV3LadderState, ...]:
+    """MIN/OPT на place=10 (alias UP), MAX на place=20 — для rebalance list2."""
+    return (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            target_position=10,
+            cpo=min_cpo,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OPTIMUM,
+            strategy_mode=KeywordStrategyMode.OPTIMUM,
+            target_position=10,
+            cpo=opt_cpo,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=20,
+            cpo=max_cpo,
+        ),
+    )
+
+
 def _dto(
     *,
     ks_id: int = 1,
@@ -338,6 +378,96 @@ def test_rebalance_audit_up_matches_down_plus_force_off() -> None:
     realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
     assert realloc.up == realloc.down + realloc.force_off
     assert realloc.up >= 1
+
+
+@pytest.mark.unit
+def test_rebalance_recipient_up_skips_alias_min_to_opt_same_place() -> None:
+    """Один цикл R: MIN→MAX@20, alias MIN→OPT@10 в list2 не применяется."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(
+            1,
+            min_cpo=250.0,
+            opt_cpo=400.0,
+            max_cpo=600.0,
+            min_place=10,
+            opt_place=20,
+            max_place=30,
+        ),
+        target_place=30,
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.MIN_CPA,
+        target_place=10,
+        ladder=_alias_up_ladder_states(2, max_cpo=350.0),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(
+            policy=SelectionPolicy.from_aggressiveness(
+                click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+                aggressiveness=V3RolloutAggressiveness.MAX,
+            ),
+        ),
+    )
+    RebalanceExecutor().execute(ctx)
+
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[1].current_target_place == 20
+    assert len(ctx.keywords[1].next_state) == 1
+
+    snap = build_keyword_changes_snapshot(ctx.keywords, adv_id=99)
+    realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
+    assert realloc.up == 1
+    assert realloc.down == 1
+    assert realloc.up == realloc.down + realloc.force_off
+
+
+@pytest.mark.unit
+def test_rebalance_up_skips_alias_same_target_place_in_audit() -> None:
+    """Два цикла R: alias MIN→OPT не считается; audit ↑=2 только ladder UP."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(
+            1,
+            min_cpo=250.0,
+            opt_cpo=400.0,
+            max_cpo=600.0,
+            min_place=10,
+            opt_place=20,
+            max_place=30,
+        ),
+        target_place=30,
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_alias_up_ladder_states(2, max_cpo=310.0),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(
+            policy=SelectionPolicy.from_aggressiveness(
+                click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+                aggressiveness=V3RolloutAggressiveness.MAX,
+            ),
+        ),
+    )
+    RebalanceExecutor().execute(ctx)
+
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[1].current_target_place == 20
+    assert len(ctx.keywords[1].next_state) == 2
+
+    snap = build_keyword_changes_snapshot(ctx.keywords, adv_id=99)
+    realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
+    assert realloc.up == 2
+    assert realloc.down == 2
+    assert realloc.up == realloc.down + realloc.force_off
 
 
 @pytest.mark.unit
