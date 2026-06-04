@@ -54,7 +54,14 @@ class StatesListGenerator:
         self,
         keywords: list[KeywordDTO],
     ) -> tuple[list[StateBinding], list[StateBinding]]:
-        """``(current_active, potential_up)`` по operable ключам тика."""
+        """``(current_active, potential_up)`` по operable ключам тика.
+
+        ``current_active``: ключ не ``OFF``, текущая operable-ступень + CPO.
+        ``potential_up``: пары (ключ, ступень) **строго выше** текущего ранга
+        (``ladder_aggression_rank(state) > current_aggression_rank(dto)``),
+        с CPO и shelf/rec gates. Пустой ``potential_up`` — все operable «в упор»
+        вверх или некуда поднимать в рамках policy.
+        """
         current_active: list[StateBinding] = []
         potential_up: list[StateBinding] = []
 

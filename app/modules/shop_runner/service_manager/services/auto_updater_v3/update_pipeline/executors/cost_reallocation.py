@@ -31,16 +31,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 # Верхняя граница пар DOWN+UP за тик (каждая итерация — одна пара при наличии donor/recipient).
 _MAX_REBALANCE_CYCLES = 3000
 
+# Skip фазы (tick report / Telegram).
+SKIP_NO_CURRENT_ACTIVE = "no_current_active"
+SKIP_NO_POTENTIAL_UP = "no_potential_up"
+
 
 class RebalanceExecutor:
     """COST_REALLOCATION: перетекание cost из active в potential.
 
-    Итерация: самый дорогой ``current_active`` → DOWN; из ``potential_up`` — минимальный
-    CPO с учтённым UP. Это не «recipient обязан дешевле донора», а перебор списков,
-    пока дешёвая ступень в potential ещё **ниже** CPO текущего донора (иначе смысла
-    резать дорогого нет — выход из цикла).
+    ``potential_up`` — ступени MIN/OPT/MAX **выше** текущего ранга ключа (см.
+    ``StatesListGenerator``). Пока есть куда поднимать и есть дорогой active —
+    режем донора, поднимаем recipient. Выход:
 
-    Пара пишется в audit только если оба шага реальны (``classify_ladder_step``).
+    - ``no_potential_up`` — некуда поднимать (все operable на потолке / list2 пуст);
+    - ``no_current_active`` — нечего резать (все OFF или нет CPO в active);
+    - в цикле: нет DOWN донора, нет учтённого UP, CPO-донор ≤ min potential (равновесие).
     """
 
     phase_name = "cost_reallocation"
@@ -54,11 +59,24 @@ class RebalanceExecutor:
         if self._skip_reason is not None:
             return
         generator = StatesListGenerator(context.adv_state)
+        current_states, potential_states = generator.get_current_states(
+            context.keywords
+        )
+        if not current_states:
+            self._skip_reason = SKIP_NO_CURRENT_ACTIVE
+            return
+        if not potential_states:
+            self._skip_reason = SKIP_NO_POTENTIAL_UP
+            return
+
         for _ in range(_MAX_REBALANCE_CYCLES):
             current_states, potential_states = generator.get_current_states(
                 context.keywords
             )
-            if not current_states or not potential_states:
+            if not current_states:
+                break
+            if not potential_states:
+                # Все поднялись до потолка / policy — принять некуда, перетекание стоп.
                 break
             donor = _pick_most_expensive(current_states)
             down_state = pick_effective_down_ladder_state(donor[0])

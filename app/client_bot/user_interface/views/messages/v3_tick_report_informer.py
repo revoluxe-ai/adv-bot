@@ -48,6 +48,8 @@ _SKIP_REASON_RU: dict[str, str] = {
     "views_unchanged": "views не изменились",
     "plan_fact_unchanged_and_views_unchanged": "plan/fact и views не изменились",
     "fact_gt_max": "fact > max",
+    "no_potential_up": "нет ступеней выше текущих (potential пуст)",
+    "no_current_active": "нет active ключей для среза (все OFF)",
 }
 
 

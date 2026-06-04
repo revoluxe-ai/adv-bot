@@ -195,11 +195,15 @@ def _note_cost_reallocation(
     resolve: float | None,
     policy: SelectionPolicy | None,
 ) -> str:
+    _ = policy
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
     if not prepared:
         return "нет operable ключей"
-    return "нет пар donor/recipient с CPO-разрывом для ребаланса"
+    return (
+        "нет пар donor/recipient: potential пуст (все на потолке), "
+        "равновесие CPO или нет active для среза"
+    )
 
 
 def _note_enable_gap(

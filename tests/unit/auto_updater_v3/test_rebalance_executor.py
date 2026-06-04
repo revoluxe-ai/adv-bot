@@ -41,6 +41,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation import (
     RebalanceExecutor,
+    SKIP_NO_POTENTIAL_UP,
     _MAX_REBALANCE_CYCLES,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.builder import (
@@ -191,6 +192,16 @@ def test_generator_list1_active_modes_only() -> None:
     assert current[0][0].keyword_setting_id == 1
     assert current[0][2] == 600.0
     assert len(potential) >= 1
+
+
+@pytest.mark.unit
+def test_generator_no_potential_when_keyword_at_max_ceiling() -> None:
+    """На MAX (потолок policy) в potential нет ступеней выше текущего ранга."""
+    at_max = _dto(ks_id=1, mode=KeywordStrategyMode.MAX_CONVERSION, target_place=30)
+    gen = StatesListGenerator(_adv_state())
+    _current, potential = gen.get_current_states([at_max])
+    assert len(_current) == 1
+    assert potential == []
 
 
 @pytest.mark.unit
@@ -356,6 +367,48 @@ def test_resolve_current_ladder_state_matches_target_place() -> None:
     assert state is not None
     assert state.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
     assert state.target_position == 20
+
+
+@pytest.mark.unit
+def test_rebalance_skips_when_no_potential_all_at_max() -> None:
+    """Все operable на потолке → ``no_potential_up``, без пар DOWN+UP."""
+    at_max_1 = _dto(ks_id=1, mode=KeywordStrategyMode.MAX_CONVERSION, target_place=30)
+    at_max_2 = _dto(ks_id=2, mode=KeywordStrategyMode.MAX_CONVERSION, target_place=30)
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[at_max_1, at_max_2]),
+        adv_state=_adv_state(),
+    )
+    executor = RebalanceExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == SKIP_NO_POTENTIAL_UP
+    assert at_max_1.next_state == []
+    assert at_max_2.next_state == []
+
+
+@pytest.mark.unit
+def test_rebalance_stops_mid_loop_when_potential_becomes_empty() -> None:
+    """После цикла OFF→MIN potential может опустеть — выход без бесконечного цикла."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(),
+    )
+    RebalanceExecutor().execute(ctx)
+    assert len(ctx.keywords[0].next_state) == 1
+    assert len(ctx.keywords[1].next_state) == 1
+    snap = build_keyword_changes_snapshot(ctx.keywords, adv_id=1)
+    realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
+    assert realloc.up == realloc.down + realloc.force_off
 
 
 @pytest.mark.unit
