@@ -69,6 +69,8 @@ def test_merge_replaces_counters_preserves_skip_reason() -> None:
                 force_off=16,
                 planned=18,
                 keywords_touched=18,
+                ended_off=16,
+                ended_on=0,
             ),
         ],
     )
@@ -86,10 +88,13 @@ def test_merge_replaces_counters_preserves_skip_reason() -> None:
     realloc = next(p for p in merged.phases if p.phase_id == "cost_reallocation")
     assert realloc.down == 2
     assert realloc.force_off == 16
+    assert realloc.ended_off == 16
+    assert realloc.ended_on == 0
 
     assert merged.net_up == 20
     assert merged.net_down == 18
     assert merged.net_force_off == 16
+    assert merged.net_on == 0
     assert merged.aggression_score_after == 156
     assert merged.aggression_delta == 56
 

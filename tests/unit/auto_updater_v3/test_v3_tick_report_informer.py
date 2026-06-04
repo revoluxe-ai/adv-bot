@@ -79,6 +79,43 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "бюджет 2 (было 1)" in text
     assert "Авто: 40" in text
     assert "Возможные:" not in text
+    assert "on:0  ↓3  off:0" in text
+    assert "on:0  −3↓  off:0" in text
+
+
+@pytest.mark.unit
+def test_format_phase_counters_up_on_down_off_order() -> None:
+    snap = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+        adv_id=1,
+        adv_name="Крем",
+        campaign_mode="NORMAL",
+        phases=[
+            V3PhaseStats(
+                phase_id="shelf_cleanup",
+                title_ru="6 · S · shelf cleanup",
+                up=14,
+                down=0,
+                force_off=14,
+                ended_off=14,
+                ended_on=0,
+            ),
+            V3PhaseStats(
+                phase_id="pay_for_order_gap_enable",
+                title_ru="9 · enable · gap",
+                up=1,
+                ended_on=1,
+            ),
+        ],
+        net_up=19,
+        net_down=2,
+        net_force_off=28,
+        net_on=1,
+    )
+    text = format_v3_tick_report_text(snap)
+    assert "↑14  on:0  ↓14  off:14" in text
+    assert "↑1  on:1  ↓0  off:0" in text
+    assert "Применено: +19↑  on:1  −2↓  off:28" in text
 
 
 @pytest.mark.unit

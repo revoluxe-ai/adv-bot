@@ -54,8 +54,8 @@ def _classify_netto(
     return None
 
 
-def _net_breakdown(keywords: list[KeywordDTO]) -> tuple[int, int, int]:
-    up = down = force_off = 0
+def _net_breakdown(keywords: list[KeywordDTO]) -> tuple[int, int, int, int]:
+    up = down = force_off = net_on = 0
     for dto in keywords:
         action = _classify_netto(dto.stored_mode, dto.current_mode)
         if action == V3ActionType.UP:
@@ -64,7 +64,38 @@ def _net_breakdown(keywords: list[KeywordDTO]) -> tuple[int, int, int]:
             down += 1
         elif action == V3ActionType.FORCE_OFF:
             force_off += 1
-    return up, down, force_off
+        if (
+            dto.stored_mode == KeywordStrategyMode.OFF
+            and dto.current_mode != KeywordStrategyMode.OFF
+        ):
+            net_on += 1
+    return up, down, force_off, net_on
+
+
+def _executor_outcome_counts(
+    keyword_modes: dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]],
+) -> tuple[int, int]:
+    """Исходы по ключам одного executor: off (ended OFF) и on (OFF→active)."""
+    ended_off = ended_on = 0
+    for start, end in keyword_modes.values():
+        if end == KeywordStrategyMode.OFF:
+            ended_off += 1
+        if start == KeywordStrategyMode.OFF and end != KeywordStrategyMode.OFF:
+            ended_on += 1
+    return ended_off, ended_on
+
+
+def _track_executor_keyword_mode(
+    keyword_modes: dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]],
+    *,
+    ks_id: int,
+    mode_before_step: KeywordStrategyMode,
+    mode_after_step: KeywordStrategyMode,
+) -> None:
+    if ks_id not in keyword_modes:
+        keyword_modes[ks_id] = (mode_before_step, mode_before_step)
+    start, _ = keyword_modes[ks_id]
+    keyword_modes[ks_id] = (start, mode_after_step)
 
 
 def _aggression_score_from_dtos(keywords: list[KeywordDTO]) -> int:
@@ -188,6 +219,9 @@ def build_keyword_changes_snapshot(
         }
     )
     keywords_by_executor: dict[str, set[int]] = defaultdict(set)
+    executor_keyword_modes: dict[str, dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]]] = (
+        defaultdict(dict)
+    )
     entries: list[V3KeywordChangeEntry] = []
 
     for dto in keywords:
@@ -203,6 +237,8 @@ def build_keyword_changes_snapshot(
             if step.executor_name in IGNORED_EXECUTOR_NAMES:
                 prior = step.new_mode.to_strategy_mode()
                 continue
+            mode_before = prior
+            new_mode = step.new_mode.to_strategy_mode()
             action = _step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
             if action is not None:
                 _increment_breakdown(
@@ -212,11 +248,20 @@ def build_keyword_changes_snapshot(
                     keyword_touched=keywords_by_executor[step.executor_name],
                     ks_id=ks_id,
                 )
-            prior = step.new_mode.to_strategy_mode()
+            _track_executor_keyword_mode(
+                executor_keyword_modes[step.executor_name],
+                ks_id=ks_id,
+                mode_before_step=mode_before,
+                mode_after_step=new_mode,
+            )
+            prior = new_mode
 
     by_phase: list[V3ExecutorPhaseBreakdown] = []
     for executor_name, counts in sorted(buckets.items()):
         phase_id = phase_id_for_executor(executor_name)
+        ended_off, ended_on = _executor_outcome_counts(
+            executor_keyword_modes[executor_name]
+        )
         by_phase.append(
             V3ExecutorPhaseBreakdown(
                 phase_id=phase_id,
@@ -228,10 +273,12 @@ def build_keyword_changes_snapshot(
                 force_off=counts["force_off"],
                 rebalance=counts["rebalance"],
                 keywords_touched=len(keywords_by_executor[executor_name]),
+                ended_off=ended_off,
+                ended_on=ended_on,
             )
         )
 
-    net_up, net_down, net_force_off = _net_breakdown(keywords)
+    net_up, net_down, net_force_off, net_on = _net_breakdown(keywords)
     return V3KeywordChangesSnapshot(
         tick_at=ts,
         adv_id=adv_id,
@@ -240,6 +287,7 @@ def build_keyword_changes_snapshot(
         net_up=net_up,
         net_down=net_down,
         net_force_off=net_force_off,
+        net_on=net_on,
         aggression_score_after=_aggression_score_from_dtos(keywords),
         by_phase=by_phase,
         keyword_entries=sorted(entries, key=lambda e: e.keyword_text.lower()),

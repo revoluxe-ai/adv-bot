@@ -95,7 +95,13 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         note = phase.outcome_note or "причина не зафиксирована"
         lines.append(f"  без изменений — {note}")
     else:
-        parts = [f"↑{phase.up}", f"↓{phase.down}", f"off{phase.force_off}"]
+        display_down = phase.down + phase.force_off
+        parts = [
+            f"↑{phase.up}",
+            f"on:{phase.ended_on}",
+            f"↓{display_down}",
+            f"off:{phase.ended_off}",
+        ]
         if phase.rebalance:
             parts.append(f"reb{phase.rebalance}")
         lines.append(f"  {'  '.join(parts)}")
@@ -176,8 +182,8 @@ def format_v3_tick_report_text(snapshot: V3TickReportSnapshot | None) -> str:
     )
     lines.append("  Баллы: MIN=1 · OPT=2 · MAX=3 · OFF=0")
     lines.append(
-        f"  Применено: +{snapshot.net_up}↑  −{snapshot.net_down}↓  "
-        f"off:{snapshot.net_force_off}"
+        f"  Применено: +{snapshot.net_up}↑  on:{snapshot.net_on}  "
+        f"−{snapshot.net_down}↓  off:{snapshot.net_force_off}"
     )
     if snapshot.hard_status_counts:
         lines.append("")

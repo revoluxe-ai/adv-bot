@@ -268,6 +268,8 @@ class V3PhaseStats(BaseModel):
     force_off: int = 0
     rebalance: int = 0
     sync: int = 0
+    ended_off: int = 0
+    ended_on: int = 0
     extra: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"extra": "forbid"}
@@ -294,6 +296,7 @@ class V3TickReportSnapshot(BaseModel):
     net_up: int = 0
     net_down: int = 0
     net_force_off: int = 0
+    net_on: int = 0
     calibration_effective_steps: int | None = None
     calibration_direct: str | None = None
     calibration_prev_effective_steps: int | None = None

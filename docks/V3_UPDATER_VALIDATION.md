@@ -209,13 +209,13 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 Кнопка в меню РК (только `automatic_version == 3`): отдельное сообщение с отчётом стадий последнего тика.
 
 - **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
-- **Счётчики фаз** (`↑/↓/off`, net-итог, aggression_after): post-hoc из `KeywordDTO.next_state` (модуль `v3_keyword_changes_report`) после preamble; метаданные фаз (skip, outcome_note, filter, calibration extra) — из `V3TickReportCollector` во время pipeline. NO_DATA — из `ledger.applied_actions()`.
+- **Счётчики фаз** (post-hoc из `KeywordDTO.next_state`, модуль `v3_keyword_changes_report`): **`↑N on:L ↓M off:K`** — UP-шаги; ключи OFF→active по итогам фазы (`on`); DOWN+OFF-шаги лестницы в `↓`; ключи, окончившие фазу в OFF (`off`). Net-итог тика: **`+↑ on: −↓ off:`** (stored→current). `aggression_after` — из audit.
 - **Redis audit:** `V3KeywordChanges:{adv_id}`, TTL 7 суток — полный per-keyword audit (цепочки режимов, executor); UI читает merged `V3TickReport`.
 - **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
 - **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
-- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
+- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net `+↑ on: −↓ off:` (UP / OFF→active / DOWN без OFF / OFF net), распределение hard_status, время тика (MSK).
 - **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
-- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …` (фаза не запускалась). **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note` (диагностика `v3_tick_report_phase_notes`, зеркалит `plan_*`). Счётчики `↑/↓/off` только при ненулевом плане фазы. Старые снимки без `outcome_note` — fallback «причина не зафиксирована».
+- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …`. **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note`. При ненулевом плане — **`↑ on: ↓ off:`** (все четыре поля, нули явно). Метаданные фаз (skip, outcome_note, filter, calibration extra) — из `V3TickReportCollector`; NO_DATA audit — из `ledger.applied_actions()`.
 - **Шапка:** adaptive calibration (`calibration_effective_steps`, `calibration_direct`, `calibration_prev_effective_steps` из Redis resolver); **БС max** — самый дорогой ключ `hard_status=2` по decision CPO (FULL → state, PFO → `pay_for_order`), с обоими CPO если доступны.
 
 ## UI: порядок ключей в списке (V3)

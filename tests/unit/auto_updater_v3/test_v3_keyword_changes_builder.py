@@ -121,8 +121,11 @@ def test_multi_step_keyword_two_executors() -> None:
     snap = build_keyword_changes_snapshot([dto], adv_id=1)
     by_phase = {p.phase_id: p for p in snap.by_phase}
     assert by_phase["pay_for_order_gap_enable"].up == 1
+    assert by_phase["pay_for_order_gap_enable"].ended_on == 1
     assert by_phase["resolve_calibration"].up == 1
+    assert by_phase["resolve_calibration"].ended_on == 0
     assert snap.net_up == 1
+    assert snap.net_on == 1
     entry = snap.keyword_entries[0]
     assert "OFF→MIN_CPA→OPTIMUM" in entry.mode_chain
     assert len(entry.steps) == 2
@@ -160,3 +163,22 @@ def test_target_place_history_in_entry() -> None:
     assert snap.changed_keywords == 1
     assert snap.net_up == 0
     assert snap.keyword_entries[0].target_place_steps == ["15 (R↑)"]
+
+
+@pytest.mark.unit
+def test_shelf_force_off_counts_ended_off() -> None:
+    dto = _dto(1, mode=KeywordStrategyMode.OPTIMUM)
+    dto.current_mode = NextState(
+        new_mode=KeywordMode.OFF,
+        executor_name="ShelfCleanupExecutor",
+    )
+
+    snap = build_keyword_changes_snapshot([dto], adv_id=1)
+    shelf = next(p for p in snap.by_phase if p.phase_id == "shelf_cleanup")
+    assert shelf.up == 0
+    assert shelf.down == 0
+    assert shelf.force_off == 1
+    assert shelf.ended_off == 1
+    assert shelf.ended_on == 0
+    assert snap.net_force_off == 1
+    assert snap.net_on == 0

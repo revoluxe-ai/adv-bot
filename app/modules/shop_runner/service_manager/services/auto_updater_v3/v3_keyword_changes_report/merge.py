@@ -46,6 +46,8 @@ def merge_keyword_changes_into_tick_snapshot(
                     "down": breakdown.down,
                     "force_off": breakdown.force_off,
                     "rebalance": breakdown.rebalance,
+                    "ended_off": breakdown.ended_off,
+                    "ended_on": breakdown.ended_on,
                     "outcome_note": (
                         None
                         if breakdown.planned > 0
@@ -71,6 +73,8 @@ def merge_keyword_changes_into_tick_snapshot(
                 down=breakdown.down,
                 force_off=breakdown.force_off,
                 rebalance=breakdown.rebalance,
+                ended_off=breakdown.ended_off,
+                ended_on=breakdown.ended_on,
             )
         )
 
@@ -81,6 +85,7 @@ def merge_keyword_changes_into_tick_snapshot(
             "net_up": audit.net_up,
             "net_down": audit.net_down,
             "net_force_off": audit.net_force_off,
+            "net_on": audit.net_on,
             "aggression_score_after": aggression_after,
             "aggression_delta": aggression_after - base.aggression_score_before,
         }

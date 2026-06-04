@@ -54,6 +54,7 @@ def build_from_applied_actions(
     up = down = force_off = 0
     entries: list[V3KeywordChangeEntry] = []
     touched_ids: set[int] = set()
+    keyword_modes: dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]] = {}
 
     for item in applied:
         ks_id = item.keyword_setting_id
@@ -70,6 +71,11 @@ def build_from_applied_actions(
             continue
         if ks_id is None:
             continue
+        kid = int(ks_id)
+        if kid not in keyword_modes:
+            keyword_modes[kid] = (item.from_mode, item.from_mode)
+        start, _ = keyword_modes[kid]
+        keyword_modes[kid] = (start, item.to_mode)
         entries.append(
             V3KeywordChangeEntry(
                 keyword_setting_id=int(ks_id),
@@ -89,6 +95,14 @@ def build_from_applied_actions(
             )
         )
 
+    ended_off = sum(1 for _, end in keyword_modes.values() if end == KeywordStrategyMode.OFF)
+    ended_on = sum(
+        1
+        for start, end in keyword_modes.values()
+        if start == KeywordStrategyMode.OFF and end != KeywordStrategyMode.OFF
+    )
+    net_on = ended_on
+
     breakdown = V3ExecutorPhaseBreakdown(
         phase_id=_NO_DATA_PHASE_ID,
         executor_name=_EXECUTOR_NAME,
@@ -98,6 +112,8 @@ def build_from_applied_actions(
         down=down,
         force_off=force_off,
         keywords_touched=len(touched_ids),
+        ended_off=ended_off,
+        ended_on=ended_on,
     )
 
     aggression_after = 0
@@ -114,6 +130,7 @@ def build_from_applied_actions(
         net_up=up,
         net_down=down,
         net_force_off=force_off,
+        net_on=net_on,
         aggression_score_after=aggression_after,
         by_phase=[breakdown],
         keyword_entries=sorted(entries, key=lambda e: e.keyword_text.lower()),

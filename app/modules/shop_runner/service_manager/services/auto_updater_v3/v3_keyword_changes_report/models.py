@@ -43,6 +43,8 @@ class V3ExecutorPhaseBreakdown(BaseModel):
     force_off: int = 0
     rebalance: int = 0
     keywords_touched: int = 0
+    ended_off: int = 0
+    ended_on: int = 0
 
     model_config = {"extra": "forbid"}
 
@@ -57,6 +59,7 @@ class V3KeywordChangesSnapshot(BaseModel):
     net_up: int = 0
     net_down: int = 0
     net_force_off: int = 0
+    net_on: int = 0
     aggression_score_after: int = 0
     by_phase: list[V3ExecutorPhaseBreakdown] = Field(default_factory=list)
     keyword_entries: list[V3KeywordChangeEntry] = Field(default_factory=list)
