@@ -65,9 +65,13 @@ def test_collector_build_snapshot() -> None:
     coll = V3TickReportCollector()
     coll.set_aggression_before(kws)
     coll.record_filter(total=10, operable=8)
-    coll.record_sync(2)
     coll.record_phase(
-        "cap_down",
+        "validate_state_by_hard_status",
+        [],
+        extra={"hs1_touched": 2},
+    )
+    coll.record_phase(
+        "validate_not_full_state",
         [V3Action(action=V3ActionType.DOWN, keyword_setting_id=1)],
     )
     snap = coll.build_snapshot(

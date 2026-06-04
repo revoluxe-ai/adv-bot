@@ -113,7 +113,7 @@ def test_find_white_list_cost_leader_picks_highest_state(
         return (100.0, False)
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         _fake_cost,
     )
 
@@ -146,7 +146,7 @@ def test_find_white_list_cost_leader_pfo_tier_uses_pay_for_order(
     ladder = LadderInputs.from_contexts([ctx], campaign_orders_per_cart_7d=None)
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         lambda *, ctx, to_mode, **_: (50.0, False),
     )
     monkeypatch.setattr(
@@ -194,7 +194,7 @@ def test_find_white_list_cost_leader_full_uses_state(
     ladder = LadderInputs.from_contexts([ctx], campaign_orders_per_cart_7d=None)
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         lambda *, ctx, to_mode, **_: (250.0, False),
     )
 

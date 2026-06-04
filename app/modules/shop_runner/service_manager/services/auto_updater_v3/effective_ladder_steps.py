@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -50,7 +52,109 @@ _LADDER_MODES: tuple[KeywordStrategyMode, ...] = (
     KeywordStrategyMode.MAX_CONVERSION,
 )
 
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+
 logger = logging.getLogger(__name__)
+
+
+class LadderStepKind(str, Enum):
+    """Направление одного ladder-шага (смена place или переход OFF)."""
+
+    UP = "UP"
+    DOWN = "DOWN"
+    OFF = "OFF"
+
+
+@dataclass(frozen=True, slots=True)
+class LadderStepSnapshot:
+    """Снимок режима и ``target_place`` для классификации шага."""
+
+    mode: KeywordStrategyMode
+    target_place: int | None
+
+
+def ladder_step_snapshot_from_dto(dto: KeywordDTO) -> LadderStepSnapshot:
+    """Текущий ``mode`` + ``target_place`` ключа (OFF → ``place=None``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if dto.current_mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    place = dto.current_target_place
+    return LadderStepSnapshot(dto.current_mode, int(place))
+
+
+def ladder_step_snapshot_for_mode(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+) -> LadderStepSnapshot:
+    """Снимок для ``mode`` по матрице ladder (не зависит от ``dto.current_mode``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+        ladder_state_for_mode,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    state = ladder_state_for_mode(dto, mode)
+    if state is None:
+        return LadderStepSnapshot(mode, None)
+    return LadderStepSnapshot(mode, int(state.target_position))
+
+
+def _ladder_step_rank(snapshot: LadderStepSnapshot) -> tuple[int, int]:
+    if snapshot.mode == KeywordStrategyMode.OFF:
+        return (-1, -1)
+    place = snapshot.target_place if snapshot.target_place is not None else 0
+    return (mode_level(snapshot.mode), -place)
+
+
+def classify_ladder_step(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> LadderStepKind | None:
+    """Классифицировать переход: ``None`` если alias на том же ``target_place``."""
+    if before.mode == after.mode and before.target_place == after.target_place:
+        return None
+    if after.mode == KeywordStrategyMode.OFF and before.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.OFF
+    if before.mode == KeywordStrategyMode.OFF and after.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.UP
+    if (
+        before.target_place is not None
+        and after.target_place is not None
+        and before.target_place == after.target_place
+        and before.mode != after.mode
+    ):
+        return None
+    before_rank = _ladder_step_rank(before)
+    after_rank = _ladder_step_rank(after)
+    if after_rank > before_rank:
+        return LadderStepKind.UP
+    if after_rank < before_rank:
+        return LadderStepKind.DOWN
+    return None
+
+
+def is_ladder_step(before: LadderStepSnapshot, after: LadderStepSnapshot) -> bool:
+    """``True``, если переход считается одним ladder-шагом."""
+    return classify_ladder_step(before, after) is not None
+
+
+def count_ladder_step_if_applied(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> int:
+    """``1`` если переход — ladder-шаг, иначе ``0``."""
+    return 1 if is_ladder_step(before, after) else 0
 
 
 def candidate_for_strategy_mode(
@@ -124,6 +228,44 @@ def logical_modes_at_target_place_above(
         if place == target_place:
             out.append(mode)
     return tuple(out)
+
+
+def resolve_alias_collapse_up_at_same_target_place(
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> KeywordStrategyMode | None:
+    """Схлопнуть alias UP на текущем ``target_place`` до max ``mode_level`` в группе.
+
+    Срабатывает только если ``step_up(current)`` ведёт на тот же ``target_place``,
+    что и текущий режим. Не поднимает ключ на новый place (в отличие от
+    ``resolve_next_effective_step_up``).
+    """
+    if current in (
+        KeywordStrategyMode.OFF,
+        KeywordStrategyMode.MAX_CONVERSION,
+    ):
+        return None
+    cur_c = candidate_for_strategy_mode(current, catalog)
+    if cur_c is None or not cur_c.is_valid:
+        return None
+    place = target_place_from_mode_candidate(cur_c)
+    if place is None:
+        return None
+    nxt = step_up(current)
+    if nxt is None:
+        return None
+    nxt_c = candidate_for_strategy_mode(nxt, catalog)
+    if nxt_c is None or not nxt_c.is_valid:
+        return None
+    if not mode_candidates_same_effective_target(cur_c, nxt_c):
+        return None
+    group = logical_modes_at_target_place_above(current, place, catalog)
+    if not group:
+        return None
+    target = max(group, key=mode_level)
+    if mode_level(target) <= mode_level(current):
+        return None
+    return target
 
 
 def resolve_next_effective_step_up(
@@ -255,7 +397,7 @@ def iter_effective_upper_mode_groups(
         nxt_c = candidate_for_strategy_mode(res.next_mode, catalog)
         place = target_place_from_mode_candidate(nxt_c)
         if place is None:
-            if cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+            if cursor == KeywordStrategyMode.OFF:
                 groups.append((res.next_mode,))
                 cursor = res.next_mode
                 continue
@@ -263,7 +405,7 @@ def iter_effective_upper_mode_groups(
         group = logical_modes_at_target_place_above(cursor, place, catalog)
         if group:
             groups.append(group)
-        elif cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+        elif cursor == KeywordStrategyMode.OFF:
             groups.append((res.next_mode,))
         cursor = res.next_mode
 

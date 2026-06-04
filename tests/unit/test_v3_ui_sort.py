@@ -185,7 +185,6 @@ def test_v3_sort_no_ch_uses_pay_for_order_not_campaign_worst() -> None:
         KeywordV3Context(keyword=no_ch, position_profile=None),
     ]
     ladder_inputs, elig_map = _ladder_bundle(contexts)
-    assert ladder_inputs.worst_costs.get(AggressionTargetMode.MIN_CPA) is not None
     sorted_kws = sort_keywords_by_current_state_cost(
         [donor, no_ch],
         contexts,

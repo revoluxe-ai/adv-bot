@@ -114,15 +114,14 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
     views_cache = MagicMock()
     views_cache.get_cached_views = AsyncMock(return_value=100)
     views_cache.set_views = AsyncMock()
-    calibration = MagicMock(return_value=[])
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(
                 max_pay_for_order=100.0,
                 orders=10,
@@ -130,49 +129,47 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
             ),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
         ) as updater_cls,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact",
             return_value=plan_fact,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews",
             return_value=views_cache,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_complex_adv_total_views",
             new=AsyncMock(side_effect=RuntimeError("clickhouse unavailable")),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.detect_campaign_state",
             return_value=SalesStates.STABLE,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner.run_calibration_up",
+        ) as cal_up,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner.run_calibration_down",
+        ) as cal_down,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration",
-            calibration,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState"
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.V3CalibrationStepState"
         ) as step_cls,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.V3TickKeywordLedger.flush_to_db",
             new=AsyncMock(return_value=False),
         ),
         patch(
@@ -181,12 +178,14 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
         ),
     ):
         step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=85.0, predict_orders=10)
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    calibration.assert_not_called()
+    cal_up.assert_not_called()
+    cal_down.assert_not_called()
     plan_fact.set_new_plan_fact.assert_not_awaited()
     views_cache.set_views.assert_not_awaited()
 

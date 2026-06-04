@@ -29,58 +29,52 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
     step.get_state = AsyncMock(return_value=None)
     step.set_state = AsyncMock()
     return {
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context": AsyncMock(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context": AsyncMock(
             return_value=(MagicMock(), {})
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts": lambda *a, **k: [],
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
             orders=10,
             target_pay_for_order=80.0,
             max_pay_for_order=100.0,
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._resolve_v3_fact_data": AsyncMock(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_v3_fact_data": AsyncMock(
             return_value=(
                 MagicMock(predict_orders=10.0, pay_for_order=85.0, original_orders=10),
                 "dto",
             )
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state": lambda *a, **k: SalesStates.STABLE,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_campaign_mode": lambda *a, **k: CampaignMode.NORMAL,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.is_campaign_full_stop": lambda *a, **k: False,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.allows_ladder_phases": lambda *a, **k: True,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.detect_campaign_state": lambda *a, **k: SalesStates.STABLE,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode.resolve_campaign_mode": lambda *a, **k: CampaignMode.NORMAL,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode.is_campaign_full_stop": lambda *a, **k: False,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode.allows_ladder_phases": lambda *a, **k: True,
         "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d": AsyncMock(
             return_value=None
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._prepare_v3_operable_ladder_contexts": lambda *a, **k: (
-            [],
-            [],
-            0,
-        ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_mode_cap_down": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.is_resolve_valid": lambda *a, **k: True,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_passing_up": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_cost_reallocation": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_pay_for_order_gap_enable": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_resolve_calibration": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact": lambda *a, **k: pfc,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFactViews": lambda *a, **k: views,
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.resolve_complex_adv_total_views": AsyncMock(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold.is_resolve_valid": lambda *a, **k: True,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact": lambda *a, **k: pfc,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews": lambda *a, **k: views,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_complex_adv_total_views": AsyncMock(
             return_value=100
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3CalibrationStepState": lambda *a, **k: step,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.V3CalibrationStepState": lambda *a, **k: step,
         "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3": AsyncMock(
             return_value=None
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._refresh_v3_tick_state": lambda *a, **k: (
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context.refresh_v3_tick_state": lambda *a, **k: (
             [],
             {},
             MagicMock(),
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.select_v3_post_gate_actions": lambda *a, **k: [],
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.V3TickKeywordLedger.flush_to_db": AsyncMock(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions": lambda *a, **k: [],
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.V3TickKeywordLedger.flush_to_db": AsyncMock(
             return_value=False
         ),
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_keyword_changes": AsyncMock(),
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report": persist_mock,
     }
 
@@ -122,7 +116,5 @@ async def test_process_adv_v3_persists_tick_report_on_normal_tick() -> None:
     assert isinstance(snapshot, V3TickReportSnapshot)
     assert snapshot.campaign_mode == "NORMAL"
     assert any(p.phase_id == "filter" for p in snapshot.phases)
-    cap_phase = next(p for p in snapshot.phases if p.phase_id == "cap_down")
-    assert cap_phase.executed
-    assert cap_phase.outcome_note is not None
-    assert cap_phase.up == 0
+    nf_phase = next(p for p in snapshot.phases if p.phase_id == "validate_not_full_state")
+    assert nf_phase.executed

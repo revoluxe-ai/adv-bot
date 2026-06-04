@@ -16,8 +16,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibratio
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    plan_resolve_calibration,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
+    plan_calibration_actions,
 )
 from tests.unit.auto_updater_v3.calibration_debug_log import write_calibration_debug_log
 from tests.unit.auto_updater_v3.test_calibration_adaptive_integration import (
@@ -113,7 +113,7 @@ def test_debug_run_planner_budgets_match_actions(
         [KeywordV3Context(keyword=kw, position_profile=_three_place_profile())]
     )
     for budget in (1, 2, 4):
-        actions = plan_resolve_calibration(
+        actions = plan_calibration_actions(
             prepared,
             resolve=550.0,
             calibration_direct=CalibrationDirect.LOOSEN,

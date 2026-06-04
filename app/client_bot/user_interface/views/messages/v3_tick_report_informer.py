@@ -48,6 +48,8 @@ _SKIP_REASON_RU: dict[str, str] = {
     "views_unchanged": "views не изменились",
     "plan_fact_unchanged_and_views_unchanged": "plan/fact и views не изменились",
     "fact_gt_max": "fact > max",
+    "no_potential_up": "нет ступеней выше текущих (potential пуст)",
+    "no_current_active": "нет active ключей для среза (все OFF)",
 }
 
 
@@ -81,9 +83,11 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         operable = phase.extra.get("operable", 0)
         lines.append(f"  Управляемых: {operable} из {total}")
         return lines
-    if phase.phase_id == "hard_status_sync":
-        lines.append(f"  Синхронизировано: {phase.sync}")
-        if phase.sync == 0 and phase.outcome_note:
+    if phase.phase_id == "validate_state_by_hard_status":
+        touched = phase.extra.get("hs1_touched", 0)
+        if touched:
+            lines.append(f"  ключей авто (hs=1): {touched}")
+        elif phase.outcome_note:
             lines.append(f"  без изменений — {phase.outcome_note}")
         return lines
     if not phase.executed and phase.skip_reason:
@@ -93,7 +97,13 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         note = phase.outcome_note or "причина не зафиксирована"
         lines.append(f"  без изменений — {note}")
     else:
-        parts = [f"↑{phase.up}", f"↓{phase.down}", f"off{phase.force_off}"]
+        display_down = phase.down + phase.force_off
+        parts = [
+            f"↑{phase.up}",
+            f"on:{phase.ended_on}",
+            f"↓{display_down}",
+            f"off:{phase.ended_off}",
+        ]
         if phase.rebalance:
             parts.append(f"reb{phase.rebalance}")
         lines.append(f"  {'  '.join(parts)}")
@@ -174,8 +184,8 @@ def format_v3_tick_report_text(snapshot: V3TickReportSnapshot | None) -> str:
     )
     lines.append("  Баллы: MIN=1 · OPT=2 · MAX=3 · OFF=0")
     lines.append(
-        f"  Применено: +{snapshot.net_up}↑  −{snapshot.net_down}↓  "
-        f"off:{snapshot.net_force_off}"
+        f"  Применено: +{snapshot.net_up}↑  on:{snapshot.net_on}  "
+        f"−{snapshot.net_down}↓  off:{snapshot.net_force_off}"
     )
     if snapshot.hard_status_counts:
         lines.append("")

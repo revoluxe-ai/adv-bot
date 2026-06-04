@@ -27,9 +27,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
     PreComplexAdv,
 )
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
@@ -117,13 +114,26 @@ def _enter_pre_adv_mocks(
             new=AsyncMock(return_value=[]),
         )
     )
-    # Глобальный redis.asyncio клиент из app.core.redis_manager привязан к loop первого теста;
-    # без мока второй async-тест ловит «Event loop is closed». Кэш ключевых слов здесь не цель теста.
+    # plan_fact: факт из Redis keywords → PlanFactProvider (без глобального redis_client).
+    stack.enter_context(
+        patch(
+            "app.modules.shop_runner.required_data_miss.fetch_calculated_keywords_from_redis",
+            new=AsyncMock(return_value=[]),
+        )
+    )
     stack.enter_context(
         patch.object(
-            RedisCalculatedKeywordsCacheManager,
-            "get_all_calculated_keywords_for_adv",
-            new=AsyncMock(return_value=None),
+            PlanFactProvider,
+            "get_stat_data",
+            new=AsyncMock(
+                return_value=_make_minimal_common_advs_stat_data(MagicMock()),
+            ),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.run_tasks",
+            new=_run_tasks_sequentially,
         )
     )
 
@@ -324,15 +334,6 @@ async def test_full_cycle_error_handling_for_some_advs(
         stack.enter_context(
             patch.object(
                 PlanFactProvider,
-                "get_stat_data",
-                new=AsyncMock(
-                    return_value=_make_minimal_common_advs_stat_data(MagicMock()),
-                ),
-            )
-        )
-        stack.enter_context(
-            patch.object(
-                PlanFactProvider,
                 "get_fact_data",
                 new=AsyncMock(side_effect=[fact1, Exception("Fact data error")]),
             )
@@ -392,15 +393,6 @@ async def test_full_cycle_multiple_advs_simultaneously(
             patch(
                 "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_manager.run_tasks",
                 new=_run_tasks_sequentially,
-            )
-        )
-        stack.enter_context(
-            patch.object(
-                PlanFactProvider,
-                "get_stat_data",
-                new=AsyncMock(
-                    return_value=_make_minimal_common_advs_stat_data(MagicMock()),
-                ),
             )
         )
         stack.enter_context(

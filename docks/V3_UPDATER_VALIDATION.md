@@ -12,7 +12,7 @@
 | **NO_DATA** | `SalesStates.NO_DATA` (`fact.pay_for_order is None`) | только `plan_campaign_no_data_bootstrap_safe` → flush → sync с `force_all_target_place_zero=True` (управляемые ключи) |
 | **NORMAL** | OVERSPEND / UNDERPERFORM / STABLE / OPTIMAL | полный preamble + post-gate (без gate) + snapshots |
 
-При **NO_DATA** запрещены: COST_REALLOCATION, PROFITABLE_EXPANSION, MAX_CPA_GUARD, selector, plan/fact/views snapshots.
+При **NO_DATA** запрещены: COST_REALLOCATION, selector ladder, plan/fact/views snapshots (кроме bootstrap path).
 
 ### Keyword-level (`KeywordDataTier`, `keyword_v3_eligibility.py`)
 
@@ -33,23 +33,44 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter/sync → B → U → S → G → R → enable → calibration(DOWN|UP)
+NORMAL    → filter operable → V → NF → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
-Каждая фаза NORMAL с actions: `_apply_v3_phase` → `_refresh_v3_tick_state`.
+### Cap-down (legacy B) — намеренно удалён
 
-Фазы NORMAL (только `allows_ladder_phases`):
+До рефакторинга V3 была фаза **B** (`CapDownExecutor`, `plan_mode_cap_down`): опускать
+``strategy_mode`` выше ``max_allowed_mode`` по ``KeywordDataTier``.
 
-1. **B** (`plan_mode_cap_down`) — cap DOWN active выше tier cap (FULL/PFO/NO DATA).
-2. **U** (`plan_passing_up`) — UP до max passing при cost/PFO ≤ resolve.
-3. **S** (`plan_shelf_rec_false_cleanup_down`) — shelf active + rec FAIL → DOWN.
-4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
-5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
-6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
-7. **Effective step (глобально, `effective_ladder_steps`)**: одно V3-действие = collapsed `resolve_next_effective_step_up/down` (alias на том же `target_place`, OFF→max в группе); **passing_up / realloc passing** — `resolve_furthest_passing_up_mode` (alias на текущем place + sequential новые place, 1 UP). **pooled / calibration**: один collapsed target на ключ за итерацию. Passing: `state_cost ≤ resolve` (при плане выполнен — `target_pay_for_order`, иначе `max`).
-8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
-9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+**Сейчас отдельной фазы нет — это не баг.**
+
+| Ситуация | Кто обрабатывает |
+|----------|------------------|
+| Нет CH-профиля (`position_profile` пуст), PFO или GAP | **NF** — active → ``MIN_CPA`` + ``target_place=0`` |
+| Есть CH-профиль | Лестница M/O/C и CPO из профиля (**FULL**); режим берётся из профиля, cap по tier не режет |
+| UP/realloc/calibration | ``can_target_mode(eligibility, mode)`` — tier без профиля не даёт OPT/MAX |
+
+**Не восстанавливать** ``CapDownExecutor`` без изменения продуктового контракта «есть профиль →
+работаем из профиля». Статика: ``tests/unit/auto_updater_v3/test_orchestrator_campaign_mode_layout.py``
+(``test_no_legacy_cap_down_executor_in_preamble``).
+
+Каждая фаза NORMAL in-place: `UpdatePipelineManager.run_preamble` → `NextState` на `KeywordDTO`.
+
+Фазы NORMAL (только `allows_ladder_phases`, in-place executors):
+
+1. **V** (`HardStatusValidateExecutor`) — авто hard_status=1 → OFF.
+2. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN + tp=0.
+3. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place.
+4. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO.
+5. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend.
+6. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
+7. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
+8. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
+9. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
+10. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
+11. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+
+Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 
 ## Structured logs
 
@@ -78,7 +99,10 @@ UI (Telegram) и updater (COST_REALLOCATION / RESOLVE_CALIBRATION / PROFITABLE_E
 |--------|------|
 | `keyword_v3_contexts.py` | `build_keyword_v3_contexts`, `load_campaign_v3_contexts` |
 | `keyword_v3_ladder_view.py` | `LadderInputs`, `cost_for_mode`, `resolve_ladder_stage_display` |
-| `rollout_planner.py` | фазы делегируют в `cost_for_mode` через `ladder_inputs` (отдельный `worst_costs` в API planner **нет**) |
+| `resolve_threshold.py` | `compute_resolve_cost_threshold`, `is_resolve_valid` |
+| `ladder_tick_helpers.py` | tick-report / gap enable helpers (`mode_catalog_for_ctx`, …) |
+| `effective_ladder_steps.py` | collapsed UP/DOWN, alias groups; SSOT ``LadderStepSnapshot`` / ``classify_ladder_step`` (1 шаг = смена ``target_place`` или OFF; alias на том же place = 0) |
+| `update_pipeline/executors/` | in-place preamble executors + `NextStateManager` |
 
 **Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` и `ladder_inputs_for_prepared` не пересчитывают worst вне `LadderInputs`.
 
@@ -202,11 +226,13 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 Кнопка в меню РК (только `automatic_version == 3`): отдельное сообщение с отчётом стадий последнего тика.
 
 - **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
-- **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
+- **Счётчики фаз** (post-hoc из `KeywordDTO.next_state`, модуль `v3_keyword_changes_report`): **`↑N on:L ↓M off:K`** — UP-шаги; ключи OFF→active по итогам фазы (`on`); DOWN+OFF-шаги лестницы в `↓`; ключи, окончившие фазу в OFF (`off`). Net-итог тика: **`+↑ on: −↓ off:`** (stored→current). `aggression_after` — из audit.
+- **Redis audit:** `V3KeywordChanges:{adv_id}`, TTL 7 суток — полный per-keyword audit (цепочки режимов, executor); UI читает merged `V3TickReport`.
+- **Стадии NORMAL:** filter → V → NF → skip_up → raise → reset → S → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING). Legacy фаза **B (cap_down)** удалена — см. § Cap-down выше.
 - **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
-- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).
+- **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net `+↑ on: −↓ off:` (UP / OFF→active / DOWN без OFF / OFF net), распределение hard_status, время тика (MSK).
 - **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».
-- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …` (фаза не запускалась). **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note` (диагностика `v3_tick_report_phase_notes`, зеркалит `plan_*`). Счётчики `↑/↓/off` только при ненулевом плане фазы. Старые снимки без `outcome_note` — fallback «причина не зафиксирована».
+- **Формат стадии:** без строки «Возможные:». **Пропуск** (`executed=False`, `skip_reason`) — `пропуск — …`. **Нулевой исход** (`executed=True`, действий 0) — `без изменений — …` из `outcome_note`. При ненулевом плане — **`↑ on: ↓ off:`** (все четыре поля, нули явно). Метаданные фаз (skip, outcome_note, filter, calibration extra) — из `V3TickReportCollector`; NO_DATA audit — из `ledger.applied_actions()`.
 - **Шапка:** adaptive calibration (`calibration_effective_steps`, `calibration_direct`, `calibration_prev_effective_steps` из Redis resolver); **БС max** — самый дорогой ключ `hard_status=2` по decision CPO (FULL → state, PFO → `pay_for_order`), с обоими CPO если доступны.
 
 ## UI: порядок ключей в списке (V3)

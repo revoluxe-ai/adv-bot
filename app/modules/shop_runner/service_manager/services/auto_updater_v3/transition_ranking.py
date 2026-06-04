@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
@@ -26,7 +26,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
     build_mode_candidates,
-    stored_strategy_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     effective_conv_for_v3,
@@ -39,11 +38,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3SelectionLog,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
-    candidate_for_strategy_mode,
     log_skipped_aliases,
-    mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
     resolve_next_effective_step_up,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordV3Eligibility,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -64,25 +64,30 @@ _HARD_STATUS_WHITE_LIST = 2
 
 
 def _hard_status_allows_up(hard_status: int) -> bool:
-    """UP: авто (1) и белый список (2), как в ``rollout_planner``."""
+    """UP (ladder): авто (1) и белый список (2)."""
     return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
-PreparedList = list[_PreparedEntry]
+
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
+    KeywordsPreparedList,
+    build_keywords_prepared_list,
+)
+
+# Legacy: mutable list of (ctx, mode); canonical tick container — ``KeywordsPreparedList``.
+PreparedList: TypeAlias = list[_PreparedEntry]
+PreparedListLike: TypeAlias = KeywordsPreparedList | PreparedList
 
 
 def build_prepared_from_contexts(
     contexts: list["KeywordV3Context"],
-) -> PreparedList:
-    """Собрать ``PreparedList`` из контекстов ключей.
+) -> KeywordsPreparedList:
+    """Собрать ``KeywordsPreparedList`` из контекстов ключей.
 
-    Каноническое определение для V3 planners; импортировать из ``transition_ranking``,
-    не из ``selector``.
+    Каноническое определение для V3 planners; импортировать из ``transition_ranking``
+    или ``keyword_dto`` (``build_keywords_prepared_list``).
     """
-    prepared: PreparedList = []
-    for ctx in contexts:
-        prepared.append((ctx, stored_strategy_mode(ctx.keyword)))
-    return prepared
+    return build_keywords_prepared_list(contexts)
 
 
 class RecTier(str, Enum):
@@ -151,7 +156,7 @@ def max_target_mode_for_aggressiveness(
 
 
 def _ladder_inputs_for_prepared(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> "LadderInputs":
     """Единый ``LadderInputs`` на проход pooled ranking (RK + worst_costs SSOT)."""
@@ -167,7 +172,7 @@ def _ladder_inputs_for_prepared(
 
 def _catalog_for_ctx(
     ctx: "KeywordV3Context",
-    contexts: PreparedList | None = None,
+    contexts: PreparedListLike | None = None,
     *,
     ladder_inputs: "LadderInputs | None" = None,
     rk_orders_per_cart: float | None = None,
@@ -176,10 +181,10 @@ def _catalog_for_ctx(
     """Каталог M/O/C: через ``LadderInputs.orders_per_cart_for_ctx`` или legacy resolve."""
     if ladder_inputs is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-            _catalog_for_ctx as _ladder_catalog_for_ctx,
+            catalog_for_ctx as ladder_catalog_for_ctx,
         )
 
-        return _ladder_catalog_for_ctx(ctx, ladder_inputs)
+        return ladder_catalog_for_ctx(ctx, ladder_inputs)
 
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
         resolve_orders_per_cart_for_cpo,
@@ -218,7 +223,7 @@ def missing_target_matrix_from_catalog(
 
 def missing_target_matrix(
     ctx: "KeywordV3Context",
-    contexts: PreparedList | None = None,
+    contexts: PreparedListLike | None = None,
 ) -> bool:
     """Нет ни одного валидного целевого места M/O/C в матрице профиля."""
     return missing_target_matrix_from_catalog(_catalog_for_ctx(ctx, contexts))
@@ -281,12 +286,6 @@ def _target_allowed(
     max_target_mode: KeywordStrategyMode,
 ) -> bool:
     return int(to_mode) <= int(max_target_mode)
-
-
-def _has_valid_target_place_data(
-    catalog: dict[AggressionTargetMode, ModeCandidate],
-) -> bool:
-    return any(mc.is_valid for mc in catalog.values())
 
 
 def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
@@ -364,7 +363,7 @@ def _resolve_state_cost(
 
 
 def build_worst_per_state_costs(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     rk_orders_per_cart: float | None = None,
     campaign_orders_per_cart_7d: float | None = None,
@@ -376,15 +375,14 @@ def build_worst_per_state_costs(
 
 
 def collect_transition_candidates(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     policy: SelectionPolicy,
-    ladder_inputs: "LadderInputs | None" = None,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: LadderInputs | None = None,
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
 ) -> list[TransitionCandidate]:
     """Один схлопнутый effective UP на ключ (alias = 1 шаг, см. ``effective_ladder_steps``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        KeywordV3Eligibility,
         build_eligibility_map,
         can_target_mode,
         min_cpa_operational_via_pay_for_order,
@@ -411,14 +409,12 @@ def collect_transition_candidates(
             continue
 
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
 
         catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-        use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
-        elig = (
-            elig_map.get(int(ks_id)) if ks_id is not None else None
-        )
+        _ = missing_target_matrix_from_catalog(catalog)
+        elig = elig_map.get(ks_id)
         pfo_operational = min_cpa_operational_via_pay_for_order(ctx, elig, catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
@@ -470,193 +466,6 @@ def collect_transition_candidates(
         out.append(
             TransitionCandidate(
                 keyword_setting_id=ks_id,
-                from_mode=current_mode,
-                to_mode=to_mode,
-                move_kind=move_kind_for(current_mode, to_mode),
-                state_cost=cost,
-                pay_for_order=pfo,
-                rec_tier=tier,
-                imputed=imputed,
-            )
-        )
-    return out
-
-
-def collect_calibration_up_next_step_candidates(
-    prepared: PreparedList,
-    *,
-    policy: SelectionPolicy,
-    ladder_inputs: "LadderInputs | None" = None,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
-) -> list[TransitionCandidate]:
-    """Пул кандидатов для калибровки UP (``plan_resolve_calibration``, ветка UP).
-
-    Контракт выбора
-    ----------------
-    - На ключ — один схлопнутый effective UP (``resolve_next_effective_step_up``): alias M/O/C
-      с одним ``target_place`` = одно действие = 1 шаг бюджета.
-    - Потолка ``resolve`` по ``state_cost`` нет (в отличие от passing_up / expansion).
-    - CAL UP: до ``max_effective_steps`` итераций — глобальный min ``state_cost`` целевого
-      state → один UP → пересбор пула.
-
-    Ключи в режиме OFF (намеренно не отфильтровываются целиком)
-    -----------------------------------------------------------
-    Раньше все OFF отсекались в начале цикла — при ``fact << resolve`` калибровка UP
-    никогда не «включала» массу OFF NO DATA при ветке UP, хотя enable даёт ≤1 такого
-    ключа за тик.
-
-    **OFF + NO DATA** (``participates_in_ladder=False``, tier ``KEYWORD_NO_DATA``):
-        - Тот же смысл, что ``plan_pay_for_order_gap_enable``: первый шаг OFF→MIN.
-        - Ослаблены проверки eligibility: не требуются ``participates_in_ladder`` и
-          ``can_target_mode`` (у NO DATA ``allowed_modes`` пустой).
-        - При ``state_cost=inf`` без CH-профиля — fallback на ``predicted_cpa`` каталога
-          (imputed), иначе ключ без валидного MIN в каталоге не попадает в пул.
-        - Дальше действуют общие фильтры: ``rec_gate_allows_up``, ``max_target_mode``,
-          ``hard_status`` 1|2.
-
-    **OFF + FULL / PFO** (``participates_in_ladder=True``):
-        - Enable их **не** трогает (фаза 7 только NO DATA + OFF).
-        - Калибровка — нормальный ladder UP: catalog, ``cost_for_mode``, rec-gate,
-          ``can_target_mode`` без ослаблений. Это не «обход enable», а единственный
-          preamble-путь включить OFF при наличии операционных данных на ключе.
-        - На практике таких ключей мало; основной объём ветки UP — OFF NO DATA.
-
-    OFF collapse vs MIN-only bootstrap (``resolve_next_effective_step_up``)
-    -----------------------------------------------------------------------
-    Effective UP с ``OFF`` схлопляет alias на **первом** ``target_place`` до max M/O/C
-    (не обязательно ``MIN_CPA``). Ослабление ``off_no_data_bootstrap`` ниже срабатывает
-    **только** при ``to_mode == MIN_CPA`` (NO DATA). Если collapsed target —
-    ``OPTIMUM``/``MAX_CONVERSION``, ``can_target_mode(elig, to_mode)`` ложен и bootstrap
-    не применяется → ``continue`` (ключ не попадает в пул, **fallback на MIN нет**).
-    Типичный кейс: MIN-only tier (``allowed_modes={MIN_CPA}``) + M=O=C на одном place.
-    Фаза enable всегда шлёт OFF→MIN и этим ограничением не страдает.
-
-    Отличие от фазы enable (``plan_pay_for_order_gap_enable``)
-    ----------------------------------------------------------
-    | | enable (7) | calibration UP (8) |
-    |---|------------|----------------------|
-    | Кого OFF→MIN | только NO DATA | NO DATA (ослабления) + FULL/PFO (полный контракт) |
-    | Лимит за тик | ≤1, детерминированная сортировка ks_id | ≤1 из пула, min CPO |
-    | Gate тика | plan/fact **OR** views; ``fact < 0.9×resolve`` | plan/fact **AND** views; ``fact ≤ max`` |
-    | rec-gate | нет | да |
-    | reason | ``pay_for_order_gap_enable`` | ``resolve_calibration_up`` / imputed |
-
-    В одном NORMAL-тике сначала enable (7), затем calibration (8) на обновлённом
-    ``prepared`` — могут включиться разные OFF NO DATA, если оба gate прошли.
-
-    Args:
-        prepared: operable контексты и текущие режимы.
-        policy: shelf + aggressiveness (cap ``max_target_mode``).
-        ladder_inputs: SSOT профиля / orders_per_cart.
-        eligibility_by_ks_id: tier FULL/PFO/NO DATA; опционально prebuilt.
-
-    Returns:
-        Кандидаты UP; пустой список → ``_plan_calibration_up`` не формирует действие.
-    """
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        KeywordDataTier,
-        KeywordV3Eligibility,
-        build_eligibility_map,
-        can_target_mode,
-        min_cpa_operational_via_pay_for_order,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
-        is_keyword_no_data,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-        cost_for_mode,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.state_rec_gate import (
-        rec_gate_allows_up,
-        state_rec_gate_status_for_mode,
-    )
-
-    ladder = _ladder_inputs_for_prepared(prepared, ladder_inputs)
-    elig_map: dict[int, KeywordV3Eligibility] = (
-        eligibility_by_ks_id
-        if eligibility_by_ks_id is not None
-        else build_eligibility_map(
-            ladder.all_contexts,
-            campaign_orders_per_cart_7d=ladder.campaign_orders_per_cart_7d,
-        )
-    )
-    out: list[TransitionCandidate] = []
-
-    for ctx, current_mode in prepared:
-        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        # OFF: см. docstring — NO DATA (bootstrap) и FULL/PFO (полная лестница).
-        is_off_gap_enable = current_mode == KeywordStrategyMode.OFF
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-        elig = elig_map.get(int(ks_id))
-        if elig is not None and not elig.participates_in_ladder:
-            if is_off_gap_enable:
-                if (
-                    elig.data_tier != KeywordDataTier.KEYWORD_NO_DATA
-                    or not is_keyword_no_data(ctx.keyword)
-                ):
-                    continue
-            else:
-                continue
-        step = resolve_next_effective_step_up(current_mode, catalog)
-        log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
-        to_mode = step.next_mode
-        if to_mode is None:
-            continue
-        target = _target_mode_for_strategy(to_mode)
-        mc = catalog.get(target)
-        if mc is None:
-            continue
-        # Bootstrap NO DATA: ослабление can_target_mode только для OFF→MIN_CPA.
-        # Если resolve_next_effective_step_up вернул collapsed OPT/MAX (alias на place),
-        # to_mode != MIN_CPA → bootstrap False → ключ выпадает (см. docstring).
-        off_no_data_bootstrap = (
-            is_off_gap_enable
-            and to_mode == KeywordStrategyMode.MIN_CPA
-            and elig is not None
-            and elig.data_tier == KeywordDataTier.KEYWORD_NO_DATA
-        )
-        if elig is not None and not can_target_mode(elig, to_mode):
-            if not off_no_data_bootstrap:
-                continue
-        gate_status = state_rec_gate_status_for_mode(
-            catalog,
-            to_mode,
-            policy,
-            rec_orders_per_view=ladder.rec_orders_per_view,
-            orders_per_cart=ladder.orders_per_cart_for_ctx(ctx),
-        )
-        if not rec_gate_allows_up(gate_status):
-            continue
-        if not _target_allowed(to_mode=to_mode, max_target_mode=policy.max_target_mode):
-            continue
-        pfo_operational = min_cpa_operational_via_pay_for_order(ctx, elig, catalog)
-        tier = _rec_tier_for_keyword(
-            ctx.keyword.above_rec_conversion,
-            click_mode=policy.click_mode,
-        )
-        pfo = float(ctx.keyword.pay_for_order or 0.0)
-        if pfo_operational or elig is not None:
-            cost, imputed = cost_for_mode(
-                ctx,
-                to_mode,
-                ladder_inputs=ladder,
-                eligibility=elig,
-            )
-        else:
-            cost, imputed = _resolve_state_cost(mc, target)
-        if cost == float("inf"):
-            if off_no_data_bootstrap and mc is not None:
-                cost = float(mc.predicted_cpa or 0.0)
-                imputed = True
-            else:
-                continue
-        out.append(
-            TransitionCandidate(
-                keyword_setting_id=int(ks_id),
                 from_mode=current_mode,
                 to_mode=to_mode,
                 move_kind=move_kind_for(current_mode, to_mode),
@@ -731,7 +540,7 @@ def _candidate_to_action(
 
 
 def plan_shelf_rec_false_cleanup_down(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     click_mode: ShelfClickMode,
     ladder_inputs: "LadderInputs | None" = None,
@@ -774,7 +583,7 @@ def plan_shelf_rec_false_cleanup_down(
         if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
 
         state_candidates = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
@@ -857,7 +666,7 @@ def plan_shelf_rec_false_cleanup_down(
 
 
 def plan_one_up_by_policy(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     policy: SelectionPolicy,
     ladder_inputs: "LadderInputs | None" = None,
@@ -887,7 +696,7 @@ def plan_one_up_by_policy(
 
 
 def plan_cost_first_up_one(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     click_mode: ShelfClickMode,
     layered: bool,

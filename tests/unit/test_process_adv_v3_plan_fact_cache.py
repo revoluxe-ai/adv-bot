@@ -14,6 +14,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrat
 )
 
 _ORCH = "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator"
+_DM = "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager"
+_AM = "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager"
+_TC = "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context"
+_UP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors"
+_NDA = "app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation"
+_RP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold"
+_TL = "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger"
 _V3_CPO = "app.modules.shop_runner.service_manager.services.v3_point_order_cpo"
 
 
@@ -43,7 +50,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
             new=AsyncMock(return_value=(MagicMock(), {})),
         ),
         patch(
@@ -51,18 +58,18 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
             bootstrap,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
         ) as updater_cls,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact",
             return_value=plan_fact,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.detect_campaign_state",
             return_value=None,
         ),
     ):
@@ -111,28 +118,25 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
     )
     patchers = _start_patches(
         {
-            f"{_ORCH}._load_v3_wb_context": AsyncMock(return_value=(dto, {})),
-            f"{_ORCH}._prepare_v3_operable_ladder_contexts": lambda *a, **k: ([], [], 0),
+            f"{_DM}.load_v3_wb_context": AsyncMock(return_value=(dto, {})),
             f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
             f"{_V3_CPO}.load_rec_orders_per_view_for_v3": AsyncMock(return_value=None),
-            f"{_ORCH}.plan_mode_cap_down": lambda *a, **k: [],
-            f"{_ORCH}.plan_passing_up": lambda *a, **k: [],
-            f"{_ORCH}.plan_cost_reallocation": lambda *a, **k: [],
-            f"{_ORCH}.plan_pay_for_order_gap_enable": lambda *a, **k: [],
-            f"{_ORCH}.plan_resolve_calibration": lambda *a, **k: [],
-            f"{_ORCH}.is_resolve_valid": lambda *a, **k: True,
-            f"{_ORCH}.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
-            f"{_ORCH}.select_v3_post_gate_actions": lambda *a, **k: [],
-            f"{_ORCH}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
+            f"{_UP}.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
+            f"{_UP}.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
+            f"{_UP}.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
+            f"{_RP}.is_resolve_valid": lambda *a, **k: True,
+            f"{_RP}.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
+            f"{_AM}.select_v3_post_gate_actions": lambda *a, **k: [],
+            f"{_DM}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
                 max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0
             ),
-            f"{_ORCH}.AdvSettingAutoUpdater": updater_cls,
-            f"{_ORCH}.ChangePlanFact": lambda *a, **k: plan_fact,
-            f"{_ORCH}.ChangePlanFactViews": lambda *a, **k: views_cache,
-            f"{_ORCH}.V3CalibrationStepState": lambda *a, **k: step_cache,
-            f"{_ORCH}.resolve_complex_adv_total_views": AsyncMock(return_value=777),
-            f"{_ORCH}.detect_campaign_state": lambda *a, **k: SalesStates.OPTIMAL,
-            f"{_ORCH}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
+            f"{_DM}.AdvSettingAutoUpdater": updater_cls,
+            f"{_DM}.ChangePlanFact": lambda *a, **k: plan_fact,
+            f"{_DM}.ChangePlanFactViews": lambda *a, **k: views_cache,
+            f"{_DM}.V3CalibrationStepState": lambda *a, **k: step_cache,
+            f"{_DM}.resolve_complex_adv_total_views": AsyncMock(return_value=777),
+            f"{_DM}.detect_campaign_state": lambda *a, **k: SalesStates.OPTIMAL,
+            f"{_TL}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
             f"{_ORCH}.persist_v3_tick_report": AsyncMock(),
         }
     )
@@ -152,40 +156,39 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     complex_adv.adv_id = 2
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+    complex_adv.v3_rollout_aggressiveness = 2
 
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
 
-    wb_manager = MagicMock()
-    wb_manager.get_wb_advs_dto = AsyncMock(return_value=[])
-
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            f"{_DM}.load_v3_wb_context",
+            new=AsyncMock(return_value=(None, {})),
+        ),
+        patch(
+            f"{_DM}.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+            f"{_DM}.AdvSettingAutoUpdater",
         ) as updater_cls,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.ChangePlanFact",
+            f"{_DM}.ChangePlanFact",
             return_value=plan_fact,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
-            return_value=MagicMock(name="UNDERPERFORM"),
+            f"{_DM}.detect_campaign_state",
+            return_value=SalesStates.UNDERPERFORM,
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.SalesStates"
-        ) as sales_states,
     ):
-        sales_states.OPTIMAL = MagicMock()
         updater_cls.return_value.get_fact_data = AsyncMock(return_value=MagicMock())
         complex_adv.get_keywords = AsyncMock(return_value=[])
         await process_adv_v3(
             complex_adv,
-            wb_shop_data_manager=wb_manager,
+            wb_shop_data_manager=MagicMock(),
         )
 
     plan_fact.set_new_plan_fact.assert_not_awaited()
@@ -193,6 +196,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
 
 @pytest.mark.asyncio
 async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
+    """NO_DATA: bootstrap + ApplyManager; post-gate selector вызывается, NORMAL pipeline — нет."""
     complex_adv = MagicMock()
     complex_adv.adv_id = 3
     complex_adv.adv_setting = MagicMock()
@@ -207,7 +211,6 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
-    expansion = MagicMock(return_value=[])
 
     updater_cls = MagicMock()
     updater_cls.return_value.get_fact_data = AsyncMock(
@@ -215,21 +218,20 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
     )
     patchers = _start_patches(
         {
-            f"{_ORCH}._load_v3_wb_context": AsyncMock(return_value=(dto, {})),
-            f"{_ORCH}._prepare_v3_operable_ladder_contexts": lambda *a, **k: ([], [], 0),
+            f"{_DM}.load_v3_wb_context": AsyncMock(return_value=(dto, {})),
             f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
             f"{_ORCH}.plan_campaign_no_data_bootstrap_safe": bootstrap,
-            f"{_ORCH}.plan_passing_up": expansion,
-            f"{_ORCH}.select_v3_post_gate_actions": select_mock,
-            f"{_ORCH}.sync_keyword_target_places_v3": sync_mock,
-            f"{_ORCH}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
+            f"{_AM}.select_v3_post_gate_actions": select_mock,
+            f"{_AM}.sync_keyword_target_places_v3": sync_mock,
+            f"{_DM}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
                 max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0
             ),
-            f"{_ORCH}.AdvSettingAutoUpdater": updater_cls,
-            f"{_ORCH}.ChangePlanFact": lambda *a, **k: plan_fact,
-            f"{_ORCH}.detect_campaign_state": lambda *a, **k: SalesStates.NO_DATA,
-            f"{_ORCH}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
+            f"{_DM}.AdvSettingAutoUpdater": updater_cls,
+            f"{_DM}.ChangePlanFact": lambda *a, **k: plan_fact,
+            f"{_DM}.detect_campaign_state": lambda *a, **k: SalesStates.NO_DATA,
+            f"{_TL}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
             f"{_ORCH}.persist_v3_tick_report": AsyncMock(),
+            f"{_ORCH}.persist_v3_keyword_changes": AsyncMock(),
         }
     )
     try:
@@ -239,8 +241,7 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
         _stop_patches(patchers)
 
     bootstrap.assert_called_once()
-    expansion.assert_not_called()
-    select_mock.assert_not_called()
+    select_mock.assert_called_once()
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is True
     plan_fact.set_new_plan_fact.assert_not_awaited()

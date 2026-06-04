@@ -24,8 +24,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     diagnose_keyword_v3_data,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    plan_profitable_expansion,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
     resolve_effective_state_cost_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -291,41 +290,6 @@ def test_no_ch_pay_for_order_min_only_never_worst_source() -> None:
         eligibility=elig,
     )
     assert opt_cost == float("inf")
-
-
-@pytest.mark.unit
-def test_expansion_cost_matches_cost_for_mode() -> None:
-    """``plan_profitable_expansion`` state_cost == ``cost_for_mode``."""
-    prof = _rollout_profile()
-    kw = _calc_kw(
-        ks_id=5,
-        text="exp",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        conv=_conv_for_pay_for_order(25.0),
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
-    contexts = [ctx]
-    prepared = build_prepared_from_contexts(contexts)
-    ladder_inputs = LadderInputs.from_contexts(contexts)
-    actions = plan_profitable_expansion(
-        prepared,
-        resolve=500.0,
-        policy=_policy(),
-        ladder_inputs=ladder_inputs,
-    )
-    assert actions
-    log = actions[0].selection_log
-    assert log is not None
-    assert log.state_cost is not None
-    to_mode = KeywordStrategyMode[actions[0].target_strategy_mode.name]  # type: ignore[union-attr]
-    expected, _ = cost_for_mode(
-        ctx,
-        to_mode,
-        ladder_inputs=ladder_inputs,
-        eligibility=build_eligibility_map(contexts).get(5),
-    )
-    assert log.state_cost == pytest.approx(expected)
 
 
 @pytest.mark.unit

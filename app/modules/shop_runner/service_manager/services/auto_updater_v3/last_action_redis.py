@@ -12,7 +12,6 @@ from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache imp
     AdvSettingRedisCache,
 )
 from app.core.redis_cache.redis_cache_base import RedisCacheBase
-from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3ActionType,

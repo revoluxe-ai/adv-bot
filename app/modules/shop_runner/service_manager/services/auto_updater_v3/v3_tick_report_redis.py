@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache import (
     AdvSettingRedisCache,
@@ -47,9 +47,10 @@ class V3TickReportRedisCache(
                 data["tick_at"] = dt
             phases_raw = data.get("phases")
             if isinstance(phases_raw, list):
+                phases_items = cast(list[Any], phases_raw)
                 data["phases"] = [
                     V3PhaseStats.model_validate(p) if isinstance(p, dict) else p
-                    for p in phases_raw
+                    for p in phases_items
                 ]
             return V3TickReportSnapshot.model_validate(data)
         except (json.JSONDecodeError, ValueError, TypeError):

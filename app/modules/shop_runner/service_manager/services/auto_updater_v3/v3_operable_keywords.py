@@ -1,10 +1,11 @@
-"""Operable keywords V3: фильтр hard_status 1|2 и синхронизация hard_status ↔ strategy_mode.
+"""Operable keywords V3: фильтр hard_status 1|2.
 
-Перед preamble NORMAL (фаза 0):
-1. ``filter_operable_v3_contexts`` — только ключи, с которыми ladder может работать;
-2. ``sync_operable_hard_status_with_strategy_mode`` на ledger — OFF→1, active→2.
+Источник истины — ``hard_status`` из БД; ``strategy_mode`` подтягивается к нему:
+``HardStatusValidateExecutor`` (preamble фаза V) — авто (1) → ``OFF``.
 
-Fixed/manual (hard_status 3/4/…) остаются в полном списке для target_place, но не в preamble.
+Ограничение mode по tier без CH-профиля — **NF** (``NotFullValidateExecutor``):
+нет ``position_profile`` → MIN + tp=0. Отдельный legacy ``cap_down`` по ``max_allowed_mode``
+не используется (есть профиль → лестница из CH). См. ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
 HARD_STATUS_AUTO_MODE = 1
 HARD_STATUS_WHITE_LIST = 2
 HARD_STATUS_MODE_SYNC_REASON = "hard_status_mode_sync"
+HARD_STATUS_PERSIST_NORMALIZE_REASON = "hard_status_persist_normalize"
 
 
 def is_v3_operable_hard_status(hard_status: int) -> bool:

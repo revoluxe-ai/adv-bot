@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_
     iter_effective_upper_mode_groups,
     iter_effective_upper_modes,
     mode_candidates_same_effective_target,
+    resolve_alias_collapse_up_at_same_target_place,
     resolve_next_effective_step_down,
     resolve_next_effective_step_up,
     target_place_from_mode_candidate,
@@ -92,6 +93,21 @@ def test_same_target_place_only_position_not_bid() -> None:
     assert resolve_next_effective_step_up(
         KeywordStrategyMode.MIN_CPA, cat
     ).next_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert (
+        resolve_alias_collapse_up_at_same_target_place(
+            KeywordStrategyMode.MIN_CPA, cat
+        )
+        == KeywordStrategyMode.OPTIMUM
+    )
+
+
+@pytest.mark.unit
+def test_alias_collapse_same_place_all_three_noop_on_distinct_next() -> None:
+    """MIN=10, OPT=20 — resolver same-place не поднимает (следующий шаг меняет place)."""
+    cat = _fake_catalog_places(min_place=10, opt_place=20, max_place=30)
+    assert resolve_alias_collapse_up_at_same_target_place(
+        KeywordStrategyMode.MIN_CPA, cat
+    ) is None
 
 
 @pytest.mark.unit

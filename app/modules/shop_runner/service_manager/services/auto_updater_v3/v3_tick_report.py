@@ -36,7 +36,7 @@ if TYPE_CHECKING:
         KeywordV3Context,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        PreparedList,
+        PreparedListLike,
     )
 
 _HARD_STATUS_WHITE_LIST = 2
@@ -105,7 +105,7 @@ class WhiteListCostLeader(BaseModel):
 def find_white_list_cost_leader(
     contexts: list[KeywordV3Context],
     *,
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
 ) -> WhiteListCostLeader | None:
@@ -126,7 +126,7 @@ def find_white_list_cost_leader(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
         resolve_effective_state_cost_for_mode,
     )
 
@@ -159,8 +159,8 @@ def find_white_list_cost_leader(
                 state_cpo = float(cost)
 
         elig = (
-            eligibility_by_ks_id.get(int(ks_id))
-            if eligibility_by_ks_id is not None and ks_id is not None
+            eligibility_by_ks_id.get(ks_id)
+            if eligibility_by_ks_id is not None and ks_id > 0
             else None
         )
         tier = elig.data_tier.value if elig is not None else ""
@@ -188,7 +188,7 @@ def find_white_list_cost_leader(
             text = text[:45] + "…"
         best = WhiteListCostLeader(
             keyword_text=text or f"ks_id={ks_id}",
-            keyword_setting_id=int(ks_id) if ks_id is not None else None,
+            keyword_setting_id=ks_id if ks_id > 0 else None,
             data_tier=tier,
             strategy_mode=mode.name,
             cost_source=cost_source,
@@ -268,6 +268,8 @@ class V3PhaseStats(BaseModel):
     force_off: int = 0
     rebalance: int = 0
     sync: int = 0
+    ended_off: int = 0
+    ended_on: int = 0
     extra: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"extra": "forbid"}
@@ -294,6 +296,7 @@ class V3TickReportSnapshot(BaseModel):
     net_up: int = 0
     net_down: int = 0
     net_force_off: int = 0
+    net_on: int = 0
     calibration_effective_steps: int | None = None
     calibration_direct: str | None = None
     calibration_prev_effective_steps: int | None = None
@@ -304,15 +307,18 @@ class V3TickReportSnapshot(BaseModel):
 
 PHASE_TITLES: dict[str, tuple[str, str]] = {
     "filter": ("0 · Фильтр operable", "—"),
-    "hard_status_sync": ("1 · Sync hard_status ↔ mode", "sync"),
+    "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
-    "cap_down": ("2 · B · cap_down", "DOWN"),
-    "passing_up": ("3 · U · passing_up", "UP"),
-    "shelf_cleanup": ("4 · S · shelf cleanup", "DOWN, OFF"),
-    "max_cpa_guard": ("5 · G · max CPA guard", "DOWN, OFF"),
-    "cost_reallocation": ("6 · R · cost_reallocation", "DOWN, REBALANCE"),
-    "pay_for_order_gap_enable": ("7 · enable · gap", "UP"),
-    "resolve_calibration": ("8 · calibration", "UP, DOWN"),
+    "validate_not_full_state": ("2 · NF · validate_not_full", "DOWN"),
+    "skip_up_same_target_place": ("2b · skip_up · same target_place", "DOWN"),
+    "raise_state_to_target_cpo": ("3 · R↑ · raise to resolve", "UP only"),
+    "reset_over_max_cpo_on_overspend": ("4 · R↓ · reset over max CPO", "DOWN, OFF"),
+    "passing_up": ("5 · U · passing_up", "UP"),
+    "shelf_cleanup": ("6 · S · shelf cleanup", "DOWN, OFF"),
+    "max_cpa_guard": ("7 · G · max CPA guard", "DOWN, OFF"),
+    "cost_reallocation": ("8 · R · cost_reallocation", "DOWN, REBALANCE"),
+    "pay_for_order_gap_enable": ("9 · enable · gap", "UP"),
+    "resolve_calibration": ("10 · calibration", "UP, DOWN"),
 }
 
 
@@ -321,7 +327,9 @@ class V3TickReportCollector:
     """Накопитель фаз за один ``process_adv_v3``."""
 
     aggression_score_before: int = 0
-    _phases: list[V3PhaseStats] = field(default_factory=list)
+    _phases: list[V3PhaseStats] = field(
+        default_factory=lambda: list[V3PhaseStats]()
+    )
     _total_keywords: int = 0
     _operable_keywords: int = 0
 
@@ -338,26 +346,6 @@ class V3TickReportCollector:
                 title_ru=title,
                 possible_actions_ru=possible,
                 extra={"total": total, "operable": operable},
-            )
-        )
-
-    def record_sync(
-        self,
-        sync_count: int,
-        *,
-        outcome_note: str | None = None,
-    ) -> None:
-        title, possible = PHASE_TITLES["hard_status_sync"]
-        note = outcome_note
-        if sync_count == 0 and note is None:
-            note = "режимы уже соответствуют hard_status"
-        self._phases.append(
-            V3PhaseStats(
-                phase_id="hard_status_sync",
-                title_ru=title,
-                possible_actions_ru=possible,
-                sync=sync_count,
-                outcome_note=note if sync_count == 0 else None,
             )
         )
 

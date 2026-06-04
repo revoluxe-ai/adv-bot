@@ -9,7 +9,7 @@ max по соседним ключам, лестница M1/M2/M3.
 - tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — только MIN, ``target_place=0``;
 - UP/trim/OVERSPEND: граница ``keyword.pay_for_order`` vs ``plan.max_pay_for_order``
   (как в UI), см. ``_no_ch_bootstrap_allowed_by_pay_for_order``,
-  ``plan_no_ch_min_bootstrap_actions``, ``rollout_planner.plan_campaign_trim_by_max_state_cost``;
+  ``plan_no_ch_min_bootstrap_actions`` (NO_DATA bootstrap only);
 - ``resolve_keyword_v2_pay_for_order_cost`` — отдельная консервативная метрика (rating CPM),
   не подменяет ``pay_for_order`` в гейтах.
 
@@ -32,6 +32,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3Action,
     V3ActionType,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordV3Eligibility,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
     keyword_lacks_v3_decision_data as _keyword_lacks_v3_decision_data,
@@ -42,6 +45,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
+    PreparedListLike,
     build_prepared_from_contexts,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
@@ -50,11 +54,6 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
 )
-from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
-    calc_orders_per_1000_rub,
-    calc_pay_for_order,
-)
-
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
@@ -137,7 +136,7 @@ def diagnose_v2_cpo_gap(keyword: CalculatedKeyword) -> str | None:
     if cpm is None or cpm <= 0:
         return "нет CPM (каскад ставок ключа)"
     conv = keyword.conv_views_to_orders
-    if conv is None or conv <= 0:
+    if conv <= 0:
         return "нет conv показ→заказ"
     return "нет заказов на 1000₽ (CPO не считается)"
 
@@ -207,11 +206,6 @@ def keyword_v2_pay_for_order_unavailable(keyword: CalculatedKeyword) -> bool:
     Строгий «свой V2 CPO» для NO CH tier — ``keyword_has_v2_cpo`` /
     ``resolve_keyword_v2_pay_for_order_cost`` (без подстановки ``pay_for_order``).
     """
-    if not isinstance(keyword, CalculatedKeyword):
-        raise TypeError(
-            "keyword_v2_pay_for_order_unavailable expects CalculatedKeyword, "
-            f"got {type(keyword).__name__}"
-        )
     if keyword.pay_for_order is not None:
         return False
     return resolve_keyword_v2_pay_for_order_cost(keyword) is None
@@ -305,7 +299,7 @@ def _append_force_off_then_min_cpa(
 
 
 def _plan_min_cpa_bootstrap_for_prepared(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     reason: str,
     include_entry: Callable[["KeywordV3Context", KeywordStrategyMode], bool],
@@ -324,7 +318,7 @@ def _plan_min_cpa_bootstrap_for_prepared(
         if not include_entry(ctx, mode):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
         hard_status = int(ctx.keyword.hard_status)
         if not _hard_status_allows_up(hard_status):
@@ -455,7 +449,7 @@ def plan_data_bootstrap_v3(
 
     for ctx, mode in prepared:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None or int(ks_id) in covered:
+        if ks_id <= 0 or ks_id in covered:
             continue
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
@@ -491,9 +485,9 @@ def plan_data_bootstrap_v3(
 
 
 def plan_no_data_keyword_actions(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
 ) -> list[V3Action]:
     """N-state: MIN_CPA + min bid + белый список для ключей без V2 CPO / CH.
 
@@ -515,14 +509,14 @@ def plan_no_data_keyword_actions(
     for ctx, mode in prepared:
         ks_id = ctx.keyword.keyword_setting_original_id
         if eligibility_by_ks_id is not None:
-            if ks_id is None:
+            if ks_id <= 0:
                 continue
-            elig = eligibility_by_ks_id.get(int(ks_id))
+            elig = eligibility_by_ks_id.get(ks_id)
             if elig is None or elig.data_tier != KeywordDataTier.KEYWORD_INVALID:
                 continue
         elif not keyword_lacks_v3_decision_data(ctx, peer_contexts):
             continue
-        if ks_id is None:
+        if ks_id <= 0:
             continue
         hard_status = int(ctx.keyword.hard_status)
 
@@ -566,7 +560,7 @@ def plan_no_data_min_up_actions(prepared: PreparedList) -> list[V3Action]:
         if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
         _append_min_cpa_up(actions, ks_id=ks_id)
     return actions

@@ -37,9 +37,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
-    build_prepared_from_contexts,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
+    KeywordsPreparedList,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,7 +83,7 @@ class LadderInputs:
     """Предрасчёт на список contexts; переиспользуется всеми ``cost_for_mode`` на тике."""
 
     all_contexts: list[KeywordV3Context]
-    prepared: PreparedList
+    prepared: KeywordsPreparedList
     campaign_cache: CampaignV3DecisionCache
     campaign_orders_per_cart_7d: float | None = None
     rec_orders_per_view: float | None = None
@@ -121,11 +120,24 @@ class LadderInputs:
             if campaign_orders_per_cart_7d is not None
             else rk_orders_per_cart
         )
-        prepared = build_prepared_from_contexts(contexts)
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
+            bootstrap_ladder_inputs,
+            build_keywords_prepared_list,
+        )
+
+        bootstrap = bootstrap_ladder_inputs(contexts)
+        bootstrap = LadderInputs(
+            all_contexts=bootstrap.all_contexts,
+            prepared=KeywordsPreparedList(keywords=[]),
+            campaign_cache=bootstrap.campaign_cache,
+            campaign_orders_per_cart_7d=campaign_opc,
+            rec_orders_per_view=rec_orders_per_view,
+        )
+        prepared = build_keywords_prepared_list(contexts, ladder_inputs=bootstrap)
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,
-            campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
+            campaign_cache=bootstrap.campaign_cache,
             campaign_orders_per_cart_7d=campaign_opc,
             rec_orders_per_view=rec_orders_per_view,
         )
@@ -161,6 +173,9 @@ def _catalog_for_ctx(
 ) -> dict[AggressionTargetMode, ModeCandidate]:
     """Legacy name; delegates to ``state_candidates_by_mode_for_ctx``."""
     return state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
+
+
+catalog_for_ctx = _catalog_for_ctx
 
 
 def _strategy_mode_for_agg(mode: AggressionTargetMode) -> KeywordStrategyMode:
@@ -280,7 +295,7 @@ def _resolve_stage(
     mc = catalog.get(target)
     eff_conv = effective_conv_for_v3(ctx, ladder_inputs.all_contexts)
     own_conv = ctx.keyword.conv_views_to_orders
-    conv_imputed = eff_conv is not None and (own_conv is None or own_conv <= 0)
+    conv_imputed = eff_conv is not None and own_conv <= 0
 
     if eligibility is not None and min_cpa_operational_via_pay_for_order(
         ctx, eligibility, catalog
@@ -334,7 +349,7 @@ def _resolve_stage(
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
-    cost_val, cost_imputed = resolve_effective_state_cost(profile_cost=profile_cost)
+    _, cost_imputed = resolve_effective_state_cost(profile_cost=profile_cost)
     if profile_cost is not None:
         source = LadderCostSource.PROFILE
         is_valid = True

@@ -18,7 +18,7 @@ os.environ["POSTGRES_SSL_INSECURE"] = "true"
 
 # FORCE override ClickHouse settings for tests (must connect to test container, not production!)
 os.environ["CLICKHOUSE_PORT"] = "8124"  # HTTP port for test ClickHouse
-os.environ["CLICK_HOUSE_HOST"] = "localhost"
+os.environ["CLICK_HOUSE_HOST"] = _TEST_PG_HOST  # 127.0.0.1: Windows localhost (::1) → reset
 os.environ["CLICK_HOUSE_USER"] = "CLICK_HOUSE_USER"  # Username from docker-compose.test.yml
 os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.test.yml
 
@@ -776,10 +776,10 @@ async def clickhouse_client(setup_test_database):
     Создаёт async-клиент ClickHouse.
     Зависит от setup_test_database (который запускает docker-compose).
     """
-    host =  "localhost"
-    port =  8124
-    user = "CLICK_HOUSE_USER"
-    password = "password"
+    host = os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST)
+    port = int(os.environ.get("CLICKHOUSE_PORT", "8124"))
+    user = os.environ.get("CLICK_HOUSE_USER", "CLICK_HOUSE_USER")
+    password = os.environ.get("CLICK_HOUSE_PASSWORD", "password")
 
     client = await get_async_client(
             host=host,
