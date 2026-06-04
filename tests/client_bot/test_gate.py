@@ -11,7 +11,8 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.client_bot.const import ADMINS, SUPPORT_USER_NAME
-from app.client_bot.middlewars.gate import GateMiddleware, _is_start_command
+from app.client_bot.middlewars.gate import GateMiddleware
+from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.utils.db.models import User
@@ -61,7 +62,8 @@ def test_is_start_command_empty_or_whitespace_returns_false(text: str) -> None:
     """Пустой/пробельный text не должен давать IndexError при split."""
     msg = MagicMock(spec=Message)
     msg.text = text
-    assert _is_start_command(msg) is False
+    msg.caption = None
+    assert is_start_command_message(msg) is False
 
 
 def test_get_gate_keyboard_has_three_buttons() -> None:

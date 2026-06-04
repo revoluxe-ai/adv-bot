@@ -235,7 +235,23 @@ class V3TickKeywordLedger:
                 )
                 applied_count += 1
             elif action.action == V3ActionType.FORCE_OFF:
+                baseline = self._baseline_mode.get(ks_id)
                 if current == KeywordStrategyMode.OFF:
+                    if baseline == KeywordStrategyMode.OFF:
+                        continue
+                    from_mode = (
+                        baseline
+                        if baseline is not None
+                        else KeywordStrategyMode.OFF
+                    )
+                    self._record_applied(
+                        action=V3ActionType.FORCE_OFF,
+                        ks_id=ks_id,
+                        from_mode=from_mode,
+                        to_mode=KeywordStrategyMode.OFF,
+                        reason=action.reason,
+                    )
+                    applied_count += 1
                     continue
                 if not hard_status_allows_force_off(hard_status):
                     continue

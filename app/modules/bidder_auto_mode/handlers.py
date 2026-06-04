@@ -20,7 +20,8 @@ async def on_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSettingM
         adv_setting = result.scalar_one_or_none()
 
         if not adv_setting:
-            await callback.answer("Рекламная кампания не найдена")
+            if callback.message is not None:
+                await callback.message.answer("Рекламная кампания не найдена")
             return
 
         # Включаем автоматический биддер
@@ -30,7 +31,6 @@ async def on_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSettingM
         # Обновляем сообщение с настройками
         message = CPMSetting(callback.bot, callback.message.chat.id)
         await message(callback_data.adv_original_id)
-        await callback.answer("Автоматический биддер включен")
 
 
 @router.callback_query(CPMSettingMenu.filter(F.action == "off_bidder_for_auto"))
@@ -43,7 +43,8 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         adv_setting = result.scalar_one_or_none()
 
         if not adv_setting:
-            await callback.answer("Рекламная кампания не найдена")
+            if callback.message is not None:
+                await callback.message.answer("Рекламная кампания не найдена")
             return
 
         # Выключаем автоматический биддер
@@ -53,4 +54,3 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         # Обновляем сообщение с настройками
         message = CPMSetting(callback.bot, callback.message.chat.id)
         await message(callback_data.adv_original_id)
-        await callback.answer("Автоматический биддер выключен")

@@ -52,7 +52,6 @@ async def raise_card_analyze_callback(
     redis_client=Provide["redis_client_wrapper"],
 ) -> None:
     """Handle RaiseCardAnalyze: menu (choose nmid or run), result (with nmid)."""
-    await callback.answer()
     if not callback.message:
         return
     bot = callback.bot

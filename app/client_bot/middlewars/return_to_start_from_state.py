@@ -5,6 +5,7 @@ from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
 )
@@ -17,10 +18,7 @@ class ReturnToStart(BaseMiddleware):
         event: Message,
         data: dict[str, Any],
     ) -> Any:
-        payload = (event.text or event.caption or "").strip()
-        first_token = payload.split(maxsplit=1)[0].lower() if payload else ""
-        is_start_command = first_token == "/start" or first_token.startswith("/start@")
-        if is_start_command:
+        if is_start_command_message(event):
             bot = data["bot"]
             state: FSMContext = data["state"]
             await state.clear()

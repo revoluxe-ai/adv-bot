@@ -69,7 +69,6 @@ async def export_shop_adv_excel(
 ) -> None:
     if callback.message is None or callback.from_user is None:
         return
-    await callback.answer()
     chat_id = callback.message.chat.id
     wb_uc_id = callback_data.wb_user_cabinet_original_id
     try:
@@ -122,7 +121,6 @@ async def import_shop_adv_excel_start(
 ) -> None:
     if callback.message is None or callback.from_user is None:
         return
-    await callback.answer()
     chat_id = callback.message.chat.id
     wb_uc_id = callback_data.wb_user_cabinet_original_id
     try:

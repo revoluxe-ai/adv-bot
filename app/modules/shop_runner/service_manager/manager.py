@@ -502,7 +502,7 @@ class CoroutinesManager:
         )
 
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False   
+            load_extras=False
         )
         advs = [adv for adv in advs if adv.bot_active]
         advs_with_whitelist = [

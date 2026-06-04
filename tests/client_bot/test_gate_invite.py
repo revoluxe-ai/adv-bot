@@ -282,6 +282,22 @@ async def test_gate_invite_start_command_is_left_for_global_middleware(
     mock_bot.send_message.assert_not_awaited()
 
 
+async def test_gate_invite_start_command_case_insensitive_early_return(
+    mock_bot: AsyncMock,
+    mock_state: MagicMock,
+) -> None:
+    """`/Start` в FSM инвайта не должен уходить в ветку «ожидается инвайт-код»."""
+    message = MagicMock()
+    message.chat.id = 2007
+    message.from_user = MagicMock(id=2007)
+    message.text = "/Start"
+
+    await gate_invite_process_code(message, mock_bot, mock_state)
+
+    mock_state.clear.assert_not_awaited()
+    mock_bot.send_message.assert_not_awaited()
+
+
 @pytest.fixture
 def mock_bot():
     bot = AsyncMock()

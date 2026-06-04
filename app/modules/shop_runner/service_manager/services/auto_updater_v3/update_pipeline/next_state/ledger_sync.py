@@ -34,6 +34,8 @@ def sync_update_context_to_ledger(
         if baseline is None:
             baseline = dto.stored_mode
         desired = dto.current_mode
+        if baseline == desired:
+            continue
         action = _netto_action(ks_id, baseline=baseline, desired=desired)
         if action is not None:
             actions.append(action)

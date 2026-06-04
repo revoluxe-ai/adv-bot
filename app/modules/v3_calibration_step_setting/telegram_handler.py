@@ -42,10 +42,10 @@ async def change_v3_calibration_step(
         )
         adv = adv_result.scalar_one_or_none()
         if adv is None or normalize_automatic_version_ui(adv.automatic_version) != 3:
-            await callback.answer(
-                "Доступно только при версии АвтоАпдейтера V3.",
-                show_alert=True,
-            )
+            if callback.message is not None:
+                await callback.message.answer(
+                    "Доступно только при версии АвтоАпдейтера V3."
+                )
             return
     await state.update_data(
         {FSM_V3_CALIBRATION_STEP_ADV_SETTING_ID: adv_setting_original_id}
@@ -56,7 +56,6 @@ async def change_v3_calibration_step(
             f"Введите макс. число effective ladder-шагов калибратора V3 "
             f"(от 1 до {MAX_CALIBRATION_STEP}):"
         )
-    await callback.answer()
 
 
 @router.message(StateFilter("waiting_for_v3_calibration_step"))

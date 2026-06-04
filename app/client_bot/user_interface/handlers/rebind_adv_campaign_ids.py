@@ -160,7 +160,6 @@ async def open_rebind_menu(
 ) -> None:
     if callback.message is None:
         raise ValueError("Нет сообщения")
-    _ = await callback.answer()
     chat_id = callback.message.chat.id
     await bot.send_message(
         chat_id,
@@ -180,7 +179,6 @@ async def rebind_back_to_adv_menu(
 ) -> None:
     if callback.message is None:
         raise ValueError("Нет сообщения")
-    _ = await callback.answer()
     chat_id = callback.message.chat.id
     adv_oid = callback_data.adv_setting_original_id
     wb_uc_oid = callback_data.wb_user_cabinet_original_id
@@ -219,7 +217,6 @@ async def _start_rebind_input_impl(
 ) -> None:
     if callback.message is None:
         raise ValueError("Нет сообщения")
-    _ = await callback.answer()
     chat_id = callback.message.chat.id
     adv_oid = callback_data.adv_setting_original_id
     wb_uc_oid = callback_data.wb_user_cabinet_original_id

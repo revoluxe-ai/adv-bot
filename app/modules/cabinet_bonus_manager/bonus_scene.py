@@ -408,7 +408,6 @@ class BonusScene(Scene, state="bonus_scene"):
     @on.callback_query(AdminBonus.filter(F.action == "menu"))
     async def bonus_menu_callback(self, callback: CallbackQuery, state: FSMContext):
         """Обработчик возврата в главное меню бонусов"""
-        await callback.answer()
         await state.clear()
         await state.update_data(action="menu")
         await callback.message.edit_text(
@@ -580,7 +579,6 @@ class BonusScene(Scene, state="bonus_scene"):
     @on.callback_query(AdminBonus.filter(F.action == "back"))
     async def process_exit_button(self, callback: CallbackQuery):
         """Обработчик нажатия на кнопку 'Назад' для выхода из меню управления бонусами"""
-        await callback.answer()
 
         logger.info(f"Пользователь {callback.from_user.id} выходит из сцены бонусов")
 

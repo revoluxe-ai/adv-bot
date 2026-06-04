@@ -21,7 +21,7 @@ def _session_cm_with_adv(adv_obj: object) -> AsyncMock:
 
 @pytest.mark.asyncio
 async def test_export_black_phrases_sends_document() -> None:
-    callback = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock())
+    callback = SimpleNamespace(from_user=SimpleNamespace(id=123))
     bot = SimpleNamespace(send_document=AsyncMock())
     callback_data = callbacks.ExportBlackPhrases(adv_setting_id=11)
 
@@ -36,12 +36,11 @@ async def test_export_black_phrases_sends_document() -> None:
     bot.send_document.assert_awaited_once()
     sent_document = bot.send_document.await_args.kwargs["document"]
     assert sent_document.filename == "black_phrases.txt"
-    callback.answer.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_export_relevant_templates_sends_document() -> None:
-    callback = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock())
+    callback = SimpleNamespace(from_user=SimpleNamespace(id=123))
     bot = SimpleNamespace(send_document=AsyncMock())
     callback_data = callbacks.ExportRelevantPhraseTemplates(adv_setting_id=22)
 
@@ -62,4 +61,3 @@ async def test_export_relevant_templates_sends_document() -> None:
     bot.send_document.assert_awaited_once()
     sent_document = bot.send_document.await_args.kwargs["document"]
     assert sent_document.filename == "relevant_phrase_templates.txt"
-    callback.answer.assert_awaited_once()
