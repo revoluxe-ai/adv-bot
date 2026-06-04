@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    should_skip_raise_state_to_target_cpo,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
-    AdvState,
+    should_skip_keyword_raise_to_target_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.update_context import (
     UpdateContext,
@@ -24,7 +21,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 class RaiseStateToTargetCpoExecutor:
     """Поднять ключ до max ступени с ``cpo <= resolve``; DOWN запрещён (no-op).
 
-    Skip всей фазы, если fact CPO РК ``>= 90 % plan.max_pay_for_order`` (стабилизация).
+    Per-keyword skip в зоне стабилизации (``fact >= 0.9×resolve``) только если
+    ``kw.pay_for_order > resolve``; дешёвые ключи (``<= resolve``) поднимаются всегда.
     """
 
     phase_name = "raise_state_to_target_cpo"
@@ -35,27 +33,15 @@ class RaiseStateToTargetCpoExecutor:
 
     def execute(self, context: UpdateContext) -> None:
         """Поднять operable ключи до max ступени с ``cpo <= resolve`` (только UP)."""
-        self._skip_reason = _phase_skip_reason(context.adv_state)
-        if self._skip_reason is not None:
-            return
+        self._skip_reason = None
         target_cpo = float(context.adv_state.resolve)
-        # Если факт CPO кампании > 90% от max CPO плана,
-        # пропускаем ключи, у которых pay_for_order > max_pay_for_order
         adv = context.adv_state
-        campaign_over_90 = (
-            adv.fact_pay_for_order is not None
-            and float(adv.fact_pay_for_order) > 0.9 * float(adv.max_pay_for_order)
-        )
 
         for dto in context.keywords:
             if dto.is_not_full():
                 continue
-
-            if campaign_over_90:
-                kw_pfo = dto.calculated_keyword.pay_for_order
-                if kw_pfo is not None and float(kw_pfo) > float(adv.max_pay_for_order):
-                    # Пропускаем этот ключ — слишком дорогой по CPO относительно плана
-                    continue
+            if should_skip_keyword_raise_to_target_cpo(dto, adv):
+                continue
 
             state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
             if state is None:
@@ -67,10 +53,3 @@ class RaiseStateToTargetCpoExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
-
-
-def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip R↑ при fact в зоне ``>= 90 % plan.max``; без fact — фаза выполняется."""
-    if not should_skip_raise_state_to_target_cpo(adv_state):
-        return None
-    return "fact_cpo_ge_90pct_plan_max"

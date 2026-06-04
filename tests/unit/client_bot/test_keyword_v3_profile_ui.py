@@ -484,8 +484,8 @@ def test_profile_no_conv_tier_no_max_rk_header() -> None:
 
 
 @pytest.mark.unit
-def test_enable_blockers_shows_raise_skip_and_bad_rating() -> None:
-    """OFF + авто + skip R↑ + bad → две причины в карточке."""
+def test_enable_blockers_shows_raise_not_selected_and_bad_rating() -> None:
+    """OFF + авто + R↑ без подъёма + bad → две причины в карточке."""
     snapshot = V3TickReportSnapshot(
         tick_at=datetime.now(timezone.utc),
         adv_id=1,
@@ -496,8 +496,8 @@ def test_enable_blockers_shows_raise_skip_and_bad_rating() -> None:
             V3PhaseStats(
                 phase_id="raise_state_to_target_cpo",
                 title_ru="R↑",
-                executed=False,
-                skip_reason="fact_cpo_ge_90pct_plan_max",
+                executed=True,
+                up=0,
             ),
         ],
     )
@@ -508,6 +508,6 @@ def test_enable_blockers_shows_raise_skip_and_bad_rating() -> None:
         reason_value="less_then_rating_by_orders",
         tick_snapshot=snapshot,
     )
-    assert "R↑ пропущен" in text
-    assert "701" in text
+    assert "R↑ выполнен, но ключ не выбран" in text
+    assert "R↑ пропущен" not in text
     assert "рейтинг ниже порога" in text
