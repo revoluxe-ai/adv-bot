@@ -1,6 +1,6 @@
 """Фаза NF: нет CH-профиля (PFO / GAP) → active → MIN_CPA.
 
-``target_place`` — ``NotFullTargetPlaceMigrateExecutor`` / ``NotFullTargetPlacePlanFactExecutor``.
+``target_place`` — после NF: ``NotFullTargetPlaceMigrateExecutor`` / plan-fact.
 Заменяет legacy ``cap_down`` для ключей без ``position_profile``.
 """
 

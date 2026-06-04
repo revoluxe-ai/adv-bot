@@ -217,6 +217,30 @@ def test_fallback_zero_true_on_overspend_not_full() -> None:
 
 
 @pytest.mark.unit
+def test_validate_before_migrate_non_min_gets_pos_minus_one() -> None:
+    """NF validate → MIN, затем migrate: ключ не в MIN на старте тика не теряет pos−1."""
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        target_place=0,
+        position=12.0,
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context().adv_state,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
+        NotFullValidateExecutor,
+    )
+
+    NotFullValidateExecutor().execute(ctx)
+    NotFullTargetPlaceMigrateExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[0].current_target_place == 11
+
+
+@pytest.mark.unit
 def test_migrate_executor_updates_context() -> None:
     dto = _not_full_dto(position=12.0, target_place=0)
     ctx = UpdateContextManager().from_prepared(
@@ -247,8 +271,8 @@ def test_plan_fact_executor_skips_unchanged_gate() -> None:
 def test_preamble_includes_nf_tp_phases() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
     assert names[1:5] == [
-        "not_full_target_place_migrate",
         "validate_not_full_state",
+        "not_full_target_place_migrate",
         "not_full_target_place_overspend_reset",
         "not_full_target_place_plan_fact",
     ]

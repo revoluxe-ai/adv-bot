@@ -309,8 +309,8 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "filter": ("0 · Фильтр operable", "—"),
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
-    "not_full_target_place_migrate": ("2a · NF · tp migrate 0→pos−1", "tp"),
     "validate_not_full_state": ("2 · NF · validate_not_full", "DOWN"),
+    "not_full_target_place_migrate": ("2a · NF · tp migrate 0→pos−1", "tp"),
     "not_full_target_place_overspend_reset": (
         "2b · NF · tp overspend → 0",
         "tp",

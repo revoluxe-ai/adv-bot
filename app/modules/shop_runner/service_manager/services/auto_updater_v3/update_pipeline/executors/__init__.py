@@ -1,6 +1,6 @@
 """Executors preamble NORMAL для ``UpdatePipeline``.
 
-Порядок: V → NF_migrate → NF → NF_overspend_tp → NF_plan_fact → skip_up → raise → reset → …
+Порядок: V → NF → NF_migrate → NF_overspend_tp → NF_plan_fact → skip_up → raise → reset → …
 
 **Нет отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``):**
 
@@ -53,8 +53,8 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble (без legacy ``cap_down`` — см. module docstring)."""
     return [
         HardStatusValidateExecutor(),
-        NotFullTargetPlaceMigrateExecutor(),
         NotFullValidateExecutor(),
+        NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlaceOverspendResetExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
         SkipUpTargetPlaceExecutor(),

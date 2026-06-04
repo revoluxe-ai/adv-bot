@@ -33,7 +33,7 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter operable → V → NF_migrate → NF → NF_plan_fact → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
+NORMAL    → filter operable → V → NF → NF_migrate → NF_overspend_tp → NF_plan_fact → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
@@ -59,8 +59,8 @@ NORMAL    → filter operable → V → NF_migrate → NF → NF_plan_fact → s
 Фазы NORMAL (только `allows_ladder_phases`, in-place executors):
 
 1. **V** (`HardStatusValidateExecutor`) — авто hard_status=1 → OFF.
-2. **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) — NOT FULL MIN + tp=0 → ``round(position)−1``; skip при overspend.
-3. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN (tp не сбрасывается в 0).
+2. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN (tp не сбрасывается в 0); **до migrate**, иначе migrate не видит MIN_CPA.
+3. **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) — NOT FULL MIN + tp=0 → ``round(position)−1``; skip при overspend.
 4. **NF_overspend_tp** (`NotFullTargetPlaceOverspendResetExecutor`) — при ``fact CPO РК > MAX``: NOT FULL MIN → tp=0; sync fallback force 0.
 5. **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) — tp ±1 по fact vs 0.9×resolve; gate: plan/fact и views; skip при overspend.
 6. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place (NOT FULL пропуск).
