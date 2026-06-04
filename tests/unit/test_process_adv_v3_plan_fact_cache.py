@@ -122,7 +122,6 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
             f"{_TC}.prepare_v3_operable_ladder_contexts": lambda *a, **k: ([], [], 0),
             f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
             f"{_V3_CPO}.load_rec_orders_per_view_for_v3": AsyncMock(return_value=None),
-            f"{_UP}.passing_up.plan_passing_up": lambda *a, **k: [],
             f"{_UP}.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
             f"{_UP}.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
             f"{_UP}.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
@@ -158,6 +157,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     complex_adv.adv_id = 2
     complex_adv.adv_setting = MagicMock()
     complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
 
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
@@ -209,7 +209,6 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
     plan_fact.set_new_plan_fact = AsyncMock()
-    expansion = MagicMock(return_value=[])
 
     updater_cls = MagicMock()
     updater_cls.return_value.get_fact_data = AsyncMock(
@@ -221,7 +220,6 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
             f"{_TC}.prepare_v3_operable_ladder_contexts": lambda *a, **k: ([], [], 0),
             f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
             f"{_ORCH}.plan_campaign_no_data_bootstrap_safe": bootstrap,
-            f"{_UP}.passing_up.plan_passing_up": expansion,
             f"{_AM}.select_v3_post_gate_actions": select_mock,
             f"{_AM}.sync_keyword_target_places_v3": sync_mock,
             f"{_DM}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(
@@ -241,7 +239,6 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
         _stop_patches(patchers)
 
     bootstrap.assert_called_once()
-    expansion.assert_not_called()
     select_mock.assert_not_called()
     sync_mock.assert_awaited_once()
     assert sync_mock.await_args.kwargs.get("force_all_target_place_zero") is True

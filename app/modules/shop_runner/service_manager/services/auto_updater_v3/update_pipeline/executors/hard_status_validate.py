@@ -20,8 +20,10 @@ class HardStatusValidateExecutor:
         self._next_state_manager = NextStateManager(HardStatusValidateExecutor)
 
     def execute(self, context: UpdateContext) -> None:
-
+        self._skip_reason = None
         for dto in context.keywords:
             self._next_state_manager.validate_state_by_hard_status(dto)
-        return  None
 
+    @property
+    def skip_reason(self) -> str | None:
+        return self._skip_reason

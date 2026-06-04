@@ -101,6 +101,12 @@ def test_nsm_validate_skips_non_auto() -> None:
 
 
 @pytest.mark.unit
+def test_hard_status_validate_executor_exposes_skip_reason() -> None:
+    executor = HardStatusValidateExecutor()
+    assert executor.skip_reason is None
+
+
+@pytest.mark.unit
 def test_hard_status_validate_executor_first_in_preamble() -> None:
     executors = build_normal_preamble_executors()
     assert executors[0].phase_name == "validate_state_by_hard_status"
