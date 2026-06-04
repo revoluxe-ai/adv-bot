@@ -38,7 +38,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     NextStateManager,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    pfo_off_plan_headroom_floor,
+    pfo_off_plan_headroom_floor, raise_state_plan_max_floor, should_skip_raise_state_to_target_cpo,
 
 )
 
