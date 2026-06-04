@@ -253,7 +253,8 @@ def test_shelf_filter_not_applied_when_organic() -> None:
 
 
 @pytest.mark.unit
-def test_rebalance_gate_skips_when_donor_not_more_expensive() -> None:
+def test_rebalance_stops_when_cheapest_potential_not_below_donor_cpo() -> None:
+    """Выход: min CPO в potential ≥ CPO донора — перетекание исчерпано, пару не применяем."""
     expensive = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.OPTIMUM,

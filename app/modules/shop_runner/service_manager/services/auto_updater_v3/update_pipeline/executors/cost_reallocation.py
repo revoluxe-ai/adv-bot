@@ -33,11 +33,14 @@ _MAX_REBALANCE_CYCLES = 3000
 
 
 class RebalanceExecutor:
-    """COST_REALLOCATION: цикл DOWN max-CPO active + UP min-CPO potential.
+    """COST_REALLOCATION: перетекание cost из active в potential.
 
-    Инвариант цикла: DOWN донора выполняется только если найден recipient,
-    для которого тот же шаг даст учтённый ladder-переход (``classify_ladder_step``).
-    Иначе возможны «сиротские» ↓ без ↑ в tick report (``KeywordDTO`` не пишет no-op).
+    Итерация: самый дорогой ``current_active`` → DOWN; из ``potential_up`` — минимальный
+    CPO с учтённым UP. Это не «recipient обязан дешевле донора», а перебор списков,
+    пока дешёвая ступень в potential ещё **ниже** CPO текущего донора (иначе смысла
+    резать дорогого нет — выход из цикла).
+
+    Пара пишется в audit только если оба шага реальны (``classify_ladder_step``).
     """
 
     phase_name = "cost_reallocation"
@@ -63,11 +66,10 @@ class RebalanceExecutor:
                 break
             if not _ladder_step_would_change(donor[0], down_state):
                 break
-            recipient = _pick_cheapest_actionable_recipient(
-                potential_states,
-                donor_cpo=donor[2],
-            )
+            recipient = _pick_cheapest_actionable_recipient(potential_states)
             if recipient is None:
+                break
+            if donor[2] <= recipient[2]:
                 break
             self._next_state_manager.raise_state_to_target_cpo(donor[0], down_state)
             self._next_state_manager.raise_state_to_target_cpo(
@@ -104,13 +106,11 @@ def _ladder_step_would_change(dto: KeywordDTO, state: KeywordV3LadderState) -> b
 
 def _pick_cheapest_actionable_recipient(
     potential_states: list[StateBinding],
-    *,
-    donor_cpo: float,
 ) -> StateBinding | None:
-    """Минимальный CPO среди potential, у которого шаг реально изменит ladder snapshot."""
-    for binding in sorted(potential_states, key=lambda item: (item[2], item[0].keyword_setting_id)):
-        if binding[2] >= donor_cpo:
-            break
+    """Минимальный CPO в ``potential_up``, для которого UP попадёт в audit."""
+    for binding in sorted(
+        potential_states, key=lambda item: (item[2], item[0].keyword_setting_id)
+    ):
         if _ladder_step_would_change(binding[0], binding[1]):
             return binding
     return None
