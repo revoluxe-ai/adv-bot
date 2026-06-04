@@ -1,16 +1,21 @@
-"""Фаза S: shelf rec-false cleanup down (in-place через ``NextStateManager``)."""
+"""Фаза S: shelf rec-FAIL cleanup (multi-step DOWN) + UP-компенсация через list2."""
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    candidate_for_strategy_mode,
+    count_ladder_step_if_applied,
+    ladder_step_snapshot_from_dto,
     log_skipped_aliases,
     resolve_next_effective_step_down,
+    target_place_from_mode_candidate,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     KeywordDTO,
@@ -25,6 +30,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     SelectionPolicy,
     shelf_rec_conversion_policy_active,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
+    run_potential_up_steps,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+    ladder_state_for_mode,
+    ladder_state_for_mode_and_place,
+    pick_off_ladder_state,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
@@ -36,9 +49,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 
 logger = logging.getLogger(__name__)
 
+_MAX_SHELF_CLEANUP_ITERATIONS_PER_KEY = 50
+
 
 class ShelfCleanupExecutor:
-    """SHELF_REC_CLEANUP: effective DOWN / FORCE_OFF по rec-gate FAIL на текущем state."""
+    """SHELF_REC_CLEANUP: while rec-FAIL → DOWN/OFF; затем столько же UP из list2."""
 
     phase_name = "shelf_cleanup"
     _skip_reason: str | None = None
@@ -52,30 +67,44 @@ class ShelfCleanupExecutor:
             self._skip_reason = "shelf_inactive"
             return
         self._skip_reason = None
-        _run_shelf_rec_cleanup(
+        down_budget = run_shelf_cleanup_down(
             context,
             click_mode=state.shelf_click_mode,
             ladder_inputs=state.ladder_inputs,
             policy=state.policy,
             nsm=self._next_state_manager,
         )
+        if down_budget > 0:
+            run_potential_up_steps(
+                context,
+                max_steps=down_budget,
+                nsm=self._next_state_manager,
+            )
 
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
 
 
-def _run_shelf_rec_cleanup(
+def _apply_and_count_step(dto: KeywordDTO, mutator: Callable[[], None]) -> int:
+    """Применить мутацию и вернуть ``1`` если SSOT зафиксировал ladder-шаг."""
+    before = ladder_step_snapshot_from_dto(dto)
+    mutator()
+    after = ladder_step_snapshot_from_dto(dto)
+    return count_ladder_step_if_applied(before, after)
+
+
+def run_shelf_cleanup_down(
     context: UpdateContext,
     *,
     click_mode: ShelfClickMode,
     ladder_inputs,
     policy: SelectionPolicy | None,
     nsm: NextStateManager,
-) -> None:
-    """Cleanup активных ключей с ``RecGateStatus.FAIL`` на текущем state."""
+) -> int:
+    """Multi-step DOWN/OFF для rec-FAIL ключей; сумма ladder-шагов = бюджет UP."""
     if not shelf_rec_conversion_policy_active(click_mode):
-        return
+        return 0
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
         ladder_inputs_for_prepared,
@@ -95,72 +124,138 @@ def _run_shelf_rec_cleanup(
     )
     rec = ladder.rec_orders_per_view
     if rec is None:
-        return
+        return 0
 
-    dto_by_ks: dict[int, KeywordDTO] = {
-        dto.keyword_setting_id: dto for dto in context.keywords
-    }
+    down_budget = 0
 
-    for ctx, mode in prepared:
-        if mode == KeywordStrategyMode.OFF:
+    for dto in context.keywords:
+        if dto.keyword_setting_id <= 0:
             continue
-        hard_status = int(ctx.keyword.hard_status)
-        if not is_v3_operable_hard_status(hard_status):
+        if not is_v3_operable_hard_status(dto.hard_status):
             continue
-        ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
-            continue
-        dto = dto_by_ks.get(int(ks_id))
-        if dto is None:
+        if dto.current_mode == KeywordStrategyMode.OFF:
             continue
 
-        state_candidates = mode_catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-        opc = ladder.orders_per_cart_for_ctx(ctx)
-        current_status = state_rec_gate_status_for_mode(
-            state_candidates,
-            mode,
-            gate_policy,
-            rec_orders_per_view=rec,
-            orders_per_cart=opc,
-        )
-        if not rec_gate_triggers_cleanup(current_status):
-            continue
+        iterations = 0
+        while iterations < _MAX_SHELF_CLEANUP_ITERATIONS_PER_KEY:
+            iterations += 1
+            catalog = mode_catalog_for_ctx(
+                dto.context,
+                prepared,
+                ladder_inputs=ladder,
+            )
+            opc = ladder.orders_per_cart_for_ctx(dto.context)
+            current_status = state_rec_gate_status_for_mode(
+                catalog,
+                dto.current_mode,
+                gate_policy,
+                rec_orders_per_view=rec,
+                orders_per_cart=opc,
+            )
+            if not rec_gate_triggers_cleanup(current_status):
+                break
 
-        min_status = state_rec_gate_status_for_mode(
-            state_candidates,
-            KeywordStrategyMode.MIN_CPA,
-            gate_policy,
-            rec_orders_per_view=rec,
-            orders_per_cart=opc,
-        )
+            hard_status = int(dto.hard_status)
+            ks_id = dto.keyword_setting_id
 
-        if rec_gate_allows_up(min_status) and mode != KeywordStrategyMode.MIN_CPA:
-            if hard_status == HARD_STATUS_WHITE_LIST:
-                nsm.set_keyword_strategy_mode(dto, KeywordStrategyMode.MIN_CPA)
-            else:
-                nsm.force_off(dto)
-            continue
+            if hard_status == HARD_STATUS_AUTO_MODE:
+                off_state = pick_off_ladder_state(dto)
+                if off_state is not None:
+                    down_budget += _apply_and_count_step(
+                        dto,
+                        lambda s=off_state: nsm.raise_state_to_target_cpo(dto, s),
+                    )
+                else:
+                    down_budget += _apply_and_count_step(dto, lambda: nsm.force_off(dto))
+                break
 
-        if hard_status == HARD_STATUS_WHITE_LIST:
-            step = resolve_next_effective_step_down(mode, state_candidates)
-            log_skipped_aliases(ctx.keyword.text, step.skipped_aliases)
-            nxt = step.next_mode
-            if nxt is None:
-                if mode == KeywordStrategyMode.MIN_CPA:
+            min_status = state_rec_gate_status_for_mode(
+                catalog,
+                KeywordStrategyMode.MIN_CPA,
+                gate_policy,
+                rec_orders_per_view=rec,
+                orders_per_cart=opc,
+            )
+
+            if (
+                rec_gate_allows_up(min_status)
+                and dto.current_mode != KeywordStrategyMode.MIN_CPA
+            ):
+                min_state = ladder_state_for_mode(dto, KeywordStrategyMode.MIN_CPA)
+                if min_state is None:
+                    logger.warning(
+                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s "
+                        "MIN ladder missing; skip",
+                        ks_id,
+                    )
+                    break
+                down_budget += _apply_and_count_step(
+                    dto,
+                    lambda s=min_state: nsm.raise_state_to_target_cpo(dto, s),
+                )
+                continue
+
+            if dto.current_mode == KeywordStrategyMode.MIN_CPA:
+                off_state = pick_off_ladder_state(dto)
+                if off_state is None:
                     logger.warning(
                         "v3 shelf_rec_false_cleanup: whitelist ks_id=%s at MIN, "
-                        "step_down returned None; fallback OFF",
+                        "OFF ladder missing",
                         ks_id,
                     )
-                    nxt = KeywordStrategyMode.OFF
+                    break
+                down_budget += _apply_and_count_step(
+                    dto,
+                    lambda s=off_state: nsm.raise_state_to_target_cpo(dto, s),
+                )
+                break
+
+            if hard_status != HARD_STATUS_WHITE_LIST:
+                off_state = pick_off_ladder_state(dto)
+                if off_state is not None:
+                    down_budget += _apply_and_count_step(
+                        dto,
+                        lambda s=off_state: nsm.raise_state_to_target_cpo(dto, s),
+                    )
                 else:
-                    logger.warning(
-                        "v3 shelf_rec_false_cleanup: whitelist ks_id=%s mode=%s, "
-                        "step_down returned None; skip cleanup",
-                        ks_id,
-                        mode.name,
-                    )
-                    continue
-            nsm.set_keyword_strategy_mode(dto, nxt)
-        else:
-            nsm.force_off(dto)
+                    down_budget += _apply_and_count_step(dto, lambda: nsm.force_off(dto))
+                break
+
+            step = resolve_next_effective_step_down(dto.current_mode, catalog)
+            log_skipped_aliases(dto.calculated_keyword.text, step.skipped_aliases)
+            nxt = step.next_mode
+            if nxt is None:
+                logger.warning(
+                    "v3 shelf_rec_false_cleanup: whitelist ks_id=%s mode=%s, "
+                    "step_down returned None; skip",
+                    ks_id,
+                    dto.current_mode.name,
+                )
+                break
+
+            if nxt == KeywordStrategyMode.OFF:
+                target_state = pick_off_ladder_state(dto)
+            else:
+                mc = candidate_for_strategy_mode(nxt, catalog)
+                place = target_place_from_mode_candidate(mc)
+                target_state = ladder_state_for_mode_and_place(dto, nxt, place)
+            if target_state is None:
+                logger.warning(
+                    "v3 shelf_rec_false_cleanup: whitelist ks_id=%s "
+                    "target state missing for %s",
+                    ks_id,
+                    nxt.name,
+                )
+                break
+            down_budget += _apply_and_count_step(
+                dto,
+                lambda s=target_state: nsm.raise_state_to_target_cpo(dto, s),
+            )
+
+        if iterations >= _MAX_SHELF_CLEANUP_ITERATIONS_PER_KEY:
+            logger.warning(
+                "v3 shelf_rec_false_cleanup: ks_id=%s hit iteration cap",
+                dto.keyword_setting_id,
+            )
+
+    return down_budget

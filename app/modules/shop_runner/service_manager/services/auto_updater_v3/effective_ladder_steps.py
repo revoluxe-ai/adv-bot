@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -51,6 +52,103 @@ _LADDER_MODES: tuple[KeywordStrategyMode, ...] = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class LadderStepKind(str, Enum):
+    """Направление одного ladder-шага (смена place или переход OFF)."""
+
+    UP = "UP"
+    DOWN = "DOWN"
+    OFF = "OFF"
+
+
+@dataclass(frozen=True, slots=True)
+class LadderStepSnapshot:
+    """Снимок режима и ``target_place`` для классификации шага."""
+
+    mode: KeywordStrategyMode
+    target_place: int | None
+
+
+def ladder_step_snapshot_from_dto(dto: "KeywordDTO") -> LadderStepSnapshot:
+    """Текущий ``mode`` + ``target_place`` ключа (OFF → ``place=None``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if dto.current_mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    place = dto.current_target_place
+    return LadderStepSnapshot(dto.current_mode, int(place))
+
+
+def ladder_step_snapshot_for_mode(
+    dto: "KeywordDTO",
+    mode: KeywordStrategyMode,
+) -> LadderStepSnapshot:
+    """Снимок для ``mode`` по матрице ladder (не зависит от ``dto.current_mode``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+        ladder_state_for_mode,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    state = ladder_state_for_mode(dto, mode)
+    if state is None:
+        return LadderStepSnapshot(mode, None)
+    return LadderStepSnapshot(mode, int(state.target_position))
+
+
+def _ladder_step_rank(snapshot: LadderStepSnapshot) -> tuple[int, int]:
+    if snapshot.mode == KeywordStrategyMode.OFF:
+        return (-1, -1)
+    place = snapshot.target_place if snapshot.target_place is not None else 0
+    return (mode_level(snapshot.mode), -place)
+
+
+def classify_ladder_step(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> LadderStepKind | None:
+    """Классифицировать переход: ``None`` если alias на том же ``target_place``."""
+    if before.mode == after.mode and before.target_place == after.target_place:
+        return None
+    if after.mode == KeywordStrategyMode.OFF and before.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.OFF
+    if before.mode == KeywordStrategyMode.OFF and after.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.UP
+    if (
+        before.target_place is not None
+        and after.target_place is not None
+        and before.target_place == after.target_place
+        and before.mode != after.mode
+    ):
+        return None
+    before_rank = _ladder_step_rank(before)
+    after_rank = _ladder_step_rank(after)
+    if after_rank > before_rank:
+        return LadderStepKind.UP
+    if after_rank < before_rank:
+        return LadderStepKind.DOWN
+    return None
+
+
+def is_ladder_step(before: LadderStepSnapshot, after: LadderStepSnapshot) -> bool:
+    """``True``, если переход считается одним ladder-шагом."""
+    return classify_ladder_step(before, after) is not None
+
+
+def count_ladder_step_if_applied(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> int:
+    """``1`` если переход — ladder-шаг, иначе ``0``."""
+    return 1 if is_ladder_step(before, after) else 0
 
 
 def candidate_for_strategy_mode(

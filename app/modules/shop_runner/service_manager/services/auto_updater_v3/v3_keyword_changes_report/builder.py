@@ -113,7 +113,7 @@ def _build_keyword_entry(dto: KeywordDTO) -> V3KeywordChangeEntry | None:
             prior = step.new_mode.to_strategy_mode()
             continue
         new_mode = step.new_mode.to_strategy_mode()
-        action = _step_to_action(ks_id, prior_mode=prior, step=step)
+        action = _step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
         action_label = "NOOP"
         if action is not None:
             action_label = action.action.name
@@ -203,7 +203,7 @@ def build_keyword_changes_snapshot(
             if step.executor_name in IGNORED_EXECUTOR_NAMES:
                 prior = step.new_mode.to_strategy_mode()
                 continue
-            action = _step_to_action(ks_id, prior_mode=prior, step=step)
+            action = _step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
             if action is not None:
                 _increment_breakdown(
                     buckets,

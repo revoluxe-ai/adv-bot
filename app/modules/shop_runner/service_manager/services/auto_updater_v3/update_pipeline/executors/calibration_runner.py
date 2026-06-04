@@ -57,6 +57,29 @@ def run_calibration_down(
         nsm.raise_state_to_target_cpo(donor[0], down_state)
 
 
+def run_potential_up_steps(
+    context: UpdateContext,
+    *,
+    max_steps: int,
+    nsm: NextStateManager,
+    for_calibration: bool = False,
+) -> None:
+    """До ``max_steps`` UP-итераций: min CPO из list2, пересборка списков каждый шаг."""
+    step_budget = max(0, int(max_steps))
+    if step_budget == 0:
+        return
+    generator = StatesListGenerator(
+        context.adv_state,
+        for_calibration=for_calibration,
+    )
+    for _ in range(step_budget):
+        _current, potential_states = generator.get_current_states(context.keywords)
+        if not potential_states:
+            break
+        recipient = _pick_cheapest(potential_states)
+        nsm.raise_state_to_target_cpo(recipient[0], recipient[1])
+
+
 def run_calibration_up(
     context: UpdateContext,
     *,
@@ -64,15 +87,12 @@ def run_calibration_up(
     nsm: NextStateManager,
 ) -> None:
     """CAL UP: до ``max_steps`` итераций min CPO из list2 → apply ladder state."""
-    step_budget = max(1, int(max_steps))
-    generator = StatesListGenerator(context.adv_state, for_calibration=True)
-
-    for _ in range(step_budget):
-        _current, potential_states = generator.get_current_states(context.keywords)
-        if not potential_states:
-            break
-        recipient = _pick_cheapest(potential_states)
-        nsm.raise_state_to_target_cpo(recipient[0], recipient[1])
+    run_potential_up_steps(
+        context,
+        max_steps=max(1, int(max_steps)),
+        nsm=nsm,
+        for_calibration=True,
+    )
 
 
 def _resolve_calibration_down_state(

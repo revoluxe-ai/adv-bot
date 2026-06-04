@@ -7,12 +7,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3Action,
     V3ActionType,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    LadderStepKind,
+    classify_ladder_step,
+    ladder_step_snapshot_for_mode,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     KeywordDTO,
     NextState,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    mode_level,
 )
 
 
@@ -44,7 +46,12 @@ def steps_to_v3_actions(
     if idx_before > 0:
         prior = dto.next_state[idx_before - 1].new_mode.to_strategy_mode()
     for step in steps:
-        action = _step_to_action(ks_id, prior_mode=prior, step=step)
+        action = _step_to_action(
+            ks_id,
+            dto=dto,
+            prior_mode=prior,
+            step=step,
+        )
         if action is not None:
             actions.append(action)
         prior = step.new_mode.to_strategy_mode()
@@ -54,31 +61,33 @@ def steps_to_v3_actions(
 def _step_to_action(
     keyword_setting_id: int,
     *,
+    dto: KeywordDTO,
     prior_mode: KeywordStrategyMode,
     step: NextState,
 ) -> V3Action | None:
     new_mode = step.new_mode.to_strategy_mode()
-    if prior_mode == new_mode:
+    before = ladder_step_snapshot_for_mode(dto, prior_mode)
+    after = ladder_step_snapshot_for_mode(dto, new_mode)
+    kind = classify_ladder_step(before, after)
+    if kind is None:
         return None
     reason = step.executor_name
-    if new_mode == KeywordStrategyMode.OFF:
+    if kind == LadderStepKind.OFF:
         return V3Action(
             action=V3ActionType.FORCE_OFF,
             keyword_setting_id=keyword_setting_id,
             reason=reason,
         )
-    if mode_level(new_mode) < mode_level(prior_mode):
+    if kind == LadderStepKind.DOWN:
         return V3Action(
             action=V3ActionType.DOWN,
             keyword_setting_id=keyword_setting_id,
             target_strategy_mode=new_mode,
             reason=reason,
         )
-    if mode_level(new_mode) > mode_level(prior_mode):
-        return V3Action(
-            action=V3ActionType.UP,
-            keyword_setting_id=keyword_setting_id,
-            target_strategy_mode=new_mode,
-            reason=reason,
-        )
-    return None
+    return V3Action(
+        action=V3ActionType.UP,
+        keyword_setting_id=keyword_setting_id,
+        target_strategy_mode=new_mode,
+        reason=reason,
+    )

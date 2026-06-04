@@ -46,7 +46,7 @@ NORMAL    → filter/sync → V → NF → skip_up → raise → reset → S →
 3. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place.
 4. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO.
 5. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend.
-6. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL → effective DOWN / FORCE_OFF.
+6. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
 7. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
 8. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
 9. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
@@ -84,7 +84,7 @@ UI (Telegram) и updater (COST_REALLOCATION / RESOLVE_CALIBRATION / PROFITABLE_E
 | `keyword_v3_ladder_view.py` | `LadderInputs`, `cost_for_mode`, `resolve_ladder_stage_display` |
 | `resolve_threshold.py` | `compute_resolve_cost_threshold`, `is_resolve_valid` |
 | `ladder_tick_helpers.py` | tick-report / gap enable helpers (`mode_catalog_for_ctx`, …) |
-| `effective_ladder_steps.py` | collapsed UP/DOWN, alias groups |
+| `effective_ladder_steps.py` | collapsed UP/DOWN, alias groups; SSOT ``LadderStepSnapshot`` / ``classify_ladder_step`` (1 шаг = смена ``target_place`` или OFF; alias на том же place = 0) |
 | `update_pipeline/executors/` | in-place preamble executors + `NextStateManager` |
 
 **Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` и `ladder_inputs_for_prepared` не пересчитывают worst вне `LadderInputs`.
