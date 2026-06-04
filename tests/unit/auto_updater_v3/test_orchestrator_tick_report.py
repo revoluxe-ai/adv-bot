@@ -51,11 +51,6 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
         "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d": AsyncMock(
             return_value=None
         ),
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context.prepare_v3_operable_ladder_contexts": lambda *a, **k: (
-            [],
-            [],
-            0,
-        ),
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold.is_resolve_valid": lambda *a, **k: True,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
