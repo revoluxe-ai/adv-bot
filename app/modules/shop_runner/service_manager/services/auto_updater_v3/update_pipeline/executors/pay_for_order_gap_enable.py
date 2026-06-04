@@ -66,8 +66,8 @@ def _phase_skip_reason(adv_state: AdvState) -> str | None:
     fact = float(adv_state.fact_pay_for_order)
     if fact > float(adv_state.max_pay_for_order):
         return "fact_gt_max_cpo"
-    if fact >= MAX_PAY_STABILIZATION_RATIO * float(adv_state.resolve):
-        return "fact_ge_90pct_resolve"
+    if fact >= MAX_PAY_STABILIZATION_RATIO * float(adv_state.max_pay_for_order):
+        return "fact_ge_90pct_plan_max"
     return None
 
 

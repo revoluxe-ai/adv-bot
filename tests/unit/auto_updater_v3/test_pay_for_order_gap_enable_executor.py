@@ -168,13 +168,17 @@ def _context(
 
 
 @pytest.mark.unit
-def test_skip_when_fact_ge_90pct_resolve() -> None:
-    resolve = 100.0
-    fact = MAX_PAY_STABILIZATION_RATIO * resolve
-    ctx = _context([_gap_dto()], _adv_state(fact=fact, resolve=resolve))
+def test_skip_when_fact_ge_90pct_plan_max() -> None:
+    max_cpo = 120.0
+    resolve = 50.0
+    fact = MAX_PAY_STABILIZATION_RATIO * max_cpo
+    ctx = _context(
+        [_gap_dto()],
+        _adv_state(fact=fact, resolve=resolve, max_cpo=max_cpo),
+    )
     executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_ge_90pct_resolve"
+    assert executor.skip_reason == "fact_ge_90pct_plan_max"
     assert ctx.keywords[0].next_state == []
 
 

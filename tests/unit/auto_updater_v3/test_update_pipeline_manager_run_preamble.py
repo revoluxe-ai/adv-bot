@@ -86,7 +86,7 @@ def test_run_preamble_pfo_off_count_zero_when_phase_skipped() -> None:
     """При skip фазы счётчик не трогаем (нет actions → нет setattr)."""
     dto = _dto()
     max_cpo = 100.0
-    fact = 110.0  # граница: не deep overspend
+    fact = 89.0  # ниже 0.9×max — фаза skip
     ctx = _with_runtime(_context([dto], _adv_state(fact=fact, max_cpo=max_cpo)))
     with patch(
         f"{_MANAGER_MODULE}.build_normal_preamble_executors",

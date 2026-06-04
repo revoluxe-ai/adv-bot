@@ -21,33 +21,35 @@ from tests.unit.test_auto_updater_v3 import _calc_kw
 
 
 @pytest.mark.unit
-def test_enable_gap_fact_above_stabilization_zone() -> None:
-    resolve = 550.0
-    fact = MAX_PAY_STABILIZATION_RATIO * resolve + 1.0
+def test_enable_gap_fact_above_plan_max_stabilization_zone() -> None:
+    max_cpo = 550.0
+    resolve = 200.0
+    fact = MAX_PAY_STABILIZATION_RATIO * max_cpo
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],
         fact_pay_for_order=fact,
         resolve=resolve,
+        max_pay_for_order=max_cpo,
     )
-    assert "0.9" in note or "90%" in note or "стабилизации" in note
+    assert "plan.max" in note or "0.9" in note or "90%" in note
 
 
 @pytest.mark.unit
-def test_pfo_off_skip_when_fact_le_110pct_max() -> None:
+def test_pfo_off_skip_when_fact_lt_90pct_plan_max() -> None:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-        FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+        plan_max_stabilization_floor,
     )
 
     max_cpo = 100.0
-    fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo
+    fact = plan_max_stabilization_floor(max_cpo) - 0.01
     note = summarize_phase_zero_actions(
         "pay_for_order_over_max_off_on_deep_overspend",
         prepared=[],
         fact_pay_for_order=fact,
         max_pay_for_order=max_cpo,
     )
-    assert "1.1" in note or "110%" in note or "deep overspend" in note
+    assert "plan.max" in note or "0.9" in note or "90%" in note
 
 
 @pytest.mark.unit
