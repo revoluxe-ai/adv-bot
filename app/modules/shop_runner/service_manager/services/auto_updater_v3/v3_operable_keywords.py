@@ -1,10 +1,11 @@
 """Operable keywords V3: фильтр hard_status 1|2.
 
 Источник истины — ``hard_status`` из БД; ``strategy_mode`` подтягивается к нему:
-``HardStatusValidateExecutor`` (preamble фаза V) — авто (1) → ``OFF`` через ``NextState``.
+``HardStatusValidateExecutor`` (preamble фаза V) — авто (1) → ``OFF``.
 
-``filter_operable_v3_contexts`` — только ключи с ``hard_status in {1, 2}`` для ladder.
-Fixed/manual (3/4/…) остаются в полном списке для target_place, но не в preamble.
+Ограничение mode по tier без CH-профиля — **NF** (``NotFullValidateExecutor``):
+нет ``position_profile`` → MIN + tp=0. Отдельный legacy ``cap_down`` по ``max_allowed_mode``
+не используется (есть профиль → лестница из CH). См. ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations

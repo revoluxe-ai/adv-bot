@@ -29,7 +29,7 @@ class PreamblePipelineRunResult:
     prepared: KeywordsPreparedList
     eligibility: dict[int, KeywordV3Eligibility]
     ladder_inputs: LadderInputs
-    cap_down_count: int = 0
+    cap_down_count: int = 0  # legacy: фаза B удалена, поле не заполняется
     validate_not_full_count: int = 0
     validate_count: int = 0
     raise_state_count: int = 0

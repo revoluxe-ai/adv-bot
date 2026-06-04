@@ -33,9 +33,26 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter/sync → V → NF → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
+NORMAL    → filter operable → V → NF → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
+
+### Cap-down (legacy B) — намеренно удалён
+
+До рефакторинга V3 была фаза **B** (`CapDownExecutor`, `plan_mode_cap_down`): опускать
+``strategy_mode`` выше ``max_allowed_mode`` по ``KeywordDataTier``.
+
+**Сейчас отдельной фазы нет — это не баг.**
+
+| Ситуация | Кто обрабатывает |
+|----------|------------------|
+| Нет CH-профиля (`position_profile` пуст), PFO или GAP | **NF** — active → ``MIN_CPA`` + ``target_place=0`` |
+| Есть CH-профиль | Лестница M/O/C и CPO из профиля (**FULL**); режим берётся из профиля, cap по tier не режет |
+| UP/realloc/calibration | ``can_target_mode(eligibility, mode)`` — tier без профиля не даёт OPT/MAX |
+
+**Не восстанавливать** ``CapDownExecutor`` без изменения продуктового контракта «есть профиль →
+работаем из профиля». Статика: ``tests/unit/auto_updater_v3/test_orchestrator_campaign_mode_layout.py``
+(``test_no_legacy_cap_down_executor_in_preamble``).
 
 Каждая фаза NORMAL in-place: `UpdatePipelineManager.run_preamble` → `NextState` на `KeywordDTO`.
 
@@ -211,7 +228,7 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 - **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
 - **Счётчики фаз** (post-hoc из `KeywordDTO.next_state`, модуль `v3_keyword_changes_report`): **`↑N on:L ↓M off:K`** — UP-шаги; ключи OFF→active по итогам фазы (`on`); DOWN+OFF-шаги лестницы в `↓`; ключи, окончившие фазу в OFF (`off`). Net-итог тика: **`+↑ on: −↓ off:`** (stored→current). `aggression_after` — из audit.
 - **Redis audit:** `V3KeywordChanges:{adv_id}`, TTL 7 суток — полный per-keyword audit (цепочки режимов, executor); UI читает merged `V3TickReport`.
-- **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
+- **Стадии NORMAL:** filter → V → NF → skip_up → raise → reset → S → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING). Legacy фаза **B (cap_down)** удалена — см. § Cap-down выше.
 - **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
 - **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net `+↑ on: −↓ off:` (UP / OFF→active / DOWN без OFF / OFF net), распределение hard_status, время тика (MSK).
 - **Кнопки:** «Обновить» (перечитать Redis), «Назад к меню РК».

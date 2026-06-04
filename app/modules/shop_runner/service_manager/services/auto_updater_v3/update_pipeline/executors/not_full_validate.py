@@ -1,4 +1,8 @@
-"""Фаза validate: NOT FULL active → MIN_CPA + target_place=0."""
+"""Фаза NF: нет CH-профиля (PFO / GAP) → active → MIN_CPA + target_place=0.
+
+Заменяет legacy ``cap_down`` для ключей без ``position_profile``. При наличии профиля
+лестница строится из CH (FULL); отдельный cap по eligibility не применяется.
+"""
 
 from __future__ import annotations
 
