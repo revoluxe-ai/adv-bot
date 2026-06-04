@@ -31,6 +31,17 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
         ShelfClickMode,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
+        V3TickReportSnapshot,
+    )
+
+_STATUS_REASON_RU: dict[str, str] = {
+    "less_then_rating_by_orders": "рейтинг ниже порога белого списка (НР)",
+    "below_rec_conversion": "конверсия ниже рекомендуемой полки",
+    "not_relevant_phrase": "фраза не релевантна РК",
+    "turn_off": "хард-статус «отключен»",
+    "black_list": "чёрный список",
+}
 
 _PROFILE_UNAVAILABLE = (
     "📊 *Профиль ключа (V3):* недоступен (нет данных CH/WB)\n"
@@ -229,6 +240,52 @@ def _format_diagnostic_line(
         gaps = "; ".join(missing)
         line += f"\n   Нет: {gaps}"
     return line
+
+
+def format_keyword_v3_enable_blockers(
+    *,
+    hard_status: int,
+    current_mode: KeywordStrategyMode,
+    status_value: str,
+    reason_value: str,
+    tick_snapshot: "V3TickReportSnapshot | None",
+) -> str:
+    """Почему авто-ключ с ``OFF``/``bad`` не включается (последний V3-тик + whitelist)."""
+    lines: list[str] = []
+    if hard_status == 1 and current_mode == KeywordStrategyMode.OFF:
+        lines.append(
+            "   V3 авто: каждый тик сброс в OFF; подъём — только фаза R↑"
+        )
+        if tick_snapshot is not None:
+            for phase in tick_snapshot.phases:
+                if phase.phase_id != "raise_state_to_target_cpo":
+                    continue
+                if (
+                    not phase.executed
+                    and phase.skip_reason == "fact_cpo_ge_90pct_plan_max"
+                ):
+                    fact = tick_snapshot.fact_cpa
+                    mx = tick_snapshot.max_pay_for_order
+                    if fact is not None and mx is not None:
+                        lines.append(
+                            f"   R↑ пропущен (старый тик): fact CPA РК {fact:.0f} ₽ "
+                            f"≥ 90% max ({mx:.0f} ₽)"
+                        )
+                    else:
+                        lines.append(
+                            "   R↑ пропущен (старый тик): зона стабилизации ≥ 90% max"
+                        )
+                elif phase.executed and phase.up == 0:
+                    lines.append(
+                        "   R↑ выполнен, но ключ не выбран для подъёма на этом тике"
+                    )
+                break
+    if status_value == "bad":
+        reason_ru = _STATUS_REASON_RU.get(reason_value, reason_value)
+        lines.append(f"   Показы WB: статус bad — {reason_ru}")
+    if not lines:
+        return ""
+    return "⚠️ *Почему ключ не крутится:*\n" + "\n".join(lines) + "\n"
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:

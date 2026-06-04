@@ -37,7 +37,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend import (
     PayForOrderOverMaxOffOnDeepOverspendExecutor,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
+    RaiseStateToTargetCpoExecutor,
+)
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order, _sample_profile
 
 
 def _ladder_states(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
@@ -129,8 +132,30 @@ def test_skip_when_fact_lt_plan_headroom_ratio() -> None:
 
 @pytest.mark.unit
 def test_off_active_keyword_when_at_plan_headroom_and_pfo_gt_max() -> None:
+    """OFF только если нет ступени с ``cpo <= max`` (все operable выше потолка)."""
     max_cpo = 550.0
+    ks_id = 1
+    states = (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            target_position=10,
+            cpo=600.0,
+        ),
+    )
     dto = _dto(pfo_target=600.0)
+    dto = KeywordDTO.from_context(
+        KeywordV3Context(keyword=dto.calculated_keyword, position_profile=_sample_profile()),
+        ladder_states=states,
+    )
     fact = pfo_off_plan_headroom_floor(max_cpo)
     ctx = _context([dto], _adv_state(fact=fact, max_cpo=max_cpo))
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
@@ -155,6 +180,44 @@ def test_keyword_pfo_over_plan_max_gate() -> None:
     low = _dto(ks_id=2, pfo_target=400.0)
     assert keyword_pay_for_order_over_plan_max(high, max_pay=max_cpo) is True
     assert keyword_pay_for_order_over_plan_max(low, max_pay=max_cpo) is False
+
+
+@pytest.mark.unit
+def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> None:
+    """R↑ поднял на MAX с cpo<=max — pfo_off не гасит, даже если aggregate PFO > max."""
+    max_cpo = 550.0
+    ks_id = 17783643
+    states = (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=1,
+            cpo=10.689,
+        ),
+    )
+    dto = _dto(ks_id=ks_id, mode=KeywordStrategyMode.OFF, pfo_target=600.0)
+    dto = KeywordDTO.from_context(
+        KeywordV3Context(
+            keyword=dto.calculated_keyword,
+            position_profile=_sample_profile(),
+        ),
+        ladder_states=states,
+    )
+    adv = _adv_state(fact=700.0, max_cpo=max_cpo)
+    ctx = _context([dto], adv)
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert len(dto.next_state) == 1
 
 
 @pytest.mark.unit

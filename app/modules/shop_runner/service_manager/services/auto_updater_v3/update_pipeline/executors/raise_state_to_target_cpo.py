@@ -39,9 +39,24 @@ class RaiseStateToTargetCpoExecutor:
         if self._skip_reason is not None:
             return
         target_cpo = float(context.adv_state.resolve)
+        # Если факт CPO кампании > 90% от max CPO плана,
+        # пропускаем ключи, у которых pay_for_order > max_pay_for_order
+        adv = context.adv_state
+        campaign_over_90 = (
+            adv.fact_pay_for_order is not None
+            and float(adv.fact_pay_for_order) > 0.9 * float(adv.max_pay_for_order)
+        )
+
         for dto in context.keywords:
             if dto.is_not_full():
                 continue
+
+            if campaign_over_90:
+                kw_pfo = dto.calculated_keyword.pay_for_order
+                if kw_pfo is not None and float(kw_pfo) > float(adv.max_pay_for_order):
+                    # Пропускаем этот ключ — слишком дорогой по CPO относительно плана
+                    continue
+
             state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
             if state is None:
                 continue
