@@ -39,9 +39,6 @@ if TYPE_CHECKING:
         KeywordV3Context,
     )
 
-_NOT_FULL_TARGET_PLACE = 0
-
-
 @dataclass(slots=True)
 class KeywordDTO:
     """Аккумулятор данных ключa на тик V3.
@@ -117,7 +114,7 @@ class KeywordDTO:
         return not bool(self.position_profile)
 
     def _validate_not_full_state(self, executor_name: str) -> None:
-        """NOT FULL + active: единственно допустимо MIN_CPA + target_place=0."""
+        """NOT FULL + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
         if not self.is_not_full():
             return
         if self.current_mode == KeywordStrategyMode.OFF:
@@ -125,11 +122,6 @@ class KeywordDTO:
         if self.current_mode != KeywordStrategyMode.MIN_CPA:
             self.current_mode = NextState(
                 new_mode=KeywordMode.MIN_CPA,
-                executor_name=executor_name,
-            )
-        if self.current_target_place != _NOT_FULL_TARGET_PLACE:
-            self.current_target_place = NextTargetPlace(
-                new_target_place=_NOT_FULL_TARGET_PLACE,
                 executor_name=executor_name,
             )
 

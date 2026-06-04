@@ -150,6 +150,51 @@ async def test_sync_keyword_target_places_v3_sets_zero_when_no_profile_active_mo
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_sync_preserves_not_full_target_place_from_ledger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NOT FULL без CH-профиля: tp>0 из ledger не затирается в 0."""
+    min_kw = _kw_row(target_place=0, ks_id=42)
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.all.return_value = [min_kw]
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=fake_result)
+    session.commit = AsyncMock()
+
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.target_place_sync.sm",
+        _patched_sm(session_cm),
+    )
+
+    calc = _calculated_kw_fixture(
+        ks_id=42,
+        text="kw_min",
+        mode=KeywordStrategyMode.MIN_CPA,
+        conv=0.01,
+        cpm_set_bid=200,
+    )
+    calc.keyword_setting.target_place = 14
+
+    adv = MagicMock()
+    adv.adv_setting_original_id = 1
+    adv.adv_id = 123
+
+    await sync_keyword_target_places_v3(
+        adv=adv,
+        bid_profiles={},
+        calculated_by_text={"kw_min": calc},
+        target_place_fallback_zero_by_keyword_id={42: False},
+    )
+
+    assert min_kw.target_place == 14
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_sync_keyword_target_places_v3_sets_zero_when_candidate_invalid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

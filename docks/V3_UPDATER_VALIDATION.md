@@ -33,7 +33,7 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter operable → V → NF → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
+NORMAL    → filter operable → V → NF_migrate → NF → NF_plan_fact → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
@@ -46,7 +46,7 @@ NORMAL    → filter operable → V → NF → skip_up → raise → reset → S
 
 | Ситуация | Кто обрабатывает |
 |----------|------------------|
-| Нет CH-профиля (`position_profile` пуст), PFO или GAP | **NF** — active → ``MIN_CPA`` + ``target_place=0`` |
+| Нет CH-профиля (`position_profile` пуст), PFO или GAP | **NF** — active → ``MIN_CPA``; tp: migrate ``0→round(pos)−1``, plan-fact ±1 (gate fact+views) |
 | Есть CH-профиль | Лестница M/O/C и CPO из профиля (**FULL**); режим берётся из профиля, cap по tier не режет |
 | UP/realloc/calibration | ``can_target_mode(eligibility, mode)`` — tier без профиля не даёт OPT/MAX |
 
@@ -59,16 +59,19 @@ NORMAL    → filter operable → V → NF → skip_up → raise → reset → S
 Фазы NORMAL (только `allows_ladder_phases`, in-place executors):
 
 1. **V** (`HardStatusValidateExecutor`) — авто hard_status=1 → OFF.
-2. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN + tp=0.
-3. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place.
-4. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO.
-5. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend.
-6. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
-7. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
-8. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
-9. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
-10. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
-11. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+2. **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) — NOT FULL MIN + tp=0 → ``round(position)−1``; skip при overspend.
+3. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN (tp не сбрасывается в 0).
+4. **NF_overspend_tp** (`NotFullTargetPlaceOverspendResetExecutor`) — при ``fact CPO РК > MAX``: NOT FULL MIN → tp=0; sync fallback force 0.
+5. **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) — tp ±1 по fact vs 0.9×resolve; gate: plan/fact и views; skip при overspend.
+6. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place (NOT FULL пропуск).
+7. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO (NOT FULL пропуск).
+8. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend (лестница).
+9. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
+10. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
+11. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
+12. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
+13. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
+14. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
 Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 

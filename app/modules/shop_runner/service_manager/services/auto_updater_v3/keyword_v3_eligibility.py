@@ -194,8 +194,12 @@ def build_target_place_fallback_zero_by_keyword_id(
     contexts: list["KeywordV3Context"],
     *,
     campaign_orders_per_cart_7d: float | None = None,
+    campaign_overspend: bool = False,
 ) -> dict[int, bool]:
-    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``."""
+    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
+
+    При ``campaign_overspend`` NOT FULL active → force 0 (согласовано с NF_overspend_reset).
+    """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
     )
@@ -213,6 +217,9 @@ def build_target_place_fallback_zero_by_keyword_id(
             campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
+        if not bool(ctx.position_profile) and mode != KeywordStrategyMode.OFF:
+            out[int(ks_id)] = campaign_overspend
+            continue
         out[int(ks_id)] = (
             elig.target_place_fallback_zero and mode != KeywordStrategyMode.OFF
         )

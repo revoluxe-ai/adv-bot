@@ -26,6 +26,8 @@ class SkipUpTargetPlaceExecutor:
         self._skip_reason = None
         ladder_inputs = context.adv_state.ladder_inputs
         for dto in context.keywords:
+            if dto.is_not_full():
+                continue
             catalog = state_candidates_by_mode_for_ctx(dto.context, ladder_inputs)
             self._next_state_manager.skip_up_same_target_place(dto, catalog)
 

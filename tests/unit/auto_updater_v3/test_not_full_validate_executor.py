@@ -84,14 +84,14 @@ def test_is_full_with_ch_profile() -> None:
 
 
 @pytest.mark.unit
-def test_validate_not_full_active_max_down_to_min_and_zero() -> None:
+def test_validate_not_full_active_max_down_to_min_keeps_target_place() -> None:
     dto = _dto(mode=KeywordStrategyMode.MAX_CONVERSION, target_place=15)
     dto.current_mode = NextState(
         new_mode=KeywordMode.NOT_FULL_ACTIVATE,
         executor_name="Test",
     )
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
-    assert dto.current_target_place == 0
+    assert dto.current_target_place == 15
     assert len(dto.next_state) == 1
     assert dto.next_state[0].new_mode is KeywordMode.MIN_CPA
 
@@ -128,13 +128,13 @@ def test_nsm_validate_not_full_state() -> None:
     dto = _dto(mode=KeywordStrategyMode.OPTIMUM, target_place=5)
     nsm.validate_not_full_state(dto)
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
-    assert dto.current_target_place == 0
+    assert dto.current_target_place == 5
 
 
 @pytest.mark.unit
-def test_not_full_validate_executor_second_in_preamble() -> None:
+def test_not_full_validate_executor_third_in_preamble() -> None:
     executors = build_normal_preamble_executors()
-    assert executors[1].phase_name == "validate_not_full_state"
+    assert executors[2].phase_name == "validate_not_full_state"
 
 
 @pytest.mark.unit
@@ -151,4 +151,4 @@ def test_not_full_validate_executor_mutates_context() -> None:
     )
     NotFullValidateExecutor().execute(ctx)
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
-    assert ctx.keywords[0].current_target_place == 0
+    assert ctx.keywords[0].current_target_place == 20

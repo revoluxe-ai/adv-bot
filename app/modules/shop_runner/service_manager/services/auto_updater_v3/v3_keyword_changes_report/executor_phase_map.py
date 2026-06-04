@@ -8,7 +8,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_re
 
 EXECUTOR_TO_PHASE_ID: dict[str, str] = {
     "HardStatusValidateExecutor": "validate_state_by_hard_status",
+    "NotFullTargetPlaceMigrateExecutor": "not_full_target_place_migrate",
     "NotFullValidateExecutor": "validate_not_full_state",
+    "NotFullTargetPlaceOverspendResetExecutor": "not_full_target_place_overspend_reset",
+    "NotFullTargetPlacePlanFactExecutor": "not_full_target_place_plan_fact",
     "SkipUpTargetPlaceExecutor": "skip_up_same_target_place",
     "RaiseStateToTargetCpoExecutor": "raise_state_to_target_cpo",
     "ResetOverMaxCpoOnOverspendExecutor": "reset_over_max_cpo_on_overspend",
@@ -29,7 +32,10 @@ IGNORED_EXECUTOR_NAMES: frozenset[str] = frozenset(
 # Короткие метки для цепочки ключa (audit Redis).
 EXECUTOR_SHORT_LABEL: dict[str, str] = {
     "HardStatusValidateExecutor": "V",
+    "NotFullTargetPlaceMigrateExecutor": "NFm",
     "NotFullValidateExecutor": "NF",
+    "NotFullTargetPlaceOverspendResetExecutor": "NFo",
+    "NotFullTargetPlacePlanFactExecutor": "NFp",
     "SkipUpTargetPlaceExecutor": "skip",
     "RaiseStateToTargetCpoExecutor": "R↑",
     "ResetOverMaxCpoOnOverspendExecutor": "R↓",

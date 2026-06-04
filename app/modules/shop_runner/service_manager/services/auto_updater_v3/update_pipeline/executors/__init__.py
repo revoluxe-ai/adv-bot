@@ -1,10 +1,11 @@
 """Executors preamble NORMAL для ``UpdatePipeline``.
 
-Порядок: V → NF → skip_up → raise → reset → S → R → enable → cal.
+Порядок: V → NF_migrate → NF → NF_overspend_tp → NF_plan_fact → skip_up → raise → reset → …
 
 **Нет отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``):**
 
-- нет CH-профиля (PFO или GAP) → **NF** (`NotFullValidateExecutor`): active → MIN + ``target_place=0``;
+- нет CH-профиля (PFO или GAP) → **NF** (`NotFullValidateExecutor`): active → MIN;
+  ``target_place`` — migrate + plan-fact (`NotFullTargetPlace*Executor``);
 - есть CH-профиля → лестница и CPO из профиля (FULL); отдельный cap по ``max_allowed_mode`` не нужен.
 
 См. ``docks/V3_UPDATER_VALIDATION.md`` § «Cap-down (legacy B) — намеренно удалён».
@@ -19,6 +20,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_target_place import (
+    NotFullTargetPlaceMigrateExecutor,
+    NotFullTargetPlaceOverspendResetExecutor,
+    NotFullTargetPlacePlanFactExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
     NotFullValidateExecutor,
@@ -47,7 +53,10 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble (без legacy ``cap_down`` — см. module docstring)."""
     return [
         HardStatusValidateExecutor(),
+        NotFullTargetPlaceMigrateExecutor(),
         NotFullValidateExecutor(),
+        NotFullTargetPlaceOverspendResetExecutor(),
+        NotFullTargetPlacePlanFactExecutor(),
         SkipUpTargetPlaceExecutor(),
         RaiseStateToTargetCpoExecutor(),
         ResetOverMaxCpoOnOverspendExecutor(),
@@ -61,6 +70,9 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
 __all__ = [
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
+    "NotFullTargetPlaceMigrateExecutor",
+    "NotFullTargetPlaceOverspendResetExecutor",
+    "NotFullTargetPlacePlanFactExecutor",
     "NotFullValidateExecutor",
     "PayForOrderGapEnableExecutor",
     "PreambleExecutor",
