@@ -55,6 +55,7 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold.compute_resolve_cost_threshold": lambda *a, **k: 90.0,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute": lambda *a, **k: None,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact": lambda *a, **k: pfc,
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews": lambda *a, **k: views,

@@ -162,6 +162,10 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
             return_value=[],
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute",
+            return_value=[],
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
             return_value=[],
         ),

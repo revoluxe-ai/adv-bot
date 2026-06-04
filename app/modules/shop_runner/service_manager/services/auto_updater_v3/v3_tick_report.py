@@ -324,6 +324,10 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "max_cpa_guard": ("7 · G · max CPA guard", "DOWN, OFF"),
     "cost_reallocation": ("8 · R · cost_reallocation", "DOWN, REBALANCE"),
     "pay_for_order_gap_enable": ("9 · enable · gap", "UP"),
+    "pay_for_order_over_max_off_on_deep_overspend": (
+        "9b · pfo_off · deep overspend",
+        "OFF",
+    ),
     "resolve_calibration": ("10 · calibration", "UP, DOWN"),
 }
 

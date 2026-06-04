@@ -239,6 +239,10 @@ async def _run_preamble_with_fact_cpa(
             return_value=[],
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute",
+            return_value=[],
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
         ) as updater_cls,
         patch(
@@ -334,6 +338,10 @@ async def test_calibration_trim_passes_max_effective_steps_from_resolver() -> No
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute",
+            return_value=[],
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute",
             return_value=[],
         ),
         patch(

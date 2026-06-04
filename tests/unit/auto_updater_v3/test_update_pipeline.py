@@ -79,6 +79,7 @@ def _legacy_context(**adv_overrides: object) -> UpdateContext:
         resolve_valid=True,
         shelf_active=False,
         guard_condition=False,
+        deep_overspend_active=False,
         calibration_direct=CalibrationDirect.LOOSEN,
         max_effective_steps=1,
         calibration_phase_extra={"calibration_direct": "loosen"},
@@ -143,5 +144,6 @@ def test_build_normal_preamble_executors_order() -> None:
         "shelf_cleanup",
         "cost_reallocation",
         "pay_for_order_gap_enable",
+        "pay_for_order_over_max_off_on_deep_overspend",
         "resolve_calibration",
     ]

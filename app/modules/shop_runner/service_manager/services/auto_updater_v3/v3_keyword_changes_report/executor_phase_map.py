@@ -18,6 +18,9 @@ EXECUTOR_TO_PHASE_ID: dict[str, str] = {
     "ShelfCleanupExecutor": "shelf_cleanup",
     "RebalanceExecutor": "cost_reallocation",
     "PayForOrderGapEnableExecutor": "pay_for_order_gap_enable",
+    "PayForOrderOverMaxOffOnDeepOverspendExecutor": (
+        "pay_for_order_over_max_off_on_deep_overspend"
+    ),
     "ResolveCalibrationExecutor": "resolve_calibration",
 }
 
@@ -42,6 +45,7 @@ EXECUTOR_SHORT_LABEL: dict[str, str] = {
     "ShelfCleanupExecutor": "S",
     "RebalanceExecutor": "R",
     "PayForOrderGapEnableExecutor": "en",
+    "PayForOrderOverMaxOffOnDeepOverspendExecutor": "pfo↓",
     "ResolveCalibrationExecutor": "cal",
     "DATA_BOOTSTRAP": "boot",
 }

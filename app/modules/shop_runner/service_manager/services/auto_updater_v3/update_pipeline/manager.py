@@ -60,6 +60,10 @@ _PHASE_LOG: dict[str, tuple[str, str]] = {
     "shelf_cleanup": ("v3 SHELF_REC_CLEANUP", "shelf_count"),
     "cost_reallocation": ("v3 COST_REALLOCATION", "realloc_count"),
     "pay_for_order_gap_enable": ("v3 PAY_FOR_ORDER_GAP_ENABLE", "enable_count"),
+    "pay_for_order_over_max_off_on_deep_overspend": (
+        "v3 PAY_FOR_ORDER_OVER_MAX_OFF",
+        "pfo_off_count",
+    ),
     "resolve_calibration": ("v3 RESOLVE_CALIBRATION", "calibration_count"),
 }
 

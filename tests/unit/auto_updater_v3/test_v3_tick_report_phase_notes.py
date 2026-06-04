@@ -34,6 +34,23 @@ def test_enable_gap_fact_above_stabilization_zone() -> None:
 
 
 @pytest.mark.unit
+def test_pfo_off_skip_when_fact_le_110pct_max() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+        FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+    )
+
+    max_cpo = 100.0
+    fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo
+    note = summarize_phase_zero_actions(
+        "pay_for_order_over_max_off_on_deep_overspend",
+        prepared=[],
+        fact_pay_for_order=fact,
+        max_pay_for_order=max_cpo,
+    )
+    assert "1.1" in note or "110%" in note or "deep overspend" in note
+
+
+@pytest.mark.unit
 def test_enable_gap_fact_above_max() -> None:
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
