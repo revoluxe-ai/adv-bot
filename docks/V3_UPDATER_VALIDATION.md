@@ -209,6 +209,8 @@ Legacy ``select_v3_actions`` с ``plan``/``fact`` → ``_select_v3_actions_with_
 Кнопка в меню РК (только `automatic_version == 3`): отдельное сообщение с отчётом стадий последнего тика.
 
 - **Redis:** `V3TickReport:{adv_id}`, TTL 7 суток; запись в `finally` каждого тика с preamble (NORMAL / NO_DATA), **не** перезаписывается при `NOT_READY`.
+- **Счётчики фаз** (`↑/↓/off`, net-итог, aggression_after): post-hoc из `KeywordDTO.next_state` (модуль `v3_keyword_changes_report`) после preamble; метаданные фаз (skip, outcome_note, filter, calibration extra) — из `V3TickReportCollector` во время pipeline. NO_DATA — из `ledger.applied_actions()`.
+- **Redis audit:** `V3KeywordChanges:{adv_id}`, TTL 7 суток — полный per-keyword audit (цепочки режимов, executor); UI читает merged `V3TickReport`.
 - **Стадии NORMAL:** filter → sync → B → U → S → G → R → enable → calibration (post-gate в отчёт **не** входит — shelf в S, selector = DO_NOTHING).
 - **Стадии NO_DATA:** filter → sync → DATA_BOOTSTRAP.
 - **Итог:** Δ агрессии РК (MIN=1, OPT=2, MAX=3, OFF=0), net UP/DOWN/OFF, распределение hard_status, время тика (MSK).

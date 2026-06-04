@@ -59,6 +59,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_re
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_redis import (
     persist_v3_tick_report,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report import (
+    build_from_applied_actions,
+    build_keyword_changes_snapshot,
+    merge_keyword_changes_into_tick_snapshot,
+    persist_v3_keyword_changes,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
@@ -255,6 +261,35 @@ async def process_adv_v3(
                     ),
                     white_list_cost_leader=wl_leader,
                 )
+                audit = None
+                if (
+                    pipeline_result is not None
+                    and pipeline_result.update_context is not None
+                ):
+                    audit = build_keyword_changes_snapshot(
+                        pipeline_result.update_context.keywords,
+                        adv_id=int(complex_adv.adv_id),
+                        tick_at=snapshot.tick_at,
+                    )
+                elif tick_data.campaign_mode == CampaignMode.NO_DATA:
+                    audit = build_from_applied_actions(
+                        tick_data.ledger.applied_actions(),
+                        adv_id=int(complex_adv.adv_id),
+                        tick_at=snapshot.tick_at,
+                        keywords_aggression_modes=[
+                            kw.keyword_setting.strategy_mode
+                            for kw in tick_data.ledger.keywords
+                        ],
+                    )
+                if audit is not None:
+                    snapshot = merge_keyword_changes_into_tick_snapshot(
+                        snapshot,
+                        audit,
+                    )
+                    await persist_v3_keyword_changes(
+                        tick_data.complex_adv.adv_setting,
+                        audit,
+                    )
                 await persist_v3_tick_report(
                     tick_data.complex_adv.adv_setting,
                     snapshot,
