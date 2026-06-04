@@ -79,7 +79,6 @@ def _legacy_context(**adv_overrides: object) -> UpdateContext:
         resolve_valid=True,
         shelf_active=False,
         guard_condition=False,
-        deep_overspend_active=False,
         calibration_direct=CalibrationDirect.LOOSEN,
         max_effective_steps=1,
         calibration_phase_extra={"calibration_direct": "loosen"},

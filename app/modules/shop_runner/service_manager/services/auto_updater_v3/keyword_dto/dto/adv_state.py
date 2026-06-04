@@ -44,7 +44,6 @@ class AdvState:
     resolve_valid: bool
     shelf_active: bool
     guard_condition: bool
-    deep_overspend_active: bool
     calibration_direct: CalibrationDirect | None
     max_effective_steps: int
     calibration_phase_extra: dict[str, Any] = field(
@@ -110,7 +109,6 @@ class AdvState:
             resolve_valid=False,
             shelf_active=False,
             guard_condition=False,
-            deep_overspend_active=False,
             calibration_direct=None,
             max_effective_steps=1,
         )

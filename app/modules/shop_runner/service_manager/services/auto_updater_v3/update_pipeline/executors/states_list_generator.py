@@ -13,9 +13,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    deep_overspend_blocks_ladder_up,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
     is_keyword_no_data,
 )
@@ -97,8 +94,6 @@ class StatesListGenerator:
                 if not _shelf_participating_state(dto, state, self._adv_state):
                     continue
                 if not _shelf_allows_up(dto, state, self._adv_state):
-                    continue
-                if deep_overspend_blocks_ladder_up(dto, self._adv_state):
                     continue
                 potential_up.append((dto, state, float(state.cpo)))
 
