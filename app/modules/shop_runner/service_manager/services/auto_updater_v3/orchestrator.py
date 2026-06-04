@@ -27,13 +27,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_updat
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_target_place_fallback_zero_by_keyword_id,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     UpdateContextManager,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     plan_campaign_no_data_bootstrap_safe,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold import (
     compute_resolve_cost_threshold,
     is_resolve_valid,
 )

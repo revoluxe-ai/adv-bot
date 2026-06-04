@@ -1,6 +1,7 @@
 """Executors preamble NORMAL для ``UpdatePipeline``."""
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.base import (
+    PreambleExecutor,
     UpdateExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation import (
@@ -9,14 +10,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.max_cpa_guard import (
-    MaxCpaGuardExecutor,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
     NotFullValidateExecutor,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up import (
-    PassingUpExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable import (
     PayForOrderGapEnableExecutor,
@@ -38,7 +33,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 
 
-def build_normal_preamble_executors() -> list[UpdateExecutor]:
+def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble: V → NF → skip_up → raise → reset → S → R → enable → cal."""
     return [
         HardStatusValidateExecutor(),
@@ -56,10 +51,9 @@ def build_normal_preamble_executors() -> list[UpdateExecutor]:
 __all__ = [
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
-    "MaxCpaGuardExecutor",
     "NotFullValidateExecutor",
-    "PassingUpExecutor",
     "PayForOrderGapEnableExecutor",
+    "PreambleExecutor",
     "RaiseStateToTargetCpoExecutor",
     "ResetOverMaxCpoOnOverspendExecutor",
     "ResolveCalibrationExecutor",

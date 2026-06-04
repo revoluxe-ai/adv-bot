@@ -65,16 +65,21 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
             new=AsyncMock(return_value=100),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            side_effect=_ROOT_ERROR,
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.sync_keyword_target_places_v3",
             new=AsyncMock(side_effect=OSError("db down")),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report",
+            new=AsyncMock(),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.manager.UpdatePipelineManager.run_preamble",
+            side_effect=_ROOT_ERROR,
         ),
     ):
         plan_fact = MagicMock()
         plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.set_new_plan_fact = AsyncMock()
         pfc_cls.return_value = plan_fact
         views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
         views_cls.return_value.set_views = AsyncMock()

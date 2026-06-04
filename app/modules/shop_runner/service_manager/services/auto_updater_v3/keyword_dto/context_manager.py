@@ -128,7 +128,7 @@ class UpdateContextManager:
         eligibility_by_ks_id: dict[int, KeywordV3Eligibility],
         ladder_inputs: LadderInputs,
     ) -> AdvState:
-        from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold import (
             compute_resolve_cost_threshold,
             is_resolve_valid,
         )

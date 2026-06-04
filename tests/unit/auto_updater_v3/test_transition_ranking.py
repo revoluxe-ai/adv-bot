@@ -127,8 +127,19 @@ def test_jump_off_collects_effective_targets_only() -> None:
 
 @pytest.mark.unit
 def test_rec_gate_blocks_false_on_shelf() -> None:
-    """State-level: M проходит к→з, O/C — нет (``above_rec`` ключа не важен)."""
-    prof = sample_profile()
+    """Shelf pooled UP: effective OFF→MIN, alias O/C не попадают в пул отдельно."""
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=100, predicted_conversion=0.04, pay_for_cart=15.0, timestamp=ts
+        ),
+        PositionProfilePoint(
+            position=10, bid=80, predicted_conversion=0.025, pay_for_cart=10.0, timestamp=ts
+        ),
+        PositionProfilePoint(
+            position=22, bid=500, predicted_conversion=0.015, pay_for_cart=10.0, timestamp=ts
+        ),
+    ]
     prepared = [
         (
             ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof, above_rec=False),
@@ -138,14 +149,9 @@ def test_rec_gate_blocks_false_on_shelf() -> None:
     candidates = collect_transition_candidates(
         prepared,
         policy=_policy(click_mode=ShelfClickMode.SHELF_DOMINANT_OR_EQUAL),
-        ladder_inputs=_ladder_for_prepared(
-            prepared,
-            rk_orders_per_cart=0.25,
-            rec_orders_per_view=0.004,
-        ),
     )
     to_modes = {c.to_mode for c in candidates}
-    assert KeywordStrategyMode.MIN_CPA in to_modes
+    assert to_modes == {KeywordStrategyMode.MIN_CPA}
     assert KeywordStrategyMode.OPTIMUM not in to_modes
     assert KeywordStrategyMode.MAX_CONVERSION not in to_modes
 
@@ -176,8 +182,8 @@ def test_missing_above_rec_allows_effective_jump_on_shelf() -> None:
     assert candidates
     assert all(c.rec_tier == RecTier.MISSING_ABOVE_REC for c in candidates)
     to_modes = {c.to_mode for c in candidates}
-    assert KeywordStrategyMode.MIN_CPA in to_modes
-    assert len(to_modes) >= 1
+    assert to_modes == {KeywordStrategyMode.MAX_CONVERSION}
+    assert len(to_modes) == 1
 
 
 @pytest.mark.unit
@@ -613,7 +619,18 @@ def test_plan_one_up_by_policy_sets_selection_log() -> None:
 
 @pytest.mark.unit
 def test_collect_candidates_filters_by_aggr_target_cap() -> None:
-    prof = sample_profile(min_pay=10.0, high_pay=15.0)
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
+    prof = [
+        PositionProfilePoint(
+            position=1, bid=100, predicted_conversion=0.04, pay_for_cart=15.0, timestamp=ts
+        ),
+        PositionProfilePoint(
+            position=10, bid=80, predicted_conversion=0.025, pay_for_cart=10.0, timestamp=ts
+        ),
+        PositionProfilePoint(
+            position=22, bid=500, predicted_conversion=0.015, pay_for_cart=10.0, timestamp=ts
+        ),
+    ]
     prepared = [
         (ctx(ks_id=1, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
     ]

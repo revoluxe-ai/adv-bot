@@ -7,7 +7,7 @@ import logging
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     UpdateContext,
 )
@@ -19,7 +19,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     build_normal_preamble_executors,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.base import (
-    UpdateExecutor,
+    PreambleExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.phase_report import (
     next_state_steps_for_executor,
@@ -45,16 +45,14 @@ _PHASE_LOG: dict[str, tuple[str, str]] = {
         "v3 RESET_OVER_MAX_CPO",
         "reset_over_max_cpo_count",
     ),
-    "passing_up": ("v3 PASSING_UP", "passing_up_count"),
     "shelf_cleanup": ("v3 SHELF_REC_CLEANUP", "shelf_count"),
-    "max_cpa_guard": ("v3 MAX_CPA_GUARD", "guard_count"),
     "cost_reallocation": ("v3 COST_REALLOCATION", "realloc_count"),
     "pay_for_order_gap_enable": ("v3 PAY_FOR_ORDER_GAP_ENABLE", "enable_count"),
     "resolve_calibration": ("v3 RESOLVE_CALIBRATION", "calibration_count"),
 }
 
 
-def _executor_extra(context: UpdateContext, executor: UpdateExecutor) -> dict[str, object] | None:
+def _executor_extra(context: UpdateContext, executor: PreambleExecutor) -> dict[str, object] | None:
     state = context.adv_state
     if executor.phase_name == "resolve_calibration":
         return dict(state.calibration_phase_extra)
@@ -195,9 +193,6 @@ class UpdatePipelineManager:
                 ),
             )
 
-            if executor.phase_name == "max_cpa_guard" and actions:
-                state.guard_applied = True
-                stats.guard_applied = True
             if executor.phase_name == "resolve_calibration":
                 stats.calibration_executed = True
 

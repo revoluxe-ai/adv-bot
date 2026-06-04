@@ -37,8 +37,6 @@ async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_c
 
     dto = MagicMock()
     dto.min_target_position = 5
-
-    passing_up = MagicMock(return_value=[])
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
     plan_fact.set_new_plan_fact = AsyncMock()
@@ -57,10 +55,6 @@ async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_c
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts",
             return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            passing_up,
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
@@ -105,8 +99,6 @@ async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_c
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
-
-    passing_up.assert_called_once()
     select_mock.assert_called_once()
     flush_mock.assert_awaited_once()
     plan_fact.check_equal_in_cache.assert_awaited_once()
@@ -141,10 +133,6 @@ async def test_process_adv_v3_no_data_calls_bootstrap_and_sync_with_force() -> N
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
             bootstrap,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            MagicMock(return_value=[]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
@@ -323,10 +311,6 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
@@ -422,14 +406,6 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            return_value=[],
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.max_cpa_guard.plan_max_cpa_guard_phase",
-            return_value=[guard_action],
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility.build_target_place_fallback_zero_by_keyword_id",

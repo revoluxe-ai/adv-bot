@@ -34,22 +34,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    _HARD_STATUS_AUTO_MODE,
-    _HARD_STATUS_WHITE_LIST,
-    _eligibility_for_ctx,
-    _hard_status_allows_up,
-    _min_cpa_bound_by_pay_for_order,
-    _mode_catalog_for_ctx,
-    ladder_inputs_for_prepared,
-    resolve_effective_state_cost_for_mode,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     PreparedList,
     SelectionPolicy,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_preamble_phases import (
-    plan_passing_up,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
+    HARD_STATUS_AUTO_MODE,
+    HARD_STATUS_WHITE_LIST,
+    eligibility_for_ctx,
+    hard_status_allows_up,
+    ladder_inputs_for_prepared,
+    min_cpa_bound_by_pay_for_order,
+    mode_catalog_for_ctx,
+    resolve_effective_state_cost_for_mode,
 )
 
 if TYPE_CHECKING:
@@ -111,25 +108,10 @@ def summarize_phase_zero_actions(
             max_pay_for_order=max_pay_for_order,
             fact_pay_for_order=fact_pay_for_order,
         ),
-        "passing_up": lambda: _note_passing_up(
-            prepared,
-            resolve=resolve,
-            policy=policy,
-            eligibility_by_ks_id=eligibility_by_ks_id,
-            ladder_inputs=ladder_inputs,
-        ),
         "shelf_cleanup": lambda: _note_shelf_cleanup(
             prepared,
             shelf_active=shelf_active,
             click_mode=shelf_click_mode,
-            ladder_inputs=ladder_inputs,
-        ),
-        "max_cpa_guard": lambda: _note_max_cpa_guard(
-            prepared,
-            max_pay_for_order=max_pay_for_order,
-            shelf_click_mode=shelf_click_mode,
-            aggressiveness=aggressiveness,
-            eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
         ),
         "cost_reallocation": lambda: _note_cost_reallocation(
@@ -202,32 +184,6 @@ def _note_reset_over_max_cpo(
     return "нет GAP/active ключей с ladder CPO > max для сброса"
 
 
-def _note_passing_up(
-    prepared: PreparedList,
-    *,
-    resolve: float | None,
-    policy: SelectionPolicy | None,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
-    ladder_inputs: LadderInputs | None,
-) -> str:
-    if resolve is None or float(resolve) <= 0:
-        return "resolve недоступен"
-    if not prepared:
-        return "нет operable ключей"
-    if policy is None:
-        return "нет режимов с cost ≤ resolve для UP"
-    actions = plan_passing_up(
-        prepared,
-        resolve=float(resolve),
-        policy=policy,
-        eligibility_by_ks_id=eligibility_by_ks_id,
-        ladder_inputs=ladder_inputs,
-    )
-    if actions:
-        return "планировщик не выбрал ключей"
-    return "нет режимов с cost ≤ resolve для UP"
-
-
 def _note_shelf_cleanup(
     prepared: PreparedList,
     *,
@@ -243,39 +199,6 @@ def _note_shelf_cleanup(
     if ladder.rec_orders_per_view is None:
         return "rec gate неактивен (нет rec_orders_per_view)"
     return "нет ключей с shelf rec FAIL"
-
-
-def _note_max_cpa_guard(
-    prepared: PreparedList,
-    *,
-    max_pay_for_order: float | None,
-    shelf_click_mode: ShelfClickMode | None,
-    aggressiveness: V3RolloutAggressiveness | None,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
-    ladder_inputs: LadderInputs | None,
-) -> str:
-    if max_pay_for_order is None:
-        return "max недоступен"
-    if not prepared:
-        return "нет operable ключей"
-    click = shelf_click_mode or ShelfClickMode.ORGANIC_DOMINANT
-    aggr = aggressiveness or V3RolloutAggressiveness.MID
-    ladder = ladder_inputs_for_prepared(prepared, ladder_inputs)
-    above = 0
-    for ctx, current in prepared:
-        if current == KeywordStrategyMode.OFF:
-            continue
-        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
-            continue
-        cpo = operational_cpo_at_keyword_target_place(ctx, ladder_inputs=ladder)
-        if cpo is not None and float(cpo) > float(max_pay_for_order):
-            above += 1
-    if above > 0:
-        return (
-            f"нет trim: {above} ключей с CPO > max, но планировщик не снизил "
-            "(rec-gate / min_cpa bound / уже на целевом режиме)"
-        )
-    return "нет ключей с operational CPO > max"
 
 
 def _note_cost_reallocation(
@@ -327,7 +250,7 @@ def _note_enable_gap(
             continue
         if not is_keyword_no_data(ctx.keyword):
             continue
-        if not _hard_status_allows_up(int(ctx.keyword.hard_status)):
+        if not hard_status_allows_up(int(ctx.keyword.hard_status)):
             continue
         candidates += 1
     if candidates == 0:

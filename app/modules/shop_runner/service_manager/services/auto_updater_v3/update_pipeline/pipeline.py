@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.base import (

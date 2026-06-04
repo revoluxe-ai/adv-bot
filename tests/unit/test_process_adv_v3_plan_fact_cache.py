@@ -19,7 +19,7 @@ _AM = "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_ma
 _TC = "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context"
 _UP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors"
 _NDA = "app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation"
-_RP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner"
+_RP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold"
 _TL = "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger"
 _V3_CPO = "app.modules.shop_runner.service_manager.services.v3_point_order_cpo"
 

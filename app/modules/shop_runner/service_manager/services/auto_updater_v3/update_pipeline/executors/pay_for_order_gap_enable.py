@@ -21,8 +21,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
     is_keyword_no_data,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    _hard_status_allows_up,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
+    hard_status_allows_up,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     is_gap_ladder,
@@ -84,7 +84,7 @@ def _pick_gap_enable_candidate(
             continue
         if not is_keyword_no_data(dto.calculated_keyword):
             continue
-        if not _hard_status_allows_up(int(dto.hard_status)):
+        if not hard_status_allows_up(int(dto.hard_status)):
             continue
         elig = adv_state.eligibility_by_ks_id.get(dto.keyword_setting_id)
         if elig is not None and elig.data_tier != KeywordDataTier.KEYWORD_NO_DATA:

@@ -23,7 +23,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.action_merge import (
     merge_and_dedup_actions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (

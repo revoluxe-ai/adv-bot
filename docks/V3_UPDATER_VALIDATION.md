@@ -12,7 +12,7 @@
 | **NO_DATA** | `SalesStates.NO_DATA` (`fact.pay_for_order is None`) | только `plan_campaign_no_data_bootstrap_safe` → flush → sync с `force_all_target_place_zero=True` (управляемые ключи) |
 | **NORMAL** | OVERSPEND / UNDERPERFORM / STABLE / OPTIMAL | полный preamble + post-gate (без gate) + snapshots |
 
-При **NO_DATA** запрещены: COST_REALLOCATION, PROFITABLE_EXPANSION, MAX_CPA_GUARD, selector, plan/fact/views snapshots.
+При **NO_DATA** запрещены: COST_REALLOCATION, selector ladder, plan/fact/views snapshots (кроме bootstrap path).
 
 ### Keyword-level (`KeywordDataTier`, `keyword_v3_eligibility.py`)
 
@@ -33,23 +33,27 @@ load CH profiles → plan/fact → resolve_campaign_mode
 
 NOT_READY → full stop (no bootstrap, flush, sync)
 NO_DATA   → safe bootstrap → flush → target_place (force 0, managed only)
-NORMAL    → filter/sync → B → U → S → G → R → enable → calibration(DOWN|UP)
+NORMAL    → filter/sync → V → NF → skip_up → raise → reset → S → R → enable → calibration(DOWN|UP)
             → post-gate (noop) → snapshots plan/fact + views → flush → target_place
 ```
 
-Каждая фаза NORMAL с actions: `_apply_v3_phase` → `_refresh_v3_tick_state`.
+Каждая фаза NORMAL in-place: `UpdatePipelineManager.run_preamble` → `NextState` на `KeywordDTO`.
 
-Фазы NORMAL (только `allows_ladder_phases`):
+Фазы NORMAL (только `allows_ladder_phases`, in-place executors):
 
-1. **B** (`plan_mode_cap_down`) — cap DOWN active выше tier cap (FULL/PFO/NO DATA).
-2. **U** (`plan_passing_up`) — UP до max passing при cost/PFO ≤ resolve.
-3. **S** (`plan_shelf_rec_false_cleanup_down`) — shelf active + rec FAIL → DOWN.
-4. **G** (`plan_max_cpa_guard_phase`) — trim при `fact > plan.max`.
-5. **R** (`plan_cost_reallocation`) — каждый тик при valid resolve (без gate `fact < 0.9×resolve`).
-6. **enable** (`plan_pay_for_order_gap_enable`) — NO DATA OFF→MIN, ≤1/tick; gate **plan/fact OR views** (хотя бы один сигнал) и **fact < 0.9×resolve** (единственный NORMAL-путь OFF→MIN; `plan_data_bootstrap_v3` в orchestrator не вызывается).
-7. **Effective step (глобально, `effective_ladder_steps`)**: одно V3-действие = collapsed `resolve_next_effective_step_up/down` (alias на том же `target_place`, OFF→max в группе); **passing_up / realloc passing** — `resolve_furthest_passing_up_mode` (alias на текущем place + sequential новые place, 1 UP). **pooled / calibration**: один collapsed target на ключ за итерацию. Passing: `state_cost ≤ resolve` (при плане выполнен — `target_pay_for_order`, иначе `max`).
-8. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
-9. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+1. **V** (`HardStatusValidateExecutor`) — авто hard_status=1 → OFF.
+2. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN + tp=0.
+3. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place.
+4. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO.
+5. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend.
+6. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL → effective DOWN / FORCE_OFF.
+7. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
+8. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
+9. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
+10. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
+11. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+
+Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 
 ## Structured logs
 
@@ -78,8 +82,10 @@ UI (Telegram) и updater (COST_REALLOCATION / RESOLVE_CALIBRATION / PROFITABLE_E
 |--------|------|
 | `keyword_v3_contexts.py` | `build_keyword_v3_contexts`, `load_campaign_v3_contexts` |
 | `keyword_v3_ladder_view.py` | `LadderInputs`, `cost_for_mode`, `resolve_ladder_stage_display` |
-| `rollout_planner.py` | фазы делегируют в `cost_for_mode` через `ladder_inputs` (отдельный `worst_costs` в API planner **нет**) |
-| `step_manager/` | UP/DOWN по ``prepared`` (`step_down` / `step_up`: collect → sort → pick → bump); ``resolve_effective_*`` для realloc; DTO — `step_manager/dto/` |
+| `resolve_threshold.py` | `compute_resolve_cost_threshold`, `is_resolve_valid` |
+| `ladder_tick_helpers.py` | tick-report / gap enable helpers (`mode_catalog_for_ctx`, …) |
+| `effective_ladder_steps.py` | collapsed UP/DOWN, alias groups |
+| `update_pipeline/executors/` | in-place preamble executors + `NextStateManager` |
 
 **Производительность:** `LadderInputs.from_contexts(contexts)` один раз на тик (orchestrator после финального `contexts` для realloc/expansion); `cost_for_mode` и `ladder_inputs_for_prepared` не пересчитывают worst вне `LadderInputs`.
 

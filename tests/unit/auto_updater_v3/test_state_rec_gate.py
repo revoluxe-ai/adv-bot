@@ -22,9 +22,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    plan_profitable_expansion,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
@@ -214,7 +211,7 @@ def test_up_allowed_on_unknown_rk_via_collect_transition_candidates() -> None:
         policy=_policy_shelf(),
         ladder_inputs=ladder,
     )
-    assert any(c.to_mode == KeywordStrategyMode.MIN_CPA for c in candidates)
+    assert any(c.to_mode == KeywordStrategyMode.MAX_CONVERSION for c in candidates)
 
 
 @pytest.mark.unit
@@ -340,73 +337,6 @@ def test_mass_cleanup_impossible_when_all_unknown() -> None:
 
 
 @pytest.mark.unit
-def test_expansion_off_to_min_when_m_state_passes() -> None:
-    prof = [
-        PositionProfilePoint(
-            position=49, bid=510.0, predicted_conversion=0.02, pay_for_cart=1.0, timestamp=TS
-        ),
-        PositionProfilePoint(
-            position=1, bid=5340.0, predicted_conversion=0.13, pay_for_cart=1.0, timestamp=TS
-        ),
-    ]
-    kw = _calc_kw(
-        ks_id=200,
-        text="крем для комбинированной кожи лица",
-        mode=KeywordStrategyMode.OFF,
-        rating=5.0,
-        conv=0.001,
-        hard_status=2,
-        above_rec=False,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
-    prepared = build_prepared_from_contexts([ctx])
-    ladder = LadderInputs.from_contexts(
-        [ctx],
-        rk_orders_per_cart=RK,
-        rec_orders_per_view=0.004,
-    )
-    actions = plan_profitable_expansion(
-        prepared,
-        resolve=120.0,
-        policy=_policy_shelf(),
-        ladder_inputs=ladder,
-    )
-    assert len(actions) == 1
-    assert actions[0].action == V3ActionType.UP
-    assert actions[0].target_strategy_mode in (
-        KeywordStrategyMode.OPTIMUM,
-        KeywordStrategyMode.MAX_CONVERSION,
-    )
-
-
-@pytest.mark.unit
-def test_expansion_blocks_min_when_m_state_below_baseline() -> None:
-    prof = [
-        PositionProfilePoint(
-            position=49, bid=510.0, predicted_conversion=0.01, pay_for_cart=1.0, timestamp=TS
-        ),
-    ]
-    kw = _calc_kw(
-        ks_id=201,
-        text="kw",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        above_rec=True,
-        hard_status=2,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=prof)
-    prepared = build_prepared_from_contexts([ctx])
-    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK, rec_orders_per_view=0.01)
-    actions = plan_profitable_expansion(
-        prepared,
-        resolve=400.0,
-        policy=_policy_shelf(),
-        ladder_inputs=ladder,
-    )
-    assert actions == []
-
-
-@pytest.mark.unit
 def test_cleanup_no_action_when_rec_none() -> None:
     prof = [
         PositionProfilePoint(
@@ -459,120 +389,3 @@ def test_state_status_for_mode_from_candidates_dict() -> None:
     )
     assert status == RecGateStatus.PASS
     assert rec_gate_allows_up(status)
-
-
-def _same_place_catalog() -> dict[AggressionTargetMode, ModeCandidate]:
-    from tests.unit.auto_updater_v3.test_effective_ladder_steps import _fake_catalog_places
-
-    return _fake_catalog_places(min_place=1, opt_place=1, max_place=1)
-
-
-def _patch_same_place_catalog(monkeypatch: pytest.MonkeyPatch, cat: dict) -> None:
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
-        lambda _ctx, _prepared, _ladder=None: cat,
-    )
-
-
-@pytest.mark.unit
-def test_expansion_off_picks_highest_passing_in_same_place_alias_group(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """OFF, M/O/C same place: MIN FAIL, OPT+MAX PASS → UP на MAX."""
-    cat = _same_place_catalog()
-    _patch_same_place_catalog(monkeypatch, cat)
-
-    def _status(
-        _cats: dict,
-        to_mode: KeywordStrategyMode,
-        _policy: SelectionPolicy,
-        **kwargs: object,
-    ) -> RecGateStatus:
-        _ = (_cats, _policy, kwargs)
-        if to_mode == KeywordStrategyMode.MIN_CPA:
-            return RecGateStatus.FAIL
-        if to_mode in (
-            KeywordStrategyMode.OPTIMUM,
-            KeywordStrategyMode.MAX_CONVERSION,
-        ):
-            return RecGateStatus.PASS
-        return RecGateStatus.FAIL
-
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.state_rec_gate_status_for_mode",
-        _status,
-    )
-
-    def _fixed_cost(
-        *,
-        to_mode: KeywordStrategyMode,
-        **kwargs: object,
-    ) -> tuple[float, bool]:
-        _ = (kwargs, to_mode)
-        return 100.0, False
-
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
-        _fixed_cost,
-    )
-
-    kw = _calc_kw(
-        ks_id=301,
-        text="off_same_place",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        hard_status=2,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=[])
-    prepared = build_prepared_from_contexts([ctx])
-    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK, rec_orders_per_view=REC)
-    actions = plan_profitable_expansion(
-        prepared,
-        resolve=500.0,
-        policy=_policy_shelf(),
-        ladder_inputs=ladder,
-    )
-    assert len(actions) == 1
-    assert actions[0].action == V3ActionType.UP
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MAX_CONVERSION
-
-
-@pytest.mark.unit
-def test_expansion_off_no_up_when_entire_alias_group_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """OFF, same place: все modes FAIL → UP не создаётся."""
-    cat = _same_place_catalog()
-    _patch_same_place_catalog(monkeypatch, cat)
-
-    def _all_fail(
-        _cats: dict,
-        _to_mode: KeywordStrategyMode,
-        _policy: SelectionPolicy,
-        **kwargs: object,
-    ) -> RecGateStatus:
-        _ = (_cats, _to_mode, _policy, kwargs)
-        return RecGateStatus.FAIL
-
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.state_rec_gate_status_for_mode",
-        _all_fail,
-    )
-
-    kw = _calc_kw(
-        ks_id=302,
-        text="off_all_fail",
-        mode=KeywordStrategyMode.OFF,
-        rating=1.0,
-        hard_status=2,
-    )
-    ctx = KeywordV3Context(keyword=kw, position_profile=[])
-    prepared = build_prepared_from_contexts([ctx])
-    ladder = LadderInputs.from_contexts([ctx], rk_orders_per_cart=RK, rec_orders_per_view=REC)
-    actions = plan_profitable_expansion(
-        prepared,
-        resolve=500.0,
-        policy=_policy_shelf(),
-        ladder_inputs=ladder,
-    )
-    assert actions == []

@@ -37,7 +37,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordsPreparedList,
 )
 
@@ -120,7 +120,7 @@ class LadderInputs:
             if campaign_orders_per_cart_7d is not None
             else rk_orders_per_cart
         )
-        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared._prepared_builder import (
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
             _bootstrap_ladder_inputs,
             build_keywords_prepared_list,
         )

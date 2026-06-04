@@ -58,8 +58,6 @@ def _phase_skip_reason(context: UpdateContext) -> str | None:
         return "resolve_invalid"
     if not state.calibration_in_range:
         return "fact_gt_max"
-    if state.guard_applied:
-        return "guard_applied"
     if state.plan_fact_equal and state.views_equal:
         return "plan_fact_unchanged_and_views_unchanged"
     if state.plan_fact_equal:

@@ -44,13 +44,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_target_place_fallback_zero_by_keyword_id,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     UpdateContextInput,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     normalize_v3_rollout_aggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold import (
     compute_resolve_cost_threshold,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (

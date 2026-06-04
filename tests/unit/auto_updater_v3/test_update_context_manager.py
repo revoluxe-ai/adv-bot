@@ -9,7 +9,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     UpdateContext,
     UpdateContextInput,
     UpdateContextManager,

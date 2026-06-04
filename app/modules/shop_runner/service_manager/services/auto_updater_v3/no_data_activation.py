@@ -9,7 +9,7 @@ max по соседним ключам, лестница M1/M2/M3.
 - tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — только MIN, ``target_place=0``;
 - UP/trim/OVERSPEND: граница ``keyword.pay_for_order`` vs ``plan.max_pay_for_order``
   (как в UI), см. ``_no_ch_bootstrap_allowed_by_pay_for_order``,
-  ``plan_no_ch_min_bootstrap_actions``, ``rollout_planner.plan_campaign_trim_by_max_state_cost``;
+  ``plan_no_ch_min_bootstrap_actions`` (NO_DATA bootstrap only);
 - ``resolve_keyword_v2_pay_for_order_cost`` — отдельная консервативная метрика (rating CPM),
   не подменяет ``pay_for_order`` в гейтах.
 

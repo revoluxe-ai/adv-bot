@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     UpdateContext,
     UpdateContextInput,
     UpdateContextManager,
@@ -53,7 +53,7 @@ def _legacy_context(**adv_overrides: object) -> UpdateContext:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderInputs,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
         AdvState,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
@@ -118,12 +118,12 @@ def test_context_manager_build_from_plan_fact() -> None:
 
 @pytest.mark.unit
 def test_executor_sets_skip_reason() -> None:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up import (
-        PassingUpExecutor,
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable import (
+        PayForOrderGapEnableExecutor,
     )
 
-    ctx = _legacy_context(resolve_valid=False)
-    executor = PassingUpExecutor()
+    ctx = _legacy_context(resolve=0.0, resolve_valid=False)
+    executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
     assert executor.skip_reason == "resolve_invalid"
 

@@ -18,7 +18,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibratio
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.dto import (
     TickData,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold import (
     compute_resolve_cost_threshold,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (

@@ -13,7 +13,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 
 if TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         UpdateContext,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.runner import (

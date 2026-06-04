@@ -5,19 +5,19 @@ from __future__ import annotations
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordBatch,
     KeywordDTO,
     NextState,
     UpdateContextManager,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_mode import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_mode import (
     KeywordMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.ladder_state_kind import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
     V3LadderStageKind,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
@@ -72,7 +72,7 @@ def test_keyword_batch_iter_yields_current_mode() -> None:
 
 @pytest.mark.unit
 def test_update_context_exposes_keywords() -> None:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         AdvState,
         KeywordsPreparedList,
     )

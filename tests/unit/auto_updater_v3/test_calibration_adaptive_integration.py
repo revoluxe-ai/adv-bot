@@ -105,7 +105,7 @@ def _patch_ladder_costs(
     catalog = _moc_catalog()
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner._mode_catalog_for_ctx",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.mode_catalog_for_ctx",
         lambda _ctx, _prepared, _ladder=None: catalog,
     )
     monkeypatch.setattr(
@@ -123,7 +123,7 @@ def _patch_ladder_costs(
         return costs.get(to_mode, (float("inf"), False))
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         _fake_cost,
     )
 
@@ -261,7 +261,7 @@ def test_planner_up_iterative_picks_cheapest_each_step(
         return (cost, imputed)
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         _fake_cost,
     )
     monkeypatch.setattr(
@@ -322,7 +322,7 @@ def test_planner_down_iterative_picks_dearest_each_step(
         return (cost, imputed)
 
     monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner.resolve_effective_state_cost_for_mode",
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers.resolve_effective_state_cost_for_mode",
         _fake_cost,
     )
 

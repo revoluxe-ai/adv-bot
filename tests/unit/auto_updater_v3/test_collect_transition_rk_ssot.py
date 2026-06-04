@@ -25,9 +25,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
-    plan_profitable_expansion,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
@@ -42,7 +39,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
     PositionProfilePoint,
 )
 from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST, ctx
-from tests.unit.auto_updater_v3.test_effective_phases_acceptance import _calc_kw
+from tests.unit.test_auto_updater_v3 import _calc_kw as _calc_kw_fixture
 
 RK = RK_ORDERS_PER_CART_TEST
 TS = datetime(2024, 1, 1, tzinfo=UTC)
@@ -93,7 +90,7 @@ def test_rk_ladder_catalog_o_eq_m_effective_up_only_max() -> None:
 def test_collect_transition_rk_skips_opt_alias_matches_expansion() -> None:
     """MIN→MAX при O=M; pooled candidates совпадают с profitable_expansion."""
     prof = _o_eq_m_profile()
-    min_kw = _calc_kw(
+    min_kw = _calc_kw_fixture(
         ks_id=20,
         text="rk_ssot",
         mode=KeywordStrategyMode.MIN_CPA,
@@ -118,15 +115,6 @@ def test_collect_transition_rk_skips_opt_alias_matches_expansion() -> None:
     assert len(min_up) == 1
     assert min_up[0].to_mode == KeywordStrategyMode.MAX_CONVERSION
     assert KeywordStrategyMode.OPTIMUM not in {c.to_mode for c in cands}
-
-    expansion = plan_profitable_expansion(
-        prepared,
-        resolve=500.0,
-        policy=policy,
-        ladder_inputs=ladder,
-    )
-    assert len(expansion) == 1
-    assert expansion[0].target_strategy_mode == min_up[0].to_mode
 
 
 @pytest.mark.unit

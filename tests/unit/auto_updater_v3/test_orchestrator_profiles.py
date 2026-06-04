@@ -70,10 +70,6 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             new=AsyncMock(return_value=100),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.max_cpa_guard.plan_max_cpa_guard_phase",
-            return_value=[],
-        ),
-        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute",
             return_value=None,
         ),
@@ -88,10 +84,6 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation.RebalanceExecutor.execute",
             return_value=None,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.passing_up.plan_passing_up",
-            return_value=[],
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",

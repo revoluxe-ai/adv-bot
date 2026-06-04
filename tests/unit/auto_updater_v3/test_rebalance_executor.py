@@ -13,18 +13,18 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordDTO,
     UpdateContextManager,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     KeywordsPreparedList,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.keyword_v3_ladder_state import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto.ladder_state_kind import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
     V3LadderStageKind,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (

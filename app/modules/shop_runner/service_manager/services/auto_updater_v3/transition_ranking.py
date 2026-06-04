@@ -63,12 +63,12 @@ _HARD_STATUS_WHITE_LIST = 2
 
 
 def _hard_status_allows_up(hard_status: int) -> bool:
-    """UP: авто (1) и белый список (2), как в ``rollout_planner``."""
+    """UP (ladder): авто (1) и белый список (2)."""
     return int(hard_status) in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST)
 
 _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
 
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordPreparedRow,
     KeywordsPreparedList,
     build_keywords_prepared_list,
@@ -84,7 +84,7 @@ def build_prepared_from_contexts(
     """Собрать ``KeywordsPreparedList`` из контекстов ключей.
 
     Каноническое определение для V3 planners; импортировать из ``transition_ranking``
-    или ``keywords_prepared`` (``build_keywords_prepared_list``).
+    или ``keyword_dto`` (``build_keywords_prepared_list``).
     """
     return build_keywords_prepared_list(contexts)
 

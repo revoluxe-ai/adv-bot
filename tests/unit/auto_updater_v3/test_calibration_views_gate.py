@@ -114,7 +114,6 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
     views_cache = MagicMock()
     views_cache.get_cached_views = AsyncMock(return_value=100)
     views_cache.set_views = AsyncMock()
-    calibration = MagicMock(return_value=[])
 
     with (
         patch(
@@ -153,9 +152,11 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.ResolveCalibrationExecutor.execute",
-            calibration,
-        ),
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner.run_calibration_up",
+        ) as cal_up,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner.run_calibration_down",
+        ) as cal_down,
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute",
             return_value=[],
@@ -177,12 +178,14 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
         ),
     ):
         step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=85.0, predict_orders=10)
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    calibration.assert_not_called()
+    cal_up.assert_not_called()
+    cal_down.assert_not_called()
     plan_fact.set_new_plan_fact.assert_not_awaited()
     views_cache.set_views.assert_not_awaited()
 

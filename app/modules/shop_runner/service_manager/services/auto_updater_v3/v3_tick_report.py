@@ -126,7 +126,7 @@ def find_white_list_cost_leader(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_planner import (
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
         resolve_effective_state_cost_for_mode,
     )
 

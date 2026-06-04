@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     state_candidates_by_mode_for_ctx,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keywords_prepared.dto import (
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
