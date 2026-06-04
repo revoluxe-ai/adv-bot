@@ -86,7 +86,16 @@ def summarize_phase_zero_actions(
     """
     handlers = {
         "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
+        "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
+        "not_full_target_place_overspend_reset": lambda: _note_not_full_tp_overspend(
+            fact_pay_for_order=fact_pay_for_order,
+            max_pay_for_order=max_pay_for_order,
+        ),
+        "not_full_target_place_plan_fact": lambda: _note_not_full_tp_plan_fact(
+            plan_fact_changed=plan_fact_changed,
+            views_changed=views_changed,
+        ),
         "raise_state_to_target_cpo": lambda: _note_raise_state_to_target_cpo(
             prepared,
             resolve=resolve,
@@ -139,8 +148,45 @@ def _note_validate_not_full(prepared: PreparedListLike) -> str:
         if mode == KeywordStrategyMode.OFF:
             continue
         if not bool(ctx.position_profile):
-            return "NOT FULL active уже MIN + target_place=0"
+            return "NOT FULL active уже MIN (tp — migrate / plan-fact)"
     return "нет NOT FULL active ключей"
+
+
+def _note_not_full_tp_overspend(
+    *,
+    fact_pay_for_order: float | None,
+    max_pay_for_order: float | None,
+) -> str:
+    if fact_pay_for_order is None or max_pay_for_order is None:
+        return "нет fact/max для overspend"
+    if float(fact_pay_for_order) <= float(max_pay_for_order):
+        return "CPO РК в пределах MAX"
+    return "fact CPO > MAX — сброс tp NOT FULL MIN в 0"
+
+
+def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
+    if not prepared:
+        return "нет operable ключей"
+    for ctx, mode in prepared:
+        if mode == KeywordStrategyMode.OFF:
+            continue
+        if not bool(ctx.position_profile):
+            return "есть NOT FULL MIN с tp=0 для миграции на pos−1"
+    return "нет кандидатов migrate (tp≠0 или нет позиции)"
+
+
+def _note_not_full_tp_plan_fact(
+    *,
+    plan_fact_changed: bool,
+    views_changed: bool,
+) -> str:
+    if not plan_fact_changed and not views_changed:
+        return "plan/fact и views без изменений"
+    if not plan_fact_changed:
+        return "plan/fact без изменений"
+    if not views_changed:
+        return "views без изменений"
+    return "gate пройден — можно сдвинуть tp ±1"
 
 
 def _note_raise_state_to_target_cpo(

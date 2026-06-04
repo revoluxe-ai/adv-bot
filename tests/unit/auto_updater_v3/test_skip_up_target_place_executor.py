@@ -41,7 +41,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw
+from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
 
 
 def _fake_catalog_places(
@@ -151,7 +151,7 @@ def _dto(
         rating=1.0,
         hard_status=2,
     )
-    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
     states = ladder if ladder is not None else _ladder_states_alias(ks_id)
     return KeywordDTO.from_context(ctx, ladder_states=states)
 
@@ -251,5 +251,5 @@ def test_skip_up_executor_mutates_only_alias_keywords() -> None:
 @pytest.mark.unit
 def test_skip_up_executor_in_preamble() -> None:
     executors = build_normal_preamble_executors()
-    assert executors[2].phase_name == "skip_up_same_target_place"
-    assert executors[3].phase_name == "raise_state_to_target_cpo"
+    assert executors[5].phase_name == "skip_up_same_target_place"
+    assert executors[6].phase_name == "raise_state_to_target_cpo"

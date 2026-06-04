@@ -21,6 +21,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
+    NOT_FULL_TARGET_PLACE_OVERSPEND,
+    adjust_not_full_target_place_for_plan_fact,
+    migrate_not_full_zero_to_current_position,
+    reset_not_full_target_place_on_overspend,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     ladder_state_for_mode,
 )
@@ -49,9 +55,56 @@ class NextStateManager:
         )
 
     def validate_not_full_state(self, keyword: KeywordDTO) -> None:
-        """Validate NOT FULL active keys → ``NOT_FULL_ACTIVATE`` (DTO → MIN + tp=0)."""
+        """Validate NOT FULL active keys → ``NOT_FULL_ACTIVATE`` (DTO → MIN_CPA)."""
         keyword.current_mode = NextState(
             new_mode=KeywordMode.NOT_FULL_ACTIVATE,
+            executor_name=self._executor_name,
+        )
+
+    def migrate_not_full_target_place(
+        self,
+        keyword: KeywordDTO,
+        *,
+        campaign_overspend: bool = False,
+    ) -> None:
+        """NOT FULL MIN + tp=0 → ``round(position) - 1`` (идемпотентно)."""
+        new_place = migrate_not_full_zero_to_current_position(
+            keyword,
+            campaign_overspend=campaign_overspend,
+        )
+        if new_place is None:
+            return
+        keyword.current_target_place = NextTargetPlace(
+            new_target_place=new_place,
+            executor_name=self._executor_name,
+        )
+
+    def reset_not_full_target_place_overspend(self, keyword: KeywordDTO) -> None:
+        """OVERSPEND: NOT FULL MIN → ``target_place=0`` (min bid)."""
+        if not reset_not_full_target_place_on_overspend(keyword):
+            return
+        keyword.current_target_place = NextTargetPlace(
+            new_target_place=NOT_FULL_TARGET_PLACE_OVERSPEND,
+            executor_name=self._executor_name,
+        )
+
+    def adjust_not_full_target_place_plan_fact(
+        self,
+        keyword: KeywordDTO,
+        *,
+        fact_pay_for_order: float,
+        resolve: float,
+    ) -> None:
+        """±1 ``target_place`` по plan-fact CPO vs resolve для NOT FULL MIN."""
+        new_place = adjust_not_full_target_place_for_plan_fact(
+            keyword,
+            fact_pay_for_order=fact_pay_for_order,
+            resolve=resolve,
+        )
+        if new_place is None:
+            return
+        keyword.current_target_place = NextTargetPlace(
+            new_target_place=new_place,
             executor_name=self._executor_name,
         )
 

@@ -60,6 +60,33 @@ def _effective_strategy_mode(
     return keyword.strategy_mode
 
 
+def _ledger_target_place_for_sync(calc_kw: CalculatedKeyword | None) -> int | None:
+    """``target_place`` из ledger тика (после preamble), если > 0."""
+    if calc_kw is None:
+        return None
+    place = calc_kw.target_place
+    if place is None or int(place) <= 0:
+        return None
+    return int(place)
+
+
+def _preserve_not_full_target_place_from_ledger(
+    *,
+    profile: list[BidPosition] | None,
+    calc_kw: CalculatedKeyword | None,
+    hard_status: int,
+    strategy_mode: KeywordStrategyMode,
+) -> int | None:
+    """NOT FULL active: сохранить tp из ledger, не сбрасывать в 0 при sync."""
+    if profile:
+        return None
+    if strategy_mode == KeywordStrategyMode.OFF:
+        return None
+    if not _hard_status_is_managed(hard_status):
+        return None
+    return _ledger_target_place_for_sync(calc_kw)
+
+
 def _calculated_keyword_lookup(
     calculated_by_text: dict[str, CalculatedKeyword] | None,
     keyword_text: str,
@@ -140,6 +167,15 @@ async def sync_keyword_target_places_v3(
                 calc_kw is None or keyword_v2_pay_for_order_unavailable(calc_kw)
             )
             if not profile or no_v2_cpo:
+                preserved = _preserve_not_full_target_place_from_ledger(
+                    profile=profile,
+                    calc_kw=calc_kw,
+                    hard_status=hard_status,
+                    strategy_mode=strategy_mode,
+                )
+                if preserved is not None:
+                    keyword.target_place = preserved
+                    continue
                 moc_stats["skipped_no_profile"] += 1
                 if (
                     strategy_mode == KeywordStrategyMode.OFF

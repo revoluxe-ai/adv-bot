@@ -172,6 +172,31 @@ def test_eligibility_collapsed_ch_min_only_preserves_data_tier() -> None:
 
 
 @pytest.mark.unit
+def test_build_target_place_fallback_zero_not_full_active_false() -> None:
+    """NOT FULL active: sync не форсит 0 через fallback map (без overspend)."""
+    kw = _calculated_kw_fixture(
+        ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    assert build_target_place_fallback_zero_by_keyword_id([ctx]).get(6) is False
+
+
+@pytest.mark.unit
+def test_build_target_place_fallback_zero_not_full_overspend_true() -> None:
+    """NOT FULL active при fact CPO > MAX: sync force tp=0."""
+    kw = _calculated_kw_fixture(
+        ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    assert (
+        build_target_place_fallback_zero_by_keyword_id(
+            [ctx], campaign_overspend=True
+        ).get(6)
+        is True
+    )
+
+
+@pytest.mark.unit
 def test_build_target_place_fallback_zero_excludes_off_mode() -> None:
     """OFF после guard: map без True, хотя tier NO_CH даёт fallback в eligibility."""
     kw = _calculated_kw_fixture(

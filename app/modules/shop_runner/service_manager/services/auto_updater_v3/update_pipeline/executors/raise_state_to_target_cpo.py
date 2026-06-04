@@ -28,6 +28,8 @@ class RaiseStateToTargetCpoExecutor:
         self._skip_reason = None
         target_cpo = float(context.adv_state.resolve)
         for dto in context.keywords:
+            if dto.is_not_full():
+                continue
             state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
             if state is None:
                 continue
