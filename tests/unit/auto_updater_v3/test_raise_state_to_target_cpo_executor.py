@@ -39,6 +39,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     pfo_off_plan_headroom_floor,
+    raise_state_plan_max_floor,
+    should_skip_raise_state_to_target_cpo,
 )
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
@@ -206,28 +208,29 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
 
 
 @pytest.mark.unit
-def test_raise_state_raises_under_plan_headroom_when_pfo_gt_max() -> None:
-    """При fact ≥ ratio×plan.max (default 1) raise не блокируется — финальный OFF делает pfo_off."""
+def test_should_skip_raise_state_when_fact_ge_90pct_plan_max() -> None:
+    max_cpo = 550.0
+    fact_at_floor = raise_state_plan_max_floor(max_cpo)
+    adv_at = replace(
+        AdvState.empty(),
+        max_pay_for_order=max_cpo,
+        fact_pay_for_order=fact_at_floor,
+    )
+    assert should_skip_raise_state_to_target_cpo(adv_at) is True
+    adv_below = replace(
+        AdvState.empty(),
+        max_pay_for_order=max_cpo,
+        fact_pay_for_order=fact_at_floor - 1.0,
+    )
+    assert should_skip_raise_state_to_target_cpo(adv_below) is False
+
+
+@pytest.mark.unit
+def test_raise_state_skips_phase_when_fact_ge_90pct_plan_max() -> None:
+    """При fact ≥ 90 % plan.max фаза R↑ не выполняется (стабилизация кампании)."""
     max_cpo = 550.0
     fact = pfo_off_plan_headroom_floor(max_cpo)
-    dto_high_pfo = _dto(
-        ks_id=1,
-        mode=KeywordStrategyMode.MIN_CPA,
-    )
-    kw = dto_high_pfo.calculated_keyword
-    stat = kw.cluster_stat.model_copy(
-        update={
-            "conv_views_to_orders": _conv_for_pay_for_order(600.0),
-        }
-    )
-    dto_high_pfo = KeywordDTO.from_context(
-        KeywordV3Context(
-            keyword=kw.model_copy(update={"cluster_stat": stat}),
-            position_profile=_sample_profile(),
-        ),
-        ladder_states=dto_high_pfo.ladder_states,
-    )
-    dto_low_pfo = _dto(ks_id=2, mode=KeywordStrategyMode.MIN_CPA)
+    dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA)
     adv_state = replace(
         AdvState.empty(),
         resolve=500.0,
@@ -235,13 +238,34 @@ def test_raise_state_raises_under_plan_headroom_when_pfo_gt_max() -> None:
         fact_pay_for_order=fact,
     )
     ctx = UpdateContextManager().from_prepared(
-        KeywordsPreparedList(keywords=[dto_high_pfo, dto_low_pfo]),
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    executor = RaiseStateToTargetCpoExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "fact_cpo_ge_90pct_plan_max"
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_raise_state_runs_when_fact_below_90pct_plan_max() -> None:
+    max_cpo = 550.0
+    fact = raise_state_plan_max_floor(max_cpo) - 1.0
+    dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        max_pay_for_order=max_cpo,
+        fact_pay_for_order=fact,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
     RaiseStateToTargetCpoExecutor().execute(ctx)
-    assert ctx.keywords[0].current_mode == KeywordStrategyMode.OPTIMUM
-    assert len(ctx.keywords[0].next_state) == 1
-    assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert len(dto.next_state) == 1
 
 
 @pytest.mark.unit
