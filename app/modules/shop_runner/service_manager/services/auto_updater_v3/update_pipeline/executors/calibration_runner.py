@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
@@ -11,6 +14,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibratio
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
+    LadderStepKind,
+    classify_ladder_step,
+    ladder_step_snapshot_from_dto,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
     LadderInputs,
@@ -46,6 +54,43 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 
 
+_MAX_CALIBRATION_LOOP_ITERATIONS = 500
+
+
+def _apply_and_count_up_ladder_step(
+    dto: KeywordDTO,
+    mutator: Callable[[], None],
+) -> int:
+    """Применить UP-мутацию; ``1`` только если SSOT зафиксировал ladder UP."""
+    before = ladder_step_snapshot_from_dto(dto)
+    mutator()
+    after = ladder_step_snapshot_from_dto(dto)
+    return 1 if classify_ladder_step(before, after) == LadderStepKind.UP else 0
+
+
+def _apply_and_count_down_ladder_step(
+    dto: KeywordDTO,
+    mutator: Callable[[], None],
+) -> int:
+    """Применить DOWN-мутацию; ``1`` если SSOT зафиксировал ladder DOWN или OFF."""
+    before = ladder_step_snapshot_from_dto(dto)
+    mutator()
+    after = ladder_step_snapshot_from_dto(dto)
+    kind = classify_ladder_step(before, after)
+    return 1 if kind in (LadderStepKind.DOWN, LadderStepKind.OFF) else 0
+
+
+@dataclass(frozen=True)
+class PotentialUpRunResult:
+    """Итог цикла list2 UP (calibration или shelf compensation)."""
+
+    ladder_steps_done: int = 0
+    iterations_done: int = 0
+    step_budget: int = 0
+    stop_reason: str = "zero_budget"
+    remaining_potential: int = 0
+
+
 def run_calibration_down(
     context: UpdateContext,
     *,
@@ -53,13 +98,16 @@ def run_calibration_down(
     max_steps: int,
     nsm: NextStateManager,
 ) -> None:
-    """CAL DOWN: до ``max_steps`` итераций max CPO из list1 с ``cpo > resolve`` → DOWN."""
+    """CAL DOWN: до ``max_steps`` ladder DOWN/OFF из list1 с ``cpo > resolve``."""
     ceiling = float(resolve)
     step_budget = max(1, int(max_steps))
     generator = StatesListGenerator(context.adv_state, for_calibration=True)
     eligibility = context.adv_state.eligibility_by_ks_id
 
-    for _ in range(step_budget):
+    ladder_steps_done = 0
+    iterations = 0
+    while ladder_steps_done < step_budget and iterations < _MAX_CALIBRATION_LOOP_ITERATIONS:
+        iterations += 1
         current_states, _potential = generator.get_current_states(context.keywords)
         donors = [binding for binding in current_states if binding[2] > ceiling]
         if not donors:
@@ -72,7 +120,14 @@ def run_calibration_down(
         )
         if down_state is None:
             break
-        nsm.raise_state_to_target_cpo(donor[0], down_state)
+        dto = donor[0]
+        delta = _apply_and_count_down_ladder_step(
+            dto,
+            lambda s=down_state: nsm.raise_state_to_target_cpo(dto, s),
+        )
+        if delta == 0:
+            break
+        ladder_steps_done += delta
 
 
 def run_potential_up_steps(
@@ -81,21 +136,56 @@ def run_potential_up_steps(
     max_steps: int,
     nsm: NextStateManager,
     for_calibration: bool = False,
-) -> None:
-    """До ``max_steps`` UP-итераций: min CPO из list2, пересборка списков каждый шаг."""
+) -> PotentialUpRunResult:
+    """До ``max_steps`` ladder UP: min CPO из list2; alias на том же ``target_place`` не считаются."""
     step_budget = max(0, int(max_steps))
     if step_budget == 0:
-        return
+        return PotentialUpRunResult(step_budget=0, stop_reason="zero_budget")
     generator = StatesListGenerator(
         context.adv_state,
         for_calibration=for_calibration,
     )
-    for _ in range(step_budget):
+    ladder_steps_done = 0
+    iterations_done = 0
+    stop_reason = "budget_exhausted"
+    remaining_potential = 0
+    while (
+        ladder_steps_done < step_budget
+        and iterations_done < _MAX_CALIBRATION_LOOP_ITERATIONS
+    ):
         _current, potential_states = generator.get_current_states(context.keywords)
+        remaining_potential = len(potential_states)
         if not potential_states:
+            stop_reason = "empty_potential"
             break
         recipient = _pick_cheapest(potential_states)
-        nsm.raise_state_to_target_cpo(recipient[0], recipient[1])
+        dto, target_state, _cpo = recipient
+        delta = _apply_and_count_up_ladder_step(
+            dto,
+            lambda s=target_state: nsm.raise_state_to_target_cpo(dto, s),
+        )
+        iterations_done += 1
+        if delta == 0:
+            continue
+        ladder_steps_done += delta
+    else:
+        if iterations_done >= _MAX_CALIBRATION_LOOP_ITERATIONS:
+            stop_reason = "max_iterations_safety"
+        _current, potential_states = generator.get_current_states(context.keywords)
+        remaining_potential = len(potential_states)
+        if (
+            stop_reason == "budget_exhausted"
+            and ladder_steps_done < step_budget
+            and not potential_states
+        ):
+            stop_reason = "budget_exhausted_pool_empty"
+    return PotentialUpRunResult(
+        ladder_steps_done=ladder_steps_done,
+        iterations_done=iterations_done,
+        step_budget=step_budget,
+        stop_reason=stop_reason,
+        remaining_potential=remaining_potential,
+    )
 
 
 def run_calibration_up(
@@ -103,9 +193,9 @@ def run_calibration_up(
     *,
     max_steps: int,
     nsm: NextStateManager,
-) -> None:
-    """CAL UP: до ``max_steps`` итераций min CPO из list2 → apply ladder state."""
-    run_potential_up_steps(
+) -> PotentialUpRunResult:
+    """CAL UP: до ``max_steps`` ladder UP из list2 (alias на том же ``target_place`` не считаются)."""
+    return run_potential_up_steps(
         context,
         max_steps=max(1, int(max_steps)),
         nsm=nsm,

@@ -3,8 +3,8 @@
 Калибровка — самостоятельный степ preamble: за тик выполняется **одна** ветка,
 цель — CPA кампании у **0.9×resolve** (``MAX_PAY_STABILIZATION_RATIO``):
 
-- **ветка UP** — ``fact < 0.9×resolve``: до ``effective_steps`` итераций min state → один UP;
-- **ветка DOWN** — ``fact >= 0.9×resolve``: limited trim к ``resolve`` (adaptive steps).
+- **ветка UP** — ``fact < 0.9×resolve``: до ``effective_steps`` ladder UP (alias на том же ``target_place`` не считаются);
+- **ветка DOWN** — ``fact >= 0.9×resolve``: до ``effective_steps`` ladder DOWN/OFF к ``resolve`` (adaptive steps).
 
 ``CalibrationDirect`` (``loosen`` / ``tighten`` в Redis и логах) — legacy-имена веток UP/DOWN.
 """
@@ -60,8 +60,8 @@ def resolve_effective_calibration_steps(
         current_direct: Направление текущего тика.
 
     Returns:
-        Бюджет итераций CAL UP/DOWN за тик (сколько раз «выбрать state → один сдвиг»),
-        как ``effective_step`` у биддера, но счётчик итераций, а не величина одного шага CPM.
+        Бюджет ladder-шагов CAL UP/DOWN за тик (смена ``target_place`` или OFF↔active;
+        alias M/O/C на одном place не считаются), как ``effective_step`` у биддера по смыслу cap.
     """
     cap = max(1, int(base_max))
     if prev is None:

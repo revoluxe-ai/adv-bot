@@ -283,6 +283,57 @@ def test_calibration_budget_limits_steps() -> None:
 
 
 @pytest.mark.unit
+def test_calibration_up_budget_is_ladder_steps_not_iterations() -> None:
+    """Бюджет 2 = два ladder UP; alias MIN→OPT на том же place не считается шагом."""
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.OFF,
+        ladder=(
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=10,
+                cpo=300.0,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=10,
+                cpo=400.0,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MAX_CONVERSION,
+                strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                target_position=20,
+                cpo=500.0,
+            ),
+        ),
+        target_place=0,
+        views=100,
+    )
+    adv = _cal_adv_state(
+        calibration_direct=CalibrationDirect.LOOSEN,
+        max_effective_steps=2,
+    )
+    ctx = _ctx(dto, adv_state=adv)
+    ResolveCalibrationExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[0].current_target_place == 20
+    assert len(ctx.keywords[0].next_state) == 3
+    assert ctx.adv_state.calibration_phase_extra.get("ladder_steps_done") == 2
+
+
+@pytest.mark.unit
 def test_generator_calibration_includes_off_no_data_in_list2() -> None:
     off_no_data = _dto(
         ks_id=1,

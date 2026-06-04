@@ -40,11 +40,14 @@ class ResolveCalibrationExecutor:
                 nsm=self._next_state_manager,
             )
             return
-        run_calibration_up(
+        up_result = run_calibration_up(
             context,
             max_steps=state.max_effective_steps,
             nsm=self._next_state_manager,
         )
+        state.calibration_phase_extra["ladder_steps_done"] = up_result.ladder_steps_done
+        state.calibration_phase_extra["cal_up_iterations"] = up_result.iterations_done
+        state.calibration_phase_extra["cal_up_stop_reason"] = up_result.stop_reason
 
     @property
     def skip_reason(self) -> str | None:
