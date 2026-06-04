@@ -751,7 +751,7 @@ class Settings:
         """Доля ``plan.max_pay_for_order`` для skip ``PayForOrderGapEnableExecutor``.
 
         Зона «1 от MAX плана»: при ``fact >= ratio × plan.max`` enable не выполняется.
-        По умолчанию ``1`` (как ``MAX_PAY_STABILIZATION_RATIO`` в sales_states).
+        По умолчанию ``1`` (порог = plan.max).
         """
         value = os.getenv("V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO")
         if not value:

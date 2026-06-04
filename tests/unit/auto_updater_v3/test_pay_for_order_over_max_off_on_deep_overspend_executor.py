@@ -117,13 +117,13 @@ def test_is_campaign_at_plan_headroom_plus_one_boundary() -> None:
 
 
 @pytest.mark.unit
-def test_skip_when_fact_lt_90pct_plan_max() -> None:
+def test_skip_when_fact_lt_plan_headroom_ratio() -> None:
     max_cpo = 100.0
     fact = plan_max_stabilization_floor(max_cpo) - 0.01
     ctx = _context([_dto()], _adv_state(fact=fact, max_cpo=max_cpo))
     executor = PayForOrderOverMaxOffOnDeepOverspendExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_lt_90pct_plan_max"
+    assert executor.skip_reason == "fact_lt_plan_headroom_ratio"
     assert ctx.keywords[0].next_state == []
 
 

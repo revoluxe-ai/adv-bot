@@ -1,4 +1,4 @@
-"""Фаза: в зоне «1 от MAX плана» (fact ≥ 0.9×max) — OFF ключей с PFO > max."""
+"""Фаза: в зоне «1 от MAX плана» (fact ≥ ratio×plan.max, default ratio=1) — OFF ключей с PFO > max."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 
 
 class PayForOrderOverMaxOffOnDeepOverspendExecutor:
-    """OFF operable ключей с ``pay_for_order > max`` при ``fact ≥ 0.9×plan.max``."""
+    """OFF operable ключей с ``pay_for_order > max`` при ``fact ≥ ratio×plan.max``."""
 
     phase_name = "pay_for_order_over_max_off_on_deep_overspend"
     _skip_reason: str | None = None
@@ -55,11 +55,11 @@ class PayForOrderOverMaxOffOnDeepOverspendExecutor:
 
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip если нет fact или fact < 0.9×plan.max (вне зоны «1 от MAX»)."""
+    """Skip если нет fact или fact < ratio×plan.max (вне зоны «1 от MAX»)."""
     if adv_state.fact_pay_for_order is None:
         return "no_fact_pay_for_order"
     if not is_deep_overspend(adv_state):
-        return "fact_lt_90pct_plan_max"
+        return "fact_lt_plan_headroom_ratio"
     return None
 
 

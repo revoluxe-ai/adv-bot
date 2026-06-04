@@ -12,8 +12,8 @@ def test_pfo_plan_headroom_ratio_defaults(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.delenv("V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO", raising=False)
     monkeypatch.delenv("V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO", raising=False)
     s = Settings()
-    assert s.V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO == 0.9
-    assert s.V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO == 0.9
+    assert s.V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO == 1.0
+    assert s.V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO == 1.0
 
 
 @pytest.mark.unit

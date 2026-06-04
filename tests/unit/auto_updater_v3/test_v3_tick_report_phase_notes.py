@@ -32,11 +32,11 @@ def test_enable_gap_fact_above_plan_max_stabilization_zone() -> None:
         resolve=resolve,
         max_pay_for_order=max_cpo,
     )
-    assert "plan.max" in note or "0.9" in note or "90%" in note
+    assert "plan.max" in note
 
 
 @pytest.mark.unit
-def test_pfo_off_skip_when_fact_lt_90pct_plan_max() -> None:
+def test_pfo_off_skip_when_fact_lt_plan_headroom_ratio() -> None:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
         plan_max_stabilization_floor,
     )
@@ -49,7 +49,7 @@ def test_pfo_off_skip_when_fact_lt_90pct_plan_max() -> None:
         fact_pay_for_order=fact,
         max_pay_for_order=max_cpo,
     )
-    assert "plan.max" in note or "0.9" in note or "90%" in note
+    assert "plan.max" in note
 
 
 @pytest.mark.unit

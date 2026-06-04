@@ -207,7 +207,7 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
 
 @pytest.mark.unit
 def test_raise_state_raises_under_plan_headroom_when_pfo_gt_max() -> None:
-    """При fact ≥ 0.9×plan.max raise не блокируется — финальный OFF делает pfo_off."""
+    """При fact ≥ ratio×plan.max (default 1) raise не блокируется — финальный OFF делает pfo_off."""
     max_cpo = 550.0
     fact = pfo_off_plan_headroom_floor(max_cpo)
     dto_high_pfo = _dto(

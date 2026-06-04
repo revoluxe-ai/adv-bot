@@ -2,8 +2,8 @@
 
 Пороги «1 от MAX плана» — доля ``plan.max_pay_for_order`` из ``settings_master`` (``.env``):
 
-- ``V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO`` (default ``0.9``) — skip enable;
-- ``V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO`` (default ``0.9``) — фаза pfo_off.
+- ``V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO`` (default ``1``) — skip enable;
+- ``V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO`` (default ``1``) — фаза pfo_off.
 
 - ``pay_for_order_gap_enable`` — skip enable, если fact уже в этой зоне;
 - ``pay_for_order_over_max_off_on_deep_overspend`` — OFF ключей с ``PFO > max`` в этой зоне.
@@ -19,12 +19,12 @@ from app.settings import settings
 
 
 def gap_enable_plan_headroom_ratio() -> float:
-    """Доля plan.max для skip ``PayForOrderGapEnableExecutor`` (env, default 0.9)."""
+    """Доля plan.max для skip ``PayForOrderGapEnableExecutor`` (env, default 1)."""
     return float(settings.V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO)
 
 
 def pfo_off_plan_headroom_ratio() -> float:
-    """Доля plan.max для gate ``PayForOrderOverMaxOffOnDeepOverspend`` (env, default 0.9)."""
+    """Доля plan.max для gate ``PayForOrderOverMaxOffOnDeepOverspend`` (env, default 1)."""
     return float(settings.V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO)
 
 
