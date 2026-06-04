@@ -448,7 +448,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
-            return_value=[],
+            return_value=[guard_action],
         ),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.V3CalibrationStepState",
@@ -477,7 +477,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
         )
         await process_adv_v3(complex_adv, wb_shop_data_manager=MagicMock())
 
-    assert build_fallback.call_count >= 1
+    assert build_fallback.call_count >= 2
     fallback_map = sync_mock.await_args.kwargs[
         "target_place_fallback_zero_by_keyword_id"
     ]

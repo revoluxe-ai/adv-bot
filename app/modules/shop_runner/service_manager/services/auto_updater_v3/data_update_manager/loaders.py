@@ -78,5 +78,7 @@ async def resolve_v3_fact_data(
 ) -> tuple[FactData, str]:
     """Fact для V3 ladder без повторного ``get_stat_data``, если fact уже в ``WBAdvDTO``."""
     if dto is not None and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS:
-        return dto.fact, "dto"
+        dto_fact = dto.fact
+        if isinstance(dto_fact, FactData):
+            return dto_fact, "dto"
     return await updater.get_fact_data(keywords), "updater"

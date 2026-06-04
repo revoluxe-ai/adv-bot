@@ -145,6 +145,25 @@ class ApplyManager:
             policy=policy,
         )
         _ = ledger.apply_in_memory(post_gate_actions)
+        if (
+            post_gate_actions
+            and tick_input is not None
+            and tick_input.campaign_orders_per_cart_7d is not None
+        ):
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+                build_target_place_fallback_zero_by_keyword_id,
+            )
+
+            all_contexts = build_keyword_v3_contexts(
+                ledger.keywords,
+                tick.raw_profiles,
+            )
+            tick.all_contexts = all_contexts
+            tick.contexts = filter_operable_v3_contexts(all_contexts)
+            tick.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
+                all_contexts,
+                campaign_orders_per_cart_7d=tick_input.campaign_orders_per_cart_7d,
+            )
 
         plan_fact_cached = False
         if tick.plan_fact_change is not None and tick.views_resolve_succeeded:

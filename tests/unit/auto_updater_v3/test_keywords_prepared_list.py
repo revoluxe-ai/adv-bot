@@ -52,8 +52,12 @@ def _ctx(
 
 
 @pytest.mark.unit
-def test_prepared_list_alias_is_keywords_prepared_list() -> None:
-    assert PreparedList is KeywordsPreparedList
+def test_prepared_list_is_legacy_mutable_list_alias() -> None:
+    """``PreparedList`` — legacy ``list[tuple[...]]``; канонический контейнер — ``KeywordsPreparedList``."""
+    prepared = build_prepared_from_contexts([_ctx(1)])
+    assert isinstance(prepared, KeywordsPreparedList)
+    legacy: PreparedList = [(prepared.rows[0].context, prepared.rows[0].active_mode)]
+    assert isinstance(legacy, list)
 
 
 @pytest.mark.unit
