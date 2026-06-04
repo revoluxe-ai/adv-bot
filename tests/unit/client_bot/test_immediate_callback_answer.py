@@ -64,9 +64,12 @@ async def test_immediate_middleware_answers_before_handler() -> None:
 
 
 @pytest.mark.asyncio
-async def test_immediate_middleware_skips_time_settings_prefix() -> None:
+async def test_immediate_middleware_answers_ts_prefix() -> None:
+    """ts: без матча хендлера всё равно получает pre-ACK на Dispatcher."""
     cq = MagicMock(spec=CallbackQuery)
     cq.data = "ts:open:1:2"
+    cq.id = "2"
+    cq.from_user = User(id=1, is_bot=False, first_name="t")
     cq.answer = AsyncMock()
 
     update = MagicMock(spec=Update)
@@ -75,4 +78,4 @@ async def test_immediate_middleware_skips_time_settings_prefix() -> None:
     mw = ImmediateCallbackAnswerUpdateMiddleware()
     await mw(AsyncMock(), update, {})
 
-    cq.answer.assert_not_awaited()
+    cq.answer.assert_awaited_once()

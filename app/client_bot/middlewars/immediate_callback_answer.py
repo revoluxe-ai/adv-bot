@@ -18,9 +18,6 @@ from aiogram.types import CallbackQuery, TelegramObject, Update
 
 logger = logging.getLogger(__name__)
 
-# time_settings: toast после хендлера через роутерный CallbackAnswerMiddleware (pre=False).
-_TIME_SETTINGS_CALLBACK_PREFIX = "ts:"
-
 _STALE_CALLBACK_MARKERS = (
     "query is too old",
     "query id is invalid",
@@ -63,12 +60,6 @@ async def safe_callback_query_answer(
         raise
 
 
-def _skip_immediate_answer(callback_query: CallbackQuery) -> bool:
-    """Не отвечать до хендлера — для callback с post-answer toast (time_settings)."""
-    data = callback_query.data
-    return bool(data and data.startswith(_TIME_SETTINGS_CALLBACK_PREFIX))
-
-
 class ImmediateCallbackAnswerUpdateMiddleware(BaseMiddleware):
     """Pre-answer на уровне Update до роутеров и FSM."""
 
@@ -82,7 +73,5 @@ class ImmediateCallbackAnswerUpdateMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if isinstance(event, Update) and event.callback_query is not None:
-            cq = event.callback_query
-            if not _skip_immediate_answer(cq):
-                _ = await safe_callback_query_answer(cq, text=self._text)
+            _ = await safe_callback_query_answer(event.callback_query, text=self._text)
         return await handler(event, data)
