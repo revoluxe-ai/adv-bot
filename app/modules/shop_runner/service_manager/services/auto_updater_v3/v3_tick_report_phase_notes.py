@@ -9,14 +9,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+    gap_enable_plan_headroom_floor,
+    gap_enable_plan_headroom_ratio,
+    pfo_off_plan_headroom_floor,
+    pfo_off_plan_headroom_ratio,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
@@ -270,11 +270,12 @@ def _note_pfo_off_deep_overspend(
         return "max недоступен"
     if fact_pay_for_order is None:
         return "fact pay_for_order недоступен"
-    threshold = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * float(max_pay_for_order)
-    if float(fact_pay_for_order) <= threshold:
+    threshold = pfo_off_plan_headroom_floor(float(max_pay_for_order))
+    if float(fact_pay_for_order) < threshold:
+        ratio = pfo_off_plan_headroom_ratio()
         return (
-            f"fact ≤ {FACT_OVER_MAX_DEEP_OVERSPEND_RATIO:.0%}×max "
-            "(deep overspend gate)"
+            f"fact < {ratio:.0%}×plan.max "
+            "(вне зоны «1 от MAX плана»)"
         )
     if not prepared:
         return "нет operable ключей"
@@ -298,11 +299,15 @@ def _note_enable_gap(
         and float(fact_pay_for_order) > float(max_pay_for_order)
     ):
         return "fact > max (overspend, enable не нужен)"
-    if float(fact_pay_for_order) >= MAX_PAY_STABILIZATION_RATIO * float(resolve):
-        return (
-            f"fact ≥ {MAX_PAY_STABILIZATION_RATIO:.0%}×resolve "
-            "(зона стабилизации, enable не нужен)"
-        )
+    if max_pay_for_order is not None and float(max_pay_for_order) > 0:
+        if float(fact_pay_for_order) >= gap_enable_plan_headroom_floor(
+            float(max_pay_for_order)
+        ):
+            ratio = gap_enable_plan_headroom_ratio()
+            return (
+                f"fact ≥ {ratio:.0%}×plan.max "
+                "(зона «1 от MAX плана», enable не нужен)"
+            )
     if eligibility_by_ks_id is None:
         return "нет NO DATA GAP-ключей в OFF"
     candidates = 0

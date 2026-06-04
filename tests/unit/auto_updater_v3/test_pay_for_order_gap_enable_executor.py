@@ -7,8 +7,8 @@ from dataclasses import replace
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    MAX_PAY_STABILIZATION_RATIO,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    gap_enable_plan_headroom_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
@@ -168,13 +168,17 @@ def _context(
 
 
 @pytest.mark.unit
-def test_skip_when_fact_ge_90pct_resolve() -> None:
-    resolve = 100.0
-    fact = MAX_PAY_STABILIZATION_RATIO * resolve
-    ctx = _context([_gap_dto()], _adv_state(fact=fact, resolve=resolve))
+def test_skip_when_fact_ge_plan_headroom_ratio() -> None:
+    max_cpo = 120.0
+    resolve = 50.0
+    fact = gap_enable_plan_headroom_floor(max_cpo)
+    ctx = _context(
+        [_gap_dto()],
+        _adv_state(fact=fact, resolve=resolve, max_cpo=max_cpo),
+    )
     executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_ge_90pct_resolve"
+    assert executor.skip_reason == "fact_ge_plan_headroom_ratio"
     assert ctx.keywords[0].next_state == []
 
 

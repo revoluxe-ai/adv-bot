@@ -68,10 +68,11 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_overspend_tp �
 8. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend (лестница).
 9. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
 10. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
-11. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥0.9×resolve.
-12. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
-13. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
-14. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+11. **enable** (`PayForOrderGapEnableExecutor`) — один GAP OFF→MIN за тик; skip: no fact, fact>max, fact≥ratio×plan.max (env ``V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO``, default 1).
+12. **pfo_off** (`PayForOrderOverMaxOffOnDeepOverspendExecutor`) — OFF ключей с PFO>max при fact≥ratio×plan.max (env ``V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO``, default 1).
+13. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
+14. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
+15. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
 
 Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 

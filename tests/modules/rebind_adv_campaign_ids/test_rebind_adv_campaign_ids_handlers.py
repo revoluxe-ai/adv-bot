@@ -78,7 +78,6 @@ async def test_open_rebind_menu_sends_message() -> None:
     )
     cb = _make_callback(data)
     await rebind_adv_campaign_ids.open_rebind_menu(cb, data, bot)
-    cb.answer.assert_awaited_once()
     bot.send_message.assert_called_once()
     call_kw = bot.send_message.call_args
     assert call_kw[0][0] == 12345

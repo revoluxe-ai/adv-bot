@@ -8,9 +8,11 @@ import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+    is_campaign_at_plan_headroom_plus_one,
     is_deep_overspend,
     keyword_pay_for_order_over_plan_max,
+    pfo_off_plan_headroom_floor,
+    plan_max_stabilization_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordDTO,
@@ -105,30 +107,32 @@ def _context(keywords: list[KeywordDTO], adv: AdvState):
 
 
 @pytest.mark.unit
-def test_is_deep_overspend_at_110pct_boundary() -> None:
+def test_is_campaign_at_plan_headroom_plus_one_boundary() -> None:
     max_cpo = 100.0
-    adv_below = _adv_state(fact=110.0, max_cpo=max_cpo)
-    adv_above = _adv_state(fact=111.0, max_cpo=max_cpo)
-    assert is_deep_overspend(adv_below) is False
-    assert is_deep_overspend(adv_above) is True
+    floor = plan_max_stabilization_floor(max_cpo)
+    adv_below = _adv_state(fact=floor - 0.01, max_cpo=max_cpo)
+    adv_at = _adv_state(fact=floor, max_cpo=max_cpo)
+    assert is_campaign_at_plan_headroom_plus_one(adv_below) is False
+    assert is_deep_overspend(adv_at) is True
 
 
 @pytest.mark.unit
-def test_skip_when_fact_le_110pct_max() -> None:
+def test_skip_when_fact_lt_plan_headroom_ratio() -> None:
     max_cpo = 100.0
-    fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo
+    fact = plan_max_stabilization_floor(max_cpo) - 0.01
     ctx = _context([_dto()], _adv_state(fact=fact, max_cpo=max_cpo))
     executor = PayForOrderOverMaxOffOnDeepOverspendExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_le_110pct_max"
+    assert executor.skip_reason == "fact_lt_plan_headroom_ratio"
     assert ctx.keywords[0].next_state == []
 
 
 @pytest.mark.unit
-def test_off_active_keyword_when_deep_overspend_and_pfo_gt_max() -> None:
+def test_off_active_keyword_when_at_plan_headroom_and_pfo_gt_max() -> None:
     max_cpo = 550.0
     dto = _dto(pfo_target=600.0)
-    ctx = _context([dto], _adv_state(fact=610.0, max_cpo=max_cpo))
+    fact = pfo_off_plan_headroom_floor(max_cpo)
+    ctx = _context([dto], _adv_state(fact=fact, max_cpo=max_cpo))
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF
     assert len(dto.next_state) == 1
