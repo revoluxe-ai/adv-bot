@@ -23,7 +23,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledge
     V3TickKeywordLedger,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
+    PreparedListLike,
     build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
@@ -70,7 +70,7 @@ def refresh_v3_tick_state(
     *,
     campaign_orders_per_cart_7d: float | None,
     rec_orders_per_view: float | None,
-) -> tuple[PreparedList, dict[int, KeywordV3Eligibility], LadderInputs]:
+) -> tuple[PreparedListLike, dict[int, KeywordV3Eligibility], LadderInputs]:
     """Пересобрать prepared, eligibility и ladder_inputs после preamble-фазы."""
     eligibility = build_eligibility_map(
         contexts,

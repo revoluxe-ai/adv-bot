@@ -218,8 +218,10 @@ class UpdatePipelineManager:
                     )
             if stat_field and actions:
                 setattr(stats, stat_field, len(actions))
-            elif stat_field == "validate_count" and extra and extra.get("hs1_touched"):
-                setattr(stats, stat_field, int(extra["hs1_touched"]))
+            elif stat_field == "validate_count" and extra:
+                hs1_touched = extra.get("hs1_touched")
+                if isinstance(hs1_touched, int):
+                    setattr(stats, stat_field, hs1_touched)
 
         stats.update_context = current_ctx
         return stats

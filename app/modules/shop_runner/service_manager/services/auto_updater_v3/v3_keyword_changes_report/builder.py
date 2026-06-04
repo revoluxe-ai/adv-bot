@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
     mode_level,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.phase_report import (
-    _step_to_action,
+    step_to_action,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.executor_phase_map import (
     IGNORED_EXECUTOR_NAMES,
@@ -144,7 +144,7 @@ def _build_keyword_entry(dto: KeywordDTO) -> V3KeywordChangeEntry | None:
             prior = step.new_mode.to_strategy_mode()
             continue
         new_mode = step.new_mode.to_strategy_mode()
-        action = _step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
+        action = step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
         action_label = "NOOP"
         if action is not None:
             action_label = action.action.name
@@ -239,7 +239,7 @@ def build_keyword_changes_snapshot(
                 continue
             mode_before = prior
             new_mode = step.new_mode.to_strategy_mode()
-            action = _step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
+            action = step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
             if action is not None:
                 _increment_breakdown(
                     buckets,

@@ -52,7 +52,7 @@ class KeywordBatch:
 
     def to_legacy_prepared(self) -> PreparedList:
         """Явная legacy-проекция для rollout planner."""
-        return list(self)
+        return list(self.__iter__())
 
     def copy(self) -> KeywordBatch:
         return KeywordBatch(list(self._items))

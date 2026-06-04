@@ -5,9 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-    stored_strategy_mode,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
 )
@@ -69,7 +66,7 @@ def _target_position_for_stage(
     return max(0, int(position))
 
 
-def _bootstrap_ladder_inputs(
+def bootstrap_ladder_inputs(
     contexts: list[KeywordV3Context],
 ) -> LadderInputs:
     """Минимальный ``LadderInputs`` для сборки ladder states без рекурсии в ``prepared``."""
@@ -125,7 +122,7 @@ def build_ladder_states_for_context(
     if ladder_inputs is None:
         raise ValueError(
             "ladder_inputs is required for non-GAP ladder states; "
-            "use _bootstrap_ladder_inputs(contexts) at the call site"
+            "use bootstrap_ladder_inputs(contexts) at the call site"
         )
 
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
@@ -184,7 +181,7 @@ def build_ladder_states_for_contexts(
         ks_id = ctx.keyword.keyword_setting_original_id
         elig = (
             eligibility_by_ks_id.get(int(ks_id))
-            if eligibility_by_ks_id is not None and ks_id is not None
+            if eligibility_by_ks_id is not None
             else None
         )
         flat.extend(
@@ -206,7 +203,6 @@ def build_keyword_dto(
     all_contexts: list[KeywordV3Context] | None = None,
 ) -> KeywordDTO:
     """Один ``KeywordDTO`` на ключ: stored/active + ``TargetPlaceMatrix``."""
-    stored = stored_strategy_mode(ctx.keyword)
     states = build_ladder_states_for_context(
         ctx,
         eligibility=eligibility,
@@ -253,14 +249,14 @@ def build_keywords_prepared_list(
         eligibility_by_ks_id = build_eligibility_map(contexts)
 
     if ladder_inputs is None:
-        ladder_inputs = _bootstrap_ladder_inputs(contexts)
+        ladder_inputs = bootstrap_ladder_inputs(contexts)
 
     dtos: list[KeywordDTO] = []
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
         elig = (
             eligibility_by_ks_id.get(int(ks_id))
-            if eligibility_by_ks_id is not None and ks_id is not None
+            if eligibility_by_ks_id is not None
             else None
         )
         dtos.append(
@@ -304,7 +300,7 @@ def update_context_from_prepared(
     """Обернуть ``KeywordsPreparedList`` или legacy ``PreparedList`` в ``UpdateContext``."""
     state = adv_state if adv_state is not None else AdvState.empty()
     if not isinstance(prepared, KeywordsPreparedList):
-        if isinstance(prepared, list):
+        if type(prepared) is list:
             contexts = [ctx for ctx, _ in prepared]
             prepared = build_keywords_prepared_list(
                 contexts,

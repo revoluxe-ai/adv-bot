@@ -9,6 +9,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     candidate_for_strategy_mode,
     count_ladder_step_if_applied,
@@ -98,7 +101,7 @@ def run_shelf_cleanup_down(
     context: UpdateContext,
     *,
     click_mode: ShelfClickMode,
-    ladder_inputs,
+    ladder_inputs: LadderInputs | None,
     policy: SelectionPolicy | None,
     nsm: NextStateManager,
 ) -> int:

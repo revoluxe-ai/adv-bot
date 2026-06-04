@@ -16,6 +16,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_dto import (
     KeywordDTO,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_prepared_row import (
+    KeywordPreparedRow,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keywords_prepared_list import (
     KeywordsPreparedList,
 )
@@ -58,7 +61,7 @@ class UpdateContext:
         return self.prepared.batch
 
     @property
-    def rows(self) -> list:
+    def rows(self) -> list[KeywordPreparedRow]:
         """Строки ``KeywordsPreparedList``."""
         return self.prepared.rows
 

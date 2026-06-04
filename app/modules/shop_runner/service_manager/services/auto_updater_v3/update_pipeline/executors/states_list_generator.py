@@ -25,7 +25,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
     shelf_rec_conversion_policy_active,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
-    _OPERABLE_LADDER_STAGES,
+    OPERABLE_LADDER_STAGES,
     current_aggression_rank,
     ladder_aggression_rank,
     mode_catalog_from_dto,
@@ -115,14 +115,14 @@ def _operable_ladder_states(dto: KeywordDTO) -> tuple[KeywordV3LadderState, ...]
     return tuple(
         state
         for state in dto.ladder_states
-        if state.stage in _OPERABLE_LADDER_STAGES
+        if state.stage in OPERABLE_LADDER_STAGES
     )
 
 
 def _current_binding(dto: KeywordDTO, adv_state: AdvState) -> StateBinding | None:
     """Текущая active-ступень для list1 (не OFF, известный CPO)."""
     state = resolve_current_ladder_state(dto)
-    if state is None or state.stage not in _OPERABLE_LADDER_STAGES:
+    if state is None or state.stage not in OPERABLE_LADDER_STAGES:
         return None
     if state.cpo is None:
         return None

@@ -54,8 +54,10 @@ class KeywordDTO:
     position_profile: list[PositionProfilePoint] | None
     stored_mode: KeywordStrategyMode
     target_place_matrix: TargetPlaceMatrix
-    next_state: list[NextState] = field(default_factory=list)
-    history_target_place: list[NextTargetPlace] = field(default_factory=list)
+    next_state: list[NextState] = field(default_factory=lambda: list[NextState]())
+    history_target_place: list[NextTargetPlace] = field(
+        default_factory=lambda: list[NextTargetPlace]()
+    )
 
     @property
     def keyword_setting_id(self) -> int:

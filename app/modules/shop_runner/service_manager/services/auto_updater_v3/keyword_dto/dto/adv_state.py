@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
@@ -46,7 +46,9 @@ class AdvState:
     guard_condition: bool
     calibration_direct: CalibrationDirect | None
     max_effective_steps: int
-    calibration_phase_extra: dict[str, object] = field(default_factory=dict)
+    calibration_phase_extra: dict[str, Any] = field(
+        default_factory=lambda: dict[str, Any]()
+    )
     guard_applied: bool = False
 
     @property

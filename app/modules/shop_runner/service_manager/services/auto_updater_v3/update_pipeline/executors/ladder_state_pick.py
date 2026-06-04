@@ -26,11 +26,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder imp
     mode_level,
 )
 
-_OPERABLE_LADDER_STAGES = (
+OPERABLE_LADDER_STAGES = (
     V3LadderStageKind.MIN_CPA,
     V3LadderStageKind.OPTIMUM,
     V3LadderStageKind.MAX_CONVERSION,
 )
+_OPERABLE_LADDER_STAGES = OPERABLE_LADDER_STAGES
 
 
 def is_gap_ladder(dto: KeywordDTO) -> bool:

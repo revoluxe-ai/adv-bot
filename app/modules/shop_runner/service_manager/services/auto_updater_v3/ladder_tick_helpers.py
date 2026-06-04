@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     effective_conv_for_v3,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
+    PreparedListLike,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
     HARD_STATUS_AUTO_MODE,
@@ -42,7 +42,7 @@ def hard_status_allows_up(hard_status: int) -> bool:
 
 
 def ladder_inputs_for_prepared(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     ladder_inputs: LadderInputs | None = None,
 ) -> LadderInputs:
     """Единый ``LadderInputs`` на проход; worst только в ``ladder_inputs.worst_costs``."""
@@ -57,7 +57,7 @@ def ladder_inputs_for_prepared(
 
 def mode_catalog_for_ctx(
     ctx: KeywordV3Context,
-    prepared: PreparedList | None = None,
+    prepared: PreparedListLike | None = None,
     ladder_inputs: LadderInputs | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
     """M/O/C state candidates; delegates to ``state_candidates_by_mode_for_ctx`` when ladder set."""
@@ -78,7 +78,7 @@ def mode_catalog_for_ctx(
 
 def _conv_for_ctx(
     ctx: KeywordV3Context,
-    prepared: PreparedList | None = None,
+    prepared: PreparedListLike | None = None,
 ) -> float:
     """Conv для кандидатов M/O/C: своя или импутация РК."""
     peer = [c for c, _ in prepared] if prepared else [ctx]
@@ -100,16 +100,16 @@ def eligibility_for_ctx(
     if eligibility_by_ks_id is None:
         return None
     ks_id = ctx.keyword.keyword_setting_original_id
-    if ks_id is None:
+    if ks_id <= 0:
         return None
-    return eligibility_by_ks_id.get(int(ks_id))
+    return eligibility_by_ks_id.get(ks_id)
 
 
 def resolve_effective_state_cost_for_mode(
     *,
     ctx: KeywordV3Context,
     to_mode: KeywordStrategyMode,
-    prepared: PreparedList | None = None,
+    prepared: PreparedListLike | None = None,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
     eligibility: KeywordV3Eligibility | None = None,
     ladder_inputs: LadderInputs | None = None,
@@ -131,7 +131,7 @@ def _resolve_state_cost_for_mode(
     *,
     ctx: KeywordV3Context,
     to_mode: KeywordStrategyMode,
-    prepared: PreparedList | None = None,
+    prepared: PreparedListLike | None = None,
     eligibility: KeywordV3Eligibility | None = None,
     ladder_inputs: LadderInputs | None = None,
 ) -> tuple[float, bool]:

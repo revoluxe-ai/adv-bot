@@ -91,3 +91,6 @@ def _step_to_action(
         target_strategy_mode=new_mode,
         reason=reason,
     )
+
+
+step_to_action = _step_to_action

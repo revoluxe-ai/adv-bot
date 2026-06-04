@@ -11,13 +11,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     LadderInputs,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+    KeywordsPreparedList,
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
 )
 
 
@@ -28,7 +26,7 @@ class PreamblePipelineRunResult:
     update_context: UpdateContext
     contexts: list[KeywordV3Context]
     all_contexts: list[KeywordV3Context]
-    prepared: PreparedList
+    prepared: KeywordsPreparedList
     eligibility: dict[int, KeywordV3Eligibility]
     ladder_inputs: LadderInputs
     cap_down_count: int = 0

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -45,4 +45,6 @@ class UpdateContextInput:
     views_equal: bool = True
     calibration_direct: CalibrationDirect | None = None
     max_effective_steps: int = 1
-    calibration_phase_extra: dict[str, object] = field(default_factory=dict)
+    calibration_phase_extra: dict[str, Any] = field(
+        default_factory=lambda: dict[str, Any]()
+    )

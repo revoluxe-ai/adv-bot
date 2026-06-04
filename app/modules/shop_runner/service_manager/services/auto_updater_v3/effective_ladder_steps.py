@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -50,6 +51,11 @@ _LADDER_MODES: tuple[KeywordStrategyMode, ...] = (
     KeywordStrategyMode.OPTIMUM,
     KeywordStrategyMode.MAX_CONVERSION,
 )
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +76,7 @@ class LadderStepSnapshot:
     target_place: int | None
 
 
-def ladder_step_snapshot_from_dto(dto: "KeywordDTO") -> LadderStepSnapshot:
+def ladder_step_snapshot_from_dto(dto: KeywordDTO) -> LadderStepSnapshot:
     """Текущий ``mode`` + ``target_place`` ключа (OFF → ``place=None``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         KeywordDTO,
@@ -84,7 +90,7 @@ def ladder_step_snapshot_from_dto(dto: "KeywordDTO") -> LadderStepSnapshot:
 
 
 def ladder_step_snapshot_for_mode(
-    dto: "KeywordDTO",
+    dto: KeywordDTO,
     mode: KeywordStrategyMode,
 ) -> LadderStepSnapshot:
     """Снимок для ``mode`` по матрице ladder (не зависит от ``dto.current_mode``)."""
@@ -391,7 +397,7 @@ def iter_effective_upper_mode_groups(
         nxt_c = candidate_for_strategy_mode(res.next_mode, catalog)
         place = target_place_from_mode_candidate(nxt_c)
         if place is None:
-            if cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+            if cursor == KeywordStrategyMode.OFF:
                 groups.append((res.next_mode,))
                 cursor = res.next_mode
                 continue
@@ -399,7 +405,7 @@ def iter_effective_upper_mode_groups(
         group = logical_modes_at_target_place_above(cursor, place, catalog)
         if group:
             groups.append(group)
-        elif cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+        elif cursor == KeywordStrategyMode.OFF:
             groups.append((res.next_mode,))
         cursor = res.next_mode
 

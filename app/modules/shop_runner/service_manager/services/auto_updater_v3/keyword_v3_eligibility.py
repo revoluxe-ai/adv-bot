@@ -13,7 +13,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
-    _keyword_has_own_conv,
+    keyword_has_own_conv,
     resolve_keyword_v3_decision,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
@@ -160,7 +160,7 @@ def resolve_keyword_v3_eligibility(
         participates_in_ladder=True,
         target_place_fallback_zero=True,
         imputed=False,
-        fallback_kind="none" if _keyword_has_own_conv(ctx.keyword) else "v2_cpo",
+        fallback_kind="none" if keyword_has_own_conv(ctx.keyword) else "v2_cpo",
         decision_tier=decision.tier,
     )
 
@@ -179,9 +179,9 @@ def build_eligibility_map(
     result: dict[int, KeywordV3Eligibility] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
-        result[int(ks_id)] = resolve_keyword_v3_eligibility(
+        result[ks_id] = resolve_keyword_v3_eligibility(
             ctx,
             contexts,
             campaign_cache=campaign_cache,
@@ -204,7 +204,7 @@ def build_target_place_fallback_zero_by_keyword_id(
     out: dict[int, bool] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
         elig = resolve_keyword_v3_eligibility(
             ctx,

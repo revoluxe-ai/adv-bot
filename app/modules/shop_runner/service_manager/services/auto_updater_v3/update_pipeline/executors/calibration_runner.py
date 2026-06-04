@@ -3,6 +3,24 @@
 from __future__ import annotations
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedListLike,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     KeywordDTO,
 )
@@ -140,29 +158,20 @@ def _keyword_pay_for_order_exceeds(dto: KeywordDTO, *, ceiling: float) -> bool:
 
 
 def plan_calibration_trim_actions(
-    prepared: "PreparedList",
+    prepared: PreparedListLike,
     *,
     resolve: float,
-    shelf_click_mode: "ShelfClickMode",
-    aggressiveness: "V3RolloutAggressiveness",
+    shelf_click_mode: ShelfClickMode,
+    aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
-    ladder_inputs: "LadderInputs | None" = None,
+    ladder_inputs: LadderInputs | None = None,
     max_effective_steps: int = 1,
-) -> list["V3Action"]:
+) -> list[V3Action]:
     """Legacy trim entry: CAL DOWN на ``prepared`` → ``V3Action`` для unit-тестов."""
     from dataclasses import replace
 
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
-        ShelfClickMode,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
-        V3Action,
-    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         AdvState,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-        LadderInputs,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         build_eligibility_map,
@@ -170,11 +179,7 @@ def plan_calibration_trim_actions(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
         update_context_from_prepared,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-        V3RolloutAggressiveness,
-    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        PreparedList,
         SelectionPolicy,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
@@ -188,7 +193,6 @@ def plan_calibration_trim_actions(
         steps_to_v3_actions,
     )
 
-    _ = ShelfClickMode, V3RolloutAggressiveness
     ladder = ladder_inputs or LadderInputs.from_contexts(
         [ctx for ctx, _ in prepared],
     )
@@ -233,33 +237,24 @@ def plan_calibration_trim_actions(
 
 
 def plan_calibration_actions(
-    prepared: "PreparedList",
+    prepared: PreparedListLike,
     *,
     resolve: float,
-    calibration_direct: "CalibrationDirect",
-    shelf_click_mode: "ShelfClickMode",
-    aggressiveness: "V3RolloutAggressiveness",
+    calibration_direct: CalibrationDirect,
+    shelf_click_mode: ShelfClickMode,
+    aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
-    ladder_inputs: "LadderInputs | None" = None,
+    ladder_inputs: LadderInputs | None = None,
     max_effective_steps: int = 1,
-) -> list["V3Action"]:
+) -> list[V3Action]:
     """Legacy test entry: CAL UP/DOWN на ``prepared`` → ``V3Action``."""
     from dataclasses import replace
 
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
-        ShelfClickMode,
-    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
         CalibrationDirect,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
-        V3Action,
-    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         AdvState,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-        LadderInputs,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         build_eligibility_map,
@@ -267,11 +262,7 @@ def plan_calibration_actions(
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
         update_context_from_prepared,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
-        V3RolloutAggressiveness,
-    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        PreparedList,
         SelectionPolicy,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
@@ -285,7 +276,6 @@ def plan_calibration_actions(
         steps_to_v3_actions,
     )
 
-    _ = ShelfClickMode, V3RolloutAggressiveness, PreparedList
     ladder = ladder_inputs or LadderInputs.from_contexts(
         [ctx for ctx, _ in prepared],
     )

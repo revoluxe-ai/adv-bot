@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_mana
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationStepState,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.dto import (
     TickData,
 )
@@ -224,7 +227,7 @@ class ApplyManager:
     def _log_v3_cycle(
         tick: TickData,
         inp: V3ApplyInput,
-        post_gate_actions: list,
+        post_gate_actions: list[V3Action],
     ) -> None:
         """Лог ``v3_cycle`` с preamble stats и post-gate counts."""
         tick_input = tick.tick_input

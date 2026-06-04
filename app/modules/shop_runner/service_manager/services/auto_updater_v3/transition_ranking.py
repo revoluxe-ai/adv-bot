@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
@@ -38,11 +38,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3SelectionLog,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
-    candidate_for_strategy_mode,
     log_skipped_aliases,
-    mode_candidates_same_effective_target,
     resolve_next_effective_step_down,
     resolve_next_effective_step_up,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordV3Eligibility,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -69,13 +70,13 @@ def _hard_status_allows_up(hard_status: int) -> bool:
 _PreparedEntry = tuple["KeywordV3Context", KeywordStrategyMode]
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
-    KeywordPreparedRow,
     KeywordsPreparedList,
     build_keywords_prepared_list,
 )
 
-# Legacy aliases (миграция на ``KeywordsPreparedList``).
-PreparedList = KeywordsPreparedList
+# Legacy: mutable list of (ctx, mode); canonical tick container — ``KeywordsPreparedList``.
+PreparedList: TypeAlias = list[_PreparedEntry]
+PreparedListLike: TypeAlias = KeywordsPreparedList | PreparedList
 
 
 def build_prepared_from_contexts(
@@ -155,7 +156,7 @@ def max_target_mode_for_aggressiveness(
 
 
 def _ladder_inputs_for_prepared(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     ladder_inputs: "LadderInputs | None" = None,
 ) -> "LadderInputs":
     """Единый ``LadderInputs`` на проход pooled ranking (RK + worst_costs SSOT)."""
@@ -171,7 +172,7 @@ def _ladder_inputs_for_prepared(
 
 def _catalog_for_ctx(
     ctx: "KeywordV3Context",
-    contexts: PreparedList | None = None,
+    contexts: PreparedListLike | None = None,
     *,
     ladder_inputs: "LadderInputs | None" = None,
     rk_orders_per_cart: float | None = None,
@@ -180,10 +181,10 @@ def _catalog_for_ctx(
     """Каталог M/O/C: через ``LadderInputs.orders_per_cart_for_ctx`` или legacy resolve."""
     if ladder_inputs is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-            _catalog_for_ctx as _ladder_catalog_for_ctx,
+            catalog_for_ctx as ladder_catalog_for_ctx,
         )
 
-        return _ladder_catalog_for_ctx(ctx, ladder_inputs)
+        return ladder_catalog_for_ctx(ctx, ladder_inputs)
 
     from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
         resolve_orders_per_cart_for_cpo,
@@ -222,7 +223,7 @@ def missing_target_matrix_from_catalog(
 
 def missing_target_matrix(
     ctx: "KeywordV3Context",
-    contexts: PreparedList | None = None,
+    contexts: PreparedListLike | None = None,
 ) -> bool:
     """Нет ни одного валидного целевого места M/O/C в матрице профиля."""
     return missing_target_matrix_from_catalog(_catalog_for_ctx(ctx, contexts))
@@ -285,12 +286,6 @@ def _target_allowed(
     max_target_mode: KeywordStrategyMode,
 ) -> bool:
     return int(to_mode) <= int(max_target_mode)
-
-
-def _has_valid_target_place_data(
-    catalog: dict[AggressionTargetMode, ModeCandidate],
-) -> bool:
-    return any(mc.is_valid for mc in catalog.values())
 
 
 def shelf_rec_conversion_policy_active(click_mode: ShelfClickMode) -> bool:
@@ -368,7 +363,7 @@ def _resolve_state_cost(
 
 
 def build_worst_per_state_costs(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     rk_orders_per_cart: float | None = None,
     campaign_orders_per_cart_7d: float | None = None,
@@ -380,15 +375,14 @@ def build_worst_per_state_costs(
 
 
 def collect_transition_candidates(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     policy: SelectionPolicy,
-    ladder_inputs: "LadderInputs | None" = None,
-    eligibility_by_ks_id: dict[int, "KeywordV3Eligibility"] | None = None,
+    ladder_inputs: LadderInputs | None = None,
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
 ) -> list[TransitionCandidate]:
     """Один схлопнутый effective UP на ключ (alias = 1 шаг, см. ``effective_ladder_steps``)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        KeywordV3Eligibility,
         build_eligibility_map,
         can_target_mode,
         min_cpa_operational_via_pay_for_order,
@@ -415,14 +409,12 @@ def collect_transition_candidates(
             continue
 
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
 
         catalog = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
-        use_matrix_imputation = missing_target_matrix_from_catalog(catalog)
-        elig = (
-            elig_map.get(int(ks_id)) if ks_id is not None else None
-        )
+        _ = missing_target_matrix_from_catalog(catalog)
+        elig = elig_map.get(ks_id)
         pfo_operational = min_cpa_operational_via_pay_for_order(ctx, elig, catalog)
         tier = _rec_tier_for_keyword(
             ctx.keyword.above_rec_conversion,
@@ -548,7 +540,7 @@ def _candidate_to_action(
 
 
 def plan_shelf_rec_false_cleanup_down(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     click_mode: ShelfClickMode,
     ladder_inputs: "LadderInputs | None" = None,
@@ -591,7 +583,7 @@ def plan_shelf_rec_false_cleanup_down(
         if hard_status not in (_HARD_STATUS_AUTO_MODE, _HARD_STATUS_WHITE_LIST):
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
 
         state_candidates = _catalog_for_ctx(ctx, prepared, ladder_inputs=ladder)
@@ -674,7 +666,7 @@ def plan_shelf_rec_false_cleanup_down(
 
 
 def plan_one_up_by_policy(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     policy: SelectionPolicy,
     ladder_inputs: "LadderInputs | None" = None,
@@ -704,7 +696,7 @@ def plan_one_up_by_policy(
 
 
 def plan_cost_first_up_one(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     click_mode: ShelfClickMode,
     layered: bool,

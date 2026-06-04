@@ -22,31 +22,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     KeywordDataTier,
     KeywordV3Eligibility,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-    operational_cpo_at_keyword_target_place,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
     is_keyword_no_data,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
-    mode_level,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
+    PreparedListLike,
     SelectionPolicy,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder_tick_helpers import (
-    HARD_STATUS_AUTO_MODE,
-    HARD_STATUS_WHITE_LIST,
-    eligibility_for_ctx,
     hard_status_allows_up,
     ladder_inputs_for_prepared,
-    min_cpa_bound_by_pay_for_order,
-    mode_catalog_for_ctx,
-    resolve_effective_state_cost_for_mode,
 )
 
 if TYPE_CHECKING:
@@ -58,7 +46,7 @@ if TYPE_CHECKING:
 def summarize_phase_zero_actions(
     phase_id: str,
     *,
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     resolve: float | None = None,
     max_pay_for_order: float | None = None,
     fact_pay_for_order: float | None = None,
@@ -144,7 +132,7 @@ def summarize_phase_zero_actions(
     return handler()
 
 
-def _note_validate_not_full(prepared: PreparedList) -> str:
+def _note_validate_not_full(prepared: PreparedListLike) -> str:
     if not prepared:
         return "нет operable ключей"
     for ctx, mode in prepared:
@@ -156,7 +144,7 @@ def _note_validate_not_full(prepared: PreparedList) -> str:
 
 
 def _note_raise_state_to_target_cpo(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     resolve: float | None,
 ) -> str:
@@ -168,7 +156,7 @@ def _note_raise_state_to_target_cpo(
 
 
 def _note_reset_over_max_cpo(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     max_pay_for_order: float | None,
     fact_pay_for_order: float | None,
@@ -185,7 +173,7 @@ def _note_reset_over_max_cpo(
 
 
 def _note_shelf_cleanup(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     shelf_active: bool,
     click_mode: ShelfClickMode | None,
@@ -202,7 +190,7 @@ def _note_shelf_cleanup(
 
 
 def _note_cost_reallocation(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     resolve: float | None,
     policy: SelectionPolicy | None,
@@ -215,7 +203,7 @@ def _note_cost_reallocation(
 
 
 def _note_enable_gap(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     fact_pay_for_order: float | None,
@@ -243,9 +231,9 @@ def _note_enable_gap(
         if mode != KeywordStrategyMode.OFF:
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
-        elig = eligibility_by_ks_id.get(int(ks_id))
+        elig = eligibility_by_ks_id.get(ks_id)
         if elig is None or elig.data_tier != KeywordDataTier.KEYWORD_NO_DATA:
             continue
         if not is_keyword_no_data(ctx.keyword):
@@ -259,7 +247,7 @@ def _note_enable_gap(
 
 
 def _note_resolve_calibration(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     resolve: float | None,
     calibration_direct: CalibrationDirect | str | None,
@@ -300,7 +288,7 @@ def _note_resolve_calibration(
 
 
 def _note_calibration_up(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     shelf_click_mode: ShelfClickMode,
     aggressiveness: V3RolloutAggressiveness,
@@ -347,7 +335,7 @@ def _note_calibration_up(
 
 
 def _note_calibration_down(
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     *,
     cost_ceiling: float,
     shelf_click_mode: ShelfClickMode,

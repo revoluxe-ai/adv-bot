@@ -56,22 +56,33 @@ class V3TickKeywordLedger:
     """Снимок ключей на тик: baseline + in-memory нетто-режимы."""
 
     keywords: list[CalculatedKeyword]
-    _by_id: dict[int, CalculatedKeyword] = field(default_factory=dict)
-    _baseline_mode: dict[int, KeywordStrategyMode] = field(default_factory=dict)
-    _baseline_hard_status: dict[int, int] = field(default_factory=dict)
-    _last_reason: dict[int, str] = field(default_factory=dict)
-    _netto_action_type: dict[int, V3ActionType] = field(default_factory=dict)
-    _tick_applied: list[AppliedV3Action] = field(default_factory=list)
+    _by_id: dict[int, CalculatedKeyword] = field(
+        default_factory=lambda: dict[int, CalculatedKeyword]()
+    )
+    _baseline_mode: dict[int, KeywordStrategyMode] = field(
+        default_factory=lambda: dict[int, KeywordStrategyMode]()
+    )
+    _baseline_hard_status: dict[int, int] = field(
+        default_factory=lambda: dict[int, int]()
+    )
+    _last_reason: dict[int, str] = field(default_factory=lambda: dict[int, str]())
+    _netto_action_type: dict[int, V3ActionType] = field(
+        default_factory=lambda: dict[int, V3ActionType]()
+    )
+    _tick_applied: list[AppliedV3Action] = field(
+        default_factory=lambda: list[AppliedV3Action]()
+    )
 
     def __post_init__(self) -> None:
         self._reindex()
 
     def _reindex(self) -> None:
-        self._by_id = {}
+        by_id: dict[int, CalculatedKeyword] = {}
         for kw in self.keywords:
             ks_id = kw.keyword_setting_original_id
-            if ks_id is not None:
-                self._by_id[int(ks_id)] = kw
+            if ks_id > 0:
+                by_id[ks_id] = kw
+        self._by_id = by_id
 
     @classmethod
     def from_keywords(cls, keywords: list[CalculatedKeyword]) -> V3TickKeywordLedger:
@@ -390,7 +401,11 @@ class V3TickKeywordLedger:
                     if item.keyword_setting_id is not None
                 }
                 db_applied.sort(
-                    key=lambda a: tick_order.get(a.keyword_setting_id, 10**9)
+                    key=lambda a: (
+                        tick_order.get(a.keyword_setting_id, 10**9)
+                        if a.keyword_setting_id is not None
+                        else 10**9
+                    )
                 )
                 await session.commit()
             else:

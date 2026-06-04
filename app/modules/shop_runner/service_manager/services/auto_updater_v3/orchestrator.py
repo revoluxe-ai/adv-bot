@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager import (
     ApplyManager,
@@ -37,7 +38,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_th
     compute_resolve_cost_threshold,
     is_resolve_valid,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3Action,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    PreparedList,
+    PreparedListLike,
     build_prepared_from_contexts,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline import (
@@ -75,10 +81,10 @@ logger = logging.getLogger(__name__)
 
 def _phase_outcome_note_if_empty(
     phase_id: str,
-    actions: list,
+    actions: list[V3Action],
     *,
-    prepared: list,
-    **kwargs: object,
+    prepared: PreparedList | PreparedListLike,
+    **kwargs: Any,
 ) -> str | None:
     """Русская причина нулевого исхода фазы; ``None`` если есть действия."""
     if actions:
@@ -124,7 +130,7 @@ async def process_adv_v3(
         keywords = await complex_adv.get_keywords()
         tick_report.set_aggression_before(keywords)
 
-        tick_data: TickData = await data_mgr.load(
+        tick_data = await data_mgr.load(
             complex_adv,
             wb_shop_data_manager=wb_shop_data_manager,
             max_last_period=max_last_period,
@@ -205,18 +211,15 @@ async def process_adv_v3(
                 plan = tick_input.plan
                 fact = tick_input.fact
                 resolve_for_report: float | None = None
-                if plan is not None and fact is not None:
-                    candidate = compute_resolve_cost_threshold(plan, fact)
-                    if is_resolve_valid(plan, candidate):
-                        resolve_for_report = float(candidate)
+                candidate = compute_resolve_cost_threshold(plan, fact)
+                if is_resolve_valid(plan, candidate):
+                    resolve_for_report = float(candidate)
                 fact_cpa = (
                     float(fact.pay_for_order)
-                    if fact is not None and fact.pay_for_order is not None
+                    if fact.pay_for_order is not None
                     else None
                 )
-                max_pfo = (
-                    float(plan.max_pay_for_order) if plan is not None else None
-                )
+                max_pfo = float(plan.max_pay_for_order)
                 adv_name = str(
                     getattr(tick_data.complex_adv.adv_setting, "name", "") or ""
                 )
@@ -256,16 +259,18 @@ async def process_adv_v3(
                         if tick_input.calibration_direct is not None
                         else None
                     ),
-                    calibration_prev_effective_steps=calibration_extra.get(
-                        "prev_effective_steps"
+                    calibration_prev_effective_steps=(
+                        _prev
+                        if isinstance(
+                            (_prev := calibration_extra.get("prev_effective_steps")),
+                            int,
+                        )
+                        else None
                     ),
                     white_list_cost_leader=wl_leader,
                 )
                 audit = None
-                if (
-                    pipeline_result is not None
-                    and pipeline_result.update_context is not None
-                ):
+                if pipeline_result is not None:
                     audit = build_keyword_changes_snapshot(
                         pipeline_result.update_context.keywords,
                         adv_id=int(complex_adv.adv_id),

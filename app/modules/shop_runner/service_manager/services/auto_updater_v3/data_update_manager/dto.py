@@ -60,7 +60,7 @@ class TickData:
     tick_input: UpdateContextInput | None = None
     ladder_inputs: LadderInputs | None = None
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] = field(
-        default_factory=dict
+        default_factory=lambda: dict[int, KeywordV3Eligibility]()
     )
     sync_fallback_by_id: dict[int, bool] | None = None
     plan_fact_change: ChangePlanFact | None = None

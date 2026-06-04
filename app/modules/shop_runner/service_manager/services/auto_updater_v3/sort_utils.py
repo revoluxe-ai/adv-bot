@@ -113,9 +113,9 @@ def v3_ui_sort_key(
     """
     text_key = (keyword.text or "").casefold()
     ks_id = keyword.keyword_setting_original_id
-    if ks_id is None:
+    if ks_id <= 0:
         return (1, float("inf"), text_key)
-    ctx = ctx_by_ks_id.get(int(ks_id))
+    ctx = ctx_by_ks_id.get(ks_id)
     if ctx is None:
         return (1, float("inf"), text_key)
     elig = eligibility_by_ks_id.get(int(ks_id))
@@ -145,8 +145,8 @@ def sort_keywords_by_current_state_cost(
     ctx_by_ks_id: dict[int, KeywordV3Context] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is not None:
-            ctx_by_ks_id[int(ks_id)] = ctx
+        if ks_id > 0:
+            ctx_by_ks_id[ks_id] = ctx
 
     return sorted(
         keywords,

@@ -24,6 +24,10 @@ if TYPE_CHECKING:
     )
 
 
+def _empty_v3_contexts() -> list[KeywordV3Context]:
+    return []
+
+
 @dataclass
 class UpdateContextRuntime:
     """Исполнение NORMAL preamble; живёт в ``UpdateContext.runtime``."""
@@ -33,5 +37,5 @@ class UpdateContextRuntime:
     ledger: V3TickKeywordLedger
     raw_profiles: dict[str, list[BidPosition]]
     tick_report: V3TickReportCollector
-    contexts: list[KeywordV3Context] = field(default_factory=list)
-    all_contexts: list[KeywordV3Context] = field(default_factory=list)
+    contexts: list[KeywordV3Context] = field(default_factory=_empty_v3_contexts)
+    all_contexts: list[KeywordV3Context] = field(default_factory=_empty_v3_contexts)

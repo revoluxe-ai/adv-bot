@@ -12,9 +12,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (
-    V3TickKeywordLedger,
-)
 from app.modules.shop_runner.service_manager.services.traffic_clicks_manager import (
     TrafficClicksManager,
 )
@@ -80,10 +77,6 @@ async def resolve_v3_fact_data(
     max_last_period: int,
 ) -> tuple[FactData, str]:
     """Fact для V3 ladder без повторного ``get_stat_data``, если fact уже в ``WBAdvDTO``."""
-    if (
-        dto is not None
-        and isinstance(dto, WBAdvDTO)
-        and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS
-    ):
+    if dto is not None and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS:
         return dto.fact, "dto"
     return await updater.get_fact_data(keywords), "updater"

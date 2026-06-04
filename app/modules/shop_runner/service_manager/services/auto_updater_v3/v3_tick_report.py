@@ -36,7 +36,7 @@ if TYPE_CHECKING:
         KeywordV3Context,
     )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        PreparedList,
+        PreparedListLike,
     )
 
 _HARD_STATUS_WHITE_LIST = 2
@@ -105,7 +105,7 @@ class WhiteListCostLeader(BaseModel):
 def find_white_list_cost_leader(
     contexts: list[KeywordV3Context],
     *,
-    prepared: PreparedList,
+    prepared: PreparedListLike,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
     ladder_inputs: LadderInputs | None,
 ) -> WhiteListCostLeader | None:
@@ -159,8 +159,8 @@ def find_white_list_cost_leader(
                 state_cpo = float(cost)
 
         elig = (
-            eligibility_by_ks_id.get(int(ks_id))
-            if eligibility_by_ks_id is not None and ks_id is not None
+            eligibility_by_ks_id.get(ks_id)
+            if eligibility_by_ks_id is not None and ks_id > 0
             else None
         )
         tier = elig.data_tier.value if elig is not None else ""
@@ -188,7 +188,7 @@ def find_white_list_cost_leader(
             text = text[:45] + "…"
         best = WhiteListCostLeader(
             keyword_text=text or f"ks_id={ks_id}",
-            keyword_setting_id=int(ks_id) if ks_id is not None else None,
+            keyword_setting_id=ks_id if ks_id > 0 else None,
             data_tier=tier,
             strategy_mode=mode.name,
             cost_source=cost_source,
@@ -327,7 +327,9 @@ class V3TickReportCollector:
     """Накопитель фаз за один ``process_adv_v3``."""
 
     aggression_score_before: int = 0
-    _phases: list[V3PhaseStats] = field(default_factory=list)
+    _phases: list[V3PhaseStats] = field(
+        default_factory=lambda: list[V3PhaseStats]()
+    )
     _total_keywords: int = 0
     _operable_keywords: int = 0
 

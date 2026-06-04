@@ -77,6 +77,9 @@ def _keyword_has_own_conv(keyword: CalculatedKeyword) -> bool:
     return stat.views > 0 and keyword.conv_views_to_orders > 0
 
 
+keyword_has_own_conv = _keyword_has_own_conv
+
+
 def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
     """CPM как в рейтинге/карточке: set_bid → stats → cluster_stat, без bid_log/api."""
     sources = keyword.cpm_sources
@@ -99,7 +102,7 @@ def keyword_has_v2_cpo(keyword: CalculatedKeyword) -> bool:
 def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float | None:
     """Себестоимость V2: только conv ключа + rating CPM (без worst/imputed)."""
     conv = keyword.conv_views_to_orders
-    if conv is None or conv <= 0:
+    if conv <= 0:
         return None
     cpm = rating_aligned_cpm(keyword)
     if cpm is None or cpm <= 0:
@@ -140,7 +143,7 @@ def resolve_keyword_v3_decision(
     has_ch = bool(profile)
     if not has_ch:
         conv = ctx.keyword.conv_views_to_orders
-        eff_conv = float(conv) if conv is not None and conv > 0 else None
+        eff_conv = float(conv) if conv > 0 else None
         return KeywordV3Decision(
             tier=KeywordV3DecisionTier.NO_CH_MATRIX,
             effective_conv_views_to_orders=eff_conv,
