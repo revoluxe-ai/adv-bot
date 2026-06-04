@@ -7,7 +7,8 @@
 
 - ``pay_for_order_gap_enable`` — skip enable, если fact уже в этой зоне;
 - ``pay_for_order_over_max_off_on_deep_overspend`` — OFF ключей с ``PFO > max`` в этой зоне;
-- ``raise_state_to_target_cpo`` — skip R↑, если ``fact >= MAX_PAY_STABILIZATION_RATIO × plan.max``.
+- ``raise_state_to_target_cpo`` — per-keyword skip только если ``kw.pay_for_order > resolve``
+  и ``fact >= MAX_PAY_STABILIZATION_RATIO × resolve``; при ``kw.pay_for_order <= resolve`` — never skip.
 """
 
 from __future__ import annotations
@@ -62,19 +63,39 @@ def is_deep_overspend(adv_state: AdvState) -> bool:
     return is_campaign_at_plan_headroom_plus_one(adv_state)
 
 
-def raise_state_plan_max_floor(max_pay: float) -> float:
-    """Порог skip R↑: ``MAX_PAY_STABILIZATION_RATIO × plan.max_pay_for_order`` (90 %)."""
-    return MAX_PAY_STABILIZATION_RATIO * float(max_pay)
+def raise_state_resolve_stabilization_floor(resolve: float) -> float:
+    """Порог зоны стабилизации R↑: ``MAX_PAY_STABILIZATION_RATIO × resolve`` (90 %)."""
+    return MAX_PAY_STABILIZATION_RATIO * float(resolve)
 
 
-def should_skip_raise_state_to_target_cpo(adv_state: AdvState) -> bool:
-    """``True``, если fact CPO РК в зоне стабилизации (``>= 90 % plan.max``)."""
+def is_campaign_in_raise_stabilization_zone(adv_state: AdvState) -> bool:
+    """``True``, если fact CPO РК в зоне стабилизации (``>= 90 % resolve``)."""
     if adv_state.fact_pay_for_order is None:
         return False
-    max_pay = float(adv_state.max_pay_for_order)
-    if max_pay <= 0:
+    if not adv_state.resolve_valid:
         return False
-    return float(adv_state.fact_pay_for_order) >= raise_state_plan_max_floor(max_pay)
+    resolve = float(adv_state.resolve)
+    if resolve <= 0:
+        return False
+    return float(adv_state.fact_pay_for_order) >= raise_state_resolve_stabilization_floor(
+        resolve
+    )
+
+
+def should_skip_keyword_raise_to_target_cpo(
+    dto: KeywordDTO,
+    adv_state: AdvState,
+) -> bool:
+    """Skip подъёма ключа в R↑ только для дорогих ключей в зоне стабилизации кампании.
+
+    Абсолютное правило: ``kw.pay_for_order <= resolve`` → never skip.
+    Условный skip: ``kw.pay_for_order > resolve`` и ``fact >= 0.9×resolve``.
+    """
+    resolve = float(adv_state.resolve)
+    kw_pfo = dto.calculated_keyword.pay_for_order
+    if kw_pfo is None or float(kw_pfo) <= resolve:
+        return False
+    return is_campaign_in_raise_stabilization_zone(adv_state)
 
 
 def keyword_pay_for_order_over_plan_max(

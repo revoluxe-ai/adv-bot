@@ -260,22 +260,7 @@ def format_keyword_v3_enable_blockers(
             for phase in tick_snapshot.phases:
                 if phase.phase_id != "raise_state_to_target_cpo":
                     continue
-                if (
-                    not phase.executed
-                    and phase.skip_reason == "fact_cpo_ge_90pct_plan_max"
-                ):
-                    fact = tick_snapshot.fact_cpa
-                    mx = tick_snapshot.max_pay_for_order
-                    if fact is not None and mx is not None:
-                        lines.append(
-                            f"   R↑ пропущен (старый тик): fact CPA РК {fact:.0f} ₽ "
-                            f"≥ 90% max ({mx:.0f} ₽)"
-                        )
-                    else:
-                        lines.append(
-                            "   R↑ пропущен (старый тик): зона стабилизации ≥ 90% max"
-                        )
-                elif phase.executed and phase.up == 0:
+                if phase.executed and phase.up == 0:
                     lines.append(
                         "   R↑ выполнен, но ключ не выбран для подъёма на этом тике"
                     )
