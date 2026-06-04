@@ -206,8 +206,8 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
 
 
 @pytest.mark.unit
-def test_raise_state_skips_up_when_deep_overspend_and_pfo_gt_max() -> None:
-    """При fact > 1.1×max ключ с PFO > max не поднимается до resolve."""
+def test_raise_state_raises_under_deep_overspend_when_pfo_gt_max() -> None:
+    """При fact > 1.1×max raise не блокируется — финальный OFF делает pfo_off."""
     max_cpo = 550.0
     fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo + 10.0
     dto_high_pfo = _dto(
@@ -223,7 +223,7 @@ def test_raise_state_skips_up_when_deep_overspend_and_pfo_gt_max() -> None:
     dto_high_pfo = KeywordDTO.from_context(
         KeywordV3Context(
             keyword=kw.model_copy(update={"cluster_stat": stat}),
-            position_profile=None,
+            position_profile=_sample_profile(),
         ),
         ladder_states=dto_high_pfo.ladder_states,
     )
@@ -239,8 +239,8 @@ def test_raise_state_skips_up_when_deep_overspend_and_pfo_gt_max() -> None:
         adv_state=adv_state,
     )
     RaiseStateToTargetCpoExecutor().execute(ctx)
-    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
-    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.OPTIMUM
+    assert len(ctx.keywords[0].next_state) == 1
     assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
 
 

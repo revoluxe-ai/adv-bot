@@ -9,7 +9,6 @@ import pytest
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
-    deep_overspend_blocks_ladder_up,
     is_deep_overspend,
     keyword_pay_for_order_over_plan_max,
 )
@@ -95,7 +94,6 @@ def _adv_state(*, fact: float, max_cpo: float = 550.0) -> AdvState:
         max_pay_for_order=max_cpo,
         fact_pay_for_order=fact,
         resolve_valid=True,
-        deep_overspend_active=fact > FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo,
     )
 
 
@@ -147,14 +145,12 @@ def test_no_off_when_pfo_at_or_below_max() -> None:
 
 
 @pytest.mark.unit
-def test_deep_overspend_blocks_ladder_up_only_when_pfo_over_max() -> None:
+def test_keyword_pfo_over_plan_max_gate() -> None:
     max_cpo = 550.0
-    adv = _adv_state(fact=610.0, max_cpo=max_cpo)
     high = _dto(pfo_target=600.0)
     low = _dto(ks_id=2, pfo_target=400.0)
-    assert deep_overspend_blocks_ladder_up(high, adv) is True
-    assert deep_overspend_blocks_ladder_up(low, adv) is False
     assert keyword_pay_for_order_over_plan_max(high, max_pay=max_cpo) is True
+    assert keyword_pay_for_order_over_plan_max(low, max_pay=max_cpo) is False
 
 
 @pytest.mark.unit

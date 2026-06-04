@@ -1,7 +1,7 @@
 """SSOT гейты кампании по fact/max pay_for_order и keyword.pay_for_order.
 
-Используется preamble NORMAL: блок ladder UP и фаза OFF при «глубоком overspend»
-(``fact > 1.1 * max``) для ключей с ``keyword.pay_for_order > max``.
+Используется фазой ``pay_for_order_over_max_off_on_deep_overspend``: OFF ключей
+с ``keyword.pay_for_order > max`` при ``fact > 1.1 * max`` (последний сброс в preamble).
 """
 
 from __future__ import annotations
@@ -36,13 +36,3 @@ def keyword_pay_for_order_over_plan_max(
     if pfo is None:
         return False
     return float(pfo) > float(max_pay)
-
-
-def deep_overspend_blocks_ladder_up(dto: KeywordDTO, adv_state: AdvState) -> bool:
-    """Запрет ladder UP: deep overspend на РК и PFO ключа выше max."""
-    if not is_deep_overspend(adv_state):
-        return False
-    return keyword_pay_for_order_over_plan_max(
-        dto,
-        max_pay=float(adv_state.max_pay_for_order),
-    )

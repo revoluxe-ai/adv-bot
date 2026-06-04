@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    deep_overspend_blocks_ladder_up,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.update_context import (
     UpdateContext,
 )
@@ -32,8 +29,6 @@ class RaiseStateToTargetCpoExecutor:
         target_cpo = float(context.adv_state.resolve)
         for dto in context.keywords:
             if dto.is_not_full():
-                continue
-            if deep_overspend_blocks_ladder_up(dto, context.adv_state):
                 continue
             state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
             if state is None:

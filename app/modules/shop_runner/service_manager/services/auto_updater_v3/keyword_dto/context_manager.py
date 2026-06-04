@@ -128,9 +128,6 @@ class UpdateContextManager:
         eligibility_by_ks_id: dict[int, KeywordV3Eligibility],
         ladder_inputs: LadderInputs,
     ) -> AdvState:
-        from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-            FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
-        )
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold import (
             compute_resolve_cost_threshold,
             is_resolve_valid,
@@ -157,12 +154,6 @@ class UpdateContextManager:
             and float(tick_input.fact.pay_for_order)
             > float(tick_input.plan.max_pay_for_order)
         )
-        max_pfo = float(tick_input.plan.max_pay_for_order)
-        deep_overspend_active = (
-            fact_pfo is not None
-            and max_pfo > 0
-            and fact_pfo > FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_pfo
-        )
         return AdvState(
             eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
@@ -177,7 +168,6 @@ class UpdateContextManager:
             resolve_valid=is_resolve_valid(tick_input.plan, resolve),
             shelf_active=tick_input.shelf_active,
             guard_condition=guard_condition,
-            deep_overspend_active=deep_overspend_active,
             calibration_direct=tick_input.calibration_direct,
             max_effective_steps=tick_input.max_effective_steps,
             calibration_phase_extra=dict(tick_input.calibration_phase_extra),

@@ -54,9 +54,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
-    FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
-)
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
 
@@ -332,28 +329,6 @@ def test_rebalance_stops_when_cheapest_potential_not_below_donor_cpo() -> None:
 @pytest.mark.unit
 def test_max_rebalance_cycles_is_3000() -> None:
     assert _MAX_REBALANCE_CYCLES == 3000
-
-
-@pytest.mark.unit
-def test_generator_excludes_potential_up_when_deep_overspend_and_pfo_gt_max() -> None:
-    max_cpo = 550.0
-    fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo + 5.0
-    dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA)
-    kw = dto.calculated_keyword
-    stat = kw.cluster_stat.model_copy(
-        update={"conv_views_to_orders": _conv_for_pay_for_order(600.0)}
-    )
-    dto = KeywordDTO.from_context(
-        KeywordV3Context(
-            keyword=kw.model_copy(update={"cluster_stat": stat}),
-            position_profile=None,
-        ),
-        ladder_states=dto.ladder_states,
-    )
-    adv = _adv_state(fact_pay_for_order=fact, max_pay_for_order=max_cpo)
-    _current, potential = StatesListGenerator(adv).get_current_states([dto])
-    assert len(_current) == 1
-    assert potential == []
 
 
 @pytest.mark.unit
