@@ -162,10 +162,12 @@ class WBShopDataManager:
                 )
             else:
                 # TODO: Вынести получение данных по API отсюда
-                min_bids, search_adv_bids = await asyncio.gather(
+                gathered = await asyncio.gather(
                     self._get_min_bids(complex_advs, cache_possible=True),
                     self._get_search_adv_common_bids(complex_advs),
                 )
+                min_bids = gathered[0]
+                search_adv_bids = gathered[1]
 
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
