@@ -35,9 +35,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_updat
     load_v3_wb_context,
     resolve_v3_fact_data,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context import (
-    prepare_v3_operable_ladder_contexts,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
     build_keyword_v3_contexts,
 )
@@ -154,11 +151,7 @@ class DataUpdateManager:
             and campaign_mode in (CampaignMode.NO_DATA, CampaignMode.NORMAL)
         ):
             operable_before = len(filter_operable_v3_contexts(all_contexts))
-            contexts, all_contexts = prepare_v3_operable_ladder_contexts(
-                ledger,
-                raw_profiles,
-                all_contexts,
-            )
+            contexts = filter_operable_v3_contexts(all_contexts)
             tick_report.record_filter(
                 total=len(all_contexts),
                 operable=operable_before,

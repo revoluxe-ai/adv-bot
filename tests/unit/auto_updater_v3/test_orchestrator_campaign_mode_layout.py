@@ -25,11 +25,18 @@ def test_validate_not_full_in_pipeline_not_orchestrator() -> None:
 
 
 @pytest.mark.unit
-def test_operable_sync_in_data_manager_before_normal_pipeline() -> None:
-    """Filter/sync operable — в ``DataUpdateManager.load`` до NORMAL pipeline."""
+def test_operable_filter_in_data_manager_before_normal_pipeline() -> None:
+    """Filter operable — в ``DataUpdateManager.load`` до NORMAL pipeline; sync — в preamble."""
     data_src = _DATA_MANAGER.read_text(encoding="utf-8")
+    tick_ctx = (_ROOT / "data_update_manager" / "tick_context.py").read_text(
+        encoding="utf-8"
+    )
     orch = _ORCHESTRATOR.read_text(encoding="utf-8")
     assert "prepare_v3_operable_ladder_contexts" in data_src
+    assert "sync_operable_hard_status_with_strategy_mode" not in tick_ctx
+    assert "HardStatusValidateExecutor" in (_ROOT / "update_pipeline" / "executors" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
     assert "tick_report.record_filter" in data_src
     assert "prepare_v3_operable_ladder_contexts" not in orch
     assert "build_for_tick" in orch

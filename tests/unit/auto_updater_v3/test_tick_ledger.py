@@ -96,33 +96,35 @@ def test_apply_in_memory_updates_dto_for_next_phase() -> None:
 
 
 @pytest.mark.unit
-def test_sync_operable_hard_status_with_strategy_mode() -> None:
-    """MIN при hard_status=1 → 2 in-memory без смены mode."""
-    kw = _kw(ks_id=11, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
-    ledger = V3TickKeywordLedger.from_keywords([kw])
-    fixed = ledger.sync_operable_hard_status_with_strategy_mode()
-    assert fixed == 1
-    assert ledger.keywords[0].keyword_setting.hard_status == 2
-    assert ledger.keywords[0].keyword_setting.strategy_mode == KeywordStrategyMode.MIN_CPA
+def test_normalize_operable_hard_status_for_persist() -> None:
+    """Перед flush: OFF→1, active→2 по финальному mode."""
+    off_wrong = _kw(ks_id=11, mode=KeywordStrategyMode.OFF, hard_status=2)
+    min_wrong = _kw(ks_id=12, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([off_wrong, min_wrong])
+    fixed = ledger.normalize_operable_hard_status_for_persist()
+    assert fixed == 2
+    by_id = {k.keyword_setting_original_id: k for k in ledger.keywords}
+    assert by_id[11].keyword_setting.hard_status == 1
+    assert by_id[12].keyword_setting.hard_status == 2
+    assert by_id[12].keyword_setting.strategy_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit
-def test_sync_skips_non_operable_hard_status() -> None:
-    kw = _kw(ks_id=12, mode=KeywordStrategyMode.OPTIMUM, hard_status=3)
+def test_normalize_skips_non_operable_hard_status() -> None:
+    kw = _kw(ks_id=15, mode=KeywordStrategyMode.OPTIMUM, hard_status=3)
     ledger = V3TickKeywordLedger.from_keywords([kw])
-    assert ledger.sync_operable_hard_status_with_strategy_mode() == 0
+    assert ledger.normalize_operable_hard_status_for_persist() == 0
     assert ledger.keywords[0].keyword_setting.hard_status == 3
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_flush_persists_hard_status_only_sync(
+async def test_flush_normalizes_active_hard_status_to_two(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mode не менялся, только hard_status 1→2 для MIN."""
+    """MIN+hs=1 → flush normalize → persist MIN+2."""
     kw = _kw(ks_id=13, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
     ledger = V3TickKeywordLedger.from_keywords([kw])
-    assert ledger.sync_operable_hard_status_with_strategy_mode() == 1
 
     async def _execute(stmt: object) -> MagicMock:
         sql = str(stmt)
@@ -156,6 +158,49 @@ async def test_flush_persists_hard_status_only_sync(
     compiled = stmts[0].compile(dialect=postgresql.dialect())
     assert compiled.params["hard_status"] == 2
     assert compiled.params["strategy_mode"] == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_flush_persists_off_hard_status_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OFF с неверным hard_status=2 → flush ставит 1."""
+    kw = _kw(ks_id=14, mode=KeywordStrategyMode.OFF, hard_status=2)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+
+    async def _execute(stmt: object) -> MagicMock:
+        sql = str(stmt)
+        result = MagicMock()
+        if sql.startswith("SELECT"):
+            result.all.return_value = [
+                (14, KeywordStrategyMode.OFF, 2, "k14"),
+            ]
+        return result
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=_execute)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = None
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.sm",
+        _patched_sm(session_cm),
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger.persist_last_applied_v3",
+        AsyncMock(),
+    )
+
+    flushed = await ledger.flush_to_db(MagicMock(adv_setting=MagicMock()))
+    assert flushed is True
+    stmts = _update_stmts(session.execute)
+    assert len(stmts) == 1
+    compiled = stmts[0].compile(dialect=postgresql.dialect())
+    assert compiled.params["hard_status"] == 1
+    assert compiled.params["strategy_mode"] == KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit

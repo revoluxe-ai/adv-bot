@@ -1,9 +1,10 @@
 """In-memory ladder state за один тик V3 и нетто-flush в БД.
 
-Фазы (M1, trim, no_data, selector) планируют действия и мутируют ``CalculatedKeyword``
-in-memory; в конце тика — один commit ``strategy_mode`` + ``hard_status`` для ключей,
-у которых нетто-состояние отличается от baseline (в т.ч. ``hard_status_mode_sync``).
-Bulk-проверка свежего ``hard_status`` в БД — только operable {1, 2}.
+Фазы планируют действия и мутируют ``CalculatedKeyword`` in-memory; в конце тика —
+commit ``strategy_mode`` + ``hard_status`` для ключей с нетто-изменением от baseline.
+
+``hard_status=1`` → ``OFF``: ``HardStatusValidateExecutor`` (preamble). Перед flush —
+денормализация OFF→1, active→2 по финальному ``strategy_mode``.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
     resolve_v3_action_target_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
-    HARD_STATUS_MODE_SYNC_REASON,
+    HARD_STATUS_PERSIST_NORMALIZE_REASON,
     is_v3_operable_hard_status,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -135,10 +136,10 @@ class V3TickKeywordLedger:
                 break
         self._by_id[ks_id] = updated
 
-    def sync_operable_hard_status_with_strategy_mode(self) -> int:
-        """Привести ``hard_status`` operable-ключей в соответствие с ``strategy_mode``.
+    def normalize_operable_hard_status_for_persist(self) -> int:
+        """Перед flush: денормализация ``hard_status`` по финальному ``strategy_mode``.
 
-        OFF → 1, active mode → 2. In-memory only; flush — ``flush_to_db``.
+        OFF → 1, активный mode → 2. Mode не меняется.
 
         Returns:
             Число ключей с исправленным ``hard_status``.
@@ -153,7 +154,7 @@ class V3TickKeywordLedger:
             if current_hs == expected_hs:
                 continue
             self._set_keyword_mode(ks_id, mode, new_hard_status=expected_hs)
-            self._last_reason[ks_id] = HARD_STATUS_MODE_SYNC_REASON
+            self._last_reason[ks_id] = HARD_STATUS_PERSIST_NORMALIZE_REASON
             fixed += 1
         return fixed
 
@@ -336,9 +337,12 @@ class V3TickKeywordLedger:
     async def flush_to_db(self, complex_adv: ComplexAdv) -> bool:
         """Нетто-flush: один SELECT + точечные UPDATE только изменённых ключей.
 
+        Перед persist — ``normalize_operable_hard_status_for_persist``: OFF→1, active→2.
+
         Returns:
             True, если хотя бы одна строка обновлена в БД.
         """
+        self.normalize_operable_hard_status_for_persist()
         pending = self._pending_db_state_changes()
         if not pending:
             return False

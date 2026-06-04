@@ -141,3 +141,34 @@ async def test_load_not_ready_without_plan() -> None:
 
     assert tick_data.campaign_mode == CampaignMode.NOT_READY
     assert tick_data.tick_input is None
+
+
+@pytest.mark.unit
+def test_prepare_v3_operable_ladder_contexts_does_not_sync_hard_status() -> None:
+    """prepare только фильтрует; MIN+hs=1 не трогаем (validate — в preamble)."""
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.tick_context import (
+        prepare_v3_operable_ladder_contexts,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
+        build_keyword_v3_contexts,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (
+        V3TickKeywordLedger,
+    )
+    from tests.unit.auto_updater_v3.test_tick_ledger import _kw
+
+    kw = _kw(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, hard_status=1)
+    ledger = V3TickKeywordLedger.from_keywords([kw])
+    all_contexts = build_keyword_v3_contexts(ledger.keywords, {})
+
+    operable, rebuilt = prepare_v3_operable_ladder_contexts(
+        ledger,
+        {},
+        all_contexts,
+    )
+
+    assert ledger.keywords[0].keyword_setting.hard_status == 1
+    assert ledger.keywords[0].keyword_setting.strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert len(operable) == 1
+    assert len(rebuilt) == 1

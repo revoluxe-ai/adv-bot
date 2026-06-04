@@ -1,10 +1,10 @@
 """Operable keywords V3: фильтр hard_status 1|2.
 
-Перед preamble NORMAL (фаза 0):
-1. ``filter_operable_v3_contexts`` — только ключи, с которыми ladder может работать;
-2. ``validate_state_by_hard_status`` (executor) — авто (1) → OFF через ``NextState``.
+Источник истины — ``hard_status`` из БД; ``strategy_mode`` подтягивается к нему:
+``HardStatusValidateExecutor`` (preamble фаза V) — авто (1) → ``OFF`` через ``NextState``.
 
-Fixed/manual (hard_status 3/4/…) остаются в полном списке для target_place, но не в preamble.
+``filter_operable_v3_contexts`` — только ключи с ``hard_status in {1, 2}`` для ladder.
+Fixed/manual (3/4/…) остаются в полном списке для target_place, но не в preamble.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 HARD_STATUS_AUTO_MODE = 1
 HARD_STATUS_WHITE_LIST = 2
 HARD_STATUS_MODE_SYNC_REASON = "hard_status_mode_sync"
+HARD_STATUS_PERSIST_NORMALIZE_REASON = "hard_status_persist_normalize"
 
 
 def is_v3_operable_hard_status(hard_status: int) -> bool:

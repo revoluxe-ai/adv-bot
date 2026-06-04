@@ -52,19 +52,6 @@ def apply_v3_phase_operable(
     return filter_operable_v3_contexts(all_contexts), all_contexts
 
 
-def prepare_v3_operable_ladder_contexts(
-    ledger: V3TickKeywordLedger,
-    raw_profiles: dict[str, list[BidPosition]],
-    all_contexts: list[KeywordV3Context],
-) -> tuple[list[KeywordV3Context], list[KeywordV3Context]]:
-    """Filter operable (1|2) и rebuild contexts."""
-    _ = ledger
-    _ = filter_operable_v3_contexts(all_contexts)
-    all_contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
-    operable_contexts = filter_operable_v3_contexts(all_contexts)
-    return operable_contexts, all_contexts
-
-
 def refresh_v3_tick_state(
     contexts: list[KeywordV3Context],
     *,
