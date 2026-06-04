@@ -1,6 +1,7 @@
 """Unit tests for V3 hard_status <-> strategy_mode synchronization."""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -194,12 +195,29 @@ def test_sync_white_list_uses_adv_strategy_max_conv() -> None:
     keyword_setting = SimpleNamespace(
         hard_status=2,
         strategy_mode=KeywordStrategyMode.OFF,
-        adv_setting=SimpleNamespace(strategy=Strategy.MAX_CONV),
     )
     changed = sync_keyword_setting_mode_for_v3(
         keyword_setting,
         automatic_version=3,
         hard_status_override=2,
+        adv_strategy=Strategy.MAX_CONV,
     )
     assert changed is True
     assert keyword_setting.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
+def test_sync_black_list_does_not_access_adv_setting_relationship() -> None:
+    """ЧС (hard_status=0): sync не обращается к relationship adv_setting."""
+    keyword_setting = MagicMock(spec=["hard_status", "strategy_mode"])
+    keyword_setting.hard_status = 1
+    keyword_setting.strategy_mode = KeywordStrategyMode.MIN_CPA
+
+    changed = sync_keyword_setting_mode_for_v3(
+        keyword_setting,
+        automatic_version=3,
+        hard_status_override=0,
+    )
+
+    assert changed is True
+    assert keyword_setting.strategy_mode == KeywordStrategyMode.OFF

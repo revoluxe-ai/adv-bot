@@ -123,6 +123,7 @@ async def reset_white_list(
                 keyword_setting,
                 automatic_version=adv.automatic_version,
                 hard_status_override=1,
+                adv_strategy=adv.strategy,
             )
         await session.commit()
     async with sm() as session:
