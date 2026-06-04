@@ -41,6 +41,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation import (
     RebalanceExecutor,
+    _MAX_REBALANCE_CYCLES,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.builder import (
+    build_keyword_changes_snapshot,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     pick_effective_down_ladder_state,
@@ -271,6 +275,11 @@ def test_rebalance_gate_skips_when_donor_not_more_expensive() -> None:
 
 
 @pytest.mark.unit
+def test_max_rebalance_cycles_is_3000() -> None:
+    assert _MAX_REBALANCE_CYCLES == 3000
+
+
+@pytest.mark.unit
 def test_rebalance_one_cycle_down_donor_up_recipient() -> None:
     donor = _dto(
         ks_id=1,
@@ -292,6 +301,31 @@ def test_rebalance_one_cycle_down_donor_up_recipient() -> None:
     assert ctx.keywords[1].current_mode == KeywordStrategyMode.MIN_CPA
     assert len(ctx.keywords[0].next_state) == 1
     assert len(ctx.keywords[1].next_state) == 1
+
+
+@pytest.mark.unit
+def test_rebalance_audit_up_matches_down_plus_force_off() -> None:
+    """Каждый цикл R — пара учтённых шагов: ↑ совпадает с ↓ (включая FORCE_OFF)."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(),
+    )
+    RebalanceExecutor().execute(ctx)
+    snap = build_keyword_changes_snapshot(ctx.keywords, adv_id=99)
+    realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
+    assert realloc.up == realloc.down + realloc.force_off
+    assert realloc.up >= 1
 
 
 @pytest.mark.unit
