@@ -308,7 +308,7 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "validate_not_full_state": ("2 · NF · validate_not_full", "DOWN"),
     "skip_up_same_target_place": ("2b · skip_up · same target_place", "DOWN"),
-    "raise_state_to_target_cpo": ("3 · R↑ · raise to resolve", "UP"),
+    "raise_state_to_target_cpo": ("3 · R↑ · raise to resolve", "UP only"),
     "reset_over_max_cpo_on_overspend": ("4 · R↓ · reset over max CPO", "DOWN, OFF"),
     "passing_up": ("5 · U · passing_up", "UP"),
     "shelf_cleanup": ("6 · S · shelf cleanup", "DOWN, OFF"),

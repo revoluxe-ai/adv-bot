@@ -6,6 +6,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+    current_aggression_rank,
+    ladder_aggression_rank,
     pick_max_ladder_state_at_or_below_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
@@ -14,7 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class RaiseStateToTargetCpoExecutor:
-    """Поднять каждый ключ до max ступени с ``cpo <= adv_state.resolve`` (без skip)."""
+    """Поднять ключ до max ступени с ``cpo <= resolve``; DOWN запрещён (no-op)."""
 
     phase_name = "raise_state_to_target_cpo"
     _skip_reason: str | None = None
@@ -27,6 +29,10 @@ class RaiseStateToTargetCpoExecutor:
         target_cpo = float(context.adv_state.resolve)
         for dto in context.keywords:
             state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
+            if state is None:
+                continue
+            if ladder_aggression_rank(state) <= current_aggression_rank(dto):
+                continue
             self._next_state_manager.raise_state_to_target_cpo(dto, state)
 
     @property

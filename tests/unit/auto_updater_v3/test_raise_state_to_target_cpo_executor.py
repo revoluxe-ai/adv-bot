@@ -181,6 +181,27 @@ def test_raise_state_executor_mutates_matching_keywords_only() -> None:
 
 
 @pytest.mark.unit
+def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> None:
+    """Ключ выше max ступени под resolve — фаза R↑ не опускает (только UP)."""
+    dto_high = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+    )
+    dto_low = _dto(ks_id=2, mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(AdvState.empty(), resolve=550.0)
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto_high, dto_low]),
+        adv_state=adv_state,
+    )
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
+    assert len(ctx.keywords[1].next_state) == 1
+
+
+@pytest.mark.unit
 def test_raise_state_executor_in_preamble() -> None:
     executors = build_normal_preamble_executors()
     assert executors[0].phase_name == "validate_state_by_hard_status"
