@@ -126,6 +126,7 @@ async def refresh_v3_tick_report(
 @router.callback_query(V3TickReportBack.filter())
 async def back_from_v3_tick_report(
     callback_query: CallbackQuery,
+    callback_data: V3TickReportBack,
     bot: Bot,
     state: FSMContext,
 ) -> None:
@@ -134,11 +135,8 @@ async def back_from_v3_tick_report(
         await _clear_tick_report_fsm(state)
         return
     chat_id = callback_query.message.chat.id
-    fsm_data = await state.get_data()
-    adv_setting_original_id = fsm_data.get(FSM_V3_TICK_REPORT_ADV_SETTING_ID)
+    adv_setting_original_id = callback_data.adv_setting_original_id
     await _clear_tick_report_fsm(state)
-    if adv_setting_original_id is None:
-        return
     telegram_user_id = callback_query.from_user.id
     async with sm() as session:
         adv_result = await session.execute(

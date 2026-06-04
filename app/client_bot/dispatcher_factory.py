@@ -6,7 +6,15 @@ from aiohttp import ClientSession
 from aiogram import Dispatcher
 
 from app.client_bot.global_router import global_router
+from app.client_bot.middlewars.immediate_callback_answer import (
+    ImmediateCallbackAnswerUpdateMiddleware,
+)
 from app.modules.billing.event_manager.event_manager import BillingEventManager
+
+
+def install_client_bot_dispatcher_middleware(dp: Dispatcher) -> None:
+    """Outer middleware: ACK callback до FSM/Scene/Gate (см. docks/CALLBACK_ANSWER_POLICY.md)."""
+    dp.update.outer_middleware(ImmediateCallbackAnswerUpdateMiddleware())
 
 
 def create_client_bot_dispatcher(
@@ -19,5 +27,6 @@ def create_client_bot_dispatcher(
         client_session=client_session,
         billing_event_manager=billing_event_manager,
     )
+    install_client_bot_dispatcher_middleware(dp)
     dp.include_router(global_router)
     return dp

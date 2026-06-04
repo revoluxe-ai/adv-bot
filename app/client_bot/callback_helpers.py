@@ -1,11 +1,12 @@
 """Хелперы для toast/alert при ответе на CallbackQuery.
 
-В ``global_router`` включён ``CallbackAnswerMiddleware(pre=True)`` — ACK и toast
-«Запрос в обработке» до хендлера. Из хендлеров ``callback.answer()`` не вызываем.
+Pre-answer: ``ImmediateCallbackAnswerUpdateMiddleware`` на Dispatcher (см.
+``dispatcher_factory.install_client_bot_dispatcher_middleware``). Из хендлеров
+``callback.answer()`` не вызываем.
 
-Для кастомного toast после обработки: ``flags={"callback_answer": {"pre": False}}``
-на хендлере/роутере и ``set_callback_toast``. Для ошибок — ``callback.message.answer``
-или ``bot.send_message`` в чат.
+Для toast после обработки (time_settings, префикс ``ts:``): роутерный
+``CallbackAnswerMiddleware(pre=False)`` и ``set_callback_toast``. Для ошибок —
+``callback.message.answer`` или ``bot.send_message``.
 """
 
 from __future__ import annotations

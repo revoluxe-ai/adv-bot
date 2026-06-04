@@ -7,8 +7,9 @@
 задумано: можно настроить расписание заранее, оно начнёт действовать после
 включения контроля активности.
 
-Callback ACK: глобальный `CallbackAnswerMiddleware` с ``pre=True``; для toast
-после обработки на этом роутере — ``pre=False`` и ``set_callback_toast``.
+Callback ACK: глобальный pre-answer на Dispatcher; для toast после обработки
+на этом роутере — локальный ``CallbackAnswerMiddleware(pre=False)`` и
+``set_callback_toast`` (префикс callback ``ts:`` без раннего ACK).
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.utils import callback_answer
 from aiogram.utils.callback_answer import CallbackAnswer
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -54,6 +56,9 @@ from app.client_bot.callback_helpers import set_callback_toast
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
+_ = router.callback_query.middleware(
+    callback_answer.CallbackAnswerMiddleware(pre=False),
+)
 repo = TimeSettingsRepository()
 
 
