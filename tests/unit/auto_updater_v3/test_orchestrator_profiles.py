@@ -74,6 +74,10 @@ async def test_process_adv_v3_fetches_bid_profiles_once() -> None:
             return_value=None,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute",
+            return_value=None,
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration.ResolveCalibrationExecutor.execute",
             return_value=None,
         ),

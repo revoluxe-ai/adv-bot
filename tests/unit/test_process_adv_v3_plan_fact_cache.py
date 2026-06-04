@@ -123,6 +123,7 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
             f"{_V3_CPO}.load_rec_orders_per_view_for_v3": AsyncMock(return_value=None),
             f"{_UP}.cost_reallocation.RebalanceExecutor.execute": lambda *a, **k: None,
             f"{_UP}.pay_for_order_gap_enable.PayForOrderGapEnableExecutor.execute": lambda *a, **k: None,
+            f"{_UP}.pay_for_order_over_max_off_on_deep_overspend.PayForOrderOverMaxOffOnDeepOverspendExecutor.execute": lambda *a, **k: None,
             f"{_UP}.resolve_calibration.ResolveCalibrationExecutor.execute": lambda *a, **k: None,
             f"{_RP}.is_resolve_valid": lambda *a, **k: True,
             f"{_RP}.compute_resolve_cost_threshold": lambda *a, **k: 90.0,

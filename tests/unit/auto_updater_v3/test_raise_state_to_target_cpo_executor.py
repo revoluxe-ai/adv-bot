@@ -37,6 +37,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+)
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 from tests.unit.test_auto_updater_v3 import _calc_kw, _sample_profile
 
 
@@ -199,6 +203,45 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
     assert ctx.keywords[0].next_state == []
     assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
     assert len(ctx.keywords[1].next_state) == 1
+
+
+@pytest.mark.unit
+def test_raise_state_skips_up_when_deep_overspend_and_pfo_gt_max() -> None:
+    """При fact > 1.1×max ключ с PFO > max не поднимается до resolve."""
+    max_cpo = 550.0
+    fact = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * max_cpo + 10.0
+    dto_high_pfo = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+    )
+    kw = dto_high_pfo.calculated_keyword
+    stat = kw.cluster_stat.model_copy(
+        update={
+            "conv_views_to_orders": _conv_for_pay_for_order(600.0),
+        }
+    )
+    dto_high_pfo = KeywordDTO.from_context(
+        KeywordV3Context(
+            keyword=kw.model_copy(update={"cluster_stat": stat}),
+            position_profile=None,
+        ),
+        ladder_states=dto_high_pfo.ladder_states,
+    )
+    dto_low_pfo = _dto(ks_id=2, mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        max_pay_for_order=max_cpo,
+        fact_pay_for_order=fact,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto_high_pfo, dto_low_pfo]),
+        adv_state=adv_state,
+    )
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit

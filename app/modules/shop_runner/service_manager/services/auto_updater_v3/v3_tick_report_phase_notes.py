@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
+    FACT_OVER_MAX_DEEP_OVERSPEND_RATIO,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
 )
@@ -121,6 +124,11 @@ def summarize_phase_zero_actions(
             eligibility_by_ks_id=eligibility_by_ks_id,
             fact_pay_for_order=fact_pay_for_order,
             resolve=resolve,
+            max_pay_for_order=max_pay_for_order,
+        ),
+        "pay_for_order_over_max_off_on_deep_overspend": lambda: _note_pfo_off_deep_overspend(
+            prepared,
+            fact_pay_for_order=fact_pay_for_order,
             max_pay_for_order=max_pay_for_order,
         ),
         "resolve_calibration": lambda: _note_resolve_calibration(
@@ -250,6 +258,27 @@ def _note_cost_reallocation(
         "нет пар donor/recipient: potential пуст (все на потолке), "
         "равновесие CPO или нет active для среза"
     )
+
+
+def _note_pfo_off_deep_overspend(
+    prepared: PreparedListLike,
+    *,
+    fact_pay_for_order: float | None,
+    max_pay_for_order: float | None,
+) -> str:
+    if max_pay_for_order is None:
+        return "max недоступен"
+    if fact_pay_for_order is None:
+        return "fact pay_for_order недоступен"
+    threshold = FACT_OVER_MAX_DEEP_OVERSPEND_RATIO * float(max_pay_for_order)
+    if float(fact_pay_for_order) <= threshold:
+        return (
+            f"fact ≤ {FACT_OVER_MAX_DEEP_OVERSPEND_RATIO:.0%}×max "
+            "(deep overspend gate)"
+        )
+    if not prepared:
+        return "нет operable ключей"
+    return "нет active ключей с pay_for_order > max для OFF"
 
 
 def _note_enable_gap(
