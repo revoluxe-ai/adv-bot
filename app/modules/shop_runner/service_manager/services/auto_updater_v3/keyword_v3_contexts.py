@@ -64,8 +64,8 @@ def merge_position_profiles_from_contexts(
         if not profile:
             continue
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is not None and int(ks_id) > 0:
-            profile_by_ks_id[int(ks_id)] = profile
+        if ks_id > 0:
+            profile_by_ks_id[ks_id] = profile
         text_key = (ctx.keyword.text or "").casefold()
         if text_key:
             profile_by_text[text_key] = profile
@@ -77,8 +77,8 @@ def merge_position_profiles_from_contexts(
             continue
         profile: list[PositionProfilePoint] | None = None
         ks_id = kw.keyword_setting_original_id
-        if ks_id is not None and int(ks_id) > 0:
-            profile = profile_by_ks_id.get(int(ks_id))
+        if ks_id > 0:
+            profile = profile_by_ks_id.get(ks_id)
         if profile is None:
             profile = profile_by_text.get((kw.text or "").casefold())
         if profile:
