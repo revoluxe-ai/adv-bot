@@ -37,15 +37,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
     format_keyword_list_target_place_suffix,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-    KeywordV3Eligibility,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-    LadderInputs,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-    KeywordV3Context,
-)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
@@ -329,33 +320,13 @@ def get_advs_keyboard_with_paginator(
 
 def sorting_keywords_for_v3(
     keywords: list[CalculatedKeyword],
-    *,
-    contexts: list[KeywordV3Context] | None = None,
-    ladder_inputs: LadderInputs | None = None,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
 ) -> list[CalculatedKeyword]:
-    """V3: state_cost текущего режима (OFF → MIN); без ladder-контекста — ``pay_for_order`` asc.
-
-    Список в prod сортируется в ``AdvKeywordsSetting`` через ``sort_keywords_for_v3_ui``.
-    Опциональные ``contexts`` / ``ladder_inputs`` / ``eligibility_by_ks_id`` — для unit-тестов SSOT.
-    """
+    """V3: сортировка по возрастанию ``pay_for_order`` (``None`` — в конец списка)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.sort_utils import (
-        pay_for_order_sort_key,
-        sort_keywords_by_current_state_cost,
+        sort_keywords_by_pay_for_order,
     )
 
-    if (
-        contexts is not None
-        and ladder_inputs is not None
-        and eligibility_by_ks_id is not None
-    ):
-        return sort_keywords_by_current_state_cost(
-            keywords,
-            contexts,
-            ladder_inputs,
-            eligibility_by_ks_id,
-        )
-    return sorted(keywords, key=pay_for_order_sort_key)
+    return sort_keywords_by_pay_for_order(keywords)
 
 
 def get_keywords_setting_keyboard(
