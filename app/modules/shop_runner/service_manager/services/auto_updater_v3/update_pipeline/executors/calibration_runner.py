@@ -148,7 +148,6 @@ def run_potential_up_steps(
     ladder_steps_done = 0
     iterations_done = 0
     stop_reason = "budget_exhausted"
-    remaining_potential = 0
     while (
         ladder_steps_done < step_budget
         and iterations_done < _MAX_CALIBRATION_LOOP_ITERATIONS
@@ -255,7 +254,7 @@ def plan_calibration_trim_actions(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
     ladder_inputs: LadderInputs | None = None,
-    max_effective_steps: int = 1,
+    max_effective_steps: int,
 ) -> list[V3Action]:
     """Legacy trim entry: CAL DOWN на ``prepared`` → ``V3Action`` для unit-тестов."""
     from dataclasses import replace
@@ -335,7 +334,7 @@ def plan_calibration_actions(
     aggressiveness: V3RolloutAggressiveness,
     eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
     ladder_inputs: LadderInputs | None = None,
-    max_effective_steps: int = 1,
+    max_effective_steps: int,
 ) -> list[V3Action]:
     """Legacy test entry: CAL UP/DOWN на ``prepared`` → ``V3Action``."""
     from dataclasses import replace

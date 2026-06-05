@@ -155,7 +155,7 @@ def test_resolver_flip_down_to_up_halves_budget() -> None:
         prev=prev,
         current_direct=CalibrationDirect.LOOSEN,
     )
-    assert budget == 4
+    assert budget == 7
 
 
 @pytest.mark.unit

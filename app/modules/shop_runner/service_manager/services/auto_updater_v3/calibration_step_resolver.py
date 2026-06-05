@@ -67,5 +67,5 @@ def resolve_effective_calibration_steps(
     if prev is None:
         return 1
     if prev.direct == current_direct:
-        return min(max(1, prev.effective_steps) * 2, cap)
-    return max(max(1, prev.effective_steps) // 2, 1)
+        return min(max(1, prev.effective_steps) + 1, cap)
+    return max(max(1, prev.effective_steps) - 1, 1)
