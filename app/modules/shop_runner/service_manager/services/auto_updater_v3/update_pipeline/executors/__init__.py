@@ -57,7 +57,6 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     return [
         HardStatusValidateExecutor(),
         NotFullValidateExecutor(),
-        RebalanceExecutor(),
         NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlaceOverspendResetExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
@@ -65,6 +64,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
         RaiseStateToTargetCpoExecutor(),
         ResetOverMaxCpoOnOverspendExecutor(),
         ShelfCleanupExecutor(),
+        RebalanceExecutor(),
         PayForOrderGapEnableExecutor(),
         PayForOrderOverMaxOffOnDeepOverspendExecutor(),
         ResolveCalibrationExecutor(),
