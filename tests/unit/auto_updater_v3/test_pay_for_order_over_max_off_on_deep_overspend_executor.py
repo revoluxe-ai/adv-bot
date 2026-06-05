@@ -132,7 +132,7 @@ def test_skip_when_fact_lt_plan_headroom_ratio() -> None:
 
 @pytest.mark.unit
 def test_off_active_keyword_when_at_plan_headroom_and_pfo_gt_max() -> None:
-    """OFF только если нет ступени с ``cpo <= max`` (все operable выше потолка)."""
+    """OFF при ``pay_for_order > max`` в зоне deep overspend."""
     max_cpo = 550.0
     ks_id = 1
     states = (
@@ -183,8 +183,48 @@ def test_keyword_pfo_over_plan_max_gate() -> None:
 
 
 @pytest.mark.unit
-def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> None:
-    """R↑ поднял на MAX с cpo<=max — pfo_off не гасит, даже если aggregate PFO > max."""
+def test_pfo_off_when_ladder_cpo_at_or_below_max_but_pfo_gt_max() -> None:
+    """pfo_off только по pay_for_order; дешёвая CH-ступень не блокирует OFF."""
+    max_cpo = 550.0
+    ks_id = 17783643
+    states = (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=1,
+            cpo=10.689,
+        ),
+    )
+    dto = _dto(
+        ks_id=ks_id,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        pfo_target=600.0,
+    )
+    dto = KeywordDTO.from_context(
+        KeywordV3Context(
+            keyword=dto.calculated_keyword,
+            position_profile=_sample_profile(),
+        ),
+        ladder_states=states,
+    )
+    adv = _adv_state(fact=700.0, max_cpo=max_cpo)
+    ctx = _context([dto], adv)
+    PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OFF
+    assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
+def test_pfo_off_noop_when_keyword_already_off() -> None:
+    """R↑ не поднимает дорогой ключ; pfo_off не трогает уже OFF."""
     max_cpo = 550.0
     ks_id = 17783643
     states = (
@@ -214,10 +254,8 @@ def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> 
     adv = _adv_state(fact=700.0, max_cpo=max_cpo)
     ctx = _context([dto], adv)
     RaiseStateToTargetCpoExecutor().execute(ctx)
-    # При fact > 90% от max — R↑ пропускает ключи с PFO > max, остаёмся в OFF
     assert dto.current_mode == KeywordStrategyMode.OFF
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
-    # Фаза pfo_off ничего не делает для уже OFF ключа
     assert dto.current_mode == KeywordStrategyMode.OFF
     assert len(dto.next_state) == 0
 
