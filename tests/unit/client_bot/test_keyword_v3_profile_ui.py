@@ -6,15 +6,16 @@ import pytest
 
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     KeywordV3ProfileData,
-    format_keyword_v3_enable_blockers,
+    format_keyword_v3_last_tick_executor_line,
     format_keyword_v3_profile_block,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
-    V3PhaseStats,
-    V3TickReportSnapshot,
 )
 from datetime import datetime, timezone
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.models import (
+    V3KeywordChangeEntry,
+    V3KeywordChangesSnapshot,
+    V3KeywordStepRecord,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
@@ -484,30 +485,107 @@ def test_profile_no_conv_tier_no_max_rk_header() -> None:
 
 
 @pytest.mark.unit
-def test_enable_blockers_shows_raise_not_selected_and_bad_rating() -> None:
-    """OFF + авто + R↑ без подъёма + bad → две причины в карточке."""
-    snapshot = V3TickReportSnapshot(
-        tick_at=datetime.now(timezone.utc),
+def test_last_tick_executor_line_resolve_calibration_up() -> None:
+    """Решающий UP на последнем тике → компактная строка без заголовка-блока."""
+    tick_at = datetime(2026, 6, 2, 17, 59, tzinfo=timezone.utc)
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=tick_at,
         adv_id=1,
-        campaign_mode="NORMAL",
-        fact_cpa=701.0,
-        max_pay_for_order=550.0,
-        phases=[
-            V3PhaseStats(
-                phase_id="raise_state_to_target_cpo",
-                title_ru="R↑",
-                executed=True,
-                up=0,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=42,
+                keyword_text="test kw",
+                stored_mode="MIN_CPA",
+                current_mode="OPTIMUM",
+                steps=[
+                    V3KeywordStepRecord(
+                        executor_name="ResolveCalibrationExecutor",
+                        from_mode="MIN_CPA",
+                        to_mode="OPTIMUM",
+                        action="UP",
+                    ),
+                ],
             ),
         ],
     )
-    text = format_keyword_v3_enable_blockers(
-        hard_status=1,
-        current_mode=KeywordStrategyMode.OFF,
-        status_value="bad",
-        reason_value="less_then_rating_by_orders",
-        tick_snapshot=snapshot,
+    text = format_keyword_v3_last_tick_executor_line(
+        keyword_setting_id=42,
+        keyword_changes=snapshot,
     )
-    assert "R↑ выполнен, но ключ не выбран" in text
-    assert "R↑ пропущен" not in text
-    assert "рейтинг ниже порога" in text
+    assert text.startswith("V3 · cal · 10 · calibration:")
+    assert "↑ MIN_CPA→OPTIMUM" in text
+    assert "20:59:00 02-06-2026" in text
+    assert "Почему ключ не крутится" not in text
+    assert "⚠️" not in text
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_empty_when_no_entry() -> None:
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=datetime.now(timezone.utc),
+        adv_id=1,
+        keyword_entries=[],
+    )
+    assert (
+        format_keyword_v3_last_tick_executor_line(
+            keyword_setting_id=99,
+            keyword_changes=snapshot,
+        )
+        == ""
+    )
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_target_place_only() -> None:
+    tick_at = datetime(2026, 6, 2, 12, 0, tzinfo=timezone.utc)
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=tick_at,
+        adv_id=1,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=7,
+                keyword_text="tp kw",
+                stored_mode="MIN_CPA",
+                current_mode="MIN_CPA",
+                target_place_steps=["15 (R↑)"],
+            ),
+        ],
+    )
+    text = format_keyword_v3_last_tick_executor_line(
+        keyword_setting_id=7,
+        keyword_changes=snapshot,
+    )
+    assert "V3 · R↑ ·" in text
+    assert "tp → 15" in text
+    assert "15:00:00 02-06-2026" in text
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_empty_when_all_noop() -> None:
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=datetime.now(timezone.utc),
+        adv_id=1,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=1,
+                keyword_text="noop",
+                stored_mode="MIN_CPA",
+                current_mode="MIN_CPA",
+                steps=[
+                    V3KeywordStepRecord(
+                        executor_name="ShelfCleanupExecutor",
+                        from_mode="MIN_CPA",
+                        to_mode="MIN_CPA",
+                        action="NOOP",
+                    ),
+                ],
+            ),
+        ],
+    )
+    assert (
+        format_keyword_v3_last_tick_executor_line(
+            keyword_setting_id=1,
+            keyword_changes=snapshot,
+        )
+        == ""
+    )
