@@ -1,7 +1,16 @@
 """Фаза R: симметричный cost reallocation (DOWN дорогого + UP дешёвого).
 
-Помимо сравнения ``state_cost`` (CPO ступени) требуется ``recipient.pay_for_order <
-donor.pay_for_order`` по keyword-level PFO (как в карточке UI).
+Двойная защита от каннибализации бюджета (намеренно, не баг):
+
+1. ``state_cost`` — CPO **целевой ступени** лестницы (CH-профиль, ``StateBinding[2]``).
+2. ``keyword.pay_for_order`` — операционная себестоимость заказа ключа (как в UI).
+
+Пара фиксирована: **max-CPO active** (donor) ↔ **min-CPO potential** (recipient).
+Оба условия проверяются на **этой одной паре**. При провале PFO у min-CPO recipient
+цикл ``break`` — **без** перебора следующих potential с более высоким ladder CPO:
+иначе ключ с плохим keyword PFO мог бы получить UP только потому, что у другого
+кандидата PFO лучше, хотя по лестнице он уже не «самый дешёвый» — это и есть
+каннибализация (лестница обещает дешевизну, фактическая экономика ключа — нет).
 """
 
 from __future__ import annotations
@@ -48,13 +57,28 @@ class RebalanceExecutor:
     """COST_REALLOCATION: перетекание cost из active в potential.
 
     ``potential_up`` — ступени MIN/OPT/MAX **выше** текущего ранга ключа (см.
-    ``StatesListGenerator``). Пока есть куда поднимать и есть дорогой active —
-    режем донора, поднимаем recipient. Выход:
+    ``StatesListGenerator``). На каждой итерации одна пара:
+
+    - donor — active с **максимальным** ``state_cost``;
+    - recipient — potential с **минимальным** ``state_cost`` (actionable UP).
+
+    Условия перетекания (оба на **этой** паре, без fallback на другие potential):
+
+    - ``donor.state_cost > recipient.state_cost`` — по лестнице есть куда переливать;
+    - ``recipient.keyword.pay_for_order < donor.keyword.pay_for_order`` — операционная
+      экономика ключа подтверждает (anti-cannibalization: низкий ladder CPO при
+      плохом keyword PFO не даёт UP).
+
+    Если min-CPO recipient не проходит PFO-гейт — ``break`` всей фазы на тик.
+    Следующие potential (дороже по ladder CPO, но с лучшим PFO) **намеренно**
+    не перебираются: это уже другая операция, не «max-active → min-potential».
+
+    Выход:
 
     - ``no_potential_up`` — некуда поднимать (все operable на потолке / list2 пуст);
     - ``no_current_active`` — нечего резать (все OFF или нет CPO в active);
     - в цикле: нет DOWN донора, нет учтённого UP, CPO-донор ≤ min potential (равновесие),
-      или PFO recipient ≥ PFO donor (нет оснований по операционной себестоимости ключа).
+      или PFO min-CPO recipient ≥ PFO donor (двойная защита: оснований нет).
     """
 
     phase_name = "cost_reallocation"
@@ -98,6 +122,8 @@ class RebalanceExecutor:
                 break
             if donor[2] <= recipient[2]:
                 break
+            # PFO только для пары max-active ↔ min-potential; break без перебора
+            # других potential — намеренная anti-cannibalization (см. module docstring).
             if not _rebalance_allowed_by_pay_for_order(donor, recipient):
                 break
             self._next_state_manager.raise_state_to_target_cpo(donor[0], down_state)
@@ -136,7 +162,12 @@ def _ladder_step_would_change(dto: KeywordDTO, state: KeywordV3LadderState) -> b
 def _pick_cheapest_actionable_recipient(
     potential_states: list[StateBinding],
 ) -> StateBinding | None:
-    """Минимальный CPO в ``potential_up``, для которого UP попадёт в audit."""
+    """Единственный candidate recipient: min ``state_cost`` в ``potential_up`` с audit UP.
+
+    Возвращает ровно одну связку — самую дешёвую по ladder CPO. PFO-гейт в ``execute``
+    проверяется только для неё; при провале другие potential не рассматриваются
+    (см. ``RebalanceExecutor``).
+    """
     for binding in sorted(
         potential_states, key=lambda item: (item[2], item[0].keyword_setting_id)
     ):
@@ -146,6 +177,7 @@ def _pick_cheapest_actionable_recipient(
 
 
 def _pick_most_expensive(states: list[StateBinding]) -> StateBinding:
+    """Donor: active-связка с максимальным ``state_cost`` (пара к min-potential recipient)."""
     return max(states, key=lambda item: (item[2], item[0].keyword_setting_id))
 
 
@@ -181,7 +213,14 @@ def _rebalance_allowed_by_pay_for_order(
     donor: StateBinding,
     recipient: StateBinding,
 ) -> bool:
-    """``True``, если PFO recipient строго ниже PFO donor (основание для перетекания)."""
+    """Второй слой гейта: keyword PFO recipient < keyword PFO donor.
+
+    ``recipient`` всегда min-CPO potential из ``_pick_cheapest_actionable_recipient``.
+    ``False`` означает «лестница дешевле, но ключ дорогой по факту» — UP не даём.
+    Вызывающий код делает ``break`` без поиска альтернативного recipient: перебор
+    potential с большим ladder CPO ослабил бы требование min-potential и открыл бы
+    каннибализацию бюджета в ключ с плохой операционной экономикой.
+    """
     donor_pfo = _keyword_pay_for_order(donor[0], role="donor")
     recipient_pfo = _keyword_pay_for_order(recipient[0], role="recipient")
     return recipient_pfo < donor_pfo
