@@ -6,12 +6,16 @@
 
 Отдельно: **РК 7д**, raw и **сглаженная** ключевая корз→заказ (prior к РК).
 CPO на точке CH = ``к→к`` × сглаженный ``orders_per_cart`` (SSOT ``orders_per_cart_for_ctx``).
+
+На V3-карточке — компактная строка последнего решающего executor на тике
+(``V3KeywordChanges`` Redis, SSOT ``last_decisive_step``).
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from app.client_bot.user_interface.views.keyword_strategy_ui import strategy_mode_letter
@@ -26,22 +30,35 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
     KeywordV3DataDiagnostic,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.executor_phase_map import (
+    EXECUTOR_SHORT_LABEL,
+    phase_id_for_executor,
+    short_label_for_executor,
+    title_ru_for_phase,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.keyword_entry import (
+    find_keyword_change_entry,
+    last_decisive_step,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.models import (
+    V3KeywordChangesSnapshot,
+    V3KeywordStepRecord,
+)
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
         ShelfClickMode,
     )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
-        V3TickReportSnapshot,
-    )
 
-_STATUS_REASON_RU: dict[str, str] = {
-    "less_then_rating_by_orders": "рейтинг ниже порога белого списка (НР)",
-    "below_rec_conversion": "конверсия ниже рекомендуемой полки",
-    "not_relevant_phrase": "фраза не релевантна РК",
-    "turn_off": "хард-статус «отключен»",
-    "black_list": "чёрный список",
+_ACTION_RU: dict[str, str] = {
+    "UP": "↑",
+    "DOWN": "↓",
+    "FORCE_OFF": "OFF",
 }
+
+_TARGET_PLACE_STEP_RE = re.compile(r"^(\d+) \((.+)\)$")
+_MSK_TZ = timezone(timedelta(hours=3))
+_TICK_TIME_FMT = "%H:%M:%S %d-%m-%Y"
 
 _PROFILE_UNAVAILABLE = (
     "📊 *Профиль ключа (V3):* недоступен (нет данных CH/WB)\n"
@@ -242,35 +259,70 @@ def _format_diagnostic_line(
     return line
 
 
-def format_keyword_v3_enable_blockers(
+def _format_tick_at_msk(tick_at: datetime) -> str:
+    """Время тика V3 в MSK для компактной строки executor."""
+    dt = tick_at
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_MSK_TZ).strftime(_TICK_TIME_FMT)
+
+
+def _executor_name_from_short_label(short_label: str) -> str:
+    """Обратный lookup short label → имя executor (fallback — исходная метка)."""
+    for executor_name, label in EXECUTOR_SHORT_LABEL.items():
+        if label == short_label:
+            return executor_name
+    return short_label
+
+
+def _format_decisive_step_body(
+    decisive: V3KeywordStepRecord | str,
+) -> tuple[str, str, str] | None:
+    """Короткая метка, title_ru и тело строки для решающего шага."""
+    if isinstance(decisive, V3KeywordStepRecord):
+        short = short_label_for_executor(decisive.executor_name)
+        title = title_ru_for_phase(phase_id_for_executor(decisive.executor_name))
+        action_ru = _ACTION_RU.get(decisive.action, decisive.action)
+        body = f"{action_ru} {decisive.from_mode}→{decisive.to_mode}"
+        return short, title, body
+
+    match = _TARGET_PLACE_STEP_RE.match(decisive)
+    if match is None:
+        return None
+    place, short = match.group(1), match.group(2)
+    executor_name = _executor_name_from_short_label(short)
+    title = title_ru_for_phase(phase_id_for_executor(executor_name))
+    return short, title, f"tp → {place}"
+
+
+def format_keyword_v3_last_tick_executor_line(
     *,
-    hard_status: int,
-    current_mode: KeywordStrategyMode,
-    status_value: str,
-    reason_value: str,
-    tick_snapshot: "V3TickReportSnapshot | None",
+    keyword_setting_id: int,
+    keyword_changes: V3KeywordChangesSnapshot | None,
 ) -> str:
-    """Почему авто-ключ с ``OFF``/``bad`` не включается (последний V3-тик + whitelist)."""
-    lines: list[str] = []
-    if hard_status == 1 and current_mode == KeywordStrategyMode.OFF:
-        lines.append(
-            "   V3 авто: каждый тик сброс в OFF; подъём — только фаза R↑"
-        )
-        if tick_snapshot is not None:
-            for phase in tick_snapshot.phases:
-                if phase.phase_id != "raise_state_to_target_cpo":
-                    continue
-                if phase.executed and phase.up == 0:
-                    lines.append(
-                        "   R↑ выполнен, но ключ не выбран для подъёма на этом тике"
-                    )
-                break
-    if status_value == "bad":
-        reason_ru = _STATUS_REASON_RU.get(reason_value, reason_value)
-        lines.append(f"   Показы WB: статус bad — {reason_ru}")
-    if not lines:
+    """Компактная строка последнего решающего executor ключа на V3-тике.
+
+    Args:
+        keyword_setting_id: ID ``KeywordSetting``.
+        keyword_changes: Audit последнего тика из Redis; ``None`` — нет данных.
+
+    Returns:
+        ``"V3 · …\\n"`` или пустая строка, если ключ не менялся / нет решающего шага.
+    """
+    if keyword_changes is None:
         return ""
-    return "⚠️ *Почему ключ не крутится:*\n" + "\n".join(lines) + "\n"
+    entry = find_keyword_change_entry(keyword_changes, keyword_setting_id)
+    if entry is None:
+        return ""
+    decisive = last_decisive_step(entry)
+    if decisive is None:
+        return ""
+    parts = _format_decisive_step_body(decisive)
+    if parts is None:
+        return ""
+    short, title, body = parts
+    time_str = _format_tick_at_msk(keyword_changes.tick_at)
+    return f"V3 · {short} · {title}: {body} · {time_str}\n"
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:

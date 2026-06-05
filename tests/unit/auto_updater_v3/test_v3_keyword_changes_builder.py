@@ -28,6 +28,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.builder import (
     build_keyword_changes_snapshot,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.keyword_entry import (
+    find_keyword_change_entry,
+    last_decisive_step,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.models import (
+    V3KeywordChangeEntry,
+    V3KeywordStepRecord,
+)
 from tests.unit.test_auto_updater_v3 import _calc_kw
 
 
@@ -182,3 +190,92 @@ def test_shelf_force_off_counts_ended_off() -> None:
     assert shelf.ended_on == 0
     assert snap.net_force_off == 1
     assert snap.net_on == 0
+
+
+@pytest.mark.unit
+def test_last_decisive_step_picks_last_non_noop() -> None:
+    entry = V3KeywordChangeEntry(
+        keyword_setting_id=1,
+        keyword_text="kw",
+        stored_mode="OFF",
+        current_mode="OPTIMUM",
+        steps=[
+            V3KeywordStepRecord(
+                executor_name="PayForOrderGapEnableExecutor",
+                from_mode="OFF",
+                to_mode="MIN_CPA",
+                action="UP",
+            ),
+            V3KeywordStepRecord(
+                executor_name="ResolveCalibrationExecutor",
+                from_mode="MIN_CPA",
+                to_mode="OPTIMUM",
+                action="UP",
+            ),
+        ],
+    )
+    decisive = last_decisive_step(entry)
+    assert isinstance(decisive, V3KeywordStepRecord)
+    assert decisive.executor_name == "ResolveCalibrationExecutor"
+
+
+@pytest.mark.unit
+def test_last_decisive_step_skips_trailing_noop() -> None:
+    entry = V3KeywordChangeEntry(
+        keyword_setting_id=1,
+        keyword_text="kw",
+        stored_mode="MIN_CPA",
+        current_mode="MIN_CPA",
+        steps=[
+            V3KeywordStepRecord(
+                executor_name="ShelfCleanupExecutor",
+                from_mode="MIN_CPA",
+                to_mode="OPTIMUM",
+                action="UP",
+            ),
+            V3KeywordStepRecord(
+                executor_name="SkipUpTargetPlaceExecutor",
+                from_mode="OPTIMUM",
+                to_mode="OPTIMUM",
+                action="NOOP",
+            ),
+        ],
+    )
+    decisive = last_decisive_step(entry)
+    assert isinstance(decisive, V3KeywordStepRecord)
+    assert decisive.executor_name == "ShelfCleanupExecutor"
+
+
+@pytest.mark.unit
+def test_last_decisive_step_target_place_when_all_noop() -> None:
+    entry = V3KeywordChangeEntry(
+        keyword_setting_id=7,
+        keyword_text="kw",
+        stored_mode="MIN_CPA",
+        current_mode="MIN_CPA",
+        steps=[
+            V3KeywordStepRecord(
+                executor_name="SkipUpTargetPlaceExecutor",
+                from_mode="MIN_CPA",
+                to_mode="MIN_CPA",
+                action="NOOP",
+            ),
+        ],
+        target_place_steps=["15 (R↑)", "20 (R↑)"],
+    )
+    assert last_decisive_step(entry) == "20 (R↑)"
+
+
+@pytest.mark.unit
+def test_find_keyword_change_entry_by_id() -> None:
+    dto = _dto(5)
+    dto.current_mode = NextState(
+        new_mode=KeywordMode.OPTIMUM,
+        executor_name="ResolveCalibrationExecutor",
+    )
+    snap = build_keyword_changes_snapshot([dto], adv_id=1)
+    found = find_keyword_change_entry(snap, 5)
+    assert found is not None
+    assert found.keyword_setting_id == 5
+    assert find_keyword_change_entry(snap, 999) is None
+    assert find_keyword_change_entry(None, 5) is None
