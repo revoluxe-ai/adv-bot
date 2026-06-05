@@ -1,6 +1,12 @@
-"""Фаза R: симметричный cost reallocation (DOWN дорогого + UP дешёвого)."""
+"""Фаза R: симметричный cost reallocation (DOWN дорогого + UP дешёвого).
+
+Помимо сравнения ``state_cost`` (CPO ступени) требуется ``recipient.pay_for_order <
+donor.pay_for_order`` по keyword-level PFO (как в карточке UI).
+"""
 
 from __future__ import annotations
+
+import logging
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
@@ -28,6 +34,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     NextStateManager,
 )
 
+logger = logging.getLogger(__name__)
+
 # Верхняя граница пар DOWN+UP за тик (каждая итерация — одна пара при наличии donor/recipient).
 _MAX_REBALANCE_CYCLES = 3000
 
@@ -45,7 +53,8 @@ class RebalanceExecutor:
 
     - ``no_potential_up`` — некуда поднимать (все operable на потолке / list2 пуст);
     - ``no_current_active`` — нечего резать (все OFF или нет CPO в active);
-    - в цикле: нет DOWN донора, нет учтённого UP, CPO-донор ≤ min potential (равновесие).
+    - в цикле: нет DOWN донора, нет учтённого UP, CPO-донор ≤ min potential (равновесие),
+      или PFO recipient ≥ PFO donor (нет оснований по операционной себестоимости ключа).
     """
 
     phase_name = "cost_reallocation"
@@ -88,6 +97,8 @@ class RebalanceExecutor:
             if recipient is None:
                 break
             if donor[2] <= recipient[2]:
+                break
+            if not _rebalance_allowed_by_pay_for_order(donor, recipient):
                 break
             self._next_state_manager.raise_state_to_target_cpo(donor[0], down_state)
             self._next_state_manager.raise_state_to_target_cpo(
@@ -136,3 +147,41 @@ def _pick_cheapest_actionable_recipient(
 
 def _pick_most_expensive(states: list[StateBinding]) -> StateBinding:
     return max(states, key=lambda item: (item[2], item[0].keyword_setting_id))
+
+
+def _keyword_pay_for_order(dto: KeywordDTO, *, role: str) -> float:
+    """Вернуть ``keyword.pay_for_order``; при ``None`` — error-лог и ``ValueError``.
+
+    Args:
+        dto: Ключ donor/recipient.
+        role: ``"donor"`` или ``"recipient"`` для диагностики.
+
+    Returns:
+        Положительный PFO ключа.
+
+    Raises:
+        ValueError: PFO недоступен при наличии operable state (инвариант нарушен).
+    """
+    pfo = dto.calculated_keyword.pay_for_order
+    if pfo is None:
+        logger.error(
+            "rebalance: keyword pay_for_order missing role=%s ks_id=%s adv_id=%s",
+            role,
+            dto.keyword_setting_id,
+            dto.calculated_keyword.adv_id,
+        )
+        raise ValueError(
+            f"rebalance: keyword pay_for_order missing "
+            f"(role={role}, ks_id={dto.keyword_setting_id})"
+        )
+    return float(pfo)
+
+
+def _rebalance_allowed_by_pay_for_order(
+    donor: StateBinding,
+    recipient: StateBinding,
+) -> bool:
+    """``True``, если PFO recipient строго ниже PFO donor (основание для перетекания)."""
+    donor_pfo = _keyword_pay_for_order(donor[0], role="donor")
+    recipient_pfo = _keyword_pay_for_order(recipient[0], role="recipient")
+    return recipient_pfo < donor_pfo
