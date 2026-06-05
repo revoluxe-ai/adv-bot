@@ -2,6 +2,8 @@
 
 FULL (есть CH ``position_profile``): ``o`` / ``M`` / ``O`` / ``C`` по ``KeywordStrategyMode``.
 Без матрицы: GAP → ``G``, PFO → ``N`` — подмена только в списке кнопок, updater не затрагивается.
+Перед отрисовкой списка V3 ``sort_keywords_for_v3_ui`` подставляет ``position_profile`` из CH
+(без второго ``fetch_keywords_from_database``).
 Карточка ключа использует ``strategy_mode_letter`` без tier-подмены.
 """
 
