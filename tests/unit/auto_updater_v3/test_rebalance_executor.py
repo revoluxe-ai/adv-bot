@@ -56,6 +56,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
+# Donor PFO > recipient PFO — основание для ребаланса по keyword.pay_for_order.
+_DONOR_CONV = _conv_for_pay_for_order(500.0)
+_RECIPIENT_CONV = _conv_for_pay_for_order(200.0)
+
 
 def _ladder_states(
     ks_id: int,
@@ -187,14 +191,20 @@ def _dto(
     ladder: tuple[KeywordV3LadderState, ...] | None = None,
     hard_status: int = 2,
     target_place: int | None = None,
+    conv: float | None = None,
+    cpm_set_bid: int = 200,
 ) -> KeywordDTO:
-    kw = _calc_kw(
-        ks_id=ks_id,
-        text=f"kw{ks_id}",
-        mode=mode,
-        rating=1.0,
-        hard_status=hard_status,
-    )
+    calc_kwargs: dict[str, object] = {
+        "ks_id": ks_id,
+        "text": f"kw{ks_id}",
+        "mode": mode,
+        "rating": 1.0,
+        "hard_status": hard_status,
+        "cpm_set_bid": cpm_set_bid,
+    }
+    if conv is not None:
+        calc_kwargs["conv"] = conv
+    kw = _calc_kw(**calc_kwargs)
     states = ladder if ladder is not None else _ladder_states(ks_id)
     if target_place is None:
         for state in states:
@@ -337,12 +347,14 @@ def test_rebalance_one_cycle_down_donor_up_recipient() -> None:
         ks_id=1,
         mode=KeywordStrategyMode.MAX_CONVERSION,
         ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        conv=_DONOR_CONV,
     )
     recipient = _dto(
         ks_id=2,
         mode=KeywordStrategyMode.OFF,
         target_place=0,
         ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+        conv=_RECIPIENT_CONV,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[donor, recipient]),
@@ -362,12 +374,14 @@ def test_rebalance_audit_up_matches_down_plus_force_off() -> None:
         ks_id=1,
         mode=KeywordStrategyMode.MAX_CONVERSION,
         ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        conv=_DONOR_CONV,
     )
     recipient = _dto(
         ks_id=2,
         mode=KeywordStrategyMode.OFF,
         target_place=0,
         ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+        conv=_RECIPIENT_CONV,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[donor, recipient]),
@@ -396,12 +410,14 @@ def test_rebalance_recipient_up_skips_alias_min_to_opt_same_place() -> None:
             max_place=30,
         ),
         target_place=30,
+        conv=_DONOR_CONV,
     )
     recipient = _dto(
         ks_id=2,
         mode=KeywordStrategyMode.MIN_CPA,
         target_place=10,
         ladder=_alias_up_ladder_states(2, max_cpo=350.0),
+        conv=_RECIPIENT_CONV,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[donor, recipient]),
@@ -441,12 +457,14 @@ def test_rebalance_up_skips_alias_same_target_place_in_audit() -> None:
             max_place=30,
         ),
         target_place=30,
+        conv=_DONOR_CONV,
     )
     recipient = _dto(
         ks_id=2,
         mode=KeywordStrategyMode.OFF,
         target_place=0,
         ladder=_alias_up_ladder_states(2, max_cpo=310.0),
+        conv=_RECIPIENT_CONV,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[donor, recipient]),
@@ -522,12 +540,14 @@ def test_rebalance_stops_mid_loop_when_potential_becomes_empty() -> None:
         ks_id=1,
         mode=KeywordStrategyMode.MAX_CONVERSION,
         ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        conv=_DONOR_CONV,
     )
     recipient = _dto(
         ks_id=2,
         mode=KeywordStrategyMode.OFF,
         target_place=0,
         ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+        conv=_RECIPIENT_CONV,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[donor, recipient]),
@@ -539,6 +559,57 @@ def test_rebalance_stops_mid_loop_when_potential_becomes_empty() -> None:
     snap = build_keyword_changes_snapshot(ctx.keywords, adv_id=1)
     realloc = next(p for p in snap.by_phase if p.phase_id == "cost_reallocation")
     assert realloc.up == realloc.down + realloc.force_off
+
+
+@pytest.mark.unit
+def test_rebalance_stops_when_recipient_pfo_not_below_donor_pfo() -> None:
+    """CPO позволяет, но recipient PFO ≥ donor PFO — пару не применяем."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        conv=_RECIPIENT_CONV,
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+        conv=_DONOR_CONV,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(),
+    )
+    RebalanceExecutor().execute(ctx)
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[1].next_state == []
+
+
+@pytest.mark.unit
+def test_rebalance_raises_when_pay_for_order_missing() -> None:
+    """При operable state без PFO — error до мутации next_state."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        cpm_set_bid=0,
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=500.0, max_cpo=550.0),
+        conv=_RECIPIENT_CONV,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(),
+    )
+    with pytest.raises(ValueError, match="pay_for_order missing"):
+        RebalanceExecutor().execute(ctx)
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[1].next_state == []
 
 
 @pytest.mark.unit

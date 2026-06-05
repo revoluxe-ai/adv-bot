@@ -256,7 +256,7 @@ def _note_cost_reallocation(
         return "нет operable ключей"
     return (
         "нет пар donor/recipient: potential пуст (все на потолке), "
-        "равновесие CPO или нет active для среза"
+        "равновесие CPO, PFO recipient ≥ PFO donor или нет active для среза"
     )
 
 
