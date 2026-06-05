@@ -16,7 +16,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     pick_off_ladder_state,
-    resolve_current_ladder_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
@@ -27,7 +26,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 
 
 class PayForOrderOverMaxOffOnDeepOverspendExecutor:
-    """OFF operable ключей с ``pay_for_order > max`` при ``fact ≥ ratio×plan.max``."""
+    """OFF operable ключей с ``pay_for_order > max`` при ``fact ≥ ratio×plan.max``.
+
+    Per-key только ``keyword.pay_for_order``; trim по CH-матрице — ``ResetOverMaxCpoOnOverspendExecutor``.
+    """
 
     phase_name = "pay_for_order_over_max_off_on_deep_overspend"
     _skip_reason: str | None = None
@@ -65,23 +67,11 @@ def _phase_skip_reason(adv_state: AdvState) -> str | None:
 
 
 def _should_off_keyword(dto: KeywordDTO, *, max_pay: float) -> bool:
-    """Operable, не OFF; OFF только если нет ladder-ступени с ``cpo <= max`` и PFO > max.
-
-    После R↑ ключ может иметь aggregate ``pay_for_order`` выше плана, но operable
-    ступень CH с ``cpo <= max_pay`` — такой ключ не гасим (regression: R↑ → pfo_off).
-    """
+    """Operable active ключ с ``pay_for_order`` строго выше ``plan.max_pay_for_order``."""
     if not is_v3_operable_hard_status(dto.hard_status):
         return False
     if dto.keyword_setting_id == 0:
         return False
     if dto.current_mode == KeywordStrategyMode.OFF:
         return False
-    ceiling = float(max_pay)
-    current = resolve_current_ladder_state(dto)
-    if (
-        current is not None
-        and current.cpo is not None
-        and float(current.cpo) <= ceiling
-    ):
-        return False
-    return keyword_pay_for_order_over_plan_max(dto, max_pay=ceiling)
+    return keyword_pay_for_order_over_plan_max(dto, max_pay=float(max_pay))
