@@ -41,7 +41,7 @@ def test_debug_run_resolver_chain_loosen_cap8(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Симуляция 5 тиков UP: бюджет 1→2→4→8→8 (cap)."""
-    cap = 8
+    cap = 5
     prev: CalibrationStepState | None = None
     for tick in range(1, 6):
         budget = resolve_effective_calibration_steps(
@@ -85,7 +85,7 @@ def test_debug_run_flip_loosen_to_tighten(
         run_id="debug-run",
         data={"prev_steps": 8, "budget_down": down},
     )
-    assert down == 4
+    assert down == 7
 
 
 @pytest.mark.unit

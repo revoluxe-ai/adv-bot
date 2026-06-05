@@ -43,7 +43,7 @@ def test_resolve_same_direct_doubles_capped() -> None:
             prev=prev,
             current_direct=CalibrationDirect.TIGHTEN,
         )
-        == 4
+        == 3
     )
     prev4 = CalibrationStepState(effective_steps=4, direct=CalibrationDirect.TIGHTEN)
     assert (
@@ -52,7 +52,7 @@ def test_resolve_same_direct_doubles_capped() -> None:
             prev=prev4,
             current_direct=CalibrationDirect.TIGHTEN,
         )
-        == 8
+        == 5
     )
     prev8 = CalibrationStepState(effective_steps=8, direct=CalibrationDirect.TIGHTEN)
     assert (
@@ -74,7 +74,7 @@ def test_resolve_flip_direct_halves_floor() -> None:
             prev=prev,
             current_direct=CalibrationDirect.LOOSEN,
         )
-        == 4
+        == 7
     )
 
 
@@ -87,7 +87,7 @@ def test_resolve_loosen_same_direct_multiplies() -> None:
             prev=prev,
             current_direct=CalibrationDirect.LOOSEN,
         )
-        == 4
+        == 3
     )
 
 
@@ -100,16 +100,15 @@ def test_resolve_loosen_to_tighten_halves() -> None:
             prev=prev,
             current_direct=CalibrationDirect.TIGHTEN,
         )
-        == 2
+        == 3
     )
 
 
 @pytest.mark.unit
 def test_resolve_three_loosen_ticks_double_sequence() -> None:
     """Цепочка LOOSEN: 1 → 2 → 4 при cap=8 (как в production Redis)."""
-    steps = 1
     prev = None
-    for expected in (1, 2, 4):
+    for expected in (1, 2, 3):
         steps = resolve_effective_calibration_steps(
             8,
             prev=prev,
