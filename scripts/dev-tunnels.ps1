@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 # Скрипт лежит в scripts/ — корень репозитория на уровень выше
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-$defaultKubeconfig = Join-Path $repoRoot "k8s\new-cluster\new-cluster-config.yaml"
+$defaultKubeconfig = "C:\twc-diligent-dunnock-config.yaml"
 if ($env:DEV_TUNNELS_KUBECONFIG) {
     $kubeconfig = $env:DEV_TUNNELS_KUBECONFIG
 } else {
