@@ -75,6 +75,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,14 @@ def _sync_tick_data_after_pipeline(
         )
 
 
+def only_relevant_phrase_filter(keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
+    only_relevant_phrase = []
+    for kw in keywords:
+        if kw.relevant:
+            only_relevant_phrase.append(kw)
+    return only_relevant_phrase
+
+
 async def process_adv_v3(
     complex_adv: ComplexAdv,
     *,
@@ -139,7 +148,8 @@ async def process_adv_v3(
     try:
         keywords = await complex_adv.get_keywords()
         tick_report.set_aggression_before(keywords)
-
+        if complex_adv.auto_add_only_relevant_phrase:
+            keywords = only_relevant_phrase_filter(keywords)
         tick_data = await data_mgr.load(
             complex_adv,
             wb_shop_data_manager=wb_shop_data_manager,
