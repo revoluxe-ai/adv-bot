@@ -168,18 +168,20 @@ class AutoShelfBidControlViewProvider:
 
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
+        fact_predict_orders: float | None = None
         resolve_cpo: float | None = None
         if auto_adv_id is not None:
             plan_fact_reader = PlanFactReader()
             plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
             if plan_fact_summary is not None:
+                fact_predict_orders = plan_fact_summary.fact_predict_orders
                 fact_cpo = plan_fact_summary.fact_pay_for_order
             # resolve_cpo вычисляем из настроек кампании
             resolve_cpo = resolve_target_cost(
                 adv.plan_for_sales_for_day,
                 adv.target_price_for_order,
                 adv.max_price_for_order,
-                None,
+                fact_predict_orders,
             )
         optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
 
