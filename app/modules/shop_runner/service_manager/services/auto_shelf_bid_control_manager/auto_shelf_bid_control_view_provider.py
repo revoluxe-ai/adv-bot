@@ -214,15 +214,20 @@ class AutoShelfBidControlViewProvider:
             if nmid
             else []
         )
-        best = (
-            await self._analytics.get_best_bid_by_cart_cpa(
+        if nmid and optimization_metric == OptimizationMetric.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
                 nmid=nmid,
                 from_ts=stats_from_ts,
                 currency=currency,
             )
-            if nmid
-            else None
-        )
+        elif nmid:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=nmid,
+                from_ts=stats_from_ts,
+                currency=currency,
+            )
+        else:
+            best = None
         target_main = (
             self._target_main_impressions(target_test, float(settings_obj.test_share))
             if settings_obj and target_test is not None
