@@ -387,6 +387,8 @@ class WBShopDataManager:
                 get_keywords_func=self.__get_calculated_keywords,
                 search_adv=pre_adv.search_adv,
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
+                fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
+                resolve_cpo=pre_adv.resolved_target_pay_for_order,
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [

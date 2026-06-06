@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from .optimization_metric import OptimizationMetric
+
 
 @dataclass(frozen=True, slots=True)
 class BidPointStatsDTO:
@@ -67,4 +69,7 @@ class AutoShelfBidControlViewDTO:
     cycle_bid_points: list[BidPointStatsDTO]  # агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
+    optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
+    fact_cpo: float | None  # фактическое CPO кампании
+    resolve_cpo: float | None  # resolve/target CPO кампании
 

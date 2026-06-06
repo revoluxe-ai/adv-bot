@@ -77,9 +77,10 @@ def test_run_preamble_increments_pfo_off_count_when_phase_produces_actions() -> 
         result = UpdatePipelineManager().run_preamble(ctx)
 
     assert isinstance(result, PreamblePipelineRunResult)
+    # Фаза производит действие (force_off), когда fact > max_cpo
     assert result.pfo_off_count == 1
+    assert len(dto.next_state) == 1
     assert dto.current_mode == KeywordStrategyMode.OFF
-
 
 @pytest.mark.unit
 def test_run_preamble_pfo_off_count_zero_when_phase_skipped() -> None:

@@ -14,12 +14,15 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     BidPointStatsDTO,
+    OptimizationMetric,
 )
 
 pytestmark = pytest.mark.unit
 
 
-def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
+def _view_with_bid_point(
+    optimization_metric: OptimizationMetric = OptimizationMetric.CPC,
+) -> AutoShelfBidControlViewDTO:
     return AutoShelfBidControlViewDTO(
         nmid=10749810,
         auto_adv_id=32824944,
@@ -72,6 +75,9 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
         ],
         last_reason="initialized",
         warnings=[],
+        optimization_metric=optimization_metric,
+        fact_cpo=150.0,
+        resolve_cpo=100.0,
     )
 
 
@@ -113,3 +119,17 @@ def test_render_shows_bid_points_in_rubles_not_raw_kopecks() -> None:
     assert "Минимальная ставка WB: 120 ₽" in text
     assert "Максимальная ставка: 500 ₽" in text
     assert "Шаг между тестовыми ставками: 1 ₽" in text
+
+
+def test_render_shows_optimization_metric_cpc() -> None:
+    """Отображение метрики оптимизации CPC."""
+    view = _view_with_bid_point(optimization_metric=OptimizationMetric.CPC)
+    text = render_auto_shelf_bid_control_message(view)
+    assert "Оптимизация: CPC" in text
+
+
+def test_render_shows_optimization_metric_ctr() -> None:
+    """Отображение метрики оптимизации CTR."""
+    view = _view_with_bid_point(optimization_metric=OptimizationMetric.CTR)
+    text = render_auto_shelf_bid_control_message(view)
+    assert "Оптимизация: CTR" in text

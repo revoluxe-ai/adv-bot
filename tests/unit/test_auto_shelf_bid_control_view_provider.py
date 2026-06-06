@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -30,11 +30,16 @@ async def test_build_view_returns_warning_when_adv_setting_not_found() -> None:
 
 
 @pytest.mark.asyncio
-async def test_build_view_auto_creates_default_settings_for_single_nmid() -> None:
+async def test_build_view_auto_creates_default_settings_for_single_nmid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     adv = MagicMock()
     adv.nmids = [111]
     adv.adv_id = 12345
     adv.auto_shelf_bid_control_enabled = False
+    adv.plan_for_sales_for_day = None
+    adv.target_price_for_order = None
+    adv.max_price_for_order = None
     settings_obj = MagicMock()
     settings_obj.currency = "RUB"
     settings_obj.target_test_impressions = 500
@@ -56,6 +61,14 @@ async def test_build_view_auto_creates_default_settings_for_single_nmid() -> Non
     provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
+    # Mock PlanFactReader to avoid CH connection
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
     view = await provider.build_view(adv_setting_original_id=1)
 
     repository.get_or_create_default_settings.assert_awaited_once_with(111)
@@ -64,11 +77,16 @@ async def test_build_view_auto_creates_default_settings_for_single_nmid() -> Non
 
 
 @pytest.mark.asyncio
-async def test_build_view_contains_gate_dry_run_and_missing_state_warnings() -> None:
+async def test_build_view_contains_gate_dry_run_and_missing_state_warnings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     adv = MagicMock()
     adv.nmids = [111]
     adv.adv_id = 12345
     adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = None
+    adv.target_price_for_order = None
+    adv.max_price_for_order = None
     settings_obj = MagicMock()
     settings_obj.currency = "RUB"
     settings_obj.target_test_impressions = 500
@@ -91,6 +109,14 @@ async def test_build_view_contains_gate_dry_run_and_missing_state_warnings() -> 
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
     provider._app_dry_run = lambda: True  # type: ignore[method-assign]
 
+    # Mock PlanFactReader to avoid CH connection
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
     view = await provider.build_view(adv_setting_original_id=1)
 
     assert "state_missing" in view.warnings
@@ -100,12 +126,17 @@ async def test_build_view_contains_gate_dry_run_and_missing_state_warnings() -> 
 
 
 @pytest.mark.asyncio
-async def test_build_view_uses_wb_min_bid_not_actual_bid() -> None:
+async def test_build_view_uses_wb_min_bid_not_actual_bid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """min_bid_minor — минимум WB из кэша, не текущая ставка и не CH."""
     adv = MagicMock()
     adv.nmids = [111]
     adv.adv_id = 12345
     adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = None
+    adv.target_price_for_order = None
+    adv.max_price_for_order = None
     settings_obj = MagicMock()
     settings_obj.currency = "RUB"
     settings_obj.target_test_impressions = 500
@@ -129,6 +160,14 @@ async def test_build_view_uses_wb_min_bid_not_actual_bid() -> None:
     bid_cache_value.bid_minor = 20_000
     provider._bid_cache.get_bid = AsyncMock(return_value=bid_cache_value)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=15_000)  # type: ignore[method-assign]
+
+    # Mock PlanFactReader to avoid CH connection
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
 
     view = await provider.build_view(adv_setting_original_id=1)
 

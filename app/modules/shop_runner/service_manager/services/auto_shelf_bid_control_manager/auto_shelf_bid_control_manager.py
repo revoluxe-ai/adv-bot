@@ -252,6 +252,8 @@ class AutoShelfBidControlManager:
         actual_bid_minor: int | None,
         min_bid_minor: int,
         max_bid_minor: int,
+        fact_cpo: float | None = None,
+        resolve_cpo: float | None = None,
     ) -> int:
         def _in_window(bid: int) -> int:
             return self._clamp_bid_minor(
@@ -267,14 +269,28 @@ class AutoShelfBidControlManager:
             currency=currency,
             current_cycle_started_at=cycle_started_at,
             previous_cycle_started_at=previous_cycle_started_at,
+            fact_cpo=fact_cpo,
+            resolve_cpo=resolve_cpo,
         )
         if global_best is not None:
             return _in_window(global_best.bid_minor)
-        best = await self._analytics.get_best_bid_by_cart_cpa(
-            nmid=nmid,
-            from_ts=report_from,
-            currency=currency,
-        )
+
+        # Fallback к статистике за день с учётом метрики оптимизации
+        from .dto import OptimizationMetric, resolve_optimization_metric
+        metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
+
+        if metric == OptimizationMetric.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
+                nmid=nmid,
+                from_ts=report_from,
+                currency=currency,
+            )
+        else:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=nmid,
+                from_ts=report_from,
+                currency=currency,
+            )
         if best is not None:
             return _in_window(best.bid_minor)
         if current_main_bid_minor is not None:
@@ -486,6 +502,8 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             min_bid_minor=min_bid_minor,
             max_bid_minor=int(settings_obj.max_bid_minor),
+            fact_cpo=complex_adv.fact_pay_for_order,
+            resolve_cpo=complex_adv.resolve_cpo,
         )
         state.current_main_bid_minor = best_bid
         state.current_mode = "main"
@@ -557,6 +575,8 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             min_bid_minor=min_bid_minor,
             max_bid_minor=max_bid,
+            fact_cpo=complex_adv.fact_pay_for_order,
+            resolve_cpo=complex_adv.resolve_cpo,
         )
         if int(main_bid) != target_main_bid:
             main_bid = target_main_bid
@@ -621,6 +641,8 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=int(settings_obj.max_bid_minor),
+                fact_cpo=complex_adv.fact_pay_for_order,
+                resolve_cpo=complex_adv.resolve_cpo,
             )
             new_test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
             state.previous_cycle_started_at = state.current_cycle_started_at

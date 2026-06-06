@@ -75,6 +75,8 @@ class ComplexAdv:
         shop_id: str | None = None,
         get_keywords_func: GetKeywordsProvider | None = None,
         min_nmids_bids: AdvMinNmidsBids | None = None,
+        fact_pay_for_order: float | None = None,
+        resolve_cpo: float | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
@@ -93,6 +95,8 @@ class ComplexAdv:
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
+        self._fact_pay_for_order: float | None = fact_pay_for_order
+        self._resolve_cpo: float | None = resolve_cpo
 
     def __repr__(self):
         return str(self._adv_setting.id)
@@ -498,3 +502,13 @@ class ComplexAdv:
     @property
     def max_user_cpm(self) -> int:
         return self._adv_setting.max_cpm
+
+    @property
+    def fact_pay_for_order(self) -> float | None:
+        """Фактическое CPO кампании (cost per order) из plan-fact статистики."""
+        return self._fact_pay_for_order
+
+    @property
+    def resolve_cpo(self) -> float | None:
+        """Resolve CPO кампании (целевое/разрешенное значение CPO)."""
+        return self._resolve_cpo

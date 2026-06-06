@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     BidPointStatsDTO,
+    OptimizationMetric,
 )
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -56,6 +57,13 @@ def _bid_point_cpc_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
     return (float(cpc), point.bid_minor)
 
 
+def _bid_point_ctr_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
+    """Ключ сортировки: лучший CTR первым (по убыванию CTR)."""
+    ctr = point.ctr if point.ctr is not None else float("-inf")
+    # Отрицательный CTR для сортировки по убыванию
+    return (-float(ctr), point.bid_minor)
+
+
 def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
     """Значок статуса теста по ставке в текущем цикле."""
     if point.is_covered:
@@ -65,13 +73,20 @@ def cycle_bid_coverage_icon(point: BidPointStatsDTO) -> str:
 
 def select_cycle_bid_points_for_viewer(
     points: list[BidPointStatsDTO],
+    optimization_metric: OptimizationMetric = OptimizationMetric.CPC,
 ) -> list[BidPointStatsDTO]:
-    """Ставки цикла с показами для просмотрщика, от лучшего CPC к худшему.
+    """Ставки цикла с показами для просмотрщика.
+
+    Сортировка зависит от метрики оптимизации:
+    - CPC: от лучшего (меньший) к худшему (больший)
+    - CTR: от лучшего (больший) к худшему (меньший)
 
     В списке все точки с ``impressions > 0``. ``is_covered`` — порог test показов
     достигнут (✅), иначе набор показов (⏳).
     """
     with_impressions = [p for p in points if p.impressions > 0]
+    if optimization_metric == OptimizationMetric.CTR:
+        return sorted(with_impressions, key=_bid_point_ctr_sort_key)
     return sorted(with_impressions, key=_bid_point_cpc_sort_key)
 
 
@@ -119,16 +134,29 @@ def slice_bid_points_page(
     return points[start : start + page_size]
 
 
-BID_POINT_VIEWER_HEADER = "Ставки цикла (есть показы, сортировка по CPC):"
-BID_POINT_VIEWER_LEGEND = (
-    "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC (есть клики)"
-)
+def _bid_point_viewer_header(optimization_metric: OptimizationMetric) -> str:
+    """Заголовок для страницы покрытия цикла в зависимости от метрики."""
+    metric_name = "CTR" if optimization_metric == OptimizationMetric.CTR else "CPC"
+    return f"Ставки цикла (есть показы, сортировка по {metric_name}):"
+
+
+def _bid_point_viewer_legend(optimization_metric: OptimizationMetric) -> str:
+    """Легенда для страницы покрытия цикла в зависимости от метрики."""
+    if optimization_metric == OptimizationMetric.CTR:
+        return "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CTR"
+    return "✅ покрыта · ⏳ набор показов · ⭐ лучшая глобальная по CPC (есть клики)"
+
+
+# Legacy константы для обратной совместимости
+BID_POINT_VIEWER_HEADER = _bid_point_viewer_header(OptimizationMetric.CPC)
+BID_POINT_VIEWER_LEGEND = _bid_point_viewer_legend(OptimizationMetric.CPC)
 
 
 def render_bid_point_viewer_message(
     page: int,
     points: list[BidPointStatsDTO],
     page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
+    optimization_metric: OptimizationMetric = OptimizationMetric.CPC,
 ) -> str:
     """До ``page_size`` строк покрытий цикла на одной странице просмотрщика."""
     total = len(points)
@@ -137,9 +165,11 @@ def render_bid_point_viewer_message(
     chunk = slice_bid_points_page(points, safe_page, page_size)
     lines = [format_bid_point_line(point) for point in chunk]
     body = "\n".join(lines) if lines else "Нет ставок с показами в текущем цикле."
+    header = _bid_point_viewer_header(optimization_metric)
+    legend = _bid_point_viewer_legend(optimization_metric)
     return (
-        f"{BID_POINT_VIEWER_HEADER}\n"
-        f"{BID_POINT_VIEWER_LEGEND}\n\n"
+        f"{header}\n"
+        f"{legend}\n\n"
         f"{body}\n\n"
         f"Страница {safe_page + 1} / {total_pages}"
     )
@@ -199,6 +229,11 @@ def build_bid_point_viewer_keyboard(
     return builder.as_markup()
 
 
+def _format_optimization_metric(metric: OptimizationMetric) -> str:
+    """Отформатировать метрику оптимизации для отображения."""
+    return "CTR" if metric == OptimizationMetric.CTR else "CPC"
+
+
 def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> str:
     """Собрать основной экран управления ставкой в полках."""
     state_missing = (
@@ -210,6 +245,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     dry_run_text = "включён" if view.dry_run else "выключен"
     gate_text = "подтверждён" if view.bid_units_confirmed else "не подтверждён"
     enabled_text = "включено" if view.enabled else "выключено"
+    optimization_text = _format_optimization_metric(view.optimization_metric)
     return (
         "⚙️ Управление ставкой в полках\n\n"
         f"Артикул: {view.nmid}\n"
@@ -219,6 +255,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Gate ставок: {gate_text}\n\n"
         f"{state_missing}"
         f"Режим сейчас: {view.current_mode or '—'}\n"
+        f"Оптимизация: {optimization_text}\n"
         f"Текущая ставка WB: {format_bid(view.actual_bid_minor, view.currency)}\n"
         f"Рабочая ставка main: {format_bid(view.current_main_bid_minor, view.currency)}\n"
         f"Тестовая ставка test: {format_bid(view.current_test_bid_minor, view.currency)}\n"
