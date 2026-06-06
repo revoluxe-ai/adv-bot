@@ -155,3 +155,34 @@ class AutoShelfBidControlAnalyticsRepository:
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
 
+    async def get_best_bid_by_ctr(
+        self,
+        nmid: int,
+        from_ts: datetime,
+        currency: str,
+        *,
+        mode: str | None = None,
+        to_ts: datetime | None = None,
+    ) -> BidStatsDTO | None:
+        """Лучшая ставка: max CTR ``clicks/impressions`` при ``impressions > 0``.
+
+        Для режима оптимизации по CTR, когда фактическое CPO ниже resolve CPO.
+        """
+        query = self._load_sql("get_best_bid_by_ctr.sql")
+        params = {
+            "nmid": nmid,
+            "from_ts": from_ts,
+            "to_ts": to_ts,
+            "currency": currency,
+            "mode": mode,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return None
+        names = cast(tuple[object, ...], result.column_names)
+        column_names = [str(name) for name in names]
+        row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
+        return self._build_bid_stats_dto(row)
+

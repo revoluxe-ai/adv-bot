@@ -16,6 +16,7 @@ from .auto_shelf_bid_control_analytics_repository import (
 )
 from .auto_shelf_bid_control_manager import AutoShelfBidControlManager
 from .bid_selection import resolve_cycle_best_bids
+from .dto import OptimizationMetric, resolve_optimization_metric
 from .settings_normalizer import compute_settings_repair, repair_state_test_bid_minor
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .bid_units import (
@@ -25,7 +26,11 @@ from .bid_units import (
     wb_min_cpm_rub_to_bid_minor,
 )
 from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.settings import settings
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 class AutoShelfBidControlViewProvider:
@@ -148,6 +153,9 @@ class AutoShelfBidControlViewProvider:
                 cycle_bid_points=[],
                 last_reason="adv_setting_not_found",
                 warnings=["adv_setting_not_found"],
+                optimization_metric=OptimizationMetric.CPC,
+                fact_cpo=None,
+                resolve_cpo=None,
             )
 
         nmids = list(adv.nmids or [])
@@ -157,6 +165,25 @@ class AutoShelfBidControlViewProvider:
             warnings.append("single_nmid_guard_skip")
         nmid = nmids[0] if nmids else 0
         auto_adv_id = int(adv.adv_id) if adv.adv_id is not None else None
+
+        # Получаем plan-fact данные для определения метрики оптимизации
+        fact_cpo: float | None = None
+        fact_predict_orders: float | None = None
+        resolve_cpo: float | None = None
+        if auto_adv_id is not None:
+            plan_fact_reader = PlanFactReader()
+            plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
+            if plan_fact_summary is not None:
+                fact_predict_orders = plan_fact_summary.fact_predict_orders
+                fact_cpo = plan_fact_summary.fact_pay_for_order
+            # resolve_cpo вычисляем из настроек кампании
+            resolve_cpo = resolve_target_cost(
+                adv.plan_for_sales_for_day,
+                adv.target_price_for_order,
+                adv.max_price_for_order,
+                fact_predict_orders,
+            )
+        optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
 
         state = await self._repository.get_state(nmid) if nmid else None
         settings_obj = None
@@ -189,15 +216,20 @@ class AutoShelfBidControlViewProvider:
             if nmid
             else []
         )
-        best = (
-            await self._analytics.get_best_bid_by_cart_cpa(
+        if nmid and optimization_metric == OptimizationMetric.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
                 nmid=nmid,
                 from_ts=stats_from_ts,
                 currency=currency,
             )
-            if nmid
-            else None
-        )
+        elif nmid:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=nmid,
+                from_ts=stats_from_ts,
+                currency=currency,
+            )
+        else:
+            best = None
         target_main = (
             self._target_main_impressions(target_test, float(settings_obj.test_share))
             if settings_obj and target_test is not None
@@ -227,6 +259,8 @@ class AutoShelfBidControlViewProvider:
                     currency=currency,
                     current_cycle_started_at=cycle_from_ts,
                     previous_cycle_started_at=state.previous_cycle_started_at,
+                    fact_cpo=fact_cpo,
+                    resolve_cpo=resolve_cpo,
                 )
 
         covered_points_count = 0
@@ -379,5 +413,8 @@ class AutoShelfBidControlViewProvider:
             cycle_bid_points=cycle_bid_points,
             last_reason=(state.last_reason if state else None),
             warnings=warnings,
+            optimization_metric=optimization_metric,
+            fact_cpo=fact_cpo,
+            resolve_cpo=resolve_cpo,
         )
 

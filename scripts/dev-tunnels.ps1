@@ -13,14 +13,14 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
 $defaultKubeconfig = Join-Path $repoRoot "k8s\new-cluster\new-cluster-config.yaml"
-if ($env:DEV_TUNNELS_KUBECONFIG) {
-    $kubeconfig = $env:DEV_TUNNELS_KUBECONFIG
+$kubeconfig = if (-not [string]::IsNullOrWhiteSpace($env:DEV_TUNNELS_KUBECONFIG)) {
+    $env:DEV_TUNNELS_KUBECONFIG
 } else {
-    $kubeconfig = $defaultKubeconfig
+    $defaultKubeconfig
 }
 
 if (-not (Test-Path $kubeconfig)) {
-    Write-Error "Kubeconfig not found: $kubeconfig"
+    throw "Kubeconfig not found: $kubeconfig. Set DEV_TUNNELS_KUBECONFIG to override."
 }
 
 $env:KUBECONFIG = $kubeconfig

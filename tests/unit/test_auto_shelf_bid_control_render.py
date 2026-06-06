@@ -8,6 +8,7 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
+    OptimizationMetric,
 )
 
 
@@ -46,6 +47,9 @@ def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
         cycle_bid_points=[],
         last_reason=None,
         warnings=[],
+        optimization_metric=OptimizationMetric.CPC,
+        fact_cpo=None,
+        resolve_cpo=None,
     )
 
 

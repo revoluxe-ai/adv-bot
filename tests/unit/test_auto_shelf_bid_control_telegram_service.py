@@ -13,6 +13,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
+    OptimizationMetric,
 )
 
 pytestmark = pytest.mark.unit
@@ -62,6 +63,9 @@ def _view(min_bid: int | None = None) -> AutoShelfBidControlViewDTO:
         cycle_bid_points=[],
         last_reason=None,
         warnings=[],
+        optimization_metric=OptimizationMetric.CPC,
+        fact_cpo=None,
+        resolve_cpo=None,
     )
 
 
