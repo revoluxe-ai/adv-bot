@@ -1,7 +1,7 @@
 """Регрессионные тесты исходных синтетических bid-math сценариев."""
 
 from tests.rec_system_bid_math.bid_model import run_bid_model
-from tests.bid_math.synthetic_cases import (
+from tests.rec_system_bid_math.synthetic_cases import (
     make_one_night_hour_candidate_obs,
     make_sparse_confirmed_best_obs,
     print_rankings,
