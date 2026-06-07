@@ -1,4 +1,4 @@
-"""Adversarial-тесты рисков раздувания sparse-ставок."""
+"""Adversarial-тесты новой архитектуры bid-math."""
 
 import pytest
 
