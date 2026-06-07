@@ -363,6 +363,16 @@ async def test_get_rec_bid_recommendations_returns_full_payload() -> None:
                 ]
             )
 
+        async def fetch_rec_bid_ctr_by_bid_for_nmid(
+            self,
+            nmid: int,
+            mode: str,
+            date_from: datetime,
+            date_to: datetime,
+        ) -> dict[int, float]:
+            _ = (nmid, mode, date_from, date_to)
+            return {100: 0.2}
+
     service = AutoShelfBidRecommendationReadService(FakeRepository())
     result = await service.get_rec_bid_recommendations(
         nmid=123,

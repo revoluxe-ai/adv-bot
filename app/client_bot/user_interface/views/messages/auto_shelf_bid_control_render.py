@@ -374,6 +374,7 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
         f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
         f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
         f"Показов на тест: {view.target_test_impressions or '—'}\n"
+        f"Мин. минут теста: {view.target_test_observation_minutes or '—'}\n"
         f"Шаг между тестовыми ставками: {format_bid(view.min_bid_distance_minor, view.currency)}\n"
         f"Dry-run (глобально, AUTO_SHELF_BID_CONTROL_DRY_RUN): {dry_run_text}\n\n"
         f"Управление включено: {enabled_text}"
@@ -401,6 +402,13 @@ def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> Inli
         text="Изменить показов на тест",
         callback_data=AutoShelfBidControlMenu(
             action="set_target_test_impressions",
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить минут теста",
+        callback_data=AutoShelfBidControlMenu(
+            action="set_target_test_observation_minutes",
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
