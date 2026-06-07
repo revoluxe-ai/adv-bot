@@ -181,10 +181,10 @@ async def _run() -> int:
         ctr_by_bid=ctr_by_bid,
     )
 
-    diagnostics = result["diagnostics"]
-    bid_result = result["bid_result"]
-    plan_ranked = result["plan_ranked"]
-    expected_ranked = bid_result["expected_ranked"]
+    view = result["view"]
+    diagnostics = view["diagnostics"]
+    plan_ranked = view["plan_ranked"]
+    expected_ranked = view["expected_ranked"]
 
     _print_section("diagnostics")
     _print_table(
@@ -205,8 +205,8 @@ async def _run() -> int:
     )
 
     print()
-    print(f"best_expected_bid: {result['best_expected_bid']}")
-    print(f"best_plan_bid: {result['best_plan_bid']}")
+    print(f"best_expected_bid: {view['best_expected_bid']}")
+    print(f"best_plan_bid: {view['best_plan_bid']}")
 
     if not expected_ranked or not plan_ranked:
         print()
@@ -240,8 +240,8 @@ async def _run() -> int:
             "expected_order_cost_rub",
             "resolved_order_cost_rub",
             "projected_sales",
-            "needed_sales",
-            "sales_miss",
+            "sales_gap",
+            "abs_sales_gap",
             "sales_dist",
             "order_cost_overlimit_rub",
             "order_cost_overlimit_dist",
