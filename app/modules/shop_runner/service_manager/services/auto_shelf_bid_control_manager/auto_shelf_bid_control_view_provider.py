@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
+import logging
+from datetime import UTC, datetime, timedelta
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -28,11 +29,14 @@ from .bid_units import (
     wb_min_cpm_rub_to_bid_minor,
 )
 from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
+from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
 from app.settings import settings
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+
+logger = logging.getLogger(__name__)
 
 
 class AutoShelfBidControlViewProvider:
@@ -176,6 +180,7 @@ class AutoShelfBidControlViewProvider:
                 optimization_metric=OptimizationMetric.CPC,
                 fact_cpo=None,
                 resolve_cpo=None,
+                rec_bid_recommendation=None,
             )
 
         nmids = list(adv.nmids or [])
@@ -203,8 +208,6 @@ class AutoShelfBidControlViewProvider:
                 adv.max_price_for_order,
                 fact_predict_orders,
             )
-        optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
-
         state = await self._repository.get_state(nmid) if nmid else None
         settings_obj = None
         if nmid and len(nmids) == 1:
@@ -214,6 +217,68 @@ class AutoShelfBidControlViewProvider:
         if state is None:
             warnings.append("state_missing")
         now_utc = datetime.now(UTC)
+
+        optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
+
+        rec_bid_recommendation: dict | None = None
+        if auto_adv_id is not None and nmid:
+            try:
+                from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
+                    AutoShelfBidRecommendationReadService,
+                )
+
+                rec_bid_service = getattr(self, "_rec_bid_service", None)
+                if rec_bid_service is None:
+                    rec_bid_service = AutoShelfBidRecommendationReadService(self._repository)
+                date_to = now_utc
+                date_from = date_to - timedelta(days=7)
+                current_fact_sales = (
+                    float(plan_fact_summary.fact_original_orders)
+                    if plan_fact_summary is not None and plan_fact_summary.fact_original_orders is not None
+                    else 0.0
+                )
+                current_sales_forecast = (
+                    float(plan_fact_summary.fact_predict_orders)
+                    if plan_fact_summary is not None and plan_fact_summary.fact_predict_orders is not None
+                    else 0.0
+                )
+                current_mode = state.current_mode if state is not None and state.current_mode else ""
+                click_to_order_cr_7d = await self._repository.fetch_rec_bid_click_to_order_cr_7d_for_nmid(
+                    nmid=nmid,
+                    mode=current_mode,
+                    date_from=date_from,
+                    date_to=date_to,
+                )
+                ctr_by_bid = await self._repository.fetch_rec_bid_ctr_by_bid_for_nmid(
+                    nmid=nmid,
+                    mode=current_mode,
+                    date_from=date_from,
+                    date_to=date_to,
+                )
+                rec_result = await rec_bid_service.get_rec_bid_recommendations(
+                    nmid=nmid,
+                    mode=current_mode,
+                    date_from=date_from,
+                    date_to=date_to,
+                    plan_context=PlanContext(
+                        sales_plan=float(adv.plan_for_sales_for_day or 0.0),
+                        current_fact_sales=current_fact_sales,
+                        current_sales_forecast=current_sales_forecast,
+                        target_order_cost=float(adv.target_price_for_order or 0.0),
+                        max_order_cost=float(adv.max_price_for_order or 0.0),
+                        click_to_order_cr_7d=click_to_order_cr_7d,
+                    ),
+                    ctr_by_bid=ctr_by_bid,
+                )
+                rec_bid_recommendation = rec_result.get("view")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "auto_shelf_bid_control_rec_bid_recommendation_failed adv_id=%s nmid=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    exc,
+                )
+                rec_bid_recommendation = None
 
         actual_bid_minor: int | None = None
         if nmid and auto_adv_id is not None:
@@ -456,4 +521,5 @@ class AutoShelfBidControlViewProvider:
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
+            rec_bid_recommendation=rec_bid_recommendation,
         )

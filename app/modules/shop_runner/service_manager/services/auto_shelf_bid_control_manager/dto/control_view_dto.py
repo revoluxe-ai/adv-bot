@@ -78,3 +78,5 @@ class AutoShelfBidControlViewDTO:
     resolve_cpo: float | None  # resolve/target CPO РєР°РјРїР°РЅРёРё
 
 
+
+    rec_bid_recommendation: dict | None = None

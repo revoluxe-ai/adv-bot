@@ -291,6 +291,38 @@ class AutoShelfBidRepository:
             ctr_by_bid[bid] = clicks / impressions if impressions > 0 else 0.0
         return ctr_by_bid
 
+    async def fetch_rec_bid_click_to_order_cr_7d_for_nmid(
+        self,
+        *,
+        nmid: int,
+        mode: str,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> float:
+        """Return 7d click-to-order conversion from read-only CH aggregation."""
+        query = self._load_sql("fetch_rec_bid_click_to_order_cr_7d_for_nmid.sql")
+        params = {
+            "nmid": nmid,
+            "mode": mode,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return 0.0
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        row_dict = dict(zip(column_names, tuple(result.result_rows[0])))
+        value = row_dict.get("click_to_order_cr_7d")
+        if value is None:
+            return 0.0
+        return self._to_float(value)
+
     async def fetch_current_auto_common_bid(
         self,
         complex_adv: ComplexAdv,

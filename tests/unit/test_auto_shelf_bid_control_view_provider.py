@@ -63,6 +63,10 @@ async def test_build_view_auto_creates_default_settings_for_single_nmid(
         repository=repository,
         analytics_repository=analytics,
     )
+    provider._rec_bid_service = MagicMock()  # type: ignore[attr-defined]
+    provider._rec_bid_service.get_rec_bid_recommendations = AsyncMock(  # type: ignore[attr-defined]
+        return_value={"view": None}
+    )
     provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
@@ -109,6 +113,10 @@ async def test_build_view_contains_gate_dry_run_and_missing_state_warnings(
         redis_client=MagicMock(),
         repository=repository,
         analytics_repository=analytics,
+    )
+    provider._rec_bid_service = MagicMock()  # type: ignore[attr-defined]
+    provider._rec_bid_service.get_rec_bid_recommendations = AsyncMock(  # type: ignore[attr-defined]
+        return_value={"view": None}
     )
     provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
@@ -160,6 +168,10 @@ async def test_build_view_uses_wb_min_bid_not_actual_bid(
         redis_client=MagicMock(),
         repository=repository,
         analytics_repository=analytics,
+    )
+    provider._rec_bid_service = MagicMock()  # type: ignore[attr-defined]
+    provider._rec_bid_service.get_rec_bid_recommendations = AsyncMock(  # type: ignore[attr-defined]
+        return_value={"view": None}
     )
     bid_cache_value = MagicMock()
     bid_cache_value.bid_minor = 20_000
@@ -228,11 +240,19 @@ async def test_build_view_uses_best_bid_method_for_optimization_metric(
     analytics.get_bid_stats = AsyncMock(return_value=[])
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
 
     provider = AutoShelfBidControlViewProvider(
         redis_client=MagicMock(),
         repository=repository,
         analytics_repository=analytics,
+    )
+    provider._rec_bid_service = MagicMock()  # type: ignore[attr-defined]
+    provider._rec_bid_service.get_rec_bid_recommendations = AsyncMock(  # type: ignore[attr-defined]
+        return_value={"view": None}
     )
     provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
@@ -283,11 +303,19 @@ async def test_build_view_uses_fact_predict_orders_for_optimization_metric(
     analytics.get_bid_stats = AsyncMock(return_value=[])
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_impressions = AsyncMock(return_value=0)
 
     provider = AutoShelfBidControlViewProvider(
         redis_client=MagicMock(),
         repository=repository,
         analytics_repository=analytics,
+    )
+    provider._rec_bid_service = MagicMock()  # type: ignore[attr-defined]
+    provider._rec_bid_service.get_rec_bid_recommendations = AsyncMock(  # type: ignore[attr-defined]
+        return_value={"view": None}
     )
     provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
@@ -307,3 +335,141 @@ async def test_build_view_uses_fact_predict_orders_for_optimization_metric(
 
     assert view.resolve_cpo == 100.0
     assert view.optimization_metric == OptimizationMetric.CPC
+
+
+@pytest.mark.asyncio
+async def test_build_view_includes_rec_bid_recommendation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 100.0
+    adv.target_price_for_order = 140.0
+    adv.max_price_for_order = 590.0
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+    settings_obj.target_test_observation_minutes = 60
+
+    state = MagicMock()
+    state.current_mode = "main"
+    state.current_cycle_started_at = None
+    state.test_started_at = None
+    state.main_started_at = None
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=state)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+    repository.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.034)
+    repository.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={12000: 0.02})
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    fake_rec_service = MagicMock()
+    fake_rec_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={"view": {"best_plan_bid": 12000}}
+    )
+    provider._rec_bid_service = fake_rec_service  # type: ignore[attr-defined]
+
+    mock_plan_fact_reader = MagicMock()
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = 10.0
+    plan_fact_summary.fact_original_orders = 7.0
+    plan_fact_summary.fact_pay_for_order = 150.0
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.rec_bid_recommendation == {"best_plan_bid": 12000}
+
+
+@pytest.mark.asyncio
+async def test_build_view_keeps_rec_bid_none_on_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 100.0
+    adv.target_price_for_order = 140.0
+    adv.max_price_for_order = 590.0
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+    settings_obj.target_test_observation_minutes = 60
+
+    state = MagicMock()
+    state.current_mode = "main"
+    state.current_cycle_started_at = None
+    state.test_started_at = None
+    state.main_started_at = None
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=state)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+    repository.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.034)
+    repository.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={12000: 0.02})
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    fake_rec_service = MagicMock()
+    fake_rec_service.get_rec_bid_recommendations = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
+    provider._rec_bid_service = fake_rec_service  # type: ignore[attr-defined]
+
+    mock_plan_fact_reader = MagicMock()
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = 10.0
+    plan_fact_summary.fact_original_orders = 7.0
+    plan_fact_summary.fact_pay_for_order = 150.0
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.rec_bid_recommendation is None
