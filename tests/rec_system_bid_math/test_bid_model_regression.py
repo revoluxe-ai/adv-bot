@@ -1,4 +1,4 @@
-"""Регрессионные тесты исходных синтетических bid-math сценариев."""
+"""Регрессионные тесты новой архитектуры bid-math."""
 
 from tests.rec_system_bid_math.bid_model import run_bid_model
 from tests.rec_system_bid_math.synthetic_cases import (
