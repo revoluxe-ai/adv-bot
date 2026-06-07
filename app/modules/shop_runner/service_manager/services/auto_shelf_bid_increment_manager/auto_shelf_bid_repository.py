@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
@@ -55,24 +55,24 @@ def build_bid_bucket_observations_from_ch_rows(
     grouped: dict[datetime, list[dict[str, object]]] = {}
     for row in rows:
         bucket_start = row.get("bucket_start")
-        if bucket_start is None:
+        if not isinstance(bucket_start, datetime):
             raise KeyError("row is missing bucket_start")
         grouped.setdefault(bucket_start, []).append(row)
 
     observations: list[BidBucketObservation] = []
     for bucket_start, bucket_rows in grouped.items():
-        bid_values = {
-            int(row.get("bid_minor", row.get("bid")))
-            for row in bucket_rows
-            if row.get("bid_minor", row.get("bid")) is not None
-        }
+        bid_values: set[int] = set()
+        for row in bucket_rows:
+            bid_value = row.get("bid_minor", row.get("bid"))
+            if bid_value is not None:
+                bid_values.add(int(cast(Any, bid_value)))
         if len(bid_values) != 1:
             continue
 
-        price_values = {
-            None if row.get("price_minor") is None else int(row["price_minor"])
-            for row in bucket_rows
-        }
+        price_values: set[int | None] = set()
+        for row in bucket_rows:
+            price_value = row.get("price_minor")
+            price_values.add(None if price_value is None else int(cast(Any, price_value)))
         if len(price_values) != 1:
             continue
 
@@ -81,7 +81,7 @@ def build_bid_bucket_observations_from_ch_rows(
             impressions_value = row.get("delta_impressions", row.get("impressions"))
             if impressions_value is None:
                 raise KeyError("row is missing delta_impressions/impressions")
-            impressions_sum += float(impressions_value)
+            impressions_sum += float(cast(Any, impressions_value))
 
         if impressions_sum < 0:
             continue
@@ -89,7 +89,7 @@ def build_bid_bucket_observations_from_ch_rows(
         observations.append(
             BidBucketObservation(
                 bid=next(iter(bid_values)),
-                bucket_start=bucket_start,  # type: ignore[arg-type]
+                bucket_start=bucket_start,
                 impressions=impressions_sum,
                 price_minor=next(iter(price_values)),
             )
