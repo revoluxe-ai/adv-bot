@@ -97,5 +97,5 @@ def test_zero_ctr_keeps_bid_and_forces_infinite_plan_costs() -> None:
     assert ranked[0]["expected_orders"] == 0
     assert ranked[0]["expected_order_cost_minor"] == float("inf")
     assert ranked[0]["expected_order_cost_rub"] == float("inf")
-    assert ranked[0]["cpo_over_minor"] == float("inf")
-    assert ranked[0]["plan_score"] == float("inf")
+    assert ranked[0]["order_cost_overlimit_minor"] == float("inf")
+    assert ranked[0]["plan_distance_score"] == float("inf")

@@ -60,4 +60,4 @@ def test_fixture_rank_rec_system_bids() -> None:
     assert plan_ranked
     assert len(plan_ranked) == len(expected_ranked)
     assert {row["bid"] for row in plan_ranked} == {row["bid"] for row in expected_ranked}
-    assert all(not math.isnan(row["plan_score"]) for row in plan_ranked)
+    assert all(not math.isnan(row["plan_distance_score"]) for row in plan_ranked)
