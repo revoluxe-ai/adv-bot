@@ -245,7 +245,7 @@ def _keyword_pay_for_order_exceeds(dto: KeywordDTO, *, ceiling: float) -> bool:
         return False
     return float(pfo) > float(ceiling)
 
-
+# TODO: Кажется мертвый метод
 def plan_calibration_trim_actions(
     prepared: PreparedListLike,
     *,
@@ -324,7 +324,7 @@ def plan_calibration_trim_actions(
         actions.extend(steps_to_v3_actions(dto, steps))
     return actions
 
-
+# TODO: Кажется мертвый метод
 def plan_calibration_actions(
     prepared: PreparedListLike,
     *,

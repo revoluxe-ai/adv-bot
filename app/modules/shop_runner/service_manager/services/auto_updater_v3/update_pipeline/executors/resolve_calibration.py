@@ -29,6 +29,7 @@ class ResolveCalibrationExecutor:
     def execute(self, context: UpdateContext) -> None:
         self._skip_reason = _phase_skip_reason(context)
         if self._skip_reason is not None:
+            self._reset_step(context)
             return
         state = context.adv_state
         assert state.calibration_direct is not None
@@ -52,6 +53,12 @@ class ResolveCalibrationExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
+
+    @staticmethod
+    def _reset_step(context: UpdateContext) -> None:
+        """Сбросить in-memory budget; Redis-сброс выполняет ``ApplyManager``."""
+        context.adv_state.max_effective_steps = 0
+        context.adv_state.calibration_phase_extra["effective_steps"] = 0
 
 
 def _phase_skip_reason(context: UpdateContext) -> str | None:

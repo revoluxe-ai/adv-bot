@@ -294,8 +294,8 @@ async def _run_preamble_with_fact_cpa(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_calibration_step_cache_not_updated_when_calibration_skipped() -> None:
-    """Пропуск calibration (unchanged plan/fact и views) — Redis step state не пишется."""
+async def test_calibration_step_cache_reset_when_calibration_skipped() -> None:
+    """Пропуск calibration (unchanged plan/fact и views) сбрасывает Redis step state."""
     _, cal_up, cal_down, _, _, step_cache = await _run_preamble_with_fact_cpa(
         pay_for_order=50.0,
         plan_fact_equal=True,
@@ -304,7 +304,9 @@ async def test_calibration_step_cache_not_updated_when_calibration_skipped() -> 
     )
     cal_up.assert_not_called()
     cal_down.assert_not_called()
-    step_cache.set_state.assert_not_awaited()
+    step_cache.set_state.assert_awaited_once()
+    saved = step_cache.set_state.await_args[0][0]
+    assert saved.effective_steps == 0
 
 
 @pytest.mark.unit
@@ -485,4 +487,6 @@ async def test_resolve_calibration_skipped_when_fact_above_max() -> None:
     realloc.assert_called_once()
     cal_up.assert_not_called()
     cal_down.assert_not_called()
-    step_cache.set_state.assert_not_awaited()
+    step_cache.set_state.assert_awaited_once()
+    saved = step_cache.set_state.await_args[0][0]
+    assert saved.effective_steps == 0
