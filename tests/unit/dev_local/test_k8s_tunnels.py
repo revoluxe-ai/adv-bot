@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 import types
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -80,17 +81,75 @@ def test_start_dev_tunnels_skipped_when_disabled(
     assert k8s_tunnels._monitor_started is False
 
 
-def test_start_missing_kubeconfig_leaves_monitor_not_started() -> None:
-    with (
-        patch.object(k8s_tunnels.Path, "is_file", return_value=False),
-        patch.object(k8s_tunnels.threading, "Thread") as mock_thread,
+def test_start_missing_kubeconfig_leaves_monitor_not_started(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "KUBECONFIG",
+        "DEV_KUBECONFIG",
+        "TWC_KUBECONFIG",
+        "DEV_TUNNELS_KUBECONFIG",
     ):
+        monkeypatch.delenv(env_name, raising=False)
+    with patch.object(k8s_tunnels.threading, "Thread") as mock_thread:
         k8s_tunnels._monitor_started = False
         with pytest.raises(FileNotFoundError, match="Kubeconfig not found"):
             k8s_tunnels.start_dev_tunnels_monitor(wait_ready=False)
 
     assert k8s_tunnels._monitor_started is False
     mock_thread.assert_not_called()
+
+
+@pytest.mark.unit
+def test_resolve_kubeconfig_path_prefers_env_and_keeps_windows_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    kubeconfig = tmp_path / "twc-diligent-dunnock-config.yaml"
+    kubeconfig.write_text("apiVersion: v1\n", encoding="utf-8")
+    monkeypatch.setenv("KUBECONFIG", str(kubeconfig))
+
+    resolved = k8s_tunnels.resolve_kubeconfig_path()
+
+    assert resolved == kubeconfig.resolve()
+    assert "\t" not in str(resolved)
+
+
+@pytest.mark.unit
+def test_wait_for_dev_tunnels_ready_waits_until_probe_succeeds() -> None:
+    specs = k8s_tunnels._tunnel_specs()
+    probe_results = [False, False, True]
+
+    def _ports_ready(_specs: list[k8s_tunnels._TunnelSpec]) -> bool:
+        return probe_results.pop(0)
+
+    with (
+        patch.object(k8s_tunnels, "_ports_ready", side_effect=_ports_ready),
+        patch.object(k8s_tunnels, "_postgres_select_1_smoke_check"),
+        patch.object(k8s_tunnels, "_clickhouse_select_1_smoke_check"),
+        patch("time.sleep"),
+    ):
+        k8s_tunnels.wait_for_dev_tunnels_ready(timeout_sec=1.0, specs=specs)
+
+
+@pytest.mark.unit
+def test_start_dev_tunnels_monitor_accepts_occupied_ready_ports() -> None:
+    mock_thread_instance = MagicMock()
+    specs = k8s_tunnels._tunnel_specs()
+
+    with (
+        patch.object(k8s_tunnels, "_tunnel_specs", return_value=specs),
+        patch.object(k8s_tunnels, "_default_kubeconfig", return_value="C:/tmp/kubeconfig.yaml"),
+        patch.object(k8s_tunnels, "_ports_ready", return_value=True),
+        patch.object(k8s_tunnels, "_try_reuse_healthy_forward", return_value=True),
+        patch.object(k8s_tunnels, "wait_for_dev_tunnels_ready"),
+        patch.object(k8s_tunnels, "_register_cleanup_once"),
+        patch.object(k8s_tunnels.threading, "Thread", return_value=mock_thread_instance) as mock_thread_cls,
+    ):
+        k8s_tunnels.start_dev_tunnels_monitor(wait_ready=True)
+
+    mock_thread_cls.assert_called_once()
+    mock_thread_instance.start.assert_called_once()
 
 
 def test_already_started_waits_outside_monitor_lock() -> None:
@@ -165,6 +224,25 @@ def test_clickhouse_http_healthy_separate_from_probe() -> None:
 
     with patch.object(k8s_tunnels, "_clickhouse_http_select_1"):
         assert k8s_tunnels._clickhouse_http_healthy(18123) is True
+
+
+@pytest.mark.unit
+def test_clickhouse_http_select_1_reads_full_response_body() -> None:
+    response_parts = [
+        (
+            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n"
+            b"X-ClickHouse-Summary: {}\r\n\r\n"
+        ),
+        b"1\n",
+        b"",
+    ]
+    mock_sock = MagicMock()
+    mock_sock.__enter__.return_value = mock_sock
+    mock_sock.__exit__.return_value = False
+    mock_sock.recv.side_effect = response_parts
+
+    with patch.object(k8s_tunnels.socket, "create_connection", return_value=mock_sock):
+        k8s_tunnels._clickhouse_http_select_1(18123, 1.0)
 
 
 @pytest.mark.unit

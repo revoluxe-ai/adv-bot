@@ -21,6 +21,9 @@ from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
 
+from app.domain.rec_system_bid_math.hour_observation_builder import (
+    BidBucketObservation,
+)
 from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -37,6 +40,62 @@ from ..auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def build_bid_bucket_observations_from_ch_rows(
+    rows: list[dict[str, object]],
+) -> list[BidBucketObservation]:
+    """Собрать 15-минутные bucket-объекты из CH rows без бизнес-логики.
+
+    Ожидаются минимум поля:
+        - bid_minor / bid
+        - bucket_start
+        - delta_impressions / impressions
+    """
+    grouped: dict[datetime, list[dict[str, object]]] = {}
+    for row in rows:
+        bucket_start = row.get("bucket_start")
+        if bucket_start is None:
+            raise KeyError("row is missing bucket_start")
+        grouped.setdefault(bucket_start, []).append(row)
+
+    observations: list[BidBucketObservation] = []
+    for bucket_start, bucket_rows in grouped.items():
+        bid_values = {
+            int(row.get("bid_minor", row.get("bid")))
+            for row in bucket_rows
+            if row.get("bid_minor", row.get("bid")) is not None
+        }
+        if len(bid_values) != 1:
+            continue
+
+        price_values = {
+            None if row.get("price_minor") is None else int(row["price_minor"])
+            for row in bucket_rows
+        }
+        if len(price_values) != 1:
+            continue
+
+        impressions_sum = 0.0
+        for row in bucket_rows:
+            impressions_value = row.get("delta_impressions", row.get("impressions"))
+            if impressions_value is None:
+                raise KeyError("row is missing delta_impressions/impressions")
+            impressions_sum += float(impressions_value)
+
+        if impressions_sum < 0:
+            continue
+
+        observations.append(
+            BidBucketObservation(
+                bid=next(iter(bid_values)),
+                bucket_start=bucket_start,  # type: ignore[arg-type]
+                impressions=impressions_sum,
+                price_minor=next(iter(price_values)),
+            )
+        )
+
+    return observations
 
 
 class AutoShelfBidRepository:
@@ -94,7 +153,7 @@ class AutoShelfBidRepository:
         """Безопасно привести значение CH к float."""
         if isinstance(value, bool):
             return float(int(value))
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, str):
             return float(value)
@@ -172,6 +231,66 @@ class AutoShelfBidRepository:
         row["bucket_start"] = row["src_ts"]
         return AutoShelfBidSnapshot.from_clickhouse(row)
 
+    async def fetch_rec_bid_bucket_observations_for_nmid(
+        self,
+        nmid: int,
+        mode: str,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[BidBucketObservation]:
+        """Read-only bucket fetch for rec_system bid ranking."""
+        query = self._load_sql("fetch_auto_shelf_bid_bucket_rows.sql")
+        params = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return []
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
+        return build_bid_bucket_observations_from_ch_rows(rows)
+
+    async def fetch_rec_bid_ctr_by_bid_for_nmid(
+        self,
+        nmid: int,
+        mode: str,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> dict[int, float]:
+        """Return real CTR by bid from read-only CH aggregation."""
+        query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql")
+        params = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return {}
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        ctr_by_bid: dict[int, float] = {}
+        for row in result.result_rows:
+            row_dict = dict(zip(column_names, tuple(row)))
+            bid = self._to_int(row_dict["bid"])
+            impressions = self._to_float(row_dict["impressions"])
+            clicks = self._to_float(row_dict["clicks"])
+            ctr_by_bid[bid] = clicks / impressions if impressions > 0 else 0.0
+        return ctr_by_bid
+
     async def fetch_current_auto_common_bid(
         self,
         complex_adv: ComplexAdv,
@@ -223,4 +342,3 @@ class AutoShelfBidRepository:
     async def get_current_mode(self, nmid: int) -> str:
         """Вернуть mode из control state при включенном флаге, иначе main."""
         return await self._control_repository.get_mode_for_nmid(nmid)
-

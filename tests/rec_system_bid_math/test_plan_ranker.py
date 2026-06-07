@@ -45,6 +45,7 @@ def test_bid_closer_to_sales_plan_ranks_above_higher_impressions_bid() -> None:
     assert [row["bid"] for row in ranked] == [100, 200]
     assert set(ranked[0]) == {
         "bid",
+        "ctr",
         "expected_impressions",
         "expected_clicks",
         "expected_orders",

@@ -56,6 +56,7 @@ def rank_bids_for_sales_plan(
         ranked_rows.append(
             {
                 "bid": bid,
+                "ctr": ctr,
                 "expected_impressions": expected_impressions,
                 "expected_clicks": expected_clicks,
                 "expected_orders": expected_orders,
