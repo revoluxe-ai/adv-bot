@@ -34,11 +34,23 @@ class ResolveCalibrationExecutor:
         state = context.adv_state
         assert state.calibration_direct is not None
         if state.calibration_direct == CalibrationDirect.TIGHTEN:
-            run_calibration_down(
+            down_result = run_calibration_down(
                 context,
                 resolve=float(state.resolve),
                 max_steps=state.max_effective_steps,
                 nsm=self._next_state_manager,
+            )
+            state.calibration_phase_extra["ladder_steps_done"] = (
+                down_result.ladder_steps_done
+            )
+            state.calibration_phase_extra["cal_down_iterations"] = (
+                down_result.iterations_done
+            )
+            state.calibration_phase_extra["cal_down_stop_reason"] = (
+                down_result.stop_reason
+            )
+            state.calibration_phase_extra["applied_steps"] = (
+                down_result.ladder_steps_done
             )
             return
         up_result = run_calibration_up(
@@ -49,6 +61,7 @@ class ResolveCalibrationExecutor:
         state.calibration_phase_extra["ladder_steps_done"] = up_result.ladder_steps_done
         state.calibration_phase_extra["cal_up_iterations"] = up_result.iterations_done
         state.calibration_phase_extra["cal_up_stop_reason"] = up_result.stop_reason
+        state.calibration_phase_extra["applied_steps"] = up_result.ladder_steps_done
 
     @property
     def skip_reason(self) -> str | None:
@@ -59,6 +72,7 @@ class ResolveCalibrationExecutor:
         """Сбросить in-memory budget; Redis-сброс выполняет ``ApplyManager``."""
         context.adv_state.max_effective_steps = 0
         context.adv_state.calibration_phase_extra["effective_steps"] = 0
+        context.adv_state.calibration_phase_extra["applied_steps"] = None
 
 
 def _phase_skip_reason(context: UpdateContext) -> str | None:

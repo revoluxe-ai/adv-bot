@@ -5,7 +5,7 @@ trim, shelf cleanup):
 - одно действие = один вызов ``resolve_next_effective_step_up`` / ``resolve_next_effective_step_down``;
 - режимы M/O/C с тем же ``target_place``, что у якоря шага, схлопываются (UP → max
   ``mode_level`` в группе, DOWN → пройти alias-цепочку до следующего place или OFF);
-- это **не** увеличивает бюджет шагов (×2 calibration, released_steps realloc и т.д.).
+- это **не** увеличивает cap шагов (×2 calibration, released_steps realloc и т.д.).
 
 ``iter_effective_upper_modes`` / ``iter_effective_lower_modes`` / ``iter_effective_upper_mode_groups``
 — перечисление смен ``target_place`` для анализа и «до упора» в **одном** UP

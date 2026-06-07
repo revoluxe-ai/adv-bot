@@ -97,8 +97,12 @@ def run_calibration_down(
     resolve: float,
     max_steps: int,
     nsm: NextStateManager,
-) -> None:
-    """CAL DOWN: до ``max_steps`` ladder DOWN/OFF из list1 с ``cpo > resolve``."""
+) -> PotentialUpRunResult:
+    """CAL DOWN: до ``max_steps`` ladder DOWN/OFF из list1 с ``cpo > resolve``.
+
+    Returns:
+        Счётчик фактически применённых ladder-шагов и служебные итоги цикла.
+    """
     ceiling = float(resolve)
     step_budget = max(1, int(max_steps))
     generator = StatesListGenerator(context.adv_state, for_calibration=True)
@@ -106,11 +110,15 @@ def run_calibration_down(
 
     ladder_steps_done = 0
     iterations = 0
+    remaining_potential = 0
+    stop_reason = "budget_exhausted"
     while ladder_steps_done < step_budget and iterations < _MAX_CALIBRATION_LOOP_ITERATIONS:
         iterations += 1
         current_states, _potential = generator.get_current_states(context.keywords)
         donors = [binding for binding in current_states if binding[2] > ceiling]
         if not donors:
+            remaining_potential = 0
+            stop_reason = "empty_potential"
             break
         donor = _pick_most_expensive(donors)
         down_state = _resolve_calibration_down_state(
@@ -119,6 +127,8 @@ def run_calibration_down(
             eligibility_by_ks_id=eligibility,
         )
         if down_state is None:
+            remaining_potential = len(donors)
+            stop_reason = "budget_exhausted"
             break
         dto = donor[0]
         delta = _apply_and_count_down_ladder_step(
@@ -126,8 +136,22 @@ def run_calibration_down(
             lambda s=down_state: nsm.raise_state_to_target_cpo(dto, s),
         )
         if delta == 0:
+            remaining_potential = len(donors)
+            stop_reason = "budget_exhausted"
             break
         ladder_steps_done += delta
+        remaining_potential = len(donors)
+    else:
+        if iterations >= _MAX_CALIBRATION_LOOP_ITERATIONS:
+            stop_reason = "max_iterations_safety"
+
+    return PotentialUpRunResult(
+        ladder_steps_done=ladder_steps_done,
+        iterations_done=iterations,
+        step_budget=step_budget,
+        stop_reason=stop_reason,
+        remaining_potential=remaining_potential,
+    )
 
 
 def run_potential_up_steps(

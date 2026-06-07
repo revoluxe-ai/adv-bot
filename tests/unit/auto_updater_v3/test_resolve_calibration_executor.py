@@ -178,6 +178,7 @@ def test_calibration_skip_gates(
     assert ctx.keywords[0].next_state == []
     assert ctx.adv_state.max_effective_steps == 0
     assert ctx.adv_state.calibration_phase_extra["effective_steps"] == 0
+    assert ctx.adv_state.calibration_phase_extra["applied_steps"] is None
 
 
 @pytest.mark.unit
@@ -267,7 +268,7 @@ def test_calibration_up_min_from_list2() -> None:
 
 
 @pytest.mark.unit
-def test_calibration_budget_limits_steps() -> None:
+def test_calibration_step_limits_steps() -> None:
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.MIN_CPA,
@@ -285,8 +286,8 @@ def test_calibration_budget_limits_steps() -> None:
 
 
 @pytest.mark.unit
-def test_calibration_up_budget_is_ladder_steps_not_iterations() -> None:
-    """Бюджет 2 = два ladder UP; alias MIN→OPT на том же place не считается шагом."""
+def test_calibration_up_step_is_ladder_steps_not_iterations() -> None:
+    """Шаг 2 = два ladder UP; alias MIN→OPT на том же place не считается шагом."""
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.OFF,
@@ -333,6 +334,7 @@ def test_calibration_up_budget_is_ladder_steps_not_iterations() -> None:
     assert ctx.keywords[0].current_target_place == 20
     assert len(ctx.keywords[0].next_state) == 3
     assert ctx.adv_state.calibration_phase_extra.get("ladder_steps_done") == 2
+    assert ctx.adv_state.calibration_phase_extra.get("applied_steps") == 2
 
 
 @pytest.mark.unit
