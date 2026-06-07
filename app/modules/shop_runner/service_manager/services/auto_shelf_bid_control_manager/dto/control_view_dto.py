@@ -76,4 +76,4 @@ class AutoShelfBidControlViewDTO:
     optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
     fact_cpo: float | None  # фактическое CPO кампании
     resolve_cpo: float | None  # resolve/target CPO кампании
-
+    rec_bid_recommendation: dict[str, object] | None = None

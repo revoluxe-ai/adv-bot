@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from app.domain.rec_system_bid_math.hour_observation_builder import (
     BidBucketObservation,
@@ -23,10 +23,33 @@ from app.domain.rec_system_bid_math.view_models import (
     build_rec_bid_recommendation_view,
 )
 
-from .auto_shelf_bid_repository import AutoShelfBidRepository
 from app.domain.rec_system_bid_math.hour_observation_builder import BUCKET_MINUTES
 
 logger = logging.getLogger(__name__)
+
+
+class RecBidRecommendationRepository(Protocol):
+    """Минимальный контракт CH-read репозитория для rec bid recommendation."""
+
+    async def fetch_rec_bid_bucket_observations_for_nmid(
+        self,
+        nmid: int,
+        mode: str,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[BidBucketObservation]:
+        """Вернуть bucket-строки для hour-level recommendation."""
+        ...
+
+    async def fetch_rec_bid_ctr_by_bid_for_nmid(
+        self,
+        nmid: int,
+        mode: str,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> dict[int, float]:
+        """Вернуть CTR по bid для recommendation."""
+        ...
 
 
 def _bucket_reason_counts(buckets: list[BidBucketObservation]) -> dict[str, int]:
@@ -95,7 +118,7 @@ def _hour_reason_counts(
 class AutoShelfBidRecommendationReadService:
     """Читает bucket rows и строит ranked result без записи в БД."""
 
-    def __init__(self, repository: AutoShelfBidRepository) -> None:
+    def __init__(self, repository: RecBidRecommendationRepository) -> None:
         self._repository = repository
 
     async def fetch_bid_hour_observation_diagnostics(
