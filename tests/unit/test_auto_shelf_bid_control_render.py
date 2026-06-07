@@ -5,6 +5,7 @@ from dataclasses import replace
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    render_auto_shelf_bid_control_message,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
@@ -114,3 +115,81 @@ def test_settings_keyboard_contains_all_actions() -> None:
         "Изменить шаг между ставками",
         "Назад к управлению ставкой",
     ]
+
+
+def test_render_main_message_without_rec_bid_recommendation() -> None:
+    view = _view(enabled=True, has_settings=True)
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "🧪 Рекомендации по ставке полок" not in message
+
+
+def test_render_main_message_with_rec_bid_recommendation() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        rec_bid_recommendation={
+            "best_expected_bid": 123,
+            "best_plan_bid": 456,
+            "diagnostics": {
+                "hour_observation_count": 7,
+                "bid_count": 3,
+            },
+            "plan_ranked": [
+                {
+                    "bid": 10,
+                    "ctr": 0.1,
+                    "expected_order_cost_rub": 11.1,
+                    "resolved_order_cost_rub": 22.2,
+                    "sales_gap": -3.0,
+                    "plan_distance_score": 0.5,
+                },
+                {
+                    "bid": 20,
+                    "ctr": 0.2,
+                    "expected_order_cost_rub": 33.3,
+                    "resolved_order_cost_rub": 44.4,
+                    "sales_gap": -2.0,
+                    "plan_distance_score": 0.4,
+                },
+                {
+                    "bid": 30,
+                    "ctr": 0.3,
+                    "expected_order_cost_rub": 55.5,
+                    "resolved_order_cost_rub": 66.6,
+                    "sales_gap": -1.0,
+                    "plan_distance_score": 0.3,
+                },
+            ],
+            "expected_ranked": [
+                {
+                    "bid": 10,
+                    "expected_daily_impressions": 1000.0,
+                    "confidence": 0.9,
+                    "own_anchor": 0.1,
+                },
+                {
+                    "bid": 20,
+                    "expected_daily_impressions": 2000.0,
+                    "confidence": 0.8,
+                    "own_anchor": 0.2,
+                },
+                {
+                    "bid": 30,
+                    "expected_daily_impressions": 3000.0,
+                    "confidence": 0.7,
+                    "own_anchor": 0.3,
+                },
+            ],
+        },
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "🧪 Рекомендации по ставке полок" in message
+    assert "best_expected_bid: 123" in message
+    assert "best_plan_bid: 456" in message
+    assert "hours: 7" in message
+    assert "bids: 3" in message
+    assert "Top-3 plan_ranked:" in message
+    assert "Top-3 expected_ranked:" in message
