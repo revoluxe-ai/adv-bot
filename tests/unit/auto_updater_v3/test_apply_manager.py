@@ -18,7 +18,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
 )
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_apply_runs_post_gate_flush_and_redis() -> None:
     """Post-gate → flush → plan/fact/views Redis."""
