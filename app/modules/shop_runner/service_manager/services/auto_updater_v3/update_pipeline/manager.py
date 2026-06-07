@@ -196,6 +196,8 @@ class UpdatePipelineManager:
 
             skip_reason = getattr(executor, "skip_reason", None)
             if skip_reason is not None:
+                if executor.phase_name == "resolve_calibration":
+                    stats.calibration_reset_required = True
                 rt.tick_report.record_phase(
                     executor.phase_name,
                     skip_reason=skip_reason,

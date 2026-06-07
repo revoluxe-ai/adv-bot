@@ -46,3 +46,4 @@ class PreamblePipelineRunResult:
     calibration_count: int = 0
     guard_applied: bool = False
     calibration_executed: bool = False
+    calibration_reset_required: bool = False

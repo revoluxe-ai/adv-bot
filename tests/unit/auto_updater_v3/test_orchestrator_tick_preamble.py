@@ -104,8 +104,10 @@ async def test_process_adv_v3_normal_runs_preamble_and_selector_when_plan_fact_c
     plan_fact.check_equal_in_cache.assert_awaited_once()
     plan_fact.set_new_plan_fact.assert_awaited_once()
     views_cache.set_views.assert_awaited_once_with(500)
-    # plan/fact и views unchanged → calibration gate закрыт → Redis step не пишется
-    step_cache.set_state.assert_not_awaited()
+    # plan/fact и views unchanged → calibration gate закрыт → Redis step сбрасывается
+    step_cache.set_state.assert_awaited_once()
+    saved = step_cache.set_state.await_args[0][0]
+    assert saved.effective_steps == 0
 
 
 @pytest.mark.unit

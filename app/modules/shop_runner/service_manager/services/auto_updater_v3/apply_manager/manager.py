@@ -13,6 +13,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_mana
     V3ApplyResult,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
     CalibrationStepState,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -198,16 +199,30 @@ class ApplyManager:
         if (
             tick.calibration_step_cache is not None
             and tick_input is not None
-            and tick_input.calibration_direct is not None
-            and inp.calibration_executed
         ):
-            await tick.calibration_step_cache.set_state(
-                CalibrationStepState(
-                    effective_steps=tick_input.max_effective_steps,
-                    direct=tick_input.calibration_direct,
-                )
+            calibration_reset_required = (
+                inp.pipeline_result is not None
+                and inp.pipeline_result.calibration_reset_required is True
             )
-            calibration_cached = True
+            if calibration_reset_required:
+                await tick.calibration_step_cache.set_state(
+                    CalibrationStepState(
+                        effective_steps=0,
+                        direct=(
+                            tick_input.calibration_direct
+                            or CalibrationDirect.TIGHTEN
+                        ),
+                    )
+                )
+                calibration_cached = True
+            elif tick_input.calibration_direct is not None and inp.calibration_executed:
+                await tick.calibration_step_cache.set_state(
+                    CalibrationStepState(
+                        effective_steps=tick_input.max_effective_steps,
+                        direct=tick_input.calibration_direct,
+                    )
+                )
+                calibration_cached = True
 
         self._log_v3_cycle(tick, inp, post_gate_actions)
 

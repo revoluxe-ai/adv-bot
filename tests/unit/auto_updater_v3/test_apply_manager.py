@@ -10,6 +10,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_mana
     ApplyManager,
     V3ApplyInput,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
+    CalibrationDirect,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaign_mode import (
     CampaignMode,
 )
@@ -90,6 +93,75 @@ async def test_apply_runs_post_gate_flush_and_redis() -> None:
     calibration_cache.set_state.assert_awaited_once()
     assert result.flushed_to_db is True
     assert result.plan_fact_cached is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_resets_calibration_cache_when_preamble_requires_reset() -> None:
+    """Skip ``resolve_calibration`` persists zero steps for the next tick."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 6
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+
+    ledger = MagicMock()
+    ledger.apply_in_memory = MagicMock()
+    ledger.flush_to_db = AsyncMock(return_value=False)
+
+    tick_input = MagicMock(
+        plan=MagicMock(),
+        fact=MagicMock(),
+        shelf_click_mode=MagicMock(),
+        aggressiveness=MagicMock(),
+        calibration_direct=CalibrationDirect.LOOSEN,
+        max_effective_steps=5,
+    )
+    calibration_cache = MagicMock()
+    calibration_cache.set_state = AsyncMock()
+    pipeline_result = MagicMock(calibration_reset_required=True)
+    tick_data = MagicMock(
+        complex_adv=complex_adv,
+        ledger=ledger,
+        tick_input=tick_input,
+        contexts=[],
+        ladder_inputs=None,
+        campaign_mode=CampaignMode.NORMAL,
+        plan_fact_change=None,
+        views_cache=None,
+        calibration_step_cache=calibration_cache,
+        views_resolve_succeeded=False,
+        current_views=None,
+        sales_state=MagicMock(name="OPTIMAL"),
+        raw_profiles={},
+        all_contexts=[],
+    )
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
+            return_value=[],
+        ),
+        patch.object(
+            ApplyManager,
+            "sync_target_places_if_needed",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        result = await ApplyManager().apply(
+            V3ApplyInput(
+                tick_data=tick_data,
+                update_context=None,
+                pipeline_result=pipeline_result,
+                calibration_executed=False,
+                sync_force_zero=False,
+            )
+        )
+
+    calibration_cache.set_state.assert_awaited_once()
+    saved = calibration_cache.set_state.await_args[0][0]
+    assert saved.effective_steps == 0
+    assert saved.direct == CalibrationDirect.LOOSEN
+    assert result.calibration_cached is True
 
 
 @pytest.mark.unit

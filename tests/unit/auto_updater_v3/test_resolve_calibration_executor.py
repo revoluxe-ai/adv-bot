@@ -176,6 +176,8 @@ def test_calibration_skip_gates(
     executor.execute(ctx)
     assert executor.skip_reason == expected_skip
     assert ctx.keywords[0].next_state == []
+    assert ctx.adv_state.max_effective_steps == 0
+    assert ctx.adv_state.calibration_phase_extra["effective_steps"] == 0
 
 
 @pytest.mark.unit
