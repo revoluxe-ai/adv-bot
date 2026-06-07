@@ -160,6 +160,29 @@ def test_format_skipped_calibration_shows_none_as_no() -> None:
 
 
 @pytest.mark.unit
+def test_format_phase_skipped_calibration_does_not_fallback_to_zero() -> None:
+    """Стадия calibration без applied_steps не должна печатать «шаг 0»."""
+    phase = V3PhaseStats(
+        phase_id="resolve_calibration",
+        title_ru="10 · calibration",
+        executed=True,
+        outcome_note="нет ключей для UP",
+        extra={"calibration_direct": "tighten", "effective_steps": 0},
+    )
+    text = format_v3_tick_report_text(
+        V3TickReportSnapshot(
+            tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+            adv_id=1,
+            adv_name="Крем",
+            campaign_mode="NORMAL",
+            phases=[phase],
+        )
+    )
+    assert "шаг 0" not in text
+    assert "Калибровка:" not in text
+
+
+@pytest.mark.unit
 def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     snap = V3TickReportSnapshot(
         tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),

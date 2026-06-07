@@ -74,8 +74,6 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         if branch:
             title = f"{title} · {branch}"
         eff_raw = phase.extra.get("applied_steps")
-        if eff_raw is None:
-            eff_raw = phase.extra.get("effective_steps")
         eff = int(eff_raw) if eff_raw is not None else None
         prev_raw = phase.extra.get("prev_effective_steps")
         prev = int(prev_raw) if prev_raw is not None else None
