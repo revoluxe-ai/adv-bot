@@ -14,13 +14,13 @@ class PlanContext:
     current_sales_forecast: float
     target_order_cost: float
     max_order_cost: float
-    ctr: float
     click_to_order_cr_7d: float
 
 
 def rank_bids_for_sales_plan(
     bid_model_result: dict[str, Any],
     context: PlanContext,
+    ctr_by_bid: dict[int, float],
     *,
     cost_penalty_alpha: float = 1.0,
 ) -> list[dict[str, Any]]:
@@ -38,22 +38,19 @@ def rank_bids_for_sales_plan(
     ranked_rows: list[dict[str, Any]] = []
 
     for row in bid_model_result["expected_ranked"]:
-        bid = float(row["bid"])
+        bid = int(row["bid"])
+        ctr = ctr_by_bid[bid]
         expected_impressions = float(row["expected_daily_impressions"])
-        expected_clicks = expected_impressions * context.ctr
+        expected_clicks = expected_impressions * ctr
         expected_orders = expected_clicks * context.click_to_order_cr_7d
         expected_cost = expected_impressions / 1000.0 * bid
-        expected_order_cost = (
-            expected_cost / expected_orders
-            if expected_orders > 0
-            else math.inf
-        )
+        if expected_orders > 0:
+            expected_order_cost = expected_cost / expected_orders
+        else:
+            expected_order_cost = math.inf
         projected_sales = context.current_fact_sales + expected_orders
         sales_gap = abs(projected_sales - context.sales_plan)
-        order_cost_overlimit = max(
-            0.0,
-            expected_order_cost - resolved_order_cost,
-        )
+        order_cost_overlimit = max(0.0, expected_order_cost - resolved_order_cost)
         plan_score = sales_gap + cost_penalty_alpha * order_cost_overlimit
 
         ranked_rows.append(
