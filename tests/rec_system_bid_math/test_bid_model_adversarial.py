@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.rec_system_bid_math.bid_model import run_bid_model
+from app.domain.rec_system_bid_math.bid_model import run_bid_model
 from tests.rec_system_bid_math.synthetic_cases import (
     make_bad_neighbors_good_night_spike_obs,
     make_local_peak_bad_daily_obs,

@@ -1,7 +1,7 @@
 """Проверка связки run_bid_model и планового ранжировщика."""
 
-from tests.rec_system_bid_math.bid_model import run_bid_model
-from tests.rec_system_bid_math.plan_ranker import (
+from app.domain.rec_system_bid_math.bid_model import run_bid_model
+from app.domain.rec_system_bid_math.plan_ranker import (
     PlanContext,
     rank_bids_for_sales_plan,
 )
@@ -21,10 +21,10 @@ def test_bid_model_result_can_be_ranked_by_sales_plan() -> None:
         current_sales_forecast=2500.0,
         target_order_cost=150.0,
         max_order_cost=250.0,
-        ctr=0.01,
         click_to_order_cr_7d=0.05,
     )
-    plan_ranked = rank_bids_for_sales_plan(result, context)
+    ctr_by_bid = {row["bid"]: 0.01 for row in result["expected_ranked"]}
+    plan_ranked = rank_bids_for_sales_plan(result, context, ctr_by_bid)
 
     assert len(plan_ranked) == len(result["expected_ranked"])
     assert result["expected_ranked"][0]["bid"] == 160

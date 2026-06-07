@@ -4,7 +4,7 @@ import math
 import random
 from typing import Any, TypedDict
 
-from tests.rec_system_bid_math.bid_model import HOURS, ModelResult, Obs
+from app.domain.rec_system_bid_math.bid_model import HOURS, ModelResult, Obs
 
 
 class SyntheticTruth(TypedDict):
