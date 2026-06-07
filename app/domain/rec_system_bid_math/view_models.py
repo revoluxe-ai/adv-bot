@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 _EXPECTED_RANKED_FIELDS: tuple[str, ...] = (
     "bid",
@@ -45,12 +46,12 @@ def _pick_fields(row: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]
     return {field: row.get(field) for field in fields}
 
 
-def build_rec_bid_recommendation_view(result: dict[str, Any]) -> dict[str, Any]:
+def build_rec_bid_recommendation_view(result: Mapping[str, object]) -> dict[str, Any]:
     """Build a stable UI view from get_rec_bid_recommendations/debug result."""
-    diagnostics = result.get("diagnostics", {})
-    bid_result = result.get("bid_result", {})
-    expected_ranked = bid_result.get("expected_ranked", [])
-    plan_ranked = result.get("plan_ranked", [])
+    diagnostics = cast(dict[str, Any], result.get("diagnostics", {}))
+    bid_result = cast(dict[str, Any], result.get("bid_result", {}))
+    expected_ranked = cast(list[dict[str, Any]], bid_result.get("expected_ranked", []))
+    plan_ranked = cast(list[dict[str, Any]], result.get("plan_ranked", []))
 
     return {
         "diagnostics": _pick_fields(diagnostics, _DIAGNOSTICS_FIELDS),
