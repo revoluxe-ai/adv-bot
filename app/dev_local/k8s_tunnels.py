@@ -20,6 +20,7 @@ from __future__ import annotations
 import atexit
 import logging
 import os
+import platform
 import signal
 import socket
 import subprocess
@@ -82,11 +83,57 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _normalize_kubeconfig_candidate(raw_path: str) -> Path:
+    """Нормализует kubeconfig path без Windows escape-багов."""
+    return Path(raw_path.strip().strip('"').strip("'")).expanduser()
+
+
+def _kubeconfig_candidates() -> list[tuple[str, Path]]:
+    """Возвращает кандидаты kubeconfig по приоритету env-переменных и default path."""
+    candidates: list[tuple[str, Path]] = []
+    for env_name in (
+        "KUBECONFIG",
+        "DEV_KUBECONFIG",
+        "TWC_KUBECONFIG",
+        "DEV_TUNNELS_KUBECONFIG",
+    ):
+        raw_value = os.environ.get(env_name, "").strip()
+        if not raw_value:
+            continue
+        for raw_part in raw_value.split(os.pathsep):
+            candidate = raw_part.strip()
+            if candidate:
+                candidates.append((env_name, _normalize_kubeconfig_candidate(candidate)))
+
+    candidates.append(
+        (
+            "default",
+            (_repo_root() / "k8s" / "new-cluster" / "new-cluster-config.yaml").resolve(),
+        )
+    )
+    return candidates
+
+
+def resolve_kubeconfig_path() -> Path:
+    """Определяет kubeconfig path и логирует фактический выбор."""
+    candidates = _kubeconfig_candidates()
+    for source, candidate in candidates:
+        if candidate.is_file():
+            resolved = candidate.resolve()
+            logger.info("Using kubeconfig from %s: %s", source, resolved)
+            return resolved
+
+    checked = ", ".join(f"{source}={path}" for source, path in candidates)
+    raise FileNotFoundError(
+        "Kubeconfig not found. Checked: "
+        f"{checked}. Platform={platform.system()}. "
+        "Set KUBECONFIG, DEV_KUBECONFIG, TWC_KUBECONFIG or DEV_TUNNELS_KUBECONFIG."
+    )
+
+
 def _default_kubeconfig() -> str:
-    env_path = os.environ.get("DEV_TUNNELS_KUBECONFIG", "").strip()
-    if env_path:
-        return env_path
-    return str(_repo_root() / "k8s" / "new-cluster" / "new-cluster-config.yaml")
+    """Совместимый wrapper для существующих вызовов."""
+    return str(resolve_kubeconfig_path())
 
 
 def _int_env(name: str, default: int) -> int:
@@ -299,12 +346,18 @@ def _clickhouse_http_select_1(port: int, timeout_sec: float) -> None:
         with socket.create_connection((host, port), timeout=timeout_sec) as sock:
             sock.settimeout(timeout_sec)
             sock.sendall(request)
-            raw = sock.recv(4096)
+            chunks: list[bytes] = []
+            while True:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                chunks.append(chunk)
     except OSError as exc:
         raise OSError(
             f"ClickHouse HTTP smoke failed on http://{host}:{port}/: {exc}"
         ) from exc
 
+    raw = b"".join(chunks)
     if not raw:
         raise OSError(f"ClickHouse HTTP smoke empty response on http://{host}:{port}/")
 
@@ -339,6 +392,15 @@ def _tunnel_probe_ready(spec: _TunnelSpec) -> bool:
 
 def _ports_ready(specs: list[_TunnelSpec]) -> bool:
     return all(_tunnel_probe_ready(spec) for spec in specs)
+
+
+def _tunnel_ready_message(spec: _TunnelSpec) -> str:
+    """Человеко-читаемый readiness log для одного tunnel."""
+    mappings = ", ".join(
+        f"127.0.0.1:{local} -> {spec.namespace} {spec.resource}:{remote}"
+        for local, remote in zip(spec.local_ports, spec.remote_ports, strict=True)
+    )
+    return f"{spec.name.capitalize()} port-forward ready: {mappings}"
 
 
 def _listener_pids_netstat(port: int) -> list[int]:
@@ -1004,6 +1066,8 @@ def wait_for_dev_tunnels_ready(
         if _ports_ready(tunnel_specs):
             _postgres_select_1_smoke_check(tunnel_specs)
             _clickhouse_select_1_smoke_check(tunnel_specs)
+            for spec in tunnel_specs:
+                logger.info(_tunnel_ready_message(spec))
             logger.info("Dev k8s tunnels are ready on localhost")
             return
         time.sleep(_READY_POLL_INTERVAL_SEC)
@@ -1256,9 +1320,6 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
                 wait_specs_after_lock = _tunnel_specs()
         else:
             kubeconfig = _default_kubeconfig()
-            if not Path(kubeconfig).is_file():
-                raise FileNotFoundError(f"Kubeconfig not found: {kubeconfig}")
-
             specs = _tunnel_specs()
 
             if _ports_ready(specs):
@@ -1304,3 +1365,8 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
     )
     if wait_ready and monitor_bootstrap:
         wait_for_dev_tunnels_ready(specs=specs)
+
+
+def ensure_dev_tunnels(*, wait_ready: bool = True) -> None:
+    """Публичный helper для локальных entrypoint-скриптов."""
+    start_dev_tunnels_monitor(wait_ready=wait_ready)
