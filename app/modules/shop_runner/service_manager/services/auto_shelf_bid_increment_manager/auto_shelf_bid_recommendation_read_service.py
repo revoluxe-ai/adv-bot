@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from app.domain.rec_system_bid_math.hour_observation_builder import (
     BidBucketObservation,
@@ -194,7 +194,7 @@ class AutoShelfBidRecommendationReadService:
             "hour_count": len({obs.hour for obs in observations}),
         }
         if not observations:
-            result = {
+            result: dict[str, object] = {
                 "bid_result": {
                     "rows": [],
                     "expected_ranked": [],
@@ -213,20 +213,20 @@ class AutoShelfBidRecommendationReadService:
             }
             result["view"] = build_rec_bid_recommendation_view(result)
             return result
-        result = rank_rec_system_bids(
+        result: dict[str, object] = rank_rec_system_bids(
             observations=observations,
             plan_context=plan_context,
             ctr_by_bid=ctr_by_bid,
         )
-        bid_result = result["bid_result"]
-        plan_ranked = result["plan_ranked"]
-        full_result = {
+        bid_result = cast(dict[str, object], result["bid_result"])
+        expected_ranked = cast(list[dict[str, object]], bid_result["expected_ranked"])
+        plan_ranked = cast(list[dict[str, object]], result["plan_ranked"])
+        full_result: dict[str, object] = {
             "bid_result": bid_result,
             "plan_ranked": plan_ranked,
             "best_plan_bid": plan_ranked[0]["bid"] if plan_ranked else None,
             "best_expected_bid": (
-                bid_result["expected_ranked"][0]["bid"]
-                if bid_result["expected_ranked"]
+                expected_ranked[0]["bid"] if expected_ranked
                 else None
             ),
             "diagnostics": diagnostics,
