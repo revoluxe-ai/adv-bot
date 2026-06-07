@@ -233,7 +233,7 @@ class ApplyManager:
                     applied_steps = int(tick_input.max_effective_steps)
                 await tick.calibration_step_cache.set_state(
                     CalibrationStepState(
-                        effective_steps=max(1, applied_steps),
+                        effective_steps=max(0, applied_steps),
                         direct=tick_input.calibration_direct,
                     )
                 )
