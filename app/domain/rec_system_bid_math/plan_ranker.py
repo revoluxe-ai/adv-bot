@@ -21,21 +21,16 @@ def rank_bids_for_sales_plan(
     bid_model_result: dict[str, Any],
     context: PlanContext,
     ctr_by_bid: dict[int, float],
-    *,
-    cost_penalty_alpha: float = 1.0,
 ) -> list[dict[str, Any]]:
-    """Ранжировать все ставки по близости к плану и стоимости заказа.
+    """Ранжировать все ставки по нормализованному одностороннему расстоянию.
 
-    Исходные строки из ``expected_ranked`` не изменяются. Для каждой ставки
-    возвращается новая строка с расчётами кликов, заказов, стоимости и итогового
-    plan score. Меньший score означает более подходящую ставку.
+    Чем меньше plan_score, тем ближе ставка к целевой зоне:
+    недобор продаж штрафуется только снизу, а перерасход CPO только сверху.
     """
-    resolved_order_cost = (
-        context.max_order_cost
-        if context.current_sales_forecast < context.sales_plan
-        else context.target_order_cost
-    )
     ranked_rows: list[dict[str, Any]] = []
+    needed_sales = max(1.0, context.sales_plan - context.current_fact_sales)
+    target_order_cost_minor = context.target_order_cost * 100.0
+    max_order_cost_minor = context.max_order_cost * 100.0
 
     for row in bid_model_result["expected_ranked"]:
         bid = int(row["bid"])
@@ -49,9 +44,15 @@ def rank_bids_for_sales_plan(
         else:
             expected_order_cost = math.inf
         projected_sales = context.current_fact_sales + expected_orders
-        sales_gap = abs(projected_sales - context.sales_plan)
-        order_cost_overlimit = max(0.0, expected_order_cost - resolved_order_cost)
-        plan_score = sales_gap + cost_penalty_alpha * order_cost_overlimit
+        if projected_sales < context.sales_plan:
+            resolved_order_cost = max_order_cost_minor
+        else:
+            resolved_order_cost = target_order_cost_minor
+        sales_miss = max(0.0, context.sales_plan - projected_sales)
+        cpo_over = max(0.0, expected_order_cost - resolved_order_cost)
+        sales_dist = sales_miss / needed_sales
+        cpo_dist = cpo_over / resolved_order_cost if resolved_order_cost > 0 else math.inf
+        plan_score = math.sqrt(sales_dist**2 + cpo_dist**2)
 
         ranked_rows.append(
             {
@@ -61,11 +62,17 @@ def rank_bids_for_sales_plan(
                 "expected_clicks": expected_clicks,
                 "expected_orders": expected_orders,
                 "expected_cost": expected_cost,
-                "expected_order_cost": expected_order_cost,
-                "resolved_order_cost": resolved_order_cost,
+                "expected_order_cost_minor": expected_order_cost,
+                "expected_order_cost_rub": expected_order_cost / 100.0,
+                "resolved_order_cost_minor": resolved_order_cost,
+                "resolved_order_cost_rub": resolved_order_cost / 100.0,
                 "projected_sales": projected_sales,
-                "sales_gap": sales_gap,
-                "order_cost_overlimit": order_cost_overlimit,
+                "needed_sales": needed_sales,
+                "sales_miss": sales_miss,
+                "sales_dist": sales_dist,
+                "cpo_over_minor": cpo_over,
+                "cpo_over_rub": cpo_over / 100.0,
+                "cpo_dist": cpo_dist,
                 "plan_score": plan_score,
                 "confidence": row["confidence"],
                 "uncertainty": row["uncertainty"],

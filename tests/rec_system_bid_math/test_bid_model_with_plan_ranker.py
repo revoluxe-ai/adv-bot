@@ -33,5 +33,5 @@ def test_bid_model_result_can_be_ranked_by_sales_plan() -> None:
     for row in plan_ranked:
         assert "expected_orders" in row
         assert "expected_order_cost" in row
-        assert "sales_gap" in row
+        assert "sales_dist" in row
         assert "plan_score" in row
