@@ -49,19 +49,22 @@ def test_bid_closer_to_sales_plan_ranks_above_higher_impressions_bid() -> None:
         "expected_impressions",
         "expected_clicks",
         "expected_orders",
-        "expected_cost",
+        "expected_cost_minor",
+        "expected_cost_rub",
         "expected_order_cost_minor",
         "expected_order_cost_rub",
         "resolved_order_cost_minor",
         "resolved_order_cost_rub",
         "projected_sales",
+        "sales_gap",
+        "abs_sales_gap",
         "needed_sales",
         "sales_miss",
         "sales_dist",
-        "cpo_over_minor",
-        "cpo_over_rub",
-        "cpo_dist",
-        "plan_score",
+        "order_cost_overlimit_minor",
+        "order_cost_overlimit_rub",
+        "order_cost_overlimit_dist",
+        "plan_distance_score",
         "confidence",
         "uncertainty",
         "main_score",
@@ -69,7 +72,9 @@ def test_bid_closer_to_sales_plan_ranks_above_higher_impressions_bid() -> None:
         "own_anchor",
     }
     assert ranked[0]["projected_sales"] == 120.0
-    assert ranked[0]["plan_score"] <= ranked[1]["plan_score"]
+    assert ranked[0]["sales_gap"] == 0.0
+    assert ranked[0]["abs_sales_gap"] == 0.0
+    assert ranked[0]["plan_distance_score"] <= ranked[1]["plan_distance_score"]
 
 
 def test_zero_ctr_keeps_bid_but_forces_infinite_costs() -> None:
@@ -102,8 +107,8 @@ def test_zero_ctr_keeps_bid_but_forces_infinite_costs() -> None:
     assert ranked[0]["expected_clicks"] == 0
     assert ranked[0]["expected_orders"] == 0
     assert ranked[0]["expected_order_cost_minor"] == float("inf")
-    assert ranked[0]["cpo_over_minor"] == float("inf")
-    assert ranked[0]["plan_score"] == float("inf")
+    assert ranked[0]["order_cost_overlimit_minor"] == float("inf")
+    assert ranked[0]["plan_distance_score"] == float("inf")
 
 
 def test_missing_ctr_raises_key_error() -> None:

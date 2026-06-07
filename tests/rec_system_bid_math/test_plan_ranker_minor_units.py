@@ -51,4 +51,4 @@ def test_plan_ranker_uses_minor_units_for_cpo() -> None:
     assert ranked[0]["resolved_order_cost_minor"] == 59000.0
     assert ranked[0]["resolved_order_cost_rub"] == 590.0
     assert ranked[0]["expected_order_cost_minor"] > 0
-    assert ranked[0]["plan_score"] < ranked[1]["plan_score"]
+    assert ranked[0]["plan_distance_score"] < ranked[1]["plan_distance_score"]
