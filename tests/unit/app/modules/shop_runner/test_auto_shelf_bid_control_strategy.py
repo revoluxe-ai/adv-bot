@@ -22,16 +22,16 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
     ("raw_value", "expected"),
     [
         (None, AutoShelfBidControlStrategy.PLAN_DISTANCE),
-        ("", ""),
-        ("unknown", "unknown"),
+        ("", AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        ("unknown", AutoShelfBidControlStrategy.PLAN_DISTANCE),
         (AutoShelfBidControlStrategy.PLAN_DISTANCE, AutoShelfBidControlStrategy.PLAN_DISTANCE),
     ],
 )
 def test_resolve_auto_shelf_bid_control_strategy(
     raw_value: AutoShelfBidControlStrategy | str | None,
-    expected: AutoShelfBidControlStrategy | str,
+    expected: AutoShelfBidControlStrategy,
 ) -> None:
-    """Рефакторинг оставил enum-путь для None и passthrough для заданных значений."""
+    """None, пустые и неизвестные значения должны падать в legacy default."""
     assert resolve_auto_shelf_bid_control_strategy(raw_value) == expected
 
 
@@ -40,16 +40,16 @@ def test_resolve_auto_shelf_bid_control_strategy(
     ("raw_value", "expected"),
     [
         (None, AutoShelfBidControlStrategy.PLAN_DISTANCE),
-        ("", ""),
-        ("unknown", "unknown"),
+        ("", AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        ("unknown", AutoShelfBidControlStrategy.PLAN_DISTANCE),
         (AutoShelfBidControlStrategy.PLAN_DISTANCE, AutoShelfBidControlStrategy.PLAN_DISTANCE),
     ],
 )
 def test_complex_adv_exposes_auto_shelf_bid_control_strategy(
     raw_value: AutoShelfBidControlStrategy | str | None,
-    expected: AutoShelfBidControlStrategy | str,
+    expected: AutoShelfBidControlStrategy,
 ) -> None:
-    """ComplexAdv отдает значение из AdvSetting без изменения семантики рефакторинга."""
+    """ComplexAdv должен нормализовать control-strategy в enum default."""
     adv_setting = MagicMock()
     adv_setting.auto_shelf_bid_control_strategy = raw_value
     complex_adv = ComplexAdv(adv_setting=adv_setting)

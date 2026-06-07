@@ -30,15 +30,21 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 
 
-def resolve_auto_shelf_bid_control_strategy(raw_value: AutoShelfBidControlStrategy| None) -> AutoShelfBidControlStrategy:
+def resolve_auto_shelf_bid_control_strategy(
+    raw_value: AutoShelfBidControlStrategy | str | None,
+) -> AutoShelfBidControlStrategy:
     """Нормализует стратегию control-логики полок.
 
     None, пустые и неизвестные значения безопасно сводятся к legacy-режиму.
     """
-    if raw_value is None:
-        return AutoShelfBidControlStrategy.PLAN_DISTANCE.PLAN_DISTANCE
-
-    return raw_value
+    if raw_value is None or raw_value == "":
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if isinstance(raw_value, AutoShelfBidControlStrategy):
+        return raw_value
+    try:
+        return AutoShelfBidControlStrategy(str(raw_value))
+    except ValueError:
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
 
 
 class GetKeywordsProvider(Protocol):
@@ -294,7 +300,7 @@ class ComplexAdv:
         return bool(self._adv_setting.auto_shelf_bid_control_enabled)
 
     @property
-    def auto_shelf_bid_control_strategy(self) -> str:
+    def auto_shelf_bid_control_strategy(self) -> AutoShelfBidControlStrategy:
         """Стратегия выбора main bid для auto_shelf_bid_control."""
         return resolve_auto_shelf_bid_control_strategy(
             getattr(self._adv_setting, "auto_shelf_bid_control_strategy", None)
