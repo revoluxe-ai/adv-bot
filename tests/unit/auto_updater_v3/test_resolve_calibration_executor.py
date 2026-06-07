@@ -268,7 +268,7 @@ def test_calibration_up_min_from_list2() -> None:
 
 
 @pytest.mark.unit
-def test_calibration_budget_limits_steps() -> None:
+def test_calibration_step_limits_steps() -> None:
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.MIN_CPA,
@@ -286,8 +286,8 @@ def test_calibration_budget_limits_steps() -> None:
 
 
 @pytest.mark.unit
-def test_calibration_up_budget_is_ladder_steps_not_iterations() -> None:
-    """Бюджет 2 = два ladder UP; alias MIN→OPT на том же place не считается шагом."""
+def test_calibration_up_step_is_ladder_steps_not_iterations() -> None:
+    """Шаг 2 = два ladder UP; alias MIN→OPT на том же place не считается шагом."""
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.OFF,

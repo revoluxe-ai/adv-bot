@@ -144,6 +144,22 @@ def test_format_zero_calibration_shows_outcome_note_not_counters() -> None:
 
 
 @pytest.mark.unit
+def test_format_skipped_calibration_shows_none_as_no() -> None:
+    """Если applied step отсутствует, UI должен показать «нет», а не техничное None."""
+    snap = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+        adv_id=1,
+        adv_name="Крем",
+        campaign_mode="NORMAL",
+        calibration_direct="tighten",
+        calibration_prev_effective_steps=2,
+    )
+    text = format_v3_tick_report_text(snap)
+    assert "Калибровка: DOWN · нет" in text
+    assert "шаг None" not in text
+
+
+@pytest.mark.unit
 def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     snap = V3TickReportSnapshot(
         tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
