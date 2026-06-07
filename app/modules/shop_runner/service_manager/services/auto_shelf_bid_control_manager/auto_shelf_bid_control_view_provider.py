@@ -472,6 +472,23 @@ class AutoShelfBidControlViewProvider:
                 "rec_bid_recommendation_missing_nmid adv_setting_original_id=%s",
                 adv_setting_original_id,
             )
+        if rec_bid_recommendation is None:
+            logger.warning(
+                "rec_bid_recommendation_none nmid=%s adv_setting_original_id=%s",
+                nmid,
+                adv_setting_original_id,
+            )
+        else:
+            diagnostics = cast(
+                dict[str, object],
+                rec_bid_recommendation.get("diagnostics", {}),
+            )
+            logger.warning(
+                "rec_bid_recommendation_not_none nmid=%s adv_setting_original_id=%s diagnostics=%s",
+                nmid,
+                adv_setting_original_id,
+                diagnostics,
+            )
 
         return AutoShelfBidControlViewDTO(
             nmid=nmid,
