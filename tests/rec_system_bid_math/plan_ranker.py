@@ -58,7 +58,7 @@ def rank_bids_for_sales_plan(
 
         ranked_rows.append(
             {
-                **row,
+                "bid": bid,
                 "expected_impressions": expected_impressions,
                 "expected_clicks": expected_clicks,
                 "expected_orders": expected_orders,
@@ -69,6 +69,11 @@ def rank_bids_for_sales_plan(
                 "sales_gap": sales_gap,
                 "order_cost_overlimit": order_cost_overlimit,
                 "plan_score": plan_score,
+                "confidence": row["confidence"],
+                "uncertainty": row["uncertainty"],
+                "main_score": row["main_score"],
+                "test_score": row["test_score"],
+                "own_anchor": row["own_anchor"],
             }
         )
 
