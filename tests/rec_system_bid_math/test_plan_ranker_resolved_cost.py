@@ -7,7 +7,7 @@ from app.domain.rec_system_bid_math.plan_ranker import (
 
 
 def test_resolved_order_cost_uses_max_order_cost_when_forecast_below_plan() -> None:
-    """Если forecast ниже плана, resolved cost должен быть max_order_cost."""
+    """Если projected sales ниже плана, resolved cost должен быть max_order_cost."""
     bid_model_result = {
         "expected_ranked": [
             {
@@ -32,11 +32,12 @@ def test_resolved_order_cost_uses_max_order_cost_when_forecast_below_plan() -> N
 
     ranked = rank_bids_for_sales_plan(bid_model_result, context, {100: 0.01})
 
-    assert ranked[0]["resolved_order_cost"] == 250.0
+    assert ranked[0]["resolved_order_cost_minor"] == 25000.0
+    assert ranked[0]["resolved_order_cost_rub"] == 250.0
 
 
 def test_resolved_order_cost_uses_target_order_cost_when_forecast_meets_plan() -> None:
-    """Если forecast не ниже плана, resolved cost должен быть target_order_cost."""
+    """Если projected sales не ниже плана, resolved cost должен быть target_order_cost."""
     bid_model_result = {
         "expected_ranked": [
             {
@@ -61,7 +62,8 @@ def test_resolved_order_cost_uses_target_order_cost_when_forecast_meets_plan() -
 
     ranked = rank_bids_for_sales_plan(bid_model_result, context, {100: 0.01})
 
-    assert ranked[0]["resolved_order_cost"] == 150.0
+    assert ranked[0]["resolved_order_cost_minor"] == 15000.0
+    assert ranked[0]["resolved_order_cost_rub"] == 150.0
 
 
 def test_zero_ctr_keeps_bid_and_forces_infinite_plan_costs() -> None:
@@ -93,6 +95,6 @@ def test_zero_ctr_keeps_bid_and_forces_infinite_plan_costs() -> None:
     assert ranked[0]["bid"] == 100
     assert ranked[0]["expected_clicks"] == 0
     assert ranked[0]["expected_orders"] == 0
-    assert ranked[0]["expected_order_cost"] == float("inf")
-    assert ranked[0]["order_cost_overlimit"] == float("inf")
+    assert ranked[0]["expected_order_cost_minor"] == float("inf")
+    assert ranked[0]["cpo_over_minor"] == float("inf")
     assert ranked[0]["plan_score"] == float("inf")
