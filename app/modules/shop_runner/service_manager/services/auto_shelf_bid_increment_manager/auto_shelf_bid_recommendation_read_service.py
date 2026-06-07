@@ -19,6 +19,9 @@ from app.domain.rec_system_bid_math.hour_observation_builder import (
 from app.domain.rec_system_bid_math.input_models import BidHourObservation
 from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.domain.rec_system_bid_math.service import rank_rec_system_bids
+from app.domain.rec_system_bid_math.view_models import (
+    build_rec_bid_recommendation_view,
+)
 
 from .auto_shelf_bid_repository import AutoShelfBidRepository
 from app.domain.rec_system_bid_math.hour_observation_builder import BUCKET_MINUTES
@@ -191,7 +194,7 @@ class AutoShelfBidRecommendationReadService:
             "hour_count": len({obs.hour for obs in observations}),
         }
         if not observations:
-            return {
+            result = {
                 "bid_result": {
                     "rows": [],
                     "expected_ranked": [],
@@ -208,6 +211,8 @@ class AutoShelfBidRecommendationReadService:
                 "best_expected_bid": None,
                 "diagnostics": diagnostics,
             }
+            result["view"] = build_rec_bid_recommendation_view(result)
+            return result
         result = rank_rec_system_bids(
             observations=observations,
             plan_context=plan_context,
@@ -215,7 +220,7 @@ class AutoShelfBidRecommendationReadService:
         )
         bid_result = result["bid_result"]
         plan_ranked = result["plan_ranked"]
-        return {
+        full_result = {
             "bid_result": bid_result,
             "plan_ranked": plan_ranked,
             "best_plan_bid": plan_ranked[0]["bid"] if plan_ranked else None,
@@ -226,6 +231,8 @@ class AutoShelfBidRecommendationReadService:
             ),
             "diagnostics": diagnostics,
         }
+        full_result["view"] = build_rec_bid_recommendation_view(full_result)
+        return full_result
 
     @staticmethod
     def _top10(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

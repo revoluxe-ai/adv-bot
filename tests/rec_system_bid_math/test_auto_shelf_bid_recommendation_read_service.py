@@ -396,6 +396,14 @@ async def test_get_rec_bid_recommendations_returns_full_payload() -> None:
     assert result["best_expected_bid"] == 100
     assert result["diagnostics"]["bucket_count"] == 4
     assert result["diagnostics"]["hour_observation_count"] == 1
+    assert "view" in result
+    assert {
+        "diagnostics",
+        "best_expected_bid",
+        "best_plan_bid",
+        "expected_ranked",
+        "plan_ranked",
+    } <= set(result["view"].keys())
 
 
 @pytest.mark.asyncio
@@ -441,3 +449,5 @@ async def test_get_rec_bid_recommendations_returns_empty_payload_on_no_hours() -
     assert result["plan_ranked"] == []
     assert result["best_plan_bid"] is None
     assert result["best_expected_bid"] is None
+    assert "view" in result
+    assert result["view"]["plan_ranked"] == []
