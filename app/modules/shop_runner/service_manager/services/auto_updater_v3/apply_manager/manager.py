@@ -216,9 +216,24 @@ class ApplyManager:
                 )
                 calibration_cached = True
             elif tick_input.calibration_direct is not None and inp.calibration_executed:
+                applied_steps_raw: object | None = None
+                if inp.pipeline_result is not None:
+                    applied_steps_raw = (
+                        inp.pipeline_result.update_context.adv_state.calibration_phase_extra.get(
+                            "applied_steps"
+                        )
+                    )
+                if not isinstance(applied_steps_raw, int):
+                    applied_steps_raw = tick_input.calibration_phase_extra.get(
+                        "applied_steps"
+                    )
+                if isinstance(applied_steps_raw, int):
+                    applied_steps = int(applied_steps_raw)
+                else:
+                    applied_steps = int(tick_input.max_effective_steps)
                 await tick.calibration_step_cache.set_state(
                     CalibrationStepState(
-                        effective_steps=tick_input.max_effective_steps,
+                        effective_steps=max(1, applied_steps),
                         direct=tick_input.calibration_direct,
                     )
                 )

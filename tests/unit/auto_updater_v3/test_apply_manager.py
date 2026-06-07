@@ -166,6 +166,82 @@ async def test_apply_resets_calibration_cache_when_preamble_requires_reset() -> 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_apply_persists_applied_calibration_steps_not_cap() -> None:
+    """Redis stores the реально применённый calibration step, not the resolver cap."""
+    complex_adv = MagicMock()
+    complex_adv.adv_id = 7
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
+
+    ledger = MagicMock()
+    ledger.apply_in_memory = MagicMock()
+    ledger.flush_to_db = AsyncMock(return_value=False)
+
+    tick_input = MagicMock(
+        plan=MagicMock(),
+        fact=MagicMock(),
+        shelf_click_mode=MagicMock(),
+        aggressiveness=MagicMock(),
+        calibration_direct=CalibrationDirect.TIGHTEN,
+        max_effective_steps=8,
+        calibration_phase_extra={"applied_steps": 3},
+    )
+    calibration_cache = MagicMock()
+    calibration_cache.set_state = AsyncMock()
+    pipeline_result = MagicMock(
+        update_context=MagicMock(
+            adv_state=MagicMock(
+                calibration_phase_extra={"applied_steps": 3},
+            )
+        ),
+        calibration_reset_required=False,
+    )
+    tick_data = MagicMock(
+        complex_adv=complex_adv,
+        ledger=ledger,
+        tick_input=tick_input,
+        contexts=[],
+        ladder_inputs=None,
+        campaign_mode=CampaignMode.NORMAL,
+        plan_fact_change=None,
+        views_cache=None,
+        calibration_step_cache=calibration_cache,
+        views_resolve_succeeded=False,
+        current_views=None,
+        sales_state=MagicMock(name="OPTIMAL"),
+        raw_profiles={},
+        all_contexts=[],
+    )
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.select_v3_post_gate_actions",
+            return_value=[],
+        ),
+        patch.object(
+            ApplyManager,
+            "sync_target_places_if_needed",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        await ApplyManager().apply(
+            V3ApplyInput(
+                tick_data=tick_data,
+                update_context=None,
+                pipeline_result=pipeline_result,
+                calibration_executed=True,
+                sync_force_zero=False,
+            )
+        )
+
+    calibration_cache.set_state.assert_awaited_once()
+    saved = calibration_cache.set_state.await_args[0][0]
+    assert saved.effective_steps == 3
+    assert saved.direct == CalibrationDirect.TIGHTEN
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_sync_target_places_skips_when_already_synced() -> None:
     """``already_synced=True`` — повторный sync не вызывается."""
     tick_data = MagicMock(

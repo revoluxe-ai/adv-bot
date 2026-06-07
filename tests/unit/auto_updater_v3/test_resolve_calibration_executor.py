@@ -178,6 +178,7 @@ def test_calibration_skip_gates(
     assert ctx.keywords[0].next_state == []
     assert ctx.adv_state.max_effective_steps == 0
     assert ctx.adv_state.calibration_phase_extra["effective_steps"] == 0
+    assert ctx.adv_state.calibration_phase_extra["applied_steps"] is None
 
 
 @pytest.mark.unit
@@ -333,6 +334,7 @@ def test_calibration_up_budget_is_ladder_steps_not_iterations() -> None:
     assert ctx.keywords[0].current_target_place == 20
     assert len(ctx.keywords[0].next_state) == 3
     assert ctx.adv_state.calibration_phase_extra.get("ladder_steps_done") == 2
+    assert ctx.adv_state.calibration_phase_extra.get("applied_steps") == 2
 
 
 @pytest.mark.unit
