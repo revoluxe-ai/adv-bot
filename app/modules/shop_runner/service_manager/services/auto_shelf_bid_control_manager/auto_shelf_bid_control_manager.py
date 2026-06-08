@@ -838,6 +838,44 @@ class AutoShelfBidControlManager:
             )
             return None
 
+        cycle_from_ts = state.current_cycle_started_at
+        if cycle_from_ts is None:
+            cycle_from_ts = now
+        covered_stats = await self._analytics.get_bid_stats(
+            nmid=nmid,
+            from_ts=cycle_from_ts,
+            currency=state.currency,
+        )
+        covered_bids = [
+            row.bid_minor
+            for row in covered_stats
+            if row.impressions >= int(settings_obj.target_test_impressions)
+        ]
+        next_test_bid = self.choose_next_test_bid(
+            min_bid=min_bid_minor,
+            max_bid=int(settings_obj.max_bid_minor),
+            covered_bids=covered_bids,
+            min_distance=int(settings_obj.min_bid_distance_minor),
+        )
+        if next_test_bid is not None:
+            state.current_test_bid_minor = next_test_bid
+            state.current_mode = "test"
+            state.test_started_at = now
+            state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=next_test_bid,
+            )
+            logger.info(
+                "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                next_test_bid,
+                state.last_reason,
+            )
+            return None
+
         target_main_bid = await self._choose_main_bid_by_strategy(
             complex_adv=complex_adv,
             current_cycle_started_at=state.current_cycle_started_at,
@@ -876,86 +914,3 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
-        main_bid = target_main_bid
-
-        cycle_from_ts = state.current_cycle_started_at
-        if cycle_from_ts is None:
-            cycle_from_ts = now
-        covered_stats = await self._analytics.get_bid_stats(
-            nmid=nmid,
-            from_ts=cycle_from_ts,
-            currency=state.currency,
-        )
-        covered_bids = [
-            row.bid_minor
-            for row in covered_stats
-            if row.impressions >= int(settings_obj.target_test_impressions)
-        ]
-        next_test_bid = self.choose_next_test_bid(
-            min_bid=min_bid_minor,
-            max_bid=int(settings_obj.max_bid_minor),
-            covered_bids=covered_bids,
-            min_distance=int(settings_obj.min_bid_distance_minor),
-        )
-        if next_test_bid is None:
-            best_bid = await self._choose_main_bid_by_strategy(
-                complex_adv=complex_adv,
-                current_cycle_started_at=state.current_cycle_started_at,
-                previous_cycle_started_at=state.previous_cycle_started_at,
-                current_main_bid_minor=state.current_main_bid_minor,
-                actual_bid_minor=actual_bid_minor,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=int(settings_obj.max_bid_minor),
-            )
-            if best_bid is None:
-                state.last_reason = ControlReason.BEST_BID_NOT_FOUND
-                await self._repository.save_state(state)
-                logger.warning(
-                    "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
-                    auto_adv_id,
-                    nmid,
-                    state.last_reason,
-                    complex_adv.auto_shelf_bid_control_strategy,
-                )
-                return None
-            new_test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
-            state.previous_cycle_started_at = state.current_cycle_started_at
-            state.current_cycle_started_at = now
-            state.current_mode = "test"
-            state.current_test_bid_minor = new_test_bid
-            state.current_main_bid_minor = best_bid
-            state.test_started_at = now
-            state.main_started_at = None
-            state.last_reason = ControlReason.CYCLE_COMPLETED
-            await self._persist_state_then_set_bid(
-                complex_adv,
-                state=state,
-                bid_minor=new_test_bid,
-            )
-            logger.info(
-                "auto_shelf_bid_control_cycle_completed auto_adv_id=%s nmid=%s new_test_bid=%s best_main_bid=%s reason=%s",
-                auto_adv_id,
-                nmid,
-                new_test_bid,
-                best_bid,
-                state.last_reason,
-            )
-            return None
-
-        state.current_test_bid_minor = next_test_bid
-        state.current_mode = "test"
-        state.test_started_at = now
-        state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=next_test_bid,
-        )
-        logger.info(
-            "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
-            auto_adv_id,
-            nmid,
-            next_test_bid,
-            state.last_reason,
-        )
-        return None
