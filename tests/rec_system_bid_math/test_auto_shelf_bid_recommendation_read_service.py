@@ -193,6 +193,38 @@ async def test_fetch_bid_hour_observation_diagnostics() -> None:
                         "price_minor": 700,
                         "delta_impressions": 40,
                     },
+                    {
+                        "event_id": "b1",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 0),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 10,
+                    },
+                    {
+                        "event_id": "b2",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 15),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 20,
+                    },
+                    {
+                        "event_id": "b3",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 30),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 30,
+                    },
+                    {
+                        "event_id": "b4",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 45),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 40,
+                    },
                 ]
             )
 
@@ -214,11 +246,11 @@ async def test_fetch_bid_hour_observation_diagnostics() -> None:
         date_to=datetime(2026, 6, 8, 0, 0),
     )
 
-    assert summary["raw_rows_count"] == 4
-    assert summary["valid_bucket_count"] == 4
-    assert summary["valid_hour_count"] == 1
-    assert summary["observations_count"] == 1
-    assert summary["distinct_bids"] == 1
+    assert summary["raw_rows_count"] == 8
+    assert summary["valid_bucket_count"] == 8
+    assert summary["valid_hour_count"] == 2
+    assert summary["observations_count"] == 2
+    assert summary["distinct_bids"] == 2
     assert summary["invalid_bucket_reason_counts"] == {}
     assert summary["invalid_hour_reason_counts"] == {}
 
@@ -313,6 +345,116 @@ async def test_fetch_and_rank_rec_system_bids_for_nmid_returns_plan_ranked() -> 
     assert "bid_result" in result
     assert "plan_ranked" in result
     assert result["plan_ranked"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_rank_rec_system_bids_for_nmid_raises_on_missing_ctr() -> None:
+    class FakeRepository:
+        async def fetch_rec_bid_bucket_observations_for_nmid(
+            self,
+            nmid: int,
+            mode: str,
+            date_from: datetime,
+            date_to: datetime,
+        ) -> list[object]:
+            _ = (nmid, mode, date_from, date_to)
+            return build_bid_bucket_observations_from_ch_rows(
+                [
+                    {
+                        "event_id": "a1",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 3, 0),
+                        "bid_minor": 100,
+                        "price_minor": 700,
+                        "delta_impressions": 10,
+                    },
+                    {
+                        "event_id": "a2",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 3, 15),
+                        "bid_minor": 100,
+                        "price_minor": 700,
+                        "delta_impressions": 20,
+                    },
+                    {
+                        "event_id": "a3",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 3, 30),
+                        "bid_minor": 100,
+                        "price_minor": 700,
+                        "delta_impressions": 30,
+                    },
+                    {
+                        "event_id": "a4",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 3, 45),
+                        "bid_minor": 100,
+                        "price_minor": 700,
+                        "delta_impressions": 40,
+                    },
+                    {
+                        "event_id": "a5",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 0),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 10,
+                    },
+                    {
+                        "event_id": "a6",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 15),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 20,
+                    },
+                    {
+                        "event_id": "a7",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 30),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 30,
+                    },
+                    {
+                        "event_id": "a8",
+                        "version": 1,
+                        "bucket_start": datetime(2026, 6, 7, 4, 45),
+                        "bid_minor": 200,
+                        "price_minor": 700,
+                        "delta_impressions": 40,
+                    },
+                ]
+            )
+
+        async def fetch_rec_bid_ctr_by_bid_for_nmid(
+            self,
+            nmid: int,
+            mode: str,
+            date_from: datetime,
+            date_to: datetime,
+        ) -> dict[int, float]:
+            _ = (nmid, mode, date_from, date_to)
+            return {100: 0.2}
+
+    service = AutoShelfBidRecommendationReadService(FakeRepository())
+
+    with pytest.raises(ValueError, match=r"Missing CTR for bids: \[200\]"):
+        await service.fetch_and_rank_rec_system_bids_for_nmid(
+            nmid=123,
+            mode="main",
+            date_from=datetime(2026, 6, 7, 0, 0),
+            date_to=datetime(2026, 6, 8, 0, 0),
+            plan_context=PlanContext(
+                sales_plan=100.0,
+                current_fact_sales=10.0,
+                current_sales_forecast=90.0,
+                target_order_cost=100.0,
+                max_order_cost=120.0,
+                click_to_order_cr_7d=0.1,
+            ),
+            ctr_by_bid={100: 0.2},
+        )
 
 
 @pytest.mark.asyncio
