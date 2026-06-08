@@ -8,6 +8,9 @@ from typing import Any, cast
 
 from clickhouse_connect.driver.query import QueryResult
 
+from app.domain.rec_system_bid_math.hour_observation_builder import (
+    BidBucketObservation,
+)
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -36,9 +39,7 @@ class AutoShelfBidControlAnalyticsRepository:
     @staticmethod
     def _result_column_names(result: QueryResult) -> list[str]:
         """Нормализовать имена колонок CH в явный список строк."""
-        raw_column_names: tuple[Any, ...] = cast(
-            tuple[Any, ...], getattr(result, "column_names")
-        )
+        raw_column_names = cast(tuple[Any, ...], getattr(result, "column_names"))
         column_names: list[str] = []
         for name in raw_column_names:
             column_names.append(str(name))

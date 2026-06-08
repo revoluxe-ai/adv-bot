@@ -8,7 +8,6 @@ from typing import cast
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.redis_manager_v2.redis_client import RedisClient
-from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
@@ -27,6 +26,7 @@ from .bid_selection import resolve_cycle_best_bids
 from .dto import OptimizationMetric, resolve_optimization_metric
 from .settings_normalizer import compute_settings_repair, repair_state_test_bid_minor
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
+from .rec_bid_plan_context import build_rec_bid_plan_context
 from .bid_units import (
     report_day_start_utc,
     resolve_test_segment_start_utc,
@@ -38,7 +38,6 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
 )
 from app.settings import settings
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 logger = logging.getLogger(__name__)
 
@@ -212,13 +211,15 @@ class AutoShelfBidControlViewProvider:
         if plan_fact_summary is not None:
             fact_predict_orders = plan_fact_summary.fact_predict_orders
             fact_cpo = plan_fact_summary.fact_pay_for_order
-        # resolve_cpo вычисляем из настроек кампании
-        resolve_cpo = resolve_target_cost(
-            adv.plan_for_sales_for_day,
-            adv.target_price_for_order,
-            adv.max_price_for_order,
-            fact_predict_orders,
-        )
+        # resolve_cpo ????????? ?? ???????? ????????
+        resolve_cpo = build_rec_bid_plan_context(
+            sales_plan=float(adv.plan_for_sales_for_day or 0.0),
+            current_fact_sales=float(fact_predict_orders or 0.0),
+            current_sales_forecast=float(fact_predict_orders or 0.0),
+            target_price_for_order=adv.target_price_for_order,
+            max_price_for_order=adv.max_price_for_order,
+            click_to_order_cr_7d=0.0,
+        ).target_order_cost
         optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
 
         state = await self._repository.get_state(nmid) if nmid else None
@@ -457,12 +458,12 @@ class AutoShelfBidControlViewProvider:
                             date_to=rec_date_to,
                         )
                     )
-                    plan_context = PlanContext(
+                    plan_context = build_rec_bid_plan_context(
                         sales_plan=float(adv.plan_for_sales_for_day or 0.0),
                         current_fact_sales=float(fact_predict_orders or 0.0),
                         current_sales_forecast=float(fact_predict_orders or 0.0),
-                        target_order_cost=float(adv.target_price_for_order or 0.0),
-                        max_order_cost=float(adv.max_price_for_order or 0.0),
+                        target_price_for_order=adv.target_price_for_order,
+                        max_price_for_order=adv.max_price_for_order,
                         click_to_order_cr_7d=click_to_order_cr_7d,
                     )
                     rec_result = await self._rec_bid_recommendation_service.get_rec_bid_recommendations(

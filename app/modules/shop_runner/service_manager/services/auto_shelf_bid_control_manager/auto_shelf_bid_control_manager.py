@@ -25,9 +25,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
 )
-from app.domain.rec_system_bid_math.plan_ranker import PlanContext
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
-
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
@@ -40,6 +37,7 @@ from .bid_units import (
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
+from .rec_bid_plan_context import build_rec_bid_plan_context
 
 logger = logging.getLogger(__name__)
 
@@ -394,20 +392,12 @@ class AutoShelfBidControlManager:
             fact_predict_orders = (
                 plan_fact_summary.fact_predict_orders if plan_fact_summary else None
             )
-            target_order_cost = resolve_target_cost(
-                complex_adv.adv_setting.plan_for_sales_for_day,
-                complex_adv.adv_setting.target_price_for_order,
-                complex_adv.adv_setting.max_price_for_order,
-                fact_predict_orders,
-            )
-            if target_order_cost is None:
-                target_order_cost = float(complex_adv.adv_setting.max_price_for_order or 0.0)
-            plan_context = PlanContext(
+            plan_context = build_rec_bid_plan_context(
                 sales_plan=float(complex_adv.adv_setting.plan_for_sales_for_day or 0.0),
                 current_fact_sales=float(fact_predict_orders or 0.0),
                 current_sales_forecast=float(fact_predict_orders or 0.0),
-                target_order_cost=target_order_cost,
-                max_order_cost=float(complex_adv.adv_setting.max_price_for_order or 0.0),
+                target_price_for_order=complex_adv.adv_setting.target_price_for_order,
+                max_price_for_order=complex_adv.adv_setting.max_price_for_order,
                 click_to_order_cr_7d=click_to_order_cr_7d,
             )
             rec_service = AutoShelfBidRecommendationReadService(rec_repository)
@@ -726,21 +716,23 @@ class AutoShelfBidControlManager:
             return None
 
         max_bid = int(settings_obj.max_bid_minor)
-        main_bid = state.current_main_bid_minor
-        if main_bid is None:
-            main_bid = self._middle_bid(min_bid_minor, max_bid)
-            state.current_main_bid_minor = main_bid
+        main_bid_value = state.current_main_bid_minor
+        if main_bid_value is None:
+            main_bid_value = self._middle_bid(min_bid_minor, max_bid)
+            state.current_main_bid_minor = main_bid_value
             state.main_started_at = state.main_started_at or now
         else:
             clamped_main = self._clamp_bid_minor(
-                main_bid,
+                main_bid_value,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=max_bid,
             )
-            if clamped_main != int(main_bid):
-                main_bid = clamped_main
-                state.current_main_bid_minor = main_bid
-        if state.current_main_bid_minor is not None and state.main_started_at is None:
+            if clamped_main != int(main_bid_value):
+                main_bid_value = clamped_main
+                state.current_main_bid_minor = main_bid_value
+        assert state.current_main_bid_minor is not None
+        main_bid: int = int(state.current_main_bid_minor)
+        if state.main_started_at is None:
             state.main_started_at = now
             state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
             await self._repository.save_state(state)
@@ -753,36 +745,7 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
-        target_main_bid = await self._choose_main_bid_by_strategy(
-            complex_adv=complex_adv,
-            currency=state.currency,
-            current_cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=state.current_main_bid_minor,
-            actual_bid_minor=actual_bid_minor,
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=max_bid,
-        )
-        if target_main_bid is None:
-            state.last_reason = ControlReason.BEST_BID_NOT_FOUND
-            await self._repository.save_state(state)
-            logger.warning(
-                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
-                auto_adv_id,
-                nmid,
-                state.last_reason,
-                complex_adv.auto_shelf_bid_control_strategy,
-            )
-            return None
-        if int(main_bid) != target_main_bid:
-            main_bid = target_main_bid
-            state.current_main_bid_minor = main_bid
-            state.main_started_at = now
         main_started_at = state.main_started_at
-        if main_started_at is None:
-            main_started_at = now
-            state.main_started_at = main_started_at
-        assert main_started_at is not None
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
             self._target_observation_minutes_or_default(
@@ -852,8 +815,9 @@ class AutoShelfBidControlManager:
             )
             return None
 
-        target_main_bid = await self._choose_main_bid_by_strategy(
+        target_main_bid: int | None = await self._choose_main_bid_by_strategy(
             complex_adv=complex_adv,
+            currency=state.currency,
             current_cycle_started_at=state.current_cycle_started_at,
             previous_cycle_started_at=state.previous_cycle_started_at,
             current_main_bid_minor=state.current_main_bid_minor,
@@ -872,7 +836,7 @@ class AutoShelfBidControlManager:
                 complex_adv.auto_shelf_bid_control_strategy,
             )
             return None
-        if int(main_bid) != target_main_bid:
+        if int(main_bid) != int(target_main_bid):
             main_bid = target_main_bid
             state.current_main_bid_minor = main_bid
             state.main_started_at = now
