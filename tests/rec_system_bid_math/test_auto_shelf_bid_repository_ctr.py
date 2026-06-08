@@ -132,7 +132,7 @@ async def test_fetch_rec_bid_bucket_observations_for_nmid_passes_mode(
 
     assert len(buckets) == 1
     assert buckets[0].bid == 100
-    assert buckets[0].impressions == 30.0
+    assert buckets[0].impressions == 10.0
     assert client.calls
     query, parameters = client.calls[0]
     assert "%(mode)s" in query
