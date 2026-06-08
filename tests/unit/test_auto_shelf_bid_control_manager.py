@@ -9,8 +9,17 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     ControlReason,
     AutoShelfBidControlManager,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     BidStatsDTO,
+)
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactSummary,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
+    AutoShelfBidRecommendationReadService,
 )
 
 
@@ -79,6 +88,161 @@ async def test_choose_best_bid_clamps_historical_ch_bid() -> None:
         max_bid_minor=50_000,
     )
     assert result == 50_000
+
+
+@pytest.mark.asyncio
+async def test_choose_main_bid_by_strategy_uses_cycle_metric_fallback() -> None:
+    """CYCLE_METRIC должен использовать старый cycle/CPC-CTR path без rec-bid."""
+    analytics = MagicMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        adv_setting=MagicMock(currency="RUB"),
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    result = await manager._choose_main_bid_by_strategy(
+        complex_adv=complex_adv,
+        currency="RUB",
+        current_cycle_started_at=datetime.now(UTC),
+        previous_cycle_started_at=None,
+        current_main_bid_minor=20_000,
+        actual_bid_minor=20_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+    )
+
+    assert result == 25_000
+    manager._choose_best_bid_with_fallback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_choose_main_bid_by_strategy_uses_plan_distance_best_plan_bid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAN_DISTANCE должен брать best_plan_bid из rec-bid recommendation."""
+    analytics = MagicMock()
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={20_000: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.2)
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=222,
+                fact_predict_orders=100.0,
+                fact_pay_for_order=42.0,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        AutoShelfBidRecommendationReadService,
+        "get_rec_bid_recommendations",
+        AsyncMock(
+            return_value={
+                "best_plan_bid": 33_000,
+                "plan_ranked": [{"bid": 33_000}],
+            }
+        ),
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        adv_setting=MagicMock(
+            currency="RUB",
+            plan_for_sales_for_day=500.0,
+            target_price_for_order=100.0,
+            max_price_for_order=120.0,
+        ),
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    result = await manager._choose_main_bid_by_strategy(
+        complex_adv=complex_adv,
+        currency="RUB",
+        current_cycle_started_at=datetime.now(UTC),
+        previous_cycle_started_at=None,
+        current_main_bid_minor=20_000,
+        actual_bid_minor=20_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+    )
+
+    assert result == 33_000
+    manager._choose_best_bid_with_fallback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_choose_main_bid_by_strategy_plan_distance_without_recommendation_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAN_DISTANCE без рекомендации не должен падать в cycle fallback."""
+    analytics = MagicMock()
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={20_000: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.2)
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=222,
+                fact_predict_orders=100.0,
+                fact_pay_for_order=42.0,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        AutoShelfBidRecommendationReadService,
+        "get_rec_bid_recommendations",
+        AsyncMock(return_value={"best_plan_bid": None, "plan_ranked": []}),
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=None,
+        adv_setting=MagicMock(
+            currency="RUB",
+            plan_for_sales_for_day=500.0,
+            target_price_for_order=100.0,
+            max_price_for_order=120.0,
+        ),
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    result = await manager._choose_main_bid_by_strategy(
+        complex_adv=complex_adv,
+        currency="RUB",
+        current_cycle_started_at=datetime.now(UTC),
+        previous_cycle_started_at=None,
+        current_main_bid_minor=20_000,
+        actual_bid_minor=20_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+    )
+
+    assert result is None
+    manager._choose_best_bid_with_fallback.assert_not_awaited()
 
 
 def test_choose_next_test_bid_without_covered_returns_middle() -> None:
@@ -213,6 +377,7 @@ async def test_handle_test_mode_waits_for_observation_minutes_even_if_impression
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -264,6 +429,7 @@ async def test_handle_test_mode_accepts_nullable_target_observation_minutes() ->
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -317,6 +483,7 @@ async def test_handle_test_mode_switches_to_main_after_time_and_impressions() ->
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -372,6 +539,7 @@ async def test_handle_main_mode_waits_for_observation_minutes() -> None:
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -426,6 +594,7 @@ async def test_handle_main_mode_waits_when_main_started_at_missing() -> None:
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -481,6 +650,7 @@ async def test_handle_main_mode_accepts_nullable_target_observation_minutes() ->
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -538,6 +708,7 @@ async def test_handle_main_mode_uses_main_started_at_even_if_cycle_is_recent() -
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
