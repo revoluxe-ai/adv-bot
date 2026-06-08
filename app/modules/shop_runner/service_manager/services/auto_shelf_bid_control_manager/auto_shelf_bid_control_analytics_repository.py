@@ -8,12 +8,12 @@ from typing import Any, cast
 
 from clickhouse_connect.driver.query import QueryResult
 
-from app.domain.rec_system_bid_math.hour_observation_builder import (
-    BidBucketObservation,
-)
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
+from ..auto_shelf_bid_increment_manager.bid_bucket_row_mapper import (
+    build_bid_bucket_observations_from_ch_rows,
+)
 from .bid_units import cpc_from_totals
 from .dto import BidStatsDTO
 
@@ -44,54 +44,6 @@ class AutoShelfBidControlAnalyticsRepository:
             column_names.append(str(name))
         return column_names
 
-
-    @staticmethod
-    def _build_bid_bucket_observations_from_ch_rows(
-        rows: list[dict[str, object]],
-    ) -> list[BidBucketObservation]:
-        """Build 15-minute bucket observations from CH rows.
-
-        Rows are grouped by the full bucket context:
-            (bucket_start, bid_minor, price_minor).
-        """
-        grouped: dict[tuple[datetime, int, int | None], list[dict[str, object]]] = {}
-        for row in rows:
-            bucket_start = row.get("bucket_start")
-            if not isinstance(bucket_start, datetime):
-                raise KeyError("row is missing bucket_start")
-            bid_value = row.get("bid_minor", row.get("bid"))
-            if bid_value is None:
-                raise KeyError("row is missing bid_minor/bid")
-            price_value = row.get("price_minor")
-            key = (
-                bucket_start,
-                int(cast(Any, bid_value)),
-                None if price_value is None else int(cast(Any, price_value)),
-            )
-            grouped.setdefault(key, []).append(row)
-
-        observations: list[BidBucketObservation] = []
-        for (bucket_start, bid_minor, price_minor), bucket_rows in grouped.items():
-            impressions_sum = 0.0
-            for row in bucket_rows:
-                impressions_value = row.get("delta_impressions", row.get("impressions"))
-                if impressions_value is None:
-                    raise KeyError("row is missing delta_impressions/impressions")
-                impressions_sum += float(cast(Any, impressions_value))
-
-            if impressions_sum < 0:
-                continue
-
-            observations.append(
-                BidBucketObservation(
-                    bid=bid_minor,
-                    bucket_start=bucket_start,
-                    impressions=impressions_sum,
-                    price_minor=price_minor,
-                )
-            )
-
-        return observations
 
     @staticmethod
     def _to_int(value: object) -> int:
@@ -241,7 +193,7 @@ class AutoShelfBidControlAnalyticsRepository:
             return []
         column_names = self._result_column_names(result)
         rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
-        return self._build_bid_bucket_observations_from_ch_rows(rows)
+        return build_bid_bucket_observations_from_ch_rows(rows)
 
     async def fetch_rec_bid_ctr_by_bid_for_nmid(
         self,

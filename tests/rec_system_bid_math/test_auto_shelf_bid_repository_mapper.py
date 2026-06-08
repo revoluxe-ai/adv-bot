@@ -1,9 +1,9 @@
-"""Unit-тесты mapper'ов CH rows в bucket observations."""
+"""Unit tests for shared CH row -> bucket observation mapper."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from collections.abc import Callable
+from datetime import datetime
 
 import pytest
 
@@ -11,23 +11,14 @@ from app.domain.rec_system_bid_math.hour_observation_builder import (
     BidBucketObservation,
     build_hour_observations_from_buckets,
 )
-from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_analytics_repository import (
-    AutoShelfBidControlAnalyticsRepository,
-)
-from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_repository import (
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.bid_bucket_row_mapper import (
     build_bid_bucket_observations_from_ch_rows,
 )
 
 BucketingBuilder = Callable[[list[dict[str, object]]], list[BidBucketObservation]]
 
 
-@pytest.mark.parametrize(
-    "builder",
-    [
-        build_bid_bucket_observations_from_ch_rows,
-        AutoShelfBidControlAnalyticsRepository._build_bid_bucket_observations_from_ch_rows,
-    ],
-)
+@pytest.mark.parametrize("builder", [build_bid_bucket_observations_from_ch_rows])
 def test_build_bid_bucket_observations_from_ch_rows_groups_same_bucket_rows(
     builder: BucketingBuilder,
 ) -> None:
@@ -64,13 +55,7 @@ def test_build_bid_bucket_observations_from_ch_rows_groups_same_bucket_rows(
     assert result[0].impressions_sum == 100.0
 
 
-@pytest.mark.parametrize(
-    "builder",
-    [
-        build_bid_bucket_observations_from_ch_rows,
-        AutoShelfBidControlAnalyticsRepository._build_bid_bucket_observations_from_ch_rows,
-    ],
-)
+@pytest.mark.parametrize("builder", [build_bid_bucket_observations_from_ch_rows])
 def test_build_bid_bucket_observations_from_ch_rows_keeps_same_bucket_different_bids(
     builder: BucketingBuilder,
 ) -> None:
@@ -96,13 +81,7 @@ def test_build_bid_bucket_observations_from_ch_rows_keeps_same_bucket_different_
     assert all(bucket.bucket_start == datetime(2026, 6, 7, 3, 0) for bucket in buckets)
 
 
-@pytest.mark.parametrize(
-    "builder",
-    [
-        build_bid_bucket_observations_from_ch_rows,
-        AutoShelfBidControlAnalyticsRepository._build_bid_bucket_observations_from_ch_rows,
-    ],
-)
+@pytest.mark.parametrize("builder", [build_bid_bucket_observations_from_ch_rows])
 def test_build_bid_bucket_observations_from_ch_rows_keeps_same_bucket_different_prices(
     builder: BucketingBuilder,
 ) -> None:
@@ -128,13 +107,7 @@ def test_build_bid_bucket_observations_from_ch_rows_keeps_same_bucket_different_
     assert all(bucket.bid == 100 for bucket in buckets)
 
 
-@pytest.mark.parametrize(
-    "builder",
-    [
-        build_bid_bucket_observations_from_ch_rows,
-        AutoShelfBidControlAnalyticsRepository._build_bid_bucket_observations_from_ch_rows,
-    ],
-)
+@pytest.mark.parametrize("builder", [build_bid_bucket_observations_from_ch_rows])
 def test_build_bid_bucket_observations_from_ch_rows_rejects_mixed_bid_hour(
     builder: BucketingBuilder,
 ) -> None:
@@ -172,13 +145,7 @@ def test_build_bid_bucket_observations_from_ch_rows_rejects_mixed_bid_hour(
     assert result == []
 
 
-@pytest.mark.parametrize(
-    "builder",
-    [
-        build_bid_bucket_observations_from_ch_rows,
-        AutoShelfBidControlAnalyticsRepository._build_bid_bucket_observations_from_ch_rows,
-    ],
-)
+@pytest.mark.parametrize("builder", [build_bid_bucket_observations_from_ch_rows])
 def test_build_bid_bucket_observations_from_ch_rows_rejects_mixed_price_hour(
     builder: BucketingBuilder,
 ) -> None:
@@ -214,4 +181,3 @@ def test_build_bid_bucket_observations_from_ch_rows_rejects_mixed_price_hour(
 
     assert len(buckets) == 4
     assert result == []
-
