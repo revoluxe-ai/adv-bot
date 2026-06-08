@@ -126,6 +126,33 @@ def _validate_ctr_by_bid(
         raise ValueError(f"Missing CTR for bids: {missing_bids}")
 
 
+def _empty_recommendation_payload(
+    *,
+    diagnostics: dict[str, Any],
+) -> dict[str, object]:
+    """Build stable empty recommendation payload."""
+    bid_result: dict[str, object] = {
+        "rows": [],
+        "expected_ranked": [],
+        "main_ranked": [],
+        "test_ranked": [],
+        "debug": {},
+        "y_obs": {},
+        "c_obs": {},
+        "y_final": {},
+        "c_final": {},
+    }
+    result: dict[str, object] = {
+        "bid_result": bid_result,
+        "plan_ranked": [],
+        "best_plan_bid": None,
+        "best_expected_bid": None,
+        "diagnostics": diagnostics,
+    }
+    result["view"] = build_rec_bid_recommendation_view(result)
+    return result
+
+
 class AutoShelfBidRecommendationReadService:
     """Читает bucket rows и строит ranked result без записи в БД."""
 
@@ -185,12 +212,23 @@ class AutoShelfBidRecommendationReadService:
             date_to=date_to,
         )
         observations = build_hour_observations_from_buckets(buckets)
+        diagnostics = {
+            "bucket_count": len(buckets),
+            "hour_observation_count": len(observations),
+            "bid_count": len({bucket.bid for bucket in buckets}),
+            "hour_count": len({obs.hour for obs in observations}),
+        }
+        if not observations:
+            return _empty_recommendation_payload(diagnostics=diagnostics)
         _validate_ctr_by_bid(observations, ctr_by_bid)
-        return rank_rec_system_bids(
+        result = rank_rec_system_bids(
             observations=observations,
             plan_context=plan_context,
             ctr_by_bid=ctr_by_bid,
         )
+        result["diagnostics"] = diagnostics
+        result["view"] = build_rec_bid_recommendation_view(result)
+        return result
 
     async def get_rec_bid_recommendations(
         self,
@@ -215,7 +253,6 @@ class AutoShelfBidRecommendationReadService:
             date_from=date_from,
             date_to=date_to,
         )
-        _validate_ctr_by_bid(observations, ctr_by_bid)
         diagnostics = {
             "bucket_count": len(buckets),
             "hour_observation_count": len(observations),
@@ -223,25 +260,8 @@ class AutoShelfBidRecommendationReadService:
             "hour_count": len({obs.hour for obs in observations}),
         }
         if not observations:
-            result: dict[str, object] = {
-                "bid_result": {
-                    "rows": [],
-                    "expected_ranked": [],
-                    "main_ranked": [],
-                    "test_ranked": [],
-                    "debug": {},
-                    "y_obs": {},
-                    "c_obs": {},
-                    "y_final": {},
-                    "c_final": {},
-                },
-                "plan_ranked": [],
-                "best_plan_bid": None,
-                "best_expected_bid": None,
-                "diagnostics": diagnostics,
-            }
-            result["view"] = build_rec_bid_recommendation_view(result)
-            return result
+            return _empty_recommendation_payload(diagnostics=diagnostics)
+        _validate_ctr_by_bid(observations, ctr_by_bid)
         result: dict[str, object] = rank_rec_system_bids(
             observations=observations,
             plan_context=plan_context,

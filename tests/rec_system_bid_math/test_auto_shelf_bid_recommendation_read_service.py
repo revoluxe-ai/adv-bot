@@ -348,6 +348,53 @@ async def test_fetch_and_rank_rec_system_bids_for_nmid_returns_plan_ranked() -> 
 
 
 @pytest.mark.asyncio
+async def test_fetch_and_rank_rec_system_bids_for_nmid_returns_empty_payload_on_no_hours() -> None:
+    class FakeRepository:
+        async def fetch_rec_bid_bucket_observations_for_nmid(
+            self,
+            nmid: int,
+            mode: str,
+            date_from: datetime,
+            date_to: datetime,
+        ) -> list[object]:
+            _ = (nmid, mode, date_from, date_to)
+            return []
+
+        async def fetch_rec_bid_ctr_by_bid_for_nmid(
+            self,
+            nmid: int,
+            mode: str,
+            date_from: datetime,
+            date_to: datetime,
+        ) -> dict[int, float]:
+            _ = (nmid, mode, date_from, date_to)
+            return {}
+
+    service = AutoShelfBidRecommendationReadService(FakeRepository())
+    result = await service.fetch_and_rank_rec_system_bids_for_nmid(
+        nmid=123,
+        mode="main",
+        date_from=datetime(2026, 6, 7, 0, 0),
+        date_to=datetime(2026, 6, 8, 0, 0),
+        plan_context=PlanContext(
+            sales_plan=100.0,
+            current_fact_sales=10.0,
+            current_sales_forecast=90.0,
+            target_order_cost=100.0,
+            max_order_cost=120.0,
+            click_to_order_cr_7d=0.1,
+        ),
+        ctr_by_bid={100: 0.2},
+    )
+
+    assert result["plan_ranked"] == []
+    assert result["best_plan_bid"] is None
+    assert result["best_expected_bid"] is None
+    assert result["diagnostics"]["hour_observation_count"] == 0
+    assert result["view"]["plan_ranked"] == []
+
+
+@pytest.mark.asyncio
 async def test_fetch_and_rank_rec_system_bids_for_nmid_raises_on_missing_ctr() -> None:
     class FakeRepository:
         async def fetch_rec_bid_bucket_observations_for_nmid(
