@@ -363,6 +363,65 @@ async def test_build_view_uses_fact_predict_orders_for_optimization_metric(
 
 
 @pytest.mark.asyncio
+async def test_build_view_keeps_resolve_cpo_none_when_resolver_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Old UI resolve_cpo must stay None if cost resolver cannot resolve it."""
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=None)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = None
+    plan_fact_summary.fact_pay_for_order = 150.0
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.resolve_target_cost",
+        lambda *_args, **_kwargs: None,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.resolve_cpo is None
+    assert view.optimization_metric == OptimizationMetric.CPC
+
+
+@pytest.mark.asyncio
 async def test_build_view_includes_rec_bid_recommendation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
