@@ -215,3 +215,50 @@ async def test_rec_bid_queries_with_mode_filter_for_main(
             "date_from": datetime(2026, 6, 7, 0, 0),
             "date_to": datetime(2026, 6, 8, 0, 0),
         }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("clicks", "orders", "expected"),
+    [
+        (10.0, 3.0, 0.3),
+        (10.0, 0.0, 0.0),
+        (4.0, 10.0, 1.0),
+        (0.0, 5.0, 0.0),
+    ],
+)
+async def test_click_to_order_cr_7d_is_normalized_to_unit_interval(
+    monkeypatch: pytest.MonkeyPatch,
+    clicks: float,
+    orders: float,
+    expected: float,
+) -> None:
+    class _NormalizationClient:
+        async def query(self, query: str, parameters: dict[str, object]) -> _FakeResult:
+            _ = (query, parameters)
+            return _FakeResult(
+                [(2.5, clicks, orders)],
+                ("click_to_order_cr_7d", "clicks", "orders"),
+            )
+
+    client = _NormalizationClient()
+    monkeypatch.setattr(
+        repository_module,
+        "get_clickhouse_client",
+        lambda: _FakeAsyncContext(client),
+    )
+    monkeypatch.setattr(
+        repository_module,
+        "anti_ch_crash_semaphore",
+        _FakeAsyncContext(None),
+    )
+
+    repository = AutoShelfBidControlAnalyticsRepository()
+    click_to_order_cr_7d = await repository.fetch_rec_bid_click_to_order_cr_7d_for_nmid(
+        nmid=123,
+        mode=None,
+        date_from=datetime(2026, 6, 7, 0, 0),
+        date_to=datetime(2026, 6, 8, 0, 0),
+    )
+
+    assert click_to_order_cr_7d == expected
