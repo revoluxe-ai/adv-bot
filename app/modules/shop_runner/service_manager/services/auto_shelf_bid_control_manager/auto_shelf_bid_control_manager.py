@@ -128,6 +128,18 @@ class AutoShelfBidControlManager:
         return int(target_test_observation_minutes * (1 - test_share) / test_share)
 
     @staticmethod
+    def _target_observation_minutes_or_default(
+        value: int | None,
+    ) -> int:
+        """Вернуть безопасный fallback для nullable observation minutes.
+
+        В БД поле nullable, поэтому отсутствие значения не должно останавливать
+        control loop. Для такого случая используем 0, чтобы дальше сработали
+        обычные проверки по impressions.
+        """
+        return 0 if value is None else int(value)
+
+    @staticmethod
     def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
         if started_at is None:
             return None
@@ -484,7 +496,9 @@ class AutoShelfBidControlManager:
             fallback_now=now,
         )
         test_elapsed_minutes = self._elapsed_minutes(test_started_at, now)
-        target_test_observation_minutes = int(settings_obj.target_test_observation_minutes)
+        target_test_observation_minutes = self._target_observation_minutes_or_default(
+            settings_obj.target_test_observation_minutes
+        )
         test_impressions = await self._analytics.get_impressions(
             nmid=nmid,
             from_ts=test_started_at,
@@ -628,7 +642,9 @@ class AutoShelfBidControlManager:
         main_started_at = state.main_started_at or state.current_cycle_started_at
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
-            int(settings_obj.target_test_observation_minutes),
+            self._target_observation_minutes_or_default(
+                settings_obj.target_test_observation_minutes
+            ),
             float(settings_obj.test_share),
         )
         if target_main_observation_minutes is None:
