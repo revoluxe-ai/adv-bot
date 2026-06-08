@@ -610,6 +610,10 @@ class AdvSetting(BaseTable):
         comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
     )
 
+    # Intentional default:
+    # auto_shelf_bid_control_strategy defaults to plan_distance intentionally.
+    # At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns.
+    # Legacy bidder paths do not read this field.
     auto_shelf_bid_control_strategy: Mapped[AutoShelfBidControlStrategy | None] = mapped_column(
         SAEnum(
             AutoShelfBidControlStrategy,
@@ -622,7 +626,10 @@ class AdvSetting(BaseTable):
         server_default="plan_distance",
         comment=(
             "Стратегия выбора main bid для auto_shelf_bid_control: "
-            "cycle_metric | plan_distance"
+            "cycle_metric | plan_distance. "
+            "auto_shelf_bid_control_strategy defaults to plan_distance intentionally. "
+            "At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns. "
+            "Legacy bidder paths do not read this field."
         ),
     )
 
