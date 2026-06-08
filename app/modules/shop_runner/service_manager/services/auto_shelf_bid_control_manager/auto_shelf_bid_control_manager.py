@@ -896,6 +896,20 @@ class AutoShelfBidControlManager:
                 complex_adv.auto_shelf_bid_control_strategy,
             )
             return None
+        if int(main_bid) == target_main_bid:
+            state.current_mode = "main"
+            state.main_started_at = now
+            state.current_cycle_started_at = now
+            state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_main_bid_kept auto_adv_id=%s nmid=%s main_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                main_bid,
+                state.last_reason,
+            )
+            return None
         if int(main_bid) != target_main_bid:
             state.current_main_bid_minor = target_main_bid
             state.main_started_at = now
