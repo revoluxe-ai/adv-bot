@@ -25,9 +25,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
 )
-from app.domain.rec_system_bid_math.plan_ranker import PlanContext
-from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
-
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
@@ -41,6 +38,7 @@ from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
 from .dto import BidStatsDTO
+from .rec_bid_plan_context import build_rec_bid_plan_context
 
 logger = logging.getLogger(__name__)
 
@@ -398,20 +396,12 @@ class AutoShelfBidControlManager:
             fact_predict_orders = (
                 plan_fact_summary.fact_predict_orders if plan_fact_summary else None
             )
-            target_order_cost = resolve_target_cost(
-                complex_adv.adv_setting.plan_for_sales_for_day,
-                complex_adv.adv_setting.target_price_for_order,
-                complex_adv.adv_setting.max_price_for_order,
-                fact_predict_orders,
-            )
-            if target_order_cost is None:
-                target_order_cost = float(complex_adv.adv_setting.max_price_for_order or 0.0)
-            plan_context = PlanContext(
+            plan_context = build_rec_bid_plan_context(
                 sales_plan=float(complex_adv.adv_setting.plan_for_sales_for_day or 0.0),
                 current_fact_sales=float(fact_predict_orders or 0.0),
                 current_sales_forecast=float(fact_predict_orders or 0.0),
-                target_order_cost=target_order_cost,
-                max_order_cost=float(complex_adv.adv_setting.max_price_for_order or 0.0),
+                target_price_for_order=complex_adv.adv_setting.target_price_for_order,
+                max_price_for_order=complex_adv.adv_setting.max_price_for_order,
                 click_to_order_cr_7d=click_to_order_cr_7d,
             )
             rec_service = AutoShelfBidRecommendationReadService(rec_repository)
