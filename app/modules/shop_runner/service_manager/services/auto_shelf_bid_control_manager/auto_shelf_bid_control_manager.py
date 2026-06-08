@@ -609,14 +609,15 @@ class AutoShelfBidControlManager:
             test_elapsed_minutes is None
             or test_elapsed_minutes < target_test_observation_minutes
         ):
-            state.last_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            wait_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            state.last_reason = wait_reason
             if actual_bid_minor != test_bid:
                 await self._set_target_bid(
                     complex_adv,
                     bid_minor=test_bid,
                     currency=state.currency,
                 )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
+                state.last_reason = wait_reason
             await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_test_wait_time auto_adv_id=%s nmid=%s mode=%s test_elapsed_minutes=%s target=%s reason=%s",
@@ -765,6 +766,41 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
+        target_main_bid: int | None = None
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            == AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            target_main_bid = await self._choose_main_bid_by_strategy(
+                complex_adv=complex_adv,
+                currency=state.currency,
+                current_cycle_started_at=state.current_cycle_started_at,
+                previous_cycle_started_at=state.previous_cycle_started_at,
+                current_main_bid_minor=state.current_main_bid_minor,
+                actual_bid_minor=actual_bid_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid,
+            )
+            if target_main_bid is not None and int(target_main_bid) != int(main_bid):
+                state.current_mode = "main"
+                state.current_main_bid_minor = target_main_bid
+                state.main_started_at = now
+                state.current_cycle_started_at = now
+                state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+                await self._persist_state_then_set_bid(
+                    complex_adv,
+                    state=state,
+                    bid_minor=target_main_bid,
+                )
+                logger.info(
+                    "auto_shelf_bid_control_main_bid_changed auto_adv_id=%s nmid=%s previous_main_bid=%s new_main_bid=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    main_bid,
+                    target_main_bid,
+                    state.last_reason,
+                )
+                return None
         main_started_at = state.main_started_at
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
@@ -788,15 +824,17 @@ class AutoShelfBidControlManager:
             main_elapsed_minutes is None
             or main_elapsed_minutes < target_main_observation_minutes
         ):
+            wait_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            state.last_reason = wait_reason
             if actual_bid_minor != main_bid:
                 await self._set_target_bid(
                     complex_adv,
                     bid_minor=main_bid,
                     currency=state.currency,
                 )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
+                state.last_reason = wait_reason
             else:
-                state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+                state.last_reason = wait_reason
             await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_main_wait_time auto_adv_id=%s nmid=%s mode=%s main_elapsed_minutes=%s target=%s reason=%s",
@@ -816,6 +854,8 @@ class AutoShelfBidControlManager:
             mode="main",
         )
         if main_impressions < target_main_impressions:
+            wait_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
+            state.last_reason = wait_reason
             state.last_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
             if actual_bid_minor != main_bid:
                 await self._set_target_bid(
@@ -823,6 +863,9 @@ class AutoShelfBidControlManager:
                     bid_minor=main_bid,
                     currency=state.currency,
                 )
+                state.last_reason = wait_reason
+            else:
+                state.last_reason = wait_reason
             await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_main_wait auto_adv_id=%s nmid=%s mode=%s main_impressions=%s target=%s reason=%s",
@@ -866,18 +909,25 @@ class AutoShelfBidControlManager:
                 bid_minor=next_test_bid,
             )
             return None
-
-        target_main_bid: int | None = await self._choose_main_bid_by_strategy(
-            complex_adv=complex_adv,
-            currency=state.currency,
-            current_cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=state.current_main_bid_minor,
-            actual_bid_minor=actual_bid_minor,
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=max_bid,
-        )
         if target_main_bid is None:
+            if (
+                complex_adv.auto_shelf_bid_control_strategy
+                == AutoShelfBidControlStrategy.PLAN_DISTANCE
+            ):
+                state.current_mode = "main"
+                state.main_started_at = now
+                state.current_cycle_started_at = now
+                state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+                await self._repository.save_state(state)
+                logger.info(
+                    "auto_shelf_bid_control_main_kept auto_adv_id=%s nmid=%s main_bid=%s reason=%s strategy=%s",
+                    auto_adv_id,
+                    nmid,
+                    main_bid,
+                    state.last_reason,
+                    complex_adv.auto_shelf_bid_control_strategy,
+                )
+                return None
             state.last_reason = ControlReason.BEST_BID_NOT_FOUND
             await self._repository.save_state(state)
             logger.warning(
