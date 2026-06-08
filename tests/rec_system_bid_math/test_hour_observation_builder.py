@@ -87,6 +87,20 @@ def test_build_hour_observations_from_buckets_two_prices_is_invalid() -> None:
     assert result == []
 
 
+def test_build_hour_observations_from_buckets_mixed_bid_is_invalid() -> None:
+    buckets = _make_four_bucket_hour(700)
+    buckets[2] = BidBucketObservation(
+        bid=101,
+        bucket_start=datetime(2026, 6, 7, 3, 30),
+        impressions=30.0,
+        price_minor=700,
+    )
+
+    result = build_hour_observations_from_buckets(buckets)
+
+    assert result == []
+
+
 def test_build_hour_observations_from_buckets_skips_three_buckets() -> None:
     buckets = _make_four_bucket_hour(700)[:3]
 

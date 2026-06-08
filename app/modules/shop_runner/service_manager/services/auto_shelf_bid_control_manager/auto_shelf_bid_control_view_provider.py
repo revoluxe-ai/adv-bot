@@ -424,9 +424,14 @@ class AutoShelfBidControlViewProvider:
         if nmid:
             try:
                 rec_repository = self._analytics
-                rec_mode = state.current_mode if state is not None and state.current_mode else ""
+                rec_mode: str | None = None
                 rec_date_to = now_utc
                 rec_date_from = rec_date_to - timedelta(days=7)
+                logger.info(
+                    "rec_bid_recommendation_mode_scope=all nmid=%s adv_setting_original_id=%s",
+                    nmid,
+                    adv_setting_original_id,
+                )
                 ctr_by_bid = await rec_repository.fetch_rec_bid_ctr_by_bid_for_nmid(
                     nmid=nmid,
                     mode=rec_mode,

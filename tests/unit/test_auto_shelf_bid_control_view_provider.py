@@ -419,13 +419,13 @@ async def test_build_view_includes_rec_bid_recommendation(
     assert view.rec_bid_recommendation == {"best_expected_bid": 111}
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid.assert_awaited_once_with(
         nmid=111,
-        mode="",
+        mode=None,
         date_from=ANY,
         date_to=ANY,
     )
     analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid.assert_awaited_once_with(
         nmid=111,
-        mode="",
+        mode=None,
         date_from=ANY,
         date_to=ANY,
     )

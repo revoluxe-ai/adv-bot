@@ -29,11 +29,16 @@ class _FakeClient:
 
     async def query(self, query: str, parameters: dict[str, object]) -> _FakeResult:
         self.calls.append((query, parameters))
-        mode = parameters["mode"]
+        mode = parameters.get("mode")
         if "sum(delta_clicks) AS clicks" in query:
             if mode == "main":
                 return _FakeResult(
                     [(100, 200.0, 4.0)],
+                    ("bid", "impressions", "clicks"),
+                )
+            if mode is None:
+                return _FakeResult(
+                    [(130, 50.0, 5.0)],
                     ("bid", "impressions", "clicks"),
                 )
             return _FakeResult(
@@ -54,6 +59,33 @@ class _FakeClient:
                         0,
                         1.5,
                     ),
+                ],
+                (
+                    "event_id",
+                    "version",
+                    "bucket_start",
+                    "bid_minor",
+                    "price_minor",
+                    "delta_impressions",
+                    "delta_clicks",
+                    "delta_orders",
+                    "delta_spend",
+                ),
+            )
+        if mode is None:
+            return _FakeResult(
+                [
+                    (
+                        "all-a1",
+                        1,
+                        datetime(2026, 6, 7, 3, 0),
+                        130,
+                        800,
+                        50,
+                        5,
+                        1,
+                        3.5,
+                    )
                 ],
                 (
                     "event_id",
@@ -164,6 +196,43 @@ async def test_fetch_rec_bid_bucket_observations_for_nmid_passes_mode(
 
 
 @pytest.mark.asyncio
+async def test_fetch_rec_bid_bucket_observations_for_nmid_all_modes_omits_mode_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeClient()
+    monkeypatch.setattr(
+        repository_module,
+        "get_clickhouse_client",
+        lambda: _FakeAsyncContext(client),
+    )
+    monkeypatch.setattr(
+        repository_module,
+        "anti_ch_crash_semaphore",
+        _FakeAsyncContext(None),
+    )
+
+    repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
+    buckets = await repository.fetch_rec_bid_bucket_observations_for_nmid(
+        nmid=123,
+        mode=None,
+        date_from=datetime(2026, 6, 7, 0, 0),
+        date_to=datetime(2026, 6, 8, 0, 0),
+    )
+
+    assert len(buckets) == 1
+    assert buckets[0].bid == 130
+    assert buckets[0].impressions == 50.0
+    assert client.calls
+    query, parameters = client.calls[0]
+    assert "mode = %(mode)s" not in query
+    assert parameters == {
+        "nmid": 123,
+        "date_from": datetime(2026, 6, 7, 0, 0),
+        "date_to": datetime(2026, 6, 8, 0, 0),
+    }
+
+
+@pytest.mark.asyncio
 async def test_fetch_rec_bid_ctr_by_bid_for_nmid_passes_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -194,6 +263,41 @@ async def test_fetch_rec_bid_ctr_by_bid_for_nmid_passes_mode(
     assert parameters == {
         "nmid": 123,
         "mode": "main",
+        "date_from": datetime(2026, 6, 7, 0, 0),
+        "date_to": datetime(2026, 6, 8, 0, 0),
+    }
+
+
+@pytest.mark.asyncio
+async def test_fetch_rec_bid_ctr_by_bid_for_nmid_all_modes_omits_mode_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeClient()
+    monkeypatch.setattr(
+        repository_module,
+        "get_clickhouse_client",
+        lambda: _FakeAsyncContext(client),
+    )
+    monkeypatch.setattr(
+        repository_module,
+        "anti_ch_crash_semaphore",
+        _FakeAsyncContext(None),
+    )
+
+    repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
+    ctr_by_bid = await repository.fetch_rec_bid_ctr_by_bid_for_nmid(
+        nmid=123,
+        mode=None,
+        date_from=datetime(2026, 6, 7, 0, 0),
+        date_to=datetime(2026, 6, 8, 0, 0),
+    )
+
+    assert ctr_by_bid == {130: 0.1}
+    assert client.calls
+    query, parameters = client.calls[0]
+    assert "mode = %(mode)s" not in query
+    assert parameters == {
+        "nmid": 123,
         "date_from": datetime(2026, 6, 7, 0, 0),
         "date_to": datetime(2026, 6, 8, 0, 0),
     }
@@ -234,33 +338,6 @@ def test_build_bid_bucket_observations_from_ch_rows_sums_rows_in_bucket() -> Non
     assert len(buckets) == 1
     assert buckets[0].impressions == 21.0
     assert buckets[0].price_minor == 700
-
-
-@pytest.mark.asyncio
-async def test_fetch_rec_bid_bucket_observations_for_nmid_empty_mode_raises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    client = _FakeClient()
-    monkeypatch.setattr(
-        repository_module,
-        "get_clickhouse_client",
-        lambda: _FakeAsyncContext(client),
-    )
-    monkeypatch.setattr(
-        repository_module,
-        "anti_ch_crash_semaphore",
-        _FakeAsyncContext(None),
-    )
-
-    repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
-
-    with pytest.raises(ValueError, match="mode must be a non-empty string"):
-        await repository.fetch_rec_bid_bucket_observations_for_nmid(
-            nmid=123,
-            mode="",
-            date_from=datetime(2026, 6, 7, 0, 0),
-            date_to=datetime(2026, 6, 8, 0, 0),
-        )
 
 
 @pytest.mark.asyncio

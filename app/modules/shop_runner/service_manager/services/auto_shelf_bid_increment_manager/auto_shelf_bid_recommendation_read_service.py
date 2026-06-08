@@ -34,7 +34,7 @@ class RecBidRecommendationRepository(Protocol):
     async def fetch_rec_bid_bucket_observations_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> list[BidBucketObservation]:
@@ -44,7 +44,7 @@ class RecBidRecommendationRepository(Protocol):
     async def fetch_rec_bid_ctr_by_bid_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> dict[int, float]:
@@ -124,7 +124,7 @@ class AutoShelfBidRecommendationReadService:
     async def fetch_bid_hour_observation_diagnostics(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> dict[str, Any]:
@@ -160,7 +160,7 @@ class AutoShelfBidRecommendationReadService:
     async def fetch_and_rank_rec_system_bids_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
         plan_context: PlanContext,
@@ -183,7 +183,7 @@ class AutoShelfBidRecommendationReadService:
     async def get_rec_bid_recommendations(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
         plan_context: PlanContext,

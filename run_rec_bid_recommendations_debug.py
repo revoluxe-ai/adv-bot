@@ -7,6 +7,8 @@ Required env:
     REC_BID_DEBUG_NMID
     REC_BID_DEBUG_DATE_FROM
     REC_BID_DEBUG_DATE_TO
+
+Optional env:
     REC_BID_DEBUG_MODE
 
 Plan context env:
@@ -138,7 +140,8 @@ async def _run() -> int:
     nmid = int(_required_env("REC_BID_DEBUG_NMID"))
     date_from = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_FROM"))
     date_to = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_TO"))
-    mode = _required_env("REC_BID_DEBUG_MODE")
+    mode_raw = os.getenv("REC_BID_DEBUG_MODE", "").strip()
+    mode = mode_raw or None
 
     current_sales_forecast: float | None = None
     adv_id_raw = os.getenv("REC_BID_DEBUG_ADV_ID", "").strip()
