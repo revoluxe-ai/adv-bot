@@ -661,6 +661,24 @@ class AutoShelfBidControlManager:
             max_bid_minor=int(settings_obj.max_bid_minor),
         )
         if best_bid is None:
+            if state.current_main_bid_minor is not None:
+                state.current_mode = "main"
+                state.main_started_at = now
+                state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+                await self._persist_state_then_set_bid(
+                    complex_adv,
+                    state=state,
+                    bid_minor=state.current_main_bid_minor,
+                )
+                logger.info(
+                    "auto_shelf_bid_control_test_to_main_fallback auto_adv_id=%s nmid=%s main_bid=%s reason=%s strategy=%s",
+                    auto_adv_id,
+                    nmid,
+                    state.current_main_bid_minor,
+                    state.last_reason,
+                    complex_adv.auto_shelf_bid_control_strategy,
+                )
+                return None
             state.last_reason = ControlReason.BEST_BID_NOT_FOUND
             await self._repository.save_state(state)
             logger.warning(
