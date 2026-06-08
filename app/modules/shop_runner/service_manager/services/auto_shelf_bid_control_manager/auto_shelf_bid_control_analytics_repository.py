@@ -28,6 +28,11 @@ class AutoShelfBidControlAnalyticsRepository:
         """Прочитать SQL-шаблон из каталога sql/."""
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
 
+    @staticmethod
+    def _mode_filter_clause(mode: str | None) -> str:
+        """Собрать SQL-фильтр по mode только для конкретного режима."""
+        return "" if mode is None else "  AND mode = %(mode)s\n"
+
 
     @staticmethod
     def _build_bid_bucket_observations_from_ch_rows(
@@ -199,18 +204,26 @@ class AutoShelfBidControlAnalyticsRepository:
     async def fetch_rec_bid_bucket_observations_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> list[BidBucketObservation]:
-        """Собрать read-only bucket-строки для rec bid recommendation."""
-        query = self._load_sql("fetch_rec_bid_bucket_rows.sql")
-        params = {
+        """Собрать read-only bucket-строки для rec bid recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_bucket_rows.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
             "nmid": nmid,
-            "mode": mode,
             "date_from": date_from,
             "date_to": date_to,
         }
+        if mode is not None:
+            params["mode"] = mode
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result: QueryResult = await client.query(query, parameters=params)
@@ -227,18 +240,26 @@ class AutoShelfBidControlAnalyticsRepository:
     async def fetch_rec_bid_ctr_by_bid_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> dict[int, float]:
-        """Вернуть CTR по bid для read-only recommendation."""
-        query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql")
-        params = {
+        """Вернуть CTR по bid для read-only recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
             "nmid": nmid,
-            "mode": mode,
             "date_from": date_from,
             "date_to": date_to,
         }
+        if mode is not None:
+            params["mode"] = mode
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result: QueryResult = await client.query(query, parameters=params)
@@ -261,18 +282,26 @@ class AutoShelfBidControlAnalyticsRepository:
     async def fetch_rec_bid_click_to_order_cr_7d_for_nmid(
         self,
         nmid: int,
-        mode: str,
+        mode: str | None,
         date_from: datetime,
         date_to: datetime,
     ) -> float:
-        """Вернуть 7d click-to-order CR для PlanContext recommendation."""
-        query = self._load_sql("fetch_rec_bid_click_to_order_cr_7d.sql")
-        params = {
+        """Вернуть 7d click-to-order CR для PlanContext recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_click_to_order_cr_7d.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
             "nmid": nmid,
-            "mode": mode,
             "date_from": date_from,
             "date_to": date_to,
         }
+        if mode is not None:
+            params["mode"] = mode
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 result: QueryResult = await client.query(query, parameters=params)

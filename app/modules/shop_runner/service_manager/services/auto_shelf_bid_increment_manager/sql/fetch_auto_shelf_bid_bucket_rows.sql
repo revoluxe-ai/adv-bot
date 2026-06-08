@@ -10,7 +10,7 @@
 --
 -- Параметры:
 --   %(nmid)s      - артикул
---   %(mode)s      - режим текущего control-state
+--   mode          - режим анализа; None = all modes / без фильтра
 --   %(date_from)s - нижняя граница bucket_start (inclusive)
 --   %(date_to)s   - верхняя граница bucket_start (exclusive)
 --
@@ -30,8 +30,8 @@ SELECT
     delta_spend
 FROM default_db.auto_shelf_bid_intervals
 WHERE nmid = %(nmid)s
-  AND mode = %(mode)s
   AND bucket_start >= %(date_from)s
   AND bucket_start < %(date_to)s
   AND delta_impressions IS NOT NULL
+  -- MODE_FILTER
 ORDER BY bucket_start ASC
