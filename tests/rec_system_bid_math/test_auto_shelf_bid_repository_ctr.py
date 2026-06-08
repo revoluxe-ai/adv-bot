@@ -53,17 +53,6 @@ class _FakeClient:
                         0,
                         1.5,
                     ),
-                    (
-                        "main-a2",
-                        1,
-                        datetime(2026, 6, 7, 3, 15),
-                        100,
-                        700,
-                        20,
-                        2,
-                        0,
-                        2.5,
-                    ),
                 ],
                 (
                     "event_id",
@@ -189,3 +178,67 @@ async def test_fetch_rec_bid_ctr_by_bid_for_nmid_passes_mode(
         "date_from": datetime(2026, 6, 7, 0, 0),
         "date_to": datetime(2026, 6, 8, 0, 0),
     }
+
+
+def test_build_bid_bucket_observations_from_ch_rows_sums_rows_in_bucket() -> None:
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_repository import (
+        build_bid_bucket_observations_from_ch_rows,
+    )
+
+    rows = [
+        {
+            "event_id": "a",
+            "version": 1,
+            "bucket_start": datetime(2026, 6, 7, 3, 0),
+            "bid_minor": 100,
+            "price_minor": 700,
+            "delta_impressions": 10,
+            "delta_clicks": 1,
+            "delta_orders": 0,
+            "delta_spend": 1.5,
+        },
+        {
+            "event_id": "a",
+            "version": 2,
+            "bucket_start": datetime(2026, 6, 7, 3, 0),
+            "bid_minor": 100,
+            "price_minor": 700,
+            "delta_impressions": 11,
+            "delta_clicks": 2,
+            "delta_orders": 0,
+            "delta_spend": 1.7,
+        },
+    ]
+
+    buckets = build_bid_bucket_observations_from_ch_rows(rows)
+
+    assert len(buckets) == 1
+    assert buckets[0].impressions == 21.0
+    assert buckets[0].price_minor == 700
+
+
+@pytest.mark.asyncio
+async def test_fetch_rec_bid_bucket_observations_for_nmid_empty_mode_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeClient()
+    monkeypatch.setattr(
+        repository_module,
+        "get_clickhouse_client",
+        lambda: _FakeAsyncContext(client),
+    )
+    monkeypatch.setattr(
+        repository_module,
+        "anti_ch_crash_semaphore",
+        _FakeAsyncContext(None),
+    )
+
+    repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="mode must be a non-empty string"):
+        await repository.fetch_rec_bid_bucket_observations_for_nmid(
+            nmid=123,
+            mode="",
+            date_from=datetime(2026, 6, 7, 0, 0),
+            date_to=datetime(2026, 6, 8, 0, 0),
+        )
