@@ -33,31 +33,29 @@ class AutoShelfBidControlAnalyticsRepository:
     def _build_bid_bucket_observations_from_ch_rows(
         rows: list[dict[str, object]],
     ) -> list[BidBucketObservation]:
-        """Build 15-minute bucket observations from CH rows."""
-        grouped: dict[datetime, list[dict[str, object]]] = {}
+        """Build 15-minute bucket observations from CH rows.
+
+        Rows are grouped by the full bucket context:
+            (bucket_start, bid_minor, price_minor).
+        """
+        grouped: dict[tuple[datetime, int, int | None], list[dict[str, object]]] = {}
         for row in rows:
             bucket_start = row.get("bucket_start")
             if not isinstance(bucket_start, datetime):
                 raise KeyError("row is missing bucket_start")
-            grouped.setdefault(bucket_start, []).append(row)
+            bid_value = row.get("bid_minor", row.get("bid"))
+            if bid_value is None:
+                raise KeyError("row is missing bid_minor/bid")
+            price_value = row.get("price_minor")
+            key = (
+                bucket_start,
+                int(cast(Any, bid_value)),
+                None if price_value is None else int(cast(Any, price_value)),
+            )
+            grouped.setdefault(key, []).append(row)
 
         observations: list[BidBucketObservation] = []
-        for bucket_start, bucket_rows in grouped.items():
-            bid_values: set[int] = set()
-            for row in bucket_rows:
-                bid_value = row.get("bid_minor", row.get("bid"))
-                if bid_value is not None:
-                    bid_values.add(int(cast(Any, bid_value)))
-            if len(bid_values) != 1:
-                continue
-
-            price_values: set[int | None] = set()
-            for row in bucket_rows:
-                price_value = row.get("price_minor")
-                price_values.add(None if price_value is None else int(cast(Any, price_value)))
-            if len(price_values) != 1:
-                continue
-
+        for (bucket_start, bid_minor, price_minor), bucket_rows in grouped.items():
             impressions_sum = 0.0
             for row in bucket_rows:
                 impressions_value = row.get("delta_impressions", row.get("impressions"))
@@ -70,10 +68,10 @@ class AutoShelfBidControlAnalyticsRepository:
 
             observations.append(
                 BidBucketObservation(
-                    bid=next(iter(bid_values)),
+                    bid=bid_minor,
                     bucket_start=bucket_start,
                     impressions=impressions_sum,
-                    price_minor=next(iter(price_values)),
+                    price_minor=price_minor,
                 )
             )
 
