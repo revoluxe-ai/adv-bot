@@ -515,11 +515,12 @@ async def test_handle_main_mode_uses_main_started_at_even_if_cycle_is_recent() -
     manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
-    main_started_at = datetime.now(UTC) - timedelta(hours=10)
+    now = datetime.now(UTC)
+    main_started_at = now - timedelta(hours=10)
     state = MagicMock(
         current_test_bid_minor=20_000,
         current_mode="main",
-        current_cycle_started_at=datetime.now(UTC),
+        current_cycle_started_at=now,
         test_started_at=main_started_at,
         main_started_at=main_started_at,
         current_main_bid_minor=25_000,
