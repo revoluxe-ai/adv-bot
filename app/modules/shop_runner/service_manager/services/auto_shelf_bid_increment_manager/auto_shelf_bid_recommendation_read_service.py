@@ -247,12 +247,6 @@ class AutoShelfBidRecommendationReadService:
             date_to=date_to,
         )
         observations = build_hour_observations_from_buckets(buckets)
-        ctr_by_bid = await self._repository.fetch_rec_bid_ctr_by_bid_for_nmid(
-            nmid=nmid,
-            mode=mode,
-            date_from=date_from,
-            date_to=date_to,
-        )
         diagnostics = {
             "bucket_count": len(buckets),
             "hour_observation_count": len(observations),
