@@ -42,7 +42,7 @@ def test_build_bid_bucket_observations_from_ch_rows_sums_rows_in_one_bucket() ->
     assert buckets[0].impressions == 21.0
 
 
-def test_build_bid_bucket_observations_from_ch_rows_invalid_on_bid_conflict() -> None:
+def test_build_bid_bucket_observations_from_ch_rows_bid_conflict_keeps_both_rows() -> None:
     rows = [
         {
             "bucket_start": datetime(2026, 6, 7, 3, 0),
@@ -60,10 +60,14 @@ def test_build_bid_bucket_observations_from_ch_rows_invalid_on_bid_conflict() ->
 
     buckets = build_bid_bucket_observations_from_ch_rows(rows)
 
-    assert buckets == []
+    assert len(buckets) == 2
+    assert {(bucket.bid, bucket.price_minor, bucket.impressions) for bucket in buckets} == {
+        (100, 700, 10.0),
+        (120, 700, 11.0),
+    }
 
 
-def test_build_bid_bucket_observations_from_ch_rows_invalid_on_price_conflict() -> None:
+def test_build_bid_bucket_observations_from_ch_rows_price_conflict_keeps_both_rows() -> None:
     rows = [
         {
             "bucket_start": datetime(2026, 6, 7, 3, 0),
@@ -81,7 +85,11 @@ def test_build_bid_bucket_observations_from_ch_rows_invalid_on_price_conflict() 
 
     buckets = build_bid_bucket_observations_from_ch_rows(rows)
 
-    assert buckets == []
+    assert len(buckets) == 2
+    assert {(bucket.bid, bucket.price_minor, bucket.impressions) for bucket in buckets} == {
+        (100, None, 10.0),
+        (100, 700, 11.0),
+    }
 
 
 def test_build_bid_bucket_observations_from_ch_rows_to_hour_builder() -> None:
