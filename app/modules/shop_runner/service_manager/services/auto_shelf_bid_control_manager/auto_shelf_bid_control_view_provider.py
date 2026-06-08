@@ -92,7 +92,7 @@ class AutoShelfBidControlViewProvider:
         return int(test_observation_minutes * (1 - test_share) / test_share)
 
     @staticmethod
-    def _elapsed_minutes(started_at, now):
+    def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
         if started_at is None:
             return None
         return max(0, int((now - started_at).total_seconds() // 60))
@@ -201,25 +201,24 @@ class AutoShelfBidControlViewProvider:
         if len(nmids) != 1:
             warnings.append("single_nmid_guard_skip")
         nmid = nmids[0] if nmids else 0
-        auto_adv_id = int(adv.adv_id) if adv.adv_id is not None else None
+        auto_adv_id = int(adv.adv_id)
 
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
         fact_predict_orders: float | None = None
         resolve_cpo: float | None = None
-        if auto_adv_id is not None:
-            plan_fact_reader = PlanFactReader()
-            plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
-            if plan_fact_summary is not None:
-                fact_predict_orders = plan_fact_summary.fact_predict_orders
-                fact_cpo = plan_fact_summary.fact_pay_for_order
-            # resolve_cpo вычисляем из настроек кампании
-            resolve_cpo = resolve_target_cost(
-                adv.plan_for_sales_for_day,
-                adv.target_price_for_order,
-                adv.max_price_for_order,
-                fact_predict_orders,
-            )
+        plan_fact_reader = PlanFactReader()
+        plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
+        if plan_fact_summary is not None:
+            fact_predict_orders = plan_fact_summary.fact_predict_orders
+            fact_cpo = plan_fact_summary.fact_pay_for_order
+        # resolve_cpo вычисляем из настроек кампании
+        resolve_cpo = resolve_target_cost(
+            adv.plan_for_sales_for_day,
+            adv.target_price_for_order,
+            adv.max_price_for_order,
+            fact_predict_orders,
+        )
         optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
 
         state = await self._repository.get_state(nmid) if nmid else None
@@ -234,7 +233,7 @@ class AutoShelfBidControlViewProvider:
         rec_bid_recommendation: dict[str, object] | None = None
 
         actual_bid_minor: int | None = None
-        if nmid and auto_adv_id is not None:
+        if nmid:
             cached = await self._bid_cache.get_bid(auto_adv_id=auto_adv_id, nmid=nmid)
             if cached is not None:
                 actual_bid_minor = int(cached.bid_minor)
@@ -293,11 +292,7 @@ class AutoShelfBidControlViewProvider:
         cycle_bid_stats: list[BidStatsDTO] = []
         cycle_best: BidStatsDTO | None = None
         global_best: BidStatsDTO | None = None
-        cycle_from_ts = (
-            state.current_cycle_started_at
-            if state is not None and state.current_cycle_started_at is not None
-            else None
-        )
+        cycle_from_ts = state.current_cycle_started_at if state is not None else None
         if cycle_from_ts is not None and nmid:
             cycle_bid_stats = await self._analytics.get_bid_stats(
                 nmid=nmid,
@@ -322,7 +317,7 @@ class AutoShelfBidControlViewProvider:
             )
 
         min_bid_minor_value: int | None = None
-        if nmid and auto_adv_id is not None:
+        if nmid:
             min_bid_minor_value = await self._fetch_wb_min_bid_minor(auto_adv_id, nmid)
         if min_bid_minor_value is None:
             warnings.append("no_min_bid")
@@ -390,17 +385,21 @@ class AutoShelfBidControlViewProvider:
 
         test_impressions: int | None = None
         test_elapsed_minutes: int | None = None
-        if state is not None and state.current_test_bid_minor is not None:
+        if state is not None:
             test_from_ts = resolve_test_segment_start_utc(
                 test_started_at=state.test_started_at,
                 current_cycle_started_at=state.current_cycle_started_at,
             )
             test_elapsed_minutes = self._elapsed_minutes(test_from_ts, now_utc)
+            test_bid_minor = state.current_test_bid_minor
+            if test_bid_minor is None:
+                test_bid_minor = actual_bid_minor
+            assert test_bid_minor is not None
             test_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
                 from_ts=test_from_ts,
                 currency=currency,
-                bid_minor=state.current_test_bid_minor,
+                bid_minor=test_bid_minor,
             )
         elif nmid and actual_bid_minor is not None:
             test_impressions = await self._analytics.get_impressions(
@@ -411,13 +410,18 @@ class AutoShelfBidControlViewProvider:
             )
         main_impressions: int | None = None
         main_elapsed_minutes: int | None = None
-        if state is not None and state.current_main_bid_minor is not None and state.main_started_at is not None:
-            main_elapsed_minutes = self._elapsed_minutes(state.main_started_at, now_utc)
+        if state is not None and state.main_started_at is not None:
+            main_started_at = state.main_started_at
+            main_elapsed_minutes = self._elapsed_minutes(main_started_at, now_utc)
+            main_bid_minor = state.current_main_bid_minor
+            if main_bid_minor is None:
+                main_bid_minor = actual_bid_minor
+            assert main_bid_minor is not None
             main_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
-                from_ts=state.main_started_at,
+                from_ts=main_started_at,
                 currency=currency,
-                bid_minor=state.current_main_bid_minor,
+                bid_minor=main_bid_minor,
                 mode="main",
             )
 

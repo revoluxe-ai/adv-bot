@@ -233,8 +233,6 @@ class AutoShelfBidControlManager:
             return False
         if not complex_adv.auto_adv_active_status:
             return False
-        if complex_adv.auto_adv_id is None:
-            return False
         return True
 
     def _is_eligible(self, complex_adv: ComplexAdv) -> tuple[bool, str]:
@@ -244,8 +242,6 @@ class AutoShelfBidControlManager:
             return False, ControlReason.DISABLED
         if not complex_adv.auto_shelf_bid_control_enabled:
             return False, ControlReason.DISABLED
-        if complex_adv.auto_adv_id is None:
-            return False, ControlReason.NO_AUTO_ADV
         if len(complex_adv.nmids) != 1:
             return False, ControlReason.SINGLE_NMID_GUARD_SKIP
         return True, ControlReason.SETTINGS_UPDATED
@@ -770,6 +766,10 @@ class AutoShelfBidControlManager:
             state.current_main_bid_minor = main_bid
             state.main_started_at = now
         main_started_at = state.main_started_at
+        if main_started_at is None:
+            main_started_at = now
+            state.main_started_at = main_started_at
+        assert main_started_at is not None
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
             self._target_observation_minutes_or_default(
@@ -820,15 +820,13 @@ class AutoShelfBidControlManager:
             mode="main",
         )
         if main_impressions < target_main_impressions:
+            state.last_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
             if actual_bid_minor != main_bid:
                 await self._set_target_bid(
                     complex_adv,
                     bid_minor=main_bid,
                     currency=state.currency,
                 )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
-            else:
-                state.last_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
             await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_main_wait auto_adv_id=%s nmid=%s mode=%s main_impressions=%s target=%s reason=%s",
@@ -841,9 +839,7 @@ class AutoShelfBidControlManager:
             )
             return None
 
-        cycle_from_ts = state.current_cycle_started_at
-        if cycle_from_ts is None:
-            cycle_from_ts = now
+        cycle_from_ts: datetime = state.current_cycle_started_at
         covered_stats = await self._analytics.get_bid_stats(
             nmid=nmid,
             from_ts=cycle_from_ts,

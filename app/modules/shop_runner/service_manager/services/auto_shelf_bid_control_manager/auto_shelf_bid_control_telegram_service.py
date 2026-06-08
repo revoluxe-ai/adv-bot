@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, UTC
-from types import SimpleNamespace
+from datetime import UTC, datetime
+from typing import Protocol, cast
 
+from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager import (
+    WBModifier,
+)
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
+    ComplexAdv,
+)
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
@@ -18,6 +24,26 @@ from .auto_shelf_bid_control_view_provider import AutoShelfBidControlViewProvide
 from .auto_shelf_bid_setter import AutoShelfBidSetter
 from .bid_units import format_bid_minor_for_telegram, rubles_to_bid_minor
 from .dto import AutoShelfBidControlViewDTO
+
+
+class _WbManagerHubProtocol(Protocol):
+    wb_modifier: object
+
+
+class _WbManagerHubFactoryProtocol(Protocol):
+    def get_wb_manager_hub(self, shop_id: int) -> _WbManagerHubProtocol: ...
+
+
+class _WbManagerHubFactoryContainerProtocol(Protocol):
+    def wb_manager_hub_factory(self) -> _WbManagerHubFactoryProtocol: ...
+
+
+class _ModuleResourcesProtocol(Protocol):
+    wb_manager_hub_factory_container: _WbManagerHubFactoryContainerProtocol
+
+
+class _DIContainerProtocol(Protocol):
+    module_resources: _ModuleResourcesProtocol
 
 
 @dataclass(slots=True)
@@ -53,20 +79,15 @@ class AutoShelfBidControlTelegramService:
         adv = await self._get_adv_or_raise(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         await self._repository.get_or_create_default_settings(nmid=nmid)
-        if adv.adv_id is not None:
-            view_before = await self.build_view(adv_setting_original_id)
-            actual = view_before.actual_bid_minor
-            max_bid = view_before.max_bid_minor
-            # build_view мог записать legacy repair в БД — берём max из view, не stale settings.
-            if (
-                actual is not None
-                and max_bid is not None
-                and int(max_bid) < int(actual)
-            ):
-                await self._repository.update_settings(
-                    nmid=nmid,
-                    max_bid_minor=int(actual),
-                )
+        view_before = await self.build_view(adv_setting_original_id)
+        actual = view_before.actual_bid_minor
+        max_bid = view_before.max_bid_minor
+        # build_view мог записать legacy repair в БД — берём max из view, не stale settings.
+        if actual is not None and max_bid is not None and int(max_bid) < int(actual):
+            await self._repository.update_settings(
+                nmid=nmid,
+                max_bid_minor=int(actual),
+            )
         await self._repository.set_enabled(adv_setting_original_id, True)
         return await self.build_view(adv_setting_original_id)
 
@@ -90,10 +111,16 @@ class AutoShelfBidControlTelegramService:
         )
         parsed = rubles_to_bid_minor(parsed_rub)
         view = await self.build_view(adv_setting_original_id)
-        if view.min_bid_minor is not None and parsed < int(view.min_bid_minor):
+        min_bid_minor = view.min_bid_minor
+        if min_bid_minor is None:
             raise AutoShelfBidControlTelegramError(
                 "Максимальная ставка не может быть ниже минимальной ставки WB: "
                 f"{format_bid_minor_for_telegram(view.min_bid_minor, view.currency)}"
+            )
+        if parsed < int(min_bid_minor):
+            raise AutoShelfBidControlTelegramError(
+                "Максимальная ставка не может быть ниже минимальной ставки WB: "
+                f"{format_bid_minor_for_telegram(min_bid_minor, view.currency)}"
             )
         await self._repository.get_or_create_default_settings(nmid=nmid)
         await self._repository.update_settings(nmid=nmid, max_bid_minor=parsed)
@@ -226,7 +253,8 @@ class AutoShelfBidControlTelegramService:
             raise AutoShelfBidControlTelegramError(
                 "Нельзя вернуть main-ставку: состояние ещё не создано."
             )
-        if state.current_main_bid_minor is None:
+        current_main_bid_minor = state.current_main_bid_minor
+        if current_main_bid_minor is None:
             raise AutoShelfBidControlTelegramError(
                 "Нельзя вернуть main-ставку: рабочая ставка ещё не определена."
             )
@@ -239,7 +267,7 @@ class AutoShelfBidControlTelegramService:
         await self._set_bid(
             adv=adv,
             nmid=nmid,
-            bid_minor=int(state.current_main_bid_minor),
+            bid_minor=int(current_main_bid_minor),
             currency=settings_obj.currency,
         )
         return await self.build_view(adv_setting_original_id)
@@ -296,22 +324,26 @@ class AutoShelfBidControlTelegramService:
         currency: str,
     ) -> None:
         """PATCH ставки WB внутри ``DIManager.create`` (до ``shutdown_resources``)."""
-        if adv.adv_id is None:
-            raise AutoShelfBidControlTelegramError(
-                "Нельзя выставить ставку: у кампании отсутствует Auto РК id."
-            )
         from app.core.di.app_container import AppContainer
         from app.core.di.di_manager import DIManager
 
-        shop_id = adv.wb_cabinet.shop_id
-        complex_adv_like = SimpleNamespace(auto_adv_id=int(adv.adv_id), nmids=[int(nmid)])
+        shop_id = int(adv.wb_cabinet.shop_id)
+        complex_adv_like = cast(
+            ComplexAdv,
+            type(
+                "_TelegramComplexAdv",
+                (),
+                {"auto_adv_id": int(adv.adv_id), "nmids": [int(nmid)]},
+            )(),
+        )
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            typed_container = cast(_DIContainerProtocol, container)
             factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                typed_container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
             setter = AutoShelfBidSetter(
-                hub.wb_modifier,
+                cast(WBModifier, hub.wb_modifier),
                 bid_cache_manager=self._bid_cache,
             )
             await setter.set_bid(

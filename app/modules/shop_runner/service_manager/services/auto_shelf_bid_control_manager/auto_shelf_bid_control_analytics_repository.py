@@ -33,6 +33,17 @@ class AutoShelfBidControlAnalyticsRepository:
         """Собрать SQL-фильтр по mode только для конкретного режима."""
         return "" if mode is None else "  AND mode = %(mode)s\n"
 
+    @staticmethod
+    def _result_column_names(result: QueryResult) -> list[str]:
+        """Нормализовать имена колонок CH в явный список строк."""
+        raw_column_names: tuple[Any, ...] = cast(
+            tuple[Any, ...], getattr(result, "column_names")
+        )
+        column_names: list[str] = []
+        for name in raw_column_names:
+            column_names.append(str(name))
+        return column_names
+
 
     @staticmethod
     def _build_bid_bucket_observations_from_ch_rows(
@@ -168,8 +179,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         out: list[BidStatsDTO] = []
         for row_values in result.result_rows:
             row: dict[str, Any] = dict(zip(column_names, tuple(row_values)))
@@ -229,11 +239,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        raw_column_names = cast(
-            tuple[object, ...],
-            result.column_names,  # pyright: ignore[reportUnknownMemberType]
-        )
-        column_names = [str(name) for name in raw_column_names]
+        column_names = self._result_column_names(result)
         rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
         return self._build_bid_bucket_observations_from_ch_rows(rows)
 
@@ -265,11 +271,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return {}
-        raw_column_names = cast(
-            tuple[object, ...],
-            result.column_names,  # pyright: ignore[reportUnknownMemberType]
-        )
-        column_names = [str(name) for name in raw_column_names]
+        column_names = self._result_column_names(result)
         ctr_by_bid: dict[int, float] = {}
         for row in result.result_rows:
             row_dict = dict(zip(column_names, tuple(row)))
@@ -307,11 +309,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return 0.0
-        raw_column_names = cast(
-            tuple[object, ...],
-            result.column_names,  # pyright: ignore[reportUnknownMemberType]
-        )
-        column_names = [str(name) for name in raw_column_names]
+        column_names = self._result_column_names(result)
         row_dict = dict(zip(column_names, tuple(result.result_rows[0])))
         clicks = self._to_float(row_dict["clicks"])
         orders = self._to_float(row_dict["orders"])
@@ -347,8 +345,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return None
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
 
@@ -378,8 +375,6 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return None
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
-
