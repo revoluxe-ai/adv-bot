@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
@@ -32,6 +32,7 @@ from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 from .dto import AutoShelfBidSnapshot, AutoShelfRawStat
+from .bid_bucket_row_mapper import build_bid_bucket_observations_from_ch_rows
 from .redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
@@ -40,59 +41,6 @@ from ..auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def build_bid_bucket_observations_from_ch_rows(
-    rows: list[dict[str, object]],
-) -> list[BidBucketObservation]:
-    """Собрать 15-минутные bucket-объекты из CH rows без бизнес-логики.
-
-    Ожидаются минимум поля:
-        - bid_minor / bid
-        - bucket_start
-        - delta_impressions / impressions
-
-    Строки группируются по полному bucket-контексту:
-        (bucket_start, bid_minor, price_minor).
-    """
-    grouped: dict[tuple[datetime, int, int | None], list[dict[str, object]]] = {}
-    for row in rows:
-        bucket_start = row.get("bucket_start")
-        if not isinstance(bucket_start, datetime):
-            raise KeyError("row is missing bucket_start")
-        bid_value = row.get("bid_minor", row.get("bid"))
-        if bid_value is None:
-            raise KeyError("row is missing bid_minor/bid")
-        price_value = row.get("price_minor")
-        key = (
-            bucket_start,
-            int(cast(Any, bid_value)),
-            None if price_value is None else int(cast(Any, price_value)),
-        )
-        grouped.setdefault(key, []).append(row)
-
-    observations: list[BidBucketObservation] = []
-    for (bucket_start, bid_minor, price_minor), bucket_rows in grouped.items():
-        impressions_sum = 0.0
-        for row in bucket_rows:
-            impressions_value = row.get("delta_impressions", row.get("impressions"))
-            if impressions_value is None:
-                raise KeyError("row is missing delta_impressions/impressions")
-            impressions_sum += float(cast(Any, impressions_value))
-
-        if impressions_sum < 0:
-            continue
-
-        observations.append(
-            BidBucketObservation(
-                bid=bid_minor,
-                bucket_start=bucket_start,
-                impressions=impressions_sum,
-                price_minor=price_minor,
-            )
-        )
-
-    return observations
 
 
 class AutoShelfBidRepository:
@@ -266,7 +214,9 @@ class AutoShelfBidRepository:
             result.column_names,  # pyright: ignore[reportUnknownMemberType]
         )
         column_names = [str(name) for name in raw_column_names]
-        rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
+        rows: list[dict[str, object]] = [
+            dict(zip(column_names, tuple(row))) for row in result.result_rows
+        ]
         return build_bid_bucket_observations_from_ch_rows(rows)
 
     async def fetch_rec_bid_ctr_by_bid_for_nmid(
