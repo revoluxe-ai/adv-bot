@@ -595,6 +595,120 @@ async def test_handle_test_mode_switches_to_main_after_time_and_impressions() ->
 
 
 @pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_falls_back_to_known_main_bid() -> None:
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=1_000)
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_test_bid_minor=20_000,
+        current_mode="test",
+        current_cycle_started_at=datetime.now(UTC) - timedelta(hours=2),
+        test_started_at=datetime.now(UTC) - timedelta(hours=2),
+        main_started_at=None,
+        current_main_bid_minor=25_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=12_000,
+        actual_bid_minor=20_000,
+    )
+
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 25_000
+    assert state.main_started_at is not None
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=25_000,
+    )
+    repository.save_state.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_returns_best_bid_not_found_without_main_bid() -> None:
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=1_000)
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_test_bid_minor=20_000,
+        current_mode="test",
+        current_cycle_started_at=datetime.now(UTC) - timedelta(hours=2),
+        test_started_at=datetime.now(UTC) - timedelta(hours=2),
+        main_started_at=None,
+        current_main_bid_minor=None,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=12_000,
+        actual_bid_minor=20_000,
+    )
+
+    assert state.last_reason == ControlReason.BEST_BID_NOT_FOUND
+    assert state.current_mode == "test"
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    repository.save_state.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_handle_main_mode_waits_for_observation_minutes() -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
