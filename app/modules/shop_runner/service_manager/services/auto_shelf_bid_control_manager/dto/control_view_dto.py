@@ -1,4 +1,4 @@
-"""DTO экрана Telegram для Auto Shelf Bid Control."""
+﻿"""DTO экрана Telegram для Auto Shelf Bid Control."""
 
 from __future__ import annotations
 
@@ -58,15 +58,19 @@ class AutoShelfBidControlViewDTO:
     main_started_at: datetime | None
     test_share: float | None
     target_test_impressions: int | None
+    target_test_observation_minutes: int | None
     target_main_impressions: int | None
-    min_bid_distance_minor: int | None  # копейки, мин. шаг между тестовыми ставками
+    target_main_observation_minutes: int | None
+    min_bid_distance_minor: int | None  # Копейки, мин. шаг между тестовыми ставками
     test_impressions: int | None
     main_impressions: int | None
-    covered_points_count: int  # покрытые точки текущего цикла (порог test)
+    test_elapsed_minutes: int | None
+    main_elapsed_minutes: int | None
+    covered_points_count: int   # покрытые точки текущего цикла (порог test)
     bid_points_total: int  # всего точек за отчётный день (диагностика)
     bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день (диагностика)
     cycle_covered_points_count: int  # дубль covered_points_count для совместимости
-    cycle_bid_points: list[BidPointStatsDTO]  # агрегаты от current_cycle_started_at
+    cycle_bid_points: list[BidPointStatsDTO]   # агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
     optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации

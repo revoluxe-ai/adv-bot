@@ -12,33 +12,33 @@ def test_bid_closer_to_sales_plan_ranks_above_higher_impressions_bid() -> None:
         "expected_ranked": [
             {
                 "bid": 200,
-                "expected_daily_impressions": 20_000.0,
-                "confidence": 0.8,
-                "uncertainty": 4000.0,
-                "main_score": 18_000.0,
-                "test_score": 22_000.0,
-                "own_anchor": 0.3,
+                "expected_daily_impressions": 5_000.0,
+                "confidence": 0.7,
+                "uncertainty": 1_500.0,
+                "main_score": 4_000.0,
+                "test_score": 5_800.0,
+                "own_anchor": 0.2,
             },
             {
                 "bid": 100,
-                "expected_daily_impressions": 10_000.0,
-                "confidence": 0.9,
-                "uncertainty": 1000.0,
-                "main_score": 9_500.0,
-                "test_score": 10_750.0,
+                "expected_daily_impressions": 4_000.0,
+                "confidence": 0.95,
+                "uncertainty": 100.0,
+                "main_score": 950.0,
+                "test_score": 1_050.0,
                 "own_anchor": 0.5,
             },
         ]
     }
     context = PlanContext(
-        sales_plan=105.0,
+        sales_plan=120.0,
         current_fact_sales=100.0,
-        current_sales_forecast=104.0,
-        target_order_cost=150.0,
-        max_order_cost=250.0,
+        current_sales_forecast=90.0,
+        target_order_cost=20.0,
+        max_order_cost=50.0,
         click_to_order_cr_7d=0.05,
     )
-    ctr_by_bid = {100: 0.01, 200: 0.01}
+    ctr_by_bid = {100: 0.1, 200: 0.001}
 
     ranked = rank_bids_for_sales_plan(bid_model_result, context, ctr_by_bid)
 
@@ -68,7 +68,7 @@ def test_bid_closer_to_sales_plan_ranks_above_higher_impressions_bid() -> None:
         "test_score",
         "own_anchor",
     }
-    assert ranked[0]["projected_sales"] == 105.0
+    assert ranked[0]["projected_sales"] == 120.0
     assert ranked[0]["plan_score"] <= ranked[1]["plan_score"]
 
 

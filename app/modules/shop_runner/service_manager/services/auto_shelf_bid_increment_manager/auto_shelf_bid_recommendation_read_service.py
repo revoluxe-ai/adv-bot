@@ -6,20 +6,22 @@ ranked list без любых побочных эффектов для став�
 
 from __future__ import annotations
 
-from collections import Counter
 import logging
 from datetime import datetime
+from collections import Counter
+from collections.abc import Sequence
 from typing import Any
 
 from app.domain.rec_system_bid_math.hour_observation_builder import (
+    BidBucketObservation,
     build_hour_observations_from_buckets,
 )
+from app.domain.rec_system_bid_math.input_models import BidHourObservation
 from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.domain.rec_system_bid_math.service import rank_rec_system_bids
 
 from .auto_shelf_bid_repository import AutoShelfBidRepository
 from app.domain.rec_system_bid_math.hour_observation_builder import BUCKET_MINUTES
-from app.domain.rec_system_bid_math.hour_observation_builder import BidBucketObservation
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +53,8 @@ def _bucket_reason_counts(buckets: list[BidBucketObservation]) -> dict[str, int]
 
 
 def _hour_reason_counts(
-    buckets: list[BidBucketObservation],
-    observations: list[BidBucketObservation],
+    buckets: Sequence[BidBucketObservation],
+    observations: Sequence[BidHourObservation],
 ) -> dict[str, int]:
     grouped: dict[tuple[int, datetime], list[BidBucketObservation]] = {}
     for bucket in buckets:
@@ -64,12 +66,8 @@ def _hour_reason_counts(
             [],
         ).append(bucket)
 
-    valid_hour_keys = {
-        (
-            observation.bid,
-            observation.hour,
-        )
-        for observation in observations
+    valid_hour_keys: set[tuple[int, int]] = {
+        (observation.bid, observation.hour) for observation in observations
     }
     counts: Counter[str] = Counter()
     for (bid, hour_start), group in grouped.items():

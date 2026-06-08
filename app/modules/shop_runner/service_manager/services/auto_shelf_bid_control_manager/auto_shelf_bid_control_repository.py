@@ -19,6 +19,7 @@ from .settings_normalizer import compute_settings_repair
 
 DEFAULT_CURRENCY = "RUB"
 DEFAULT_TARGET_TEST_IMPRESSIONS = 500
+DEFAULT_TARGET_TEST_OBSERVATION_MINUTES = 60
 DEFAULT_TEST_SHARE = 0.1
 
 # Product-дефолты при автосоздании settings (get_or_create_default_settings).
@@ -64,6 +65,7 @@ class AutoShelfBidControlRepository:
                 currency=currency,
                 min_bid_distance_minor=DEFAULT_MIN_BID_DISTANCE_MINOR,
                 target_test_impressions=DEFAULT_TARGET_TEST_IMPRESSIONS,
+                target_test_observation_minutes=DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
                 test_share=DEFAULT_TEST_SHARE,
             )
             session.add(created)
@@ -134,6 +136,7 @@ class AutoShelfBidControlRepository:
         max_bid_minor: int | None = None,
         test_share: float | None = None,
         target_test_impressions: int | None = None,
+        target_test_observation_minutes: int | None = None,
         min_bid_distance_minor: int | None = None,
     ) -> AutoShelfBidControlSettings:
         """Обновить отдельные поля settings по nmid."""
@@ -150,6 +153,10 @@ class AutoShelfBidControlRepository:
                 settings_obj.test_share = float(test_share)
             if target_test_impressions is not None:
                 settings_obj.target_test_impressions = int(target_test_impressions)
+            if target_test_observation_minutes is not None:
+                settings_obj.target_test_observation_minutes = int(
+                    target_test_observation_minutes
+                )
             if min_bid_distance_minor is not None:
                 settings_obj.min_bid_distance_minor = int(min_bid_distance_minor)
             await session.flush()
@@ -289,4 +296,3 @@ class AutoShelfBidControlRepository:
             await session.flush()
             await session.commit()
             return None
-

@@ -88,10 +88,11 @@ class ManagedForward:
     """Запущенный kubectl port-forward."""
 
     name: str
-    process: subprocess.Popen[bytes]
+    process: subprocess.Popen[bytes] | None
     local_host: str
     local_port: int
     target: str
+    external: bool = False
 
 
 def _python_script(script_name: str) -> tuple[str, ...]:
@@ -282,10 +283,18 @@ def start_postgres_port_forward(
 ) -> ManagedForward:
     """Стартует kubectl port-forward для PostgreSQL/pgbouncer."""
     if is_tcp_open(local_host, local_port):
-        raise RuntimeError(
-            f"Локальный порт {local_host}:{local_port} уже занят. "
-            "Скорее всего, старый port-forward уже висит. "
-            "Останови его или укажи другой --postgres-local-port."
+        logger.info(
+            "Postgres port-forward already available on %s:%s; reusing existing listener",
+            local_host,
+            local_port,
+        )
+        return ManagedForward(
+            name="postgres",
+            process=None,
+            local_host=local_host,
+            local_port=local_port,
+            target=target,
+            external=True,
         )
 
     argv = (
@@ -339,8 +348,18 @@ def stop_forward(
     wait_sec: float = SHUTDOWN_WAIT_SEC,
 ) -> None:
     """Останавливает kubectl port-forward."""
+    if forward.external:
+        logger.info(
+            "Skip stopping external port-forward %s: %s:%s -> %s",
+            forward.name,
+            forward.local_host,
+            forward.local_port,
+            forward.target,
+        )
+        return
+
     proc = forward.process
-    if proc.poll() is not None:
+    if proc is None or proc.poll() is not None:
         return
 
     logger.info(

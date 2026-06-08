@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
     AutoShelfBidControlSettings,
@@ -47,8 +47,10 @@ class ControlReason:
     INVALID_BID_RANGE = "invalid_bid_range"
     INVALID_TEST_SHARE = "invalid_test_share"
     TEST_WAITING_IMPRESSIONS = "test_waiting_impressions"
+    TEST_WAITING_OBSERVATION_TIME = "test_waiting_observation_time"
     TEST_COMPLETED_SWITCH_TO_MAIN = "test_completed_switch_to_main"
     MAIN_WAITING_IMPRESSIONS = "main_waiting_impressions"
+    MAIN_WAITING_OBSERVATION_TIME = "main_waiting_observation_time"
     MAIN_COMPLETED_SWITCH_TO_TEST = "main_completed_switch_to_test"
     CYCLE_COMPLETED = "cycle_completed"
     BEST_BID_SELECTED = "best_bid_selected"
@@ -78,7 +80,7 @@ class AutoShelfBidControlManager:
 
     @staticmethod
     def _now() -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     @staticmethod
     def _middle_bid(min_bid: int, max_bid: int) -> int:
@@ -115,6 +117,22 @@ class AutoShelfBidControlManager:
         if test_share <= 0 or test_share > 0.49:
             return None
         return int(target_test_impressions * (1 - test_share) / test_share)
+
+    @staticmethod
+    def _calc_target_main_observation_minutes(
+        target_test_observation_minutes: int,
+        test_share: float,
+    ) -> int | None:
+        if test_share <= 0 or test_share > 0.49:
+            return None
+        return int(target_test_observation_minutes * (1 - test_share) / test_share)
+
+    @staticmethod
+    def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
+        if started_at is None:
+            return None
+        elapsed = int((now - started_at).total_seconds() // 60)
+        return max(0, elapsed)
 
     async def _get_actual_bid(self, auto_adv_id: int, nmid: int) -> int | None:
         cached = await self._bid_cache_manager.get_bid(auto_adv_id, nmid)
@@ -465,12 +483,37 @@ class AutoShelfBidControlManager:
             current_cycle_started_at=state.current_cycle_started_at,
             fallback_now=now,
         )
+        test_elapsed_minutes = self._elapsed_minutes(test_started_at, now)
+        target_test_observation_minutes = int(settings_obj.target_test_observation_minutes)
         test_impressions = await self._analytics.get_impressions(
             nmid=nmid,
             from_ts=test_started_at,
             currency=state.currency,
             bid_minor=test_bid,
         )
+        if (
+            test_elapsed_minutes is None
+            or test_elapsed_minutes < target_test_observation_minutes
+        ):
+            state.last_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            if actual_bid_minor != test_bid:
+                await self._set_target_bid(
+                    complex_adv,
+                    bid_minor=test_bid,
+                    currency=state.currency,
+                )
+                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
+            await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_test_wait_time auto_adv_id=%s nmid=%s mode=%s test_elapsed_minutes=%s target=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                state.current_mode,
+                test_elapsed_minutes,
+                target_test_observation_minutes,
+                state.last_reason,
+            )
+            return None
         if test_impressions < int(settings_obj.target_test_impressions):
             if actual_bid_minor != test_bid:
                 await self._set_target_bid(
@@ -583,6 +626,46 @@ class AutoShelfBidControlManager:
             state.current_main_bid_minor = main_bid
             state.main_started_at = now
         main_started_at = state.main_started_at or state.current_cycle_started_at
+        main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
+        target_main_observation_minutes = self._calc_target_main_observation_minutes(
+            int(settings_obj.target_test_observation_minutes),
+            float(settings_obj.test_share),
+        )
+        if target_main_observation_minutes is None:
+            state.last_reason = ControlReason.INVALID_TEST_SHARE
+            await self._repository.save_state(state)
+            logger.warning(
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s test_share=%s",
+                auto_adv_id,
+                nmid,
+                state.last_reason,
+                settings_obj.test_share,
+            )
+            return None
+        if (
+            main_elapsed_minutes is None
+            or main_elapsed_minutes < target_main_observation_minutes
+        ):
+            if actual_bid_minor != main_bid:
+                await self._set_target_bid(
+                    complex_adv,
+                    bid_minor=main_bid,
+                    currency=state.currency,
+                )
+                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
+            else:
+                state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_main_wait_time auto_adv_id=%s nmid=%s mode=%s main_elapsed_minutes=%s target=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                state.current_mode,
+                main_elapsed_minutes,
+                target_main_observation_minutes,
+                state.last_reason,
+            )
+            return None
         main_impressions = await self._analytics.get_impressions(
             nmid=nmid,
             from_ts=main_started_at,
@@ -685,4 +768,3 @@ class AutoShelfBidControlManager:
             state.last_reason,
         )
         return None
-

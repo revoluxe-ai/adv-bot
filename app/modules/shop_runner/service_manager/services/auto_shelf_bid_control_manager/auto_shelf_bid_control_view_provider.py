@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, UTC
+
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
@@ -69,6 +71,20 @@ class AutoShelfBidControlViewProvider:
         if test_share <= 0 or test_share > 0.49:
             return None
         return int(test_impressions * (1 - test_share) / test_share)
+
+    @staticmethod
+    def _target_main_observation_minutes(
+        test_observation_minutes: int, test_share: float
+    ) -> int | None:
+        if test_share <= 0 or test_share > 0.49:
+            return None
+        return int(test_observation_minutes * (1 - test_share) / test_share)
+
+    @staticmethod
+    def _elapsed_minutes(started_at, now):
+        if started_at is None:
+            return None
+        return max(0, int((now - started_at).total_seconds() // 60))
 
     @staticmethod
     def _app_dry_run() -> bool:
@@ -142,10 +158,14 @@ class AutoShelfBidControlViewProvider:
                 main_started_at=None,
                 test_share=None,
                 target_test_impressions=None,
+                target_test_observation_minutes=None,
                 target_main_impressions=None,
+                target_main_observation_minutes=None,
                 min_bid_distance_minor=None,
                 test_impressions=None,
                 main_impressions=None,
+                test_elapsed_minutes=None,
+                main_elapsed_minutes=None,
                 covered_points_count=0,
                 bid_points_total=0,
                 bid_points=[],
@@ -193,6 +213,7 @@ class AutoShelfBidControlViewProvider:
             settings_obj = await self._repository.get_settings(nmid)
         if state is None:
             warnings.append("state_missing")
+        now_utc = datetime.now(UTC)
 
         actual_bid_minor: int | None = None
         if nmid and auto_adv_id is not None:
@@ -206,6 +227,9 @@ class AutoShelfBidControlViewProvider:
 
         currency = settings_obj.currency if settings_obj is not None else "RUB"
         target_test = int(settings_obj.target_test_impressions) if settings_obj else None
+        target_test_observation_minutes = (
+            int(settings_obj.target_test_observation_minutes) if settings_obj else None
+        )
         stats_from_ts = report_day_start_utc()
         bid_stats = (
             await self._analytics.get_bid_stats(
@@ -233,6 +257,14 @@ class AutoShelfBidControlViewProvider:
         target_main = (
             self._target_main_impressions(target_test, float(settings_obj.test_share))
             if settings_obj and target_test is not None
+            else None
+        )
+        target_main_observation_minutes = (
+            self._target_main_observation_minutes(
+                int(settings_obj.target_test_observation_minutes),
+                float(settings_obj.test_share),
+            )
+            if settings_obj and target_test_observation_minutes is not None
             else None
         )
         if settings_obj and target_main is None:
@@ -337,11 +369,13 @@ class AutoShelfBidControlViewProvider:
         )
 
         test_impressions: int | None = None
+        test_elapsed_minutes: int | None = None
         if state is not None and state.current_test_bid_minor is not None:
             test_from_ts = resolve_test_segment_start_utc(
                 test_started_at=state.test_started_at,
                 current_cycle_started_at=state.current_cycle_started_at,
             )
+            test_elapsed_minutes = self._elapsed_minutes(test_from_ts, now_utc)
             test_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
                 from_ts=test_from_ts,
@@ -356,7 +390,9 @@ class AutoShelfBidControlViewProvider:
                 bid_minor=actual_bid_minor,
             )
         main_impressions: int | None = None
+        main_elapsed_minutes: int | None = None
         if state is not None and state.current_main_bid_minor is not None and state.main_started_at is not None:
+            main_elapsed_minutes = self._elapsed_minutes(state.main_started_at, now_utc)
             main_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
                 from_ts=state.main_started_at,
@@ -400,12 +436,16 @@ class AutoShelfBidControlViewProvider:
             ),
             test_share=(float(settings_obj.test_share) if settings_obj else None),
             target_test_impressions=target_test,
+            target_test_observation_minutes=target_test_observation_minutes,
             target_main_impressions=target_main,
+            target_main_observation_minutes=target_main_observation_minutes,
             min_bid_distance_minor=(
                 int(settings_obj.min_bid_distance_minor) if settings_obj else None
             ),
             test_impressions=test_impressions,
             main_impressions=main_impressions,
+            test_elapsed_minutes=test_elapsed_minutes,
+            main_elapsed_minutes=main_elapsed_minutes,
             covered_points_count=covered_points_count,
             bid_points_total=bid_points_total,
             bid_points=bid_points,
@@ -417,4 +457,3 @@ class AutoShelfBidControlViewProvider:
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
         )
-
