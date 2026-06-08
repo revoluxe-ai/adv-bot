@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import ANY
 
 import run_rec_bid_recommendations_debug as entrypoint
 
@@ -37,6 +38,7 @@ def test_run_uses_view_payload_from_service(
         "REC_BID_DEBUG_NMID": "123",
         "REC_BID_DEBUG_DATE_FROM": "2026-06-07T00:00:00",
         "REC_BID_DEBUG_DATE_TO": "2026-06-08T00:00:00",
+        "REC_BID_DEBUG_MODE": "main",
         "REC_BID_DEBUG_SALES_PLAN": "100",
         "REC_BID_DEBUG_CURRENT_FACT_SALES": "10",
         "REC_BID_DEBUG_TARGET_ORDER_COST": "100",
@@ -50,16 +52,24 @@ def test_run_uses_view_payload_from_service(
     monkeypatch.setattr(entrypoint.os, "getenv", lambda name, default="": required.get(name, default))
 
     class _FakeRepository:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, dict[str, object]]] = []
+
         async def fetch_rec_bid_ctr_by_bid_for_nmid(self, **kwargs):
-            _ = kwargs
+            self.calls.append(("ctr_by_bid", kwargs))
             return {100: 0.2}
+
+        async def fetch_rec_bid_click_to_order_cr_7d_for_nmid(self, **kwargs):
+            self.calls.append(("click_to_order_cr_7d", kwargs))
+            return 0.05
 
     class _FakeService:
         def __init__(self, repository):
             self.repository = repository
+            self.calls: list[dict[str, object]] = []
 
         async def get_rec_bid_recommendations(self, **kwargs):
-            _ = kwargs
+            self.calls.append(kwargs)
             return {
                 "bid_result": {"expected_ranked": [{"bid": 999, "drop": True}]},
                 "plan_ranked": [{"bid": 999, "drop": True}],
@@ -108,7 +118,91 @@ def test_run_uses_view_payload_from_service(
                 },
             }
 
-    monkeypatch.setattr(entrypoint, "AutoShelfBidRepository", lambda wb_manager_hub=None: _FakeRepository())
-    monkeypatch.setattr(entrypoint, "AutoShelfBidRecommendationReadService", _FakeService)
+    repository_holder: dict[str, _FakeRepository] = {}
+    service_holder: dict[str, _FakeService] = {}
+
+    def _repository_factory(wb_manager_hub=None):
+        _ = wb_manager_hub
+        repository = _FakeRepository()
+        repository_holder["repository"] = repository
+        return repository
+
+    def _service_factory(repository):
+        service = _FakeService(repository)
+        service_holder["service"] = service
+        return service
+
+    monkeypatch.setattr(entrypoint, "AutoShelfBidControlAnalyticsRepository", _repository_factory)
+    monkeypatch.setattr(entrypoint, "AutoShelfBidRecommendationReadService", _service_factory)
 
     entrypoint.asyncio.run(entrypoint._run())
+
+    assert repository_holder["repository"].calls == [
+        (
+            "ctr_by_bid",
+            {
+                "nmid": 123,
+                "mode": "main",
+                "date_from": ANY,
+                "date_to": ANY,
+            },
+        ),
+        (
+            "click_to_order_cr_7d",
+            {
+                "nmid": 123,
+                "mode": "main",
+                "date_from": ANY,
+                "date_to": ANY,
+            },
+        ),
+    ]
+    assert service_holder["service"].calls == [
+        {
+            "nmid": 123,
+            "mode": "main",
+            "date_from": ANY,
+            "date_to": ANY,
+            "plan_context": ANY,
+            "ctr_by_bid": {100: 0.2},
+        }
+    ]
+
+
+@pytest.mark.unit
+def test_run_missing_debug_mode_exits_before_repository_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    required = {
+        "REC_BID_DEBUG_NMID": "123",
+        "REC_BID_DEBUG_DATE_FROM": "2026-06-07T00:00:00",
+        "REC_BID_DEBUG_DATE_TO": "2026-06-08T00:00:00",
+        "REC_BID_DEBUG_SALES_PLAN": "100",
+        "REC_BID_DEBUG_CURRENT_FACT_SALES": "10",
+        "REC_BID_DEBUG_TARGET_ORDER_COST": "100",
+        "REC_BID_DEBUG_MAX_ORDER_COST": "120",
+        "REC_BID_DEBUG_CLICK_TO_ORDER_CR_7D": "0.1",
+        "REC_BID_DEBUG_CURRENT_SALES_FORECAST_OVERRIDE": "90",
+    }
+
+    def _required_env(name: str) -> str:
+        if name == "REC_BID_DEBUG_MODE":
+            raise SystemExit("Missing required env: REC_BID_DEBUG_MODE")
+        return required[name]
+
+    called = {"repository": False}
+
+    def _repository_factory(wb_manager_hub=None):
+        _ = wb_manager_hub
+        called["repository"] = True
+        raise AssertionError("repository should not be created")
+
+    monkeypatch.setattr(entrypoint, "_ensure_dev_tunnels", lambda: None)
+    monkeypatch.setattr(entrypoint, "_required_env", _required_env)
+    monkeypatch.setattr(entrypoint.os, "getenv", lambda name, default="": required.get(name, default))
+    monkeypatch.setattr(entrypoint, "AutoShelfBidControlAnalyticsRepository", _repository_factory)
+
+    with pytest.raises(SystemExit, match="Missing required env: REC_BID_DEBUG_MODE"):
+        entrypoint.asyncio.run(entrypoint._run())
+
+    assert called["repository"] is False
