@@ -239,6 +239,8 @@ class AutoShelfBidRepository:
         date_to: datetime,
     ) -> list[BidBucketObservation]:
         """Read-only bucket fetch for rec_system bid ranking."""
+        if not mode:
+            raise ValueError("mode must be a non-empty string")
         query = self._load_sql("fetch_auto_shelf_bid_bucket_rows.sql")
         params = {
             "nmid": nmid,
@@ -267,6 +269,8 @@ class AutoShelfBidRepository:
         date_to: datetime,
     ) -> dict[int, float]:
         """Return real CTR by bid from read-only CH aggregation."""
+        if not mode:
+            raise ValueError("mode must be a non-empty string")
         query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql")
         params = {
             "nmid": nmid,
