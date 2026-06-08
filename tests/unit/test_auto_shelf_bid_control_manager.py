@@ -666,7 +666,6 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
     )
     manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=16_000)  # type: ignore[method-assign]
-    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
     state = MagicMock(
         current_test_bid_minor=20_000,
@@ -706,8 +705,11 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
     assert state.main_started_at is not None
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
     repository.save_state.assert_awaited_once()
-    manager._persist_state_then_set_bid.assert_not_awaited()
-    manager._set_target_bid.assert_not_awaited()
+    manager._set_target_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=16_000,
+        currency=state.currency,
+    )
     analytics.get_bid_stats.assert_not_awaited()
 
 

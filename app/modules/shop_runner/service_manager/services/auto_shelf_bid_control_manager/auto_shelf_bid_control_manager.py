@@ -844,7 +844,11 @@ class AutoShelfBidControlManager:
             state.current_main_bid_minor = target_main_bid
             state.main_started_at = now
             state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
-            await self._repository.save_state(state)
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=target_main_bid,
+            )
             logger.info(
                 "auto_shelf_bid_control_main_bid_changed auto_adv_id=%s nmid=%s previous_main_bid=%s new_main_bid=%s reason=%s",
                 auto_adv_id,
