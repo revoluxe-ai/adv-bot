@@ -398,6 +398,25 @@ def test_calc_target_main_observation_minutes_invalid_share_returns_none() -> No
     assert AutoShelfBidControlManager._calc_target_main_observation_minutes(60, 0.5) is None
 
 
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        (None, 60),
+        (0, 60),
+        (30, 60),
+        (60, 60),
+        (120, 120),
+    ],
+)
+def test_target_observation_minutes_or_default_normalizes_minimum(
+    raw_value: int | None,
+    expected: int,
+) -> None:
+    assert AutoShelfBidControlManager._target_observation_minutes_or_default(
+        raw_value
+    ) == expected
+
+
 def test_is_coroutine_candidate_requires_enabled_single_nmid_and_active() -> None:
     from types import SimpleNamespace
 
@@ -996,7 +1015,7 @@ async def test_handle_main_mode_accepts_nullable_target_observation_minutes() ->
         actual_bid_minor=25_000,
     )
 
-    assert state.last_reason == ControlReason.MAIN_WAITING_IMPRESSIONS
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
     repository.save_state.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()

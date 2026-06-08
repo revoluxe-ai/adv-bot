@@ -141,11 +141,13 @@ class AutoShelfBidControlManager:
     ) -> int:
         """Вернуть безопасный fallback для nullable observation minutes.
 
-        В БД поле nullable, поэтому отсутствие значения не должно останавливать
-        control loop. Для такого случая используем 0, чтобы дальше сработали
-        обычные проверки по impressions.
+        SQL NULL и значения ниже минимального порога не должны обходить time gate.
+        Бизнесовый минимум observation window — 60 минут.
         """
-        return 0 if value is None else int(value)
+        if value is None:
+            return 60
+        normalized = int(value)
+        return max(60, normalized)
 
     @staticmethod
     def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
