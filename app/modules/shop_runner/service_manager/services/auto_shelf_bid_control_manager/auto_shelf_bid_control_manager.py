@@ -740,6 +740,19 @@ class AutoShelfBidControlManager:
             if clamped_main != int(main_bid):
                 main_bid = clamped_main
                 state.current_main_bid_minor = main_bid
+        if state.current_main_bid_minor is not None and state.main_started_at is None:
+            state.main_started_at = now
+            state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_main_bootstrap_started_at auto_adv_id=%s nmid=%s mode=%s main_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                state.current_mode,
+                state.current_main_bid_minor,
+                state.last_reason,
+            )
+            return None
         target_main_bid = await self._choose_main_bid_by_strategy(
             complex_adv=complex_adv,
             currency=state.currency,

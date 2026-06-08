@@ -607,7 +607,9 @@ async def test_handle_main_mode_waits_when_main_started_at_missing() -> None:
         actual_bid_minor=25_000,
     )
 
+    assert state.main_started_at is not None
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    repository.save_state.assert_awaited_once()
     analytics.get_impressions.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
