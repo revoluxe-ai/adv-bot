@@ -148,8 +148,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        names: tuple[str] = result.column_names
-        column_names: list[str] = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         out: list[BidStatsDTO] = []
         for row_values in result.result_rows:
             row: dict[str, Any] = dict(zip(column_names, tuple(row_values)))

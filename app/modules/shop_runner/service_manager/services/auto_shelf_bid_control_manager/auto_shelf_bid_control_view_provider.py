@@ -206,6 +206,7 @@ class AutoShelfBidControlViewProvider:
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
         fact_predict_orders: float | None = None
+        resolve_cpo: float | None = None
         plan_fact_reader = PlanFactReader()
         plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
         if plan_fact_summary is not None:
