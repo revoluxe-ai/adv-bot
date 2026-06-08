@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, cast
 
 import pytest
 
@@ -104,6 +105,24 @@ class _FakeAsyncContext:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         _ = (exc_type, exc, tb)
         return None
+
+
+class _BucketRowsClient:
+    def __init__(self, result_rows: list[tuple[object, ...]]) -> None:
+        self.result_rows = result_rows
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
+    async def query(self, query: str, parameters: dict[str, object]) -> _FakeResult:
+        self.calls.append((query, parameters))
+        return _FakeResult(
+            self.result_rows,
+            (
+                "bucket_start",
+                "bid_minor",
+                "price_minor",
+                "delta_impressions",
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -242,3 +261,68 @@ async def test_fetch_rec_bid_bucket_observations_for_nmid_empty_mode_raises(
             date_from=datetime(2026, 6, 7, 0, 0),
             date_to=datetime(2026, 6, 8, 0, 0),
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "result_rows, expected",
+    [
+        (
+            [
+                (datetime(2026, 6, 7, 3, 0), 100, 700, 10),
+                (datetime(2026, 6, 7, 3, 0), 100, 700, 11),
+            ],
+            {
+                (100, 700, 21.0),
+            },
+        ),
+        (
+            [
+                (datetime(2026, 6, 7, 3, 0), 100, 700, 10),
+                (datetime(2026, 6, 7, 3, 0), 101, 700, 11),
+            ],
+            {
+                (100, 700, 10.0),
+                (101, 700, 11.0),
+            },
+        ),
+        (
+            [
+                (datetime(2026, 6, 7, 3, 0), 100, 700, 10),
+                (datetime(2026, 6, 7, 3, 0), 100, 800, 11),
+            ],
+            {
+                (100, 700, 10.0),
+                (100, 800, 11.0),
+            },
+        ),
+    ],
+)
+async def test_fetch_rec_bid_bucket_observations_for_nmid_groups_full_bucket_context(
+    monkeypatch: pytest.MonkeyPatch,
+    result_rows: list[tuple[object, ...]],
+    expected: set[tuple[int, int | None, float]],
+) -> None:
+    client = _BucketRowsClient(result_rows)
+    monkeypatch.setattr(
+        repository_module,
+        "get_clickhouse_client",
+        lambda: _FakeAsyncContext(client),
+    )
+    monkeypatch.setattr(
+        repository_module,
+        "anti_ch_crash_semaphore",
+        _FakeAsyncContext(None),
+    )
+
+    repository = AutoShelfBidRepository(wb_manager_hub=cast(Any, None))
+    buckets = await repository.fetch_rec_bid_bucket_observations_for_nmid(
+        nmid=123,
+        mode="main",
+        date_from=datetime(2026, 6, 7, 0, 0),
+        date_to=datetime(2026, 6, 8, 0, 0),
+    )
+
+    assert {
+        (bucket.bid, bucket.price_minor, bucket.impressions) for bucket in buckets
+    } == expected
