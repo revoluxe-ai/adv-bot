@@ -243,7 +243,7 @@ class AutoShelfBidControlViewProvider:
         currency = settings_obj.currency if settings_obj is not None else "RUB"
         target_test = int(settings_obj.target_test_impressions) if settings_obj else None
         target_test_observation_minutes = (
-            AutoShelfBidControlManager._target_observation_minutes_or_default(
+            AutoShelfBidControlManager._target_observation_minutes_or_default( # type: ignore
                 settings_obj.target_test_observation_minutes
             )
             if settings_obj

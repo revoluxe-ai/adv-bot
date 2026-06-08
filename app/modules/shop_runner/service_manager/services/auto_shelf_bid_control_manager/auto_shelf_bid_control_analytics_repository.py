@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -19,6 +20,8 @@ from ..auto_shelf_bid_increment_manager.bid_bucket_row_mapper import (
 )
 from .bid_units import cpc_from_totals
 from .dto import BidStatsDTO
+
+logger = logging.getLogger(__name__)
 
 
 class AutoShelfBidControlAnalyticsRepository:
@@ -44,6 +47,19 @@ class AutoShelfBidControlAnalyticsRepository:
         for name in raw_column_names:
             column_names.append(str(name))
         return column_names
+
+    @staticmethod
+    def _normalize_click_to_order_cr(value: float) -> float:
+        """Нормализовать CR клики->заказы в безопасный диапазон [0, 1]."""
+        if value < 0.0:
+            return 0.0
+        if value > 1.0:
+            logger.debug(
+                "click_to_order_cr_7d_capped_to_one",
+                extra={"raw_click_to_order_cr_7d": value},
+            )
+            return 1.0
+        return value
 
 
     @staticmethod
@@ -132,7 +148,8 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        column_names = self._result_column_names(result)
+        names: tuple[str] = result.column_names
+        column_names: list[str] = [str(name) for name in names]
         out: list[BidStatsDTO] = []
         for row_values in result.result_rows:
             row: dict[str, Any] = dict(zip(column_names, tuple(row_values)))
@@ -192,7 +209,11 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        column_names = self._result_column_names(result)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
         rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
         return build_bid_bucket_observations_from_ch_rows(rows)
 
@@ -224,7 +245,11 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return {}
-        column_names = self._result_column_names(result)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
         ctr_by_bid: dict[int, float] = {}
         for row in result.result_rows:
             row_dict = dict(zip(column_names, tuple(row)))
@@ -262,11 +287,16 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return 0.0
-        column_names = self._result_column_names(result)
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
         row_dict = dict(zip(column_names, tuple(result.result_rows[0])))
         clicks = self._to_float(row_dict["clicks"])
         orders = self._to_float(row_dict["orders"])
-        return orders / clicks if clicks > 0 else 0.0
+        raw_click_to_order_cr_7d = orders / clicks if clicks > 0 else 0.0
+        return self._normalize_click_to_order_cr(raw_click_to_order_cr_7d)
 
     async def get_best_bid_by_cart_cpa(
         self,
