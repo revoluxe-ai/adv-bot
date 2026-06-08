@@ -1,4 +1,4 @@
-"""DTO экрана Telegram для Auto Shelf Bid Control."""
+﻿"""DTO СЌРєСЂР°РЅР° Telegram РґР»СЏ Auto Shelf Bid Control."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ from .optimization_metric import OptimizationMetric
 
 @dataclass(frozen=True, slots=True)
 class BidPointStatsDTO:
-    """Статистика по одной точке ставки для отображения в Telegram.
+    """РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РѕРґРЅРѕР№ С‚РѕС‡РєРµ СЃС‚Р°РІРєРё РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ Telegram.
 
-    ``cart_cpa`` — CPC score (не CPA корзины), см. ``BidStatsDTO.cart_cpa``.
+    ``cart_cpa`` вЂ” CPC score (РЅРµ CPA РєРѕСЂР·РёРЅС‹), СЃРј. ``BidStatsDTO.cart_cpa``.
     """
 
-    bid_minor: int  # копейки (как в CH auto_shelf_bid_intervals)
+    bid_minor: int  # РєРѕРїРµР№РєРё (РєР°Рє РІ CH auto_shelf_bid_intervals)
     currency: str
-    last_interval_at: datetime | None  # последний интервал по ставке (для сортировки UI)
+    last_interval_at: datetime | None  # РїРѕСЃР»РµРґРЅРёР№ РёРЅС‚РµСЂРІР°Р» РїРѕ СЃС‚Р°РІРєРµ (РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё UI)
     impressions: int
     clicks: int
     carts: int
@@ -34,23 +34,23 @@ class BidPointStatsDTO:
 
 @dataclass(frozen=True, slots=True)
 class AutoShelfBidControlViewDTO:
-    """Срез состояния control-модуля для Telegram-экрана."""
+    """РЎСЂРµР· СЃРѕСЃС‚РѕСЏРЅРёСЏ control-РјРѕРґСѓР»СЏ РґР»СЏ Telegram-СЌРєСЂР°РЅР°."""
 
     nmid: int
     auto_adv_id: int | None
     enabled: bool
     has_settings: bool
     has_state: bool
-    dry_run: bool  # глобально: settings.AUTO_SHELF_BID_CONTROL_DRY_RUN
+    dry_run: bool  # РіР»РѕР±Р°Р»СЊРЅРѕ: settings.AUTO_SHELF_BID_CONTROL_DRY_RUN
     bid_units_confirmed: bool
-    actual_bid_minor: int | None  # копейки, Redis recommendations
-    min_bid_minor: int | None  # копейки, мин. ставка WB (из min_bids cache)
-    max_bid_minor: int | None  # копейки, настройка пользователя
-    current_main_bid_minor: int | None  # копейки
-    current_test_bid_minor: int | None  # копейки
-    cycle_best_bid_minor: int | None  # копейки, лучший CPC в текущем цикле
-    global_best_bid_minor: int | None  # копейки, min CPC текущий ∪ предыдущий цикл
-    next_test_bid_minor: int | None  # копейки
+    actual_bid_minor: int | None  # РєРѕРїРµР№РєРё, Redis recommendations
+    min_bid_minor: int | None  # РєРѕРїРµР№РєРё, РјРёРЅ. СЃС‚Р°РІРєР° WB (РёР· min_bids cache)
+    max_bid_minor: int | None  # РєРѕРїРµР№РєРё, РЅР°СЃС‚СЂРѕР№РєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    current_main_bid_minor: int | None  # РєРѕРїРµР№РєРё
+    current_test_bid_minor: int | None  # РєРѕРїРµР№РєРё
+    cycle_best_bid_minor: int | None  # РєРѕРїРµР№РєРё, Р»СѓС‡С€РёР№ CPC РІ С‚РµРєСѓС‰РµРј С†РёРєР»Рµ
+    global_best_bid_minor: int | None  # РєРѕРїРµР№РєРё, min CPC С‚РµРєСѓС‰РёР№ в€Є РїСЂРµРґС‹РґСѓС‰РёР№ С†РёРєР»
+    next_test_bid_minor: int | None  # РєРѕРїРµР№РєРё
     currency: str
     current_mode: str | None
     current_cycle_started_at: datetime | None
@@ -58,18 +58,24 @@ class AutoShelfBidControlViewDTO:
     main_started_at: datetime | None
     test_share: float | None
     target_test_impressions: int | None
+    target_test_observation_minutes: int | None
     target_main_impressions: int | None
-    min_bid_distance_minor: int | None  # копейки, мин. шаг между тестовыми ставками
+    target_main_observation_minutes: int | None
+    min_bid_distance_minor: int | None  # РєРѕРїРµР№РєРё, РјРёРЅ. С€Р°Рі РјРµР¶РґСѓ С‚РµСЃС‚РѕРІС‹РјРё СЃС‚Р°РІРєР°РјРё
     test_impressions: int | None
     main_impressions: int | None
-    covered_points_count: int  # покрытые точки текущего цикла (порог test)
-    bid_points_total: int  # всего точек за отчётный день (диагностика)
-    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день (диагностика)
-    cycle_covered_points_count: int  # дубль covered_points_count для совместимости
-    cycle_bid_points: list[BidPointStatsDTO]  # агрегаты от current_cycle_started_at
+    test_elapsed_minutes: int | None
+    main_elapsed_minutes: int | None
+    covered_points_count: int  # РїРѕРєСЂС‹С‚С‹Рµ С‚РѕС‡РєРё С‚РµРєСѓС‰РµРіРѕ С†РёРєР»Р° (РїРѕСЂРѕРі test)
+    bid_points_total: int  # РІСЃРµРіРѕ С‚РѕС‡РµРє Р·Р° РѕС‚С‡С‘С‚РЅС‹Р№ РґРµРЅСЊ (РґРёР°РіРЅРѕСЃС‚РёРєР°)
+    bid_points: list[BidPointStatsDTO]  # Р°РіСЂРµРіР°С‚С‹ Р·Р° РѕС‚С‡С‘С‚РЅС‹Р№ РґРµРЅСЊ (РґРёР°РіРЅРѕСЃС‚РёРєР°)
+    cycle_covered_points_count: int  # РґСѓР±Р»СЊ covered_points_count РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё
+    cycle_bid_points: list[BidPointStatsDTO]  # Р°РіСЂРµРіР°С‚С‹ РѕС‚ current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
-    optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
-    fact_cpo: float | None  # фактическое CPO кампании
-    resolve_cpo: float | None  # resolve/target CPO кампании
+    optimization_metric: OptimizationMetric  # CPC РёР»Рё CTR вЂ” С‚РµРєСѓС‰Р°СЏ РјРµС‚СЂРёРєР° РѕРїС‚РёРјРёР·Р°С†РёРё
+    fact_cpo: float | None  # С„Р°РєС‚РёС‡РµСЃРєРѕРµ CPO РєР°РјРїР°РЅРёРё
+    resolve_cpo: float | None  # resolve/target CPO РєР°РјРїР°РЅРёРё
+    rec_bid_recommendation: dict[str, object] | None = None
+
 

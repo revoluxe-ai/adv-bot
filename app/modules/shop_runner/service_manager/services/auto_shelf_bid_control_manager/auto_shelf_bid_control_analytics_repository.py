@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -11,8 +12,13 @@ from clickhouse_connect.driver.query import QueryResult
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
+from ..auto_shelf_bid_increment_manager.bid_bucket_row_mapper import (
+    build_bid_bucket_observations_from_ch_rows,
+)
 from .bid_units import cpc_from_totals
 from .dto import BidStatsDTO
+
+logger = logging.getLogger(__name__)
 
 
 class AutoShelfBidControlAnalyticsRepository:
@@ -24,6 +30,49 @@ class AutoShelfBidControlAnalyticsRepository:
     def _load_sql(self, filename: str) -> str:
         """Прочитать SQL-шаблон из каталога sql/."""
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
+
+    @staticmethod
+    def _mode_filter_clause(mode: str | None) -> str:
+        """Собрать SQL-фильтр по mode только для конкретного режима."""
+        return "" if mode is None else "  AND mode = %(mode)s\n"
+
+    @staticmethod
+    def _normalize_click_to_order_cr(value: float) -> float:
+        """Нормализовать CR клики->заказы в безопасный диапазон [0, 1]."""
+        if value < 0.0:
+            return 0.0
+        if value > 1.0:
+            logger.debug(
+                "click_to_order_cr_7d_capped_to_one",
+                extra={"raw_click_to_order_cr_7d": value},
+            )
+            return 1.0
+        return value
+
+
+    @staticmethod
+    def _to_int(value: object) -> int:
+        """Безопасно привести значение CH к int."""
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str):
+            return int(value)
+        raise TypeError(f"Cannot cast to int: {type(value)!r}")
+
+    @staticmethod
+    def _to_float(value: object) -> float:
+        """Безопасно привести значение CH к float."""
+        if isinstance(value, bool):
+            return float(int(value))
+        if isinstance(value, int | float):
+            return float(value)
+        if isinstance(value, str):
+            return float(value)
+        raise TypeError(f"Cannot cast to float: {type(value)!r}")
 
     @staticmethod
     def _build_bid_stats_dto(row: dict[str, Any]) -> BidStatsDTO:
@@ -120,6 +169,123 @@ class AutoShelfBidControlAnalyticsRepository:
             return 0
         return int(result.result_rows[0][0])
 
+    async def fetch_rec_bid_bucket_observations_for_nmid(
+        self,
+        nmid: int,
+        mode: str | None,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[BidBucketObservation]:
+        """Собрать read-only bucket-строки для rec bid recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_bucket_rows.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        if mode is not None:
+            params["mode"] = mode
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return []
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        rows = [dict(zip(column_names, tuple(row))) for row in result.result_rows]
+        return build_bid_bucket_observations_from_ch_rows(rows)
+
+    async def fetch_rec_bid_ctr_by_bid_for_nmid(
+        self,
+        nmid: int,
+        mode: str | None,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> dict[int, float]:
+        """Вернуть CTR по bid для read-only recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        if mode is not None:
+            params["mode"] = mode
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return {}
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        ctr_by_bid: dict[int, float] = {}
+        for row in result.result_rows:
+            row_dict = dict(zip(column_names, tuple(row)))
+            bid = self._to_int(row_dict["bid"])
+            impressions = self._to_float(row_dict["impressions"])
+            clicks = self._to_float(row_dict["clicks"])
+            ctr_by_bid[bid] = clicks / impressions if impressions > 0 else 0.0
+        return ctr_by_bid
+
+    async def fetch_rec_bid_click_to_order_cr_7d_for_nmid(
+        self,
+        nmid: int,
+        mode: str | None,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> float:
+        """Вернуть 7d click-to-order CR для PlanContext recommendation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_click_to_order_cr_7d.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        if mode is not None:
+            params["mode"] = mode
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return 0.0
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        row_dict = dict(zip(column_names, tuple(result.result_rows[0])))
+        clicks = self._to_float(row_dict["clicks"])
+        orders = self._to_float(row_dict["orders"])
+        raw_click_to_order_cr_7d = orders / clicks if clicks > 0 else 0.0
+        return self._normalize_click_to_order_cr(raw_click_to_order_cr_7d)
+
     async def get_best_bid_by_cart_cpa(
         self,
         nmid: int,
@@ -185,4 +351,3 @@ class AutoShelfBidControlAnalyticsRepository:
         column_names = [str(name) for name in names]
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
-

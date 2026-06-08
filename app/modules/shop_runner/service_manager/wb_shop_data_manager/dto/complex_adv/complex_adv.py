@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import \
+    AutoShelfBidControlStrategy
+
+"""DTO wrapper over AdvSetting for shop-runner control flows."""
+
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -21,6 +26,25 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+
+
+
+
+def resolve_auto_shelf_bid_control_strategy(
+    raw_value: AutoShelfBidControlStrategy | str | None,
+) -> AutoShelfBidControlStrategy:
+    """Нормализует стратегию control-логики полок.
+
+    None, пустые и неизвестные значения безопасно сводятся к legacy-режиму.
+    """
+    if raw_value is None or raw_value == "":
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if isinstance(raw_value, AutoShelfBidControlStrategy):
+        return raw_value
+    try:
+        return AutoShelfBidControlStrategy(str(raw_value))
+    except ValueError:
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
 
 
 class GetKeywordsProvider(Protocol):
@@ -196,12 +220,11 @@ class ComplexAdv:
             auction_adv_id = self.auction_adv_id
             if auction_adv_id is None:
                 raise ValueError(
-                    "Аукционная кампания не зарегистрирована для adv_id=%s"
-                    % self.auto_adv_id
+                    f"Аукционная кампания не зарегистрирована для adv_id={self.auto_adv_id}"
                 )
             return auction_adv_id
         raise ValueError(
-            "Неизвестный тип кампании %s" % adv_type
+            f"Неизвестный тип кампании {adv_type}"
         )
 
     @property
@@ -275,6 +298,13 @@ class ComplexAdv:
     def auto_shelf_bid_control_enabled(self) -> bool:
         """Флаг включения control-контура общей ставки полок."""
         return bool(self._adv_setting.auto_shelf_bid_control_enabled)
+
+    @property
+    def auto_shelf_bid_control_strategy(self) -> AutoShelfBidControlStrategy:
+        """Стратегия выбора main bid для auto_shelf_bid_control."""
+        return resolve_auto_shelf_bid_control_strategy(
+            getattr(self._adv_setting, "auto_shelf_bid_control_strategy", None)
+        )
 
     @property
     def traffic_clicks_dto(self) -> TrafficClicksDTO | None:

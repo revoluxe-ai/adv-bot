@@ -93,6 +93,33 @@ function Invoke-PostgresSmokeCheck {
     }
 }
 
+function Invoke-ClickHouseSmokeCheck {
+    param(
+        [int]$Port = 18123,
+        [int]$TimeoutSec = 30
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-TcpPortOpen -Port $Port)) {
+            Start-Sleep -Milliseconds 500
+            continue
+        }
+
+        try {
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/ping" -TimeoutSec 2 -UseBasicParsing
+            if ($response.StatusCode -eq 200 -and $response.Content -match "Ok") {
+                Write-Host "CH smoke check OK: /ping via 127.0.0.1:$Port."
+                return
+            }
+        } catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
+    throw "ClickHouse tunnel is not ready: 127.0.0.1:$Port did not respond within $TimeoutSec seconds."
+}
+
 if (Test-TcpPortOpen -Port 15432) {
     Write-Host "Postgres tunnel already active on 127.0.0.1:15432, reusing existing forward."
 } else {
@@ -104,12 +131,18 @@ if (Test-TcpPortOpen -Port 15432) {
     )
 }
 
-Write-Host "Starting ClickHouse tunnel: localhost:18123 -> ClickHouse HTTP"
-Start-Process powershell -ArgumentList @(
-    "-NoExit",
-    "-Command",
-    "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-analytics svc/chi-clickhouse-main-0-0 18123:8123"
-)
+if (Test-TcpPortOpen -Port 18123) {
+    Write-Host "ClickHouse tunnel already active on 127.0.0.1:18123, reusing existing forward."
+} else {
+    Write-Host "Starting ClickHouse tunnel: localhost:18123 -> ClickHouse HTTP"
+    Start-Process powershell -ArgumentList @(
+        "-NoExit",
+        "-Command",
+        "`$env:KUBECONFIG='$kubeconfig'; kubectl port-forward -n prod-analytics svc/chi-clickhouse-main-0-0 18123:8123"
+    )
+}
+
+Invoke-ClickHouseSmokeCheck -Port 18123
 
 Write-Host ""
 Write-Host "Tunnels started in separate PowerShell windows."

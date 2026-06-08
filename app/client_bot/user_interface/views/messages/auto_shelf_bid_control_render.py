@@ -51,6 +51,89 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
     return "\n".join(f"- {item}" for item in view.warnings)
 
 
+def _as_dict(value: object) -> dict[str, object]:
+    """Безопасно интерпретировать value как dict для read-only рендера."""
+    return value if isinstance(value, dict) else {}
+
+
+def _format_rec_bid_value(value: object) -> str:
+    """Отформатировать значение recommendation, подставляя дефолт для пустых полей."""
+    if value is None:
+        return "-"
+    return str(value)
+
+
+def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
+    """Собрать компактную строку recommendation row из нужных полей."""
+    return " | ".join(f"{field}: {_format_rec_bid_value(row.get(field))}" for field in fields)
+
+
+def _format_rec_bid_rows(
+    rows: object,
+    fields: tuple[str, ...],
+    *,
+    limit: int = 3,
+) -> str:
+    """Форматировать top-N rows recommendation без падения на неполных данных."""
+    if not isinstance(rows, list) or not rows:
+        return "-"
+    formatted_rows = []
+    for item in rows[:limit]:
+        row = _as_dict(item)
+        formatted_rows.append(f"- {_format_rec_bid_row(row, fields)}")
+    return "\n".join(formatted_rows) if formatted_rows else "-"
+
+
+def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> str:
+    """Собрать компактный блок рекомендаций по ставке полок."""
+    recommendation = view.rec_bid_recommendation
+    if recommendation is None:
+        return ""
+    recommendation_dict = _as_dict(recommendation)
+    diagnostics = _as_dict(recommendation_dict.get("diagnostics"))
+    plan_ranked = recommendation_dict.get("plan_ranked")
+    expected_ranked = recommendation_dict.get("expected_ranked")
+    best_expected_bid = _format_rec_bid_value(
+        recommendation_dict.get("best_expected_bid")
+    )
+    best_plan_bid = _format_rec_bid_value(recommendation_dict.get("best_plan_bid"))
+    hour_observation_count = _format_rec_bid_value(
+        diagnostics.get("hour_observation_count")
+    )
+    bid_count = _format_rec_bid_value(diagnostics.get("bid_count"))
+    plan_ranked_text = _format_rec_bid_rows(
+        plan_ranked,
+        (
+            "bid",
+            "ctr",
+            "expected_order_cost_rub",
+            "resolved_order_cost_rub",
+            "sales_gap",
+            "plan_distance_score",
+        ),
+    )
+    expected_ranked_text = _format_rec_bid_rows(
+        expected_ranked,
+        (
+            "bid",
+            "expected_daily_impressions",
+            "confidence",
+            "own_anchor",
+        ),
+    )
+    return (
+        "🧪 Рекомендации по ставке полок\n"
+        f"best_expected_bid: {best_expected_bid}\n"
+        f"best_plan_bid: {best_plan_bid}\n"
+        f"hours: {hour_observation_count}\n"
+        f"bids: {bid_count}\n\n"
+        "Top-3 plan_ranked:\n"
+        f"{plan_ranked_text}\n\n"
+        "Top-3 expected_ranked:\n"
+        f"{expected_ranked_text}"
+    )
+
+
 def _bid_point_cpc_sort_key(point: BidPointStatsDTO) -> tuple[float, int]:
     """Ключ сортировки: лучший CPC первым (``cart_cpa`` = CPC score в DTO)."""
     cpc = point.cart_cpa if point.cart_cpa is not None else float("inf")
@@ -246,6 +329,10 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     gate_text = "подтверждён" if view.bid_units_confirmed else "не подтверждён"
     enabled_text = "включено" if view.enabled else "выключено"
     optimization_text = _format_optimization_metric(view.optimization_metric)
+    rec_bid_recommendation_text = _render_rec_bid_recommendation_block(view)
+    rec_bid_block = (
+        f"\n\n{rec_bid_recommendation_text}" if rec_bid_recommendation_text else ""
+    )
     return (
         "⚙️ Управление ставкой в полках\n\n"
         f"Артикул: {view.nmid}\n"
@@ -278,6 +365,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"{view.last_reason or '—'}\n\n"
         "Предупреждения:\n"
         f"{_warnings_to_text(view)}"
+        f"{rec_bid_block}"
     )
 
 
@@ -374,6 +462,7 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
         f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
         f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
         f"Показов на тест: {view.target_test_impressions or '—'}\n"
+        f"Мин. минут теста: {view.target_test_observation_minutes or '—'}\n"
         f"Шаг между тестовыми ставками: {format_bid(view.min_bid_distance_minor, view.currency)}\n"
         f"Dry-run (глобально, AUTO_SHELF_BID_CONTROL_DRY_RUN): {dry_run_text}\n\n"
         f"Управление включено: {enabled_text}"
@@ -401,6 +490,13 @@ def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> Inli
         text="Изменить показов на тест",
         callback_data=AutoShelfBidControlMenu(
             action="set_target_test_impressions",
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить минут теста",
+        callback_data=AutoShelfBidControlMenu(
+            action="set_target_test_observation_minutes",
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
