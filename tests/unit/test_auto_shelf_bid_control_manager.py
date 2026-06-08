@@ -449,6 +449,7 @@ async def test_handle_test_mode_waits_for_observation_minutes_even_if_impression
     )
     manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
     state = MagicMock(
         current_test_bid_minor=20_000,
         current_mode="test",
@@ -479,7 +480,7 @@ async def test_handle_test_mode_waits_for_observation_minutes_even_if_impression
         settings_obj=settings_obj,
         state=state,
         min_bid_minor=12_000,
-        actual_bid_minor=20_000,
+        actual_bid_minor=21_000,
     )
 
     assert state.last_reason == ControlReason.TEST_WAITING_OBSERVATION_TIME
@@ -755,12 +756,17 @@ async def test_handle_main_mode_waits_for_observation_minutes() -> None:
         settings_obj=settings_obj,
         state=state,
         min_bid_minor=12_000,
-        actual_bid_minor=25_000,
+        actual_bid_minor=24_000,
     )
 
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    assert state.current_mode == "main"
     manager._persist_state_then_set_bid.assert_not_awaited()
-    manager._set_target_bid.assert_not_awaited()
+    manager._set_target_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=25_000,
+        currency=state.currency,
+    )
 
 
 @pytest.mark.asyncio
