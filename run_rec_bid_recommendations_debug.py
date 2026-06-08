@@ -7,6 +7,7 @@ Required env:
     REC_BID_DEBUG_NMID
     REC_BID_DEBUG_DATE_FROM
     REC_BID_DEBUG_DATE_TO
+    REC_BID_DEBUG_MODE
 
 Plan context env:
     REC_BID_DEBUG_SALES_PLAN
@@ -30,11 +31,11 @@ import dotenv
 
 from app.dev_local.k8s_tunnels import ensure_dev_tunnels
 from app.domain.rec_system_bid_math.plan_ranker import PlanContext
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_analytics_repository import (
+    AutoShelfBidControlAnalyticsRepository,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
     AutoShelfBidRecommendationReadService,
-)
-from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_repository import (
-    AutoShelfBidRepository,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -137,6 +138,7 @@ async def _run() -> int:
     nmid = int(_required_env("REC_BID_DEBUG_NMID"))
     date_from = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_FROM"))
     date_to = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_TO"))
+    mode = _required_env("REC_BID_DEBUG_MODE")
 
     current_sales_forecast: float | None = None
     adv_id_raw = os.getenv("REC_BID_DEBUG_ADV_ID", "").strip()
@@ -160,11 +162,17 @@ async def _run() -> int:
 
     plan_context = _plan_context_from_env(current_sales_forecast)
 
-    repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
+    repository = AutoShelfBidControlAnalyticsRepository()
     service = AutoShelfBidRecommendationReadService(repository)
     ctr_by_bid = await repository.fetch_rec_bid_ctr_by_bid_for_nmid(
         nmid=nmid,
-        mode="",
+        mode=mode,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    _ = await repository.fetch_rec_bid_click_to_order_cr_7d_for_nmid(
+        nmid=nmid,
+        mode=mode,
         date_from=date_from,
         date_to=date_to,
     )
@@ -174,7 +182,7 @@ async def _run() -> int:
 
     result = await service.get_rec_bid_recommendations(
         nmid=nmid,
-        mode="",
+        mode=mode,
         date_from=date_from,
         date_to=date_to,
         plan_context=plan_context,
