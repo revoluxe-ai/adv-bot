@@ -103,6 +103,11 @@ class AutoShelfBidControlViewProvider:
         return bool(settings.AUTO_SHELF_BID_CONTROL_DRY_RUN)
 
     @staticmethod
+    def _nullable_int(value: int | None) -> int | None:
+        """Вернуть int для non-null значения или None без падения на SQL NULL."""
+        return None if value is None else int(value)
+
+    @staticmethod
     def _map_bid_stats_to_points(
         bid_stats: list[BidStatsDTO],
         *,
@@ -241,7 +246,9 @@ class AutoShelfBidControlViewProvider:
         currency = settings_obj.currency if settings_obj is not None else "RUB"
         target_test = int(settings_obj.target_test_impressions) if settings_obj else None
         target_test_observation_minutes = (
-            int(settings_obj.target_test_observation_minutes) if settings_obj else None
+            self._nullable_int(settings_obj.target_test_observation_minutes)
+            if settings_obj
+            else None
         )
         stats_from_ts = report_day_start_utc()
         bid_stats = (
@@ -274,7 +281,7 @@ class AutoShelfBidControlViewProvider:
         )
         target_main_observation_minutes = (
             self._target_main_observation_minutes(
-                int(settings_obj.target_test_observation_minutes),
+                target_test_observation_minutes,
                 float(settings_obj.test_share),
             )
             if settings_obj and target_test_observation_minutes is not None
