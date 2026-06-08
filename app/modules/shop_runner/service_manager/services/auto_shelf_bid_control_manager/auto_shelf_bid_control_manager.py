@@ -852,6 +852,31 @@ class AutoShelfBidControlManager:
             )
             return None
 
+        target_main_bid = await self._choose_main_bid_by_strategy(
+            complex_adv=complex_adv,
+            current_cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=state.previous_cycle_started_at,
+            current_main_bid_minor=state.current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid,
+        )
+        if target_main_bid is None:
+            state.last_reason = ControlReason.BEST_BID_NOT_FOUND
+            await self._repository.save_state(state)
+            logger.warning(
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
+                auto_adv_id,
+                nmid,
+                state.last_reason,
+                complex_adv.auto_shelf_bid_control_strategy,
+            )
+            return None
+        if int(main_bid) != target_main_bid:
+            main_bid = target_main_bid
+            state.current_main_bid_minor = main_bid
+            state.main_started_at = now
+
         cycle_from_ts: datetime = state.current_cycle_started_at
         covered_stats = await self._analytics.get_bid_stats(
             nmid=nmid,
