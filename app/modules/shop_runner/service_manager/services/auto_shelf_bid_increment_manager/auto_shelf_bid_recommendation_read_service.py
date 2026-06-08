@@ -115,6 +115,17 @@ def _hour_reason_counts(
     return dict(counts)
 
 
+def _validate_ctr_by_bid(
+    observations: Sequence[BidHourObservation],
+    ctr_by_bid: dict[int, float],
+) -> None:
+    """Ensure every observed bid has CTR data before ranking."""
+    observed_bids = {observation.bid for observation in observations}
+    missing_bids = sorted(observed_bids - ctr_by_bid.keys())
+    if missing_bids:
+        raise ValueError(f"Missing CTR for bids: {missing_bids}")
+
+
 class AutoShelfBidRecommendationReadService:
     """Читает bucket rows и строит ranked result без записи в БД."""
 
@@ -174,6 +185,7 @@ class AutoShelfBidRecommendationReadService:
             date_to=date_to,
         )
         observations = build_hour_observations_from_buckets(buckets)
+        _validate_ctr_by_bid(observations, ctr_by_bid)
         return rank_rec_system_bids(
             observations=observations,
             plan_context=plan_context,
@@ -203,13 +215,7 @@ class AutoShelfBidRecommendationReadService:
             date_from=date_from,
             date_to=date_to,
         )
-        missing_ctr_bids = {
-            observation.bid for observation in observations if observation.bid not in ctr_by_bid
-        }
-        if missing_ctr_bids:
-            raise ValueError(
-                f"Missing CTR for bids: {sorted(missing_ctr_bids)}"
-            )
+        _validate_ctr_by_bid(observations, ctr_by_bid)
         diagnostics = {
             "bucket_count": len(buckets),
             "hour_observation_count": len(observations),
