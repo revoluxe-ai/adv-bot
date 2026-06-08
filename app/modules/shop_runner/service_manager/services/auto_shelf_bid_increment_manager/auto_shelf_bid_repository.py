@@ -242,6 +242,7 @@ class AutoShelfBidRepository:
         query = self._load_sql("fetch_auto_shelf_bid_bucket_rows.sql")
         params = {
             "nmid": nmid,
+            "mode": mode,
             "date_from": date_from,
             "date_to": date_to,
         }
@@ -269,6 +270,7 @@ class AutoShelfBidRepository:
         query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql")
         params = {
             "nmid": nmid,
+            "mode": mode,
             "date_from": date_from,
             "date_to": date_to,
         }
