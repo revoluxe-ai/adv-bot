@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
@@ -14,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_repository import (
     AutoShelfBidRepository,
 )
+from app.utils.click_house.client import get_clickhouse_client
 
 
 def _parse_dt(name: str) -> datetime:
@@ -23,9 +25,42 @@ def _parse_dt(name: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def _debug_integration_enabled() -> bool:
+    """Проверить явный opt-in флаг для живого ClickHouse debug-прогона."""
+    return os.environ.get("REC_BID_DEBUG_INTEGRATION_ENABLED", "").lower() == "true"
+
+
+async def _ensure_debug_table_exists() -> None:
+    """Убедиться, что debug-таблица доступна в тестовом ClickHouse.
+
+    Тест не создаёт schema сам и остаётся read-only: если таблицы нет,
+    debug-прогон пропускается вместо падения на UNKNOWN_TABLE.
+    """
+    try:
+        async with get_clickhouse_client() as client:
+            result = await client.query(
+                """
+                SELECT count()
+                FROM system.tables
+                WHERE database = 'default_db'
+                  AND name = 'auto_shelf_bid_intervals'
+                """
+            )
+    except DatabaseError as exc:
+        pytest.skip(f"ClickHouse debug integration is unavailable: {exc}")
+
+    row_count = int(result.result_rows[0][0]) if result.result_rows else 0
+    if row_count == 0:
+        pytest.skip("auto_shelf_bid_intervals table is not available")
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_debug_fetch_and_rank_rec_system_bids_for_nmid() -> None:
+    """Run the debug ranking flow only when explicitly enabled."""
+    if not _debug_integration_enabled():
+        pytest.skip("REC_BID_DEBUG_INTEGRATION_ENABLED is not set to true")
+
     nmid_value = os.environ.get("REC_BID_DEBUG_NMID")
     if not nmid_value:
         pytest.skip("REC_BID_DEBUG_NMID is not set")
@@ -37,6 +72,8 @@ async def test_debug_fetch_and_rank_rec_system_bids_for_nmid() -> None:
 
     repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
     service = AutoShelfBidRecommendationReadService(repository)
+
+    await _ensure_debug_table_exists()
 
     diagnostics = await service.fetch_bid_hour_observation_diagnostics(
         nmid=nmid,

@@ -639,7 +639,7 @@ class AutoShelfBidControlManager:
             main_bid = target_main_bid
             state.current_main_bid_minor = main_bid
             state.main_started_at = now
-        main_started_at = state.main_started_at or state.current_cycle_started_at
+        main_started_at = state.main_started_at
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
             self._target_observation_minutes_or_default(
