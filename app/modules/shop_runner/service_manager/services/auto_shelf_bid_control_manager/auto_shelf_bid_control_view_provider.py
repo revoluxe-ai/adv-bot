@@ -38,6 +38,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
 )
 from app.settings import settings
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 
 logger = logging.getLogger(__name__)
 
@@ -205,21 +206,17 @@ class AutoShelfBidControlViewProvider:
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
         fact_predict_orders: float | None = None
-        resolve_cpo: float | None = None
         plan_fact_reader = PlanFactReader()
         plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
         if plan_fact_summary is not None:
             fact_predict_orders = plan_fact_summary.fact_predict_orders
             fact_cpo = plan_fact_summary.fact_pay_for_order
-        # resolve_cpo ????????? ?? ???????? ????????
-        resolve_cpo = build_rec_bid_plan_context(
-            sales_plan=float(adv.plan_for_sales_for_day or 0.0),
-            current_fact_sales=float(fact_predict_orders or 0.0),
-            current_sales_forecast=float(fact_predict_orders or 0.0),
-            target_price_for_order=adv.target_price_for_order,
-            max_price_for_order=adv.max_price_for_order,
-            click_to_order_cr_7d=0.0,
-        ).target_order_cost
+        resolve_cpo = resolve_target_cost(
+            adv.plan_for_sales_for_day,
+            adv.target_price_for_order,
+            adv.max_price_for_order,
+            fact_predict_orders,
+        )
         optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
 
         state = await self._repository.get_state(nmid) if nmid else None
