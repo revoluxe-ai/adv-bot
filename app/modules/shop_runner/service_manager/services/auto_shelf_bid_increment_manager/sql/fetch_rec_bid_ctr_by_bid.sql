@@ -10,7 +10,7 @@
 --
 -- Параметры:
 --   %(nmid)s      - артикул
---   %(mode)s      - режим текущего control-state; пустая строка = без фильтра
+--   %(mode)s      - режим текущего control-state
 --   %(date_from)s - нижняя граница bucket_start (inclusive)
 --   %(date_to)s   - верхняя граница bucket_start (exclusive)
 --
@@ -24,7 +24,7 @@ SELECT
     sum(delta_clicks) AS clicks
 FROM default_db.auto_shelf_bid_intervals
 WHERE nmid = %(nmid)s
-  AND (%(mode)s = '' OR mode = %(mode)s)
+  AND mode = %(mode)s
   AND bucket_start >= %(date_from)s
   AND bucket_start < %(date_to)s
   AND delta_impressions IS NOT NULL
