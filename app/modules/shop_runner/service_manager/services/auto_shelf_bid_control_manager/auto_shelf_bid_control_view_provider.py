@@ -243,7 +243,9 @@ class AutoShelfBidControlViewProvider:
         currency = settings_obj.currency if settings_obj is not None else "RUB"
         target_test = int(settings_obj.target_test_impressions) if settings_obj else None
         target_test_observation_minutes = (
-            self._nullable_int(settings_obj.target_test_observation_minutes)
+            AutoShelfBidControlManager._target_observation_minutes_or_default(
+                settings_obj.target_test_observation_minutes
+            )
             if settings_obj
             else None
         )
@@ -441,7 +443,7 @@ class AutoShelfBidControlViewProvider:
                     date_to=rec_date_to,
                 )
                 if not ctr_by_bid:
-                    logger.warning(
+                    logger.debug(
                         "rec_bid_recommendation_missing_ctr nmid=%s adv_setting_original_id=%s",
                         nmid,
                         adv_setting_original_id,
@@ -482,12 +484,12 @@ class AutoShelfBidControlViewProvider:
                     exc_info=True,
                 )
         else:
-            logger.warning(
+            logger.debug(
                 "rec_bid_recommendation_missing_nmid adv_setting_original_id=%s",
                 adv_setting_original_id,
             )
         if rec_bid_recommendation is None:
-            logger.warning(
+            logger.debug(
                 "rec_bid_recommendation_none nmid=%s adv_setting_original_id=%s",
                 nmid,
                 adv_setting_original_id,
@@ -497,7 +499,7 @@ class AutoShelfBidControlViewProvider:
                 dict[str, object],
                 rec_bid_recommendation.get("diagnostics", {}),
             )
-            logger.warning(
+            logger.debug(
                 "rec_bid_recommendation_not_none nmid=%s adv_setting_original_id=%s diagnostics=%s",
                 nmid,
                 adv_setting_original_id,
