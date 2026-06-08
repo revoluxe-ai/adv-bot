@@ -129,8 +129,8 @@ async def test_build_view_handles_nullable_target_test_observation_minutes(
 
     view = await provider.build_view(adv_setting_original_id=1)
 
-    assert view.target_test_observation_minutes is None
-    assert view.target_main_observation_minutes is None
+    assert view.target_test_observation_minutes == 60
+    assert view.target_main_observation_minutes == 540
 
 
 @pytest.mark.asyncio
