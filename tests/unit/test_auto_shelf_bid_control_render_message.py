@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 import pytest
 
@@ -41,15 +41,19 @@ def _view_with_bid_point(
         next_test_bid_minor=31_000,
         currency="RUB",
         current_mode="test",
-        current_cycle_started_at=datetime.now(timezone.utc),
-        test_started_at=datetime.now(timezone.utc),
+        current_cycle_started_at=datetime.now(UTC),
+        test_started_at=datetime.now(UTC),
         main_started_at=None,
         test_share=0.1,
         target_test_impressions=500,
+        target_test_observation_minutes=60,
         target_main_impressions=4500,
+        target_main_observation_minutes=540,
         min_bid_distance_minor=100,
         test_impressions=10,
         main_impressions=0,
+        test_elapsed_minutes=60,
+        main_elapsed_minutes=0,
         covered_points_count=0,
         bid_points_total=1,
         cycle_covered_points_count=0,
@@ -58,7 +62,7 @@ def _view_with_bid_point(
             BidPointStatsDTO(
                 bid_minor=20_000,
                 currency="RUB",
-                last_interval_at=datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc),
+                last_interval_at=datetime(2026, 5, 25, 12, 0, 0, tzinfo=UTC),
                 impressions=100,
                 clicks=5,
                 carts=2,
@@ -83,7 +87,7 @@ def _view_with_bid_point(
 
 
 def test_format_cycle_timestamp_without_microseconds() -> None:
-    ts = datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc)
+    ts = datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC)
     assert _format_cycle_timestamp(ts) == "2026-05-25 13:21:36 МСК"
     assert ".799753" not in _format_cycle_timestamp(ts)
 
@@ -98,11 +102,11 @@ def test_render_cycle_timestamps_without_fractional_seconds() -> None:
     view = replace(
         _view_with_bid_point(),
         current_cycle_started_at=datetime(
-            2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc
+            2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC
         ),
-        test_started_at=datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc),
+        test_started_at=datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC),
         main_started_at=datetime(
-            2026, 5, 25, 12, 11, 12, 448857, tzinfo=timezone.utc
+            2026, 5, 25, 12, 11, 12, 448857, tzinfo=UTC
         ),
     )
     text = render_auto_shelf_bid_control_message(view)

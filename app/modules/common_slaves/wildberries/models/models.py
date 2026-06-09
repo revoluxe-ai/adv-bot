@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import datetime
 import json
 import logging
@@ -35,6 +35,7 @@ from app.modules.common_slaves.wildberries.models.enums import (
     TargetPositionMode,
 )
 from .bidder_mode import BidderMode
+from .enums.auto_shelf_bid_control_strategy import AutoShelfBidControlStrategy
 from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
@@ -608,7 +609,31 @@ class AdvSetting(BaseTable):
         server_default="false",
         comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
     )
-    # TODO: Завернуть server_default в text
+
+    # Intentional default:
+    # auto_shelf_bid_control_strategy defaults to plan_distance intentionally.
+    # At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns.
+    # Legacy bidder paths do not read this field.
+    auto_shelf_bid_control_strategy: Mapped[AutoShelfBidControlStrategy | None] = mapped_column(
+        SAEnum(
+            AutoShelfBidControlStrategy,
+            name="auto_shelf_bid_control_strategy",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=True,
+        default=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        server_default="plan_distance",
+        comment=(
+            "Стратегия выбора main bid для auto_shelf_bid_control: "
+            "cycle_metric | plan_distance. "
+            "auto_shelf_bid_control_strategy defaults to plan_distance intentionally. "
+            "At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns. "
+            "Legacy bidder paths do not read this field."
+        ),
+    )
+
+    # TODO: Р—Р°РІРµСЂРЅСѓС‚СЊ server_default РІ text
     hide_zero_views_keywords: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )

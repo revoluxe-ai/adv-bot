@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -52,10 +52,14 @@ def _view(min_bid: int | None = None) -> AutoShelfBidControlViewDTO:
         main_started_at=None,
         test_share=0.1,
         target_test_impressions=500,
+        target_test_observation_minutes=60,
         target_main_impressions=4500,
+        target_main_observation_minutes=540,
         min_bid_distance_minor=10,
         test_impressions=0,
         main_impressions=0,
+        test_elapsed_minutes=0,
+        main_elapsed_minutes=0,
         covered_points_count=0,
         bid_points_total=0,
         bid_points=[],
@@ -235,6 +239,16 @@ async def test_update_target_test_impressions_invalid_text() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_target_test_observation_minutes_rejects_less_than_hour() -> None:
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_adv([111]))
+    service = _service(repository, MagicMock())
+
+    with pytest.raises(AutoShelfBidControlTelegramError):
+        await service.update_target_test_observation_minutes(1, "30")
+
+
+@pytest.mark.asyncio
 async def test_update_min_bid_distance_invalid_value() -> None:
     repository = MagicMock()
     repository.get_adv_setting_by_original_id = AsyncMock(return_value=_adv([111]))
@@ -253,11 +267,11 @@ async def test_reset_cycle_sets_state_to_test_and_middle_bid() -> None:
     repository.get_state = AsyncMock(return_value=None)
     repository.build_state = AsyncMock(
         return_value=SimpleNamespace(
-            current_cycle_started_at=datetime.now(timezone.utc),
+            current_cycle_started_at=datetime.now(UTC),
             previous_cycle_started_at=None,
             current_mode="test",
             current_test_bid_minor=300,
-            test_started_at=datetime.now(timezone.utc),
+            test_started_at=datetime.now(UTC),
             main_started_at=None,
             last_reason="manual_cycle_reset",
             currency="RUB",

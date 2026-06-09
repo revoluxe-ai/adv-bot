@@ -40,7 +40,7 @@ from tests.unit.test_auto_updater_v3 import (
 def test_debug_run_resolver_chain_loosen_cap8(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Симуляция 5 тиков UP: бюджет 1→2→4→8→8 (cap)."""
+    """Симуляция 5 тиков UP: шаг 1→2→4→8→8 (cap)."""
     cap = 5
     prev: CalibrationStepState | None = None
     for tick in range(1, 6):
@@ -89,10 +89,10 @@ def test_debug_run_flip_loosen_to_tighten(
 
 
 @pytest.mark.unit
-def test_debug_run_planner_budgets_match_actions(
+def test_debug_run_planner_steps_match_actions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Planner: budget 1/2/4 → actions_count совпадает (один ключ MIN)."""
+    """Planner: шаг 1/2/4 → actions_count совпадает (один ключ MIN)."""
     _patch_ladder_costs(
         monkeypatch,
         costs={

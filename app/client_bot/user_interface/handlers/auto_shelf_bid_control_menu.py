@@ -249,6 +249,15 @@ async def auto_shelf_bid_control_menu_router(
                 await callback.message.answer(
                     "Введите количество показов на одну тестовую ставку.\nНапример: 500"
                 )
+        elif action == "set_target_test_observation_minutes":
+            await state.update_data(adv_setting_original_id=adv_setting_original_id)
+            await state.set_state(
+                states.AutoShelfBidControlFSM.waiting_for_target_test_observation_minutes
+            )
+            if callback.message:
+                await callback.message.answer(
+                    "Введите минимальное время теста в минутах.\nПример: 60\nМинимум: 60 минут."
+                )
         elif action == "set_min_bid_distance":
             await state.update_data(adv_setting_original_id=adv_setting_original_id)
             await state.set_state(
@@ -351,6 +360,23 @@ async def auto_shelf_waiting_for_target_test_impressions(
     )
 
 
+@router.message(
+    StateFilter(states.AutoShelfBidControlFSM.waiting_for_target_test_observation_minutes)
+)
+@inject
+async def auto_shelf_waiting_for_target_test_observation_minutes(
+    message: Message,
+    state: FSMContext,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    await _handle_fsm_update(
+        message=message,
+        state=state,
+        redis_client=redis_client,
+        update_method="update_target_test_observation_minutes",
+    )
+
+
 @router.message(StateFilter(states.AutoShelfBidControlFSM.waiting_for_min_bid_distance))
 @inject
 async def auto_shelf_waiting_for_min_bid_distance(
@@ -364,4 +390,3 @@ async def auto_shelf_waiting_for_min_bid_distance(
         redis_client=redis_client,
         update_method="update_min_bid_distance",
     )
-

@@ -21,6 +21,9 @@ from zoneinfo import ZoneInfo
 
 from clickhouse_connect.driver.query import QueryResult
 
+from app.domain.rec_system_bid_math.hour_observation_builder import (
+    BidBucketObservation,
+)
 from app.core.di.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -29,6 +32,7 @@ from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
 from .dto import AutoShelfBidSnapshot, AutoShelfRawStat
+from .bid_bucket_row_mapper import build_bid_bucket_observations_from_ch_rows
 from .redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
@@ -77,6 +81,11 @@ class AutoShelfBidRepository:
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
 
     @staticmethod
+    def _mode_filter_clause(mode: str | None) -> str:
+        """Собрать SQL-фильтр по mode только для конкретного режима."""
+        return "" if mode is None else "  AND mode = %(mode)s\n"
+
+    @staticmethod
     def _to_int(value: object) -> int:
         """Безопасно привести значение CH к int."""
         if isinstance(value, bool):
@@ -94,7 +103,7 @@ class AutoShelfBidRepository:
         """Безопасно привести значение CH к float."""
         if isinstance(value, bool):
             return float(int(value))
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, str):
             return float(value)
@@ -172,6 +181,86 @@ class AutoShelfBidRepository:
         row["bucket_start"] = row["src_ts"]
         return AutoShelfBidSnapshot.from_clickhouse(row)
 
+    async def fetch_rec_bid_bucket_observations_for_nmid(
+        self,
+        nmid: int,
+        mode: str | None,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[BidBucketObservation]:
+        """Read-only bucket fetch for rec_system bid ranking.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_auto_shelf_bid_bucket_rows.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        if mode is not None:
+            params["mode"] = mode
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return []
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        rows: list[dict[str, object]] = [
+            dict(zip(column_names, tuple(row))) for row in result.result_rows
+        ]
+        return build_bid_bucket_observations_from_ch_rows(rows)
+
+    async def fetch_rec_bid_ctr_by_bid_for_nmid(
+        self,
+        nmid: int,
+        mode: str | None,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> dict[int, float]:
+        """Return real CTR by bid from read-only CH aggregation.
+
+        Args:
+            mode: Аналитический mode-фильтр; None = all modes.
+        """
+        query = self._load_sql("fetch_rec_bid_ctr_by_bid.sql").replace(
+            "  -- MODE_FILTER\n",
+            self._mode_filter_clause(mode),
+        )
+        params: dict[str, object] = {
+            "nmid": nmid,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        if mode is not None:
+            params["mode"] = mode
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result: QueryResult = await client.query(query, parameters=params)
+        if not result.result_rows:
+            return {}
+        raw_column_names = cast(
+            tuple[object, ...],
+            result.column_names,  # pyright: ignore[reportUnknownMemberType]
+        )
+        column_names = [str(name) for name in raw_column_names]
+        ctr_by_bid: dict[int, float] = {}
+        for row in result.result_rows:
+            row_dict = dict(zip(column_names, tuple(row)))
+            bid = self._to_int(row_dict["bid"])
+            impressions = self._to_float(row_dict["impressions"])
+            clicks = self._to_float(row_dict["clicks"])
+            ctr_by_bid[bid] = clicks / impressions if impressions > 0 else 0.0
+        return ctr_by_bid
+
     async def fetch_current_auto_common_bid(
         self,
         complex_adv: ComplexAdv,
@@ -223,4 +312,3 @@ class AutoShelfBidRepository:
     async def get_current_mode(self, nmid: int) -> str:
         """Вернуть mode из control state при включенном флаге, иначе main."""
         return await self._control_repository.get_mode_for_nmid(nmid)
-

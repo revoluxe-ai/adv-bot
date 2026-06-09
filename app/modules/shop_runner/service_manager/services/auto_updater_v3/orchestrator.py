@@ -102,6 +102,10 @@ def _sync_tick_data_after_pipeline(
     _ = pipeline_result.all_contexts
     tick_data.ladder_inputs = pipeline_result.ladder_inputs
     tick_data.eligibility_by_ks_id = pipeline_result.eligibility
+    if tick_data.tick_input is not None:
+        tick_data.tick_input.calibration_phase_extra = dict(
+            pipeline_result.update_context.adv_state.calibration_phase_extra
+        )
     if tick_data.tick_input is not None and tick_data.tick_input.campaign_orders_per_cart_7d is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
             campaign_overspend_from_plan_fact,
@@ -272,6 +276,14 @@ async def process_adv_v3(
                     calibration_effective_steps=(
                         tick_input.max_effective_steps
                         if tick_input.calibration_direct is not None
+                        else None
+                    ),
+                    calibration_applied_steps=(
+                        _applied
+                        if isinstance(
+                            (_applied := calibration_extra.get("applied_steps")),
+                            int,
+                        )
                         else None
                     ),
                     calibration_direct=(

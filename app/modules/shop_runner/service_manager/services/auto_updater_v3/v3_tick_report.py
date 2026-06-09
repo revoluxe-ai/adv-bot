@@ -298,6 +298,7 @@ class V3TickReportSnapshot(BaseModel):
     net_force_off: int = 0
     net_on: int = 0
     calibration_effective_steps: int | None = None
+    calibration_applied_steps: int | None = None
     calibration_direct: str | None = None
     calibration_prev_effective_steps: int | None = None
     white_list_cost_leader: WhiteListCostLeader | None = None
@@ -423,6 +424,7 @@ class V3TickReportCollector:
         max_pay_for_order: float | None = None,
         tick_at: datetime | None = None,
         calibration_effective_steps: int | None = None,
+        calibration_applied_steps: int | None = None,
         calibration_direct: str | None = None,
         calibration_prev_effective_steps: int | None = None,
         white_list_cost_leader: WhiteListCostLeader | None = None,
@@ -453,6 +455,7 @@ class V3TickReportCollector:
             net_down=applied_bd.down,
             net_force_off=applied_bd.force_off,
             calibration_effective_steps=calibration_effective_steps,
+            calibration_applied_steps=calibration_applied_steps,
             calibration_direct=calibration_direct,
             calibration_prev_effective_steps=calibration_prev_effective_steps,
             white_list_cost_leader=white_list_cost_leader,

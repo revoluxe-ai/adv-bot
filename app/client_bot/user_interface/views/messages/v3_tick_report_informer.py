@@ -27,16 +27,19 @@ def _calibration_branch_ru(direct: str | None) -> str | None:
     return _CALIBRATION_BRANCH_RU.get(str(direct).lower(), str(direct).upper())
 
 
-def _format_calibration_budget(
-    effective: int | None,
+def _format_calibration_step(
+    applied: int | None,
     prev: int | None,
 ) -> str | None:
-    """Строка adaptive-бюджета калибровки (×2/÷2), если значения есть в снимке."""
-    if effective is None:
-        return None
+    """Строка adaptive-шагов калибровки для UI.
+
+    ``applied`` — реально применённый шаг за тик; ``prev`` — предыдущий шаг из Redis.
+    """
+    if applied is None:
+        return "нет"
     if prev is not None:
-        return f"бюджет {effective} (было {prev})"
-    return f"бюджет {effective}"
+        return f"шаг {applied} (было {prev})"
+    return f"шаг {applied}"
 
 
 _SKIP_REASON_RU: dict[str, str] = {
@@ -70,13 +73,13 @@ def _format_phase_line(phase: V3PhaseStats) -> list[str]:
         branch = _calibration_branch_ru(phase.extra.get("calibration_direct"))
         if branch:
             title = f"{title} · {branch}"
-        eff_raw = phase.extra.get("effective_steps")
+        eff_raw = phase.extra.get("applied_steps")
         eff = int(eff_raw) if eff_raw is not None else None
         prev_raw = phase.extra.get("prev_effective_steps")
         prev = int(prev_raw) if prev_raw is not None else None
-        budget = _format_calibration_budget(eff, prev)
-        if budget:
-            title = f"{title} · {budget}"
+        step_text = _format_calibration_step(eff, prev)
+        if step_text:
+            title = f"{title} · {step_text}"
     lines = [f"▸ {title}"]
     if phase.phase_id == "filter":
         total = phase.extra.get("total", 0)
@@ -144,12 +147,12 @@ def format_v3_tick_report_text(snapshot: V3TickReportSnapshot | None) -> str:
     cal_branch = _calibration_branch_ru(snapshot.calibration_direct)
     if cal_branch:
         cal_line = f"Калибровка: {cal_branch}"
-        budget = _format_calibration_budget(
-            snapshot.calibration_effective_steps,
+        step_text = _format_calibration_step(
+            snapshot.calibration_applied_steps,
             snapshot.calibration_prev_effective_steps,
         )
-        if budget:
-            cal_line += f" · {budget}"
+        if step_text:
+            cal_line += f" · {step_text}"
         lines.append(cal_line)
     leader = snapshot.white_list_cost_leader
     if leader is not None:

@@ -57,6 +57,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
                 extra={
                     "calibration_direct": "tighten",
                     "effective_steps": 2,
+                    "applied_steps": 2,
                     "prev_effective_steps": 1,
                 },
             ),
@@ -76,7 +77,7 @@ def test_format_normal_snapshot_contains_sections() -> None:
     assert "+7" in text
     assert "пропуск" in text
     assert "DOWN" in text
-    assert "бюджет 2 (было 1)" in text
+    assert "шаг 2 (было 1)" in text
     assert "Авто: 40" in text
     assert "Возможные:" not in text
     assert "on:0  ↓3  off:0" in text
@@ -143,6 +144,45 @@ def test_format_zero_calibration_shows_outcome_note_not_counters() -> None:
 
 
 @pytest.mark.unit
+def test_format_skipped_calibration_shows_none_as_no() -> None:
+    """Если applied step отсутствует, UI должен показать «нет», а не техничное None."""
+    snap = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+        adv_id=1,
+        adv_name="Крем",
+        campaign_mode="NORMAL",
+        calibration_direct="tighten",
+        calibration_prev_effective_steps=2,
+    )
+    text = format_v3_tick_report_text(snap)
+    assert "Калибровка: DOWN · нет" in text
+    assert "шаг None" not in text
+
+
+@pytest.mark.unit
+def test_format_phase_skipped_calibration_does_not_fallback_to_zero() -> None:
+    """Стадия calibration без applied_steps не должна печатать «шаг 0»."""
+    phase = V3PhaseStats(
+        phase_id="resolve_calibration",
+        title_ru="10 · calibration",
+        executed=True,
+        outcome_note="нет ключей для UP",
+        extra={"calibration_direct": "tighten", "effective_steps": 0},
+    )
+    text = format_v3_tick_report_text(
+        V3TickReportSnapshot(
+            tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
+            adv_id=1,
+            adv_name="Крем",
+            campaign_mode="NORMAL",
+            phases=[phase],
+        )
+    )
+    assert "шаг 0" not in text
+    assert "Калибровка:" not in text
+
+
+@pytest.mark.unit
 def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     snap = V3TickReportSnapshot(
         tick_at=datetime(2026, 6, 3, 14, 32, 5, tzinfo=UTC),
@@ -150,6 +190,7 @@ def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
         adv_name="Крем",
         campaign_mode="NORMAL",
         calibration_effective_steps=4,
+        calibration_applied_steps=4,
         calibration_direct="up",
         calibration_prev_effective_steps=2,
         white_list_cost_leader=WhiteListCostLeader(
@@ -165,7 +206,7 @@ def test_format_shows_calibration_adaptive_and_white_list_leader() -> None:
     )
     text = format_v3_tick_report_text(snap)
     assert "Калибровка: UP" in text
-    assert "бюджет 4 (было 2)" in text
+    assert "шаг 4 (было 2)" in text
     assert "adaptive" not in text.lower()
     assert "БС max (PFO" in text
     assert "420" in text
