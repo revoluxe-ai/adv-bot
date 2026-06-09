@@ -34,11 +34,6 @@ class AutoShelfBidControlAnalyticsRepository:
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
 
     @staticmethod
-    def _mode_filter_clause(mode: str | None) -> str:
-        """Собрать SQL-фильтр по mode только для конкретного режима."""
-        return "" if mode is None else "  AND mode = %(mode)s\n"
-
-    @staticmethod
     def _result_column_names(result: QueryResult) -> list[str]:
         """Нормализовать имена колонок CH в явный список строк."""
         raw_column_names = cast(tuple[Any, ...], getattr(result, "column_names"))
