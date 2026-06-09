@@ -787,7 +787,6 @@ class AutoShelfBidControlManager:
                 state.current_mode = "main"
                 state.current_main_bid_minor = target_main_bid
                 state.main_started_at = now
-                state.current_cycle_started_at = now
                 state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
                 await self._persist_state_then_set_bid(
                     complex_adv,
@@ -955,7 +954,6 @@ class AutoShelfBidControlManager:
         if int(target_main_bid) == int(main_bid):
             state.current_mode = "main"
             state.main_started_at = now
-            state.current_cycle_started_at = now
             state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
             await self._repository.save_state(state)
             logger.info(
@@ -969,7 +967,6 @@ class AutoShelfBidControlManager:
         state.current_mode = "main"
         state.current_main_bid_minor = target_main_bid
         state.main_started_at = now
-        state.current_cycle_started_at = now
         state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
         await self._persist_state_then_set_bid(
             complex_adv,
