@@ -322,6 +322,81 @@ async def test_build_view_repairs_corrupted_cycle_before_fetching_cycle_stats(
 
 
 @pytest.mark.asyncio
+async def test_build_view_repaired_cycle_state_is_not_saved_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = None
+    adv.target_price_for_order = None
+    adv.max_price_for_order = None
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.target_test_observation_minutes = 60
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    repaired_state = MagicMock(
+        current_cycle_started_at=datetime(2026, 6, 9, 6, 26, 23, tzinfo=UTC),
+        previous_cycle_started_at=datetime(2026, 5, 26, 3, 29, 0, tzinfo=UTC),
+        test_started_at=datetime(2026, 6, 8, 15, 56, 56, tzinfo=UTC),
+        current_test_bid_minor=45_000,
+        current_main_bid_minor=24_000,
+        current_mode="main",
+        main_started_at=datetime(2026, 6, 9, 6, 26, 23, tzinfo=UTC),
+        last_reason=None,
+    )
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=repaired_state)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+    repository.save_state = AsyncMock(side_effect=lambda saved_state: saved_state)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
+        return_value=0.05
+    )
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={"view": {"best_expected_bid": 111}}
+    )  # type: ignore[attr-defined]
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    await provider.build_view(adv_setting_original_id=1)
+    await provider.build_view(adv_setting_original_id=1)
+
+    assert repository.save_state.await_count == 1
+    assert repaired_state.current_cycle_started_at == datetime(
+        2026, 5, 26, 3, 29, 0, tzinfo=UTC
+    )
+    assert_cycle_state_valid(repaired_state)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("optimization_metric", "expected_method", "unexpected_method"),
     [

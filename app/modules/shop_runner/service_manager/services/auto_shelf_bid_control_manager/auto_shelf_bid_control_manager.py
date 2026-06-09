@@ -159,22 +159,19 @@ class AutoShelfBidControlManager:
     @staticmethod
     def repair_cycle_started_at(state: AutoShelfBidControlState) -> bool:
         """Откатить corrupted cycle start назад, не трогая историю test/main."""
-        if not isinstance(state.test_started_at, datetime):
+        test_started_at = getattr(state, "test_started_at", None)
+        current_cycle_started_at = getattr(state, "current_cycle_started_at", None)
+        previous_cycle_started_at = getattr(state, "previous_cycle_started_at", None)
+        if not isinstance(test_started_at, datetime):
             return False
-        if not isinstance(state.current_cycle_started_at, datetime):
+        if not isinstance(current_cycle_started_at, datetime):
             return False
-        if (
-            state.test_started_at >= state.current_cycle_started_at
-        ):
+        if test_started_at >= current_cycle_started_at:
             return False
-        if (
-            isinstance(state.previous_cycle_started_at, datetime)
-            and state.previous_cycle_started_at is not None
-            and state.previous_cycle_started_at <= state.test_started_at
-        ):
-            state.current_cycle_started_at = state.previous_cycle_started_at
+        if isinstance(previous_cycle_started_at, datetime) and previous_cycle_started_at <= test_started_at:
+            state.current_cycle_started_at = previous_cycle_started_at
         else:
-            state.current_cycle_started_at = state.test_started_at
+            state.current_cycle_started_at = test_started_at
         state.last_reason = "repair_cycle_started_after_test_started"
         return True
 
