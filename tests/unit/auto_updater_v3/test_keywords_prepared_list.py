@@ -23,6 +23,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
     assemble_update_context,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.ledger_sync import (
+    sync_update_context_to_ledger,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger import (
+    V3TickKeywordLedger,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
@@ -142,7 +148,7 @@ def test_update_context_from_prepared_preserves_next_state() -> None:
 
 @pytest.mark.unit
 def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None:
-    ctx = _ctx(3, no_data=True, profile=None)
+    ctx = _ctx(3, mode=KeywordStrategyMode.OFF, no_data=True, profile=None)
     adv_state = replace(AdvState.empty(), fact_pay_for_order=222.0)
 
     assembled = assemble_update_context([ctx], adv_state=adv_state)
@@ -159,17 +165,14 @@ def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None
         assert state.target_position == 0
         assert state.cpo == 222.0
         assert not state.is_gap
-        assert dto.stored_mode == KeywordStrategyMode.MIN_CPA
-        assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+        assert dto.stored_mode == KeywordStrategyMode.OFF
+        assert dto.current_mode == KeywordStrategyMode.OFF
         assert dto.is_no_data_singleton()
 
         current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
             update_ctx.keywords
         )
-        assert len(current) == 1
-        assert current[0][1].synthetic_no_data
-        assert current[0][1].stage == V3LadderStageKind.MIN_CPA
-        assert current[0][2] == 222.0
+        assert current == []
         assert potential == []
 
         down = pick_effective_down_ladder_state(dto)
@@ -177,6 +180,14 @@ def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None
         assert down.stage == V3LadderStageKind.OFF
         assert down.strategy_mode == KeywordStrategyMode.OFF
         assert down.synthetic_no_data is True
+
+    ledger = V3TickKeywordLedger.from_keywords([assembled.keywords[0].calculated_keyword])
+    assert ledger.baseline_mode_for(assembled.keywords[0].keyword_setting_id) == KeywordStrategyMode.OFF
+    assert sync_update_context_to_ledger(assembled, ledger) == []
+
+    ledger = V3TickKeywordLedger.from_keywords([prepared_ctx.keywords[0].calculated_keyword])
+    assert ledger.baseline_mode_for(prepared_ctx.keywords[0].keyword_setting_id) == KeywordStrategyMode.OFF
+    assert sync_update_context_to_ledger(prepared_ctx, ledger) == []
 
     gap_ctx = update_context_from_prepared(build_keywords_prepared_list([ctx]))
     gap_dto = gap_ctx.keywords[0]

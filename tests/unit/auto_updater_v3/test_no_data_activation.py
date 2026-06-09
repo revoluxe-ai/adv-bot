@@ -246,7 +246,8 @@ def test_no_data_singleton_state_without_matrix_uses_fact_pay_for_order() -> Non
     assert state.cpo == 123.0
     assert state.stage == V3LadderStageKind.MIN_CPA
     assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
-    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.stored_mode == KeywordStrategyMode.OFF
+    assert dto.current_mode == KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit
@@ -274,16 +275,14 @@ def test_no_data_singleton_prefers_fact_pay_for_order_over_keyword_pay_for_order
     assert state.target_position == 0
     assert state.synthetic_no_data is True
     assert not state.is_gap
-    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.stored_mode == KeywordStrategyMode.OFF
+    assert dto.current_mode == KeywordStrategyMode.OFF
     assert dto.is_no_data_singleton()
 
     current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
         update_ctx.keywords
     )
-    assert len(current) == 1
-    assert current[0][1].synthetic_no_data
-    assert current[0][1].stage == V3LadderStageKind.MIN_CPA
-    assert current[0][2] == 222.0
+    assert current == []
     assert potential == []
 
     down = pick_effective_down_ladder_state(dto)
@@ -304,10 +303,7 @@ def test_no_data_singleton_enters_current_pool_and_not_potential_pool() -> None:
         update_ctx.keywords
     )
 
-    assert len(current) == 1
-    assert current[0][1].synthetic_no_data
-    assert current[0][1].stage == V3LadderStageKind.MIN_CPA
-    assert current[0][2] == 321.0
+    assert current == []
     assert potential == []
 
 

@@ -183,16 +183,10 @@ class KeywordDTO:
     @classmethod
     def from_prepared_row(cls, row: KeywordPreparedRow) -> KeywordDTO:
         """Обратная совместимость со старыми ``KeywordPreparedRow``."""
-        stored_mode = row.stored_mode
-        if (
-            len(row.states) == 1
-            and row.states[0].synthetic_no_data
-        ):
-            stored_mode = KeywordStrategyMode.MIN_CPA
         dto = cls(
             calculated_keyword=row.keyword,
             position_profile=row.position_profile,
-            stored_mode=stored_mode,
+            stored_mode=row.stored_mode,
             target_place_matrix=TargetPlaceMatrix(row.states),
         )
         if row.active_mode != row.stored_mode:
@@ -211,8 +205,6 @@ class KeywordDTO:
     ) -> KeywordDTO:
         """Сборка из ``KeywordV3Context`` + ladder states."""
         stored_mode = stored_strategy_mode(ctx.keyword)
-        if len(ladder_states) == 1 and ladder_states[0].synthetic_no_data:
-            stored_mode = KeywordStrategyMode.MIN_CPA
         return cls(
             calculated_keyword=ctx.keyword,
             position_profile=ctx.position_profile,

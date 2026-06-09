@@ -324,11 +324,6 @@ def _apply_no_data_singletons(prepared: KeywordsPreparedList, state: AdvState) -
             synthetic_no_data=True,
         )
         dto.target_place_matrix = TargetPlaceMatrix((singleton,))
-        dto.stored_mode = KeywordStrategyMode.MIN_CPA
-        dto.current_target_place = NextTargetPlace(
-            new_target_place=0,
-            executor_name="no_data_singleton_post_process",
-        )
 
 
 def update_context_from_prepared(
