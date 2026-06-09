@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from dataclasses import replace
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import pytest
 
@@ -33,6 +33,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+    pick_effective_down_ladder_state,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.action_merge import (
     merge_and_dedup_actions,
@@ -244,6 +247,51 @@ def test_no_data_singleton_state_without_matrix_uses_fact_pay_for_order() -> Non
     assert state.stage == V3LadderStageKind.MIN_CPA
     assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_no_data_singleton_prefers_fact_pay_for_order_over_keyword_pay_for_order() -> None:
+    kw = _kw(ks_id=10, text="nd_fact_priority", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    adv_state = replace(AdvState.empty(), fact_pay_for_order=222.0)
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder.is_keyword_no_data",
+            return_value=True,
+        ),
+        patch.object(CalculatedKeyword, "pay_for_order", new_callable=PropertyMock, return_value=111.0),
+    ):
+        update_ctx = build_update_context([ctx], adv_state=adv_state)
+
+    dto = update_ctx.prepared.keywords[0]
+    assert len(dto.ladder_states) == 1
+    state = dto.ladder_states[0]
+    assert state.cpo == 222.0
+    assert state.cpo != 111.0
+    assert state.stage == V3LadderStageKind.MIN_CPA
+    assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert state.target_position == 0
+    assert state.synthetic_no_data is True
+    assert not state.is_gap
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.is_no_data_singleton()
+
+    current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
+        update_ctx.keywords
+    )
+    assert len(current) == 1
+    assert current[0][1].synthetic_no_data
+    assert current[0][1].stage == V3LadderStageKind.MIN_CPA
+    assert current[0][2] == 222.0
+    assert potential == []
+
+    down = pick_effective_down_ladder_state(dto)
+    assert down is not None
+    assert down.stage == V3LadderStageKind.OFF
+    assert down.strategy_mode == KeywordStrategyMode.OFF
+    assert down.target_position == 0
+    assert down.synthetic_no_data is True
 
 
 @pytest.mark.unit

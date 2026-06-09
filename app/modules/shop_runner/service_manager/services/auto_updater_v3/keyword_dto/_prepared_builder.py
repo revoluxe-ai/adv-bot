@@ -98,20 +98,6 @@ def build_ladder_states_for_context(
     ks_id = int(ctx.keyword.keyword_setting_original_id or 0)
     states: list[KeywordV3LadderState] = []
 
-    if _is_gap_context(ctx) and ctx.keyword.pay_for_order is not None:
-        states.append(
-            KeywordV3LadderState(
-                keyword_setting_id=ks_id,
-                stage=V3LadderStageKind.MIN_CPA,
-                strategy_mode=KeywordStrategyMode.MIN_CPA,
-                target_position=0,
-                cpo=float(ctx.keyword.pay_for_order),
-                is_valid=True,
-                synthetic_no_data=True,
-            )
-        )
-        return tuple(states)
-
     states.append(
         KeywordV3LadderState(
             keyword_setting_id=ks_id,
