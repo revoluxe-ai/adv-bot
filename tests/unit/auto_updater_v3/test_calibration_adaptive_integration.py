@@ -1,6 +1,6 @@
 """Интеграция: ``resolve_effective_calibration_steps`` → calibration runner (UP/DOWN).
 
-Проверяет, что бюджет adaptive steps из Redis-логики реально доходит до planner
+Проверяет, что adaptive step из Redis-логики реально доходит до planner
 и меняет глубину перехода на лестнице (не только kwargs в orchestrator-mock).
 """
 
@@ -129,8 +129,8 @@ def _patch_ladder_costs(
 
 
 @pytest.mark.unit
-def test_resolver_second_up_tick_budget_is_two() -> None:
-    """Второй тик ветки UP: Redis prev (1, UP) → бюджет 2."""
+def test_resolver_second_up_tick_step_is_two() -> None:
+    """Второй тик ветки UP: Redis prev (1, UP) → шаг 2."""
     prev = CalibrationStepState(
         effective_steps=1,
         direct=CalibrationDirect.LOOSEN,
@@ -144,8 +144,8 @@ def test_resolver_second_up_tick_budget_is_two() -> None:
 
 
 @pytest.mark.unit
-def test_resolver_flip_down_to_up_halves_budget() -> None:
-    """Разворот DOWN→UP: prev 8 → бюджет 4."""
+def test_resolver_flip_down_to_up_halves_step() -> None:
+    """Разворот DOWN→UP: prev 8 → шаг 4."""
     prev = CalibrationStepState(
         effective_steps=8,
         direct=CalibrationDirect.TIGHTEN,
@@ -159,10 +159,10 @@ def test_resolver_flip_down_to_up_halves_budget() -> None:
 
 
 @pytest.mark.unit
-def test_planner_up_uses_resolver_budget_second_tick(
+def test_planner_up_uses_resolver_step_second_tick(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Resolver budget=2 → два итеративных UP на одном ключе (MIN→OPT, OPT→MAX)."""
+    """Resolver step=2 → два итеративных UP на одном ключе (MIN→OPT, OPT→MAX)."""
     _patch_ladder_costs(
         monkeypatch,
         costs={

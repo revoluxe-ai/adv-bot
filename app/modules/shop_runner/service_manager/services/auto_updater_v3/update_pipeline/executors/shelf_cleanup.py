@@ -105,7 +105,7 @@ def run_shelf_cleanup_down(
     policy: SelectionPolicy | None,
     nsm: NextStateManager,
 ) -> int:
-    """Multi-step DOWN/OFF для rec-FAIL ключей; сумма ladder-шагов = бюджет UP."""
+    """Multi-step DOWN/OFF для rec-FAIL ключей; сумма ladder-шагов = cap UP."""
     if not shelf_rec_conversion_policy_active(click_mode):
         return 0
 

@@ -1,7 +1,6 @@
 """ClickHouse-аналитика по auto_shelf intervals для control-контура."""
 
 from __future__ import annotations
-
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +46,11 @@ class AutoShelfBidControlAnalyticsRepository:
         for name in raw_column_names:
             column_names.append(str(name))
         return column_names
+
+    @staticmethod
+    def _mode_filter_clause(mode: str | None) -> str:
+        """Собрать SQL-фильтр по mode только для конкретного режима."""
+        return "" if mode is None else "  AND mode = %(mode)s\n"
 
     @staticmethod
     def _normalize_click_to_order_cr(value: float) -> float:

@@ -178,6 +178,29 @@ class AutoShelfBidControlTelegramService:
         )
         return await self.build_view(adv_setting_original_id)
 
+    async def update_target_test_observation_minutes(
+        self,
+        adv_setting_original_id: int,
+        value: str,
+    ) -> AutoShelfBidControlViewDTO:
+        """Сохранить минимальное время теста, не меньше 60 минут."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        nmid = self._get_single_nmid_or_raise(adv)
+        parsed = self._parse_positive_int(
+            value,
+            "Минимальное время теста должно быть целым числом от 60 минут.",
+        )
+        if parsed < 60:
+            raise AutoShelfBidControlTelegramError(
+                "Минимальное время теста должно быть не меньше 60 минут."
+            )
+        await self._repository.get_or_create_default_settings(nmid=nmid)
+        await self._repository.update_settings(
+            nmid=nmid,
+            target_test_observation_minutes=parsed,
+        )
+        return await self.build_view(adv_setting_original_id)
+
     async def update_min_bid_distance(
         self,
         adv_setting_original_id: int,
