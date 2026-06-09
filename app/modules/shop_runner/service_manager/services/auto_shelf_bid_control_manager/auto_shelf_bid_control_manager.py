@@ -156,6 +156,25 @@ class AutoShelfBidControlManager:
         elapsed = int((now - started_at).total_seconds() // 60)
         return max(0, elapsed)
 
+    @staticmethod
+    def repair_cycle_started_at(state: AutoShelfBidControlState) -> bool:
+        """Откатить corrupted cycle start назад, не трогая историю test/main."""
+        test_started_at = getattr(state, "test_started_at", None)
+        current_cycle_started_at = getattr(state, "current_cycle_started_at", None)
+        previous_cycle_started_at = getattr(state, "previous_cycle_started_at", None)
+        if not isinstance(test_started_at, datetime):
+            return False
+        if not isinstance(current_cycle_started_at, datetime):
+            return False
+        if test_started_at >= current_cycle_started_at:
+            return False
+        if isinstance(previous_cycle_started_at, datetime) and previous_cycle_started_at <= test_started_at:
+            state.current_cycle_started_at = previous_cycle_started_at
+        else:
+            state.current_cycle_started_at = test_started_at
+        state.last_reason = "repair_cycle_started_after_test_started"
+        return True
+
     async def _get_actual_bid(self, auto_adv_id: int, nmid: int) -> int | None:
         cached = await self._bid_cache_manager.get_bid(auto_adv_id, nmid)
         if cached is None:
@@ -737,6 +756,9 @@ class AutoShelfBidControlManager:
                 settings_obj.test_share,
             )
             return None
+
+        if self.repair_cycle_started_at(state):
+            await self._repository.save_state(state)
 
         max_bid = int(settings_obj.max_bid_minor)
         main_bid_value = state.current_main_bid_minor

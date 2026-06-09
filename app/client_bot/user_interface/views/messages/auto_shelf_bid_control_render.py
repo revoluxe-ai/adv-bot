@@ -396,6 +396,20 @@ def _format_optimization_metric(metric: OptimizationMetric) -> str:
     return "CTR" if metric == OptimizationMetric.CTR else "CPC"
 
 
+def _format_main_waiting_reason(view: AutoShelfBidControlViewDTO) -> str:
+    """Пояснить, сколько осталось до main observation gate."""
+    elapsed = view.main_elapsed_minutes
+    target = view.target_main_observation_minutes
+    if elapsed is None or target is None:
+        return view.last_reason or "—"
+    if view.last_reason != "main_waiting_observation_time":
+        return view.last_reason or "—"
+    return (
+        f"{view.last_reason}\n"
+        f"Main observation: {elapsed} / {target} мин"
+    )
+
+
 def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> str:
     """Собрать основной экран управления ставкой в полках."""
     state_missing = (
@@ -446,7 +460,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Тест начат: {_format_cycle_timestamp(view.test_started_at)}\n"
         f"Main начат: {_format_cycle_timestamp(view.main_started_at)}\n\n"
         "Последнее событие:\n"
-        f"{view.last_reason or '—'}\n\n"
+        f"{_format_main_waiting_reason(view)}\n\n"
         "Предупреждения:\n"
         f"{_warnings_to_text(view)}"
         f"{rec_bid_block}"

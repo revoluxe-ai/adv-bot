@@ -291,6 +291,9 @@ class AutoShelfBidControlViewProvider:
         if settings_obj and target_main is None:
             warnings.append("invalid_test_share")
 
+        if state is not None and AutoShelfBidControlManager.repair_cycle_started_at(state):
+            state = await self._repository.save_state(state)
+
         cycle_bid_stats: list[BidStatsDTO] = []
         cycle_best: BidStatsDTO | None = None
         global_best: BidStatsDTO | None = None
