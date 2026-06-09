@@ -1,4 +1,4 @@
-﻿"""DTO СЌРєСЂР°РЅР° Telegram РґР»СЏ Auto Shelf Bid Control."""
+"""DTO СЌРєСЂР°РЅР° Telegram РґР»СЏ Auto Shelf Bid Control."""
 
 from __future__ import annotations
 
@@ -61,21 +61,19 @@ class AutoShelfBidControlViewDTO:
     target_test_observation_minutes: int | None
     target_main_impressions: int | None
     target_main_observation_minutes: int | None
-    min_bid_distance_minor: int | None  # РєРѕРїРµР№РєРё, РјРёРЅ. С€Р°Рі РјРµР¶РґСѓ С‚РµСЃС‚РѕРІС‹РјРё СЃС‚Р°РІРєР°РјРё
+    min_bid_distance_minor: int | None  # Копейки, мин. шаг между тестовыми ставками
     test_impressions: int | None
     main_impressions: int | None
     test_elapsed_minutes: int | None
     main_elapsed_minutes: int | None
-    covered_points_count: int  # РїРѕРєСЂС‹С‚С‹Рµ С‚РѕС‡РєРё С‚РµРєСѓС‰РµРіРѕ С†РёРєР»Р° (РїРѕСЂРѕРі test)
-    bid_points_total: int  # РІСЃРµРіРѕ С‚РѕС‡РµРє Р·Р° РѕС‚С‡С‘С‚РЅС‹Р№ РґРµРЅСЊ (РґРёР°РіРЅРѕСЃС‚РёРєР°)
-    bid_points: list[BidPointStatsDTO]  # Р°РіСЂРµРіР°С‚С‹ Р·Р° РѕС‚С‡С‘С‚РЅС‹Р№ РґРµРЅСЊ (РґРёР°РіРЅРѕСЃС‚РёРєР°)
-    cycle_covered_points_count: int  # РґСѓР±Р»СЊ covered_points_count РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё
-    cycle_bid_points: list[BidPointStatsDTO]  # Р°РіСЂРµРіР°С‚С‹ РѕС‚ current_cycle_started_at
+    covered_points_count: int   # покрытые точки текущего цикла (порог test)
+    bid_points_total: int  # всего точек за отчётный день (диагностика)
+    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день (диагностика)
+    cycle_covered_points_count: int  # дубль covered_points_count для совместимости
+    cycle_bid_points: list[BidPointStatsDTO]   # агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
-    optimization_metric: OptimizationMetric  # CPC РёР»Рё CTR вЂ” С‚РµРєСѓС‰Р°СЏ РјРµС‚СЂРёРєР° РѕРїС‚РёРјРёР·Р°С†РёРё
-    fact_cpo: float | None  # С„Р°РєС‚РёС‡РµСЃРєРѕРµ CPO РєР°РјРїР°РЅРёРё
-    resolve_cpo: float | None  # resolve/target CPO РєР°РјРїР°РЅРёРё
+    optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
+    fact_cpo: float | None  # фактическое CPO кампании
+    resolve_cpo: float | None  # resolve/target CPO кампании
     rec_bid_recommendation: dict[str, object] | None = None
-
-

@@ -1,7 +1,6 @@
 """ClickHouse-аналитика по auto_shelf intervals для control-контура."""
 
 from __future__ import annotations
-
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +8,9 @@ from typing import Any, cast
 
 from clickhouse_connect.driver.query import QueryResult
 
+from app.domain.rec_system_bid_math.hour_observation_builder import (
+    BidBucketObservation,
+)
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -30,6 +32,15 @@ class AutoShelfBidControlAnalyticsRepository:
     def _load_sql(self, filename: str) -> str:
         """Прочитать SQL-шаблон из каталога sql/."""
         return self._sql_dir.joinpath(filename).read_text(encoding="utf-8")
+
+    @staticmethod
+    def _result_column_names(result: QueryResult) -> list[str]:
+        """Нормализовать имена колонок CH в явный список строк."""
+        raw_column_names = cast(tuple[Any, ...], getattr(result, "column_names"))
+        column_names: list[str] = []
+        for name in raw_column_names:
+            column_names.append(str(name))
+        return column_names
 
     @staticmethod
     def _mode_filter_clause(mode: str | None) -> str:
@@ -136,8 +147,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return []
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         out: list[BidStatsDTO] = []
         for row_values in result.result_rows:
             row: dict[str, Any] = dict(zip(column_names, tuple(row_values)))
@@ -316,8 +326,7 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return None
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)
 
@@ -347,7 +356,6 @@ class AutoShelfBidControlAnalyticsRepository:
                 result: QueryResult = await client.query(query, parameters=params)
         if not result.result_rows:
             return None
-        names = cast(tuple[object, ...], result.column_names)
-        column_names = [str(name) for name in names]
+        column_names = self._result_column_names(result)
         row: dict[str, Any] = dict(zip(column_names, tuple(result.result_rows[0])))
         return self._build_bid_stats_dto(row)

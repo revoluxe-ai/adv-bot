@@ -111,6 +111,7 @@ async def test_choose_main_bid_by_strategy_uses_cycle_metric_fallback() -> None:
 
     result = await manager._choose_main_bid_by_strategy(
         complex_adv=complex_adv,
+        currency="RUB",
         current_cycle_started_at=datetime.now(UTC),
         previous_cycle_started_at=None,
         current_main_bid_minor=20_000,
@@ -174,6 +175,7 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_best_plan_bid(
 
     result = await manager._choose_main_bid_by_strategy(
         complex_adv=complex_adv,
+        currency="RUB",
         current_cycle_started_at=datetime.now(UTC),
         previous_cycle_started_at=None,
         current_main_bid_minor=20_000,
@@ -243,6 +245,7 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_target_cost_when_p
 
     result = await manager._choose_main_bid_by_strategy(
         complex_adv=complex_adv,
+        currency="RUB",
         current_cycle_started_at=datetime.now(UTC),
         previous_cycle_started_at=None,
         current_main_bid_minor=20_000,
@@ -306,6 +309,7 @@ async def test_choose_main_bid_by_strategy_plan_distance_without_recommendation_
 
     result = await manager._choose_main_bid_by_strategy(
         complex_adv=complex_adv,
+        currency="RUB",
         current_cycle_started_at=datetime.now(UTC),
         previous_cycle_started_at=None,
         current_main_bid_minor=20_000,
@@ -746,7 +750,7 @@ async def test_handle_main_mode_waits_for_observation_minutes() -> None:
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
-        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -810,7 +814,7 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
-        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -1162,7 +1166,7 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
     assert state.test_started_at is not None
     assert state.last_reason == ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
     manager.choose_next_test_bid.assert_called_once()
-    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_awaited_once_with(
         complex_adv,
         state=state,
@@ -1172,7 +1176,7 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
 
 
 @pytest.mark.asyncio
-async def test_handle_main_mode_plan_distance_returns_best_bid_not_found_when_no_next_test_bid(
+async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_test_bid_and_no_best_plan_bid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     analytics = MagicMock()
@@ -1251,9 +1255,14 @@ async def test_handle_main_mode_plan_distance_returns_best_bid_not_found_when_no
         actual_bid_minor=25_000,
     )
 
-    assert state.last_reason == ControlReason.BEST_BID_NOT_FOUND
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 25_000
+    assert state.main_started_at is not None
+    assert state.current_cycle_started_at is not None
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
     manager.choose_next_test_bid.assert_called_once()
     manager._choose_main_bid_by_strategy.assert_called_once()
+    repository.save_state.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
 

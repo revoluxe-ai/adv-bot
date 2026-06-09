@@ -56,16 +56,95 @@ def _as_dict(value: object) -> dict[str, object]:
     return value if isinstance(value, dict) else {}
 
 
-def _format_rec_bid_value(value: object) -> str:
-    """Отформатировать значение recommendation, подставляя дефолт для пустых полей."""
+def _format_rec_bid_int(value: object) -> str:
     if value is None:
-        return "-"
+        return "\u2014"
+    try:
+        if isinstance(value, bool):
+            number = int(value)
+        elif isinstance(value, int):
+            number = value
+        elif isinstance(value, float):
+            number = int(round(value))
+        elif isinstance(value, str):
+            number = int(round(float(value)))
+        else:
+            return "\u2014"
+        return f"{number:,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _format_rec_bid_rub(value: object) -> str:
+    if value is None:
+        return "\u2014"
+    try:
+        return f"{float(value):.2f} \u20bd"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _format_rec_bid_minor(value: object) -> str:
+    if value is None:
+        return "\u2014"
+    try:
+        if isinstance(value, bool):
+            minor = int(value)
+        elif isinstance(value, int):
+            minor = value
+        elif isinstance(value, float):
+            minor = int(round(value))
+        elif isinstance(value, str):
+            minor = int(round(float(value)))
+        else:
+            return "\u2014"
+        return f"{int(round(minor / 100))} \u20bd"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _format_rec_bid_percent(value: object) -> str:
+    if value is None:
+        return "\u2014"
+    try:
+        return f"{float(value) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _format_rec_bid_number(value: object, *, precision: int) -> str:
+    if value is None:
+        return "\u2014"
+    try:
+        return f"{float(value):.{precision}f}"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _format_rec_bid_value(field: str, value: object) -> str:
+    """Format recommendation values for Telegram."""
+    if field == "bid":
+        return _format_rec_bid_minor(value)
+    if field in {"ctr", "confidence", "own_anchor"}:
+        return _format_rec_bid_percent(value)
+    if field in {"expected_order_cost_rub", "resolved_order_cost_rub"}:
+        return _format_rec_bid_rub(value)
+    if field == "expected_daily_impressions":
+        return _format_rec_bid_int(value)
+    if field == "sales_gap":
+        return _format_rec_bid_number(value, precision=2)
+    if field == "plan_distance_score":
+        return _format_rec_bid_number(value, precision=3)
+    if value is None:
+        return "\u2014"
     return str(value)
 
 
 def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
-    """Собрать компактную строку recommendation row из нужных полей."""
-    return " | ".join(f"{field}: {_format_rec_bid_value(row.get(field))}" for field in fields)
+    """Format a compact recommendation row from requested fields."""
+    return " | ".join(
+        f"{field}: {_format_rec_bid_value(field, row.get(field))}" for field in fields
+    )
 
 
 def _format_rec_bid_rows(
@@ -74,7 +153,7 @@ def _format_rec_bid_rows(
     *,
     limit: int = 3,
 ) -> str:
-    """Форматировать top-N rows recommendation без падения на неполных данных."""
+    """Format top-N recommendation rows safely for Telegram."""
     if not isinstance(rows, list) or not rows:
         return "-"
     formatted_rows = []
@@ -84,8 +163,12 @@ def _format_rec_bid_rows(
     return "\n".join(formatted_rows) if formatted_rows else "-"
 
 
+def _format_rec_bid_best_bid(value: object) -> str:
+    return _format_rec_bid_minor(value)
+
+
 def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> str:
-    """Собрать компактный блок рекомендаций по ставке полок."""
+    """Build compact shelf bid recommendation block."""
     recommendation = view.rec_bid_recommendation
     if recommendation is None:
         return ""
@@ -93,14 +176,10 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
     diagnostics = _as_dict(recommendation_dict.get("diagnostics"))
     plan_ranked = recommendation_dict.get("plan_ranked")
     expected_ranked = recommendation_dict.get("expected_ranked")
-    best_expected_bid = _format_rec_bid_value(
-        recommendation_dict.get("best_expected_bid")
-    )
-    best_plan_bid = _format_rec_bid_value(recommendation_dict.get("best_plan_bid"))
     hour_observation_count = _format_rec_bid_value(
-        diagnostics.get("hour_observation_count")
+        "hour_observation_count", diagnostics.get("hour_observation_count")
     )
-    bid_count = _format_rec_bid_value(diagnostics.get("bid_count"))
+    bid_count = _format_rec_bid_value("bid_count", diagnostics.get("bid_count"))
     plan_ranked_text = _format_rec_bid_rows(
         plan_ranked,
         (
@@ -122,9 +201,9 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         ),
     )
     return (
-        "🧪 Рекомендации по ставке полок\n"
-        f"best_expected_bid: {best_expected_bid}\n"
-        f"best_plan_bid: {best_plan_bid}\n"
+        "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a\n"
+        f"best_expected_bid: {_format_rec_bid_best_bid(recommendation_dict.get('best_expected_bid'))}\n"
+        f"best_plan_bid: {_format_rec_bid_best_bid(recommendation_dict.get('best_plan_bid'))}\n"
         f"hours: {hour_observation_count}\n"
         f"bids: {bid_count}\n\n"
         "Top-3 plan_ranked:\n"

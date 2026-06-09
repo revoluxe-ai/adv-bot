@@ -16,8 +16,9 @@ def build_rec_bid_plan_context(
     click_to_order_cr_7d: float,
 ) -> PlanContext:
     """Build PlanContext with the same target-cost semantics as control."""
+    plan_orders: int | None = int(sales_plan)
     resolved_target_cost = resolve_target_cost(
-        sales_plan,
+        plan_orders,
         target_price_for_order,
         max_price_for_order,
         current_sales_forecast,

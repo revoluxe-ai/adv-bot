@@ -129,54 +129,54 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     view = replace(
         _view(enabled=True, has_settings=True),
         rec_bid_recommendation={
-            "best_expected_bid": 123,
-            "best_plan_bid": 456,
+            "best_expected_bid": 35000,
+            "best_plan_bid": 35000,
             "diagnostics": {
                 "hour_observation_count": 7,
                 "bid_count": 3,
             },
             "plan_ranked": [
                 {
-                    "bid": 10,
-                    "ctr": 0.1,
-                    "expected_order_cost_rub": 11.1,
-                    "resolved_order_cost_rub": 22.2,
-                    "sales_gap": -3.0,
-                    "plan_distance_score": 0.5,
+                    "bid": 35000,
+                    "ctr": 0.01104280322383927,
+                    "expected_order_cost_rub": 568.0587841906347,
+                    "resolved_order_cost_rub": 550.0,
+                    "sales_gap": -296.52,
+                    "plan_distance_score": 0.835,
                 },
                 {
-                    "bid": 20,
-                    "ctr": 0.2,
-                    "expected_order_cost_rub": 33.3,
-                    "resolved_order_cost_rub": 44.4,
-                    "sales_gap": -2.0,
-                    "plan_distance_score": 0.4,
+                    "bid": 16000,
+                    "ctr": 0.0199,
+                    "expected_order_cost_rub": 123.45,
+                    "resolved_order_cost_rub": 120.0,
+                    "sales_gap": -12.34,
+                    "plan_distance_score": 0.456,
                 },
                 {
-                    "bid": 30,
-                    "ctr": 0.3,
-                    "expected_order_cost_rub": 55.5,
-                    "resolved_order_cost_rub": 66.6,
+                    "bid": 20500,
+                    "ctr": 0.03,
+                    "expected_order_cost_rub": 222.2,
+                    "resolved_order_cost_rub": 200.0,
                     "sales_gap": -1.0,
                     "plan_distance_score": 0.3,
                 },
             ],
             "expected_ranked": [
                 {
-                    "bid": 10,
-                    "expected_daily_impressions": 1000.0,
-                    "confidence": 0.9,
-                    "own_anchor": 0.1,
+                    "bid": 35000,
+                    "expected_daily_impressions": 95818.2,
+                    "confidence": 0.4918326535656478,
+                    "own_anchor": 0.037878,
                 },
                 {
-                    "bid": 20,
-                    "expected_daily_impressions": 2000.0,
+                    "bid": 16000,
+                    "expected_daily_impressions": 12345.0,
                     "confidence": 0.8,
                     "own_anchor": 0.2,
                 },
                 {
-                    "bid": 30,
-                    "expected_daily_impressions": 3000.0,
+                    "bid": 20500,
+                    "expected_daily_impressions": 54321.0,
                     "confidence": 0.7,
                     "own_anchor": 0.3,
                 },
@@ -186,10 +186,19 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
 
     message = render_auto_shelf_bid_control_message(view)
 
-    assert "🧪 Рекомендации по ставке полок" in message
-    assert "best_expected_bid: 123" in message
-    assert "best_plan_bid: 456" in message
+    assert "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a" in message
+    assert "best_expected_bid: 350 \u20bd" in message
+    assert "best_plan_bid: 350 \u20bd" in message
     assert "hours: 7" in message
     assert "bids: 3" in message
+    assert "bid: 350 \u20bd" in message
+    assert "ctr: 1.10%" in message
+    assert "confidence: 49.18%" in message
+    assert "own_anchor: 3.79%" in message
+    assert "expected_order_cost_rub: 568.06 \u20bd" in message
+    assert "expected_daily_impressions: 95 818" in message
+    assert "35000" not in message
+    assert "568.0587841906347" not in message
+    assert "0.4918326535656478" not in message
     assert "Top-3 plan_ranked:" in message
     assert "Top-3 expected_ranked:" in message
