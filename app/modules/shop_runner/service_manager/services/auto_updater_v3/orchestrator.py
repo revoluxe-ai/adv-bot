@@ -120,7 +120,7 @@ def _sync_tick_data_after_pipeline(
 
 
 def only_relevant_phrase_filter(keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
-    only_relevant_phrase = []
+    only_relevant_phrase: list[CalculatedKeyword] = []
     for kw in keywords:
         if kw.relevant:
             only_relevant_phrase.append(kw)

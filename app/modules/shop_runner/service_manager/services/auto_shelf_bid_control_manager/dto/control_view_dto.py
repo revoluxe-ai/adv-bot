@@ -72,4 +72,4 @@ class AutoShelfBidControlViewDTO:
     optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
     fact_cpo: float | None  # фактическое CPO кампании
     resolve_cpo: float | None  # resolve/target CPO кампании
-
+    best_plan_bid_minor: int | None = None
