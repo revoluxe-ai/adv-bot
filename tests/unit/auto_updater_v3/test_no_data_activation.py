@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
@@ -22,6 +23,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_ac
     plan_no_ch_min_bootstrap_actions,
     plan_no_data_keyword_actions,
     plan_no_data_min_up_actions,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
+    AdvState,
+    build_update_context,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
+    StatesListGenerator,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.action_merge import (
     merge_and_dedup_actions,
@@ -216,6 +224,47 @@ def test_plan_no_data_skips_when_v2_cpo_and_ch_profile() -> None:
     assert not keyword_lacks_v3_decision_data(ctx, [ctx])
     actions = plan_no_data_min_up_actions([(ctx, KeywordStrategyMode.OFF)])
     assert actions == []
+
+
+@pytest.mark.unit
+def test_no_data_singleton_state_without_matrix_uses_fact_pay_for_order() -> None:
+    kw = _kw(ks_id=7, text="nd", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    adv_state = replace(AdvState.empty(), fact_pay_for_order=123.0)
+    dto = build_update_context([ctx], adv_state=adv_state).prepared.keywords[0]
+
+    assert len(dto.ladder_states) == 1
+    state = dto.ladder_states[0]
+    assert state.synthetic_no_data
+    assert not state.is_gap
+    assert state.cpo == 123.0
+    assert state.strategy_mode == KeywordStrategyMode.OFF
+
+
+@pytest.mark.unit
+def test_no_data_singleton_enters_current_pool_and_not_potential_pool() -> None:
+    kw = _kw(ks_id=9, text="nd2", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    adv_state = replace(AdvState.empty(), fact_pay_for_order=321.0)
+    update_ctx = build_update_context([ctx], adv_state=adv_state)
+    current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
+        update_ctx.keywords
+    )
+
+    assert len(current) == 1
+    assert current[0][1].synthetic_no_data
+    assert current[0][2] == 321.0
+    assert potential == []
+
+
+@pytest.mark.unit
+def test_no_data_without_fact_remains_gap_singleton_or_empty_behavior() -> None:
+    kw = _kw(ks_id=8, text="gap", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    dto = build_update_context([ctx]).prepared.keywords[0]
+
+    assert len(dto.ladder_states) == 2
+    assert any(state.is_gap for state in dto.ladder_states)
 
 
 @pytest.mark.unit

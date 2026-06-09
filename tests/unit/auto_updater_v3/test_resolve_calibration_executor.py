@@ -104,6 +104,19 @@ def _ladder_states(
     )
 
 
+def _no_data_singleton_ladder(ks_id: int, fact_pfo: float) -> tuple[KeywordV3LadderState, ...]:
+    return (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=fact_pfo,
+            synthetic_no_data=True,
+        ),
+    )
+
+
 def _dto(
     *,
     ks_id: int = 1,
@@ -262,6 +275,28 @@ def test_prior_up_on_key_a_blocks_calibration_up_on_key_b() -> None:
     assert ctx.keywords[1].current_mode == KeywordStrategyMode.MIN_CPA
     assert ctx.keywords[1].next_state == []
     assert ctx.adv_state.max_effective_steps == 0
+
+
+@pytest.mark.unit
+def test_resolve_calibration_handles_no_data_singleton_state() -> None:
+    dto = _dto(
+        ks_id=10,
+        mode=KeywordStrategyMode.OFF,
+        ladder=_no_data_singleton_ladder(10, 123.0),
+        target_place=0,
+    )
+    ctx = _ctx(
+        dto,
+        adv_state=_cal_adv_state(
+            calibration_direct=CalibrationDirect.LOOSEN,
+            max_effective_steps=1,
+        ),
+    )
+    executor = ResolveCalibrationExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason is None
+    assert ctx.keywords[0].ladder_states[0].synthetic_no_data
+    assert ctx.keywords[0].next_state == []
 
 
 @pytest.mark.unit

@@ -236,6 +236,36 @@ def test_non_gap_off_unchanged() -> None:
 
 
 @pytest.mark.unit
+def test_no_data_singleton_is_not_gap_candidate() -> None:
+    kw = _calc_kw(
+        ks_id=4,
+        text="nd",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        hard_status=2,
+    )
+    kw = kw.model_copy(update={"pay_for_order": 111.0})
+    ctx_obj = KeywordV3Context(keyword=kw, position_profile=None)
+    dto = KeywordDTO.from_context(
+        ctx_obj,
+        ladder_states=(
+            KeywordV3LadderState(
+                keyword_setting_id=4,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=111.0,
+                synthetic_no_data=True,
+            ),
+        ),
+    )
+    ctx = _context([dto], _adv_state(eligibility={4: _no_data_elig()}))
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.next_state == []
+    assert dto.current_mode == KeywordStrategyMode.OFF
+
+
+@pytest.mark.unit
 def test_nsm_enable_gap_to_min_cpa() -> None:
     dto = _gap_dto()
     nsm = NextStateManager(GapExecutorClass)

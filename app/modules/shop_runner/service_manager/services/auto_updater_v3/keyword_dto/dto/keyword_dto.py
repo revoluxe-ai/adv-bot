@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.target_place_matrix import (
     TargetPlaceMatrix,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
+    V3LadderStageKind,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -112,6 +115,15 @@ class KeywordDTO:
     def is_not_full(self) -> bool:
         """NOT FULL: нет CH-матрицы (``position_profile`` пуст)."""
         return not bool(self.position_profile)
+
+    def is_no_data_singleton(self) -> bool:
+        """NO DATA singleton: единственный synthetic OFF-state с fact pay_for_order."""
+        states = self.ladder_states
+        return (
+            len(states) == 1
+            and states[0].synthetic_no_data
+            and states[0].stage == V3LadderStageKind.OFF
+        )
 
     def _validate_not_full_state(self, executor_name: str) -> None:
         """NOT FULL + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
