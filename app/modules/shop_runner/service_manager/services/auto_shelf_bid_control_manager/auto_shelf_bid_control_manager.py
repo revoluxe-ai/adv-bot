@@ -800,7 +800,6 @@ class AutoShelfBidControlManager:
                     " nmid=%s"
                     " previous_main_bid=%s "
                     "new_main_bid=%s reason=%s",
-                    "last_reason=%s",
                     auto_adv_id,
                     nmid,
                     main_bid,
