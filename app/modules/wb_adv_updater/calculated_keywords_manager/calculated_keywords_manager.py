@@ -432,8 +432,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             )
             # TODO: Придумать фоллбек для этой функции
             auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
-            if auto_campaign_active is not None:
-                rec_conversion = await get_rec_conversion(complex_adv.adv_id)
+            rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
         def _above_rec_conversion(pre_kw_: PreCalculatedKeyword) -> bool | None:
             """conv(ключ) > rec_conversion (полки). Зачем — ``auto_updater_traffic_policy``."""

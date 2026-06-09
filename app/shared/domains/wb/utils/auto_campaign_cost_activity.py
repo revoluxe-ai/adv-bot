@@ -103,8 +103,12 @@ async def is_auto_campaign_active(
     *,
     plan_fact_reader: PlanFactReader | None = None,
     days_for_avg: int = 7,
-) -> bool | None:
+) -> bool:
     """Return auto-campaign activity by cost rule."""
+    if getattr(adv_setting, "auto_shelf_bid_control_enabled", False):
+        # New shelf bid control owns the shelf bid path; do not let the legacy
+        # economy contour pause or gate shelf flows when this mode is enabled.
+        return True
     metrics = await get_auto_campaign_cost_activity_metrics(
         adv_setting,
         plan_fact_reader=plan_fact_reader,

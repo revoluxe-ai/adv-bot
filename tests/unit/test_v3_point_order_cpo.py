@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
     V3_KEY_CART_TO_ORDER_PRIOR_CARTS,
     conv_views_to_orders_at_ch_point,
+    load_rec_orders_per_view_for_v3,
     order_cpo_at_ch_point,
     orders_per_cart_from_wb_carts_per_order_ratio,
     resolve_orders_per_cart_for_cpo,
@@ -130,3 +133,22 @@ def test_example_calculation_cpo_at_point() -> None:
         orders_per_cart=smoothed,
     )
     assert cpo is not None and cpo > 0
+
+
+@pytest.mark.asyncio
+async def test_load_rec_orders_per_view_for_v3_returns_none_when_guarded() -> None:
+    adv = SimpleNamespace(adv_id=777, auto_shelf_bid_control_enabled=True)
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.is_auto_campaign_active",
+        new=AsyncMock(return_value=None),
+    ), patch(
+        "app.modules.shop_runner.wb_stat_manager.rec_conversion_service.get_rec_conversion",
+        new=AsyncMock(return_value=0.42),
+    ) as get_rec_conversion_mock:
+        result = await load_rec_orders_per_view_for_v3(
+            adv,
+            rec_system_promotion_mode_active=True,
+        )
+
+    assert result is None
+    get_rec_conversion_mock.assert_not_awaited()

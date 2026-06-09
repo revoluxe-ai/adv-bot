@@ -623,9 +623,8 @@ async def reset_shop_non_relevant_phrases(
                 strategy_mode=KeywordStrategyMode.OFF,
             )
         )
-        update_non_v3_result = cast(
-            CursorResult[Any], await session.execute(stmt_non_v3)
-        )
+        update_non_v3_result = await session.execute(stmt_non_v3)
+
         update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
         updated_count = int(update_non_v3_result.rowcount or 0) + int(
             update_v3_result.rowcount or 0

@@ -36,11 +36,13 @@ class _FakeAdvSetting:
         plan_for_sales_for_day: int | None,
         target_price_for_order: int | float | None,
         max_price_for_order: int | float | None,
+        auto_shelf_bid_control_enabled: bool = False,
     ) -> None:
         self.adv_id = adv_id
         self.plan_for_sales_for_day = plan_for_sales_for_day
         self.target_price_for_order = target_price_for_order
         self.max_price_for_order = max_price_for_order
+        self.auto_shelf_bid_control_enabled = auto_shelf_bid_control_enabled
         self.sales_predict_method = FactMethods.DIRECT_SALES
 
 
@@ -109,6 +111,33 @@ async def test_is_auto_campaign_active_returns_none_without_plan_fact_row() -> N
     with patch(
         "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         new=AsyncMock(return_value=80.0),
+    ):
+        result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_is_auto_campaign_active_returns_none_when_shelf_bid_control_enabled() -> None:
+    adv = _FakeAdvSetting(
+        104,
+        plan_for_sales_for_day=10,
+        target_price_for_order=120,
+        max_price_for_order=220,
+        auto_shelf_bid_control_enabled=True,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=12.0,
+                plan_fact_ch_ts_msk="07.06.2025 08:09",
+            )
+        )
+    )
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=999.0),
     ):
         result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
 
