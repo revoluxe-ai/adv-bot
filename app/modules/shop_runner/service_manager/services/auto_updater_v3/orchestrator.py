@@ -156,6 +156,7 @@ async def process_adv_v3(
             keywords = only_relevant_phrase_filter(keywords)
         tick_data = await data_mgr.load(
             complex_adv,
+            keywords=keywords,
             wb_shop_data_manager=wb_shop_data_manager,
             max_last_period=max_last_period,
             tick_report=tick_report,

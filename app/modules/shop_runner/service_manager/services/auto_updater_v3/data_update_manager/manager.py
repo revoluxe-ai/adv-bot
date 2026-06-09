@@ -67,6 +67,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class DataUpdateManager:
     async def load(
         self,
         complex_adv: ComplexAdv,
+        keywords: list[CalculatedKeyword],
         *,
         wb_shop_data_manager: WBShopDataManager,
         max_last_period: int = 2,
@@ -84,7 +86,6 @@ class DataUpdateManager:
     ) -> TickData:
         """Собрать ``V3TickData``: keywords, dto, plan/fact, contexts, NORMAL gates."""
         adv = complex_adv.adv_setting
-        keywords = await complex_adv.get_keywords()
         ledger = V3TickKeywordLedger.from_keywords(keywords)
         dto, raw_profiles = await load_v3_wb_context(
             complex_adv,
