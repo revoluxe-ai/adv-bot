@@ -28,6 +28,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
     AdvState,
     build_update_context,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
+    V3LadderStageKind,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
 )
@@ -238,7 +241,9 @@ def test_no_data_singleton_state_without_matrix_uses_fact_pay_for_order() -> Non
     assert state.synthetic_no_data
     assert not state.is_gap
     assert state.cpo == 123.0
-    assert state.strategy_mode == KeywordStrategyMode.OFF
+    assert state.stage == V3LadderStageKind.MIN_CPA
+    assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit
@@ -253,6 +258,7 @@ def test_no_data_singleton_enters_current_pool_and_not_potential_pool() -> None:
 
     assert len(current) == 1
     assert current[0][1].synthetic_no_data
+    assert current[0][1].stage == V3LadderStageKind.MIN_CPA
     assert current[0][2] == 321.0
     assert potential == []
 

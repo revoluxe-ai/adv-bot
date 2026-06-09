@@ -262,7 +262,7 @@ def test_no_data_singleton_is_not_gap_candidate() -> None:
     ctx = _context([dto], _adv_state(eligibility={4: _no_data_elig()}))
     PayForOrderGapEnableExecutor().execute(ctx)
     assert dto.next_state == []
-    assert dto.current_mode == KeywordStrategyMode.OFF
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit

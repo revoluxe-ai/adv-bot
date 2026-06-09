@@ -27,9 +27,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.target_place_matrix import (
     TargetPlaceMatrix,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
-    V3LadderStageKind,
-)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -117,12 +114,11 @@ class KeywordDTO:
         return not bool(self.position_profile)
 
     def is_no_data_singleton(self) -> bool:
-        """NO DATA singleton: единственный synthetic OFF-state с fact pay_for_order."""
+        """NO DATA singleton: единственный synthetic MIN_CPA-state с fact pay_for_order."""
         states = self.ladder_states
         return (
             len(states) == 1
             and states[0].synthetic_no_data
-            and states[0].stage == V3LadderStageKind.OFF
         )
 
     def _validate_not_full_state(self, executor_name: str) -> None:
@@ -187,10 +183,16 @@ class KeywordDTO:
     @classmethod
     def from_prepared_row(cls, row: KeywordPreparedRow) -> KeywordDTO:
         """Обратная совместимость со старыми ``KeywordPreparedRow``."""
+        stored_mode = row.stored_mode
+        if (
+            len(row.states) == 1
+            and row.states[0].synthetic_no_data
+        ):
+            stored_mode = KeywordStrategyMode.MIN_CPA
         dto = cls(
             calculated_keyword=row.keyword,
             position_profile=row.position_profile,
-            stored_mode=row.stored_mode,
+            stored_mode=stored_mode,
             target_place_matrix=TargetPlaceMatrix(row.states),
         )
         if row.active_mode != row.stored_mode:
@@ -208,9 +210,12 @@ class KeywordDTO:
         ladder_states: tuple[KeywordV3LadderState, ...],
     ) -> KeywordDTO:
         """Сборка из ``KeywordV3Context`` + ladder states."""
+        stored_mode = stored_strategy_mode(ctx.keyword)
+        if len(ladder_states) == 1 and ladder_states[0].synthetic_no_data:
+            stored_mode = KeywordStrategyMode.MIN_CPA
         return cls(
             calculated_keyword=ctx.keyword,
             position_profile=ctx.position_profile,
-            stored_mode=stored_strategy_mode(ctx.keyword),
+            stored_mode=stored_mode,
             target_place_matrix=TargetPlaceMatrix(ladder_states),
         )

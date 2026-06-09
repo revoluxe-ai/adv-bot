@@ -102,8 +102,8 @@ def build_ladder_states_for_context(
         states.append(
             KeywordV3LadderState(
                 keyword_setting_id=ks_id,
-                stage=V3LadderStageKind.OFF,
-                strategy_mode=KeywordStrategyMode.OFF,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
                 target_position=0,
                 cpo=float(ctx.keyword.pay_for_order),
                 is_valid=True,
@@ -330,14 +330,15 @@ def _apply_no_data_singletons(prepared: KeywordsPreparedList, state: AdvState) -
             continue
         singleton = KeywordV3LadderState(
             keyword_setting_id=dto.keyword_setting_id,
-            stage=V3LadderStageKind.OFF,
-            strategy_mode=KeywordStrategyMode.OFF,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
             target_position=0,
             cpo=float(fact_pfo),
             is_valid=True,
             synthetic_no_data=True,
         )
         dto.target_place_matrix = TargetPlaceMatrix((singleton,))
+        dto.stored_mode = KeywordStrategyMode.MIN_CPA
 
 
 def update_context_from_prepared(

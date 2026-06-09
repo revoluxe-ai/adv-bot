@@ -176,6 +176,18 @@ def ladder_state_for_mode_and_place(
 
 def pick_effective_down_ladder_state(dto: KeywordDTO) -> KeywordV3LadderState | None:
     """Один effective DOWN: следующий ladder-state с другим ``target_place`` или OFF."""
+    if dto.is_no_data_singleton():
+        state = ladder_state_for_mode(dto, KeywordStrategyMode.MIN_CPA)
+        if state is None:
+            return None
+        return KeywordV3LadderState(
+            keyword_setting_id=state.keyword_setting_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+            synthetic_no_data=True,
+        )
     if dto.current_mode == KeywordStrategyMode.OFF:
         return None
     catalog = mode_catalog_from_dto(dto)
