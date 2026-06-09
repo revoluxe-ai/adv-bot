@@ -114,6 +114,33 @@ def _kubeconfig_candidates() -> list[tuple[str, Path]]:
     return candidates
 
 
+def _configured_kubeconfig_path() -> Path:
+    """Возвращает kubeconfig только из явной конфигурации окружения.
+
+    Monitor не должен стартовать на репозиторном default path, если kubeconfig
+    не задан явно или файл отсутствует.
+    """
+    configured_candidates: list[tuple[str, Path]] = []
+    for source, candidate in _kubeconfig_candidates():
+        if source == "default":
+            continue
+        configured_candidates.append((source, candidate))
+        if candidate.is_file():
+            resolved = candidate.resolve()
+            logger.info("Using kubeconfig from %s: %s", source, resolved)
+            return resolved
+
+    checked = ", ".join(
+        f"{source}={path}" for source, path in configured_candidates
+    )
+    raise FileNotFoundError(
+        "Kubeconfig not found. Checked: "
+        f"{checked or 'no configured kubeconfig env vars'}. "
+        f"Platform={platform.system()}. "
+        "Set KUBECONFIG, DEV_KUBECONFIG, TWC_KUBECONFIG or DEV_TUNNELS_KUBECONFIG."
+    )
+
+
 def resolve_kubeconfig_path() -> Path:
     """Определяет kubeconfig path и логирует фактический выбор."""
     candidates = _kubeconfig_candidates()
@@ -1319,7 +1346,7 @@ def start_dev_tunnels_monitor(*, wait_ready: bool = True) -> None:
             if wait_ready:
                 wait_specs_after_lock = _tunnel_specs()
         else:
-            kubeconfig = _default_kubeconfig()
+            kubeconfig = str(_configured_kubeconfig_path())
             specs = _tunnel_specs()
 
             if _ports_ready(specs):
