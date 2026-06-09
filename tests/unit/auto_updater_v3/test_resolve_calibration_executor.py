@@ -184,7 +184,7 @@ def test_calibration_skip_gates(
 
 
 @pytest.mark.unit
-def test_plan_fact_views_unchanged_no_longer_block_calibration_up() -> None:
+def test_plan_fact_unchanged_and_views_unchanged_blocks_calibration_up() -> None:
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.MIN_CPA,
@@ -198,9 +198,12 @@ def test_plan_fact_views_unchanged_no_longer_block_calibration_up() -> None:
         max_effective_steps=1,
     )
     ctx = _ctx(dto, adv_state=adv)
-    ResolveCalibrationExecutor().execute(ctx)
-    assert ctx.keywords[0].current_mode == KeywordStrategyMode.OPTIMUM
-    assert len(ctx.keywords[0].next_state) == 1
+    executor = ResolveCalibrationExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "plan_fact_unchanged_and_views_unchanged"
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[0].next_state == []
+    assert ctx.adv_state.max_effective_steps == 0
 
 
 @pytest.mark.unit
@@ -229,6 +232,38 @@ def test_prior_up_blocks_calibration_up() -> None:
 
 
 @pytest.mark.unit
+def test_prior_up_on_key_a_blocks_calibration_up_on_key_b() -> None:
+    key_a = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=10,
+    )
+    key_b = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(2, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=10,
+    )
+    key_a.current_mode = NextState(
+        new_mode=KeywordMode.OPTIMUM,
+        executor_name="RaiseStateToTargetCpoExecutor",
+    )
+    ctx = _ctx(
+        key_a,
+        key_b,
+        adv_state=_cal_adv_state(
+            calibration_direct=CalibrationDirect.LOOSEN,
+            max_effective_steps=1,
+        ),
+    )
+    ResolveCalibrationExecutor().execute(ctx)
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[1].next_state == []
+    assert ctx.adv_state.max_effective_steps == 0
+
+
+@pytest.mark.unit
 def test_prior_safety_off_blocks_reverse_calibration_up() -> None:
     dto = _dto(
         ks_id=1,
@@ -252,6 +287,69 @@ def test_prior_safety_off_blocks_reverse_calibration_up() -> None:
     ResolveCalibrationExecutor().execute(ctx)
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.OFF
     assert len(ctx.keywords[0].next_state) == 1
+    assert ctx.adv_state.max_effective_steps == 0
+
+
+@pytest.mark.unit
+def test_prior_force_off_blocks_calibration_down() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=30,
+    )
+    ctx = _ctx(
+        dto,
+        adv_state=_cal_adv_state(
+            calibration_direct=CalibrationDirect.TIGHTEN,
+            max_effective_steps=1,
+            fact_pay_for_order=650.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ),
+    )
+    dto.current_mode = NextState(
+        new_mode=KeywordMode.OFF,
+        executor_name="PayForOrderOverMaxOffOnDeepOverspendExecutor",
+    )
+    ResolveCalibrationExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.OFF
+    assert len(ctx.keywords[0].next_state) == 1
+    assert ctx.adv_state.max_effective_steps == 0
+
+
+@pytest.mark.unit
+def test_prior_force_off_on_key_a_blocks_calibration_down_on_key_b() -> None:
+    key_a = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=30,
+    )
+    key_b = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(2, min_cpo=250.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=30,
+    )
+    key_a.current_mode = NextState(
+        new_mode=KeywordMode.OFF,
+        executor_name="PayForOrderOverMaxOffOnDeepOverspendExecutor",
+    )
+    ctx = _ctx(
+        key_a,
+        key_b,
+        adv_state=_cal_adv_state(
+            calibration_direct=CalibrationDirect.TIGHTEN,
+            max_effective_steps=1,
+            fact_pay_for_order=650.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ),
+    )
+    ResolveCalibrationExecutor().execute(ctx)
+    assert ctx.keywords[1].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[1].next_state == []
     assert ctx.adv_state.max_effective_steps == 0
 
 

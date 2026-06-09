@@ -15,6 +15,12 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_dto import (
         KeywordDTO,
     )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
+    V3ActionType,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.phase_report import (
+    steps_to_v3_actions,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.calibration_runner import (
     run_calibration_down,
     run_calibration_up,
@@ -78,7 +84,7 @@ class ResolveCalibrationExecutor:
 
 
 def _phase_skip_reason(context: UpdateContext) -> str | None:
-    """Gate preamble calibration: только базовые данные, без unchanged plan/views."""
+    """Gate preamble calibration: skip only when plan/fact and views both stayed unchanged."""
     state = context.adv_state
     if not state.resolve_valid:
         return "resolve_invalid"
@@ -86,6 +92,8 @@ def _phase_skip_reason(context: UpdateContext) -> str | None:
         return "no_fact_pay_for_order"
     if state.calibration_direct is None:
         return "no_direct"
+    if state.plan_fact_equal and state.views_equal:
+        return "plan_fact_unchanged_and_views_unchanged"
     return None
 
 
@@ -126,27 +134,38 @@ _NEUTRAL_EXECUTOR_NAMES = {
 }
 
 
-def _prior_executor_effects(context: UpdateContext) -> dict[int, PriorExecutorEffects]:
-    return {
-        dto.keyword_setting_id: _prior_executor_effects_for_dto(dto)
-        for dto in context.keywords
-    }
+def _prior_executor_effects(context: UpdateContext) -> PriorExecutorEffects:
+    up_applied = False
+    down_applied = False
+    force_off_applied = False
+    for dto in context.keywords:
+        effects = _prior_executor_effects_for_dto(dto)
+        up_applied = up_applied or effects.up_applied
+        down_applied = down_applied or effects.down_applied
+        force_off_applied = force_off_applied or effects.force_off_applied
+    return PriorExecutorEffects(
+        up_applied=up_applied,
+        down_applied=down_applied,
+        force_off_applied=force_off_applied,
+        safety_action_applied=down_applied or force_off_applied,
+        growth_action_applied=up_applied,
+        state_changed=up_applied or down_applied or force_off_applied,
+        target_place_changed=False,
+    )
 
 
 def _prior_executor_effects_for_dto(dto: KeywordDTO) -> PriorExecutorEffects:
     up_applied = False
     down_applied = False
     force_off_applied = False
-    for step in dto.next_state:
-        if step.executor_name in _GROWTH_EXECUTOR_NAMES:
+    for action in steps_to_v3_actions(dto, dto.next_state):
+        if action.action == V3ActionType.UP:
             up_applied = True
-        if step.executor_name in _DOWN_EXECUTOR_NAMES:
+        elif action.action == V3ActionType.DOWN:
             down_applied = True
-        if step.executor_name in _FORCE_OFF_EXECUTOR_NAMES:
+        elif action.action == V3ActionType.FORCE_OFF:
+            down_applied = True
             force_off_applied = True
-    for step in dto.history_target_place:
-        if step.executor_name in _NEUTRAL_EXECUTOR_NAMES:
-            continue
     return PriorExecutorEffects(
         up_applied=up_applied,
         down_applied=down_applied,
@@ -154,26 +173,18 @@ def _prior_executor_effects_for_dto(dto: KeywordDTO) -> PriorExecutorEffects:
         safety_action_applied=down_applied or force_off_applied,
         growth_action_applied=up_applied,
         state_changed=bool(dto.next_state),
-        target_place_changed=bool(dto.history_target_place),
+        target_place_changed=False,
     )
 
 
 def _direction_conflict_reason(context: UpdateContext) -> str | None:
-    effects_by_key = _prior_executor_effects(context)
+    effects = _prior_executor_effects(context)
     if context.adv_state.calibration_direct == CalibrationDirect.LOOSEN:
-        for dto in context.keywords:
-            effects = effects_by_key.get(dto.keyword_setting_id)
-            if effects is None:
-                continue
-            if effects.up_applied or effects.growth_action_applied:
-                return "prior_up_blocks_calibration_up"
-            if effects.safety_action_applied or effects.force_off_applied:
-                return "prior_safety_blocks_reverse_up"
+        if effects.up_applied or effects.growth_action_applied:
+            return "prior_up_blocks_calibration_up"
+        if effects.safety_action_applied or effects.force_off_applied:
+            return "prior_safety_blocks_reverse_up"
     else:
-        for dto in context.keywords:
-            effects = effects_by_key.get(dto.keyword_setting_id)
-            if effects is None:
-                continue
-            if effects.down_applied or effects.force_off_applied:
-                return "prior_down_blocks_calibration_down"
+        if effects.down_applied or effects.force_off_applied:
+            return "prior_down_blocks_calibration_down"
     return None
