@@ -18,6 +18,13 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 pytestmark = pytest.mark.unit
 
 
+def assert_cycle_state_valid(state: object) -> None:
+    current_cycle_started_at = getattr(state, "current_cycle_started_at", None)
+    test_started_at = getattr(state, "test_started_at", None)
+    if current_cycle_started_at and test_started_at:
+        assert current_cycle_started_at <= test_started_at
+
+
 @pytest.mark.asyncio
 async def test_build_view_returns_warning_when_adv_setting_not_found() -> None:
     repository = MagicMock()
@@ -311,6 +318,7 @@ async def test_build_view_repairs_corrupted_cycle_before_fetching_cycle_stats(
         from_ts=datetime(2026, 5, 26, 3, 29, 0, tzinfo=UTC),
         currency="RUB",
     )
+    assert_cycle_state_valid(repository.save_state.await_args.args[0])
 
 
 @pytest.mark.asyncio

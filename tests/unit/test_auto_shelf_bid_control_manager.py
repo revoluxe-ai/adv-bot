@@ -26,6 +26,13 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 pytestmark = pytest.mark.unit
 
 
+def assert_cycle_state_valid(state: object) -> None:
+    current_cycle_started_at = getattr(state, "current_cycle_started_at", None)
+    test_started_at = getattr(state, "test_started_at", None)
+    if current_cycle_started_at and test_started_at:
+        assert current_cycle_started_at <= test_started_at
+
+
 def test_clamp_bid_minor_within_window() -> None:
     assert (
         AutoShelfBidControlManager._clamp_bid_minor(
@@ -901,6 +908,7 @@ async def test_handle_main_mode_keeps_cycle_and_test_state_when_plan_bid_changes
     assert state.current_cycle_started_at == t1
     assert state.test_started_at == t2
     assert state.current_test_bid_minor == 45_000
+    assert_cycle_state_valid(state)
     manager._persist_state_then_set_bid.assert_awaited_once_with(
         complex_adv,
         state=state,
@@ -971,12 +979,156 @@ async def test_handle_main_mode_repairs_corrupted_cycle_start_before_plan_bid_ch
     assert state.current_cycle_started_at == previous_cycle
     assert state.test_started_at == test_started
     assert state.current_test_bid_minor == 45_000
+    assert_cycle_state_valid(state)
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
     manager._persist_state_then_set_bid.assert_awaited_once_with(
         complex_adv,
         state=state,
         bid_minor=24_000,
     )
+
+
+@pytest.mark.asyncio
+async def test_handle_main_mode_repairs_missing_previous_cycle_start_before_plan_bid_change() -> None:
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=999_999)
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    repository = MagicMock()
+    repository.save_state = AsyncMock(return_value=None)
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=24_000)  # type: ignore[method-assign]
+    manager.choose_next_test_bid = MagicMock(return_value=None)  # type: ignore[method-assign]
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    test_started = datetime(2026, 6, 8, 15, 56, 56, tzinfo=UTC)
+    current_cycle = datetime(2026, 6, 9, 6, 26, 23, tzinfo=UTC)
+    now = datetime(2026, 6, 9, 8, 0, 0, tzinfo=UTC)
+    state = MagicMock(
+        current_test_bid_minor=45_000,
+        current_mode="main",
+        current_cycle_started_at=current_cycle,
+        previous_cycle_started_at=None,
+        test_started_at=test_started,
+        main_started_at=datetime(2026, 6, 9, 6, 0, 0, tzinfo=UTC),
+        current_main_bid_minor=16_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        target_main_impressions=10,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=now):
+        await manager._handle_main_mode(
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=12_000,
+            actual_bid_minor=12_000,
+        )
+
+    assert state.current_cycle_started_at == test_started
+    assert state.test_started_at == test_started
+    assert state.current_test_bid_minor == 45_000
+    assert_cycle_state_valid(state)
+    repository.save_state.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=24_000,
+    )
+
+
+@pytest.mark.asyncio
+async def test_repair_cycle_started_at_is_idempotent_for_valid_state() -> None:
+    state = MagicMock(
+        current_cycle_started_at=datetime(2026, 6, 8, 10, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=datetime(2026, 5, 26, 3, 29, 0, tzinfo=UTC),
+        test_started_at=datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC),
+        last_reason=None,
+    )
+
+    assert AutoShelfBidControlManager.repair_cycle_started_at(state) is False
+    assert state.current_cycle_started_at == datetime(2026, 6, 8, 10, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_handle_main_mode_does_not_save_state_when_cycle_is_valid() -> None:
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=999_999)
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    repository = MagicMock()
+    repository.save_state = AsyncMock(return_value=None)
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=24_000)  # type: ignore[method-assign]
+    manager.choose_next_test_bid = MagicMock(return_value=None)  # type: ignore[method-assign]
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    test_started = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    current_cycle = datetime(2026, 6, 8, 10, 0, 0, tzinfo=UTC)
+    now = datetime(2026, 6, 9, 8, 0, 0, tzinfo=UTC)
+    state = MagicMock(
+        current_test_bid_minor=45_000,
+        current_mode="main",
+        current_cycle_started_at=current_cycle,
+        previous_cycle_started_at=datetime(2026, 5, 26, 3, 29, 0, tzinfo=UTC),
+        test_started_at=test_started,
+        main_started_at=datetime(2026, 6, 9, 6, 0, 0, tzinfo=UTC),
+        current_main_bid_minor=16_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        target_main_impressions=10,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=now):
+        await manager._handle_main_mode(
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=12_000,
+            actual_bid_minor=12_000,
+        )
+
+    repository.save_state.assert_not_called()
+    assert_cycle_state_valid(state)
 
 
 @pytest.mark.asyncio
