@@ -9,6 +9,7 @@ import pytest
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager import (
     DataUpdateManager,
 )
@@ -17,6 +18,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
     V3TickReportCollector,
+)
+from tests.unit.auto_updater_v3.calculated_keyword_factory import (
+    make_calculated_keyword,
 )
 
 
@@ -32,6 +36,14 @@ async def test_load_builds_tick_input_for_normal() -> None:
     complex_adv.rec_system_promotion_mode_active = False
     complex_adv.keyword_calibration_max_step = 8
     complex_adv.get_keywords = AsyncMock(return_value=[])
+    keywords = [
+        make_calculated_keyword(
+            ks_id=1,
+            text="kw-1",
+            mode=KeywordStrategyMode.MIN_CPA,
+            conv=0.0,
+        )
+    ]
 
     plan = MagicMock(max_pay_for_order=100, orders=10, target_pay_for_order=80)
     fact = MagicMock(pay_for_order=50.0, predict_orders=10.0)
@@ -96,6 +108,7 @@ async def test_load_builds_tick_input_for_normal() -> None:
 
         tick_data = await DataUpdateManager().load(
             complex_adv,
+            keywords=keywords,
             wb_shop_data_manager=MagicMock(),
             tick_report=V3TickReportCollector(),
         )
@@ -114,6 +127,14 @@ async def test_load_not_ready_without_plan() -> None:
     complex_adv.adv_id = 2
     complex_adv.adv_setting = MagicMock()
     complex_adv.get_keywords = AsyncMock(return_value=[])
+    keywords = [
+        make_calculated_keyword(
+            ks_id=2,
+            text="kw-2",
+            mode=KeywordStrategyMode.MIN_CPA,
+            conv=0.0,
+        )
+    ]
 
     with (
         patch(
@@ -131,6 +152,7 @@ async def test_load_not_ready_without_plan() -> None:
     ):
         tick_data = await DataUpdateManager().load(
             complex_adv,
+            keywords=keywords,
             wb_shop_data_manager=MagicMock(),
             tick_report=V3TickReportCollector(),
         )

@@ -70,6 +70,11 @@ class StatesListGenerator:
                 continue
             if dto.keyword_setting_id == 0:
                 continue
+            if dto.is_no_data_singleton():
+                state = resolve_current_ladder_state(dto)
+                if state is not None and state.cpo is not None:
+                    current_active.append((dto, state, float(state.cpo)))
+                continue
             participates = _keyword_participates_in_ladder(dto, self._adv_state)
             off_no_data = (
                 self._for_calibration and _is_calibration_off_no_data(dto, self._adv_state)

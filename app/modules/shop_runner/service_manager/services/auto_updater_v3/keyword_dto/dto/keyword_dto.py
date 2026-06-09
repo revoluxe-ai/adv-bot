@@ -113,6 +113,14 @@ class KeywordDTO:
         """NOT FULL: нет CH-матрицы (``position_profile`` пуст)."""
         return not bool(self.position_profile)
 
+    def is_no_data_singleton(self) -> bool:
+        """NO DATA singleton: единственный synthetic MIN_CPA-state с fact pay_for_order."""
+        states = self.ladder_states
+        return (
+            len(states) == 1
+            and states[0].synthetic_no_data
+        )
+
     def _validate_not_full_state(self, executor_name: str) -> None:
         """NOT FULL + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
         if not self.is_not_full():
@@ -196,9 +204,10 @@ class KeywordDTO:
         ladder_states: tuple[KeywordV3LadderState, ...],
     ) -> KeywordDTO:
         """Сборка из ``KeywordV3Context`` + ladder states."""
+        stored_mode = stored_strategy_mode(ctx.keyword)
         return cls(
             calculated_keyword=ctx.keyword,
             position_profile=ctx.position_profile,
-            stored_mode=stored_strategy_mode(ctx.keyword),
+            stored_mode=stored_mode,
             target_place_matrix=TargetPlaceMatrix(ladder_states),
         )

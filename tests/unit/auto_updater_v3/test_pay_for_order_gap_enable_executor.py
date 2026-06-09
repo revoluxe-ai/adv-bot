@@ -24,6 +24,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     KeywordsPreparedList,
+    UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
@@ -140,7 +141,7 @@ def _gap_dto(*, ks_id: int = 1) -> KeywordDTO:
 
 def _adv_state(
     *,
-    fact: float = 50.0,
+    fact: float | None = None,
     resolve: float = 100.0,
     max_cpo: float = 120.0,
     eligibility: dict[int, KeywordV3Eligibility] | None = None,
@@ -152,7 +153,7 @@ def _adv_state(
         max_pay_for_order=max_cpo,
         fact_pay_for_order=fact,
         resolve_valid=True,
-        guard_condition=fact <= max_cpo,
+        guard_condition=fact is not None and fact <= max_cpo,
         eligibility_by_ks_id=elig,
     )
 
@@ -160,7 +161,11 @@ def _adv_state(
 def _context(
     keywords: list[KeywordDTO],
     adv_state: AdvState,
+    *,
+    apply_post_process: bool = True,
 ):
+    if not apply_post_process:
+        return UpdateContext(prepared=KeywordsPreparedList(keywords=keywords), adv_state=adv_state)
     return UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=keywords),
         adv_state=adv_state,
@@ -197,7 +202,7 @@ def test_skip_when_fact_gt_max() -> None:
 @pytest.mark.unit
 def test_enable_one_gap_keyword_to_min_cpa() -> None:
     dto = _gap_dto()
-    ctx = _context([dto], _adv_state())
+    ctx = _context([dto], _adv_state(fact=50.0), apply_post_process=False)
     PayForOrderGapEnableExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
     assert dto.target_place == 0
@@ -210,9 +215,10 @@ def test_picks_lowest_keyword_setting_id() -> None:
     dto1 = _gap_dto(ks_id=2)
     dto2 = _gap_dto(ks_id=1)
     adv = _adv_state(
+        fact=50.0,
         eligibility={1: _no_data_elig(), 2: _no_data_elig()},
     )
-    ctx = _context([dto1, dto2], adv)
+    ctx = _context([dto1, dto2], adv, apply_post_process=False)
     PayForOrderGapEnableExecutor().execute(ctx)
     assert dto2.current_mode == KeywordStrategyMode.MIN_CPA
     assert dto1.current_mode == KeywordStrategyMode.OFF
@@ -232,6 +238,37 @@ def test_non_gap_off_unchanged() -> None:
     ctx = _context([dto], _adv_state(eligibility={3: _no_data_elig()}))
     PayForOrderGapEnableExecutor().execute(ctx)
     assert dto.next_state == []
+    assert dto.current_mode == KeywordStrategyMode.OFF
+
+
+@pytest.mark.unit
+def test_no_data_singleton_is_not_gap_candidate() -> None:
+    kw = _calc_kw(
+        ks_id=4,
+        text="nd",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        hard_status=2,
+    )
+    kw = kw.model_copy(update={"pay_for_order": 111.0})
+    ctx_obj = KeywordV3Context(keyword=kw, position_profile=None)
+    dto = KeywordDTO.from_context(
+        ctx_obj,
+        ladder_states=(
+            KeywordV3LadderState(
+                keyword_setting_id=4,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=111.0,
+                synthetic_no_data=True,
+            ),
+        ),
+    )
+    ctx = _context([dto], _adv_state(eligibility={4: _no_data_elig()}))
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.next_state == []
+    assert dto.is_no_data_singleton()
     assert dto.current_mode == KeywordStrategyMode.OFF
 
 
