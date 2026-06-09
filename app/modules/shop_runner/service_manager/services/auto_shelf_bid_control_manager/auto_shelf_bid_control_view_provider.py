@@ -193,6 +193,7 @@ class AutoShelfBidControlViewProvider:
                 optimization_metric=OptimizationMetric.CPC,
                 fact_cpo=None,
                 resolve_cpo=None,
+                best_plan_bid_minor=None,
             )
 
         nmids = list(adv.nmids or [])
@@ -563,4 +564,5 @@ class AutoShelfBidControlViewProvider:
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
+            best_plan_bid_minor=None,
         )

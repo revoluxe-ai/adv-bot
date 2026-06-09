@@ -79,6 +79,7 @@ async def test_build_view_auto_creates_default_settings_for_single_nmid(
 
     repository.get_or_create_default_settings.assert_awaited_once_with(111)
     assert view.has_settings is True
+    assert view.best_plan_bid_minor is None
     assert "settings_missing" not in view.warnings
 
 

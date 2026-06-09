@@ -124,8 +124,8 @@ async def test_process_adv_v3_runs_selector_when_plan_fact_equal_overspend() -> 
     ("plan_fact_equal", "cached_views", "current_views", "expect_calibration"),
     [
         (True, 100, 100, False),
-        (False, 100, 100, False),
-        (True, 100, 200, False),
+        (False, 100, 100, True),
+        (True, 100, 200, True),
         (False, 100, 200, True),
     ],
 )
@@ -135,7 +135,7 @@ async def test_calibration_trim_and_gate_plan_fact_views(
     current_views: int,
     expect_calibration: bool,
 ) -> None:
-    """AND-gate: calibration только если plan/fact и views оба изменились."""
+    """Calibration skips only when plan/fact and views are both unchanged."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=85.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -473,8 +473,8 @@ async def test_resolve_calibration_loosen_when_fact_below_ninety_percent_resolve
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_resolve_calibration_skipped_when_fact_above_max() -> None:
-    """``fact > max`` — calibration skip (fact_gt_max), realloc может выполниться."""
+async def test_resolve_calibration_runs_when_fact_above_max() -> None:
+    """``fact > max```` не блокирует calibration сам по себе."""
     plan = _plan_for_cpa_gates()
     fact = _fact_for_cpa_gates(pay_for_order=150.0)
     resolve = compute_resolve_cost_threshold(plan, fact)
@@ -486,7 +486,7 @@ async def test_resolve_calibration_skipped_when_fact_above_max() -> None:
 
     realloc.assert_called_once()
     cal_up.assert_not_called()
-    cal_down.assert_not_called()
+    cal_down.assert_called_once()
     step_cache.set_state.assert_awaited_once()
     saved = step_cache.set_state.await_args[0][0]
-    assert saved.effective_steps == 0
+    assert saved.effective_steps == 1

@@ -34,6 +34,8 @@ class BidPointStatsDTO:
 
 @dataclass(frozen=True, slots=True)
 class AutoShelfBidControlViewDTO:
+
+    # TODO: Найти и исправить битую кодировку
     """РЎСЂРµР· СЃРѕСЃС‚РѕСЏРЅРёСЏ control-РјРѕРґСѓР»СЏ РґР»СЏ Telegram-СЌРєСЂР°РЅР°."""
 
     nmid: int
@@ -76,4 +78,5 @@ class AutoShelfBidControlViewDTO:
     optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
     fact_cpo: float | None  # фактическое CPO кампании
     resolve_cpo: float | None  # resolve/target CPO кампании
+    best_plan_bid_minor: int | None = None
     rec_bid_recommendation: dict[str, object] | None = None

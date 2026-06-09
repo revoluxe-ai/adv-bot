@@ -50,11 +50,29 @@ class ResetOverMaxCpoOnOverspendExecutor:
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
     """Skip если нет fact или ``fact <= plan.max_pay_for_order``."""
+    current_cpo_percent = _current_cpo_percent(adv_state)
+    if current_cpo_percent is None:
+        return "no_current_cpo_percent"
+    if current_cpo_percent < 100.0:
+        return "cpo_percent_lt_100"
     if adv_state.fact_pay_for_order is None:
         return "no_fact_pay_for_order"
     if not adv_state.guard_condition:
         return "fact_le_plan_max_cpo"
     return None
+
+
+def _current_cpo_percent(adv_state: AdvState) -> float | None:
+    fact_pay_for_order = adv_state.fact_pay_for_order
+    if fact_pay_for_order is None:
+        return None
+    max_pay_for_order: object = getattr(adv_state, "max_pay_for_order", None)
+    if not isinstance(max_pay_for_order, (int, float)):
+        return None
+    max_pay_for_order = float(max_pay_for_order)
+    if max_pay_for_order <= 0:
+        return None
+    return float(fact_pay_for_order) / max_pay_for_order * 100.0
 
 
 def _resolve_target_state(

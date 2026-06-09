@@ -82,6 +82,7 @@ def _view_with_bid_point(
         optimization_metric=optimization_metric,
         fact_cpo=150.0,
         resolve_cpo=100.0,
+        best_plan_bid_minor=None,
     )
 
 
@@ -120,9 +121,17 @@ def test_render_shows_bid_points_in_rubles_not_raw_kopecks() -> None:
     text = render_auto_shelf_bid_control_message(_view_with_bid_point())
     assert "Покрытые ставки:" not in text
     assert "20000:" not in text
+    assert "Лучшая плановая ставка" not in text
     assert "Минимальная ставка WB: 120 ₽" in text
     assert "Максимальная ставка: 500 ₽" in text
     assert "Шаг между тестовыми ставками: 1 ₽" in text
+
+
+def test_render_does_not_show_best_plan_bid_when_none() -> None:
+    view = _view_with_bid_point()
+    text = render_auto_shelf_bid_control_message(view)
+    assert "best_plan_bid" not in text
+    assert "Лучшая плановая ставка" not in text
 
 
 def test_render_shows_optimization_metric_cpc() -> None:
