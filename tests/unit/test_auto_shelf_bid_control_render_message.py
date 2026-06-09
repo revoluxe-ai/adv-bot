@@ -134,6 +134,21 @@ def test_render_does_not_show_best_plan_bid_when_none() -> None:
     assert "Лучшая плановая ставка" not in text
 
 
+def test_render_shows_main_waiting_observation_progress() -> None:
+    view = replace(
+        _view_with_bid_point(),
+        last_reason="main_waiting_observation_time",
+        main_elapsed_minutes=12,
+        target_main_observation_minutes=60,
+        main_impressions=31_572,
+        target_main_impressions=18_000,
+    )
+    text = render_auto_shelf_bid_control_message(view)
+    assert "main_waiting_observation_time" in text
+    assert "Main observation: 12 / 60 мин" in text
+    assert "Main: 31572 / 18000 показов" in text
+
+
 def test_render_shows_optimization_metric_cpc() -> None:
     """Отображение метрики оптимизации CPC."""
     view = _view_with_bid_point(optimization_metric=OptimizationMetric.CPC)
