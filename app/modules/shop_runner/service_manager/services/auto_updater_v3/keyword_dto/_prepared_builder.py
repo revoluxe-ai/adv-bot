@@ -325,6 +325,10 @@ def _apply_no_data_singletons(prepared: KeywordsPreparedList, state: AdvState) -
         )
         dto.target_place_matrix = TargetPlaceMatrix((singleton,))
         dto.stored_mode = KeywordStrategyMode.MIN_CPA
+        dto.current_target_place = NextTargetPlace(
+            new_target_place=0,
+            executor_name="no_data_singleton_post_process",
+        )
 
 
 def update_context_from_prepared(
@@ -344,6 +348,7 @@ def update_context_from_prepared(
             )
         else:
             raise TypeError(f"unsupported prepared type: {type(prepared)!r}")
+    _apply_no_data_singletons(prepared, state)
     return UpdateContext(
         prepared=prepared,
         adv_state=state,
