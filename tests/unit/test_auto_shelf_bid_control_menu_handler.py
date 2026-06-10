@@ -167,3 +167,28 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
 
     callback.answer.assert_not_awaited()
     assert chat_message.answers == ["В текущем цикле пока нет ставок с показами."]
+
+
+def test_auto_shelf_bid_settings_keyboard_callback_data_fits_telegram_limit() -> None:
+    keyboard = handler.build_auto_shelf_bid_settings_keyboard(1151721977)
+    callback_data_values = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data is not None
+    ]
+    assert callback_data_values
+    assert all(len(value.encode()) <= 64 for value in callback_data_values)
+
+
+def test_auto_shelf_bid_control_action_normalization_accepts_compact_and_legacy_codes() -> None:
+    assert (
+        callbacks.normalize_auto_shelf_bid_control_action("tto")
+        == "set_target_test_observation_minutes"
+    )
+    assert (
+        callbacks.normalize_auto_shelf_bid_control_action(
+            "set_target_test_observation_minutes"
+        )
+        == "set_target_test_observation_minutes"
+    )

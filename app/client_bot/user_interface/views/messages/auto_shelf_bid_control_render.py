@@ -7,6 +7,7 @@ from datetime import datetime
 from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlBidPoints,
     AutoShelfBidControlMenu,
+    compact_auto_shelf_bid_control_action,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_units import (
     TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
@@ -477,21 +478,21 @@ def build_auto_shelf_bid_control_keyboard(
         builder.button(
             text="Выключить управление",
             callback_data=AutoShelfBidControlMenu(
-                action="disable",
+                action=compact_auto_shelf_bid_control_action("disable"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
         builder.button(
             text="Настройки",
             callback_data=AutoShelfBidControlMenu(
-                action="settings",
+                action=compact_auto_shelf_bid_control_action("settings"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
         builder.button(
             text="Обновить",
             callback_data=AutoShelfBidControlMenu(
-                action="refresh",
+                action=compact_auto_shelf_bid_control_action("refresh"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
@@ -506,14 +507,14 @@ def build_auto_shelf_bid_control_keyboard(
         builder.button(
             text="Сбросить цикл",
             callback_data=AutoShelfBidControlMenu(
-                action="reset_cycle",
+                action=compact_auto_shelf_bid_control_action("reset_cycle"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
         builder.button(
             text="Вернуть main-ставку",
             callback_data=AutoShelfBidControlMenu(
-                action="force_main",
+                action=compact_auto_shelf_bid_control_action("force_main"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
@@ -521,28 +522,28 @@ def build_auto_shelf_bid_control_keyboard(
         builder.button(
             text="Включить управление",
             callback_data=AutoShelfBidControlMenu(
-                action="enable",
+                action=compact_auto_shelf_bid_control_action("enable"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
         builder.button(
             text="Настройки",
             callback_data=AutoShelfBidControlMenu(
-                action="settings",
+                action=compact_auto_shelf_bid_control_action("settings"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
         builder.button(
             text="Обновить",
             callback_data=AutoShelfBidControlMenu(
-                action="refresh",
+                action=compact_auto_shelf_bid_control_action("refresh"),
                 adv_setting_original_id=adv_setting_original_id,
             ).pack(),
         )
     builder.button(
         text="Назад",
         callback_data=AutoShelfBidControlMenu(
-            action="back",
+            action=compact_auto_shelf_bid_control_action("back"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
@@ -573,42 +574,46 @@ def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> Inli
     builder.button(
         text="Изменить max ставку",
         callback_data=AutoShelfBidControlMenu(
-            action="set_max_bid",
+            action=compact_auto_shelf_bid_control_action("set_max_bid"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
     builder.button(
         text="Изменить долю теста",
         callback_data=AutoShelfBidControlMenu(
-            action="set_test_share",
+            action=compact_auto_shelf_bid_control_action("set_test_share"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
     builder.button(
         text="Изменить показов на тест",
         callback_data=AutoShelfBidControlMenu(
-            action="set_target_test_impressions",
+            action=compact_auto_shelf_bid_control_action(
+                "set_target_test_impressions"
+            ),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
     builder.button(
         text="Изменить минут теста",
         callback_data=AutoShelfBidControlMenu(
-            action="set_target_test_observation_minutes",
+            action=compact_auto_shelf_bid_control_action(
+                "set_target_test_observation_minutes"
+            ),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
     builder.button(
         text="Изменить шаг между ставками",
         callback_data=AutoShelfBidControlMenu(
-            action="set_min_bid_distance",
+            action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
     builder.button(
         text="Назад к управлению ставкой",
         callback_data=AutoShelfBidControlMenu(
-            action="open",
+            action=compact_auto_shelf_bid_control_action("open"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )
