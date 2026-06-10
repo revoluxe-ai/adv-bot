@@ -173,7 +173,7 @@ async def auto_shelf_bid_control_menu_router(
     redis_client: RedisClient = Provide["redis_client_wrapper"],
 ) -> None:
     """Маршрутизация callback actions для Telegram-управления ставкой в полках."""
-    action = callback_data.action
+    action = callbacks.normalize_auto_shelf_bid_control_action(callback_data.action)
     adv_setting_original_id = callback_data.adv_setting_original_id
     service = AutoShelfBidControlTelegramService(redis_client=redis_client)
     try:
