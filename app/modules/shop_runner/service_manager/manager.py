@@ -457,13 +457,24 @@ class CoroutinesManager:
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs, _ = await self._split_advs_by_stats_freshness(
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )
         control_system_v2 = AdvControlSystem(max_last_period=2)
         from .services.auto_updater_v3 import process_adv_v3
-
+        # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
+        for adv in advs_filtred:
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 2:
+                handlers.append(
+                    functools.partial(control_system_v2.process_adv, adv)
+                )
+            else:
+                logger.error('Установлена не поддерживаемая версия автоапдейтера')
+                continue
+
+
         for adv in advs:
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 3:
@@ -474,13 +485,11 @@ class CoroutinesManager:
                         wb_shop_data_manager=self._wb_shop_data_manager,
                     )
                 )
-            elif ver == 2:
-                handlers.append(
-                    functools.partial(control_system_v2.process_adv, adv)
-                )
+
             else:
                 logger.error('Установлена не поддерживаемая версия автоапдейтера')
                 continue
+
 
         if not handlers:
             return None
