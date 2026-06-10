@@ -68,18 +68,19 @@ async def get_auto_campaign_cost_activity_metrics(
         adv_setting.adv_id,
         days=days_for_avg,
     )
-
-    is_active: bool | None
-    if target_cost is None or avg_cost is None:
-        is_active = None
-    else:
-        is_active = avg_cost <= target_cost
-
     ch_ts = (
         plan_fact_summary.plan_fact_ch_ts_msk
         if plan_fact_summary is not None
         else None
     )
+    is_active: bool | None
+    if adv_setting.auto_shelf_bid_control_enabled:
+        is_active = True
+    else:
+        if target_cost is None or avg_cost is None:
+            is_active = None
+        else:
+            is_active = avg_cost <= target_cost
 
     campaign_sales_state: SalesStates | None = None
     if plan is not None:
