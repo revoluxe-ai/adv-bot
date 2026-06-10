@@ -55,6 +55,7 @@ class _FakeAdvSetting:
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
         self.sales_predict_method = FactMethods.DIRECT_SALES
+        self.auto_shelf_bid_control_enabled: bool = False
 
 
 class _FakeSearchAdv:
@@ -81,6 +82,7 @@ class _FakeComplexAdv:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
+        auto_adv_bid_control_enable: bool = False
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -102,6 +104,7 @@ class _FakeComplexAdv:
         self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
         self._use_common_budget = use_common_budget
         self._common_budget_daily_limit = common_budget_daily_limit
+        self.auto_adv_bid_control_enable = auto_adv_bid_control_enable
 
     @property
     def adv_setting(self):
@@ -140,6 +143,7 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         plan_for_sales_for_day=1,
         target_price_for_order=100,
         max_price_for_order=200,
+        auto_adv_bid_control_enable=False
     )
     adv_to_pause = _FakeComplexAdv(
         auto_limit=0,
