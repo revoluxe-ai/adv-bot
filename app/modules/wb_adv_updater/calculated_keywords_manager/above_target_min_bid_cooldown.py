@@ -282,6 +282,29 @@ def apply_above_target_min_bid_cooldown(
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)
 
+    # Если базовая логика уже дала GOOD и себестоимость не превышает target,
+    # правило МС не должно удерживать ключ в BAD даже в окне freeze.
+    if (
+        base_state.status == KeywordStatus.GOOD
+        and keyword_pay_for_order is not None
+        and resolved_target_cost is not None
+        and keyword_pay_for_order <= resolved_target_cost
+    ):
+        entry = _normalize_entry(cooldown_map.get(text))
+        if entry is not None:
+            cooldown_updates[text] = None
+        returned = base_state.model_copy(update={"cooldown_display_tag": None})
+        diag = _build_ms_diagnostic(
+            returned_state=returned,
+            diagnostic_state=AboveTargetMinBidDiagnosticState.PASS_BY_COST,
+            gates=gates,
+            keyword_pay_for_order=keyword_pay_for_order,
+            resolved_target_cost=resolved_target_cost,
+            cost_gate_evaluated=True,
+            cost_condition_pass=True,
+        )
+        return _attach_ms_diagnostic(returned, diag)
+
     # Только ключи, которые по базовой логике сейчас GOOD (активны); остальные не трогаем и не проверяем МС.
     if base_state.status != KeywordStatus.GOOD:
         entry_inactive = _normalize_entry(cooldown_map.get(text))

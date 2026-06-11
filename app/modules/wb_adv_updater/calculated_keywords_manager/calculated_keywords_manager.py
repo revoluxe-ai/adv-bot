@@ -43,6 +43,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
     calc_pay_for_order,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
 from app.modules.wb_adv_updater.calculated_keywords_manager.redis_above_target_min_bid_cooldown_manager import (
@@ -411,9 +414,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         # Target cost already resolved at WBShopDataManager.get_complex_advs():
         # PreComplexAdv.resolved_target_pay_for_order uses batch get_latest_plan_facts.
         # Do not query ClickHouse again per campaign.
+        resolved_target_cost: float | None
         _raw_target = complex_adv.target_pay_for_order
         if _raw_target is None or isinstance(_raw_target, bool):
-            resolved_target_cost: float | None = None
+            resolved_target_cost = None
         elif isinstance(_raw_target, Real):
             resolved_target_cost = float(_raw_target)
         else:
@@ -422,6 +426,25 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             resolved_target_cost = resolve_target_cost(
                 _plan_o, _plan_t, _plan_m, None
             )
+        _resolved_ch: float | None = None
+        try:
+            _summary = await PlanFactReader().get_latest_plan_fact(
+                complex_adv.adv_id
+            )
+            if _summary is not None:
+                _resolved_ch = resolve_target_cost(
+                    _plan_o, _plan_t, _plan_m, _summary.fact_predict_orders
+                )
+        except Exception:
+            logger.exception(
+                "PlanFactReader.get_latest_plan_fact failed for adv_id=%r; "
+                "falling back to target_pay_for_order / plan without CH fact",
+                getattr(complex_adv, "adv_id", None),
+            )
+            _resolved_ch = None
+
+        if _resolved_ch is not None:
+            resolved_target_cost = _resolved_ch
 
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None

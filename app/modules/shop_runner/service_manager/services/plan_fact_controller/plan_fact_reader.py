@@ -26,7 +26,7 @@ class PlanFactSummary:
     fact_method: str | None = None
     # max(timestamp) по adv_id, строка уже в Europe/Moscow (как в консоли CH)
     plan_fact_ch_ts_msk: str | None = None
-
+    plan_orders: int | None = None
 
 class PlanFactReader:
     @staticmethod
