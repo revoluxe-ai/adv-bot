@@ -18,6 +18,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_min_bids_cache_manager import (
     MinBidsCacheManager,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
@@ -478,6 +481,7 @@ class AutoShelfBidControlViewProvider:
                     state = await self._repository.save_state(state)
 
         next_test_bid_minor: int | None = None
+        legacy_cycle_next_test_bid_minor: int | None = None
         if settings_obj is not None and min_bid_minor_value is not None:
             if int(settings_obj.max_bid_minor) < min_bid_minor_value:
                 warnings.append("max_bid_lower_than_min_bid")
@@ -490,12 +494,13 @@ class AutoShelfBidControlViewProvider:
                 if target_test is not None
                 else []
             )
-            next_test_bid_minor = AutoShelfBidControlManager.choose_next_test_bid(
+            legacy_cycle_next_test_bid_minor = AutoShelfBidControlManager.choose_next_test_bid(
                 min_bid=min_bid_minor_value,
                 max_bid=int(settings_obj.max_bid_minor),
                 covered_bids=covered_bids,
                 min_distance=int(settings_obj.min_bid_distance_minor),
             )
+            next_test_bid_minor = legacy_cycle_next_test_bid_minor
         if app_dry_run:
             warnings.append("dry_run_enabled")
         if not bid_units_confirmed:
@@ -705,6 +710,10 @@ class AutoShelfBidControlViewProvider:
                     target_test_observation_hours=target_test_observation_hours_value,
                 ),
             )
+            if adv.auto_shelf_bid_control_strategy == AutoShelfBidControlStrategy.PLAN_DISTANCE:
+                next_test_bid_minor = coverage_selected_next_test_bid_minor
+            else:
+                next_test_bid_minor = legacy_cycle_next_test_bid_minor
             universe = build_bid_universe(
                 min_bid_minor_value,
                 max_bid_minor_value,
@@ -801,4 +810,5 @@ class AutoShelfBidControlViewProvider:
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
             best_plan_bid_minor=best_plan_bid_minor,
+            legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
         )

@@ -100,3 +100,4 @@ class AutoShelfBidControlViewDTO:
     )
     best_plan_bid_minor: int | None = None
     rec_bid_recommendation: dict[str, object] | None = None
+    legacy_cycle_next_test_bid_minor: int | None = None

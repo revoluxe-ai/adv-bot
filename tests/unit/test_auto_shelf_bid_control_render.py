@@ -238,6 +238,8 @@ def test_render_main_message_rejects_bool_best_plan_bid() -> None:
 def test_render_main_message_with_coverage_layers_block() -> None:
     view = replace(
         _view(enabled=True, has_settings=True),
+        next_test_bid_minor=33_900,
+        legacy_cycle_next_test_bid_minor=40_250,
         current_main_bid_minor=20_500,
         current_test_bid_minor=60_000,
         min_bid_minor=12_000,
@@ -278,10 +280,12 @@ def test_render_main_message_with_coverage_layers_block() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     assert "Накопленное покрытие тестов:" in message
+    assert "Следующая тестовая ставка: 339 ₽" in message
     assert "first_available_bucket_start:" in message
     assert "current_layer: 0" in message
     assert "undercovered_count: 3" in message
     assert "selected_next_test_bid: 339 ₽" in message
+    assert "402.50 ₽" not in message
     assert "current_main_bid_minor: 205 ₽" in message
     assert "current_test_bid_minor / selected_next_test_bid_minor: 600 ₽" in message
     assert "best_plan_bid_minor: 375 ₽" in message

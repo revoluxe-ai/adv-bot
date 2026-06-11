@@ -475,7 +475,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Тестовая ставка test: {format_bid(view.current_test_bid_minor, view.currency)}\n"
         f"Лучшая ставка цикла: {format_bid(view.cycle_best_bid_minor, view.currency)}\n"
         f"Лучшая глобальная ставка: {format_bid(view.global_best_bid_minor, view.currency)}\n"
-        f"Следующая тестовая ставка (по циклу): {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
+        f"Следующая тестовая ставка: {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
         + (
             f"Лучшая плановая ставка: {format_bid(view.best_plan_bid_minor, view.currency)}\n\n"
             if view.best_plan_bid_minor is not None
