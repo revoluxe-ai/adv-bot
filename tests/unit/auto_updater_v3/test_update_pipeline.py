@@ -141,6 +141,7 @@ def test_build_normal_preamble_executors_order() -> None:
         "raise_state_to_target_cpo",
         "reset_over_max_cpo_on_overspend",
         "shelf_cleanup",
+        "pay_for_order_no_ch_enable",
         "cost_reallocation",
         "pay_for_order_gap_enable",
         "pay_for_order_over_max_off_on_deep_overspend",

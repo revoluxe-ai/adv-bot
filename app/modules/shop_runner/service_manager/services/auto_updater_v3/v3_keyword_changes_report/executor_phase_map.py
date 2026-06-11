@@ -16,6 +16,7 @@ EXECUTOR_TO_PHASE_ID: dict[str, str] = {
     "RaiseStateToTargetCpoExecutor": "raise_state_to_target_cpo",
     "ResetOverMaxCpoOnOverspendExecutor": "reset_over_max_cpo_on_overspend",
     "ShelfCleanupExecutor": "shelf_cleanup",
+    "PayForOrderNoChEnableExecutor": "pay_for_order_no_ch_enable",
     "RebalanceExecutor": "cost_reallocation",
     "PayForOrderGapEnableExecutor": "pay_for_order_gap_enable",
     "PayForOrderOverMaxOffOnDeepOverspendExecutor": (
@@ -43,6 +44,7 @@ EXECUTOR_SHORT_LABEL: dict[str, str] = {
     "RaiseStateToTargetCpoExecutor": "R↑",
     "ResetOverMaxCpoOnOverspendExecutor": "R↓",
     "ShelfCleanupExecutor": "S",
+    "PayForOrderNoChEnableExecutor": "enP",
     "RebalanceExecutor": "R",
     "PayForOrderGapEnableExecutor": "en",
     "PayForOrderOverMaxOffOnDeepOverspendExecutor": "pfo↓",

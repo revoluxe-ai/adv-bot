@@ -58,6 +58,7 @@ _PHASE_LOG: dict[str, tuple[str, str]] = {
         "reset_over_max_cpo_count",
     ),
     "shelf_cleanup": ("v3 SHELF_REC_CLEANUP", "shelf_count"),
+    "pay_for_order_no_ch_enable": ("v3 PAY_FOR_ORDER_NO_CH_ENABLE", "enable_count"),
     "cost_reallocation": ("v3 COST_REALLOCATION", "realloc_count"),
     "pay_for_order_gap_enable": ("v3 PAY_FOR_ORDER_GAP_ENABLE", "enable_count"),
     "pay_for_order_over_max_off_on_deep_overspend": (

@@ -110,6 +110,10 @@ class NextStateManager:
 
     def enable_gap_to_min_cpa(self, keyword: KeywordDTO) -> None:
         """GAP OFF → ``MIN_CPA`` + ``target_place=0`` (legacy enable UP без MIN в матрице)."""
+        self.enable_off_to_min_cpa(keyword)
+
+    def enable_off_to_min_cpa(self, keyword: KeywordDTO) -> None:
+        """Explicit OFF → ``MIN_CPA`` + ``target_place=0`` via authorized executor path."""
         if keyword.current_mode != KeywordStrategyMode.OFF:
             return
         keyword.current_mode = NextState(

@@ -286,3 +286,4 @@ def test_gap_enable_in_preamble() -> None:
     executors = build_normal_preamble_executors()
     phases = [ex.phase_name for ex in executors]
     assert "pay_for_order_gap_enable" in phases
+    assert phases.index("pay_for_order_gap_enable") > phases.index("cost_reallocation")

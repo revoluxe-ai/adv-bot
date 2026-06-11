@@ -140,6 +140,9 @@ class RebalanceExecutor:
 def _phase_skip_reason(context: UpdateContext) -> str | None:
     if not context.adv_state.resolve_valid:
         return "resolve_invalid"
+    for dto in context.keywords:
+        if dto.next_state or dto.history_target_place:
+            return "prior_executor_applied"
     return None
 
 
