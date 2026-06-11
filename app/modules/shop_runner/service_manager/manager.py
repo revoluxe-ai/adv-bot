@@ -470,8 +470,6 @@ class CoroutinesManager:
                 handlers.append(
                     functools.partial(control_system_v2.process_adv, adv)
                 )
-            else:
-                logger.error('Установлена не поддерживаемая версия автоапдейтера')
                 continue
 
 
@@ -485,10 +483,10 @@ class CoroutinesManager:
                         wb_shop_data_manager=self._wb_shop_data_manager,
                     )
                 )
-
-            else:
-                logger.error('Установлена не поддерживаемая версия автоапдейтера')
-                continue
+        for adv in advs:
+            if adv.auto_updater_version not in [2, 3]:
+                logger.error('Установлена не поддерживаемая версия автоапдейтера '
+                             'shop_id %s', self.shop_id)
 
 
         if not handlers:
