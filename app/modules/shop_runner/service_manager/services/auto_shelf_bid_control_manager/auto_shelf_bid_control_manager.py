@@ -31,12 +31,12 @@ from .auto_shelf_bid_control_analytics_repository import (
 from .bid_coverage_selector import (
     BidCoverage,
     build_coverage_selector_seed,
+    closed_layers_for_bid,
     choose_next_test_bid_by_coverage_layers,
 )
 from .bid_selection import resolve_cycle_best_bids
 from .bid_units import (
     report_day_start_utc,
-    resolve_test_segment_start_utc,
     wb_min_cpm_rub_to_bid_minor,
 )
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
@@ -166,6 +166,47 @@ class AutoShelfBidControlManager:
             return None
         elapsed = int((now - started_at).total_seconds() // 60)
         return max(0, elapsed)
+
+    async def _closed_layers_for_bid_at(
+        self,
+        *,
+        nmid: int,
+        currency: str,
+        bid_minor: int,
+        date_to: datetime,
+        target_test_impressions: int,
+        target_test_observation_hours: int,
+    ) -> int:
+        """Compute closed layers for one bid at a given point in time."""
+        price_minor: int | None = None
+        mode: str | None = None
+        first_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
+            nmid=nmid,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        if first_bucket_start is None:
+            return 0
+        coverages = await self._analytics.get_bid_coverages(
+            nmid=nmid,
+            date_from=first_bucket_start,
+            date_to=date_to,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        coverage_by_bid = {int(item.bid_minor): item for item in coverages}
+        coverage = coverage_by_bid.get(
+            int(bid_minor),
+            BidCoverage(bid_minor=int(bid_minor), impressions=0, valid_hours=0),
+        )
+        return closed_layers_for_bid(
+            impressions=coverage.impressions,
+            valid_hours=coverage.valid_hours,
+            target_test_impressions=int(target_test_impressions),
+            target_test_observation_hours=int(target_test_observation_hours),
+        )
 
     @staticmethod
     def repair_cycle_started_at(state: AutoShelfBidControlState) -> bool:
@@ -622,25 +663,32 @@ class AutoShelfBidControlManager:
             test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
             state.current_test_bid_minor = test_bid
             state.test_started_at = state.test_started_at or now
-        test_started_at = resolve_test_segment_start_utc(
-            test_started_at=state.test_started_at,
-            current_cycle_started_at=state.current_cycle_started_at,
-            fallback_now=now,
-        )
-        test_elapsed_minutes = self._elapsed_minutes(test_started_at, now)
+        if not isinstance(state.test_started_at, datetime):
+            state.test_started_at = now
+        test_started_at = state.test_started_at
         target_test_observation_minutes = self._target_observation_minutes_or_default(
             settings_obj.target_test_observation_minutes
         )
-        test_impressions = await self._analytics.get_impressions(
+        target_test_observation_hours = self._target_observation_hours_from_minutes(
+            target_test_observation_minutes
+        )
+        closed_layers_at_test_start = await self._closed_layers_for_bid_at(
             nmid=nmid,
-            from_ts=test_started_at,
             currency=state.currency,
             bid_minor=test_bid,
+            date_to=test_started_at,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_observation_hours=target_test_observation_hours,
         )
-        if (
-            test_elapsed_minutes is None
-            or test_elapsed_minutes < target_test_observation_minutes
-        ):
+        closed_layers_now = await self._closed_layers_for_bid_at(
+            nmid=nmid,
+            currency=state.currency,
+            bid_minor=test_bid,
+            date_to=now,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_observation_hours=target_test_observation_hours,
+        )
+        if closed_layers_now <= closed_layers_at_test_start:
             wait_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
             state.last_reason = wait_reason
             if actual_bid_minor != test_bid:
@@ -652,33 +700,13 @@ class AutoShelfBidControlManager:
                 state.last_reason = wait_reason
             await self._repository.save_state(state)
             logger.info(
-                "auto_shelf_bid_control_test_wait_time auto_adv_id=%s nmid=%s mode=%s test_elapsed_minutes=%s target=%s reason=%s",
+                "auto_shelf_bid_control_test_wait_coverage auto_adv_id=%s nmid=%s mode=%s test_bid=%s closed_layers_start=%s closed_layers_now=%s reason=%s",
                 auto_adv_id,
                 nmid,
                 state.current_mode,
-                test_elapsed_minutes,
-                target_test_observation_minutes,
-                state.last_reason,
-            )
-            return None
-        if test_impressions < int(settings_obj.target_test_impressions):
-            if actual_bid_minor != test_bid:
-                await self._set_target_bid(
-                    complex_adv,
-                    bid_minor=test_bid,
-                    currency=state.currency,
-                )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
-            else:
-                state.last_reason = ControlReason.TEST_WAITING_IMPRESSIONS
-            await self._repository.save_state(state)
-            logger.info(
-                "auto_shelf_bid_control_test_wait auto_adv_id=%s nmid=%s mode=%s test_impressions=%s target=%s reason=%s",
-                auto_adv_id,
-                nmid,
-                state.current_mode,
-                test_impressions,
-                settings_obj.target_test_impressions,
+                test_bid,
+                closed_layers_at_test_start,
+                closed_layers_now,
                 state.last_reason,
             )
             return None
