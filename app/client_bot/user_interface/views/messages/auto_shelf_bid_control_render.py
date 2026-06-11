@@ -95,14 +95,16 @@ def _format_rec_bid_minor(value: object) -> str:
         return "\u2014"
     try:
         if isinstance(value, bool):
-            minor = int(value)
-        elif isinstance(value, int):
+            return "\u2014"
+        if isinstance(value, int):
             minor = value
         elif isinstance(value, float):
             minor = int(round(value))
         elif isinstance(value, str):
             minor = int(round(float(value)))
         else:
+            return "\u2014"
+        if minor <= 0 or minor % 100 != 0:
             return "\u2014"
         return f"{int(round(minor / 100))} \u20bd"
     except (TypeError, ValueError):

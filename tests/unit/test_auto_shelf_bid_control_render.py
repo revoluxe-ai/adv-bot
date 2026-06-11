@@ -206,6 +206,35 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "Top-3 expected_ranked:" in message
 
 
+def test_render_main_message_rejects_bool_best_plan_bid() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        rec_bid_recommendation={
+            "best_expected_bid": 35000,
+            "best_plan_bid": True,
+            "plan_ranked": [
+                {
+                    "bid": False,
+                    "ctr": 0.011,
+                    "expected_order_cost_rub": 568.05,
+                    "resolved_order_cost_rub": 550.0,
+                    "sales_gap": -296.52,
+                    "plan_distance_score": 0.835,
+                }
+            ],
+        },
+        best_plan_bid_minor=None,
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "best_plan_bid: —" in message
+    assert "bid: — | ctr: 1.10%" in message
+    assert "best_plan_bid: 1 ₽" not in message
+    assert "bid: 0 ₽" not in message
+    assert "Лучшая плановая ставка:" not in message
+
+
 def test_render_main_message_with_coverage_layers_block() -> None:
     view = replace(
         _view(enabled=True, has_settings=True),

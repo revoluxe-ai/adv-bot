@@ -117,6 +117,29 @@ class AutoShelfBidControlViewProvider:
         return None if value is None else int(value)
 
     @staticmethod
+    def _parse_best_plan_bid_minor(value: object) -> int | None:
+        """Parse recommendation ``best_plan_bid`` to internal kopecks or reject invalid values."""
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        if value <= 0 or value % 100 != 0:
+            return None
+        return value
+
+    @classmethod
+    def _sanitize_rec_bid_recommendation(
+        cls, recommendation: dict[str, object]
+    ) -> tuple[dict[str, object], int | None]:
+        """Remove invalid best-plan bid from the UI payload and return sanitized bid_minor."""
+        sanitized = dict(recommendation)
+        if "best_plan_bid" not in sanitized:
+            return sanitized, None
+        best_plan_bid_minor = cls._parse_best_plan_bid_minor(
+            sanitized["best_plan_bid"]
+        )
+        sanitized["best_plan_bid"] = best_plan_bid_minor
+        return sanitized, best_plan_bid_minor
+
+    @staticmethod
     def _map_bid_stats_to_points(
         bid_stats: list[BidStatsDTO],
         *,
@@ -584,21 +607,11 @@ class AutoShelfBidControlViewProvider:
                         plan_context=plan_context,
                         ctr_by_bid=ctr_by_bid,
                     )
-                    rec_bid_recommendation = cast(
-                        dict[str, object], rec_result["view"]
-                    )
-                    best_plan_bid_raw = rec_bid_recommendation.get("best_plan_bid")
-                    if isinstance(best_plan_bid_raw, bool):
-                        best_plan_bid_minor = int(best_plan_bid_raw)
-                    elif isinstance(best_plan_bid_raw, int):
-                        best_plan_bid_minor = int(best_plan_bid_raw)
-                    elif isinstance(best_plan_bid_raw, float):
-                        best_plan_bid_minor = int(round(best_plan_bid_raw))
-                    elif isinstance(best_plan_bid_raw, str):
-                        try:
-                            best_plan_bid_minor = int(round(float(best_plan_bid_raw)))
-                        except ValueError:
-                            best_plan_bid_minor = None
+                    rec_bid_recommendation = cast(dict[str, object], rec_result["view"])
+                    (
+                        rec_bid_recommendation,
+                        best_plan_bid_minor,
+                    ) = self._sanitize_rec_bid_recommendation(rec_bid_recommendation)
             except Exception:
                 logger.warning(
                     "rec_bid_recommendation_failed nmid=%s adv_setting_original_id=%s",
