@@ -77,6 +77,11 @@ def _resolve_target_cost_pair(
     return (plan_m, "max")
 
 
+def _is_real_number(value: object) -> bool:
+    """True для int/float, не bool (bool — подкласс int)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def resolve_target_cost(
     plan_orders: int | None,
     plan_target_pay_for_order: int | float | None,
@@ -99,6 +104,7 @@ def resolve_target_cost(
     Returns:
         Целевая себестоимость заказа или None если данные невалидны.
     """
+
     pair = _resolve_target_cost_pair(
         plan_orders,
         plan_target_pay_for_order,
