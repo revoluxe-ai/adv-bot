@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone, UTC
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
     ControlReason,
     AutoShelfBidControlManager,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_coverage_selector import (
+    BidCoverage,
 )
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
@@ -424,6 +427,23 @@ def test_target_observation_minutes_or_default_normalizes_minimum(
     ) == expected
 
 
+@pytest.mark.parametrize(
+    ("minutes", "expected_hours"),
+    [
+        (60, 1),
+        (90, 2),
+        (120, 2),
+    ],
+)
+def test_target_observation_hours_from_minutes_uses_ceiling(
+    minutes: int,
+    expected_hours: int,
+) -> None:
+    assert AutoShelfBidControlManager._target_observation_hours_from_minutes(
+        minutes
+    ) == expected_hours
+
+
 def test_is_coroutine_candidate_requires_enabled_single_nmid_and_active() -> None:
     from types import SimpleNamespace
 
@@ -748,7 +768,7 @@ async def test_handle_main_mode_waits_for_observation_minutes() -> None:
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
-        target_test_observation_minutes=60,
+        target_test_observation_minutes=90,
         target_main_impressions=10,
         test_share=0.1,
         max_bid_minor=50_000,
@@ -761,6 +781,7 @@ async def test_handle_main_mode_waits_for_observation_minutes() -> None:
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
+    initial_cycle_started_at = state.current_cycle_started_at
 
     await manager._handle_main_mode(
         complex_adv=complex_adv,
@@ -812,7 +833,7 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
-        target_test_observation_minutes=60,
+        target_test_observation_minutes=90,
         target_main_impressions=10,
         test_share=0.1,
         max_bid_minor=50_000,
@@ -825,6 +846,7 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
+    initial_cycle_started_at = state.current_cycle_started_at
 
     await manager._handle_main_mode(
         complex_adv=complex_adv,
@@ -880,7 +902,7 @@ async def test_handle_main_mode_keeps_cycle_and_test_state_when_plan_bid_changes
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
-        target_test_observation_minutes=60,
+        target_test_observation_minutes=90,
         target_main_impressions=10,
         test_share=0.1,
         max_bid_minor=50_000,
@@ -951,7 +973,7 @@ async def test_handle_main_mode_repairs_corrupted_cycle_start_before_plan_bid_ch
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
-        target_test_observation_minutes=60,
+        target_test_observation_minutes=90,
         target_main_impressions=10,
         test_share=0.1,
         max_bid_minor=50_000,
@@ -1022,7 +1044,7 @@ async def test_handle_main_mode_repairs_missing_previous_cycle_start_before_plan
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
-        target_test_observation_minutes=60,
+        target_test_observation_minutes=90,
         target_main_impressions=10,
         test_share=0.1,
         max_bid_minor=50_000,
@@ -1137,7 +1159,8 @@ async def test_handle_main_mode_plan_distance_continues_when_selected_bid_unchan
 ) -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     repository = MagicMock()
     repository.save_state = AsyncMock()
     manager = AutoShelfBidControlManager(
@@ -1150,7 +1173,11 @@ async def test_handle_main_mode_plan_distance_continues_when_selected_bid_unchan
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=12_000)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
-    manager.choose_next_test_bid = MagicMock(return_value=33_000)  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
     state = MagicMock(
         current_test_bid_minor=20_000,
         current_mode="main",
@@ -1182,6 +1209,7 @@ async def test_handle_main_mode_plan_distance_continues_when_selected_bid_unchan
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
+    initial_cycle_started_at = state.current_cycle_started_at
 
     await manager._handle_main_mode(
         complex_adv=complex_adv,
@@ -1191,15 +1219,16 @@ async def test_handle_main_mode_plan_distance_continues_when_selected_bid_unchan
         actual_bid_minor=12_000,
     )
 
-    assert state.current_mode == "test"
+    assert state.current_mode == "main"
     assert state.current_main_bid_minor == 12_000
-    assert state.current_test_bid_minor == 33_000
-    repository.save_state.assert_not_awaited()
-    manager._persist_state_then_set_bid.assert_awaited_once_with(
-        complex_adv,
-        state=state,
-        bid_minor=33_000,
-    )
+    assert state.current_cycle_started_at == initial_cycle_started_at
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    analytics.get_first_available_bid_bucket_start.assert_awaited_once()
+    analytics.get_bid_coverages.assert_not_awaited()
+    selector_mock.assert_called_once()
+    repository.save_state.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    manager._set_target_bid.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1378,9 +1407,17 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
 ) -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_first_available_bid_bucket_start = AsyncMock(
+        return_value=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
+    )
+    analytics.get_bid_coverages = AsyncMock(
+        return_value=[
+            BidCoverage(bid_minor=25_000, impressions=4_000, valid_hours=2),
+            BidCoverage(bid_minor=33_000, impressions=0, valid_hours=0),
+        ]
+    )
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(
-        return_value={25_000: 0.1}
+        return_value={20_500: 0.1}
     )
     analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
         return_value=0.2
@@ -1393,10 +1430,14 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         repository=repository,
         analytics_repository=analytics,
     )
-    manager.choose_next_test_bid = MagicMock(return_value=33_000)  # type: ignore[method-assign]
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=None)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=33_000)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
         AsyncMock(
@@ -1413,12 +1454,12 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         AsyncMock(return_value={"best_plan_bid": None, "plan_ranked": []}),
     )
     state = MagicMock(
-        current_test_bid_minor=20_000,
+        current_test_bid_minor=60_000,
         current_mode="main",
-        current_cycle_started_at=datetime.now(UTC) - timedelta(hours=12),
+        current_cycle_started_at=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
         test_started_at=datetime.now(UTC) - timedelta(hours=12),
         main_started_at=datetime.now(UTC) - timedelta(hours=10),
-        current_main_bid_minor=25_000,
+        current_main_bid_minor=20_500,
         currency="RUB",
         last_reason=None,
     )
@@ -1449,14 +1490,29 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         settings_obj=settings_obj,
         state=state,
         min_bid_minor=12_000,
-        actual_bid_minor=25_000,
+        actual_bid_minor=20_500,
     )
 
     assert state.current_mode == "test"
     assert state.current_test_bid_minor == 33_000
     assert state.test_started_at is not None
+    assert state.current_cycle_started_at == datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
     assert state.last_reason == ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
-    manager.choose_next_test_bid.assert_called_once()
+    analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
+        nmid=111,
+        currency="RUB",
+        price_minor=None,
+        mode=None,
+    )
+    analytics.get_bid_coverages.assert_awaited_once_with(
+        nmid=111,
+        date_from=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
+        date_to=ANY,
+        currency="RUB",
+        price_minor=None,
+        mode=None,
+    )
+    selector_mock.assert_called_once()
     manager._choose_main_bid_by_strategy.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_awaited_once_with(
         complex_adv,
@@ -1472,7 +1528,8 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
 ) -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(
         return_value={25_000: 0.1}
     )
@@ -1487,10 +1544,14 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
         repository=repository,
         analytics_repository=analytics,
     )
-    manager.choose_next_test_bid = MagicMock(return_value=None)  # type: ignore[method-assign]
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=None)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
         AsyncMock(
@@ -1509,7 +1570,7 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
     state = MagicMock(
         current_test_bid_minor=20_000,
         current_mode="main",
-        current_cycle_started_at=datetime.now(UTC) - timedelta(hours=12),
+        current_cycle_started_at=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
         test_started_at=datetime.now(UTC) - timedelta(hours=12),
         main_started_at=datetime.now(UTC) - timedelta(hours=10),
         current_main_bid_minor=25_000,
@@ -1549,9 +1610,16 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 25_000
     assert state.main_started_at is not None
-    assert state.current_cycle_started_at is not None
+    assert state.current_cycle_started_at == datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
-    manager.choose_next_test_bid.assert_called_once()
+    analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
+        nmid=111,
+        currency="RUB",
+        price_minor=None,
+        mode=None,
+    )
+    analytics.get_bid_coverages.assert_not_awaited()
+    selector_mock.assert_called_once()
     manager._choose_main_bid_by_strategy.assert_called_once()
     repository.save_state.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
@@ -1564,7 +1632,8 @@ async def test_handle_main_mode_plan_distance_keeps_main_bid_and_restarts_window
 ) -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(
         return_value={25_000: 0.1}
     )
@@ -1579,10 +1648,14 @@ async def test_handle_main_mode_plan_distance_keeps_main_bid_and_restarts_window
         repository=repository,
         analytics_repository=analytics,
     )
-    manager.choose_next_test_bid = MagicMock(return_value=None)  # type: ignore[method-assign]
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
         AsyncMock(
@@ -1644,7 +1717,14 @@ async def test_handle_main_mode_plan_distance_keeps_main_bid_and_restarts_window
     assert state.main_started_at is not None
     assert state.current_cycle_started_at is not None
     assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
-    manager.choose_next_test_bid.assert_called_once()
+    analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
+        nmid=111,
+        currency="RUB",
+        price_minor=None,
+        mode=None,
+    )
+    analytics.get_bid_coverages.assert_not_awaited()
+    selector_mock.assert_called_once()
     manager._choose_main_bid_by_strategy.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()

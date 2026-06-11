@@ -28,6 +28,11 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
+from .bid_coverage_selector import (
+    BidCoverage,
+    build_coverage_selector_seed,
+    choose_next_test_bid_by_coverage_layers,
+)
 from .bid_selection import resolve_cycle_best_bids
 from .bid_units import (
     report_day_start_utc,
@@ -148,6 +153,12 @@ class AutoShelfBidControlManager:
             return 60
         normalized = int(value)
         return max(60, normalized)
+
+    @staticmethod
+    def _target_observation_hours_from_minutes(minutes: int) -> int:
+        """Округлить required observation window вверх до полных часов."""
+        normalized_minutes = int(minutes)
+        return max(1, (normalized_minutes + 59) // 60)
 
     @staticmethod
     def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
@@ -904,26 +915,51 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
-        cycle_from_ts = state.current_cycle_started_at
-        covered_stats = await self._analytics.get_bid_stats(
+        coverage_price_minor: int | None = None
+        first_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
             nmid=nmid,
-            from_ts=cycle_from_ts,
             currency=state.currency,
+            price_minor=coverage_price_minor,
+            mode=None,
         )
-        covered_bids = [
-            row.bid_minor
-            for row in covered_stats
-            if row.impressions >= int(settings_obj.target_test_impressions)
-        ]
-        next_test_bid = self.choose_next_test_bid(
-            min_bid=min_bid_minor,
-            max_bid=int(settings_obj.max_bid_minor),
-            covered_bids=covered_bids,
-            min_distance=int(settings_obj.min_bid_distance_minor),
+        coverages: list[BidCoverage]
+        if first_bucket_start is None:
+            coverages = []
+        else:
+            coverages = await self._analytics.get_bid_coverages(
+                nmid=nmid,
+                date_from=first_bucket_start,
+                date_to=now,
+                currency=state.currency,
+                price_minor=coverage_price_minor,
+                mode=None,
+            )
+        target_test_observation_minutes = self._target_observation_minutes_or_default(
+            settings_obj.target_test_observation_minutes
+        )
+        target_test_observation_hours = self._target_observation_hours_from_minutes(
+            target_test_observation_minutes
+        )
+        next_test_bid = choose_next_test_bid_by_coverage_layers(
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=int(settings_obj.max_bid_minor),
+            bid_unit_minor=100,
+            coverages=coverages,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_observation_hours=target_test_observation_hours,
+            min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+            random_seed=build_coverage_selector_seed(
+                nmid=nmid,
+                currency=state.currency,
+                price_minor=coverage_price_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                target_test_impressions=int(settings_obj.target_test_impressions),
+                target_test_observation_hours=target_test_observation_hours,
+            ),
         )
         if next_test_bid is not None:
-            state.previous_cycle_started_at = state.current_cycle_started_at
-            state.current_cycle_started_at = now
             state.current_mode = "test"
             state.current_test_bid_minor = next_test_bid
             state.current_main_bid_minor = main_bid
@@ -951,7 +987,6 @@ class AutoShelfBidControlManager:
             ):
                 state.current_mode = "main"
                 state.main_started_at = now
-                state.current_cycle_started_at = now
                 state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
                 await self._repository.save_state(state)
                 logger.info(

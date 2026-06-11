@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -22,8 +23,16 @@ from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
 from .auto_shelf_bid_control_manager import AutoShelfBidControlManager
+from .bid_coverage_selector import (
+    BidCoverage,
+    build_bid_universe,
+    build_coverage_selector_seed,
+    choose_next_test_bid_by_coverage_layers,
+    closed_layers_for_bid,
+)
 from .bid_selection import resolve_cycle_best_bids
 from .dto import OptimizationMetric, resolve_optimization_metric
+from .dto import CoverageLayerBidDTO
 from .settings_normalizer import compute_settings_repair, repair_state_test_bid_minor
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .rec_bid_plan_context import build_rec_bid_plan_context
@@ -143,6 +152,102 @@ class AutoShelfBidControlViewProvider:
             for item in bid_stats
         ]
 
+    @staticmethod
+    def _coverage_bid_label(
+        *,
+        bid_minor: int,
+        current_main_bid_minor: int | None,
+        current_test_bid_minor: int | None,
+        selected_next_test_bid_minor: int | None,
+        best_plan_bid_minor: int | None,
+        min_bid_minor: int | None,
+        max_bid_minor: int | None,
+    ) -> str:
+        labels: list[str] = []
+        if current_main_bid_minor is not None and bid_minor == int(current_main_bid_minor):
+            labels.append("current_main_bid_minor")
+        if current_test_bid_minor is not None and bid_minor == int(current_test_bid_minor):
+            labels.append("current_test_bid_minor")
+        if best_plan_bid_minor is not None and bid_minor == int(best_plan_bid_minor):
+            labels.append("best_plan_bid_minor")
+        if (
+            selected_next_test_bid_minor is not None
+            and bid_minor == int(selected_next_test_bid_minor)
+        ):
+            labels.append("selected_next_test_bid_minor")
+        if min_bid_minor is not None and bid_minor == int(min_bid_minor):
+            labels.append("min_bid_minor")
+        if max_bid_minor is not None and bid_minor == int(max_bid_minor):
+            labels.append("max_bid_minor")
+        if not labels:
+            return "bid"
+        return " / ".join(labels)
+
+    @staticmethod
+    def _build_coverage_layer_rows(
+        *,
+        coverages: list[BidCoverage],
+        current_layer: int,
+        selected_next_test_bid_minor: int | None,
+        current_main_bid_minor: int | None,
+        current_test_bid_minor: int | None,
+        best_plan_bid_minor: int | None,
+        min_bid_minor: int | None,
+        max_bid_minor: int | None,
+        target_test_impressions: int,
+        target_test_observation_hours: int,
+    ) -> list[CoverageLayerBidDTO]:
+        coverage_map = {int(item.bid_minor): item for item in coverages}
+        rows: list[CoverageLayerBidDTO] = []
+        seen_bids: set[int] = set()
+        candidate_bids = [
+            current_main_bid_minor,
+            current_test_bid_minor,
+            best_plan_bid_minor,
+            selected_next_test_bid_minor,
+            min_bid_minor,
+            max_bid_minor,
+        ]
+        for candidate in candidate_bids:
+            if candidate is None:
+                continue
+            bid_minor = int(candidate)
+            if bid_minor in seen_bids:
+                continue
+            seen_bids.add(bid_minor)
+            coverage = coverage_map.get(bid_minor)
+            if coverage is None:
+                impressions = 0
+                valid_hours = 0
+            else:
+                impressions = int(coverage.impressions)
+                valid_hours = int(coverage.valid_hours)
+            closed_layers = closed_layers_for_bid(
+                impressions=impressions,
+                valid_hours=valid_hours,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            )
+            rows.append(
+                CoverageLayerBidDTO(
+                    label=AutoShelfBidControlViewProvider._coverage_bid_label(
+                        bid_minor=bid_minor,
+                        current_main_bid_minor=current_main_bid_minor,
+                        current_test_bid_minor=current_test_bid_minor,
+                        selected_next_test_bid_minor=selected_next_test_bid_minor,
+                        best_plan_bid_minor=best_plan_bid_minor,
+                        min_bid_minor=min_bid_minor,
+                        max_bid_minor=max_bid_minor,
+                    ),
+                    bid_minor=bid_minor,
+                    impressions=impressions,
+                    valid_hours=valid_hours,
+                    closed_layers=closed_layers,
+                    undercovered=(closed_layers == current_layer),
+                )
+            )
+        return rows
+
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Собрать DTO для read-only Telegram экрана."""
         app_dry_run = self._app_dry_run()
@@ -231,6 +336,7 @@ class AutoShelfBidControlViewProvider:
             warnings.append("state_missing")
         now_utc = datetime.now(UTC)
         rec_bid_recommendation: dict[str, object] | None = None
+        best_plan_bid_minor: int | None = None
 
         actual_bid_minor: int | None = None
         if nmid:
@@ -481,6 +587,18 @@ class AutoShelfBidControlViewProvider:
                     rec_bid_recommendation = cast(
                         dict[str, object], rec_result["view"]
                     )
+                    best_plan_bid_raw = rec_bid_recommendation.get("best_plan_bid")
+                    if isinstance(best_plan_bid_raw, bool):
+                        best_plan_bid_minor = int(best_plan_bid_raw)
+                    elif isinstance(best_plan_bid_raw, int):
+                        best_plan_bid_minor = int(best_plan_bid_raw)
+                    elif isinstance(best_plan_bid_raw, float):
+                        best_plan_bid_minor = int(round(best_plan_bid_raw))
+                    elif isinstance(best_plan_bid_raw, str):
+                        try:
+                            best_plan_bid_minor = int(round(float(best_plan_bid_raw)))
+                        except ValueError:
+                            best_plan_bid_minor = None
             except Exception:
                 logger.warning(
                     "rec_bid_recommendation_failed nmid=%s adv_setting_original_id=%s",
@@ -509,6 +627,103 @@ class AutoShelfBidControlViewProvider:
                 nmid,
                 adv_setting_original_id,
                 diagnostics,
+            )
+
+        coverage_first_available_bucket_start: datetime | None = None
+        coverage_current_layer: int | None = None
+        coverage_undercovered_count: int | None = None
+        coverage_selected_next_test_bid_minor: int | None = None
+        coverage_bid_rows: list[CoverageLayerBidDTO] = []
+        coverage_get_first = getattr(
+            self._analytics,
+            "get_first_available_bid_bucket_start",
+            None,
+        )
+        coverage_get_coverages = getattr(self._analytics, "get_bid_coverages", None)
+        if (
+            settings_obj is not None
+            and min_bid_minor_value is not None
+            and target_test is not None
+            and inspect.iscoroutinefunction(coverage_get_first)
+            and inspect.iscoroutinefunction(coverage_get_coverages)
+        ):
+            max_bid_minor_value = int(settings_obj.max_bid_minor)
+            target_test_impressions_value = int(target_test)
+            target_test_observation_minutes_value = (
+                int(target_test_observation_minutes)
+                if target_test_observation_minutes is not None
+                else 60
+            )
+            target_test_observation_hours_value = (
+                max(1, (int(target_test_observation_minutes_value) + 59) // 60)
+            )
+            coverage_first_available_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
+                nmid=nmid,
+                currency=currency,
+                price_minor=None,
+                mode=None,
+            )
+            coverage_rows: list[BidCoverage] = []
+            if coverage_first_available_bucket_start is not None:
+                coverage_rows = await self._analytics.get_bid_coverages(
+                    nmid=nmid,
+                    date_from=coverage_first_available_bucket_start,
+                    date_to=now_utc,
+                    currency=currency,
+                    price_minor=None,
+                    mode=None,
+                )
+            coverage_selected_next_test_bid_minor = choose_next_test_bid_by_coverage_layers(
+                min_bid_minor=min_bid_minor_value,
+                max_bid_minor=max_bid_minor_value,
+                bid_unit_minor=100,
+                coverages=coverage_rows,
+                target_test_impressions=target_test_impressions_value,
+                target_test_observation_hours=target_test_observation_hours_value,
+                min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                random_seed=build_coverage_selector_seed(
+                    nmid=nmid,
+                    currency=currency,
+                    price_minor=None,
+                    min_bid_minor=min_bid_minor_value,
+                    max_bid_minor=max_bid_minor_value,
+                    min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                    target_test_impressions=target_test_impressions_value,
+                    target_test_observation_hours=target_test_observation_hours_value,
+                ),
+            )
+            universe = build_bid_universe(
+                min_bid_minor_value,
+                max_bid_minor_value,
+                bid_unit_minor=100,
+            )
+            coverage_map = {int(item.bid_minor): item for item in coverage_rows}
+            closed_by_bid: dict[int, int] = {}
+            for bid in universe:
+                coverage = coverage_map.get(bid)
+                impressions = 0 if coverage is None else int(coverage.impressions)
+                valid_hours = 0 if coverage is None else int(coverage.valid_hours)
+                closed_by_bid[bid] = closed_layers_for_bid(
+                    impressions=impressions,
+                    valid_hours=valid_hours,
+                    target_test_impressions=target_test_impressions_value,
+                    target_test_observation_hours=target_test_observation_hours_value,
+                )
+            coverage_current_layer = min(closed_by_bid.values()) if closed_by_bid else 0
+            coverage_undercovered_count = sum(
+                1 for closed in closed_by_bid.values() if closed == coverage_current_layer
+            )
+            coverage_bid_rows = AutoShelfBidControlViewProvider._build_coverage_layer_rows(
+                coverages=coverage_rows,
+                current_layer=coverage_current_layer,
+                selected_next_test_bid_minor=coverage_selected_next_test_bid_minor,
+                current_main_bid_minor=(state.current_main_bid_minor if state else None),
+                current_test_bid_minor=(state.current_test_bid_minor if state else None),
+                best_plan_bid_minor=best_plan_bid_minor,
+                min_bid_minor=min_bid_minor_value,
+                max_bid_minor=max_bid_minor_value,
+                target_test_impressions=target_test_impressions_value,
+                target_test_observation_hours=target_test_observation_hours_value,
             )
 
         return AutoShelfBidControlViewDTO(
@@ -561,11 +776,16 @@ class AutoShelfBidControlViewProvider:
             bid_points=bid_points,
             cycle_covered_points_count=cycle_covered_points_count,
             cycle_bid_points=cycle_bid_points,
+            coverage_first_available_bucket_start=coverage_first_available_bucket_start,
+            coverage_current_layer=coverage_current_layer,
+            coverage_undercovered_count=coverage_undercovered_count,
+            coverage_selected_next_test_bid_minor=coverage_selected_next_test_bid_minor,
+            coverage_bid_rows=coverage_bid_rows,
             last_reason=(state.last_reason if state else None),
             warnings=warnings,
             rec_bid_recommendation=rec_bid_recommendation,
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
-            best_plan_bid_minor=None,
+            best_plan_bid_minor=best_plan_bid_minor,
         )

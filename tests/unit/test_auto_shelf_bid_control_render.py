@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
     build_auto_shelf_bid_control_keyboard,
@@ -10,6 +11,7 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     OptimizationMetric,
+    CoverageLayerBidDTO,
 )
 
 
@@ -202,3 +204,58 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "0.4918326535656478" not in message
     assert "Top-3 plan_ranked:" in message
     assert "Top-3 expected_ranked:" in message
+
+
+def test_render_main_message_with_coverage_layers_block() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        current_main_bid_minor=20_500,
+        current_test_bid_minor=60_000,
+        min_bid_minor=12_000,
+        max_bid_minor=60_000,
+        best_plan_bid_minor=37_500,
+        coverage_first_available_bucket_start=datetime(2026, 5, 24, 21, 15, tzinfo=UTC),
+        coverage_current_layer=0,
+        coverage_undercovered_count=3,
+        coverage_selected_next_test_bid_minor=33_900,
+        coverage_bid_rows=[
+            CoverageLayerBidDTO(
+                label="current_main_bid_minor",
+                bid_minor=20_500,
+                impressions=184_393,
+                valid_hours=184,
+                closed_layers=92,
+                undercovered=False,
+            ),
+            CoverageLayerBidDTO(
+                label="current_test_bid_minor / selected_next_test_bid_minor",
+                bid_minor=60_000,
+                impressions=1_764,
+                valid_hours=1,
+                closed_layers=0,
+                undercovered=True,
+            ),
+            CoverageLayerBidDTO(
+                label="best_plan_bid_minor",
+                bid_minor=37_500,
+                impressions=0,
+                valid_hours=0,
+                closed_layers=0,
+                undercovered=True,
+            ),
+        ],
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Накопленное покрытие тестов:" in message
+    assert "first_available_bucket_start:" in message
+    assert "current_layer: 0" in message
+    assert "undercovered_count: 3" in message
+    assert "selected_next_test_bid: 339 ₽" in message
+    assert "current_main_bid_minor: 205 ₽" in message
+    assert "current_test_bid_minor / selected_next_test_bid_minor: 600 ₽" in message
+    assert "best_plan_bid_minor: 375 ₽" in message
+    assert "показы 184393" in message
+    assert "валидные часы 184" in message
+    assert "closed_layers 92" in message
