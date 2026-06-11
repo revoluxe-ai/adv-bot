@@ -31,6 +31,7 @@ from .auto_shelf_bid_control_analytics_repository import (
 from .bid_coverage_selector import (
     BidCoverage,
     build_coverage_selector_seed,
+    build_bid_universe,
     closed_layers_for_bid,
     choose_next_test_bid_by_coverage_layers,
 )
@@ -800,6 +801,11 @@ class AutoShelfBidControlManager:
             complex_adv.auto_shelf_bid_control_strategy
             == AutoShelfBidControlStrategy.PLAN_DISTANCE
         ):
+            bid_universe = build_bid_universe(
+                min_bid_minor,
+                int(settings_obj.max_bid_minor),
+                bid_unit_minor=100,
+            )
             _coverages, _current_layer, covered_anchor_count, next_test_bid = (
                 await self._build_coverage_snapshot(
                     nmid=nmid,
@@ -812,7 +818,13 @@ class AutoShelfBidControlManager:
                     date_to=now,
                 )
             )
-            if covered_anchor_count < 2 and next_test_bid is not None:
+            should_continue_test = (
+                len(bid_universe) > 1
+                and covered_anchor_count < 2
+                and next_test_bid is not None
+                and next_test_bid != test_bid
+            )
+            if should_continue_test:
                 state.current_mode = "test"
                 state.current_test_bid_minor = next_test_bid
                 state.test_started_at = now

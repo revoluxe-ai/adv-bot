@@ -51,6 +51,63 @@ def _configure_test_coverage(
     )
 
 
+def _configure_plan_distance_test_transition(
+    *,
+    min_bid_minor: int,
+    max_bid_minor: int,
+    current_test_bid_minor: int,
+    covered_anchor_count: int,
+    next_test_bid: int | None,
+    current_main_bid_minor: int = 18_000,
+) -> tuple[
+    AutoShelfBidControlManager,
+    MagicMock,
+    MagicMock,
+    MagicMock,
+]:
+    """Подготовить PLAN_DISTANCE test-mode сценарий с управляемым snapshot."""
+    analytics = MagicMock()
+    repository = MagicMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=current_main_bid_minor)  # type: ignore[method-assign]
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._closed_layers_for_bid_at = AsyncMock(side_effect=[0, 1])  # type: ignore[method-assign]
+    manager._build_coverage_snapshot = AsyncMock(
+        return_value=([], 0, covered_anchor_count, next_test_bid)
+    )  # type: ignore[method-assign]
+    state = MagicMock(
+        current_test_bid_minor=current_test_bid_minor,
+        current_mode="test",
+        current_cycle_started_at=datetime.now(UTC) - timedelta(hours=2),
+        previous_cycle_started_at=None,
+        test_started_at=datetime.now(UTC) - timedelta(hours=2),
+        main_started_at=None,
+        current_main_bid_minor=12_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=max_bid_minor,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=775965323,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    return manager, repository, state, settings_obj, complex_adv
+
+
 def test_clamp_bid_minor_within_window() -> None:
     assert (
         AutoShelfBidControlManager._clamp_bid_minor(
@@ -767,7 +824,7 @@ async def test_handle_test_mode_plan_distance_falls_back_to_known_main_bid(
         state=state,
         bid_minor=25_000,
     )
-    repository.save_state.assert_not_awaited()
+    repository.save_state.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -862,7 +919,130 @@ async def test_handle_test_mode_plan_distance_continues_test_until_two_anchors(
         state=state,
         bid_minor=20_000,
     )
-    repository.save_state.assert_not_awaited()
+    repository.save_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_single_bid_universe_goes_to_main() -> None:
+    manager, repository, state, settings_obj, complex_adv = _configure_plan_distance_test_transition(
+        min_bid_minor=8_000,
+        max_bid_minor=8_000,
+        current_test_bid_minor=8_000,
+        covered_anchor_count=0,
+        next_test_bid=8_000,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=8_000,
+        actual_bid_minor=8_000,
+    )
+
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 18_000
+    assert state.main_started_at is not None
+    assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=18_000,
+    )
+    repository.save_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_keeps_testing_with_single_anchor_on_multi_bid_universe() -> None:
+    manager, repository, state, settings_obj, complex_adv = _configure_plan_distance_test_transition(
+        min_bid_minor=8_000,
+        max_bid_minor=20_000,
+        current_test_bid_minor=8_000,
+        covered_anchor_count=1,
+        next_test_bid=20_000,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=8_000,
+        actual_bid_minor=8_000,
+    )
+
+    assert state.current_mode == "test"
+    assert state.current_test_bid_minor == 20_000
+    assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=20_000,
+    )
+    repository.save_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_switches_to_main_when_two_anchors_exist() -> None:
+    manager, repository, state, settings_obj, complex_adv = _configure_plan_distance_test_transition(
+        min_bid_minor=8_000,
+        max_bid_minor=20_000,
+        current_test_bid_minor=8_000,
+        covered_anchor_count=2,
+        next_test_bid=20_000,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=8_000,
+        actual_bid_minor=8_000,
+    )
+
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 18_000
+    assert state.main_started_at is not None
+    assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=18_000,
+    )
+    repository.save_state.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_test_mode_plan_distance_allows_main_when_next_test_bid_matches_current() -> None:
+    manager, repository, state, settings_obj, complex_adv = _configure_plan_distance_test_transition(
+        min_bid_minor=8_000,
+        max_bid_minor=20_000,
+        current_test_bid_minor=8_000,
+        covered_anchor_count=1,
+        next_test_bid=8_000,
+    )
+
+    await manager._handle_test_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=8_000,
+        actual_bid_minor=8_000,
+    )
+
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 18_000
+    assert state.main_started_at is not None
+    assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once_with(
+        complex_adv,
+        state=state,
+        bid_minor=18_000,
+    )
+    repository.save_state.assert_not_called()
 
 
 @pytest.mark.asyncio
