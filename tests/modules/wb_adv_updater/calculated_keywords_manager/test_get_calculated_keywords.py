@@ -10,7 +10,7 @@
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
@@ -48,16 +48,6 @@ from tests.factories.keyword_pipeline import (
 # ============================================================================
 # Fixtures
 # ============================================================================
-
-
-@pytest.fixture(autouse=True)
-def _stub_plan_fact_reader_no_clickhouse(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Avoid real ClickHouse in unit tests; return no row (None)."""
-    monkeypatch.setattr(
-        ckm_module.PlanFactReader,
-        "get_latest_plan_fact",
-        AsyncMock(return_value=None),
-    )
 
 
 @pytest.fixture
@@ -1281,19 +1271,18 @@ def _pre_kw_above_target_at_min(
 
 
 # ============================================================================
-# PlanFactReader (ClickHouse) → resolve_target_cost для порога МС
+# resolved_target_cost (complex_adv.target_pay_for_order) для порога МС
 # ============================================================================
 
 
 @pytest.mark.asyncio
-async def test_plan_fact_reader_fact_orders_tightens_min_bid_cooldown_gate(
+async def test_resolved_target_pay_on_complex_adv_tightens_min_bid_cooldown_gate(
     complex_adv_mock_whitelist,
     fixed_now,
 ) -> None:
-    """Факт заказов из CH сужает resolved_target_cost относительно пути без факта (как пустая выборка)."""
+    """Как PreComplexAdv.resolved_target_pay_for_order: цель 50 ₽ режет МС; max 200 — нет."""
     adv_id = 999
     complex_adv_mock_whitelist.adv_id = adv_id
-    complex_adv_mock_whitelist.target_pay_for_order = 200.0
     complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
         plan_for_sales_for_day=10,
         target_price_for_order=50,
@@ -1321,24 +1310,20 @@ async def test_plan_fact_reader_fact_orders_tightens_min_bid_cooldown_gate(
         fact_pay_for_order=None,
     )
     updates_ch: dict[str, AboveTargetCooldownEntry | None] = {}
-    patch_path = (
-        "app.modules.wb_adv_updater.calculated_keywords_manager."
-        "calculated_keywords_manager.PlanFactReader.get_latest_plan_fact"
+    complex_adv_mock_whitelist.target_pay_for_order = 50.0
+    result_ch = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates=updates_ch,
+        now=fixed_now,
     )
-    with patch(patch_path, new=AsyncMock(return_value=summary)):
-        result_ch = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
-            complex_adv_mock_whitelist,
-            [pre_kw],
-            min_bid_for_adv=100,
-            cooldown_map={},
-            cooldown_updates=updates_ch,
-            now=fixed_now,
-        )
     assert result_ch[0].status == KeywordStatus.BAD
     assert result_ch[0].reason == KeywordStatusReason.ABOVE_TARGET_AT_MIN_BID
 
-    # Без строки в CH: fact=None → 0 заказов относительно плана → max 200; 75 <= 200 → порог МС не режет.
     updates_stub: dict[str, AboveTargetCooldownEntry | None] = {}
+    complex_adv_mock_whitelist.target_pay_for_order = 200.0
     result_stub = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
         complex_adv_mock_whitelist,
         [pre_kw],
