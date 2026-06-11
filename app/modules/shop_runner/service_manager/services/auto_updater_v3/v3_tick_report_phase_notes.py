@@ -119,6 +119,11 @@ def summarize_phase_zero_actions(
             resolve=resolve,
             policy=policy,
         ),
+        "pay_for_order_no_ch_enable": lambda: _note_enable_no_ch_pfo(
+            prepared,
+            eligibility_by_ks_id=eligibility_by_ks_id,
+            resolve=resolve,
+        ),
         "pay_for_order_gap_enable": lambda: _note_enable_gap(
             prepared,
             eligibility_by_ks_id=eligibility_by_ks_id,
@@ -328,6 +333,39 @@ def _note_enable_gap(
     if candidates == 0:
         return "нет NO DATA GAP-ключей в OFF"
     return "нет подходящего GAP-кандидата для enable"
+
+
+def _note_enable_no_ch_pfo(
+    prepared: PreparedListLike,
+    *,
+    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None,
+    resolve: float | None,
+) -> str:
+    if resolve is None or float(resolve) <= 0:
+        return "resolve недоступен"
+    if eligibility_by_ks_id is None:
+        return "нет NO CH PFO-ключей в OFF"
+    candidates = 0
+    for ctx, mode in prepared:
+        if mode != KeywordStrategyMode.OFF:
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id <= 0:
+            continue
+        if bool(ctx.position_profile):
+            continue
+        elig = eligibility_by_ks_id.get(ks_id)
+        if elig is None or elig.data_tier != KeywordDataTier.KEYWORD_PFO:
+            continue
+        pfo = getattr(ctx.keyword, "pay_for_order", None)
+        if pfo is None or float(pfo) <= 0:
+            continue
+        if not hard_status_allows_up(int(ctx.keyword.hard_status)):
+            continue
+        candidates += 1
+    if candidates == 0:
+        return "нет NO CH PFO-ключей в OFF"
+    return "нет подходящего NO CH PFO-кандидата для enable"
 
 
 def _note_resolve_calibration(

@@ -32,6 +32,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable import (
     PayForOrderGapEnableExecutor,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_no_ch_enable import (
+    PayForOrderNoChEnableExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_over_max_off_on_deep_overspend import (
     PayForOrderOverMaxOffOnDeepOverspendExecutor,
 )
@@ -64,6 +67,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
         RaiseStateToTargetCpoExecutor(),
         ResetOverMaxCpoOnOverspendExecutor(),
         ShelfCleanupExecutor(),
+        PayForOrderNoChEnableExecutor(),
         RebalanceExecutor(),
         PayForOrderGapEnableExecutor(),
         PayForOrderOverMaxOffOnDeepOverspendExecutor(),
@@ -79,6 +83,7 @@ __all__ = [
     "NotFullTargetPlacePlanFactExecutor",
     "NotFullValidateExecutor",
     "PayForOrderGapEnableExecutor",
+    "PayForOrderNoChEnableExecutor",
     "PayForOrderOverMaxOffOnDeepOverspendExecutor",
     "PreambleExecutor",
     "RaiseStateToTargetCpoExecutor",

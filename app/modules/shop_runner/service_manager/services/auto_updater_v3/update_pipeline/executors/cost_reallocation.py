@@ -138,8 +138,25 @@ class RebalanceExecutor:
 
 
 def _phase_skip_reason(context: UpdateContext) -> str | None:
+    """Phase-level rebalance gate.
+
+    Rebalance intentionally yields to any earlier preamble mutation. Executors
+    before this phase may already have scheduled deterministic safety,
+    correction, activation, or target-place changes for the current tick.
+    Mixing cost reallocation with those prior decisions in the same preamble
+    would combine independent actions. Therefore any non-empty ``next_state``
+    or ``history_target_place`` produced before this phase blocks rebalance.
+
+    No-op phases do not append to these lists and do not block the phase.
+    """
     if not context.adv_state.resolve_valid:
         return "resolve_invalid"
+    for dto in context.keywords:
+        # Broad business rule: any prior real mutation blocks rebalance.
+        # ``next_state`` means a planned mode/state transition; ``history_target_place``
+        # means a planned target-place transition. Empty lists indicate no-op phases.
+        if dto.next_state or dto.history_target_place:
+            return "prior_executor_applied"
     return None
 
 

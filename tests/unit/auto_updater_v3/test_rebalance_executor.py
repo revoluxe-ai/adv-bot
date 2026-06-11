@@ -20,12 +20,22 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     KeywordsPreparedList,
+    UpdateContext,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_mode import (
+    KeywordMode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
     V3LadderStageKind,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.next_state import (
+    NextState,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.next_target_place import (
+    NextTargetPlace,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
@@ -627,3 +637,29 @@ def test_rebalance_executor_skips_on_resolve_invalid() -> None:
 def test_rebalance_executor_in_preamble() -> None:
     phases = [e.phase_name for e in build_normal_preamble_executors()]
     assert "cost_reallocation" in phases
+
+
+@pytest.mark.unit
+def test_rebalance_skips_after_prior_next_state_change() -> None:
+    dto = _dto(mode=KeywordStrategyMode.OFF, target_place=0)
+    dto.current_mode = NextState(
+        new_mode=KeywordMode.MIN_CPA,
+        executor_name="PayForOrderNoChEnableExecutor",
+    )
+    ctx = UpdateContext(prepared=KeywordsPreparedList(keywords=[dto]), adv_state=_adv_state())
+    executor = RebalanceExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "prior_executor_applied"
+
+
+@pytest.mark.unit
+def test_rebalance_skips_after_prior_target_place_change() -> None:
+    dto = _dto()
+    dto.current_target_place = NextTargetPlace(
+        new_target_place=0,
+        executor_name="PayForOrderGapEnableExecutor",
+    )
+    ctx = UpdateContext(prepared=KeywordsPreparedList(keywords=[dto]), adv_state=_adv_state())
+    executor = RebalanceExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "prior_executor_applied"
