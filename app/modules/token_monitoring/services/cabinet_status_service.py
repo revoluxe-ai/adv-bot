@@ -29,16 +29,6 @@ logger = logging.getLogger(__name__)
 sm = get_async_session_maker
 
 
-async def _shop_users_with_users(session, shop_id: str) -> list[WBUserCabinet]:
-    stmt = (
-        select(WBUserCabinet)
-        .options(selectinload(WBUserCabinet.user))
-        .join(WBCabinet)
-        .join(User)
-        .where(WBCabinet.shop_id == shop_id)
-    )
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
 # When the cabinet is active again, resolve these so a later deactivation can notify.
 _CABINET_REACTIVATION_RESOLVE_TYPES: tuple[str, ...] = (
     NotificationType.TOKEN_DEACTIVATED.value,
