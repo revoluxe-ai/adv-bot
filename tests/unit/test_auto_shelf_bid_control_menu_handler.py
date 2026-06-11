@@ -166,7 +166,7 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
     )
 
     callback.answer.assert_not_awaited()
-    assert chat_message.answers == ["В текущем цикле пока нет ставок с показами."]
+    assert chat_message.answers == ["В покрытии ставок теста пока нет доступных строк."]
 
 
 def test_auto_shelf_bid_settings_keyboard_callback_data_fits_telegram_limit() -> None:

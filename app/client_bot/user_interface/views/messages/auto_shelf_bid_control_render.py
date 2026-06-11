@@ -216,31 +216,34 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         f"bids: {bid_count}\n\n"
         "Top-3 plan_ranked:\n"
         f"{plan_ranked_text}\n\n"
+        "Top-3 expected_ranked:\n"
+        f"{expected_ranked_text}"
     )
 
 
 def _format_coverage_layer_row(row: CoverageLayerBidDTO, currency: str) -> str:
+    status = "✅" if not row.undercovered else "⏳"
+    markers: list[str] = [status]
+    if row.is_selected_next_test:
+        markers.append("🎯")
+    if row.is_best_plan or row.is_global_best:
+        markers.append("⭐️")
+    label_text = f" [{row.label}]" if row.label and row.label != "bid" else ""
     return (
-        f"- {row.label}: {format_bid(row.bid_minor, currency)} | "
+        f"{' '.join(markers)} {format_bid(row.bid_minor, currency)}{label_text}: "
         f"показы {row.impressions}, валидные часы {row.valid_hours}, "
-        f"closed_layers {row.closed_layers}, undercovered {_format_yes_no(row.undercovered)}"
+        f"closed_layers {row.closed_layers}"
     )
 
 
 def _render_coverage_layer_block(view: AutoShelfBidControlViewDTO) -> str:
-    rows = view.coverage_bid_rows
-    rows_text = "\n".join(
-        _format_coverage_layer_row(row, view.currency) for row in rows
-    )
-    if not rows_text:
-        rows_text = "-"
     return (
-        "Накопленное покрытие тестов:\n"
+        "Покрытие ставок теста:\n"
         f"first_available_bucket_start: {_format_cycle_timestamp(view.coverage_first_available_bucket_start)}\n"
         f"current_layer: {view.coverage_current_layer if view.coverage_current_layer is not None else '—'}\n"
         f"undercovered_count: {view.coverage_undercovered_count if view.coverage_undercovered_count is not None else '—'}\n"
         f"selected_next_test_bid: {format_bid(view.coverage_selected_next_test_bid_minor, view.currency)}\n"
-        f"{rows_text}"
+        "Подробный список: в пагинированном просмотрщике."
     )
 
 
@@ -341,25 +344,31 @@ def _bid_point_viewer_legend(optimization_metric: OptimizationMetric) -> str:
 
 
 # Legacy константы для обратной совместимости
-BID_POINT_VIEWER_HEADER = _bid_point_viewer_header(OptimizationMetric.CPC)
+BID_POINT_VIEWER_HEADER = "Покрытие ставок теста:"
 BID_POINT_VIEWER_LEGEND = _bid_point_viewer_legend(OptimizationMetric.CPC)
 
 
 def render_bid_point_viewer_message(
     page: int,
-    points: list[BidPointStatsDTO],
+    points: list[CoverageLayerBidDTO],
+    currency: str = "RUB",
     page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
     optimization_metric: OptimizationMetric = OptimizationMetric.CPC,
 ) -> str:
-    """До ``page_size`` строк покрытий цикла на одной странице просмотрщика."""
+    """До ``page_size`` строк dense universe accumulated coverage на одной странице."""
     total = len(points)
     total_pages = bid_point_viewer_page_count(total, page_size)
     safe_page = clamp_bid_point_page(page, total_pages)
     chunk = slice_bid_points_page(points, safe_page, page_size)
-    lines = [format_bid_point_line(point) for point in chunk]
-    body = "\n".join(lines) if lines else "Нет ставок с показами в текущем цикле."
-    header = _bid_point_viewer_header(optimization_metric)
-    legend = _bid_point_viewer_legend(optimization_metric)
+    lines = [_format_coverage_layer_row(point, currency) for point in chunk]
+    body = "\n".join(lines) if lines else "Нет ставок в dense universe."
+    header = "Покрытие ставок теста:"
+    legend = (
+        "✅ closed_layers > current_layer · "
+        "⏳ closed_layers == current_layer · "
+        "🎯 selected_next_test_bid · "
+        "⭐️ best/global/best_plan"
+    )
     return (
         f"{header}\n"
         f"{legend}\n\n"

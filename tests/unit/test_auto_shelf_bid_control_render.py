@@ -199,6 +199,16 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "own_anchor: 3.79%" in message
     assert "expected_order_cost_rub: 568.06 \u20bd" in message
     assert "expected_daily_impressions: 95 818" in message
+    plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1].split(
+        "\n\nTop-3 expected_ranked:\n",
+        maxsplit=1,
+    )[0]
+    expected_ranked_block = message.split(
+        "Top-3 expected_ranked:\n",
+        maxsplit=1,
+    )[1]
+    assert "expected_daily_impressions" not in plan_ranked_block
+    assert "expected_daily_impressions: 95 818" in expected_ranked_block
     assert "35000" not in message
     assert "568.0587841906347" not in message
     assert "0.4918326535656478" not in message
@@ -257,6 +267,7 @@ def test_render_main_message_with_coverage_layers_block() -> None:
                 valid_hours=184,
                 closed_layers=92,
                 undercovered=False,
+                is_current_main=True,
             ),
             CoverageLayerBidDTO(
                 label="current_test_bid_minor / selected_next_test_bid_minor",
@@ -265,6 +276,8 @@ def test_render_main_message_with_coverage_layers_block() -> None:
                 valid_hours=1,
                 closed_layers=0,
                 undercovered=True,
+                is_current_test=True,
+                is_selected_next_test=True,
             ),
             CoverageLayerBidDTO(
                 label="best_plan_bid_minor",
@@ -273,22 +286,18 @@ def test_render_main_message_with_coverage_layers_block() -> None:
                 valid_hours=0,
                 closed_layers=0,
                 undercovered=True,
+                is_best_plan=True,
             ),
         ],
     )
 
     message = render_auto_shelf_bid_control_message(view)
 
-    assert "Накопленное покрытие тестов:" in message
+    assert "Покрытие ставок теста:" in message
     assert "Следующая тестовая ставка: 339 ₽" in message
     assert "first_available_bucket_start:" in message
     assert "current_layer: 0" in message
     assert "undercovered_count: 3" in message
     assert "selected_next_test_bid: 339 ₽" in message
     assert "402.50 ₽" not in message
-    assert "current_main_bid_minor: 205 ₽" in message
-    assert "current_test_bid_minor / selected_next_test_bid_minor: 600 ₽" in message
-    assert "best_plan_bid_minor: 375 ₽" in message
-    assert "показы 184393" in message
-    assert "валидные часы 184" in message
-    assert "closed_layers 92" in message
+    assert "Подробный список: в пагинированном просмотрщике." in message
