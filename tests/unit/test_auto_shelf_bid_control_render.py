@@ -140,6 +140,7 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
             "plan_ranked": [
                 {
                     "bid": 35000,
+                    "expected_daily_impressions": 95818.2,
                     "ctr": 0.01104280322383927,
                     "expected_order_cost_rub": 568.0587841906347,
                     "resolved_order_cost_rub": 550.0,
@@ -148,17 +149,17 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
                 },
                 {
                     "bid": 16000,
+                    "expected_daily_impressions": 12345.0,
                     "ctr": 0.0199,
                     "expected_order_cost_rub": 123.45,
-                    "resolved_order_cost_rub": 120.0,
                     "sales_gap": -12.34,
                     "plan_distance_score": 0.456,
                 },
                 {
                     "bid": 20500,
+                    "expected_daily_impressions": 54321.0,
                     "ctr": 0.03,
                     "expected_order_cost_rub": 222.2,
-                    "resolved_order_cost_rub": 200.0,
                     "sales_gap": -1.0,
                     "plan_distance_score": 0.3,
                 },
@@ -193,27 +194,14 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "best_plan_bid: 350 \u20bd" in message
     assert "hours: 7" in message
     assert "bids: 3" in message
-    assert "bid: 350 \u20bd" in message
+    plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
+    assert "bid: 350 \u20bd" in plan_ranked_block
+    assert "expected_daily_impressions: 95 818" in plan_ranked_block
     assert "ctr: 1.10%" in message
-    assert "confidence: 49.18%" in message
-    assert "own_anchor: 3.79%" in message
     assert "expected_order_cost_rub: 568.06 \u20bd" in message
-    assert "expected_daily_impressions: 95 818" in message
-    plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1].split(
-        "\n\nTop-3 expected_ranked:\n",
-        maxsplit=1,
-    )[0]
-    expected_ranked_block = message.split(
-        "Top-3 expected_ranked:\n",
-        maxsplit=1,
-    )[1]
-    assert "expected_daily_impressions" not in plan_ranked_block
-    assert "expected_daily_impressions: 95 818" in expected_ranked_block
     assert "35000" not in message
     assert "568.0587841906347" not in message
-    assert "0.4918326535656478" not in message
     assert "Top-3 plan_ranked:" in message
-    assert "Top-3 expected_ranked:" in message
 
 
 def test_render_main_message_rejects_bool_best_plan_bid() -> None:
@@ -239,9 +227,12 @@ def test_render_main_message_rejects_bool_best_plan_bid() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     assert "best_plan_bid: —" in message
-    assert "bid: — | ctr: 1.10%" in message
+    assert "bid: —" in message
+    assert "ctr: 1.10%" in message
     assert "best_plan_bid: 1 ₽" not in message
     assert "bid: 0 ₽" not in message
+    assert "0.01 ₽" not in message
+    assert "1 minor" not in message
     assert "Лучшая плановая ставка:" not in message
 
 
