@@ -30,7 +30,8 @@ def normalize_automatic_version_ui(raw: int | None) -> int:
 
 def show_relevant_phrase_toggle(version: int) -> bool:
     """Показывать ли кнопку «только релевантные фразы». Пока только V2 (V3 — отдельно по продукту)."""
-    return version == 2
+    # TODO: Убрать вообще эту проверку
+    return True
 
 
 def automatic_version_main_menu_button(adv_setting: AdvSetting) -> InlineKeyboardButton:
