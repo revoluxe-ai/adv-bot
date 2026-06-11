@@ -109,6 +109,28 @@ def _coerce_optional_float_for_resolve(value: object) -> float | None:
     return None
 
 
+def _can_override_target_cost_from_ch(
+    *,
+    plan_orders: int | None,
+    target_pay_for_order: float | None,
+    max_pay_for_order: float | None,
+    fact_predict_orders: float | None,
+) -> bool:
+    """Whether CH fact has enough signal to override the safe fallback target cost.
+
+    ``complex_adv.target_pay_for_order`` is the safe fallback. ClickHouse-derived
+    resolve may overwrite it only when all inputs required by ``resolve_target_cost``
+    are present. In particular, ``fact_predict_orders=None`` must not be treated as
+    ``0`` here, otherwise an incomplete CH row would incorrectly force ``max``.
+    """
+    return (
+        plan_orders is not None
+        and target_pay_for_order is not None
+        and max_pay_for_order is not None
+        and fact_predict_orders is not None
+    )
+
+
 class CalculatedKeywordsManager(BaseClickHouseManager):
     async def get_calculated_keywords(
         self,
@@ -431,7 +453,12 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             _summary = await PlanFactReader().get_latest_plan_fact(
                 complex_adv.adv_id
             )
-            if _summary is not None:
+            if _summary is not None and _can_override_target_cost_from_ch(
+                plan_orders=_plan_o,
+                target_pay_for_order=_plan_t,
+                max_pay_for_order=_plan_m,
+                fact_predict_orders=_summary.fact_predict_orders,
+            ):
                 _resolved_ch = resolve_target_cost(
                     _plan_o, _plan_t, _plan_m, _summary.fact_predict_orders
                 )

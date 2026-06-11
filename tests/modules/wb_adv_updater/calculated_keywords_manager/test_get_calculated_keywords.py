@@ -1372,6 +1372,176 @@ async def test_plan_fact_reader_failure_is_logged(
     assert "4242" in caplog.text
 
 
+@pytest.mark.asyncio
+async def test_ch_null_fact_does_not_override_complex_adv_fallback_target(
+    complex_adv_mock_whitelist,
+    fixed_now,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Incomplete CH row must not overwrite safe fallback target from complex_adv."""
+    adv_id = 111
+    complex_adv_mock_whitelist.adv_id = adv_id
+    complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
+        plan_for_sales_for_day=10,
+        target_price_for_order=30.0,
+        max_price_for_order=95.0,
+    )
+    complex_adv_mock_whitelist.target_pay_for_order = 30.0
+    pre_kw = _pre_kw_above_target_at_min(
+        text="null_fact_preserve_fallback",
+        hard_status=HardStatus.WHITELIST,
+    )
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=adv_id,
+                plan_orders=10,
+                fact_predict_orders=None,
+                fact_pay_for_order=None,
+            )
+        ),
+    )
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates={},
+        now=fixed_now,
+    )
+
+    assert result[0].above_target_min_bid is not None
+    assert result[0].above_target_min_bid.resolved_target_cost == 30.0
+
+
+@pytest.mark.asyncio
+async def test_complete_ch_row_still_overrides_fallback_by_existing_resolve_formula(
+    complex_adv_mock_whitelist,
+    fixed_now,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv_id = 112
+    complex_adv_mock_whitelist.adv_id = adv_id
+    complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
+        plan_for_sales_for_day=10,
+        target_price_for_order=30.0,
+        max_price_for_order=95.0,
+    )
+    complex_adv_mock_whitelist.target_pay_for_order = 30.0
+    pre_kw = _pre_kw_above_target_at_min(
+        text="complete_ch_override",
+        hard_status=HardStatus.WHITELIST,
+    )
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=adv_id,
+                plan_orders=10,
+                fact_predict_orders=5.0,
+                fact_pay_for_order=None,
+            )
+        ),
+    )
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates={},
+        now=fixed_now,
+    )
+
+    assert result[0].above_target_min_bid is not None
+    assert result[0].above_target_min_bid.resolved_target_cost == 95.0
+
+
+@pytest.mark.asyncio
+async def test_no_ch_row_keeps_complex_adv_fallback_target(
+    complex_adv_mock_whitelist,
+    fixed_now,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv_id = 113
+    complex_adv_mock_whitelist.adv_id = adv_id
+    complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
+        plan_for_sales_for_day=10,
+        target_price_for_order=30.0,
+        max_price_for_order=95.0,
+    )
+    complex_adv_mock_whitelist.target_pay_for_order = 30.0
+    pre_kw = _pre_kw_above_target_at_min(
+        text="no_ch_row_keep_fallback",
+        hard_status=HardStatus.WHITELIST,
+    )
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(return_value=None),
+    )
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates={},
+        now=fixed_now,
+    )
+
+    assert result[0].above_target_min_bid is not None
+    assert result[0].above_target_min_bid.resolved_target_cost == 30.0
+
+
+@pytest.mark.asyncio
+async def test_missing_plan_fields_do_not_allow_ch_override(
+    complex_adv_mock_whitelist,
+    fixed_now,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv_id = 114
+    complex_adv_mock_whitelist.adv_id = adv_id
+    complex_adv_mock_whitelist.adv_setting = SimpleNamespace(
+        plan_for_sales_for_day=None,
+        target_price_for_order=30.0,
+        max_price_for_order=95.0,
+    )
+    complex_adv_mock_whitelist.target_pay_for_order = 30.0
+    pre_kw = _pre_kw_above_target_at_min(
+        text="missing_plan_fields_keep_fallback",
+        hard_status=HardStatus.WHITELIST,
+    )
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=adv_id,
+                plan_orders=None,
+                fact_predict_orders=5.0,
+                fact_pay_for_order=None,
+            )
+        ),
+    )
+
+    result = await CalculatedKeywordsManager._CalculatedKeywordsManager__get_calculated_keywords(
+        complex_adv_mock_whitelist,
+        [pre_kw],
+        min_bid_for_adv=100,
+        cooldown_map={},
+        cooldown_updates={},
+        now=fixed_now,
+    )
+
+    assert result[0].above_target_min_bid is not None
+    assert result[0].above_target_min_bid.resolved_target_cost == 30.0
+
+
 # ============================================================================
 # resolved_target_cost (complex_adv.target_pay_for_order) для порога МС
 # ============================================================================
@@ -2094,4 +2264,3 @@ def test_ms_diagnostic_no_data_user_facing_reason(fixed_now) -> None:
     assert "cooldown_map" not in ui_line
     assert "cooldown_updates" not in ui_line
     assert "мин. ставки WB" in ui_line
-
