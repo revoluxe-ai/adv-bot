@@ -31,6 +31,7 @@ from .auto_shelf_bid_control_analytics_repository import (
 from .bid_coverage_selector import (
     BidCoverage,
     build_coverage_selector_seed,
+    build_bid_universe,
     closed_layers_for_bid,
     choose_next_test_bid_by_coverage_layers,
 )
@@ -62,6 +63,7 @@ class ControlReason:
     TEST_WAITING_IMPRESSIONS = "test_waiting_impressions"
     TEST_WAITING_OBSERVATION_TIME = "test_waiting_observation_time"
     TEST_COMPLETED_SWITCH_TO_MAIN = "test_completed_switch_to_main"
+    TEST_COMPLETED_SWITCH_TO_TEST = "test_completed_switch_to_test"
     MAIN_WAITING_IMPRESSIONS = "main_waiting_impressions"
     MAIN_WAITING_OBSERVATION_TIME = "main_waiting_observation_time"
     MAIN_COMPLETED_SWITCH_TO_TEST = "main_completed_switch_to_test"
@@ -207,6 +209,90 @@ class AutoShelfBidControlManager:
             target_test_impressions=int(target_test_impressions),
             target_test_observation_hours=int(target_test_observation_hours),
         )
+
+    async def _build_coverage_snapshot(
+        self,
+        *,
+        nmid: int,
+        currency: str,
+        min_bid_minor: int,
+        max_bid_minor: int,
+        target_test_impressions: int,
+        target_test_observation_hours: int,
+        min_bid_distance_minor: int,
+        date_to: datetime,
+    ) -> tuple[list[BidCoverage], int, int, int | None]:
+        """Load accumulated coverage and derive current layer diagnostics."""
+        price_minor: int | None = None
+        mode: str | None = None
+        first_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
+            nmid=nmid,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        coverages: list[BidCoverage]
+        if first_bucket_start is None:
+            coverages = []
+        else:
+            coverages = await self._analytics.get_bid_coverages(
+                nmid=nmid,
+                date_from=first_bucket_start,
+                date_to=date_to,
+                currency=currency,
+                price_minor=price_minor,
+                mode=mode,
+            )
+        next_test_bid = choose_next_test_bid_by_coverage_layers(
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+            bid_unit_minor=100,
+            coverages=coverages,
+            target_test_impressions=target_test_impressions,
+            target_test_observation_hours=target_test_observation_hours,
+            min_bid_distance_minor=min_bid_distance_minor,
+            random_seed=build_coverage_selector_seed(
+                nmid=nmid,
+                currency=currency,
+                price_minor=price_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+                min_bid_distance_minor=min_bid_distance_minor,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            ),
+        )
+        coverage_by_bid = {int(item.bid_minor): item for item in coverages}
+        current_layer: int | None = None
+        covered_anchor_count = 0
+        for bid in range(int(min_bid_minor), int(max_bid_minor) + 1, 100):
+            coverage = coverage_by_bid.get(
+                bid,
+                BidCoverage(bid_minor=bid, impressions=0, valid_hours=0),
+            )
+            closed_layers = closed_layers_for_bid(
+                impressions=coverage.impressions,
+                valid_hours=coverage.valid_hours,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            )
+            if current_layer is None or closed_layers < current_layer:
+                current_layer = closed_layers
+        assert current_layer is not None
+        for bid in range(int(min_bid_minor), int(max_bid_minor) + 1, 100):
+            coverage = coverage_by_bid.get(
+                bid,
+                BidCoverage(bid_minor=bid, impressions=0, valid_hours=0),
+            )
+            closed_layers = closed_layers_for_bid(
+                impressions=coverage.impressions,
+                valid_hours=coverage.valid_hours,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            )
+            if closed_layers > current_layer:
+                covered_anchor_count += 1
+        return coverages, current_layer, covered_anchor_count, next_test_bid
 
     @staticmethod
     def repair_cycle_started_at(state: AutoShelfBidControlState) -> bool:
@@ -710,6 +796,54 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
+
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            == AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            bid_universe = build_bid_universe(
+                min_bid_minor,
+                int(settings_obj.max_bid_minor),
+                bid_unit_minor=100,
+            )
+            _coverages, _current_layer, covered_anchor_count, next_test_bid = (
+                await self._build_coverage_snapshot(
+                    nmid=nmid,
+                    currency=state.currency,
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=int(settings_obj.max_bid_minor),
+                    target_test_impressions=int(settings_obj.target_test_impressions),
+                    target_test_observation_hours=target_test_observation_hours,
+                    min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                    date_to=now,
+                )
+            )
+            should_continue_test = (
+                len(bid_universe) > 1
+                and covered_anchor_count < 2
+                and next_test_bid is not None
+                and next_test_bid != test_bid
+            )
+            if should_continue_test:
+                state.current_mode = "test"
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+                state.main_started_at = None
+                state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
+                await self._persist_state_then_set_bid(
+                    complex_adv,
+                    state=state,
+                    bid_minor=next_test_bid,
+                )
+                logger.info(
+                    "auto_shelf_bid_control_continue_test_coverage_bootstrap auto_adv_id=%s nmid=%s covered_anchor_count=%s next_test_bid=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    covered_anchor_count,
+                    next_test_bid,
+                    state.last_reason,
+                )
+                return None
 
         best_bid = await self._choose_main_bid_by_strategy(
             complex_adv=complex_adv,
