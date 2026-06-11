@@ -125,12 +125,14 @@ def _choose_undercovered_bid(
     min_bid_distance_minor: int,
     random_seed: int | None,
 ) -> int | None:
-    """Pick one bid from the under-covered set using reproducible randomness.
+    """Pick one bid from the under-covered set.
 
-    ``min_bid_distance_minor`` intentionally does not change coverage math. It
-    filters only final candidates: if any under-covered bids are far enough from
-    better-covered bids, sample from that filtered subset; otherwise fall back
-    to the full under-covered set.
+    Randomness is allowed only for the first bid of a coverage layer, when
+    there are no better-covered anchor bids yet. Once anchors exist, selection
+    becomes distance-driven: choose the under-covered bid that is farthest from
+    the nearest covered anchor. ``min_bid_distance_minor`` still does not alter
+    coverage math and applies only as a final candidate filter if it leaves at
+    least one candidate.
     """
     if not undercovered_bids:
         return None
@@ -139,14 +141,25 @@ def _choose_undercovered_bid(
     if not covered_ahead_bids:
         return rng.choice(ordered_undercovered)
     ordered_ahead = sorted(int(bid) for bid in covered_ahead_bids)
-    filtered_candidates: list[int] = []
-    for bid in ordered_undercovered:
-        distance = min(abs(bid - other) for other in ordered_ahead)
-        if distance >= min_bid_distance_minor:
-            filtered_candidates.append(bid)
+    distance_by_bid = {
+        bid: min(abs(bid - other) for other in ordered_ahead)
+        for bid in ordered_undercovered
+    }
+    candidates = ordered_undercovered
+    filtered_candidates = [
+        bid
+        for bid in ordered_undercovered
+        if distance_by_bid[bid] >= int(min_bid_distance_minor)
+    ]
     if filtered_candidates:
-        return rng.choice(filtered_candidates)
-    return rng.choice(ordered_undercovered)
+        candidates = filtered_candidates
+    max_distance = max(distance_by_bid[bid] for bid in candidates)
+    farthest_candidates = [
+        bid for bid in candidates if distance_by_bid[bid] == max_distance
+    ]
+    if len(farthest_candidates) == 1:
+        return farthest_candidates[0]
+    return rng.choice(farthest_candidates)
 
 
 def choose_next_test_bid_by_coverage_layers(

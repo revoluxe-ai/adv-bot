@@ -192,22 +192,14 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         plan_ranked,
         (
             "bid",
+            "expected_daily_impressions",
             "ctr",
             "expected_order_cost_rub",
-            "resolved_order_cost_rub",
             "sales_gap",
             "plan_distance_score",
         ),
     )
-    expected_ranked_text = _format_rec_bid_rows(
-        expected_ranked,
-        (
-            "bid",
-            "expected_daily_impressions",
-            "confidence",
-            "own_anchor",
-        ),
-    )
+
     return (
         "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a\n"
         f"best_expected_bid: {_format_rec_bid_best_bid(recommendation_dict.get('best_expected_bid'))}\n"
@@ -216,8 +208,7 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         f"bids: {bid_count}\n\n"
         "Top-3 plan_ranked:\n"
         f"{plan_ranked_text}\n\n"
-        "Top-3 expected_ranked:\n"
-        f"{expected_ranked_text}"
+
     )
 
 

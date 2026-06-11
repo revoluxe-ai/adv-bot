@@ -128,6 +128,24 @@ def test_render_bid_point_viewer_shows_up_to_ten_lines_per_page() -> None:
     assert "Страница 2 / 2" in page1
 
 
+def test_render_bid_point_viewer_later_pages_keep_zero_coverage_rows() -> None:
+    points = [
+        CoverageLayerBidDTO(
+            label="best_plan_bid_minor" if i == 0 else "bid",
+            bid_minor=20_000 + i * 100,
+            impressions=100 if i < 10 else 0,
+            valid_hours=1 if i < 10 else 0,
+            closed_layers=1 if i < 10 else 0,
+            undercovered=(i >= 10),
+            is_best_plan=(i == 0),
+        )
+        for i in range(12)
+    ]
+    page1 = render_bid_point_viewer_message(1, points, page_size=10)
+    assert "Страница 2 / 2" in page1
+    assert "показы 0, валидные часы 0, closed_layers 0" in page1
+
+
 def test_render_bid_point_viewer_status_and_best_markers() -> None:
     point = CoverageLayerBidDTO(
         label="bid",
