@@ -77,10 +77,6 @@ def _resolve_target_cost_pair(
     return (plan_m, "max")
 
 
-def _is_real_number(value: object) -> bool:
-    """True для int/float, не bool (bool — подкласс int)."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
 
 def resolve_target_cost(
     plan_orders: int | None,
