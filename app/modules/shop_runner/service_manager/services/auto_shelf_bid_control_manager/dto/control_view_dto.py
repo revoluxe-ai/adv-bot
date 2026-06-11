@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import cast
 
 from .optimization_metric import OptimizationMetric
 
@@ -30,6 +31,18 @@ class BidPointStatsDTO:
     is_best: bool
     is_current_main: bool
     is_current_test: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageLayerBidDTO:
+    """Строка диагностики accumulated coverage layers для одной ставки."""
+
+    label: str
+    bid_minor: int
+    impressions: int
+    valid_hours: int
+    closed_layers: int
+    undercovered: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,5 +91,13 @@ class AutoShelfBidControlViewDTO:
     optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
     fact_cpo: float | None  # фактическое CPO кампании
     resolve_cpo: float | None  # resolve/target CPO кампании
+    coverage_first_available_bucket_start: datetime | None = None
+    coverage_current_layer: int | None = None
+    coverage_undercovered_count: int | None = None
+    coverage_selected_next_test_bid_minor: int | None = None
+    coverage_bid_rows: list[CoverageLayerBidDTO] = field(
+        default_factory=lambda: cast(list[CoverageLayerBidDTO], [])
+    )
     best_plan_bid_minor: int | None = None
     rec_bid_recommendation: dict[str, object] | None = None
+    legacy_cycle_next_test_bid_minor: int | None = None

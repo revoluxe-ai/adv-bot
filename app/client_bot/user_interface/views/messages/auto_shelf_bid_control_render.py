@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     BidPointStatsDTO,
+    CoverageLayerBidDTO,
     OptimizationMetric,
 )
 from aiogram.types import InlineKeyboardMarkup
@@ -44,6 +45,10 @@ def _format_ctr(ctr: float | None) -> str:
 def _format_cycle_timestamp(value: datetime | str | None) -> str:
     """Дата/время цикла для Telegram без долей секунды."""
     return format_timestamp_for_telegram(value)
+
+
+def _format_yes_no(value: bool) -> str:
+    return "да" if value else "нет"
 
 
 def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
@@ -90,14 +95,16 @@ def _format_rec_bid_minor(value: object) -> str:
         return "\u2014"
     try:
         if isinstance(value, bool):
-            minor = int(value)
-        elif isinstance(value, int):
+            return "\u2014"
+        if isinstance(value, int):
             minor = value
         elif isinstance(value, float):
             minor = int(round(value))
         elif isinstance(value, str):
             minor = int(round(float(value)))
         else:
+            return "\u2014"
+        if minor <= 0 or minor % 100 != 0:
             return "\u2014"
         return f"{int(round(minor / 100))} \u20bd"
     except (TypeError, ValueError):
@@ -211,6 +218,31 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         f"{plan_ranked_text}\n\n"
         "Top-3 expected_ranked:\n"
         f"{expected_ranked_text}"
+    )
+
+
+def _format_coverage_layer_row(row: CoverageLayerBidDTO, currency: str) -> str:
+    return (
+        f"- {row.label}: {format_bid(row.bid_minor, currency)} | "
+        f"показы {row.impressions}, валидные часы {row.valid_hours}, "
+        f"closed_layers {row.closed_layers}, undercovered {_format_yes_no(row.undercovered)}"
+    )
+
+
+def _render_coverage_layer_block(view: AutoShelfBidControlViewDTO) -> str:
+    rows = view.coverage_bid_rows
+    rows_text = "\n".join(
+        _format_coverage_layer_row(row, view.currency) for row in rows
+    )
+    if not rows_text:
+        rows_text = "-"
+    return (
+        "Накопленное покрытие тестов:\n"
+        f"first_available_bucket_start: {_format_cycle_timestamp(view.coverage_first_available_bucket_start)}\n"
+        f"current_layer: {view.coverage_current_layer if view.coverage_current_layer is not None else '—'}\n"
+        f"undercovered_count: {view.coverage_undercovered_count if view.coverage_undercovered_count is not None else '—'}\n"
+        f"selected_next_test_bid: {format_bid(view.coverage_selected_next_test_bid_minor, view.currency)}\n"
+        f"{rows_text}"
     )
 
 
@@ -424,6 +456,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     enabled_text = "включено" if view.enabled else "выключено"
     optimization_text = _format_optimization_metric(view.optimization_metric)
     rec_bid_recommendation_text = _render_rec_bid_recommendation_block(view)
+    coverage_layer_text = _render_coverage_layer_block(view)
     rec_bid_block = (
         f"\n\n{rec_bid_recommendation_text}" if rec_bid_recommendation_text else ""
     )
@@ -442,7 +475,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Тестовая ставка test: {format_bid(view.current_test_bid_minor, view.currency)}\n"
         f"Лучшая ставка цикла: {format_bid(view.cycle_best_bid_minor, view.currency)}\n"
         f"Лучшая глобальная ставка: {format_bid(view.global_best_bid_minor, view.currency)}\n"
-        f"Следующая тестовая ставка (по циклу): {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
+        f"Следующая тестовая ставка: {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
         + (
             f"Лучшая плановая ставка: {format_bid(view.best_plan_bid_minor, view.currency)}\n\n"
             if view.best_plan_bid_minor is not None
@@ -460,6 +493,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Начат: {_format_cycle_timestamp(view.current_cycle_started_at)}\n"
         f"Тест начат: {_format_cycle_timestamp(view.test_started_at)}\n"
         f"Main начат: {_format_cycle_timestamp(view.main_started_at)}\n\n"
+        f"{coverage_layer_text}\n\n"
         "Последнее событие:\n"
         f"{_format_main_waiting_reason(view)}\n\n"
         "Предупреждения:\n"
