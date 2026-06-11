@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+import app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render as render_module
 from app.client_bot.user_interface.views.callbacks import AutoShelfBidControlBidPoints
 from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
     _bid_point_viewer_header,
@@ -21,6 +22,7 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     BidPointStatsDTO,
+    CoverageLayerBidDTO,
     OptimizationMetric,
 )
 
@@ -103,19 +105,20 @@ def test_clamp_bid_point_page_edges() -> None:
 
 
 def test_render_bid_point_viewer_shows_up_to_ten_lines_per_page() -> None:
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
     points = [
-        replace(
-            _point(20_000 + i * 100, impressions=1000 + i, is_covered=True, at=base),
-            carts=10 + i,
-            spend=100.0 + i,
-            cart_cpa=10.0 + i,
+        CoverageLayerBidDTO(
+            label="bid",
+            bid_minor=20_000 + i * 100,
+            impressions=1000 + i,
+            valid_hours=10 + i,
+            closed_layers=1 if i % 2 == 0 else 0,
+            undercovered=(i % 2 != 0),
         )
         for i in range(12)
     ]
     page0 = render_bid_point_viewer_message(0, points, page_size=10)
-    header = _bid_point_viewer_header(OptimizationMetric.CPC)
-    legend = _bid_point_viewer_legend(OptimizationMetric.CPC)
+    header = "Покрытие ставок теста:"
+    legend = "✅ closed_layers > current_layer"
     assert header in page0
     assert legend in page0
     assert page0.count("₽: показы") == 10
@@ -126,47 +129,69 @@ def test_render_bid_point_viewer_shows_up_to_ten_lines_per_page() -> None:
 
 
 def test_render_bid_point_viewer_status_and_best_markers() -> None:
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    point = _point(
-        35_000,
+    point = CoverageLayerBidDTO(
+        label="bid",
+        bid_minor=35_000,
         impressions=2500,
-        is_covered=False,
-        at=base,
-        is_best=True,
-        cart_cpa=1.0,
+        valid_hours=12,
+        closed_layers=0,
+        undercovered=True,
+        is_best_plan=True,
+        is_selected_next_test=True,
     )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
-    header = _bid_point_viewer_header(OptimizationMetric.CPC)
+    header = "Покрытие ставок теста:"
     assert text.startswith(header)
-    assert "⏳ ⭐ 350" in text or "⏳⭐" in text.replace(" ", "")
-    assert "корзины 0" in text
-    assert "клики 0" in text
-    assert "CTR 0.00%" in text
-    assert "CPC 1.00 ₽" in text
+    assert "⏳ 🎯 ⭐️ 350 ₽" in text
+    assert "показы 2500" in text
+    assert "валидные часы 12" in text
+    assert "closed_layers 0" in text
 
 
-def test_render_bid_point_viewer_shows_ctr_from_clicks_and_impressions() -> None:
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    point = _point(
-        20_000,
-        impressions=165,
-        clicks=9,
-        is_covered=False,
-        at=base,
-        carts=10,
-        cart_cpa=5.69,
-        is_best=True,
+def test_render_bid_point_viewer_shows_compact_labels() -> None:
+    point = CoverageLayerBidDTO(
+        label="current_main_bid_minor / current_test_bid_minor",
+        bid_minor=20_000,
+        impressions=10,
+        valid_hours=1,
+        closed_layers=0,
+        undercovered=True,
     )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
-    assert "клики 9" in text
-    assert "CTR 5.45%" in text
+    assert "[current_main_bid_minor / current_test_bid_minor]" in text
 
 
-def test_render_bid_point_viewer_covered_shows_checkmark() -> None:
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    point = _point(20_000, impressions=3000, is_covered=True, at=base, carts=3, cart_cpa=5.0)
+def test_render_bid_point_viewer_uses_passed_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    point = CoverageLayerBidDTO(
+        label="bid",
+        bid_minor=20_000,
+        impressions=10,
+        valid_hours=1,
+        closed_layers=0,
+        undercovered=True,
+    )
+    monkeypatch.setattr(
+        render_module,
+        "format_bid_minor_for_telegram",
+        lambda value, currency: f"{value}:{currency}",
+    )
+    text = render_bid_point_viewer_message(0, [point], currency="KZT", page_size=10)
+    assert "20000:KZT" in text
+
+
+def test_render_bid_point_viewer_shows_closed_status() -> None:
+    point = CoverageLayerBidDTO(
+        label="bid",
+        bid_minor=20_000,
+        impressions=165,
+        valid_hours=9,
+        closed_layers=3,
+        undercovered=False,
+    )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
-    assert "✅" in text
+    assert "✅ 200 ₽" in text
 
 
 def test_bid_point_viewer_keyboard_has_prev_and_next_pages() -> None:
@@ -242,10 +267,16 @@ def test_bid_point_viewer_legend_for_ctr() -> None:
     assert "лучшая глобальная по CPC" not in legend
 
 
-def test_render_bid_point_viewer_shows_ctr_header() -> None:
-    """Просмотрщик показывает правильный заголовок для CTR."""
-    base = datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc)
-    point = _point(20_000, impressions=1000, is_covered=True, at=base, clicks=50, ctr=0.05)
+def test_render_bid_point_viewer_shows_coverage_header_for_ctr() -> None:
+    """Просмотрщик coverage использует тот же заголовок независимо от метрики."""
+    point = CoverageLayerBidDTO(
+        label="bid",
+        bid_minor=20_000,
+        impressions=1000,
+        valid_hours=10,
+        closed_layers=1,
+        undercovered=False,
+    )
     text = render_bid_point_viewer_message(0, [point], page_size=10, optimization_metric=OptimizationMetric.CTR)
-    header = _bid_point_viewer_header(OptimizationMetric.CTR)
+    header = "Покрытие ставок теста:"
     assert header in text

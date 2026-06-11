@@ -43,6 +43,11 @@ class CoverageLayerBidDTO:
     valid_hours: int
     closed_layers: int
     undercovered: bool
+    is_current_main: bool = False
+    is_current_test: bool = False
+    is_selected_next_test: bool = False
+    is_best_plan: bool = False
+    is_global_best: bool = False
 
 
 @dataclass(frozen=True, slots=True)

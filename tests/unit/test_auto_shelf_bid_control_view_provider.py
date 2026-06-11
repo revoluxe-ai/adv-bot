@@ -179,7 +179,14 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
     assert view.legacy_cycle_next_test_bid_minor == 36_000
     assert view.coverage_current_layer == 0
     assert view.coverage_undercovered_count == 480
+    assert len(view.coverage_bid_rows) == 481
     assert all(row.closed_layers == 0 for row in view.coverage_bid_rows if row.bid_minor in {37_500, 60_000, 12_000})
+    missing_row = next(row for row in view.coverage_bid_rows if row.bid_minor == 12_100)
+    assert missing_row.impressions == 0
+    assert missing_row.valid_hours == 0
+    assert missing_row.closed_layers == 0
+    selected_row = next(row for row in view.coverage_bid_rows if row.bid_minor == 37_500)
+    assert selected_row.is_selected_next_test is True
     analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
         nmid=111,
         currency="RUB",
@@ -254,7 +261,10 @@ async def test_build_view_handles_missing_coverage_as_zero_rows(
     assert view.coverage_current_layer == 0
     assert view.coverage_undercovered_count == 481
     assert view.coverage_selected_next_test_bid_minor == 33_900
-    assert {row.bid_minor for row in view.coverage_bid_rows} == {33_900, 12_000, 60_000}
+    assert len(view.coverage_bid_rows) == 481
+    assert view.coverage_bid_rows[0].bid_minor == 12_000
+    assert view.coverage_bid_rows[-1].bid_minor == 60_000
+    assert any(row.bid_minor == 33_900 and row.is_selected_next_test for row in view.coverage_bid_rows)
     assert all(row.impressions == 0 for row in view.coverage_bid_rows)
     assert all(row.valid_hours == 0 for row in view.coverage_bid_rows)
     analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(

@@ -212,12 +212,14 @@ class AutoShelfBidControlViewProvider:
     @staticmethod
     def _build_coverage_layer_rows(
         *,
+        universe: list[int],
         coverages: list[BidCoverage],
         current_layer: int,
         selected_next_test_bid_minor: int | None,
         current_main_bid_minor: int | None,
         current_test_bid_minor: int | None,
         best_plan_bid_minor: int | None,
+        global_best_bid_minor: int | None,
         min_bid_minor: int | None,
         max_bid_minor: int | None,
         target_test_impressions: int,
@@ -225,22 +227,7 @@ class AutoShelfBidControlViewProvider:
     ) -> list[CoverageLayerBidDTO]:
         coverage_map = {int(item.bid_minor): item for item in coverages}
         rows: list[CoverageLayerBidDTO] = []
-        seen_bids: set[int] = set()
-        candidate_bids = [
-            current_main_bid_minor,
-            current_test_bid_minor,
-            best_plan_bid_minor,
-            selected_next_test_bid_minor,
-            min_bid_minor,
-            max_bid_minor,
-        ]
-        for candidate in candidate_bids:
-            if candidate is None:
-                continue
-            bid_minor = int(candidate)
-            if bid_minor in seen_bids:
-                continue
-            seen_bids.add(bid_minor)
+        for bid_minor in universe:
             coverage = coverage_map.get(bid_minor)
             if coverage is None:
                 impressions = 0
@@ -270,6 +257,26 @@ class AutoShelfBidControlViewProvider:
                     valid_hours=valid_hours,
                     closed_layers=closed_layers,
                     undercovered=(closed_layers == current_layer),
+                    is_current_main=(
+                        current_main_bid_minor is not None
+                        and bid_minor == int(current_main_bid_minor)
+                    ),
+                    is_current_test=(
+                        current_test_bid_minor is not None
+                        and bid_minor == int(current_test_bid_minor)
+                    ),
+                    is_selected_next_test=(
+                        selected_next_test_bid_minor is not None
+                        and bid_minor == int(selected_next_test_bid_minor)
+                    ),
+                    is_best_plan=(
+                        best_plan_bid_minor is not None
+                        and bid_minor == int(best_plan_bid_minor)
+                    ),
+                    is_global_best=(
+                        global_best_bid_minor is not None
+                        and bid_minor == int(global_best_bid_minor)
+                    ),
                 )
             )
         return rows
@@ -736,12 +743,18 @@ class AutoShelfBidControlViewProvider:
                 1 for closed in closed_by_bid.values() if closed == coverage_current_layer
             )
             coverage_bid_rows = AutoShelfBidControlViewProvider._build_coverage_layer_rows(
+                universe=universe,
                 coverages=coverage_rows,
                 current_layer=coverage_current_layer,
                 selected_next_test_bid_minor=coverage_selected_next_test_bid_minor,
                 current_main_bid_minor=(state.current_main_bid_minor if state else None),
                 current_test_bid_minor=(state.current_test_bid_minor if state else None),
                 best_plan_bid_minor=best_plan_bid_minor,
+                global_best_bid_minor=(
+                    global_best.bid_minor
+                    if global_best is not None
+                    else (best.bid_minor if best is not None else None)
+                ),
                 min_bid_minor=min_bid_minor_value,
                 max_bid_minor=max_bid_minor_value,
                 target_test_impressions=target_test_impressions_value,
