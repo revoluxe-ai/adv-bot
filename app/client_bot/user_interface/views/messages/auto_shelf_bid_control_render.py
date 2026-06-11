@@ -216,8 +216,6 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         f"bids: {bid_count}\n\n"
         "Top-3 plan_ranked:\n"
         f"{plan_ranked_text}\n\n"
-        "Top-3 expected_ranked:\n"
-        f"{expected_ranked_text}"
     )
 
 
