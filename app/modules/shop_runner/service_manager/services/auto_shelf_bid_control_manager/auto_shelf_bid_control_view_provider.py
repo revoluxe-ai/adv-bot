@@ -143,6 +143,37 @@ class AutoShelfBidControlViewProvider:
         return sanitized, best_plan_bid_minor
 
     @staticmethod
+    def _parse_plan_ranked_scores(
+        recommendation: dict[str, object] | None,
+    ) -> dict[int, float]:
+        """Extract valid plan-ranked bid scores for coverage row ordering."""
+        if recommendation is None:
+            return {}
+        raw_rows = recommendation.get("plan_ranked")
+        if not isinstance(raw_rows, list):
+            return {}
+        rows = cast(list[object], raw_rows)
+        scores: dict[int, float] = {}
+        for raw_item in rows:
+            if not isinstance(raw_item, dict):
+                continue
+            item = cast(dict[str, object], raw_item)
+            bid_value = item.get("bid")
+            score_value = item.get("plan_distance_score")
+            if isinstance(bid_value, bool) or not isinstance(bid_value, int):
+                continue
+            if isinstance(score_value, bool) or not isinstance(
+                score_value, (int, float, str)
+            ):
+                continue
+            try:
+                score = float(score_value)
+            except (TypeError, ValueError):
+                continue
+            scores[int(bid_value)] = score
+        return scores
+
+    @staticmethod
     def _map_bid_stats_to_points(
         bid_stats: list[BidStatsDTO],
         *,
@@ -280,6 +311,56 @@ class AutoShelfBidControlViewProvider:
                 )
             )
         return rows
+
+    @staticmethod
+    def _sort_coverage_layer_rows(
+        rows: list[CoverageLayerBidDTO],
+        *,
+        plan_ranked_scores: dict[int, float],
+        selected_next_test_bid_minor: int | None,
+    ) -> list[CoverageLayerBidDTO]:
+        """Sort dense coverage rows for diagnostics without dropping any bids."""
+        covered_anchors = [
+            row.bid_minor for row in rows if not row.undercovered
+        ]
+        anchor_distance_by_bid: dict[int, int] = {}
+        for row in rows:
+            if not row.undercovered or not covered_anchors:
+                continue
+            anchor_distance_by_bid[row.bid_minor] = min(
+                abs(int(row.bid_minor) - int(anchor_bid))
+                for anchor_bid in covered_anchors
+            )
+
+        def _is_important(row: CoverageLayerBidDTO) -> bool:
+            return (
+                row.is_current_main
+                or row.is_current_test
+                or row.is_best_plan
+                or row.is_global_best
+                or "min_bid_minor" in row.label
+                or "max_bid_minor" in row.label
+            )
+
+        def _sort_key(row: CoverageLayerBidDTO) -> tuple[float, ...]:
+            if row.bid_minor in plan_ranked_scores:
+                return (0.0, float(plan_ranked_scores[row.bid_minor]), float(row.bid_minor))
+            if (
+                selected_next_test_bid_minor is not None
+                and row.bid_minor == int(selected_next_test_bid_minor)
+            ):
+                return (1.0, 0.0, float(row.bid_minor))
+            if _is_important(row):
+                return (2.0, 0.0, float(row.bid_minor))
+            if row.undercovered:
+                return (
+                    3.0,
+                    float(-anchor_distance_by_bid.get(row.bid_minor, -row.bid_minor)),
+                    float(row.bid_minor),
+                )
+            return (4.0, 0.0, float(row.bid_minor))
+
+        return sorted(rows, key=_sort_key)
 
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Собрать DTO для read-only Telegram экрана."""
@@ -759,6 +840,13 @@ class AutoShelfBidControlViewProvider:
                 max_bid_minor=max_bid_minor_value,
                 target_test_impressions=target_test_impressions_value,
                 target_test_observation_hours=target_test_observation_hours_value,
+            )
+            coverage_bid_rows = AutoShelfBidControlViewProvider._sort_coverage_layer_rows(
+                coverage_bid_rows,
+                plan_ranked_scores=AutoShelfBidControlViewProvider._parse_plan_ranked_scores(
+                    rec_bid_recommendation
+                ),
+                selected_next_test_bid_minor=coverage_selected_next_test_bid_minor,
             )
 
         return AutoShelfBidControlViewDTO(
