@@ -48,6 +48,12 @@ class CoverageLayerBidDTO:
     is_selected_next_test: bool = False
     is_best_plan: bool = False
     is_global_best: bool = False
+    status_text: str | None = None
+    expected_daily_impressions: float | None = None
+    expected_daily_clicks: float | None = None
+    expected_daily_orders: float | None = None
+    expected_order_cost_rub: float | None = None
+    plan_distance_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

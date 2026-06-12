@@ -33,6 +33,13 @@ _PLAN_RANKED_FIELDS: tuple[str, ...] = (
     "plan_distance_score",
 )
 
+_PLAN_RANKED_ALIASES: tuple[tuple[str, str], ...] = (
+    ("expected_daily_impressions", "expected_impressions"),
+    ("expected_daily_clicks", "expected_clicks"),
+    ("expected_daily_orders", "expected_orders"),
+    ("cpo_rub", "expected_order_cost_rub"),
+)
+
 _DIAGNOSTICS_FIELDS: tuple[str, ...] = (
     "bucket_count",
     "hour_observation_count",
@@ -44,6 +51,19 @@ _DIAGNOSTICS_FIELDS: tuple[str, ...] = (
 def _pick_fields(row: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
     """Return a stable field subset preserving declared order."""
     return {field: row.get(field) for field in fields}
+
+
+def _build_plan_ranked_view_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Build a Telegram-facing plan row with forecast aliases.
+
+    The UI reads concise forecast labels, while the ranking engine keeps its
+    original internal keys for compatibility with analytical tests.
+    """
+    view_row = _pick_fields(row, _PLAN_RANKED_FIELDS)
+    for alias, source in _PLAN_RANKED_ALIASES:
+        alias_value = row.get(alias)
+        view_row[alias] = alias_value if alias_value is not None else row.get(source)
+    return view_row
 
 
 def build_rec_bid_recommendation_view(result: Mapping[str, object]) -> dict[str, Any]:
@@ -60,7 +80,5 @@ def build_rec_bid_recommendation_view(result: Mapping[str, object]) -> dict[str,
         "expected_ranked": [
             _pick_fields(row, _EXPECTED_RANKED_FIELDS) for row in expected_ranked
         ],
-        "plan_ranked": [
-            _pick_fields(row, _PLAN_RANKED_FIELDS) for row in plan_ranked
-        ],
+        "plan_ranked": [_build_plan_ranked_view_row(row) for row in plan_ranked],
     }

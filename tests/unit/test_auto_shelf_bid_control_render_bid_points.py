@@ -63,6 +63,38 @@ def _point(
     )
 
 
+def _coverage_point(
+    bid_minor: int,
+    *,
+    impressions: int,
+    valid_hours: int,
+    closed_layers: int,
+    undercovered: bool,
+    expected_daily_impressions: float | None = None,
+    expected_daily_clicks: float | None = None,
+    expected_daily_orders: float | None = None,
+    expected_order_cost_rub: float | None = None,
+    plan_distance_score: float | None = None,
+    status_text: str | None = None,
+    label: str = "bid",
+) -> CoverageLayerBidDTO:
+    """Собрать строку coverage-view со всеми forecast-полями."""
+    return CoverageLayerBidDTO(
+        label=label,
+        bid_minor=bid_minor,
+        impressions=impressions,
+        valid_hours=valid_hours,
+        closed_layers=closed_layers,
+        undercovered=undercovered,
+        expected_daily_impressions=expected_daily_impressions,
+        expected_daily_clicks=expected_daily_clicks,
+        expected_daily_orders=expected_daily_orders,
+        expected_order_cost_rub=expected_order_cost_rub,
+        plan_distance_score=plan_distance_score,
+        status_text=status_text,
+    )
+
+
 def test_main_screen_has_no_covered_bid_points_block() -> None:
     from tests.unit.test_auto_shelf_bid_control_render_message import _view_with_bid_point
 
@@ -210,6 +242,46 @@ def test_render_bid_point_viewer_shows_closed_status() -> None:
     )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
     assert "✅ 200 ₽" in text
+
+
+def test_render_bid_point_viewer_shows_forecast_and_status() -> None:
+    point = _coverage_point(
+        20_500,
+        impressions=165,
+        valid_hours=9,
+        closed_layers=0,
+        undercovered=True,
+        expected_daily_impressions=54_321.0,
+        expected_daily_clicks=1_629.63,
+        expected_daily_orders=48.89,
+        expected_order_cost_rub=222.2,
+        plan_distance_score=0.3,
+        status_text="eligible",
+    )
+    text = render_bid_point_viewer_message(0, [point], page_size=10)
+    assert "прогноз показов/сутки: 54 321" in text
+    assert "прогноз кликов/сутки: 1 630" in text
+    assert "прогноз заказов/сутки: 48.89" in text
+    assert "CPO: 222.20 ₽" in text
+    assert "score: 0.300" in text
+    assert "status: eligible" in text
+
+
+def test_render_bid_point_viewer_keeps_missing_forecast_as_dash() -> None:
+    point = _coverage_point(
+        20_500,
+        impressions=165,
+        valid_hours=9,
+        closed_layers=0,
+        undercovered=False,
+        status_text="covered",
+    )
+    text = render_bid_point_viewer_message(0, [point], page_size=10)
+    assert "прогноз показов/сутки: —" in text
+    assert "прогноз кликов/сутки: —" in text
+    assert "прогноз заказов/сутки: —" in text
+    assert "CPO: —" in text
+    assert "status: covered" in text
 
 
 def test_bid_point_viewer_keyboard_has_prev_and_next_pages() -> None:
