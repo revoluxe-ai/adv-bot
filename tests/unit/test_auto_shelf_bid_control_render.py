@@ -141,6 +141,9 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
                 {
                     "bid": 35000,
                     "expected_daily_impressions": 95818.2,
+                    "expected_daily_clicks": 1396.6,
+                    "expected_daily_orders": 69.83,
+                    "cpo_rub": 568.0587841906347,
                     "ctr": 0.01104280322383927,
                     "expected_order_cost_rub": 568.0587841906347,
                     "resolved_order_cost_rub": 550.0,
@@ -150,6 +153,9 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
                 {
                     "bid": 16000,
                     "expected_daily_impressions": 12345.0,
+                    "expected_daily_clicks": 245.76,
+                    "expected_daily_orders": 12.34,
+                    "cpo_rub": 123.45,
                     "ctr": 0.0199,
                     "expected_order_cost_rub": 123.45,
                     "sales_gap": -12.34,
@@ -158,6 +164,9 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
                 {
                     "bid": 20500,
                     "expected_daily_impressions": 54321.0,
+                    "expected_daily_clicks": 1629.63,
+                    "expected_daily_orders": 48.89,
+                    "cpo_rub": 222.2,
                     "ctr": 0.03,
                     "expected_order_cost_rub": 222.2,
                     "sales_gap": -1.0,
@@ -197,8 +206,10 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
     assert "bid: 350 \u20bd" in plan_ranked_block
     assert "expected_daily_impressions: 95 818" in plan_ranked_block
+    assert "expected_daily_clicks: 1 397" in plan_ranked_block
+    assert "expected_daily_orders: 69.83" in plan_ranked_block
+    assert "CPO: 568.06 \u20bd" in plan_ranked_block
     assert "ctr: 1.10%" in message
-    assert "expected_order_cost_rub: 568.06 \u20bd" in message
     assert "35000" not in message
     assert "568.0587841906347" not in message
     assert "Top-3 plan_ranked:" in message

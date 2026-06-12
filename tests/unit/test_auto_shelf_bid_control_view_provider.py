@@ -416,8 +416,22 @@ async def test_build_view_sorts_coverage_rows_by_plan_ranked_then_selected_then_
             "view": {
                 "best_plan_bid": 12_300,
                 "plan_ranked": [
-                    {"bid": 12_300, "plan_distance_score": 0.1},
-                    {"bid": 12_200, "plan_distance_score": 0.2},
+                    {
+                        "bid": 12_300,
+                        "expected_daily_impressions": 1_000.0,
+                        "expected_daily_clicks": 100.0,
+                        "expected_daily_orders": 10.0,
+                        "cpo_rub": 99.0,
+                        "plan_distance_score": 0.1,
+                    },
+                    {
+                        "bid": 12_200,
+                        "expected_daily_impressions": 800.0,
+                        "expected_daily_clicks": 80.0,
+                        "expected_daily_orders": 8.0,
+                        "cpo_rub": 120.0,
+                        "plan_distance_score": 0.2,
+                    },
                 ],
             }
         }
@@ -438,6 +452,11 @@ async def test_build_view_sorts_coverage_rows_by_plan_ranked_then_selected_then_
     assert view.coverage_bid_rows[0].is_best_plan is True
     assert view.coverage_bid_rows[2].is_selected_next_test is True
     assert view.coverage_bid_rows[3].is_current_main is True
+    assert view.coverage_bid_rows[0].expected_daily_impressions == 1_000.0
+    assert view.coverage_bid_rows[0].expected_daily_clicks == 100.0
+    assert view.coverage_bid_rows[0].expected_daily_orders == 10.0
+    assert view.coverage_bid_rows[0].expected_order_cost_rub == 99.0
+    assert view.coverage_bid_rows[0].plan_distance_score == 0.1
 
 
 @pytest.mark.asyncio

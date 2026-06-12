@@ -174,6 +174,77 @@ class AutoShelfBidControlViewProvider:
         return scores
 
     @staticmethod
+    def _coerce_optional_float(value: object) -> float | None:
+        """Convert loosely typed recommendation values into float-compatible data."""
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _parse_plan_ranked_forecasts(
+        recommendation: dict[str, object] | None,
+    ) -> dict[int, dict[str, object]]:
+        """Extract forecast fields from plan-ranked rows by bid.
+
+        The provider keeps render-time logic dumb: if a field is absent in the
+        recommendation payload, the UI gets ``None`` and prints ``—``.
+        """
+        if recommendation is None:
+            return {}
+        raw_rows = recommendation.get("plan_ranked")
+        if not isinstance(raw_rows, list):
+            return {}
+        rows = cast(list[object], raw_rows)
+        forecasts: dict[int, dict[str, object]] = {}
+        for raw_item in rows:
+            if not isinstance(raw_item, dict):
+                continue
+            item = cast(dict[str, object], raw_item)
+            bid_value = item.get("bid")
+            if isinstance(bid_value, bool) or not isinstance(bid_value, int):
+                continue
+            bid_minor = int(bid_value)
+            expected_daily_impressions = AutoShelfBidControlViewProvider._coerce_optional_float(
+                item.get("expected_daily_impressions")
+                if item.get("expected_daily_impressions") is not None
+                else item.get("expected_impressions")
+            )
+            expected_daily_clicks = AutoShelfBidControlViewProvider._coerce_optional_float(
+                item.get("expected_daily_clicks")
+                if item.get("expected_daily_clicks") is not None
+                else item.get("expected_clicks")
+            )
+            expected_daily_orders = AutoShelfBidControlViewProvider._coerce_optional_float(
+                item.get("expected_daily_orders")
+                if item.get("expected_daily_orders") is not None
+                else item.get("expected_orders")
+            )
+            expected_order_cost_rub = AutoShelfBidControlViewProvider._coerce_optional_float(
+                item.get("cpo_rub")
+                if item.get("cpo_rub") is not None
+                else item.get("expected_order_cost_rub")
+            )
+            plan_distance_score = AutoShelfBidControlViewProvider._coerce_optional_float(
+                item.get("plan_distance_score")
+            )
+            forecasts[bid_minor] = {
+                "expected_daily_impressions": expected_daily_impressions,
+                "expected_daily_clicks": expected_daily_clicks,
+                "expected_daily_orders": expected_daily_orders,
+                "expected_order_cost_rub": expected_order_cost_rub,
+                "plan_distance_score": plan_distance_score,
+                "status_text": item.get("status_text"),
+            }
+        return forecasts
+
+    @staticmethod
     def _map_bid_stats_to_points(
         bid_stats: list[BidStatsDTO],
         *,
@@ -255,8 +326,10 @@ class AutoShelfBidControlViewProvider:
         max_bid_minor: int | None,
         target_test_impressions: int,
         target_test_observation_hours: int,
+        forecast_by_bid: dict[int, dict[str, object]] | None = None,
     ) -> list[CoverageLayerBidDTO]:
         coverage_map = {int(item.bid_minor): item for item in coverages}
+        forecast_by_bid = forecast_by_bid or {}
         rows: list[CoverageLayerBidDTO] = []
         for bid_minor in universe:
             coverage = coverage_map.get(bid_minor)
@@ -308,7 +381,48 @@ class AutoShelfBidControlViewProvider:
                         global_best_bid_minor is not None
                         and bid_minor == int(global_best_bid_minor)
                     ),
+                    status_text=(
+                        "selected_next_test"
+                        if selected_next_test_bid_minor is not None
+                        and bid_minor == int(selected_next_test_bid_minor)
+                        else (
+                            "best_plan"
+                            if best_plan_bid_minor is not None
+                            and bid_minor == int(best_plan_bid_minor)
+                            else ("eligible" if closed_layers == current_layer else "covered")
+                        )
+                    ),
                 )
+            )
+            forecast = forecast_by_bid.get(bid_minor, {})
+            rows[-1] = CoverageLayerBidDTO(
+                label=rows[-1].label,
+                bid_minor=rows[-1].bid_minor,
+                impressions=rows[-1].impressions,
+                valid_hours=rows[-1].valid_hours,
+                closed_layers=rows[-1].closed_layers,
+                undercovered=rows[-1].undercovered,
+                is_current_main=rows[-1].is_current_main,
+                is_current_test=rows[-1].is_current_test,
+                is_selected_next_test=rows[-1].is_selected_next_test,
+                is_best_plan=rows[-1].is_best_plan,
+                is_global_best=rows[-1].is_global_best,
+                status_text=rows[-1].status_text,
+                expected_daily_impressions=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("expected_daily_impressions")
+                ),
+                expected_daily_clicks=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("expected_daily_clicks")
+                ),
+                expected_daily_orders=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("expected_daily_orders")
+                ),
+                expected_order_cost_rub=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("expected_order_cost_rub")
+                ),
+                plan_distance_score=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("plan_distance_score")
+                ),
             )
         return rows
 
@@ -840,6 +954,9 @@ class AutoShelfBidControlViewProvider:
                 max_bid_minor=max_bid_minor_value,
                 target_test_impressions=target_test_impressions_value,
                 target_test_observation_hours=target_test_observation_hours_value,
+                forecast_by_bid=AutoShelfBidControlViewProvider._parse_plan_ranked_forecasts(
+                    rec_bid_recommendation
+                ),
             )
             coverage_bid_rows = AutoShelfBidControlViewProvider._sort_coverage_layer_rows(
                 coverage_bid_rows,

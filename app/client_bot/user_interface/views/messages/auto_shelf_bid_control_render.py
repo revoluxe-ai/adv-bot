@@ -129,16 +129,26 @@ def _format_rec_bid_number(value: object, *, precision: int) -> str:
         return "\u2014"
 
 
+def _format_rec_bid_field_label(field: str) -> str:
+    if field == "cpo_rub":
+        return "CPO"
+    return field
+
+
 def _format_rec_bid_value(field: str, value: object) -> str:
     """Format recommendation values for Telegram."""
     if field == "bid":
         return _format_rec_bid_minor(value)
     if field in {"ctr", "confidence", "own_anchor"}:
         return _format_rec_bid_percent(value)
-    if field in {"expected_order_cost_rub", "resolved_order_cost_rub"}:
+    if field in {"expected_order_cost_rub", "resolved_order_cost_rub", "cpo_rub"}:
         return _format_rec_bid_rub(value)
     if field == "expected_daily_impressions":
         return _format_rec_bid_int(value)
+    if field == "expected_daily_clicks":
+        return _format_rec_bid_int(value)
+    if field == "expected_daily_orders":
+        return _format_rec_bid_number(value, precision=2)
     if field == "sales_gap":
         return _format_rec_bid_number(value, precision=2)
     if field == "plan_distance_score":
@@ -151,7 +161,8 @@ def _format_rec_bid_value(field: str, value: object) -> str:
 def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
     """Format a compact recommendation row from requested fields."""
     return " | ".join(
-        f"{field}: {_format_rec_bid_value(field, row.get(field))}" for field in fields
+        f"{_format_rec_bid_field_label(field)}: {_format_rec_bid_value(field, row.get(field))}"
+        for field in fields
     )
 
 
@@ -193,8 +204,10 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         (
             "bid",
             "expected_daily_impressions",
+            "expected_daily_clicks",
+            "expected_daily_orders",
+            "cpo_rub",
             "ctr",
-            "expected_order_cost_rub",
             "sales_gap",
             "plan_distance_score",
         ),
@@ -220,10 +233,20 @@ def _format_coverage_layer_row(row: CoverageLayerBidDTO, currency: str) -> str:
     if row.is_best_plan or row.is_global_best:
         markers.append("⭐️")
     label_text = f" [{row.label}]" if row.label and row.label != "bid" else ""
+    forecast_parts = [
+        f"прогноз показов/сутки: {_format_rec_bid_int(row.expected_daily_impressions)}",
+        f"прогноз кликов/сутки: {_format_rec_bid_int(row.expected_daily_clicks)}",
+        f"прогноз заказов/сутки: {_format_rec_bid_number(row.expected_daily_orders, precision=2)}",
+        f"CPO: {_format_rec_bid_rub(row.expected_order_cost_rub)}",
+        f"score: {_format_rec_bid_number(row.plan_distance_score, precision=3)}",
+    ]
+    if row.status_text is not None:
+        forecast_parts.append(f"status: {row.status_text}")
     return (
         f"{' '.join(markers)} {format_bid(row.bid_minor, currency)}{label_text}: "
         f"показы {row.impressions}, валидные часы {row.valid_hours}, "
-        f"closed_layers {row.closed_layers}"
+        f"closed_layers {row.closed_layers} | "
+        f"{' | '.join(forecast_parts)}"
     )
 
 
