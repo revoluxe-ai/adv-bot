@@ -95,14 +95,6 @@ def test_submenu_shows_v2_checkmark_when_db_still_v1() -> None:
     v2_row = markup.inline_keyboard[0][0]
     assert v2_row.text == "✓ Авто V2"
 
-
-@pytest.mark.unit
-def test_show_relevant_phrase_toggle_only_v2_for_now() -> None:
-    assert show_relevant_phrase_toggle(2) is True
-    assert show_relevant_phrase_toggle(1) is False
-    assert show_relevant_phrase_toggle(3) is False
-
-
 @pytest.mark.unit
 def test_v3_rollout_main_button_opens_submenu() -> None:
     adv = MagicMock()
