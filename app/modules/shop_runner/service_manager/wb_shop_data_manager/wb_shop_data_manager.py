@@ -285,7 +285,7 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_pre_complex_advs(self, *, skip_plan_fact: bool = False) -> list[PreComplexAdv]:
+    async def get_pre_complex_advs(self) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
         Args:
@@ -298,27 +298,21 @@ class WBShopDataManager:
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        summaries_by_adv_id: dict[int, PlanFactSummary] = {}
-        if skip_plan_fact:
-            if search_adv_ids:
-                search_adv_idv = await self.__get_adv_id_to_search_adv_map(
-                    search_adv_ids
-                )
-            else:
-                search_adv_idv = {}
+
+        plan_fact_reader = PlanFactReader()
+        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        if search_adv_ids:
+            search_adv_idv, summaries_by_adv_id = await asyncio.gather(
+                self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
+            )
         else:
-            plan_fact_reader = PlanFactReader()
-            adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
-            if search_adv_ids:
-                search_adv_idv, summaries_by_adv_id = await asyncio.gather(
-                    self.__get_adv_id_to_search_adv_map(search_adv_ids),
-                    plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
-                )
-            else:
-                search_adv_idv = {}
-                summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
-                    adv_ids_for_plan_fact
-                )
+            search_adv_idv = {}
+            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                adv_ids_for_plan_fact
+            )
+        self._set_auto_commom_budget(adv_settings)
+
         return [
             PreComplexAdv(
                 auto_adv=adv,
@@ -582,5 +576,16 @@ class WBShopDataManager:
                 )
             return await self._wb_manager.get_min_bids(complex_advs, cache_possible=False)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
+
+
+    @staticmethod
+    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> None:
+        for adv in adv_settings:
+            max_pay_for_order = adv.max_pay_for_order
+            plan_for_sales_for_day = adv.plan_for_sales_for_day
+            if max_pay_for_order is not None and plan_for_sales_for_day is not None:
+                if adv.auto_common_budget:
+                    adv.common_budget_daily_limit = adv.max_pay_for_order * adv.plan_for_sales_for_day
+
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

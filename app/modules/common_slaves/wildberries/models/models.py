@@ -765,6 +765,13 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=True, server_default=text("true")
     )
 
+    auto_common_budget: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=False,
+        server_default=text("false")
+    )
+
     __table_args__ = (
         # Составной индекс для основного запроса
         Index(
