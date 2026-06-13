@@ -458,7 +458,7 @@ async def test_ensure_budget_limits_by_doubled_all_attempts(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
+async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch, complex_adv) -> None:
     fake_redis = _FakeRedis()
     fake_redis.is_locked = True
     monkeypatch.setattr(
@@ -469,6 +469,7 @@ async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_common_budget_locked", inner)
 
     result = await service.ensure_common_budget(
+        complex_adv,
         adv_setting_id=1,
         wb_manager_hub=MagicMock(),
     )
@@ -479,7 +480,7 @@ async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ensure_common_budget_releases_lock(monkeypatch) -> None:
+async def test_ensure_common_budget_releases_lock(monkeypatch, complex_adv) -> None:
     fake_redis = _FakeRedis()
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings", _build_settings()
@@ -493,9 +494,9 @@ async def test_ensure_common_budget_releases_lock(monkeypatch) -> None:
     )
     inner = AsyncMock(return_value=expected)
     monkeypatch.setattr(service, "_ensure_common_budget_locked", inner)
-
     result = await service.ensure_common_budget(
-        adv_setting_id=1,
+        complex_adv,
+        adv_setting_id=complex_adv.original_adv_setting_id,
         wb_manager_hub=MagicMock(),
     )
 

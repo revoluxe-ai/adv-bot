@@ -84,6 +84,13 @@ def test_column_header_contains_tech_key() -> None:
 
 
 @pytest.mark.unit
+def test_column_header_auto_common_budget_label() -> None:
+    h = column_header("EDIT", "auto_common_budget", "BOOL")
+    assert "Авторасчёт общего бюджета" in h
+    assert "(EDIT__auto_common_budget__BOOL)" in h
+
+
+@pytest.mark.unit
 def test_parse_header_backward_compatible_with_old_template() -> None:
     k, f, s = parse_header("RO__adv_setting_id")
     assert k == "RO"

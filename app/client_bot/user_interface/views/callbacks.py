@@ -585,6 +585,11 @@ class CommonBudgetModeToggle(CallbackData, prefix="common_budget_mode_toggle"):
     new_status: bool
 
 
+class AutoCommonBudgetToggle(CallbackData, prefix="auto_common_budget_toggle"):
+    adv_setting_original_id: int
+    new_status: bool
+
+
 class IncrementalStatsToggle(CallbackData, prefix="incremental_stats_toggle"):
     adv_setting_original_id: int
     new_status: bool

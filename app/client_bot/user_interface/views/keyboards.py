@@ -12,6 +12,7 @@ from app.client_bot.user_interface.utils import (
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
+    AutoCommonBudgetToggle,
     CommonBudgetModeToggle,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
@@ -60,6 +61,22 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
                     adv_setting_original_id=adv_setting.id,
                     campaign_type=None,
                 ).pack(),
+            )
+        )
+        auto_common_flag = bool(getattr(adv_setting, "auto_common_budget", False))
+        auto_common_text = (
+            "Включить авторасчёт общего бюджета"
+            if not auto_common_flag
+            else "Выключить авторасчёт общего бюджета"
+        )
+        auto_common_callback = AutoCommonBudgetToggle(
+            adv_setting_original_id=adv_setting.id,
+            new_status=not auto_common_flag,
+        ).pack()
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=auto_common_text,
+                callback_data=auto_common_callback,
             )
         )
     else:

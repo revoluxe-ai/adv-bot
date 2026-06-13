@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -198,11 +200,23 @@ def build_calculated_keywords(
 
 async def create_complex_adv_seed(session: AsyncSession) -> ComplexAdvSeed:
     """Создаёт тот же набор объектов, который раньше строился прямо в conftest."""
-    # Создаем WBCabinet перед AdvSetting, чтобы удовлетворить внешний ключ
-    wb_cabinet = WBCabinetFactory.build(id=1, shop_id="test_shop_id", active=True, balance=0.0, bonus=0.0, demo=True, expiration_time=datetime.now() + timedelta(days=7))
-    session.add(wb_cabinet)
-    await session.flush()
-    await session.refresh(wb_cabinet)
+    # Попробуем переиспользовать существующий кабинет из seed-а
+    existing = await session.execute(
+        select(WBCabinet).where(WBCabinet.shop_id == "test_shop_id")
+    )
+    wb_cabinet: WBCabinet | None = existing.scalar_one_or_none()
+    if wb_cabinet is None:
+        wb_cabinet = WBCabinetFactory.build(
+            shop_id="test_shop_id",
+            active=True,
+            balance=0.0,
+            bonus=0.0,
+            demo=True,
+            expiration_time=datetime.now() + timedelta(days=7),
+        )
+        session.add(wb_cabinet)
+        await session.flush()
+        await session.refresh(wb_cabinet)
 
     adv_setting = AdvSettingFactory.build(
         adv_id=123,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from zoneinfo import ZoneInfo
-
 from app.modules.common_slaves.wildberries.models.wb_auto_budget_topup import WBAutoBudgetTopUp
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 import asyncio
@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.types import (
     UNSET,
@@ -24,7 +24,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.shared.domains.wb.enums import (
     AdvType,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.shared.domains.wb.utils.balance_source import (
@@ -130,6 +130,7 @@ class AutoBudgetService:
 
     async def ensure_budget(
         self,
+        adv: ComplexAdv,
         adv_setting_id: int,
         campaign_type: AdvType,
         wb_manager_hub: "WBManagerHub",
@@ -163,6 +164,7 @@ class AutoBudgetService:
 
     async def _ensure_budget_locked(
         self,
+        complex_adv: ComplexAdv,
         adv_setting_id: int,
         campaign_type: AdvType,
         wb_manager_hub: "WBManagerHub",
@@ -170,23 +172,7 @@ class AutoBudgetService:
         force_after_start_rejection: bool = False,
     ) -> AutoBudgetEnsureResult:
 
-        async with sm(read_only=True) as session:
-            result = await session.execute(
-                select(AdvSetting)
-                .options(joinedload(AdvSetting.wb_cabinet))
-                .where(AdvSetting.id == adv_setting_id)
-            )
-            adv_setting = result.unique().scalar_one_or_none()
-        if adv_setting is None:
-            return AutoBudgetEnsureResult(
-                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
-                campaign_type=campaign_type,
-                adv_id=None,
-                spend_today=0.0,
-                reason="AdvSetting is not found",
-            )
-
-        config = self.get_campaign_config(adv_setting, campaign_type)
+        config = self.get_campaign_config(complex_adv, campaign_type)
         if config is None:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.ADV_NOT_READY,
@@ -238,7 +224,7 @@ class AutoBudgetService:
         date_msk = now_msk.date()
         spend_today = await self._calculate_spend_today(config.adv_id, now_msk)
         successful_topups, attempt_sum = await self._get_daily_topup_sums(
-            adv_setting_id=adv_setting.id,
+            adv_setting_id=complex_adv.original_adv_setting_id,
             campaign_type=campaign_type,
             date_msk=date_msk,
         )
@@ -320,11 +306,11 @@ class AutoBudgetService:
             )
         snapshot = balance_snapshot_from_response(balance_response)
         cashback_summary = cashback_summary_from_response(balance_response)
-        shop_id = (
-            adv_setting.wb_cabinet.shop_id
-            if adv_setting.wb_cabinet
-            else None
-        )
+
+
+
+        async with sm(read_only=True) as session:
+            shop_id: str = self._get_wb_shop_id(session, adv_setting_id)
         if shop_id is not None:
             await self._balance_snapshot_manager.set(
                 shop_id,
@@ -474,8 +460,10 @@ class AutoBudgetService:
 
     @staticmethod
     def get_campaign_config(
-        adv_setting: AdvSetting, campaign_type: AdvType
+        complex_adv: ComplexAdv, campaign_type: AdvType
     ) -> _CampaignConfig | None:
+        adv_setting = complex_adv.adv_setting
+
         if campaign_type == AdvType.AUTO:
             adv_id = adv_setting.adv_id
             limit = adv_setting.auto_budget_daily_limit or 0
@@ -685,7 +673,8 @@ class AutoBudgetService:
 
     async def ensure_common_budget(
         self,
-        adv_setting_id: int,
+        adv: ComplexAdv,
+        adv_setting_id,
         wb_manager_hub: "WBManagerHub",
         *,
         force_after_start_rejection: bool = False,
@@ -704,6 +693,7 @@ class AutoBudgetService:
             )
         try:
             result = await self._ensure_common_budget_locked(
+                adv,
                 adv_setting_id,
                 wb_manager_hub,
                 force_after_start_rejection=force_after_start_rejection,
@@ -718,19 +708,14 @@ class AutoBudgetService:
 
     async def _ensure_common_budget_locked(
         self,
+        adv: ComplexAdv,
         adv_setting_id: int,
         wb_manager_hub: "WBManagerHub",
         *,
         force_after_start_rejection: bool = False,
         start_failure_campaign: AdvType | None = None,
     ) -> AutoBudgetEnsureResult:
-        async with sm(read_only=True) as session:
-            result = await session.execute(
-                select(AdvSetting)
-                .options(joinedload(AdvSetting.wb_cabinet))
-                .where(AdvSetting.id == adv_setting_id)
-            )
-            adv_setting = result.unique().scalar_one_or_none()
+        adv_setting = adv
         if adv_setting is None:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.ADV_NOT_READY,
@@ -748,7 +733,8 @@ class AutoBudgetService:
                 reason="Common budget mode is disabled",
             )
         limit = adv_setting.common_budget_daily_limit or 0
-        adv_id_auto = adv_setting.adv_id
+        common_adv_id = adv_setting.adv_id
+        adv_id_auto = adv_setting.auto_adv_id
         adv_id_search = adv_setting.search_adv_id
         if adv_id_search is None:
             logger.error('Нет adv_id search_adv')
@@ -928,9 +914,12 @@ class AutoBudgetService:
             )
         snapshot = balance_snapshot_from_response(balance_response)
         cashback_summary = cashback_summary_from_response(balance_response)
+        async with sm(read_only=True) as session:
+            wb_cabinet = await self._get_wb_shop_id(session, common_adv_id)
+
         shop_id = (
-            adv_setting.wb_cabinet.shop_id
-            if adv_setting.wb_cabinet
+            wb_cabinet.shop_id
+            if wb_cabinet
             else None
         )
         if shop_id is not None:
@@ -950,7 +939,7 @@ class AutoBudgetService:
             )
             balance_type_source = balance_decision.balance_name
         except NotEnoughBalanceOnShopError:
-            await self._topup_failed_manager.set(adv_setting.id)
+            await self._topup_failed_manager.set(adv.original_adv_setting_id)
             logger.warning(
                 "Not enough balance on shop for common budget top-up, adv_setting_id=%s",
                 adv_setting_id,
@@ -966,7 +955,7 @@ class AutoBudgetService:
         async with sm(read_only=False) as session:
             topup_log = await self._create_topup_entry(
                 session=session,
-                adv_setting_id=adv_setting.id,
+                adv_setting_id=adv.original_adv_setting_id,
                 adv_id=target_adv_id,
                 campaign_type=target_campaign_type,
                 date_msk=date_msk,
@@ -1058,8 +1047,8 @@ class AutoBudgetService:
             if verification_total is not None
             else AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
         )
-        await self._last_success_manager.set(adv_setting.id)
-        await self._topup_failed_manager.clear(adv_setting.id)
+        await self._last_success_manager.set(adv.original_adv_setting_id)
+        await self._topup_failed_manager.clear(adv.original_adv_setting_id)
         return AutoBudgetEnsureResult(
             status=result_status,
             campaign_type=target_campaign_type,
@@ -1084,3 +1073,23 @@ class AutoBudgetService:
             return None
         dt = dt.replace(tzinfo=ZoneInfo("Europe/Moscow"))
         return dt
+
+    @staticmethod
+    async def _get_wb_shop_id(session, adv_setting_id) -> str:
+        shop_id_get_query = (
+            select(WBCabinet.shop_id)
+            .options(
+                load_only(WBCabinet.shop_id),
+                joinedload(WBCabinet.adv_settings),
+            )
+            .where(
+                WBCabinet.adv_settings.any(
+                    AdvSetting.adv_id == adv_setting_id
+                )
+            )
+        )
+        result = await session.execute(shop_id_get_query)
+        shop_id: str | None = result.scalar()
+        if shop_id is None:
+            raise ValueError(f"No WB cabinet found for adv_setting_id={adv_setting_id}")
+        return shop_id
