@@ -8,8 +8,8 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_get_wb_cabinet_fetches_shop(async_session) -> None:
-    """AutoBudgetService._get_wb_shop_id должен вернуть кабинет по adv_setting.id."""
+async def test_get_wb_shop_id_fetches_shop_id(async_session) -> None:
+    """AutoBudgetService._get_wb_shop_id должен вернуть shop_id по adv_setting.id."""
     cabinet = WBCabinet(
         shop_id="auto_budget_test_shop",
         active=True,
@@ -37,6 +37,4 @@ async def test_get_wb_cabinet_fetches_shop(async_session) -> None:
     await async_session.flush()
 
     found = await AutoBudgetService._get_wb_shop_id(async_session, adv_setting.id)
-    assert found is not None
-    assert found.id == cabinet.id
-    assert found.shop_id == cabinet.shop_id
+    assert found == cabinet.shop_id

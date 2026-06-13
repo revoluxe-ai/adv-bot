@@ -113,7 +113,7 @@ def _patch_wb_shop_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         AutoBudgetService,
         "_get_wb_shop_id",
-        AsyncMock(return_value=SimpleNamespace(shop_id="test-shop")),
+        AsyncMock(return_value="test-shop"),
     )
 
 
