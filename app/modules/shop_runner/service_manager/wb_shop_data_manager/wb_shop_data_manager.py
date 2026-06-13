@@ -390,7 +390,7 @@ class WBShopDataManager:
         # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
         #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
         # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
-        pre_complex_advs = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
+        pre_complex_advs: list[PreComplexAdv] = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(
@@ -401,6 +401,7 @@ class WBShopDataManager:
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
                 fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
                 resolve_cpo=pre_adv.resolved_target_pay_for_order,
+                original_max_cpo=pre_adv.original_max_cpo
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [
