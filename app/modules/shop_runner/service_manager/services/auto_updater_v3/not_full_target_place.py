@@ -15,6 +15,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     MAX_PAY_STABILIZATION_RATIO,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    campaign_cpo_over_max,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.adv_state import (
     AdvState,
 )
@@ -33,7 +36,10 @@ def campaign_cpo_exceeds_max(state: AdvState) -> bool:
     """``fact_pay_for_order > plan.max_pay_for_order`` (OVERSPEND кампании)."""
     if state.fact_pay_for_order is None:
         return False
-    return float(state.fact_pay_for_order) > float(state.max_pay_for_order)
+    return campaign_cpo_over_max(
+        state.fact_pay_for_order,
+        float(state.max_pay_for_order),
+    )
 
 
 def campaign_overspend_from_plan_fact(
@@ -41,9 +47,18 @@ def campaign_overspend_from_plan_fact(
     max_pay_for_order: float,
 ) -> bool:
     """OVERSPEND по plan/fact без ``AdvState`` (sync fallback при load)."""
-    if fact_pay_for_order is None:
-        return False
-    return float(fact_pay_for_order) > float(max_pay_for_order)
+    return campaign_cpo_over_max(fact_pay_for_order, max_pay_for_order)
+
+
+def overspend_db_max_from_tick_input(
+    *,
+    plan_max_pay_for_order: float,
+    campaign_db_max_pay_for_order: float | None,
+) -> float:
+    """Db max для overspend-gate: snapshot до Raise или ``plan.max``."""
+    if campaign_db_max_pay_for_order is not None:
+        return float(campaign_db_max_pay_for_order)
+    return float(plan_max_pay_for_order)
 
 
 def clamp_not_full_target_place(place: int) -> int:

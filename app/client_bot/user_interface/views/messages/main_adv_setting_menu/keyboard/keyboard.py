@@ -9,6 +9,7 @@ from .automatic_version_ui import (
     show_relevant_phrase_toggle,
 )
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
+from .v3_max_cpo_raise_ui import v3_substitute_fact_cpo_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
 from .v3_tick_report_button import v3_tick_report_main_button
 from app.client_bot.user_interface.views.callbacks import (
@@ -53,12 +54,19 @@ def get_adv_setting_keyboard(
     wb_user_cabinet: WBUserCabinet,
     adv_setting: AdvSetting,
     in_favorites: bool,
+    *,
+    fact_pay_for_order: float | None = None,
 ):
     builder = InlineKeyboardBuilder()
 
     """План продаж"""
     from .buttoms import sales_plan_button
-    _ = builder.row(sales_plan_button.get(adv_setting))
+    _ = builder.row(
+        sales_plan_button.get(
+            adv_setting,
+            fact_pay_for_order=fact_pay_for_order,
+        )
+    )
 
 
 
@@ -328,6 +336,7 @@ def get_adv_setting_keyboard(
         _ = builder.row(v3_tick_report_main_button(adv_setting))
         _ = builder.row(v3_calibration_step_main_button(adv_setting))
         _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
+        _ = builder.row(v3_substitute_fact_cpo_main_button(adv_setting))
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",

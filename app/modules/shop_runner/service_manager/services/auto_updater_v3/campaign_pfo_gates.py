@@ -16,6 +16,10 @@ from __future__ import annotations
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     MAX_PAY_STABILIZATION_RATIO,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    cmp_over_threshold,
+    keyword_pfo_over_max,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
     KeywordDTO,
@@ -49,13 +53,16 @@ def plan_max_stabilization_floor(max_pay: float) -> float:
 
 
 def is_campaign_at_plan_headroom_plus_one(adv_state: AdvState) -> bool:
-    """``True``, если fact в зоне pfo_off (``>= ratio × plan.max``)."""
+    """``True``, если fact в зоне pfo_off (``> ratio × plan.max``)."""
     if adv_state.fact_pay_for_order is None:
         return False
     max_pay = float(adv_state.max_pay_for_order)
     if max_pay <= 0:
         return False
-    return float(adv_state.fact_pay_for_order) >= pfo_off_plan_headroom_floor(max_pay)
+    return cmp_over_threshold(
+        float(adv_state.fact_pay_for_order),
+        pfo_off_plan_headroom_floor(max_pay),
+    )
 
 
 def is_deep_overspend(adv_state: AdvState) -> bool:
@@ -104,7 +111,4 @@ def keyword_pay_for_order_over_plan_max(
     max_pay: float,
 ) -> bool:
     """``keyword.pay_for_order`` строго выше потолка плана (как в NO CH bootstrap)."""
-    pfo = dto.calculated_keyword.pay_for_order
-    if pfo is None:
-        return False
-    return float(pfo) > float(max_pay)
+    return keyword_pfo_over_max(dto.calculated_keyword.pay_for_order, float(max_pay))

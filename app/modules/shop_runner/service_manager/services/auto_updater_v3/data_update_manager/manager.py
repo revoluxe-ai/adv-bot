@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -83,7 +84,7 @@ class DataUpdateManager:
         wb_shop_data_manager: WBShopDataManager,
         max_last_period: int = 2,
         tick_report: V3TickReportCollector,
-    ) -> TickData:
+    ) -> TickData | None:
         """Собрать ``V3TickData``: keywords, dto, plan/fact, contexts, NORMAL gates."""
         adv = complex_adv.adv_setting
         ledger = V3TickKeywordLedger.from_keywords(keywords)
@@ -114,6 +115,7 @@ class DataUpdateManager:
         current_calibration_direct = None
         effective_calibration_steps = 1
         calibration_prev_effective_steps: int | None = None
+        campaign_db_max: float | None = None
 
         if plan is None:
             logger.debug("[adv_id=%s] v3: no plan, skip ladder", complex_adv.adv_id)
@@ -125,6 +127,24 @@ class DataUpdateManager:
                 keywords=ledger.keywords,
                 max_last_period=max_last_period,
             )
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+                campaign_db_max_for_overspend_gate,
+            )
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
+                apply_v3_max_cpo_raise_if_needed,
+            )
+
+            fact_pfo = fact.pay_for_order
+            apply_v3_max_cpo_raise_if_needed(
+                adv,
+                fact_pay_for_order=fact_pfo,
+                toggle_enabled=complex_adv.v3_substitute_fact_cpo_for_max,
+            )
+            plan: PlanData | None = AdvSettingAutoUpdater.get_plan_data(adv)
+            if not plan:
+                logger.warning('[adv_id=%s] v3: no plan, skip ladder', complex_adv.adv_id)
+                return None
+            campaign_db_max = campaign_db_max_for_overspend_gate(adv)
             sales_state = detect_campaign_state(plan, fact)
             campaign_mode = resolve_campaign_mode(sales_state)
             logger.info(
@@ -147,7 +167,11 @@ class DataUpdateManager:
 
             overspend = campaign_overspend_from_plan_fact(
                 fact.pay_for_order if fact is not None else None,
-                float(plan.max_pay_for_order),
+                float(
+                    campaign_db_max
+                    if campaign_db_max is not None
+                    else plan.max_pay_for_order
+                ),
             )
             sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                 all_contexts,
@@ -255,6 +279,7 @@ class DataUpdateManager:
                 calibration_direct=current_calibration_direct,
                 max_effective_steps=effective_calibration_steps,
                 calibration_phase_extra=calibration_phase_extra,
+                campaign_db_max_pay_for_order=campaign_db_max,
             )
         elif (
             campaign_mode == CampaignMode.NO_DATA
@@ -267,6 +292,7 @@ class DataUpdateManager:
                 fact=fact,
                 raw_profiles=raw_profiles,
                 campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                campaign_db_max_pay_for_order=campaign_db_max,
             )
 
         return TickData(

@@ -31,7 +31,7 @@ class _WbManagerHubProtocol(Protocol):
 
 
 class _WbManagerHubFactoryProtocol(Protocol):
-    def get_wb_manager_hub(self, shop_id: int) -> _WbManagerHubProtocol: ...
+    def get_wb_manager_hub(self, shop_id: str) -> _WbManagerHubProtocol: ...
 
 
 class _WbManagerHubFactoryContainerProtocol(Protocol):

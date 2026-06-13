@@ -115,8 +115,10 @@ def test_is_campaign_at_plan_headroom_plus_one_boundary() -> None:
     floor = plan_max_stabilization_floor(max_cpo)
     adv_below = _adv_state(fact=floor - 0.01, max_cpo=max_cpo)
     adv_at = _adv_state(fact=floor, max_cpo=max_cpo)
+    adv_above = _adv_state(fact=floor + 0.01, max_cpo=max_cpo)
     assert is_campaign_at_plan_headroom_plus_one(adv_below) is False
-    assert is_deep_overspend(adv_at) is True
+    assert is_deep_overspend(adv_at) is False
+    assert is_deep_overspend(adv_above) is True
 
 
 @pytest.mark.unit
@@ -156,7 +158,7 @@ def test_off_active_keyword_when_at_plan_headroom_and_pfo_gt_max() -> None:
         KeywordV3Context(keyword=dto.calculated_keyword, position_profile=_sample_profile()),
         ladder_states=states,
     )
-    fact = pfo_off_plan_headroom_floor(max_cpo)
+    fact = pfo_off_plan_headroom_floor(max_cpo) + 0.01
     ctx = _context([dto], _adv_state(fact=fact, max_cpo=max_cpo))
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF

@@ -18,6 +18,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_p
     pfo_off_plan_headroom_floor,
     pfo_off_plan_headroom_ratio,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    campaign_cpo_over_max,
+    cmp_over_threshold,
+    cmp_within_max,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
 )
@@ -172,8 +177,10 @@ def _note_not_full_tp_overspend(
 ) -> str:
     if fact_pay_for_order is None or max_pay_for_order is None:
         return "нет fact/max для overspend"
-    if float(fact_pay_for_order) <= float(max_pay_for_order):
-        return "CPO РК в пределах MAX"
+    if cmp_within_max(float(fact_pay_for_order), float(max_pay_for_order)):
+        return "CPO РК строго ниже MAX"
+    if not campaign_cpo_over_max(float(fact_pay_for_order), float(max_pay_for_order)):
+        return "fact CPO на MAX (не overspend)"
     return "fact CPO > MAX — сброс tp NOT FULL MIN в 0"
 
 
@@ -224,8 +231,8 @@ def _note_reset_over_max_cpo(
         return "max недоступен"
     if fact_pay_for_order is None:
         return "fact pay_for_order недоступен"
-    if float(fact_pay_for_order) <= float(max_pay_for_order):
-        return "fact ≤ plan max (overspend gate)"
+    if not campaign_cpo_over_max(float(fact_pay_for_order), float(max_pay_for_order)):
+        return "fact не > plan max (overspend gate)"
     if not prepared:
         return "нет operable ключей"
     return "нет GAP/active ключей с ladder CPO > max для сброса"
@@ -305,12 +312,13 @@ def _note_enable_gap(
     ):
         return "fact > max (overspend, enable не нужен)"
     if max_pay_for_order is not None and float(max_pay_for_order) > 0:
-        if float(fact_pay_for_order) >= gap_enable_plan_headroom_floor(
-            float(max_pay_for_order)
+        if cmp_over_threshold(
+            float(fact_pay_for_order),
+            gap_enable_plan_headroom_floor(float(max_pay_for_order)),
         ):
             ratio = gap_enable_plan_headroom_ratio()
             return (
-                f"fact ≥ {ratio:.0%}×plan.max "
+                f"fact > {ratio:.0%}×plan.max "
                 "(зона «1 от MAX плана», enable не нужен)"
             )
     if eligibility_by_ks_id is None:

@@ -31,8 +31,14 @@ def resolve_target_cost_from_context(ctx: PipelineContext) -> float | None:
         if not ctx.plan or not ctx.fact:
             return None
 
+        # Guard: сравниваем только реальные числа
+        if not (
+            _is_real_number(ctx.plan.orders)
+            and _is_real_number(ctx.fact.predict_orders)
+        ):
+            return None
         # Логика выбора target/max в зависимости от выполнения плана
-        if ctx.fact.predict_orders >= ctx.plan.orders:
+        if float(ctx.fact.predict_orders) >= float(ctx.plan.orders):
             return ctx.plan.target_pay_for_order
         return ctx.plan.max_pay_for_order
 

@@ -3,6 +3,7 @@
 from app.domain.rec_system_bid_math.plan_ranker import (
     PlanContext,
     rank_bids_for_sales_plan,
+    select_best_plan_bid_under_max_cap,
 )
 
 
@@ -141,3 +142,30 @@ def test_missing_ctr_raises_key_error() -> None:
         assert True
     else:
         raise AssertionError("expected KeyError for missing ctr_by_bid entry")
+
+
+def test_select_best_plan_bid_skips_cpo_at_or_above_operative_max() -> None:
+    """best_plan_bid: expected CPO должен быть строго < max (равенство max — skip)."""
+    plan_ranked = [
+        {"bid": 200, "expected_order_cost_rub": 120.0, "plan_distance_score": 0.1},
+        {"bid": 100, "expected_order_cost_rub": 80.0, "plan_distance_score": 0.2},
+    ]
+    assert select_best_plan_bid_under_max_cap(plan_ranked, max_order_cost_rub=120.0) == 100
+    assert (
+        select_best_plan_bid_under_max_cap(
+            [
+                {"bid": 200, "expected_order_cost_rub": 120.0, "plan_distance_score": 0.1},
+            ],
+            max_order_cost_rub=120.0,
+        )
+        is None
+    )
+
+
+def test_expected_cpo_strictly_below_max_allows_above_target() -> None:
+    """CPO выше target, но ниже operative max — допустимо."""
+    from app.domain.rec_system_bid_math.plan_ranker import expected_cpo_strictly_below_max
+
+    assert expected_cpo_strictly_below_max(150.0, 200.0) is True
+    assert expected_cpo_strictly_below_max(200.0, 200.0) is False
+    assert expected_cpo_strictly_below_max(201.0, 200.0) is False

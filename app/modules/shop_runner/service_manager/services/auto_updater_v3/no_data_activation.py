@@ -365,17 +365,21 @@ def _no_ch_bootstrap_allowed_by_pay_for_order(
     *,
     max_pay_for_order: float | None,
 ) -> bool:
-    """NO CH: UP только если ``keyword.pay_for_order`` (как в карточке) ≤ max.
+    """NO CH: UP только если ``keyword.pay_for_order`` (как в карточке) < max.
 
     Основная операционная граница для ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``;
     не путать с ``resolve_keyword_v2_pay_for_order_cost`` (rating CPM без bid_log).
     """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+        keyword_pfo_within_max,
+    )
+
     pfo = ctx.keyword.pay_for_order
     if pfo is None:
         return False
     if max_pay_for_order is None:
         return True
-    return float(pfo) <= float(max_pay_for_order)
+    return keyword_pfo_within_max(pfo, float(max_pay_for_order))
 
 
 def plan_no_ch_min_bootstrap_actions(

@@ -69,6 +69,7 @@ def _minimal_menu_for_text(
     menu._plan_fact_ch_max_ts_str = None
     menu._traffic_clicks_dto = None
     menu.adv_stat = None
+    menu._fact_pay_for_order_ch = None
     return menu
 
 

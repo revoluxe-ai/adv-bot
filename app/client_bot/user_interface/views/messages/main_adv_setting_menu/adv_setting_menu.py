@@ -151,6 +151,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
+        self._fact_pay_for_order_ch: float | None = None
+
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -310,6 +312,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._plan_set = cost_metrics.plan_set
         self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
         self._campaign_sales_state = cost_metrics.campaign_sales_state
+        self._fact_pay_for_order_ch = cost_metrics.fact_pay_for_order
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -583,6 +586,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
         if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
             text += f"посл. V3: {self._v3_last_action_str or 'Нет данных'}\n"
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
+                v3_raised_max_display_label,
+            )
+
+            raise_label = v3_raised_max_display_label(
+                self.adv,
+                fact_pay_for_order=self._fact_pay_for_order_ch,
+            )
+            if raise_label:
+                text += f"V3 Raise MAX: {raise_label}\n"
         else:
             text += (
                 f"добавл в БС:"
@@ -671,7 +684,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboard.get_adv_setting_keyboard(
-           self.wb_user_cabinet, self.adv, self.in_favorites_user
+           self.wb_user_cabinet, self.adv, self.in_favorites_user,
+           fact_pay_for_order=getattr(self, "_fact_pay_for_order_ch", None),
         )
 
     @staticmethod

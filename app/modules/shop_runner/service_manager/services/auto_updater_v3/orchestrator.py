@@ -109,12 +109,16 @@ def _sync_tick_data_after_pipeline(
     if tick_data.tick_input is not None and tick_data.tick_input.campaign_orders_per_cart_7d is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
             campaign_overspend_from_plan_fact,
+            overspend_db_max_from_tick_input,
         )
 
         ti = tick_data.tick_input
         overspend = campaign_overspend_from_plan_fact(
             ti.fact.pay_for_order,
-            float(ti.plan.max_pay_for_order),
+            overspend_db_max_from_tick_input(
+                plan_max_pay_for_order=float(ti.plan.max_pay_for_order),
+                campaign_db_max_pay_for_order=ti.campaign_db_max_pay_for_order,
+            ),
         )
         tick_data.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
             tick_data.all_contexts,
@@ -154,13 +158,20 @@ async def process_adv_v3(
         tick_report.set_aggression_before(keywords)
         if complex_adv.auto_add_only_relevant_phrase:
             keywords = only_relevant_phrase_filter(keywords)
-        tick_data = await data_mgr.load(
+        tick_data: TickData | None = await data_mgr.load(
             complex_adv,
             keywords=keywords,
             wb_shop_data_manager=wb_shop_data_manager,
             max_last_period=max_last_period,
             tick_report=tick_report,
         )
+        if tick_data is None:
+            logger.warning(
+                "[adv_id=%s] v3: no data to process",
+                complex_adv.adv_id,
+            )
+            return
+
 
         if is_campaign_full_stop(tick_data.campaign_mode):
             logger.info(

@@ -25,6 +25,37 @@ class PlanContext:
             )
 
 
+def expected_cpo_strictly_below_max(
+    expected_order_cost_rub: float,
+    max_order_cost_rub: float,
+) -> bool:
+    """Expected CPO ставки строго ниже operative max (``<``, не ``<=``).
+
+    ``max_order_cost_rub`` — текущий ``max_price_for_order`` кампании (может быть
+    выше db max после V3 Raise); target/resolve может быть ниже.
+    """
+    if max_order_cost_rub <= 0:
+        return False
+    if not math.isfinite(expected_order_cost_rub):
+        return False
+    return float(expected_order_cost_rub) < float(max_order_cost_rub)
+
+
+def select_best_plan_bid_under_max_cap(
+    plan_ranked: list[dict[str, Any]],
+    *,
+    max_order_cost_rub: float,
+) -> int | None:
+    """Первая ставка по ``plan_distance_score`` с expected CPO < operative max."""
+    for row in plan_ranked:
+        cpo_rub = row.get("expected_order_cost_rub")
+        if cpo_rub is None:
+            continue
+        if expected_cpo_strictly_below_max(float(cpo_rub), float(max_order_cost_rub)):
+            return int(row["bid"])
+    return None
+
+
 def rank_bids_for_sales_plan(
     bid_model_result: dict[str, Any],
     context: PlanContext,

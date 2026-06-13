@@ -10,6 +10,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     gap_enable_plan_headroom_floor,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    campaign_cpo_over_max,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
 )
@@ -153,7 +156,8 @@ def _adv_state(
         max_pay_for_order=max_cpo,
         fact_pay_for_order=fact,
         resolve_valid=True,
-        guard_condition=fact is not None and fact <= max_cpo,
+        guard_condition=fact is not None
+        and campaign_cpo_over_max(float(fact), float(max_cpo)),
         eligibility_by_ks_id=elig,
     )
 
@@ -173,7 +177,23 @@ def _context(
 
 
 @pytest.mark.unit
-def test_skip_when_fact_ge_plan_headroom_ratio() -> None:
+def test_skip_when_fact_gt_plan_headroom_ratio() -> None:
+    max_cpo = 120.0
+    resolve = 50.0
+    fact = max_cpo + 0.01
+    ctx = _context(
+        [_gap_dto()],
+        _adv_state(fact=fact, resolve=resolve, max_cpo=max_cpo),
+    )
+    executor = PayForOrderGapEnableExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "fact_gt_max_cpo"
+    assert ctx.keywords[0].next_state == []
+
+
+@pytest.mark.unit
+def test_no_skip_when_fact_equals_plan_headroom_ratio() -> None:
+    """На границе headroom (``fact == ratio×max``) enable не блокируется."""
     max_cpo = 120.0
     resolve = 50.0
     fact = gap_enable_plan_headroom_floor(max_cpo)
@@ -183,8 +203,7 @@ def test_skip_when_fact_ge_plan_headroom_ratio() -> None:
     )
     executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_ge_plan_headroom_ratio"
-    assert ctx.keywords[0].next_state == []
+    assert executor.skip_reason != "fact_ge_plan_headroom_ratio"
 
 
 @pytest.mark.unit

@@ -17,7 +17,10 @@ from app.domain.rec_system_bid_math.hour_observation_builder import (
     build_hour_observations_from_buckets,
 )
 from app.domain.rec_system_bid_math.input_models import BidHourObservation
-from app.domain.rec_system_bid_math.plan_ranker import PlanContext
+from app.domain.rec_system_bid_math.plan_ranker import (
+    PlanContext,
+    select_best_plan_bid_under_max_cap,
+)
 from app.domain.rec_system_bid_math.service import rank_rec_system_bids
 from app.domain.rec_system_bid_math.view_models import (
     build_rec_bid_recommendation_view,
@@ -267,7 +270,10 @@ class AutoShelfBidRecommendationReadService:
         full_result: dict[str, object] = {
             "bid_result": bid_result,
             "plan_ranked": plan_ranked,
-            "best_plan_bid": plan_ranked[0]["bid"] if plan_ranked else None,
+            "best_plan_bid": select_best_plan_bid_under_max_cap(
+                cast(list[dict[str, Any]], plan_ranked),
+                max_order_cost_rub=float(plan_context.max_order_cost),
+            ),
             "best_expected_bid": (
                 expected_ranked[0]["bid"] if expected_ranked
                 else None

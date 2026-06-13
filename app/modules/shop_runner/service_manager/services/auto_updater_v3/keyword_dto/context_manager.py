@@ -149,10 +149,21 @@ class UpdateContextManager:
             if tick_input.fact.pay_for_order is not None
             else None
         )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+            campaign_cpo_over_max,
+        )
+
+        gate_max = (
+            float(tick_input.campaign_db_max_pay_for_order)
+            if tick_input.campaign_db_max_pay_for_order is not None
+            else float(tick_input.plan.max_pay_for_order)
+        )
         guard_condition = (
             tick_input.fact.pay_for_order is not None
-            and float(tick_input.fact.pay_for_order)
-            > float(tick_input.plan.max_pay_for_order)
+            and campaign_cpo_over_max(
+                float(tick_input.fact.pay_for_order),
+                gate_max,
+            )
         )
         return AdvState(
             eligibility_by_ks_id=eligibility_by_ks_id,

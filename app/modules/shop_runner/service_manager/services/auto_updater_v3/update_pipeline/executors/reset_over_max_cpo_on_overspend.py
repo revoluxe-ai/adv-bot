@@ -19,6 +19,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     pick_max_ladder_state_at_or_below_cpo,
     pick_off_ladder_state,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    ladder_cpo_within_ceiling,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
@@ -49,7 +52,7 @@ class ResetOverMaxCpoOnOverspendExecutor:
 
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip если нет fact или ``fact <= plan.max_pay_for_order``."""
+    """Skip если нет fact или ``fact < plan.max_pay_for_order`` (не overspend)."""
     current_cpo_percent = _current_cpo_percent(adv_state)
     if current_cpo_percent is None:
         return "no_current_cpo_percent"
@@ -91,10 +94,12 @@ def _resolve_target_state(
     current = ladder_state_for_mode(dto, dto.current_mode)
     if current is None or current.cpo is None:
         return None
-    if float(current.cpo) <= float(ceiling):
+    if ladder_cpo_within_ceiling(float(current.cpo), float(ceiling)):
         return None
 
-    target = pick_max_ladder_state_at_or_below_cpo(dto, ceiling)
+    target = pick_max_ladder_state_at_or_below_cpo(
+        dto, ceiling, strict_ceiling=True
+    )
     if target is not None:
         return target
     return pick_off_ladder_state(dto)

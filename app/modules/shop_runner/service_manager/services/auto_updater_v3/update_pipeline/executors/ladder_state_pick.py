@@ -22,6 +22,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.ladder_state_kind import (
     V3LadderStageKind,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    ladder_cpo_within_ceiling,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
 )
@@ -82,15 +85,28 @@ def is_gap_without_operable_cpo(dto: KeywordDTO) -> bool:
 def pick_max_ladder_state_at_or_below_cpo(
     dto: KeywordDTO,
     ceiling: float,
+    *,
+    strict_ceiling: bool = False,
 ) -> KeywordV3LadderState | None:
-    """Максимальная по агрессии ступень MIN/OPT/MAX с ``cpo <= ceiling``."""
+    """Максимальная по агрессии ступень MIN/OPT/MAX под потолком ``ceiling``.
+
+    Args:
+        strict_ceiling: ``True`` для plan max (``cpo < ceiling``); иначе resolve
+            (``cpo <= ceiling``).
+    """
     threshold = float(ceiling)
+
+    def _fits(cpo: float) -> bool:
+        if strict_ceiling:
+            return ladder_cpo_within_ceiling(cpo, threshold)
+        return cpo <= threshold
+
     candidates = [
         state
         for state in dto.ladder_states
         if state.cpo is not None
         and state.stage in _OPERABLE_LADDER_STAGES
-        and float(state.cpo) <= threshold
+        and _fits(float(state.cpo))
     ]
     if not candidates:
         return None

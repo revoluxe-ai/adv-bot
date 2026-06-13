@@ -11,6 +11,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    cmp_within_max,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordV3Eligibility,
 )
@@ -63,7 +66,10 @@ class AdvState:
     def calibration_in_range(self) -> bool:
         if self.fact_pay_for_order is None:
             return False
-        return float(self.fact_pay_for_order) <= float(self.max_pay_for_order)
+        return cmp_within_max(
+            float(self.fact_pay_for_order),
+            float(self.max_pay_for_order),
+        )
 
     def copy(self) -> AdvState:
         """Поверхностная копия для ``UpdateContext.copy``."""

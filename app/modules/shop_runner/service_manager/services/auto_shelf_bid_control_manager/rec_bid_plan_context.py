@@ -21,7 +21,16 @@ def build_rec_bid_plan_context(
     ``max_order_cost`` — потолок CPO для plan_distance при недоборе продаж
     (``PlanContext.max_order_cost``). Если не передан, используется
     ``max_price_for_order``.
+
+    Build PlanContext with the same target-cost semantics as control.
+
+    ``max_price_for_order`` — operative max кампании (``AdvSetting.max_price_for_order``,
+    может быть выше db max после V3 Raise); жёсткий потолок CPO для ``best_plan_bid``.
+
+
     """
+
+
     plan_orders: int | None = int(sales_plan)
     resolved_target_cost = resolve_target_cost(
         plan_orders,

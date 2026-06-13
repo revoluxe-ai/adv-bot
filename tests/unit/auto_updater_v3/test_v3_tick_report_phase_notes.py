@@ -21,10 +21,16 @@ from tests.unit.test_auto_updater_v3 import _calc_kw
 
 
 @pytest.mark.unit
-def test_enable_gap_fact_above_plan_max_stabilization_zone() -> None:
+def test_enable_gap_fact_above_plan_max_stabilization_zone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates.gap_enable_plan_headroom_ratio",
+        lambda: 0.9,
+    )
     max_cpo = 550.0
     resolve = 200.0
-    fact = gap_enable_plan_headroom_floor(max_cpo)
+    fact = gap_enable_plan_headroom_floor(max_cpo) + 0.01
     note = summarize_phase_zero_actions(
         "pay_for_order_gap_enable",
         prepared=[],

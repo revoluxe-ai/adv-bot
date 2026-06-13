@@ -32,6 +32,7 @@ class AutoCampaignCostActivityMetrics:
     plan_fact_ch_ts_msk: str | None
     cost_threshold_kind: Literal["target", "max"] | None
     campaign_sales_state: SalesStates | None = None
+    fact_pay_for_order: float | None = None
 
 
 async def get_auto_campaign_cost_activity_metrics(
@@ -96,6 +97,11 @@ async def get_auto_campaign_cost_activity_metrics(
         plan_fact_ch_ts_msk=ch_ts,
         cost_threshold_kind=cost_threshold_kind,
         campaign_sales_state=campaign_sales_state,
+        fact_pay_for_order=(
+            plan_fact_summary.fact_pay_for_order
+            if plan_fact_summary is not None
+            else None
+        ),
     )
 
 

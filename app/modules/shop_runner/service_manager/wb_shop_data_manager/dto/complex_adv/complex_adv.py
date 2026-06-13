@@ -363,6 +363,13 @@ class ComplexAdv:
         return int(self._adv_setting.aggressiveness)
 
     @property
+    def v3_substitute_fact_cpo_for_max(self) -> bool:
+        """Toggle V3 Raise MAX: поднять рабочий max до fact CPO на текущем тике."""
+        return bool(
+            getattr(self._adv_setting, "v3_substitute_fact_cpo_for_max", False)
+        )
+
+    @property
     def keyword_calibration_max_step(self) -> int:
         return int(self._adv_setting.keyword_calibration_max_step)
 

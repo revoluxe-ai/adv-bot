@@ -574,7 +574,7 @@ class AdvSetting(BaseTable):
     plan_for_sales_for_day = mapped_column(Integer, nullable=True, default=None)
     target_price_for_order = mapped_column(Float, nullable=True, default=None)
 
-    max_price_for_order: Mapped[int] = mapped_column(Integer, nullable=True, default=None)
+    max_price_for_order: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
         Boolean, nullable=True, default=True, server_default="true"
@@ -722,6 +722,13 @@ class AdvSetting(BaseTable):
         default=1,
         server_default=text("1"),
         comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
+    )
+    v3_substitute_fact_cpo_for_max: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="V3 Raise MAX: in-memory max=fact CPO when fact>db max (per tick, no persist)",
     )
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),

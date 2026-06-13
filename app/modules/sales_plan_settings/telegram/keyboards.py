@@ -2,20 +2,38 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot.user_interface.views.callbacks import Adv as ReturnToAdvCallback
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
+    normalize_automatic_version_ui,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
+    v3_raised_max_display_label,
+)
 
 from . import callbacks
 
 
 class KeyboardsGetter:
-    def __set_data(self, adv: AdvSetting):
+    def __set_data(
+        self,
+        adv: AdvSetting,
+        *,
+        fact_pay_for_order: float | None = None,
+    ):
+        self._adv = adv
         self._adv_id = adv.adv_id
         self._plan_for_sales_for_day = adv.plan_for_sales_for_day
         self._target_price_for_order = adv.target_price_for_order
         self._max_price_for_order = adv.max_price_for_order
+        self._fact_pay_for_order = fact_pay_for_order
 
-    def get_keyboard(self, adv: AdvSetting) -> InlineKeyboardMarkup:
-        self.__set_data(adv)
+    def get_keyboard(
+        self,
+        adv: AdvSetting,
+        *,
+        fact_pay_for_order: float | None = None,
+    ) -> InlineKeyboardMarkup:
+        self.__set_data(adv, fact_pay_for_order=fact_pay_for_order)
         builder = InlineKeyboardBuilder()
 
         setting_plan_for_sales_for_day_button = (
@@ -69,11 +87,16 @@ class KeyboardsGetter:
         return button
 
     def get_setting_max_price_for_order_button(self):
-        text = (
+        base = (
             "Задать Макс.Себес. Заказа"
             if not self._max_price_for_order
             else f"Изменить Макс.Себес. Заказа ({self._max_price_for_order})"
         )
+        raise_label = v3_raised_max_display_label(
+            self._adv,
+            fact_pay_for_order=self._fact_pay_for_order,
+        )
+        text = f"{base} [{raise_label}]" if raise_label else base
 
         callback = callbacks.ChangePlanSetting(
             target_point="change-max-price-for-order", adv_id=self._adv_id
