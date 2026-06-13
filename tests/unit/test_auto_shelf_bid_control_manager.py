@@ -733,6 +733,8 @@ async def test_reconcile_expected_bid_returns_false_when_expected_bid_missing() 
         complex_adv,
         state=state,
         actual_bid_minor=14_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
         now=datetime(2026, 6, 13, 12, 25, 0, tzinfo=UTC),
     )
 
@@ -740,6 +742,90 @@ async def test_reconcile_expected_bid_returns_false_when_expected_bid_missing() 
     wb_bid_setter.set_bid.assert_not_awaited()
     repository.save_state.assert_not_awaited()
     assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_update_reconciles_main_mode_clamps_bid_above_max(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, settings_obj, complex_adv = _build_reconcile_fixture(
+        current_mode="main",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=60_000,
+        actual_bid_minor=14_000,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 30, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=50_000,
+        currency="RUB",
+    )
+    assert state.current_main_bid_minor == 50_000
+    assert state.main_started_at == datetime(2026, 6, 13, 12, 30, 0, tzinfo=UTC)
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+
+
+@pytest.mark.asyncio
+async def test_update_reconciles_main_mode_clamps_bid_below_min(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, settings_obj, complex_adv = _build_reconcile_fixture(
+        current_mode="main",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=8_000,
+        actual_bid_minor=14_000,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 35, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=12_000,
+        currency="RUB",
+    )
+    assert state.current_main_bid_minor == 12_000
+    assert state.main_started_at == datetime(2026, 6, 13, 12, 35, 0, tzinfo=UTC)
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+
+
+@pytest.mark.asyncio
+async def test_update_reconciles_test_mode_clamps_bid_outside_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, settings_obj, complex_adv = _build_reconcile_fixture(
+        current_mode="test",
+        current_test_bid_minor=60_000,
+        current_main_bid_minor=14_000,
+        actual_bid_minor=14_000,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 40, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=50_000,
+        currency="RUB",
+    )
+    assert state.current_test_bid_minor == 50_000
+    assert state.test_started_at == datetime(2026, 6, 13, 12, 40, 0, tzinfo=UTC)
+    assert state.last_reason == ControlReason.TEST_WAITING_OBSERVATION_TIME
 
 
 @pytest.mark.asyncio

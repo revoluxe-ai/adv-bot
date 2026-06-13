@@ -442,6 +442,8 @@ class AutoShelfBidControlManager:
         *,
         state: AutoShelfBidControlState,
         actual_bid_minor: int | None,
+        min_bid_minor: int,
+        max_bid_minor: int,
         now: datetime,
     ) -> bool:
         """Reapply the bid expected by the active mode before progress checks.
@@ -452,44 +454,64 @@ class AutoShelfBidControlManager:
         mode = state.current_mode
         if mode == "test":
             expected_bid = state.current_test_bid_minor
-            if expected_bid is None or actual_bid_minor == int(expected_bid):
+            if expected_bid is None:
+                return False
+            clamped_expected_bid = self._clamp_bid_minor(
+                int(expected_bid),
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+            )
+            if clamped_expected_bid != int(expected_bid):
+                state.current_test_bid_minor = clamped_expected_bid
+            if actual_bid_minor == clamped_expected_bid:
                 return False
             state.test_started_at = now
             state.last_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
             await self._persist_state_then_set_bid(
                 complex_adv,
                 state=state,
-                bid_minor=int(expected_bid),
+                bid_minor=clamped_expected_bid,
             )
             logger.info(
                 "auto_shelf_bid_control_reconcile_expected_bid "
-                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s actual_bid=%s reason=%s",
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s clamped_expected_bid=%s actual_bid=%s reason=%s",
                 complex_adv.auto_adv_id,
                 complex_adv.main_nmid,
                 mode,
                 expected_bid,
+                clamped_expected_bid,
                 actual_bid_minor,
                 state.last_reason,
             )
             return True
         if mode == "main":
             expected_bid = state.current_main_bid_minor
-            if expected_bid is None or actual_bid_minor == int(expected_bid):
+            if expected_bid is None:
+                return False
+            clamped_expected_bid = self._clamp_bid_minor(
+                int(expected_bid),
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+            )
+            if clamped_expected_bid != int(expected_bid):
+                state.current_main_bid_minor = clamped_expected_bid
+            if actual_bid_minor == clamped_expected_bid:
                 return False
             state.main_started_at = now
             state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
             await self._persist_state_then_set_bid(
                 complex_adv,
                 state=state,
-                bid_minor=int(expected_bid),
+                bid_minor=clamped_expected_bid,
             )
             logger.info(
                 "auto_shelf_bid_control_reconcile_expected_bid "
-                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s actual_bid=%s reason=%s",
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s clamped_expected_bid=%s actual_bid=%s reason=%s",
                 complex_adv.auto_adv_id,
                 complex_adv.main_nmid,
                 mode,
                 expected_bid,
+                clamped_expected_bid,
                 actual_bid_minor,
                 state.last_reason,
             )
@@ -777,6 +799,8 @@ class AutoShelfBidControlManager:
             complex_adv,
             state=state,
             actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=int(settings_obj.max_bid_minor),
             now=self._now(),
         ):
             return None
