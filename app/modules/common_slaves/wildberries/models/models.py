@@ -823,17 +823,6 @@ class AdvSetting(BaseTable):
     def search_adv_id(self, value: int) -> None:
         self._search_adv_id = value
 
-    #
-    @property
-    def max_pay_for_order(self) -> int | None:
-        pattern = re.compile(
-            r"<MAX_PAY>(\d+)!?</MAX_PAY>"
-        )  # Добавили !? для необязательного символа "!"
-        match = re.search(pattern, self.name)
-        if match:
-            return int(match.group(1))
-        return None
-
     @property
     def worst_promo_position(self) -> bool | None:
         try:
