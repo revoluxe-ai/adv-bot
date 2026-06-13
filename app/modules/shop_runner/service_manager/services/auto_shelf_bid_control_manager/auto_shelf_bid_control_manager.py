@@ -436,6 +436,66 @@ class AutoShelfBidControlManager:
             currency=state.currency,
         )
 
+    async def _reconcile_expected_bid_for_current_mode(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        actual_bid_minor: int | None,
+        now: datetime,
+    ) -> bool:
+        """Reapply the bid expected by the active mode before progress checks.
+
+        Returns ``True`` when the method had to reapply or refresh the mode
+        observation window and the caller must stop processing the tick.
+        """
+        mode = state.current_mode
+        if mode == "test":
+            expected_bid = state.current_test_bid_minor
+            if expected_bid is None or actual_bid_minor == int(expected_bid):
+                return False
+            state.test_started_at = now
+            state.last_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=int(expected_bid),
+            )
+            logger.info(
+                "auto_shelf_bid_control_reconcile_expected_bid "
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s actual_bid=%s reason=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                mode,
+                expected_bid,
+                actual_bid_minor,
+                state.last_reason,
+            )
+            return True
+        if mode == "main":
+            expected_bid = state.current_main_bid_minor
+            if expected_bid is None or actual_bid_minor == int(expected_bid):
+                return False
+            state.main_started_at = now
+            state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=int(expected_bid),
+            )
+            logger.info(
+                "auto_shelf_bid_control_reconcile_expected_bid "
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s actual_bid=%s reason=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                mode,
+                expected_bid,
+                actual_bid_minor,
+                state.last_reason,
+            )
+            return True
+        return False
+
     async def _choose_best_bid_with_fallback(
         self,
         *,
@@ -711,6 +771,14 @@ class AutoShelfBidControlManager:
                 initialized.current_test_bid_minor,
                 initialized.last_reason,
             )
+            return None
+
+        if await self._reconcile_expected_bid_for_current_mode(
+            complex_adv,
+            state=state,
+            actual_bid_minor=actual_bid_minor,
+            now=self._now(),
+        ):
             return None
 
         if state.current_mode == "test":
