@@ -34,7 +34,7 @@ async def test_WBShopDataManager_get_pre_complex_advs_raise_sintetic_max_cpo() -
     adv.nmids = [1]
     adv.search_adv_id = None
     adv.auto_common_budget = True
-    adv.max_pay_for_order = 600
+    adv.max_price_for_order = 600
     adv.plan_for_sales_for_day = 7
     adv.common_budget_daily_limit = 0
 
