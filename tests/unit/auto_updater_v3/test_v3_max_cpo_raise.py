@@ -50,7 +50,7 @@ def test_no_raise_when_toggle_off() -> None:
 
 @pytest.mark.unit
 def test_raise_max_no_overspend_when_fact_within_operative_max() -> None:
-    """После Raise operative max = fact → overspend false (не DB snapshot)."""
+    """После Raise operative max >= fact → overspend false (не DB snapshot)."""
     adv = SimpleNamespace(max_price_for_order=500.0)
     fact_pfo = 800.0
     apply_v3_max_cpo_raise_if_needed(
@@ -60,6 +60,21 @@ def test_raise_max_no_overspend_when_fact_within_operative_max() -> None:
     )
     operative_max = float(adv.max_price_for_order)
     assert operative_max == 800.0
+    assert not campaign_overspend_from_plan_fact(fact_pfo, operative_max)
+
+
+@pytest.mark.unit
+def test_raise_ceil_avoids_false_overspend_on_fractional_fact() -> None:
+    """150.4 → ceil 151: strict ``fact > max`` не срабатывает после Raise."""
+    adv = SimpleNamespace(max_price_for_order=120.0)
+    fact_pfo = 150.4
+    assert apply_v3_max_cpo_raise_if_needed(
+        adv,
+        fact_pay_for_order=fact_pfo,
+        toggle_enabled=True,
+    )
+    operative_max = float(adv.max_price_for_order)
+    assert operative_max == 151.0
     assert not campaign_overspend_from_plan_fact(fact_pfo, operative_max)
 
 

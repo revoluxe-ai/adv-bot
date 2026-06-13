@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import math
+
 from typing import TYPE_CHECKING
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
@@ -17,6 +19,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_bo
 
 if TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import AdvSetting
+
+
+def operative_max_cpo_after_raise(fact: float, db_max: float) -> int:
+    """Operative max (int) после Raise: ``ceil(fact)`` vs db, чтобы fact float не был ``>`` max.
+
+    ``max_price_for_order`` в ORM — целое; fact CPO из CH — float. ``round`` мог опустить
+    потолок ниже fact (150.4 → 150) и ложно включить overspend-gate.
+    """
+    return max(int(math.ceil(float(fact))), int(db_max))
 
 
 def apply_v3_max_cpo_raise_if_needed(
@@ -44,8 +55,7 @@ def apply_v3_max_cpo_raise_if_needed(
     db = db_max
     if not cmp_over_max(fact, db):
         return False
-    raised = max(fact, db)
-    adv.max_price_for_order = int(round(raised, 0))
+    adv.max_price_for_order = operative_max_cpo_after_raise(fact, float(db))
     return True
 
 
