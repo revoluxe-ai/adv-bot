@@ -285,12 +285,17 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_pre_complex_advs(self) -> list[PreComplexAdv]:
+    async def get_pre_complex_advs(
+        self,
+        *,
+        skip_plan_fact: bool = False,
+    ) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
         Args:
-            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats (для корутин,
-                где факт подгружается отдельно, напр. ``update_cluster_bids``).
+            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats. Используется
+                для корутин, где факт подгружается отдельно, например
+                ``update_cluster_bids``.
         """
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
@@ -299,18 +304,28 @@ class WBShopDataManager:
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
 
-        plan_fact_reader = PlanFactReader()
         adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        summaries_by_adv_id = {}
+        if skip_plan_fact:
+            plan_fact_reader = None
+        else:
+            plan_fact_reader = PlanFactReader()
+
         if search_adv_ids:
-            search_adv_idv, summaries_by_adv_id = await asyncio.gather(
-                self.__get_adv_id_to_search_adv_map(search_adv_ids),
-                plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
-            )
+            search_adv_task = self.__get_adv_id_to_search_adv_map(search_adv_ids)
+            if plan_fact_reader is not None:
+                search_adv_idv, summaries_by_adv_id = await asyncio.gather(
+                    search_adv_task,
+                    plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
+                )
+            else:
+                search_adv_idv = await search_adv_task
         else:
             search_adv_idv = {}
-            summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
-                adv_ids_for_plan_fact
-            )
+            if plan_fact_reader is not None:
+                summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                    adv_ids_for_plan_fact
+                )
         self._set_auto_commom_budget(adv_settings)
 
         return [
