@@ -327,7 +327,7 @@ class AutoShelfBidControlTelegramService:
         from app.core.di.app_container import AppContainer
         from app.core.di.di_manager import DIManager
 
-        shop_id = int(adv.wb_cabinet.shop_id)
+        shop_id = adv.wb_cabinet.shop_id
         complex_adv_like = cast(
             ComplexAdv,
             type(
