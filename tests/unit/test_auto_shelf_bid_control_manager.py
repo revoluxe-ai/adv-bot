@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone, UTC
+from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from typing import Any
 
 import pytest
 
@@ -106,6 +108,72 @@ def _configure_plan_distance_test_transition(
         resolve_cpo=None,
     )
     return manager, repository, state, settings_obj, complex_adv
+
+
+def _build_reconcile_fixture(
+    *,
+    current_mode: str,
+    current_test_bid_minor: int | None,
+    current_main_bid_minor: int | None,
+    actual_bid_minor: int | None,
+) -> tuple[
+    AutoShelfBidControlManager,
+    MagicMock,
+    MagicMock,
+    Any,
+    Any,
+    Any,
+]:
+    """Подготовить manager/update fixture для проверки reconcile-пути."""
+    repository = MagicMock()
+    repository.get_settings = AsyncMock()
+    repository.repair_settings_units = AsyncMock()
+    repository.get_state = AsyncMock()
+    repository.save_state = AsyncMock()
+    repository.update_state_reason = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._get_actual_bid = AsyncMock(return_value=actual_bid_minor)  # type: ignore[method-assign]
+    manager._resolve_min_bid_minor = MagicMock(return_value=12_000)  # type: ignore[method-assign]
+    manager._is_eligible = MagicMock(return_value=(True, ControlReason.SETTINGS_UPDATED))  # type: ignore[method-assign]
+    manager._handle_test_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
+    now = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
+    state = SimpleNamespace(
+        current_mode=current_mode,
+        current_test_bid_minor=current_test_bid_minor,
+        current_main_bid_minor=current_main_bid_minor,
+        current_cycle_started_at=datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=datetime(2026, 6, 11, 12, 0, 0, tzinfo=UTC),
+        test_started_at=datetime(2026, 6, 12, 13, 0, 0, tzinfo=UTC),
+        main_started_at=datetime(2026, 6, 12, 14, 0, 0, tzinfo=UTC),
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = SimpleNamespace(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = SimpleNamespace(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    repository.get_settings.return_value = settings_obj
+    repository.repair_settings_units.return_value = settings_obj
+    repository.get_state.return_value = state
+    return manager, repository, wb_bid_setter, state, settings_obj, complex_adv
 
 
 def test_clamp_bid_minor_within_window() -> None:
@@ -536,6 +604,142 @@ def test_is_coroutine_candidate_requires_enabled_single_nmid_and_active() -> Non
         auto_adv_id=99,
     )
     assert AutoShelfBidControlManager.is_coroutine_candidate(disabled) is False
+
+
+@pytest.mark.asyncio
+async def test_update_reconciles_test_mode_bid_before_test_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, _, complex_adv = _build_reconcile_fixture(
+        current_mode="test",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=14_000,
+        actual_bid_minor=14_000,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=26_200,
+        currency="RUB",
+    )
+    manager._handle_test_mode.assert_not_awaited()
+    manager._handle_main_mode.assert_not_awaited()
+    repository.save_state.assert_awaited_once()
+    assert state.current_mode == "test"
+    assert state.test_started_at == datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC)
+    assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
+    assert state.last_reason == ControlReason.TEST_WAITING_OBSERVATION_TIME
+
+
+@pytest.mark.asyncio
+async def test_update_reconciles_main_mode_bid_before_main_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, _, complex_adv = _build_reconcile_fixture(
+        current_mode="main",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=14_000,
+        actual_bid_minor=26_200,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 10, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=14_000,
+        currency="RUB",
+    )
+    manager._handle_test_mode.assert_not_awaited()
+    manager._handle_main_mode.assert_not_awaited()
+    repository.save_state.assert_awaited_once()
+    assert state.current_mode == "main"
+    assert state.main_started_at == datetime(2026, 6, 13, 12, 10, 0, tzinfo=UTC)
+    assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
+    assert state.last_reason == ControlReason.MAIN_WAITING_OBSERVATION_TIME
+
+
+@pytest.mark.asyncio
+async def test_update_skips_reconcile_when_test_bid_matches_and_runs_normal_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, _, complex_adv = _build_reconcile_fixture(
+        current_mode="test",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=14_000,
+        actual_bid_minor=26_200,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 15, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_not_awaited()
+    manager._handle_test_mode.assert_awaited_once()
+    manager._handle_main_mode.assert_not_awaited()
+    repository.save_state.assert_not_awaited()
+    assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_update_skips_reconcile_when_main_bid_matches_and_runs_normal_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, repository, wb_bid_setter, state, _, complex_adv = _build_reconcile_fixture(
+        current_mode="main",
+        current_test_bid_minor=26_200,
+        current_main_bid_minor=14_000,
+        actual_bid_minor=14_000,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=datetime(2026, 6, 13, 12, 20, 0, tzinfo=UTC)):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_not_awaited()
+    manager._handle_test_mode.assert_not_awaited()
+    manager._handle_main_mode.assert_awaited_once()
+    repository.save_state.assert_not_awaited()
+    assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_reconcile_expected_bid_returns_false_when_expected_bid_missing() -> None:
+    manager, repository, wb_bid_setter, state, _, complex_adv = _build_reconcile_fixture(
+        current_mode="test",
+        current_test_bid_minor=None,
+        current_main_bid_minor=None,
+        actual_bid_minor=14_000,
+    )
+
+    result = await manager._reconcile_expected_bid_for_current_mode(
+        complex_adv,
+        state=state,
+        actual_bid_minor=14_000,
+        now=datetime(2026, 6, 13, 12, 25, 0, tzinfo=UTC),
+    )
+
+    assert result is False
+    wb_bid_setter.set_bid.assert_not_awaited()
+    repository.save_state.assert_not_awaited()
+    assert state.current_cycle_started_at == datetime(2026, 6, 12, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
