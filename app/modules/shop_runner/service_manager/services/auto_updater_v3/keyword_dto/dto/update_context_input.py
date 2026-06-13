@@ -48,4 +48,3 @@ class UpdateContextInput:
     calibration_phase_extra: dict[str, Any] = field(
         default_factory=lambda: dict[str, Any]()
     )
-    campaign_db_max_pay_for_order: float | None = None

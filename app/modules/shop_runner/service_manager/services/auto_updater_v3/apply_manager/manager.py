@@ -133,15 +133,11 @@ class ApplyManager:
 
                 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
                     campaign_overspend_from_plan_fact,
-                    overspend_db_max_from_tick_input,
                 )
 
                 overspend = campaign_overspend_from_plan_fact(
                     tick_input.fact.pay_for_order,
-                    overspend_db_max_from_tick_input(
-                        plan_max_pay_for_order=float(tick_input.plan.max_pay_for_order),
-                        campaign_db_max_pay_for_order=tick_input.campaign_db_max_pay_for_order,
-                    ),
+                    float(tick_input.plan.max_pay_for_order),
                 )
                 tick.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                     all_contexts,

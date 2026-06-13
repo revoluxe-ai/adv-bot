@@ -50,17 +50,6 @@ def campaign_overspend_from_plan_fact(
     return campaign_cpo_over_max(fact_pay_for_order, max_pay_for_order)
 
 
-def overspend_db_max_from_tick_input(
-    *,
-    plan_max_pay_for_order: float,
-    campaign_db_max_pay_for_order: float | None,
-) -> float:
-    """Db max для overspend-gate: snapshot до Raise или ``plan.max``."""
-    if campaign_db_max_pay_for_order is not None:
-        return float(campaign_db_max_pay_for_order)
-    return float(plan_max_pay_for_order)
-
-
 def clamp_not_full_target_place(place: int) -> int:
     """Ограничить целевую позицию диапазоном legacy TargetPlaceUp/Down."""
     return max(NOT_FULL_TARGET_PLACE_MIN, min(NOT_FULL_TARGET_PLACE_MAX, int(place)))

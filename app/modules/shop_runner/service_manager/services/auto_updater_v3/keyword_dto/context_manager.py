@@ -153,16 +153,12 @@ class UpdateContextManager:
             campaign_cpo_over_max,
         )
 
-        gate_max = (
-            float(tick_input.campaign_db_max_pay_for_order)
-            if tick_input.campaign_db_max_pay_for_order is not None
-            else float(tick_input.plan.max_pay_for_order)
-        )
+        operative_max = float(tick_input.plan.max_pay_for_order)
         guard_condition = (
             tick_input.fact.pay_for_order is not None
             and campaign_cpo_over_max(
                 float(tick_input.fact.pay_for_order),
-                gate_max,
+                operative_max,
             )
         )
         return AdvState(

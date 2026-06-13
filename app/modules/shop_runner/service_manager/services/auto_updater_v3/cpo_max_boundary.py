@@ -5,11 +5,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.modules.common_slaves.wildberries.models import AdvSetting
-
 
 def _is_real_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
@@ -63,14 +58,3 @@ def keyword_pfo_within_max(pfo: float | None, max_pay_for_order: float | None) -
 def ladder_cpo_within_ceiling(cpo: float, ceiling: float) -> bool:
     """CPO ступени лестницы строго ниже ceiling (= max CPO плана)."""
     return cmp_within_max(float(cpo), float(ceiling))
-
-
-def campaign_db_max_for_overspend_gate(adv: AdvSetting) -> float | None:
-    """Db max для overspend-gate (до in-memory Raise)."""
-    db_max = getattr(adv, "v3_max_price_for_order_db", None)
-    if db_max is not None:
-        return float(db_max)
-    raw = adv.max_price_for_order
-    if raw is None:
-        return None
-    return float(raw)

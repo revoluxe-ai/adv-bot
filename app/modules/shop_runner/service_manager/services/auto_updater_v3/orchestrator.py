@@ -109,16 +109,12 @@ def _sync_tick_data_after_pipeline(
     if tick_data.tick_input is not None and tick_data.tick_input.campaign_orders_per_cart_7d is not None:
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
             campaign_overspend_from_plan_fact,
-            overspend_db_max_from_tick_input,
         )
 
         ti = tick_data.tick_input
         overspend = campaign_overspend_from_plan_fact(
             ti.fact.pay_for_order,
-            overspend_db_max_from_tick_input(
-                plan_max_pay_for_order=float(ti.plan.max_pay_for_order),
-                campaign_db_max_pay_for_order=ti.campaign_db_max_pay_for_order,
-            ),
+            float(ti.plan.max_pay_for_order),
         )
         tick_data.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
             tick_data.all_contexts,
