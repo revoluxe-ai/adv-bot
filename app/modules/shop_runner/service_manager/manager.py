@@ -771,10 +771,11 @@ class CoroutinesManager:
                 adv_setting_id = adv_setting.id
                 if adv.use_common_budget:
                     handlers.append(
-                        lambda adv_setting_id_=adv_setting_id,
+                        lambda adv_=adv,
+                               adv_setting_id_=adv_setting_id,
                                wb_manager_hub_=wb_manager_hub: (
                             self._auto_budget_service.ensure_common_budget(
-                                adv,
+                                adv_,
                                 adv_setting_id_,
                                 wb_manager_hub_,
                             )

@@ -97,7 +97,8 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
 
     auto_budget_service_instance.ensure_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_budget.call_args[0]
-    assert called_args[0] == enabled_adv_setting.id
+    assert called_args[0] == enabled_adv
+    assert called_args[1] == enabled_adv_setting.id
     auto_budget_service_instance.ensure_common_budget.assert_not_called()
 
 
@@ -175,7 +176,8 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
 
     auto_budget_service_instance.ensure_common_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_common_budget.call_args[0]
-    assert called_args[0] == adv_setting.id
+    assert called_args[0] == common_adv
+    assert called_args[1] == adv_setting.id
     auto_budget_service_instance.ensure_budget.assert_not_called()
 
 
