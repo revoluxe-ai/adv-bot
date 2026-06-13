@@ -771,9 +771,11 @@ class CoroutinesManager:
                 adv_setting_id = adv_setting.id
                 if adv.use_common_budget:
                     handlers.append(
-                        lambda adv_setting_id_=adv_setting_id,
+                        lambda adv_=adv,
+                               adv_setting_id_=adv_setting_id,
                                wb_manager_hub_=wb_manager_hub: (
                             self._auto_budget_service.ensure_common_budget(
+                                adv_,
                                 adv_setting_id_,
                                 wb_manager_hub_,
                             )
@@ -790,10 +792,12 @@ class CoroutinesManager:
                         )
                     for campaign_type, adv_id in campaign_checks:
                         handlers.append(
-                            lambda adv_setting_id_=adv_setting_id,
+                            lambda  adv_=adv,
+                            adv_setting_id_=adv_setting_id,
                                    campaign_type_=campaign_type,
                                    wb_manager_hub_=wb_manager_hub: (
                                 self._auto_budget_service.ensure_budget(
+                                    adv_,
                                     adv_setting_id_,
                                     campaign_type_,
                                     wb_manager_hub_,
@@ -871,6 +875,7 @@ class CoroutinesManager:
                 AdvType.SEARCH if kind == "search" else AdvType.AUTO
             )
             _ = await self._auto_budget_service.ensure_common_budget(
+                adv,
                 setting_id,
                 hub,
                 force_after_start_rejection=force,
@@ -879,6 +884,7 @@ class CoroutinesManager:
             return
         if kind == "search" and (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
             _ = await self._auto_budget_service.ensure_budget(
+                adv,
                 setting_id,
                 AdvType.SEARCH,
                 hub,
@@ -887,6 +893,7 @@ class CoroutinesManager:
             return
         if kind == "auto" and (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
             _ = await self._auto_budget_service.ensure_budget(
+                adv,
                 setting_id,
                 AdvType.AUTO,
                 hub,

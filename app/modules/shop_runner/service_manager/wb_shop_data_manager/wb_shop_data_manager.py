@@ -285,12 +285,17 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_pre_complex_advs(self, *, skip_plan_fact: bool = False) -> list[PreComplexAdv]:
+    async def get_pre_complex_advs(
+        self,
+        *,
+        skip_plan_fact: bool = False,
+    ) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
         Args:
-            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats (для корутин,
-                где факт подгружается отдельно, напр. ``update_cluster_bids``).
+            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats. Используется
+                для корутин, где факт подгружается отдельно, например
+                ``update_cluster_bids``.
         """
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
@@ -298,27 +303,32 @@ class WBShopDataManager:
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        summaries_by_adv_id: dict[int, PlanFactSummary] = {}
+
+        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        summaries_by_adv_id = {}
         if skip_plan_fact:
-            if search_adv_ids:
-                search_adv_idv = await self.__get_adv_id_to_search_adv_map(
-                    search_adv_ids
-                )
-            else:
-                search_adv_idv = {}
+            plan_fact_reader = None
         else:
             plan_fact_reader = PlanFactReader()
-            adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
-            if search_adv_ids:
+
+        if search_adv_ids:
+            search_adv_task = self.__get_adv_id_to_search_adv_map(search_adv_ids)
+            if plan_fact_reader is not None:
                 search_adv_idv, summaries_by_adv_id = await asyncio.gather(
-                    self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                    search_adv_task,
                     plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
                 )
             else:
-                search_adv_idv = {}
+                search_adv_idv = await search_adv_task
+        else:
+            search_adv_idv = {}
+            if plan_fact_reader is not None:
                 summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
                     adv_ids_for_plan_fact
                 )
+        original_max_cpo: dict[int, int] = self._set_auto_commom_budget(adv_settings)
+
+
         return [
             PreComplexAdv(
                 auto_adv=adv,
@@ -329,6 +339,8 @@ class WBShopDataManager:
                     if adv.search_adv_id is not None
                     else None
                 ),
+                original_max_cpo=original_max_cpo[adv.adv_id]
+
             )
             for adv in adv_settings
         ]
@@ -378,7 +390,7 @@ class WBShopDataManager:
         # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
         #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
         # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
-        pre_complex_advs = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
+        pre_complex_advs: list[PreComplexAdv] = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(
@@ -389,6 +401,7 @@ class WBShopDataManager:
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
                 fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
                 resolve_cpo=pre_adv.resolved_target_pay_for_order,
+                original_max_cpo=pre_adv.original_max_cpo
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [
@@ -582,5 +595,41 @@ class WBShopDataManager:
                 )
             return await self._wb_manager.get_min_bids(complex_advs, cache_possible=False)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
+
+
+    @staticmethod
+    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> dict[int, float | None]:
+        """Синтетический ``common_budget_daily_limit`` в памяти перед сборкой ``ComplexAdv``.
+
+        Вызывается из ``get_pre_complex_advs`` на каждом тике shop-runner; меняет
+        только in-memory ``AdvSetting``, в БД лимит не пишется.
+
+        Правила пересчёта ``common_budget_daily_limit``:
+
+        - ``auto_common_budget=True`` и оба поля заполнены
+          (``max_price_for_order``, ``plan_for_sales_for_day``) —
+          лимит перезаписывается как ``max_price_for_order * plan_for_sales_for_day``.
+        - ``auto_common_budget=False`` — лимит не меняется, используется значение из БД.
+        - ``auto_common_budget=True``, но одно из полей ``None`` — лимит **намеренно**
+          не трогаем: остаётся последнее значение из БД (в т.ч. ранее заданное вручную
+          до включения авто). Это штатное поведение для неполной конфигурации РК,
+          **не** fallback на ноль и **не** ошибка: пока план/max не заполнены, автоформула
+          не применяется, а существующий лимит продолжает использоваться в
+          ``AutoBudgetService``, watchdog и проверках активности кампании.
+
+        Побочный эффект: параллельно собирает ``original_max_cpo`` — исходный
+        ``max_price_for_order`` до синтетических пересчётов (для ``ComplexAdv``).
+        """
+
+        original_max_cpo: dict[int, float | None] = {}
+
+        for adv in adv_settings:
+            max_pay_for_order = adv.max_price_for_order
+            original_max_cpo[adv.adv_id] = max_pay_for_order
+            plan_for_sales_for_day = adv.plan_for_sales_for_day
+            if max_pay_for_order is not None and plan_for_sales_for_day is not None:
+                if adv.auto_common_budget:
+                    adv.common_budget_daily_limit = int(max_pay_for_order) * int(plan_for_sales_for_day)
+        return original_max_cpo
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

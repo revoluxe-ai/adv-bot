@@ -641,6 +641,7 @@ class AutoShelfBidControlManager:
                 current_sales_forecast=float(fact_predict_orders or 0.0),
                 target_price_for_order=complex_adv.adv_setting.target_price_for_order,
                 max_price_for_order=complex_adv.adv_setting.max_price_for_order,
+                max_order_cost=complex_adv.original_max_cpo,
                 click_to_order_cr_7d=click_to_order_cr_7d,
             )
             rec_service = AutoShelfBidRecommendationReadService(rec_repository)

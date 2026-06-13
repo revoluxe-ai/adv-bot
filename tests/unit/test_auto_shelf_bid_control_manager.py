@@ -319,6 +319,7 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_best_plan_bid(
             target_price_for_order=100.0,
             max_price_for_order=120.0,
         ),
+        original_max_cpo=120.0,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -336,12 +337,13 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_best_plan_bid(
 
     assert result == 33_000
     manager._choose_best_bid_with_fallback.assert_not_awaited()
-    assert (
+    plan_context = (
         AutoShelfBidRecommendationReadService.get_rec_bid_recommendations.await_args.kwargs[
             "plan_context"
-        ].target_order_cost
-        == 120.0
+        ]
     )
+    assert plan_context.target_order_cost == 120.0
+    assert plan_context.max_order_cost == 120.0
 
 
 @pytest.mark.asyncio
@@ -389,6 +391,7 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_target_cost_when_p
             target_price_for_order=100.0,
             max_price_for_order=120.0,
         ),
+        original_max_cpo=120.0,
         fact_pay_for_order=None,
         resolve_cpo=None,
     )
@@ -406,12 +409,83 @@ async def test_choose_main_bid_by_strategy_uses_plan_distance_target_cost_when_p
 
     assert result == 33_000
     manager._choose_best_bid_with_fallback.assert_not_awaited()
-    assert (
+    plan_context = (
         AutoShelfBidRecommendationReadService.get_rec_bid_recommendations.await_args.kwargs[
             "plan_context"
-        ].target_order_cost
-        == 100.0
+        ]
     )
+    assert plan_context.target_order_cost == 100.0
+    assert plan_context.max_order_cost == 120.0
+
+
+@pytest.mark.asyncio
+async def test_choose_main_bid_by_strategy_plan_distance_uses_original_max_cpo_for_max_order_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAN_DISTANCE должен брать max_order_cost из ComplexAdv.original_max_cpo."""
+    analytics = MagicMock()
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={20_000: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.2)
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        analytics_repository=analytics,
+    )
+    manager._choose_best_bid_with_fallback = AsyncMock(return_value=25_000)  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader.PlanFactReader.get_latest_plan_fact",
+        AsyncMock(
+            return_value=PlanFactSummary(
+                adv_id=222,
+                fact_predict_orders=100.0,
+                fact_pay_for_order=42.0,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        AutoShelfBidRecommendationReadService,
+        "get_rec_bid_recommendations",
+        AsyncMock(
+            side_effect=lambda **kwargs: {
+                "best_plan_bid": 33_000,
+                "plan_ranked": [{"bid": 33_000}],
+                "plan_context": kwargs["plan_context"],
+            }
+        ),
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        adv_setting=MagicMock(
+            currency="RUB",
+            plan_for_sales_for_day=500.0,
+            target_price_for_order=100.0,
+            max_price_for_order=120.0,
+        ),
+        original_max_cpo=250.0,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+
+    await manager._choose_main_bid_by_strategy(
+        complex_adv=complex_adv,
+        currency="RUB",
+        current_cycle_started_at=datetime.now(UTC),
+        previous_cycle_started_at=None,
+        current_main_bid_minor=20_000,
+        actual_bid_minor=20_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+    )
+
+    plan_context = (
+        AutoShelfBidRecommendationReadService.get_rec_bid_recommendations.await_args.kwargs[
+            "plan_context"
+        ]
+    )
+    assert plan_context.target_order_cost == 120.0
+    assert plan_context.max_order_cost == 250.0
 
 
 @pytest.mark.asyncio

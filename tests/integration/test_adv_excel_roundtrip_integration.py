@@ -144,6 +144,46 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
 
 
 @pytest.mark.asyncio
+async def test_adv_excel_export_import_auto_common_budget_flag(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """Экспорт → TRUE в auto_common_budget → импорт → значение сохраняется."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+    adv = excel_shop_bundle["adv"]
+    assert isinstance(adv, AdvSetting)
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+    assert len(rows) == 1
+    row = rows[0]
+    key_auto = edit_header("auto_common_budget")
+    row[key_auto] = "TRUE"
+
+    mock_sm = MockSessionMaker(async_session)
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=rows,
+        )
+    assert updated == 1
+
+    await async_session.commit()
+    fresh = (
+        await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
+    ).scalar_one()
+    assert fresh.auto_common_budget is True
+
+
+@pytest.mark.asyncio
 async def test_adv_excel_import_template_v1_rejected(
     async_session: AsyncSession, excel_shop_bundle: dict[str, object]
 ) -> None:

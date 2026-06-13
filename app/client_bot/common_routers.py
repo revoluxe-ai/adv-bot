@@ -91,6 +91,9 @@ from .user_interface.handlers import (
 from .user_interface.handlers.common_budget_mode_toggle import (
     router as common_budget_mode_toggle_router,
 )
+from .user_interface.handlers.auto_common_budget_toggle import (
+    router as auto_common_budget_toggle_router,
+)
 from .user_interface.handlers.incremental_stats_toggle import (
     router as incremental_stats_toggle_router,
 )
@@ -127,6 +130,7 @@ common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(common_budget_mode_toggle_router)
+common_router.include_routers(auto_common_budget_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(set_common_bid_manual.router)
 common_router.include_routers(rebind_adv_campaign_ids.router)

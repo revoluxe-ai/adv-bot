@@ -101,6 +101,7 @@ class ComplexAdv:
         min_nmids_bids: AdvMinNmidsBids | None = None,
         fact_pay_for_order: float | None = None,
         resolve_cpo: float | None = None,
+        original_max_cpo: float | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
@@ -121,6 +122,7 @@ class ComplexAdv:
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._fact_pay_for_order: float | None = fact_pay_for_order
         self._resolve_cpo: float | None = resolve_cpo
+        self._original_max_cpo = original_max_cpo
 
     def __repr__(self):
         return str(self._adv_setting.id)
@@ -542,3 +544,8 @@ class ComplexAdv:
     def resolve_cpo(self) -> float | None:
         """Resolve CPO кампании (целевое/разрешенное значение CPO)."""
         return self._resolve_cpo
+
+    @property
+    def original_max_cpo(self) -> float | None:
+        """Исходный max CPO из настроек РК до синтетических пересчётов бюджета."""
+        return self._original_max_cpo

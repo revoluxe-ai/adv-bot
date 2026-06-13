@@ -37,6 +37,7 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "search_auto_budget_daily_limit": "app/client_bot/user_interface/handlers/campaign_activity.py",
     "use_common_budget": "app/client_bot/user_interface/handlers/common_budget_mode_toggle.py",
     "common_budget_daily_limit": "app/client_bot/user_interface/handlers/campaign_activity.py",
+    "auto_common_budget": "app/client_bot/user_interface/handlers/auto_common_budget_toggle.py",
     "auto_add_only_relevant_phrase": "app/client_bot/user_interface/handlers/auto_add_only_relevant_phrase_toggle.py",
     "orders_source_for_auto_mode": "app/client_bot/user_interface/handlers/orders_source_toggle.py",
     "predict_ctr_mode": "app/client_bot/user_interface/handlers/predict_ctr_mode_toggle.py",
