@@ -586,16 +586,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
         if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
             text += f"посл. V3: {self._v3_last_action_str or 'Нет данных'}\n"
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
-                v3_raised_max_display_label,
-            )
-
-            raise_label = v3_raised_max_display_label(
-                self.adv,
-                fact_pay_for_order=self._fact_pay_for_order_ch,
-            )
-            if raise_label:
-                text += f"V3 Raise MAX: {raise_label}\n"
         else:
             text += (
                 f"добавл в БС:"

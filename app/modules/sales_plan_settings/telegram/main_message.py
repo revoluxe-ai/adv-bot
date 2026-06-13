@@ -8,9 +8,6 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
-    v3_raised_max_display_label,
-)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -40,13 +37,6 @@ class SalesPlanSettingsMenuMessage(TextWithKeyboard):
         text = """
 Задать или изменить плановые показатели РК
         """
-        if normalize_automatic_version_ui(self._adv.automatic_version) == 3:
-            raise_label = v3_raised_max_display_label(
-                self._adv,
-                fact_pay_for_order=self._fact_pay_for_order,
-            )
-            if raise_label:
-                text += f"\nV3 Raise MAX (рабочий max): {raise_label}\n"
         return text
 
     @property

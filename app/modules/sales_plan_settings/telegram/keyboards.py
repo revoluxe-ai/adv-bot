@@ -6,9 +6,6 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
-    v3_raised_max_display_label,
-)
 
 from . import callbacks
 
@@ -92,11 +89,7 @@ class KeyboardsGetter:
             if not self._max_price_for_order
             else f"Изменить Макс.Себес. Заказа ({self._max_price_for_order})"
         )
-        raise_label = v3_raised_max_display_label(
-            self._adv,
-            fact_pay_for_order=self._fact_pay_for_order,
-        )
-        text = f"{base} [{raise_label}]" if raise_label else base
+        text = base
 
         callback = callbacks.ChangePlanSetting(
             target_point="change-max-price-for-order", adv_id=self._adv_id

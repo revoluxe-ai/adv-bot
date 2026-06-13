@@ -723,13 +723,7 @@ class AdvSetting(BaseTable):
         server_default=text("1"),
         comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
     )
-    v3_substitute_fact_cpo_for_max: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-        server_default="false",
-        comment="V3 Raise MAX: in-memory max=fact CPO when fact>db max (per tick, no persist)",
-    )
+
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,

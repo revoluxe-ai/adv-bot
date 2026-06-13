@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -126,20 +125,7 @@ class DataUpdateManager:
                 keywords=ledger.keywords,
                 max_last_period=max_last_period,
             )
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_max_cpo_raise import (
-                apply_v3_max_cpo_raise_if_needed,
-            )
 
-            fact_pfo = fact.pay_for_order
-            apply_v3_max_cpo_raise_if_needed(
-                adv,
-                fact_pay_for_order=fact_pfo,
-                toggle_enabled=complex_adv.v3_substitute_fact_cpo_for_max,
-            )
-            plan: PlanData | None = AdvSettingAutoUpdater.get_plan_data(adv)
-            if not plan:
-                logger.warning('[adv_id=%s] v3: no plan, skip ladder', complex_adv.adv_id)
-                return None
             sales_state = detect_campaign_state(plan, fact)
             campaign_mode = resolve_campaign_mode(sales_state)
             logger.info(

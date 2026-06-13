@@ -537,13 +537,6 @@ class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
     level: int
 
 
-class V3SubstituteFactCpoToggle(CallbackData, prefix="v3_substitute_fact_cpo"):
-    """Toggle V3 Raise MAX: in-memory max=fact CPO when fact>db max."""
-
-    adv_setting_original_id: int
-    new_status: bool
-
-
 class V3CalibrationStepChange(CallbackData, prefix="v3_cal_step_change"):
     adv_setting_original_id: int
 

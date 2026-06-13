@@ -326,8 +326,6 @@ class WBShopDataManager:
                 summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
                     adv_ids_for_plan_fact
                 )
-        original_max_cpo: dict[int, int] = self._set_auto_commom_budget(adv_settings)
-
 
         return [
             PreComplexAdv(
@@ -339,8 +337,6 @@ class WBShopDataManager:
                     if adv.search_adv_id is not None
                     else None
                 ),
-                original_max_cpo=original_max_cpo[adv.adv_id]
-
             )
             for adv in adv_settings
         ]
@@ -401,7 +397,6 @@ class WBShopDataManager:
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
                 fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
                 resolve_cpo=pre_adv.resolved_target_pay_for_order,
-                original_max_cpo=pre_adv.original_max_cpo
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [

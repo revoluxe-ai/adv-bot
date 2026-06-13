@@ -18,7 +18,6 @@ class PreComplexAdv:
     plan_fact_summary: PlanFactSummary | None = None
     fact_data: FactData | None = None
     search_adv: AdvSetting | None = None
-    original_max_cpo: float | None = None
 
     @property
     def resolved_target_pay_for_order(self) -> float | None:
