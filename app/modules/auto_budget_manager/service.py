@@ -140,6 +140,10 @@ class AutoBudgetService:
 
         Настройки берутся из ``adv.adv_setting`` в памяти; повторный SELECT AdvSetting
         в этом пути не выполняется.
+
+        При отсутствии связи ``AdvSetting`` → ``WBCabinet`` lookup ``_get_wb_shop_id``
+        бросает ``ValueError``; внешний обработчик ловит исключение и возвращает
+        ``None`` (пополнение на этом тике пропускается, воркер не падает).
         """
         lock_key = self._lock_key(adv_setting_id, campaign_type)
         acquired = await self._acquire_lock(lock_key)
@@ -176,6 +180,12 @@ class AutoBudgetService:
         *,
         force_after_start_rejection: bool = False,
     ) -> AutoBudgetEnsureResult:
+        """Пополнение бюджета одной кампании (search/auto) под Redis-lock.
+
+        Перед пополнением пишет снапшот баланса в Redis по ``shop_id`` из
+        ``_get_wb_shop_id``; без валидной связи с кабинетом метод не доходит
+        до deposit (см. ``ensure_budget``).
+        """
 
         adv_setting = complex_adv.adv_setting
         config = self.get_campaign_config(complex_adv, campaign_type)
@@ -685,7 +695,12 @@ class AutoBudgetService:
         force_after_start_rejection: bool = False,
         start_failure_campaign: AdvType | None = None,
     ) -> AutoBudgetEnsureResult | None:
-        """Пополнить общий бюджет по уже загруженному ``ComplexAdv`` (без reload AdvSetting)."""
+        """Пополнить общий бюджет по уже загруженному ``ComplexAdv`` (без reload AdvSetting).
+
+        При отсутствии связи ``AdvSetting`` → ``WBCabinet`` lookup ``_get_wb_shop_id``
+        бросает ``ValueError``; внешний обработчик ловит исключение и возвращает
+        ``None`` (пополнение на этом тике пропускается, воркер не падает).
+        """
         lock_key = self._lock_key_common(adv_setting_id)
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
@@ -720,7 +735,12 @@ class AutoBudgetService:
         force_after_start_rejection: bool = False,
         start_failure_campaign: AdvType | None = None,
     ) -> AutoBudgetEnsureResult:
-        """Пополнение общего бюджета по уже загруженному ``ComplexAdv`` (без reload AdvSetting)."""
+        """Пополнение общего бюджета по уже загруженному ``ComplexAdv`` (без reload AdvSetting).
+
+        Перед пополнением пишет снапшот баланса в Redis по ``shop_id`` из
+        ``_get_wb_shop_id``; без валидной связи с кабинетом метод не доходит
+        до deposit (см. ``ensure_common_budget``).
+        """
         if not adv.use_common_budget:
             return AutoBudgetEnsureResult(
                 status=AutoBudgetEnsureStatus.ADV_NOT_READY,
@@ -1068,6 +1088,21 @@ class AutoBudgetService:
 
     @staticmethod
     async def _get_wb_shop_id(session: AsyncSession, adv_setting_id: int) -> str:
+        """Вернуть ``WBCabinet.shop_id`` для сегмента ключа Redis-снапшота баланса.
+
+        Args:
+            session: read-only сессия SQLAlchemy.
+            adv_setting_id: PK ``AdvSetting.id`` (не ``adv_id`` WB).
+
+        Returns:
+            Строковый ``shop_id`` кабинета, связанного с настройкой РК.
+
+        Raises:
+            ValueError: если join ``AdvSetting`` → ``WBCabinet`` не нашёл кабинет.
+                В штатном потоке watchdog каждая РК привязана к кабинету; при битых
+                данных ensure_* на этом тике возвращает ``None`` (fail-fast вместо
+                пополнения без снапшота баланса).
+        """
         shop_id_get_query = (
             select(WBCabinet.shop_id)
             .join(WBCabinet.adv_settings)

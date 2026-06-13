@@ -326,7 +326,8 @@ class WBShopDataManager:
                 summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
                     adv_ids_for_plan_fact
                 )
-        self._set_auto_commom_budget(adv_settings)
+        original_max_cpo: dict[int, int] = self._set_auto_commom_budget(adv_settings)
+
 
         return [
             PreComplexAdv(
@@ -338,6 +339,8 @@ class WBShopDataManager:
                     if adv.search_adv_id is not None
                     else None
                 ),
+                original_max_cpo=original_max_cpo[adv.adv_id]
+
             )
             for adv in adv_settings
         ]
@@ -594,13 +597,26 @@ class WBShopDataManager:
 
 
     @staticmethod
-    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> None:
+    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> dict[int, float | None]:
+        """Синтетический ``common_budget_daily_limit`` в памяти перед сборкой ``ComplexAdv``.
+
+        При ``auto_common_budget=True`` и заполненных ``max_price_for_order`` и
+        ``plan_for_sales_for_day`` пересчитывает лимит как произведение этих полей.
+
+        Если авторасчёт включён, но одно из полей ``None``, лимит **не** трогаем:
+        остаётся значение из БД (в т.ч. ранее заданный вручную). Это штатное
+        поведение для неполной конфигурации РК, а не fallback на ноль.
+        """
+
+        original_max_cpo: dict[int, float | None] = {}
+
         for adv in adv_settings:
             max_pay_for_order = adv.max_price_for_order
+            original_max_cpo[adv.adv_id] = max_pay_for_order
             plan_for_sales_for_day = adv.plan_for_sales_for_day
             if max_pay_for_order is not None and plan_for_sales_for_day is not None:
                 if adv.auto_common_budget:
                     adv.common_budget_daily_limit = int(max_pay_for_order) * int(plan_for_sales_for_day)
-
+        return original_max_cpo
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса
