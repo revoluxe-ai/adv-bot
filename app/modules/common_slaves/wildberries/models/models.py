@@ -574,7 +574,7 @@ class AdvSetting(BaseTable):
     plan_for_sales_for_day = mapped_column(Integer, nullable=True, default=None)
     target_price_for_order = mapped_column(Float, nullable=True, default=None)
 
-    max_price_for_order = mapped_column(Float, nullable=True, default=None)
+    max_price_for_order: Mapped[int] = mapped_column(Integer, nullable=True, default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
         Boolean, nullable=True, default=True, server_default="true"
