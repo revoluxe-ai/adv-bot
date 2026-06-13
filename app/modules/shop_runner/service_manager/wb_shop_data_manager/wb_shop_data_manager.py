@@ -596,11 +596,11 @@ class WBShopDataManager:
     @staticmethod
     def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> None:
         for adv in adv_settings:
-            max_pay_for_order = adv.max_pay_for_order
+            max_pay_for_order = adv.max_price_for_order
             plan_for_sales_for_day = adv.plan_for_sales_for_day
             if max_pay_for_order is not None and plan_for_sales_for_day is not None:
                 if adv.auto_common_budget:
-                    adv.common_budget_daily_limit = adv.max_pay_for_order * adv.plan_for_sales_for_day
+                    adv.common_budget_daily_limit = int(max_pay_for_order) * int(plan_for_sales_for_day)
 
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса
