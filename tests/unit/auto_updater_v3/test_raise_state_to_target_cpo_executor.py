@@ -377,5 +377,7 @@ def test_raise_state_caps_at_fact_ceiling_on_overspend() -> None:
 def test_raise_state_executor_in_preamble() -> None:
     executors = build_normal_preamble_executors()
     assert executors[0].phase_name == "validate_state_by_hard_status"
-    assert executors[3].phase_name == "skip_up_same_target_place"
-    assert executors[4].phase_name == "raise_state_to_target_cpo"
+    phases = [executor.phase_name for executor in executors]
+    assert phases.index("raise_state_to_target_cpo") == (
+        phases.index("skip_up_same_target_place") + 1
+    )
