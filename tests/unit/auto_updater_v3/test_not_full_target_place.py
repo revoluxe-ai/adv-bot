@@ -274,6 +274,45 @@ def test_next_state_manager_refuses_zero_from_nf_plan_fact_helper(
 
 
 @pytest.mark.unit
+def test_plan_fact_executor_restores_previous_tp_if_manager_resets_to_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reported executor сам держит invariant: NF plan-fact не выпускает reset-в-0."""
+    dto = _not_full_dto(target_place=14, position=14.0, pay_for_order=850.0)
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    def _broken_manager_adjustment(
+        self: NextStateManager,
+        keyword: KeywordDTO,
+        *,
+        fact_pay_for_order: float,
+        resolve: float,
+    ) -> None:
+        keyword.current_target_place = NextTargetPlace(
+            new_target_place=0,
+            executor_name=self.executor_name,
+        )
+
+    monkeypatch.setattr(
+        NextStateManager,
+        "adjust_not_full_target_place_plan_fact",
+        _broken_manager_adjustment,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+
+    assert ctx.keywords[0].current_target_place == 14
+
+
+@pytest.mark.unit
 def test_fallback_zero_false_on_overspend_not_full() -> None:
     kw = _calc_kw(ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, rating=1.0, hard_status=2)
     ctx = KeywordV3Context(keyword=kw, position_profile=None)

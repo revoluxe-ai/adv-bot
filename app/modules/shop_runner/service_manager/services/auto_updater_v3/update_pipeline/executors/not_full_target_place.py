@@ -31,6 +31,7 @@ from __future__ import annotations
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import NextTargetPlace
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+    KeywordDTO,
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
@@ -131,6 +132,32 @@ class NotFullTargetPlaceMigrateExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
+
+
+def _restore_plan_fact_target_place_if_zero(
+    dto: KeywordDTO,
+    *,
+    previous_target_place: int,
+    executor_name: str,
+) -> None:
+    """Защитить NF plan-fact от любого будущего reset-в-0.
+
+    ``NotFullTargetPlacePlanFactExecutor`` по контракту может только сдвигать
+    уже инициализированный PFO target_place на ``±1``. Если зависимый слой когда-
+    нибудь снова попытается записать ``0``, это будет ровно возврат старого
+    бага “NF reset lacks overspend gate”: локальная plan-fact ветка превратится
+    в campaign-level reset без явного overspend gate.
+
+    Поэтому executor держит собственный invariant рядом с местом вызова:
+    ``0`` не является допустимым результатом NF plan-fact. Если после
+    корректировки он появился, возвращаем предыдущее рабочее значение.
+    """
+    if dto.current_target_place != 0:
+        return
+    dto.current_target_place = NextTargetPlace(
+        new_target_place=previous_target_place,
+        executor_name=executor_name,
+    )
 
 
 class NotFullTargetPlacePlanFactExecutor:
@@ -267,10 +294,16 @@ class NotFullTargetPlacePlanFactExecutor:
                 == NotFullTargetPlaceMigrateExecutor.__name__
             ):
                 continue
+            previous_target_place = dto.current_target_place
             self._next_state_manager.adjust_not_full_target_place_plan_fact(
                 dto,
                 fact_pay_for_order=fact,
                 resolve=resolve,
+            )
+            _restore_plan_fact_target_place_if_zero(
+                dto,
+                previous_target_place=previous_target_place,
+                executor_name=self.__class__.__name__,
             )
 
     @property
