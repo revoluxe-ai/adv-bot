@@ -307,6 +307,7 @@ class WBShopDataManager:
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
         )
+        self._set_auto_commom_budget(adv_settings)
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
@@ -598,6 +599,25 @@ class WBShopDataManager:
             return await self._wb_manager.get_min_bids(complex_advs, cache_possible=False)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
 
+    @staticmethod
+    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> None:
+        """Пересчитать ``common_budget_daily_limit`` в памяти для auto common budget.
+
+        Вызывается из ``get_pre_complex_advs`` на каждом тике shop-runner. Меняет только
+        in-memory ``AdvSetting``; в PostgreSQL лимит не сохраняется.
+
+        При ``auto_common_budget=True`` и наличии ``max_price_for_order`` и
+        ``plan_for_sales_for_day`` лимит = произведение. При выключенном авторасчёте или
+        неполной конфигурации существующее значение не перезаписывается.
+        """
+        for adv in adv_settings:
+            if not adv.auto_common_budget:
+                continue
+            max_pay = adv.max_price_for_order
+            plan_sales = adv.plan_for_sales_for_day
+            if max_pay is None or plan_sales is None:
+                continue
+            adv.common_budget_daily_limit = int(max_pay) * int(plan_sales)
 
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса
