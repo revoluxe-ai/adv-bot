@@ -2,7 +2,7 @@
 
 Миграция с ``target_place=0`` на ``round(position) - 1`` (реальная позиция − 1) и сдвиг ±1 по соотношению
 ``fact_pay_for_order`` / ``resolve`` (порог ``MAX_PAY_STABILIZATION_RATIO``).
-При OVERSPEND кампании (``fact_pay_for_order > max_pay_for_order``) — сброс tp в 0 (NF_overspend_reset).
+При OVERSPEND кампании — сброс tp в 0 только для ключей с ``PFO > raise_cpo_ceiling``.
 Используется executors preamble NF_migrate / NF_overspend_tp / NF_plan_fact_tp.
 """
 
@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
     campaign_cpo_over_max,
+    keyword_pfo_over_max,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.adv_state import (
     AdvState,
@@ -57,30 +58,26 @@ def clamp_not_full_target_place(place: int) -> int:
 
 def current_position_as_target_place(keyword: "KeywordDTO") -> int | None:
     """Стартовая tp после миграции: округлённая реальная позиция WB минус 1."""
-    pos = float(keyword.calculated_keyword.position or 0)
+    pos = keyword.calculated_keyword.position
     if pos <= 0:
         return None
     real_place = int(math.floor(pos + 0.5))
-    return clamp_not_full_target_place(real_place - 1)
+    return real_place
 
 
-def migrate_not_full_zero_to_current_position(
-    keyword: "KeywordDTO",
-    *,
-    campaign_overspend: bool = False,
-) -> int | None:
-    """NOT FULL active + tp=0 → ``real_position - 1``; при overspend — ``None``."""
-    if campaign_overspend:
-        return None
-    if not keyword.is_not_full():
-        return None
-    if keyword.current_mode == KeywordStrategyMode.OFF:
-        return None
-    if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
-        return None
-    if keyword.current_target_place != 0:
-        return None
-    return current_position_as_target_place(keyword)
+# def migrate_not_full_zero_to_current_position(
+#     keyword: "KeywordDTO",
+# ) -> int | None:
+#     """NOT FULL active + tp=0 → ``real_position - 1``."""
+#     if not keyword.is_not_full():
+#         return None
+#     if keyword.current_mode == KeywordStrategyMode.OFF:
+#         return None
+#     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
+#         return None
+#     if keyword.current_target_place != 0:
+#         return None
+#     return current_position_as_target_place(keyword)
 
 
 def compute_not_full_target_place_delta(
@@ -106,13 +103,17 @@ def plan_fact_target_place_skip_reason(state: AdvState) -> str | None:
         return "resolve_invalid"
     if state.fact_pay_for_order is None:
         return "no_fact_pay_for_order"
-    if campaign_cpo_exceeds_max(state):
-        return "fact_gt_max_cpo"
     return None
 
 
-def reset_not_full_target_place_on_overspend(keyword: "KeywordDTO") -> bool:
-    """OVERSPEND: NOT FULL MIN → ``target_place=0``; ``True`` если значение изменилось."""
+def reset_not_full_target_place_on_overspend(
+    keyword: "KeywordDTO",
+    *,
+    max_pay: float,
+) -> bool:
+    """OVERSPEND: NOT FULL MIN с ``PFO > max_pay`` → ``target_place=0``."""
+    if not keyword_pfo_over_max(keyword.calculated_keyword.pay_for_order, max_pay):
+        return False
     if not keyword.is_not_full():
         return False
     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
@@ -127,15 +128,11 @@ def adjust_not_full_target_place_for_plan_fact(
     *,
     fact_pay_for_order: float,
     resolve: float,
-    campaign_overspend: bool = False,
+max_pay_for_order: float
 ) -> int | None:
     """Применить ±1 к ``current_target_place`` для NOT FULL MIN; ``None`` если no-op."""
-    if campaign_overspend:
-        return None
-    if not keyword.is_not_full():
-        return None
-    if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
-        return None
+    if fact_pay_for_order >= max_pay_for_order:
+        return 0
     delta = compute_not_full_target_place_delta(fact_pay_for_order, resolve)
     new_place = clamp_not_full_target_place(keyword.current_target_place + delta)
     if new_place == keyword.current_target_place:

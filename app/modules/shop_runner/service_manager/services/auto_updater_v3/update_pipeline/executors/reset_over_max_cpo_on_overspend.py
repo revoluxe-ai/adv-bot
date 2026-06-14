@@ -25,7 +25,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_bo
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.utils import get_raise_celling
 
 
 class ResetOverMaxCpoOnOverspendExecutor:
@@ -41,7 +40,9 @@ class ResetOverMaxCpoOnOverspendExecutor:
         self._skip_reason = _phase_skip_reason(context.adv_state)
         if self._skip_reason is not None:
             return
-        ceiling = context.adv_state.raise_cpo_ceiling
+        ceiling: float | None = context.adv_state.raise_cpo_ceiling
+        if ceiling is None:
+            return None
         for dto in context.keywords:
             state = _resolve_target_state(dto, ceiling)
             if state is not None:

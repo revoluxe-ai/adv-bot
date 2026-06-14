@@ -116,6 +116,7 @@ def _adv_state(
     max_pay_for_order: float = 550.0,
     fact_pay_for_order: float | None = None,
     resolve_valid: bool = True,
+    guard_condition: bool = False,
 ) -> AdvState:
     return replace(
         AdvState.empty(),
@@ -123,6 +124,7 @@ def _adv_state(
         max_pay_for_order=max_pay_for_order,
         fact_pay_for_order=fact_pay_for_order,
         resolve_valid=resolve_valid,
+        guard_condition=guard_condition,
     )
 
 
@@ -263,7 +265,7 @@ def test_cheap_kw_never_skipped_regardless_of_campaign_fact() -> None:
     """Регрессия: fact выше 0.9×max и 0.9×resolve, но дешёвый ключ поднимается."""
     dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, target_pfo=10.73)
     adv_state = _adv_state(
-        resolve=400.0,
+        resolve=500.0,
         max_pay_for_order=550.0,
         fact_pay_for_order=704.0,
     )
@@ -305,7 +307,7 @@ def test_raise_state_raises_expensive_kw_when_fact_below_stabilization() -> None
     fact = raise_state_resolve_stabilization_floor(resolve) - 1.0
     dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, target_pfo=500.0)
     adv_state = _adv_state(
-        resolve=resolve,
+        resolve=500.0,
         max_pay_for_order=550.0,
         fact_pay_for_order=fact,
     )
@@ -340,6 +342,35 @@ def test_raise_state_runs_when_fact_below_90pct_resolve() -> None:
     assert executor.skip_reason is None
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
     assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
+def test_raise_state_caps_at_fact_ceiling_on_overspend() -> None:
+    """Overspend: подъём только до ступени с cpo < fact (800), не до resolve."""
+    cheap = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=600.0, max_cpo=850.0),
+    )
+    expensive = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(2, min_cpo=300.0, opt_cpo=850.0, max_cpo=1000.0),
+    )
+    adv_state = _adv_state(
+        resolve=900.0,
+        max_pay_for_order=500.0,
+        fact_pay_for_order=800.0,
+        guard_condition=True,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[cheap, expensive]),
+        adv_state=adv_state,
+    )
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+    assert cheap.current_mode == KeywordStrategyMode.OPTIMUM
+    assert expensive.current_mode == KeywordStrategyMode.MIN_CPA
+    assert expensive.next_state == []
 
 
 @pytest.mark.unit

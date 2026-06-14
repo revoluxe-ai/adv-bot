@@ -7,7 +7,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_p
     gap_enable_plan_headroom_floor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
-    campaign_cpo_over_max,
     cmp_over_threshold,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.adv_state import (
@@ -62,14 +61,12 @@ class PayForOrderGapEnableExecutor:
 
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip если нет fact, overspend, вне headroom или resolve недоступен."""
+    """Skip если нет fact, вне headroom или resolve недоступен."""
     if float(adv_state.resolve) <= 0:
         return "resolve_invalid"
     if adv_state.fact_pay_for_order is None:
         return "no_fact_pay_for_order"
     fact = float(adv_state.fact_pay_for_order)
-    if campaign_cpo_over_max(fact, float(adv_state.max_pay_for_order)):
-        return "fact_gt_max_cpo"
     if cmp_over_threshold(
         fact,
         gap_enable_plan_headroom_floor(float(adv_state.max_pay_for_order)),

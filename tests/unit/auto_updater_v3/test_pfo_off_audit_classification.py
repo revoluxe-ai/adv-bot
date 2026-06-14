@@ -24,7 +24,7 @@ _EXECUTOR = "PayForOrderOverMaxOffOnDeepOverspendExecutor"
 def test_pfo_off_audit_counts_force_off_not_down_for_max_to_off() -> None:
     """MAX + PFO>max → OFF: в audit ``force_off``, не ``down``."""
     max_cpo = 550.0
-    dto = _dto(ks_id=1, mode=KeywordStrategyMode.MAX_CONVERSION, pfo_target=600.0)
+    dto = _dto(ks_id=1, mode=KeywordStrategyMode.MAX_CONVERSION, pfo_target=750.0)
     ctx = _context([dto], _adv_state(fact=705.0, max_cpo=max_cpo))
     PayForOrderOverMaxOffOnDeepOverspendExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF
@@ -43,7 +43,7 @@ def test_pfo_off_mass_off_matches_prod_shape() -> None:
     """95 ключей MAX→OFF: net_force_off=95, без net_down."""
     max_cpo = 550.0
     keywords = [
-        _dto(ks_id=i, mode=KeywordStrategyMode.MAX_CONVERSION, pfo_target=600.0)
+        _dto(ks_id=i, mode=KeywordStrategyMode.MAX_CONVERSION, pfo_target=750.0)
         for i in range(1, 96)
     ]
     ctx = _context(keywords, _adv_state(fact=705.0, max_cpo=max_cpo))

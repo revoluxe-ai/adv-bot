@@ -187,7 +187,7 @@ def test_skip_when_fact_gt_plan_headroom_ratio() -> None:
     )
     executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_gt_max_cpo"
+    assert executor.skip_reason == "fact_ge_plan_headroom_ratio"
     assert ctx.keywords[0].next_state == []
 
 
@@ -207,15 +207,20 @@ def test_no_skip_when_fact_equals_plan_headroom_ratio() -> None:
 
 
 @pytest.mark.unit
-def test_skip_when_fact_gt_max() -> None:
+def test_enable_gap_on_overspend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.pay_for_order_gap_enable.gap_enable_plan_headroom_floor",
+        lambda max_pay: float(max_pay) * 2.0,
+    )
     ctx = _context(
         [_gap_dto()],
-        _adv_state(fact=121.0, max_cpo=120.0),
+        _adv_state(fact=800.0, max_cpo=500.0, resolve=400.0),
+        apply_post_process=False,
     )
     executor = PayForOrderGapEnableExecutor()
     executor.execute(ctx)
-    assert executor.skip_reason == "fact_gt_max_cpo"
-    assert ctx.keywords[0].next_state == []
+    assert executor.skip_reason is None
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit

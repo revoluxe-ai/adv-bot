@@ -136,6 +136,7 @@ def _adv_state(
     eligibility: dict[int, KeywordV3Eligibility] | None = None,
     fact_pay_for_order: float | None = None,
     max_pay_for_order: float = 95.0,
+    guard_condition: bool = False,
 ) -> AdvState:
     return replace(
         AdvState.empty(),
@@ -143,6 +144,7 @@ def _adv_state(
         resolve_valid=True,
         fact_pay_for_order=fact_pay_for_order,
         max_pay_for_order=max_pay_for_order,
+        guard_condition=guard_condition,
         eligibility_by_ks_id=eligibility or {1: _pfo_elig()},
     )
 
@@ -212,15 +214,37 @@ def test_keyword_no_data_not_taken_by_new_executor() -> None:
 
 
 @pytest.mark.unit
-def test_campaign_fact_over_max_does_not_block_key_level_pfo_activation() -> None:
-    dto = _dto(pay_for_order=80.0)
-    ctx = _context(
-        [dto],
-        _adv_state(resolve=90.0, fact_pay_for_order=120.0, max_pay_for_order=95.0),
+def test_campaign_fact_over_max_blocks_expensive_key_enable() -> None:
+    cheap = _dto(ks_id=1, pay_for_order=80.0)
+    expensive = _dto(ks_id=2, pay_for_order=125.0)
+    adv = _adv_state(
+        resolve=150.0,
+        fact_pay_for_order=120.0,
+        max_pay_for_order=95.0,
+        guard_condition=True,
+        eligibility={1: _pfo_elig(), 2: _pfo_elig()},
     )
+    ctx = _context([cheap, expensive], adv)
     PayForOrderNoChEnableExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
-    assert dto.target_place == 0
+    assert cheap.current_mode == KeywordStrategyMode.MIN_CPA
+    assert expensive.current_mode == KeywordStrategyMode.OFF
+
+
+@pytest.mark.unit
+def test_overspend_enables_cheap_key_below_fact() -> None:
+    cheap = _dto(ks_id=1, pay_for_order=600.0)
+    expensive = _dto(ks_id=2, pay_for_order=850.0)
+    adv = _adv_state(
+        resolve=900.0,
+        fact_pay_for_order=800.0,
+        max_pay_for_order=500.0,
+        guard_condition=True,
+        eligibility={1: _pfo_elig(), 2: _pfo_elig()},
+    )
+    ctx = _context([cheap, expensive], adv)
+    PayForOrderNoChEnableExecutor().execute(ctx)
+    assert cheap.current_mode == KeywordStrategyMode.MIN_CPA
+    assert expensive.current_mode == KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit

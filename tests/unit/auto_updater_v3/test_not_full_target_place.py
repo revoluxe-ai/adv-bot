@@ -29,7 +29,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_t
     clamp_not_full_target_place,
     compute_not_full_target_place_delta,
     current_position_as_target_place,
-    migrate_not_full_zero_to_current_position,
     plan_fact_target_place_skip_reason,
     reset_not_full_target_place_on_overspend,
 )
@@ -40,12 +39,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
     KeywordV3Context,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
-    NotFullTargetPlaceMigrateExecutor,
-    NotFullTargetPlaceOverspendResetExecutor,
     NotFullTargetPlacePlanFactExecutor,
     build_normal_preamble_executors,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
 
 def _not_full_dto(
@@ -54,6 +51,7 @@ def _not_full_dto(
     mode: KeywordStrategyMode = KeywordStrategyMode.MIN_CPA,
     target_place: int | None = 0,
     position: float = 15.0,
+    pay_for_order: float | None = None,
 ) -> KeywordDTO:
     kw = _calc_kw(
         ks_id=ks_id,
@@ -61,6 +59,7 @@ def _not_full_dto(
         mode=mode,
         rating=1.0,
         hard_status=2,
+        conv=_conv_for_pay_for_order(pay_for_order) if pay_for_order is not None else 0.05,
     )
     kw = kw.model_copy(
         update={
@@ -107,9 +106,24 @@ def test_migrate_skips_when_tp_not_zero() -> None:
 
 
 @pytest.mark.unit
-def test_migrate_skips_on_campaign_overspend() -> None:
-    dto = _not_full_dto(position=12.0, target_place=0)
-    assert migrate_not_full_zero_to_current_position(dto, campaign_overspend=True) is None
+def test_migrate_skips_expensive_key_on_overspend_per_key() -> None:
+    cheap = _not_full_dto(ks_id=1, position=12.0, target_place=0, pay_for_order=600.0)
+    expensive = _not_full_dto(
+        ks_id=2, position=12.0, target_place=0, pay_for_order=850.0
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[cheap, expensive]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    NotFullTargetPlaceMigrateExecutor().execute(ctx)
+    assert cheap.current_target_place == 11
+    assert expensive.current_target_place == 0
 
 
 @pytest.mark.unit
@@ -127,10 +141,12 @@ def test_campaign_overspend_helpers() -> None:
 
 @pytest.mark.unit
 def test_overspend_reset_eligible_only_not_full_min() -> None:
-    dto = _not_full_dto(target_place=10, position=10.0)
-    assert reset_not_full_target_place_on_overspend(dto) is True
-    dto_zero = _not_full_dto(target_place=0, position=10.0)
-    assert reset_not_full_target_place_on_overspend(dto_zero) is False
+    dto = _not_full_dto(target_place=10, position=10.0, pay_for_order=850.0)
+    assert reset_not_full_target_place_on_overspend(dto, max_pay=800.0) is True
+    cheap = _not_full_dto(target_place=10, position=10.0, pay_for_order=600.0)
+    assert reset_not_full_target_place_on_overspend(cheap, max_pay=800.0) is False
+    dto_zero = _not_full_dto(target_place=0, position=10.0, pay_for_order=850.0)
+    assert reset_not_full_target_place_on_overspend(dto_zero, max_pay=800.0) is False
 
 
 @pytest.mark.unit
@@ -171,25 +187,56 @@ def test_adjust_plan_fact_decreases_tp() -> None:
 
 
 @pytest.mark.unit
-def test_migrate_executor_skips_on_overspend() -> None:
-    dto = _not_full_dto(position=12.0, target_place=0)
+def test_migrate_executor_per_key_on_overspend() -> None:
+    cheap = _not_full_dto(ks_id=1, position=12.0, target_place=0, pay_for_order=600.0)
+    expensive = _not_full_dto(
+        ks_id=2, position=12.0, target_place=0, pay_for_order=850.0
+    )
     from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
 
     ctx = UpdateContextManager().from_prepared(
-        KeywordsPreparedList(keywords=[dto]),
+        KeywordsPreparedList(keywords=[cheap, expensive]),
         adv_state=_legacy_context(
-            fact_pay_for_order=250.0, max_pay_for_order=200.0
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
         ).adv_state,
     )
     ex = NotFullTargetPlaceMigrateExecutor()
     ex.execute(ctx)
-    assert ex.skip_reason == "campaign_cpo_gt_max"
-    assert ctx.keywords[0].current_target_place == 0
+    assert ex.skip_reason is None
+    assert cheap.current_target_place == 11
+    assert expensive.current_target_place == 0
+
+
+@pytest.mark.unit
+def test_overspend_reset_executor_sets_tp_zero_per_key() -> None:
+    cheap = _not_full_dto(
+        ks_id=1, target_place=14, position=14.0, pay_for_order=600.0
+    )
+    expensive = _not_full_dto(
+        ks_id=2, target_place=14, position=14.0, pay_for_order=850.0
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[cheap, expensive]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    ex = NotFullTargetPlaceOverspendResetExecutor()
+    ex.execute(ctx)
+    assert ex.skip_reason is None
+    assert cheap.current_target_place == 14
+    assert expensive.current_target_place == 0
 
 
 @pytest.mark.unit
 def test_overspend_reset_executor_sets_tp_zero() -> None:
-    dto = _not_full_dto(target_place=14, position=14.0)
+    dto = _not_full_dto(target_place=14, position=14.0, pay_for_order=850.0)
     from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
 
     ctx = UpdateContextManager().from_prepared(
@@ -249,6 +296,31 @@ def test_migrate_executor_updates_context() -> None:
     )
     NotFullTargetPlaceMigrateExecutor().execute(ctx)
     assert ctx.keywords[0].current_target_place == 11
+
+
+@pytest.mark.unit
+def test_plan_fact_executor_per_key_on_overspend() -> None:
+    cheap = _not_full_dto(
+        ks_id=1, target_place=10, position=10.0, pay_for_order=600.0
+    )
+    expensive = _not_full_dto(
+        ks_id=2, target_place=10, position=10.0, pay_for_order=850.0
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[cheap, expensive]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    ex = NotFullTargetPlacePlanFactExecutor()
+    ex.execute(ctx)
+    assert ex.skip_reason is None
+    assert cheap.current_target_place == 11
+    assert expensive.current_target_place == 10
 
 
 @pytest.mark.unit

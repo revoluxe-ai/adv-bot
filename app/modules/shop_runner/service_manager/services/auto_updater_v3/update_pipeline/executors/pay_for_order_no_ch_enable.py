@@ -5,6 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    keyword_pfo_over_max,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.adv_state import (
+    AdvState,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordDataTier,
     KeywordV3Eligibility,
@@ -27,7 +33,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class PayForOrderNoChEnableExecutor:
-    """Enable one OFF keyword with no CH profile and own PFO when ``keyword.pay_for_order <= resolve``."""
+    """Enable one OFF keyword with no CH profile when ``keyword.pay_for_order`` below ceiling."""
 
     phase_name = "pay_for_order_no_ch_enable"
     _skip_reason: str | None = None
@@ -41,7 +47,7 @@ class PayForOrderNoChEnableExecutor:
             return
         candidate = _pick_no_ch_enable_candidate(
             context.keywords,
-            context.adv_state.resolve,
+            context.adv_state,
             eligibility_by_ks_id=context.adv_state.eligibility_by_ks_id,
         )
         if candidate is None:
@@ -62,10 +68,15 @@ def _phase_skip_reason(context: UpdateContext) -> str | None:
 
 def _pick_no_ch_enable_candidate(
     keywords: list[KeywordDTO],
-    resolve: float,
+    adv_state: AdvState,
     *,
     eligibility_by_ks_id: Mapping[int, KeywordV3Eligibility],
 ) -> KeywordDTO | None:
+    max_pay = float(adv_state.resolve)
+    if adv_state.guard_condition:
+        ceiling = adv_state.raise_cpo_ceiling
+        if ceiling is not None:
+            max_pay = min(max_pay, float(ceiling))
     candidates: list[KeywordDTO] = []
     for dto in keywords:
         if dto.current_mode != KeywordStrategyMode.OFF:
@@ -80,7 +91,7 @@ def _pick_no_ch_enable_candidate(
         pfo = keyword_pfo_value(dto.calculated_keyword)
         if pfo is None:
             continue
-        if float(pfo) > float(resolve):
+        if keyword_pfo_over_max(pfo, max_pay):
             continue
         candidates.append(dto)
     if not candidates:

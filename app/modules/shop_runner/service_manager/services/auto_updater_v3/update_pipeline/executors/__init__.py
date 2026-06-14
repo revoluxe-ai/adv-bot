@@ -22,8 +22,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     HardStatusValidateExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_target_place import (
-    NotFullTargetPlaceMigrateExecutor,
-    NotFullTargetPlaceOverspendResetExecutor,
     NotFullTargetPlacePlanFactExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
@@ -59,9 +57,6 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble (без legacy ``cap_down`` — см. module docstring)."""
     return [
         HardStatusValidateExecutor(),
-        NotFullValidateExecutor(),
-        NotFullTargetPlaceMigrateExecutor(),
-        NotFullTargetPlaceOverspendResetExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
         SkipUpTargetPlaceExecutor(),
         RaiseStateToTargetCpoExecutor(),
@@ -78,8 +73,6 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
 __all__ = [
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
-    "NotFullTargetPlaceMigrateExecutor",
-    "NotFullTargetPlaceOverspendResetExecutor",
     "NotFullTargetPlacePlanFactExecutor",
     "NotFullValidateExecutor",
     "PayForOrderGapEnableExecutor",

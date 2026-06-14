@@ -1,4 +1,4 @@
-"""Фаза: поднять ключ до max ladder-state с CPO <= resolve кампании."""
+"""Фаза: поднять ключ до max ladder-state с CPO < min(resolve, raise_cpo_ceiling)."""
 
 from __future__ import annotations
 
@@ -19,10 +19,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class RaiseStateToTargetCpoExecutor:
-    """Поднять ключ до max ступени с ``cpo <= resolve``; DOWN запрещён (no-op).
+    """Поднять ключ до max ступени с ``cpo < min(resolve, raise_cpo_ceiling)``; DOWN запрещён.
 
-    Per-keyword skip в зоне стабилизации (``fact >= 0.9×resolve``) только если
-    ``kw.pay_for_order > resolve``; дешёвые ключи (``<= resolve``) поднимаются всегда.
+    При overspend (``guard_condition``) потолок — ``raise_cpo_ceiling`` (fact CPO).
+    Per-keyword skip в зоне стабилизации только если ``kw.pay_for_order > resolve``.
     """
 
     phase_name = "raise_state_to_target_cpo"
@@ -32,10 +32,14 @@ class RaiseStateToTargetCpoExecutor:
         self._next_state_manager = NextStateManager(RaiseStateToTargetCpoExecutor)
 
     def execute(self, context: UpdateContext) -> None:
-        """Поднять operable ключи до max ступени с ``cpo <= resolve`` (только UP)."""
+        """Поднять operable ключи до max ступени под потолком (только UP)."""
         self._skip_reason = None
-        target_cpo = float(context.adv_state.resolve)
         adv = context.adv_state
+        target_cpo = float(adv.resolve)
+        if adv.guard_condition:
+            ceiling = adv.raise_cpo_ceiling
+            if ceiling is not None:
+                target_cpo = min(target_cpo, float(ceiling))
 
         for dto in context.keywords:
             if dto.is_not_full():
@@ -43,7 +47,9 @@ class RaiseStateToTargetCpoExecutor:
             if should_skip_keyword_raise_to_target_cpo(dto, adv):
                 continue
 
-            state = pick_max_ladder_state_at_or_below_cpo(dto, target_cpo)
+            state = pick_max_ladder_state_at_or_below_cpo(
+                dto, target_cpo, strict_ceiling=True
+            )
             if state is None:
                 continue
             if ladder_aggression_rank(state) <= current_aggression_rank(dto):

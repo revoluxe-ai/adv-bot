@@ -68,8 +68,13 @@ def test_preamble_run_result_has_all_phase_log_stat_fields() -> None:
 @pytest.mark.unit
 def test_run_preamble_increments_pfo_off_count_when_phase_produces_actions() -> None:
     """Regression prod: setattr(pfo_off_count) не падает, счётчик = числу V3Action фазы."""
-    dto = _dto(pfo_target=600.0)
-    ctx = _with_runtime(_context([dto], _adv_state(fact=610.0, max_cpo=550.0)))
+    dto = _dto(pfo_target=850.0)
+    ctx = _with_runtime(
+        _context(
+            [dto],
+            _adv_state(fact=800.0, max_cpo=500.0, guard_condition=True),
+        )
+    )
     with patch(
         f"{_MANAGER_MODULE}.build_normal_preamble_executors",
         return_value=[PayForOrderOverMaxOffOnDeepOverspendExecutor()],

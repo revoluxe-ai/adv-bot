@@ -26,9 +26,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 
 
 class PayForOrderOverMaxOffOnDeepOverspendExecutor:
-    """OFF operable ключей с ``pay_for_order > max`` при ``fact ≥ ratio×plan.max``.
+    """OFF operable ключей с ``PFO > raise_cpo_ceiling`` при ``fact ≥ ratio×plan.max``.
 
-    Per-key только ``keyword.pay_for_order``; trim по CH-матрице — ``ResetOverMaxCpoOnOverspendExecutor``.
+    При overspend потолок — fact CPO; trim по CH-матрице — ``ResetOverMaxCpoOnOverspendExecutor``.
     """
 
     phase_name = "pay_for_order_over_max_off_on_deep_overspend"
@@ -43,7 +43,10 @@ class PayForOrderOverMaxOffOnDeepOverspendExecutor:
         self._skip_reason = _phase_skip_reason(context.adv_state)
         if self._skip_reason is not None:
             return
-        ceiling = float(context.adv_state.max_pay_for_order)
+        ceiling = context.adv_state.raise_cpo_ceiling
+        if ceiling is None:
+            return
+        ceiling = float(ceiling)
         for dto in context.keywords:
             if not _should_off_keyword(dto, max_pay=ceiling):
                 continue
@@ -67,7 +70,7 @@ def _phase_skip_reason(adv_state: AdvState) -> str | None:
 
 
 def _should_off_keyword(dto: KeywordDTO, *, max_pay: float) -> bool:
-    """Operable active ключ с ``pay_for_order`` строго выше ``plan.max_pay_for_order``."""
+    """Operable active ключ с ``pay_for_order`` строго выше ``raise_cpo_ceiling``."""
     if not is_v3_operable_hard_status(dto.hard_status):
         return False
     if dto.keyword_setting_id == 0:
