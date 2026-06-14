@@ -57,6 +57,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble (без legacy ``cap_down`` — см. module docstring)."""
     return [
         HardStatusValidateExecutor(),
+        NotFullValidateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
         SkipUpTargetPlaceExecutor(),
         RaiseStateToTargetCpoExecutor(),
