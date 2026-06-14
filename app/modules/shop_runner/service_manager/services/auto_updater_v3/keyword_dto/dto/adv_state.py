@@ -56,6 +56,14 @@ class AdvState:
 
     @property
     def raise_cpo_ceiling(self) -> float | None:
+        """SSOT потолка для raise/preamble overspend-контуров.
+
+        Свойство возвращает per-campaign ceiling, который используют
+        preamble-executors и связанные gates. Здесь намеренно нет отдельного
+        helper-а в ``update_pipeline.utils``: дублировать вычисление потолка по
+        пер-ключевой логике не нужно, потому что источник истины уже живёт в
+        ``AdvState``.
+        """
         if self.fact_pay_for_order is None:
             return None
         return  max(self.fact_pay_for_order, self.max_pay_for_order)
