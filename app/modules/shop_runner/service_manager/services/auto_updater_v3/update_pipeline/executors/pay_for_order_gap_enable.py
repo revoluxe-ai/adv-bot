@@ -1,9 +1,18 @@
 """Фаза enable: один GAP-ключ OFF → MIN_CPA + target_place=0 за тик.
 
 Это отдельный GAP-контур, не часть NF bootstrap. Он нужен для ключей без
-операционного PFO: если overspend не наступил, включаем их по одному за тик;
-если campaign ушла в overspend, GAP-контур должен быть сброшен отдельной
-overspend-фазой.
+операционного PFO, которые ещё не готовы попасть в NF validate/migrate, но уже
+допущены к поочередному включению.
+
+Смысл фазы двойной:
+
+1. если campaign не в overspend, мы аккуратно включаем только один GAP-ключ за
+   тик;
+2. если campaign уходит в overspend, GAP-контур должен быть остановлен
+   отдельной overspend-фазой, а не NF reset'ом.
+
+Таким образом, эта фаза управляет только enable-переходом GAP и не смешивается
+с PFO bootstrap.
 """
 
 from __future__ import annotations
@@ -44,9 +53,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 class PayForOrderGapEnableExecutor:
     """PAY_FOR_ORDER_GAP_ENABLE: один GAP NO DATA OFF → MIN за тик in-place.
 
-    Executor работает только с GAP/NO DATA ключами и никогда не должен
-    подменять NF bootstrap для PFO: его задача — аккуратный поочередный enable
-    GAP-кандидатов без campaign overspend.
+    Класс работает только как enable-ворота для GAP. Он не выбирает ladder
+    состояние, не инициализирует PFO bootstrap и не меняет смысл target_place
+    для NF-контуров. Его роль — взять один разрешённый GAP-ключ и перевести его
+    из OFF в MIN_CPA, чтобы дальше он уже мог жить в отдельном GAP-контуре.
     """
 
     phase_name = "pay_for_order_gap_enable"
@@ -72,7 +82,7 @@ class PayForOrderGapEnableExecutor:
 
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip если нет fact, вне headroom или resolve недоступен."""
+    """Skip если нет fact, resolve недоступен или campaign уже в headroom-зоне."""
     if float(adv_state.resolve) <= 0:
         return "resolve_invalid"
     if adv_state.fact_pay_for_order is None:
@@ -90,7 +100,11 @@ def _pick_gap_enable_candidate(
     keywords: list[KeywordDTO],
     adv_state: AdvState,
 ) -> KeywordDTO | None:
-    """Первый GAP-кандидат по ``(keyword_setting_id, text)`` или ``None``."""
+    """Выбрать один GAP-кандидат по стабильному порядку ``(ks_id, text)``.
+
+    Это намеренно один кандидат на тик: GAP-контур должен включаться постепенно,
+    без массового перехода всей группы в MIN_CPA.
+    """
     candidates: list[KeywordDTO] = []
     for dto in keywords:
         if dto.current_mode != KeywordStrategyMode.OFF:

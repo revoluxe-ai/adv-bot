@@ -84,6 +84,13 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 Ключевое следствие: NF-ветка больше не делает “reset в 0”, не подменяет bootstrap и не пытается смешивать ladder-контур FULL с no-CH контуром PFO/GAP. Весь NF bootstrap для активных no-CH ключей идёт только через PFO: NF validate → NF migrate → NF plan-fact. GAP живёт отдельно и управляется enable/reset фазами, а всё ladder-управление остаётся у FULL.
 
+Если перевести это в практическое правило, то оно звучит так:
+
+1. `FULL` никогда не получает NF bootstrap, потому что у него уже есть профиль.
+2. `PFO` получает NF bootstrap один раз: сначала режим `MIN_CPA`, потом стартовый `target_place`, потом plan-fact `±1`.
+3. `GAP` не получает NF bootstrap вообще, пока у него нет operational PFO. Для него есть только отдельный поочередный enable и отдельный reset на overspend.
+4. `target_place=0` в NF-контуре больше не означает «давай обнулим ключ»; это только «позиция ещё не инициализирована».
+
 ### Какой баг был закрыт
 
 Речь шла про старый NOT FULL overspend-reset.

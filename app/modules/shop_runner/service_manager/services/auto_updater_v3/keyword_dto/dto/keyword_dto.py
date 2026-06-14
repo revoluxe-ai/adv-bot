@@ -128,11 +128,25 @@ class KeywordDTO:
     def data_tier(self) -> KeywordV3DataTier:
         """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``.
 
-        Возвращает операционный tier, который затем используется как SSOT для:
+        Это центральный классификатор V3-контракта. Он не пытается понять
+        «хороший» ключ или «плохой» ключ, не смотрит на overspend и не
+        интерпретирует текущий режим как источник истины. Его задача проще:
+        ответить, к какому operational сценарию относится ключ прямо сейчас.
+
+        ``FULL`` означает, что у ключа есть CH-профиль и он должен жить в
+        ladder-контуре.
+        ``PFO`` означает, что CH-профиля нет, но есть operational
+        ``pay_for_order``; такой ключ проходит NF validate → migrate →
+        plan-fact.
+        ``GAP`` означает, что нет ни CH-профиля, ни operational PFO; такой
+        ключ должен идти в отдельный enable/reset-контур и не может получать NF
+        bootstrap по одному только факту отсутствия профиля.
+
+        Возвращаемое значение используется как SSOT для:
 
         - NF validate / migrate / plan-fact;
         - пропуска FULL-ключей через ladder-only ветки;
-        - исключения OFF из NF bootstrap;
+        - исключения GAP из NF bootstrap;
         - sync/fallback логики, где no-CH ключи не должны получать target_place
           через старые overspend-reset эвристики.
         """
@@ -152,19 +166,22 @@ class KeywordDTO:
     def _validate_not_full_state(self, executor_name: str) -> None:
         """PFO + active: принудительно свести режим к ``MIN_CPA``.
 
-        Эта валидация нужна только для активного no-CH ключа с operational PFO.
-        Она не должна:
+        Эта валидация — только входной gate для NF bootstrap. Она отвечает за
+        один очень узкий переход: если no-CH ключ уже операционно активен
+        (tier ``PFO``) и не находится в ``OFF``, то его режим должен быть
+        приведён к ``MIN_CPA`` до migrate/plan-fact.
 
-        - трогать FULL, потому что FULL живёт в ladder-контуре;
-        - трогать GAP, потому что GAP обслуживается отдельным enable/reset
-          контуром и ещё не готов к NF bootstrap;
-        - оживлять OFF, потому что OFF ключи обрабатываются отдельными enable /
-          bootstrap фазами и не должны случайно попасть в NF pipeline;
-        - менять target_place, потому что bootstrap target_place делается в
-          отдельной фазе migrate, а здесь мы занимаемся только режимом.
+        Что здесь важно не перепутать:
+
+        - ``FULL`` не трогаем, потому что у него свой ladder-контур;
+        - ``GAP`` не трогаем, потому что он ещё не имеет operational PFO и
+          должен идти через отдельный enable/reset путь;
+        - ``OFF`` не трогаем, чтобы не оживлять ключи без явного enable;
+        - ``target_place`` здесь не меняем вообще, потому что bootstrap позиции
+          относится к отдельной migrate-фазе.
 
         После этого NF pipeline может безопасно считать, что активный PFO ключ
-        уже имеет ``MIN_CPA`` и готов к bootstrap ``target_place``.
+        готов к bootstrap ``target_place`` и последующему plan-fact ``±1``.
         """
         if self.data_tier != KeywordV3DataTier.PFO:
             return

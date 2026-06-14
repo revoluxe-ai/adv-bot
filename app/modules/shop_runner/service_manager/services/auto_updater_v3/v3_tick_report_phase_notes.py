@@ -164,7 +164,7 @@ def _note_validate_not_full(prepared: PreparedListLike) -> str:
             return (
                 "PFO active уже MIN: ключ прошёл NF validate и готов к "
                 "bootstrap target_place через migrate; GAP живёт в отдельном "
-                "enable/reset контуре"
+                "enable/reset контуре и в NF validate не попадает"
             )
     return "нет PFO active ключей"
 
@@ -178,7 +178,7 @@ def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
         if not bool(ctx.position_profile):
             return (
                 "есть PFO MIN с tp=0: первый bootstrap текущей позиции WB для "
-                "no-CH ключа"
+                "no-CH ключа; GAP здесь не инициализируется"
             )
     return "нет кандидатов migrate (tp≠0, FULL, GAP или OFF)"
 
