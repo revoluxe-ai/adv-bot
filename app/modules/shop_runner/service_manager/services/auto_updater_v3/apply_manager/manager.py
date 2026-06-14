@@ -240,16 +240,9 @@ class ApplyManager:
                     int(complex_adv.adv_id),
                 )
 
-        target_place_synced = await self.sync_target_places_if_needed(
-            tick,
-            sync_force_zero=inp.sync_force_zero,
-            already_synced=False,
-        )
-
         return V3ApplyResult(
             post_gate_actions=post_gate_actions,
             flushed_to_db=flushed_to_db,
-            target_place_synced=target_place_synced,
             plan_fact_cached=plan_fact_cached,
             views_cached=views_cached,
             calibration_cached=calibration_cached,
@@ -260,9 +253,14 @@ class ApplyManager:
         tick_data: TickData,
         *,
         sync_force_zero: bool,
-        already_synced: bool,
+        already_synced: bool = False,
     ) -> bool:
-        """Best-effort ``target_place`` sync (идемпотентно из ``finally``)."""
+        """Best-effort ``target_place`` sync.
+
+        Параметр ``already_synced`` оставлен как защита от повторного вызова
+        helper-а в тестах и в редких внешних сценариях. В основном потоке sync
+        теперь вызывается один раз из ``finally`` orchestrator-а.
+        """
         if already_synced or is_campaign_full_stop(tick_data.campaign_mode):
             return already_synced
         if (

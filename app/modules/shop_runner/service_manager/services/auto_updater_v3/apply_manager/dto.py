@@ -38,7 +38,6 @@ class V3ApplyResult:
 
     post_gate_actions: list[V3Action]
     flushed_to_db: bool
-    target_place_synced: bool
     plan_fact_cached: bool
     views_cached: bool
     calibration_cached: bool

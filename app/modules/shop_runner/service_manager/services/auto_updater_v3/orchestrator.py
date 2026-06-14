@@ -138,7 +138,6 @@ async def process_adv_v3(
     pipeline_result: PreamblePipelineRunResult | None = None
     sync_force_zero = False
     calibration_executed = False
-    target_place_synced = False
 
     try:
         keywords = await complex_adv.get_keywords()
@@ -201,7 +200,7 @@ async def process_adv_v3(
                     complex_adv.adv_id,
                 )
             else:
-                apply_result = await apply_mgr.apply(
+                await apply_mgr.apply(
                     V3ApplyInput(
                         tick_data=tick_data,
                         update_context=(
@@ -212,7 +211,6 @@ async def process_adv_v3(
                         sync_force_zero=sync_force_zero,
                     )
                 )
-                target_place_synced = apply_result.target_place_synced
 
     finally:
         if (
@@ -329,8 +327,7 @@ async def process_adv_v3(
                     exc_info=True,
                 )
         if tick_data is not None and not is_campaign_full_stop(tick_data.campaign_mode):
-            target_place_synced = await apply_mgr.sync_target_places_if_needed(
+            await apply_mgr.sync_target_places_if_needed(
                 tick_data,
                 sync_force_zero=sync_force_zero,
-                already_synced=target_place_synced,
             )
