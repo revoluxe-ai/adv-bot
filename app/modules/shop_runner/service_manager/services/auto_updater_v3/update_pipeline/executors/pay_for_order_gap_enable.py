@@ -1,4 +1,10 @@
-"""Фаза enable: один GAP-ключ OFF → MIN_CPA + target_place=0 за тик."""
+"""Фаза enable: один GAP-ключ OFF → MIN_CPA + target_place=0 за тик.
+
+Это отдельный GAP-контур, не часть NF bootstrap. Он нужен для ключей без
+операционного PFO: если overspend не наступил, включаем их по одному за тик;
+если campaign ушла в overspend, GAP-контур должен быть сброшен отдельной
+overspend-фазой.
+"""
 
 from __future__ import annotations
 
@@ -36,7 +42,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class PayForOrderGapEnableExecutor:
-    """PAY_FOR_ORDER_GAP_ENABLE: один GAP NO DATA OFF → MIN за тик in-place."""
+    """PAY_FOR_ORDER_GAP_ENABLE: один GAP NO DATA OFF → MIN за тик in-place.
+
+    Executor работает только с GAP/NO DATA ключами и никогда не должен
+    подменять NF bootstrap для PFO: его задача — аккуратный поочередный enable
+    GAP-кандидатов без campaign overspend.
+    """
 
     phase_name = "pay_for_order_gap_enable"
     _skip_reason: str | None = None

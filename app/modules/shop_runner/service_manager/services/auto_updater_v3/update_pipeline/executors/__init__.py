@@ -9,10 +9,10 @@ V → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S �
 pfo_off → cal.
 
 Смысл разбиения:
-- **NF** (`NotFullValidateExecutor`) переводит активные PFO/GAP ключи в
+- **NF** (`NotFullValidateExecutor`) переводит активные PFO ключи в
   ``MIN_CPA`` и оставляет ``OFF`` без изменений;
 - **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) инициализирует стартовый
-  ``target_place`` текущей WB-позицией только для активных PFO/GAP ключей с
+  ``target_place`` текущей WB-позицией только для активных PFO ключей с
   нулевым target_place;
 - **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) выполняет только
   ``±1`` по fact/resolve после bootstrap, не затрагивая FULL и не делая reset
@@ -21,7 +21,7 @@ pfo_off → cal.
   исключительно FULL ladder-контур.
 
 Отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``)
-здесь нет: её контракт полностью заменён явным делением на FULL и PFO/GAP.
+здесь нет: её контракт полностью заменён явным делением на FULL, PFO и GAP.
 Подробности и обоснование — в ``docks/V3_UPDATER_VALIDATION.md``.
 """
 

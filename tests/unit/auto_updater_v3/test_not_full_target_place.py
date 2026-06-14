@@ -57,7 +57,7 @@ def _not_full_dto(
         mode=mode,
         rating=1.0,
         hard_status=2,
-        conv=_conv_for_pay_for_order(pay_for_order) if pay_for_order is not None else 0.05,
+        conv=_conv_for_pay_for_order(pay_for_order) if pay_for_order is not None else 0.0,
     )
     kw = kw.model_copy(
         update={
@@ -239,6 +239,7 @@ def test_validate_before_migrate_non_min_gets_current_position() -> None:
         mode=KeywordStrategyMode.MAX_CONVERSION,
         target_place=0,
         position=12.0,
+        pay_for_order=50.0,
     )
     from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
 
@@ -398,7 +399,7 @@ def test_plan_fact_executor_skips_unchanged_gate() -> None:
 
 @pytest.mark.unit
 def test_plan_fact_executor_skips_tp_zero_without_pfo_when_not_overspend() -> None:
-    """Без pay_for_order tp=0 только при overspend (MIN_CPA), не blanket."""
+    """GAP без operational PFO не должен двигаться NF plan-fact'ом."""
     dto = _not_full_dto(target_place=10, position=10.0, pay_for_order=None)
     from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
 
@@ -411,7 +412,37 @@ def test_plan_fact_executor_skips_tp_zero_without_pfo_when_not_overspend() -> No
         ).adv_state,
     )
     NotFullTargetPlacePlanFactExecutor().execute(ctx)
-    assert ctx.keywords[0].current_target_place == 9
+    assert ctx.keywords[0].current_target_place == 10
+
+
+@pytest.mark.unit
+def test_gap_key_does_not_get_nf_bootstrap_or_plan_fact() -> None:
+    """GAP-key без operational PFO не должен попадать в NF bootstrap-контур."""
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        target_place=0,
+        position=12.0,
+        pay_for_order=None,
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
+        NotFullValidateExecutor,
+    )
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=50.0,
+            max_pay_for_order=200.0,
+            resolve=100.0,
+            guard_condition=False,
+        ).adv_state,
+    )
+    NotFullValidateExecutor().execute(ctx)
+    NotFullTargetPlaceMigrateExecutor().execute(ctx)
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
+    assert ctx.keywords[0].current_target_place == 0
 
 
 @pytest.mark.unit

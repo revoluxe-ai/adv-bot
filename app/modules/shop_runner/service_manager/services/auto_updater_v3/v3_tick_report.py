@@ -311,15 +311,15 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "validate_not_full_state": (
-        "2 · NF · validate PFO/GAP",
+        "2 · NF · validate PFO",
         "DOWN",
     ),
     "not_full_target_place_migrate": (
-        "2a · NF · bootstrap tp 0→current",
+        "2a · NF · bootstrap tp 0→current (PFO only)",
         "tp",
     ),
     "not_full_target_place_plan_fact": (
-        "2c · NF · tp plan-fact ±1 after bootstrap",
+        "2c · NF · tp plan-fact ±1 after bootstrap (PFO only)",
         "tp",
     ),
     "skip_up_same_target_place": ("2d · skip_up · same target_place", "DOWN"),

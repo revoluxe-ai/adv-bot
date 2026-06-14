@@ -1,7 +1,8 @@
-"""Фаза NF: нет CH-профиля (PFO / GAP) → active → MIN_CPA.
+"""Фаза NF: PFO-ключи без CH-профиля → active → MIN_CPA.
 
 ``target_place`` — после NF: ``NotFullTargetPlaceMigrateExecutor`` / plan-fact.
-Заменяет legacy ``cap_down`` для ключей без ``position_profile``.
+GAP-контур в эту фазу не входит: для него есть отдельный enable/reset путь.
+Заменяет legacy ``cap_down`` для PFO-ключей без ``position_profile``.
 """
 
 from __future__ import annotations
@@ -15,7 +16,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class NotFullValidateExecutor:
-    """Validate NOT FULL keys: команда ``NOT_FULL_ACTIVATE`` через ``NextStateManager``."""
+    """Validate PFO keys: команда ``NOT_FULL_ACTIVATE`` через ``NextStateManager``.
+
+    GAP-key не переводится здесь в ``MIN_CPA`` для NF bootstrap: он живёт в
+    отдельном enable/reset контуре и станет NF-кандидатом только после появления
+    operational PFO.
+    """
 
     phase_name = "validate_not_full_state"
     _skip_reason: str | None = None

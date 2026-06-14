@@ -150,20 +150,23 @@ class KeywordDTO:
         )
 
     def _validate_not_full_state(self, executor_name: str) -> None:
-        """PFO/GAP + active: принудительно свести режим к ``MIN_CPA``.
+        """PFO + active: принудительно свести режим к ``MIN_CPA``.
 
-        Эта валидация нужна только для активных no-CH ключей. Она не должна:
+        Эта валидация нужна только для активного no-CH ключа с operational PFO.
+        Она не должна:
 
         - трогать FULL, потому что FULL живёт в ladder-контуре;
+        - трогать GAP, потому что GAP обслуживается отдельным enable/reset
+          контуром и ещё не готов к NF bootstrap;
         - оживлять OFF, потому что OFF ключи обрабатываются отдельными enable /
           bootstrap фазами и не должны случайно попасть в NF pipeline;
         - менять target_place, потому что bootstrap target_place делается в
           отдельной фазе migrate, а здесь мы занимаемся только режимом.
 
-        После этого NF pipeline может безопасно считать, что активный PFO/GAP
-        ключ уже имеет ``MIN_CPA`` и готов к bootstrap ``target_place``.
+        После этого NF pipeline может безопасно считать, что активный PFO ключ
+        уже имеет ``MIN_CPA`` и готов к bootstrap ``target_place``.
         """
-        if self.data_tier == KeywordV3DataTier.FULL:
+        if self.data_tier != KeywordV3DataTier.PFO:
             return
         if self.current_mode == KeywordStrategyMode.OFF:
             return
