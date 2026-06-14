@@ -89,24 +89,23 @@ def _not_full_dto(
 @pytest.mark.unit
 def test_migrate_position_minus_one() -> None:
     dto = _not_full_dto(position=15.4, target_place=0)
-    assert current_position_as_target_place(dto) == 14
-    assert migrate_not_full_zero_to_current_position(dto) == 14
+    assert current_position_as_target_place(dto) == 15
 
 
 @pytest.mark.unit
 def test_migrate_clamps_at_min() -> None:
     dto = _not_full_dto(position=1.0, target_place=0)
-    assert migrate_not_full_zero_to_current_position(dto) == 1
+    assert current_position_as_target_place(dto) == 1
 
 
 @pytest.mark.unit
 def test_migrate_skips_when_tp_not_zero() -> None:
     dto = _not_full_dto(target_place=10, position=20.0)
-    assert migrate_not_full_zero_to_current_position(dto) is None
+    assert current_position_as_target_place(dto) == 20
 
 
 @pytest.mark.unit
-def test_migrate_skips_expensive_key_on_overspend_per_key() -> None:
+def test_plan_fact_sets_zero_on_overspend_for_not_full_with_pfo() -> None:
     cheap = _not_full_dto(ks_id=1, position=12.0, target_place=0, pay_for_order=600.0)
     expensive = _not_full_dto(
         ks_id=2, position=12.0, target_place=0, pay_for_order=850.0
@@ -121,8 +120,8 @@ def test_migrate_skips_expensive_key_on_overspend_per_key() -> None:
             guard_condition=True,
         ).adv_state,
     )
-    NotFullTargetPlaceMigrateExecutor().execute(ctx)
-    assert cheap.current_target_place == 11
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert cheap.current_target_place == 0
     assert expensive.current_target_place == 0
 
 
@@ -181,13 +180,13 @@ def test_plan_fact_skip_reason_requires_both_changes() -> None:
 def test_adjust_plan_fact_decreases_tp() -> None:
     dto = _not_full_dto(target_place=10, position=10.0)
     new_place = adjust_not_full_target_place_for_plan_fact(
-        dto, fact_pay_for_order=50.0, resolve=100.0
+        dto, fact_pay_for_order=50.0, resolve=100.0, max_pay_for_order=200.0
     )
     assert new_place == 9
 
 
 @pytest.mark.unit
-def test_migrate_executor_per_key_on_overspend() -> None:
+def test_plan_fact_executor_sets_zero_on_overspend() -> None:
     cheap = _not_full_dto(ks_id=1, position=12.0, target_place=0, pay_for_order=600.0)
     expensive = _not_full_dto(
         ks_id=2, position=12.0, target_place=0, pay_for_order=850.0
@@ -202,15 +201,15 @@ def test_migrate_executor_per_key_on_overspend() -> None:
             guard_condition=True,
         ).adv_state,
     )
-    ex = NotFullTargetPlaceMigrateExecutor()
+    ex = NotFullTargetPlacePlanFactExecutor()
     ex.execute(ctx)
     assert ex.skip_reason is None
-    assert cheap.current_target_place == 11
+    assert cheap.current_target_place == 0
     assert expensive.current_target_place == 0
 
 
 @pytest.mark.unit
-def test_overspend_reset_executor_sets_tp_zero_per_key() -> None:
+def test_plan_fact_executor_sets_existing_tp_zero_on_overspend() -> None:
     cheap = _not_full_dto(
         ks_id=1, target_place=14, position=14.0, pay_for_order=600.0
     )
@@ -227,10 +226,10 @@ def test_overspend_reset_executor_sets_tp_zero_per_key() -> None:
             guard_condition=True,
         ).adv_state,
     )
-    ex = NotFullTargetPlaceOverspendResetExecutor()
+    ex = NotFullTargetPlacePlanFactExecutor()
     ex.execute(ctx)
     assert ex.skip_reason is None
-    assert cheap.current_target_place == 14
+    assert cheap.current_target_place == 0
     assert expensive.current_target_place == 0
 
 
@@ -245,7 +244,7 @@ def test_overspend_reset_executor_sets_tp_zero() -> None:
             fact_pay_for_order=250.0, max_pay_for_order=200.0
         ).adv_state,
     )
-    ex = NotFullTargetPlaceOverspendResetExecutor()
+    ex = NotFullTargetPlacePlanFactExecutor()
     ex.execute(ctx)
     assert ex.skip_reason is None
     assert ctx.keywords[0].current_target_place == 0
@@ -282,20 +281,28 @@ def test_validate_before_migrate_non_min_gets_pos_minus_one() -> None:
     )
 
     NotFullValidateExecutor().execute(ctx)
-    NotFullTargetPlaceMigrateExecutor().execute(ctx)
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.MIN_CPA
-    assert ctx.keywords[0].current_target_place == 11
+    assert ctx.keywords[0].current_target_place == 1
 
 
 @pytest.mark.unit
 def test_migrate_executor_updates_context() -> None:
-    dto = _not_full_dto(position=12.0, target_place=0)
+    dto = _not_full_dto(position=12.0, target_place=0, pay_for_order=50.0)
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto]),
-        adv_state=AdvState.empty(),
+        adv_state=replace(
+            AdvState.empty(),
+            fact_pay_for_order=50.0,
+            max_pay_for_order=200.0,
+            resolve=100.0,
+            plan_fact_equal=False,
+            views_equal=False,
+            resolve_valid=True,
+        ),
     )
-    NotFullTargetPlaceMigrateExecutor().execute(ctx)
-    assert ctx.keywords[0].current_target_place == 11
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_target_place == 1
 
 
 @pytest.mark.unit
@@ -319,8 +326,8 @@ def test_plan_fact_executor_per_key_on_overspend() -> None:
     ex = NotFullTargetPlacePlanFactExecutor()
     ex.execute(ctx)
     assert ex.skip_reason is None
-    assert cheap.current_target_place == 11
-    assert expensive.current_target_place == 10
+    assert cheap.current_target_place == 0
+    assert expensive.current_target_place == 0
 
 
 @pytest.mark.unit
@@ -342,9 +349,7 @@ def test_plan_fact_executor_skips_unchanged_gate() -> None:
 @pytest.mark.unit
 def test_preamble_includes_nf_tp_phases() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
-    assert names[1:5] == [
+    assert names[1:3] == [
         "validate_not_full_state",
-        "not_full_target_place_migrate",
-        "not_full_target_place_overspend_reset",
         "not_full_target_place_plan_fact",
     ]

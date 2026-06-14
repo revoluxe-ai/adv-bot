@@ -58,42 +58,20 @@ class NextStateManager:
             executor_name=self._executor_name,
         )
 
-    # def migrate_not_full_target_place(self, keyword: KeywordDTO) -> None:
-    #     """NOT FULL MIN + tp=0 → ``round(position) - 1`` (идемпотентно)."""
-    #     new_place = migrate_not_full_zero_to_current_position(keyword)
-    #     if new_place is None:
-    #         return
-    #     keyword.current_target_place = NextTargetPlace(
-    #         new_target_place=new_place,
-    #         executor_name=self._executor_name,
-    #     )
-
-    # def reset_not_full_target_place_overspend(
-    #     self, keyword: KeywordDTO, *, max_pay: float
-    # ) -> None:
-    #     """OVERSPEND: NOT FULL MIN с ``PFO > max_pay`` → ``target_place=0`` (min bid)."""
-    #     if not reset_not_full_target_place_on_overspend(keyword, max_pay=max_pay):
-    #         return
-    #     keyword.current_target_place = NextTargetPlace(
-    #         new_target_place=NOT_FULL_TARGET_PLACE_OVERSPEND,
-    #         executor_name=self._executor_name,
-    #     )
-
     def adjust_not_full_target_place_plan_fact(
         self,
         keyword: KeywordDTO,
         *,
         fact_pay_for_order: float,
         resolve: float,
-        max_pay_for_order: float
-
+        max_pay_for_order: float,
     ) -> None:
         """±1 ``target_place`` по plan-fact CPO vs resolve для NOT FULL MIN."""
         new_place = adjust_not_full_target_place_for_plan_fact(
             keyword,
             fact_pay_for_order=fact_pay_for_order,
             resolve=resolve,
-            max_pay_for_order=max_pay_for_order
+            max_pay_for_order=max_pay_for_order,
         )
         if new_place is None:
             return

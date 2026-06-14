@@ -57,27 +57,12 @@ def clamp_not_full_target_place(place: int) -> int:
 
 
 def current_position_as_target_place(keyword: "KeywordDTO") -> int | None:
-    """Стартовая tp после миграции: округлённая реальная позиция WB минус 1."""
+    """Стартовая tp после миграции: округлённая реальная позиция WB."""
     pos = keyword.calculated_keyword.position
     if pos <= 0:
         return None
     real_place = int(math.floor(pos + 0.5))
-    return real_place
-
-
-# def migrate_not_full_zero_to_current_position(
-#     keyword: "KeywordDTO",
-# ) -> int | None:
-#     """NOT FULL active + tp=0 → ``real_position - 1``."""
-#     if not keyword.is_not_full():
-#         return None
-#     if keyword.current_mode == KeywordStrategyMode.OFF:
-#         return None
-#     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
-#         return None
-#     if keyword.current_target_place != 0:
-#         return None
-#     return current_position_as_target_place(keyword)
+    return clamp_not_full_target_place(real_place)
 
 
 def compute_not_full_target_place_delta(
@@ -128,9 +113,13 @@ def adjust_not_full_target_place_for_plan_fact(
     *,
     fact_pay_for_order: float,
     resolve: float,
-max_pay_for_order: float
+    max_pay_for_order: float,
 ) -> int | None:
     """Применить ±1 к ``current_target_place`` для NOT FULL MIN; ``None`` если no-op."""
+    if not keyword.is_not_full():
+        return None
+    if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
+        return None
     if fact_pay_for_order >= max_pay_for_order:
         return 0
     delta = compute_not_full_target_place_delta(fact_pay_for_order, resolve)
