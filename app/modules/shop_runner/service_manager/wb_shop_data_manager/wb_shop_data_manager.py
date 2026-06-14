@@ -592,39 +592,5 @@ class WBShopDataManager:
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
 
 
-    @staticmethod
-    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> dict[int, float | None]:
-        """Синтетический ``common_budget_daily_limit`` в памяти перед сборкой ``ComplexAdv``.
-
-        Вызывается из ``get_pre_complex_advs`` на каждом тике shop-runner; меняет
-        только in-memory ``AdvSetting``, в БД лимит не пишется.
-
-        Правила пересчёта ``common_budget_daily_limit``:
-
-        - ``auto_common_budget=True`` и оба поля заполнены
-          (``max_price_for_order``, ``plan_for_sales_for_day``) —
-          лимит перезаписывается как ``max_price_for_order * plan_for_sales_for_day``.
-        - ``auto_common_budget=False`` — лимит не меняется, используется значение из БД.
-        - ``auto_common_budget=True``, но одно из полей ``None`` — лимит **намеренно**
-          не трогаем: остаётся последнее значение из БД (в т.ч. ранее заданное вручную
-          до включения авто). Это штатное поведение для неполной конфигурации РК,
-          **не** fallback на ноль и **не** ошибка: пока план/max не заполнены, автоформула
-          не применяется, а существующий лимит продолжает использоваться в
-          ``AutoBudgetService``, watchdog и проверках активности кампании.
-
-        Побочный эффект: параллельно собирает ``original_max_cpo`` — исходный
-        ``max_price_for_order`` до синтетических пересчётов (для ``ComplexAdv``).
-        """
-
-        original_max_cpo: dict[int, float | None] = {}
-
-        for adv in adv_settings:
-            max_pay_for_order = adv.max_price_for_order
-            original_max_cpo[adv.adv_id] = max_pay_for_order
-            plan_for_sales_for_day = adv.plan_for_sales_for_day
-            if max_pay_for_order is not None and plan_for_sales_for_day is not None:
-                if adv.auto_common_budget:
-                    adv.common_budget_daily_limit = int(max_pay_for_order) * int(plan_for_sales_for_day)
-        return original_max_cpo
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса
