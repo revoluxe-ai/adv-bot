@@ -347,6 +347,46 @@ def test_plan_fact_executor_skips_unchanged_gate() -> None:
 
 
 @pytest.mark.unit
+def test_plan_fact_executor_skips_tp_zero_without_pfo_when_not_overspend() -> None:
+    """Без pay_for_order tp=0 только при overspend (MIN_CPA), не blanket."""
+    dto = _not_full_dto(target_place=10, position=10.0, pay_for_order=None)
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=50.0,
+            max_pay_for_order=200.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_target_place == 9
+
+
+@pytest.mark.unit
+def test_plan_fact_executor_no_tp_zero_without_pfo_when_not_min_cpa() -> None:
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        target_place=10,
+        position=10.0,
+        pay_for_order=None,
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=800.0,
+            max_pay_for_order=500.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_target_place == 10
+
+
+@pytest.mark.unit
 def test_preamble_includes_nf_tp_phases() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
     assert names[1:3] == [

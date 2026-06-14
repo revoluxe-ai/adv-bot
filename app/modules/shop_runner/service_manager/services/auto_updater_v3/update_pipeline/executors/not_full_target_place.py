@@ -8,6 +8,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
     plan_fact_target_place_skip_reason,
+    reset_not_full_target_place_on_overspend,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
@@ -30,10 +31,13 @@ class NotFullTargetPlacePlanFactExecutor:
         state = context.adv_state
         fact = float(state.fact_pay_for_order)  # type: ignore[arg-type]
         resolve = float(state.resolve)
+        max_pay_for_order = float(state.max_pay_for_order)
         for dto in context.keywords:
             if not dto.is_not_full():
                 continue
-            if not dto.calculated_keyword.pay_for_order:
+            if reset_not_full_target_place_on_overspend(
+                dto, max_pay=max_pay_for_order
+            ):
                 dto.current_target_place = NextTargetPlace(
                     new_target_place=0,
                     executor_name=self.__class__.__name__,
@@ -43,7 +47,7 @@ class NotFullTargetPlacePlanFactExecutor:
                 dto,
                 fact_pay_for_order=fact,
                 resolve=resolve,
-                max_pay_for_order=float(context.adv_state.max_pay_for_order),
+                max_pay_for_order=max_pay_for_order,
             )
 
     @property
