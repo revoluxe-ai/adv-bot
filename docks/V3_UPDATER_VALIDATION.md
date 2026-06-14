@@ -84,6 +84,38 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 Ключевое следствие: NF-ветка больше не делает “reset в 0”, не подменяет bootstrap и не пытается смешивать ladder-контур FULL с no-CH контуром PFO/GAP. Весь bootstrap для активных no-CH ключей идёт через NF validate → NF migrate → NF plan-fact, а всё ladder-управление остаётся у FULL.
 
+### Какой баг был закрыт
+
+Речь шла про старый NOT FULL overspend-reset.
+
+До рефакторинга было два опасных смешения ответственности:
+
+1. NF plan-fact мог сбросить no-CH ключ в ``0`` по локальному признаку
+   ``keyword.pay_for_order`` против ``plan.max_pay_for_order``.
+2. Sync fallback для no-CH тоже мог трактовать overspend как повод форсировать
+   ``target_place=0``.
+
+Это было неверно по продуктовой модели, потому что:
+
+- локальный PFO одного ключа не равен campaign overspend;
+- reset в ``0`` разрушал bootstrap-смысл ``target_place`` для активного no-CH
+  ключа;
+- одна и та же логика оказывалась размазана между preamble и sync.
+
+Что сделано сейчас:
+
+- NF reset в ``0`` удалён как отдельный контракт;
+- PFO/GAP ключ сначала получает bootstrap текущей позицией WB в
+  ``NotFullTargetPlaceMigrateExecutor``;
+- затем `NotFullTargetPlacePlanFactExecutor` делает только ``±1``;
+- sync fallback больше не форсит ``target_place=0`` для no-CH ключа;
+- overspend теперь не является причиной для NOT FULL reset; он обслуживается
+  только ladder/full-контуром, где это предусмотрено отдельными фазами.
+
+Итог: старый баг был не “починкой гейта”, а устранением неправильной самой
+идеи reset-в-0 для no-CH NF ключей. Сейчас контракт стал однозначным: no-CH
+ключ не обнуляется, а bootstrapится и дальше корректируется.
+
 ### Пошаговый сценарий работы
 
 Чтобы не путать контракт, удобнее смотреть на него как на три независимых сценария:
