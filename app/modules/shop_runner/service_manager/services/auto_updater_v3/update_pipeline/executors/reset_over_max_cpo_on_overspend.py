@@ -41,7 +41,7 @@ class ResetOverMaxCpoOnOverspendExecutor:
         self._skip_reason = _phase_skip_reason(context.adv_state)
         if self._skip_reason is not None:
             return
-        ceiling = get_raise_celling(context)
+        ceiling = context.adv_state.raise_cpo_ceiling
         for dto in context.keywords:
             state = _resolve_target_state(dto, ceiling)
             if state is not None:

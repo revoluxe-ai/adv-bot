@@ -55,6 +55,13 @@ class AdvState:
     guard_applied: bool = False
 
     @property
+    def raise_cpo_ceiling(self) -> float | None:
+        if self.fact_pay_for_order is None:
+            return None
+        return  max(self.fact_pay_for_order, self.max_pay_for_order)
+
+
+    @property
     def plan_fact_changed(self) -> bool:
         return not self.plan_fact_equal
 
