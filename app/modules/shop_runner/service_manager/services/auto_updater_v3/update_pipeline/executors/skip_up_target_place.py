@@ -8,6 +8,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     UpdateContext,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
 )
@@ -26,7 +29,7 @@ class SkipUpTargetPlaceExecutor:
         self._skip_reason = None
         ladder_inputs = context.adv_state.ladder_inputs
         for dto in context.keywords:
-            if dto.is_not_full():
+            if dto.data_tier != KeywordV3DataTier.FULL:
                 continue
             catalog = state_candidates_by_mode_for_ctx(dto.context, ladder_inputs)
             self._next_state_manager.skip_up_same_target_place(dto, catalog)

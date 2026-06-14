@@ -278,6 +278,33 @@ def test_migrate_executor_updates_context() -> None:
 
 
 @pytest.mark.unit
+def test_migrate_executor_skips_off_not_full_keys() -> None:
+    """NOT FULL OFF не получает target_place: migrate работает только для active MIN."""
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.OFF,
+        position=12.0,
+        target_place=0,
+        pay_for_order=50.0,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=replace(
+            AdvState.empty(),
+            fact_pay_for_order=50.0,
+            max_pay_for_order=200.0,
+            resolve=100.0,
+            plan_fact_equal=False,
+            views_equal=False,
+            resolve_valid=True,
+        ),
+    )
+    NotFullTargetPlaceMigrateExecutor().execute(ctx)
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_mode == KeywordStrategyMode.OFF
+    assert ctx.keywords[0].current_target_place == 0
+
+
+@pytest.mark.unit
 def test_plan_fact_executor_does_not_reset_per_key_on_overspend() -> None:
     cheap = _not_full_dto(
         ks_id=1, target_place=10, position=10.0, pay_for_order=600.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import NextTargetPlace
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     UpdateContext,
@@ -9,6 +10,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
     current_position_as_target_place,
     plan_fact_target_place_skip_reason,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
@@ -30,7 +34,9 @@ class NotFullTargetPlaceMigrateExecutor:
         """
         self._skip_reason = None
         for dto in context.keywords:
-            if not dto.is_not_full():
+            if dto.data_tier == KeywordV3DataTier.FULL:
+                continue
+            if dto.current_mode != KeywordStrategyMode.MIN_CPA:
                 continue
             if dto.current_target_place != 0:
                 continue
@@ -70,7 +76,7 @@ class NotFullTargetPlacePlanFactExecutor:
         fact = float(state.fact_pay_for_order)  # type: ignore[arg-type]
         resolve = float(state.resolve)
         for dto in context.keywords:
-            if not dto.is_not_full():
+            if dto.data_tier == KeywordV3DataTier.FULL:
                 continue
             if (
                 dto.history_target_place

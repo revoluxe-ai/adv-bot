@@ -14,6 +14,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_mode import (
     KeywordMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
     KeywordV3LadderState,
 )
@@ -33,7 +36,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
     PositionProfilePoint,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
 
 def _dto(
@@ -42,6 +45,7 @@ def _dto(
     mode: KeywordStrategyMode = KeywordStrategyMode.MAX_CONVERSION,
     position_profile: list[PositionProfilePoint] | None = None,
     target_place: int | None = 15,
+    pay_for_order: float | None = 100.0,
 ) -> KeywordDTO:
     kw = _calc_kw(
         ks_id=ks_id,
@@ -49,6 +53,9 @@ def _dto(
         mode=mode,
         rating=1.0,
         hard_status=2,
+        conv=_conv_for_pay_for_order(pay_for_order)
+        if pay_for_order is not None
+        else 0.0,
     )
     if target_place is not None:
         kw.keyword_setting.target_place = target_place
@@ -71,16 +78,22 @@ def _dto(
 
 
 @pytest.mark.unit
-def test_is_not_full_without_ch_profile() -> None:
-    dto = _dto(position_profile=None)
-    assert dto.is_not_full() is True
+def test_data_tier_pfo_without_ch_profile_with_pay_for_order() -> None:
+    dto = _dto(position_profile=None, pay_for_order=100.0)
+    assert dto.data_tier == KeywordV3DataTier.PFO
 
 
 @pytest.mark.unit
-def test_is_full_with_ch_profile() -> None:
+def test_data_tier_gap_without_ch_profile_and_pay_for_order() -> None:
+    dto = _dto(position_profile=None, pay_for_order=None)
+    assert dto.data_tier == KeywordV3DataTier.GAP
+
+
+@pytest.mark.unit
+def test_data_tier_full_with_ch_profile() -> None:
     profile = [PositionProfilePoint(position=1, bid=100)]
     dto = _dto(position_profile=profile)
-    assert dto.is_not_full() is False
+    assert dto.data_tier == KeywordV3DataTier.FULL
 
 
 @pytest.mark.unit

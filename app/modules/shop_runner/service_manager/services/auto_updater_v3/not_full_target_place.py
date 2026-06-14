@@ -14,6 +14,9 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     MAX_PAY_STABILIZATION_RATIO,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+)
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
@@ -76,7 +79,7 @@ def adjust_not_full_target_place_for_plan_fact(
     Сброс ``target_place`` в ``0`` не выполняется: NOT FULL управляется только
     миграцией с нуля и plan-fact шагом в пределах legacy диапазона.
     """
-    if not keyword.is_not_full():
+    if keyword.data_tier == KeywordV3DataTier.FULL:
         return None
     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
         return None

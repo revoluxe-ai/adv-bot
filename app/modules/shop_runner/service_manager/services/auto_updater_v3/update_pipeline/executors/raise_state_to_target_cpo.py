@@ -8,6 +8,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_p
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.update_context import (
     UpdateContext,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     current_aggression_rank,
     ladder_aggression_rank,
@@ -42,7 +45,7 @@ class RaiseStateToTargetCpoExecutor:
                 target_cpo = min(target_cpo, float(ceiling))
 
         for dto in context.keywords:
-            if dto.is_not_full():
+            if dto.data_tier != KeywordV3DataTier.FULL:
                 continue
             if should_skip_keyword_raise_to_target_cpo(dto, adv):
                 continue
