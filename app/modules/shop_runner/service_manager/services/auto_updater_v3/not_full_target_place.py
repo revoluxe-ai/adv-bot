@@ -128,7 +128,7 @@ def adjust_not_full_target_place_for_plan_fact(
     - ``0`` используется только до первой migrate-инициализации;
     - после bootstrap функция может только сдвинуть позицию на один шаг вверх
       или вниз;
-    - FULL и GAP сюда не попадают, потому что у них другие operational ветки.
+    - FULL и GAP сюда не попадают, потому что у них другие operational ветки;
     - если bootstrap ещё не случился и ``current_target_place`` всё ещё равен
       ``0``, функция обязана остаться no-op.
 
@@ -148,7 +148,7 @@ def adjust_not_full_target_place_for_plan_fact(
         Новый ``target_place`` или ``None``, если шаг не нужен или ключ не
         подходит под NF-plan-fact контур.
     """
-    if keyword.data_tier == KeywordV3DataTier.FULL:
+    if keyword.data_tier != KeywordV3DataTier.PFO:
         return None
     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
         return None

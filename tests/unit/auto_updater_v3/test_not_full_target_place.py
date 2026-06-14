@@ -153,11 +153,27 @@ def test_plan_fact_skip_reason_requires_both_changes() -> None:
 
 @pytest.mark.unit
 def test_adjust_plan_fact_decreases_tp() -> None:
-    dto = _not_full_dto(target_place=10, position=10.0)
+    dto = _not_full_dto(target_place=10, position=10.0, pay_for_order=50.0)
     new_place = adjust_not_full_target_place_for_plan_fact(
         dto, fact_pay_for_order=50.0, resolve=100.0
     )
     assert new_place == 9
+
+
+@pytest.mark.unit
+def test_adjust_plan_fact_skips_gap_tier() -> None:
+    """GAP не должен получать plan-fact ±1 даже при прямом вызове helper-а."""
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        target_place=10,
+        position=10.0,
+        pay_for_order=None,
+    )
+    assert adjust_not_full_target_place_for_plan_fact(
+        dto,
+        fact_pay_for_order=50.0,
+        resolve=100.0,
+    ) is None
 
 
 @pytest.mark.unit
