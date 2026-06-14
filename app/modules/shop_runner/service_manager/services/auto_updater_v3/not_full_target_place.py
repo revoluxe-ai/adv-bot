@@ -129,6 +129,8 @@ def adjust_not_full_target_place_for_plan_fact(
     - после bootstrap функция может только сдвинуть позицию на один шаг вверх
       или вниз;
     - FULL и GAP сюда не попадают, потому что у них другие operational ветки.
+    - если bootstrap ещё не случился и ``current_target_place`` всё ещё равен
+      ``0``, функция обязана остаться no-op.
 
     Главный исторический баг, который эта функция больше не допускает: когда
     локальный PFO одного ключа начинал выглядеть хуже плана, старый код
@@ -137,6 +139,11 @@ def adjust_not_full_target_place_for_plan_fact(
     инициализированную позицию, но не может отменить bootstrap и не может
     подменять campaign-level overspend gate.
 
+    Если ``current_target_place`` всё ещё равен ``0``, это означает, что
+    migrate не создал стартовую позицию. В такой ситуации plan-fact не должен
+    “сам” превращать sentinel в рабочее значение: это привело бы к скрытому
+    bootstrap внутри корректора и сломало бы разделение ответственности.
+
     Returns:
         Новый ``target_place`` или ``None``, если шаг не нужен или ключ не
         подходит под NF-plan-fact контур.
@@ -144,6 +151,8 @@ def adjust_not_full_target_place_for_plan_fact(
     if keyword.data_tier == KeywordV3DataTier.FULL:
         return None
     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
+        return None
+    if keyword.current_target_place == 0:
         return None
     delta = compute_not_full_target_place_delta(fact_pay_for_order, resolve)
     new_place = clamp_not_full_target_place(keyword.current_target_place + delta)

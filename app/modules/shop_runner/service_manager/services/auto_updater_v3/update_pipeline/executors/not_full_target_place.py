@@ -149,6 +149,11 @@ class NotFullTargetPlacePlanFactExecutor:
     продукта это неверно: один ключ может выглядеть "хуже плана", но это ещё не
     означает, что кампания уже в overspend и что no-CH target_place нужно
     обнулять.
+
+    Ещё более важная гарантия: если migrate не смог дать стартовую позицию и
+    ``target_place`` всё ещё равен ``0``, plan-fact не имеет права “поднять”
+    этот sentinel в рабочее значение. Иначе корректор начнёт подменять сам
+    bootstrap и нарушит контракт разделения фаз.
     """
 
     phase_name = "not_full_target_place_plan_fact"
@@ -184,6 +189,8 @@ class NotFullTargetPlacePlanFactExecutor:
         resolve = float(state.resolve)
         for dto in context.keywords:
             if dto.data_tier != KeywordV3DataTier.PFO:
+                continue
+            if dto.current_target_place == 0:
                 continue
             if (
                 dto.history_target_place

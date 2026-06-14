@@ -306,6 +306,30 @@ def test_migrate_executor_skips_off_not_full_keys() -> None:
 
 
 @pytest.mark.unit
+def test_plan_fact_does_not_bootstrap_zero_when_migrate_cannot_run() -> None:
+    """Если migrate не смог создать стартовую позицию, plan-fact не трогает sentinel 0."""
+    dto = _not_full_dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        position=0.0,
+        target_place=0,
+        pay_for_order=50.0,
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=50.0,
+            max_pay_for_order=200.0,
+            resolve=100.0,
+            guard_condition=False,
+        ).adv_state,
+    )
+    NotFullTargetPlacePlanFactExecutor().execute(ctx)
+    assert ctx.keywords[0].current_target_place == 0
+
+
+@pytest.mark.unit
 def test_plan_fact_executor_does_not_reset_per_key_on_overspend() -> None:
     cheap = _not_full_dto(
         ks_id=1, target_place=10, position=10.0, pay_for_order=600.0
