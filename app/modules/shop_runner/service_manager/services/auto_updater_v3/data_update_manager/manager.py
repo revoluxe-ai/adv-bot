@@ -83,8 +83,14 @@ class DataUpdateManager:
         wb_shop_data_manager: WBShopDataManager,
         max_last_period: int = 2,
         tick_report: V3TickReportCollector,
-    ) -> TickData | None:
-        """Собрать ``V3TickData``: keywords, dto, plan/fact, contexts, NORMAL gates."""
+    ) -> TickData:
+        """Собрать ``V3TickData``: keywords, dto, plan/fact, contexts, NORMAL gates.
+
+        Метод всегда возвращает заполненный ``TickData``. Ранний выход здесь не
+        используется: даже если часть внешних данных недоступна, загрузчик
+        собирает максимально полный снимок тика и оставляет решение о том, что
+        делать дальше, уровню orchestrator/pipeline.
+        """
         adv = complex_adv.adv_setting
         ledger = V3TickKeywordLedger.from_keywords(keywords)
         dto, raw_profiles = await load_v3_wb_context(

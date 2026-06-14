@@ -145,21 +145,13 @@ async def process_adv_v3(
         tick_report.set_aggression_before(keywords)
         if complex_adv.auto_add_only_relevant_phrase:
             keywords = only_relevant_phrase_filter(keywords)
-        tick_data: TickData | None = await data_mgr.load(
+        tick_data: TickData = await data_mgr.load(
             complex_adv,
             keywords=keywords,
             wb_shop_data_manager=wb_shop_data_manager,
             max_last_period=max_last_period,
             tick_report=tick_report,
         )
-        if tick_data is None:
-            logger.warning(
-                "[adv_id=%s] v3: no data to process",
-                complex_adv.adv_id,
-            )
-            return
-
-
         if is_campaign_full_stop(tick_data.campaign_mode):
             logger.info(
                 "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
