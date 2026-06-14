@@ -47,8 +47,9 @@ if TYPE_CHECKING:
 class KeywordDTO:
     """Аккумулятор данных ключa на тик V3.
 
-    Текущий режим — SSOT: последний ``NextState`` в ``next_state`` или ``stored_mode``.
-    Запись только через ``current_mode = NextState(...)`` или ``apply_ladder_state(...)``.
+    DTO хранит и состояние ladder, и текущий operational tier ключа. ``current_mode``
+    остаётся SSOT для режима, а ``data_tier`` отделяет FULL от PFO/GAP и позволяет
+    NF-фазам не пользоваться размытым ``is_not_full()``.
     """
 
     calculated_keyword: CalculatedKeyword
@@ -115,7 +116,14 @@ class KeywordDTO:
 
     @property
     def data_tier(self) -> KeywordV3DataTier:
-        """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``."""
+        """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``.
+
+        Возвращает классификацию, которую используют NF validate/migrate/plan-fact,
+        а также ladder-ветки, чтобы явно различать:
+        - ``FULL``: ключ следует ladder-профилю;
+        - ``PFO``: профиля нет, но есть operational PFO;
+        - ``GAP``: нет ни профиля, ни operational PFO.
+        """
         return resolve_keyword_v3_data_tier(
             position_profile=self.position_profile,
             keyword=self.calculated_keyword,
@@ -130,7 +138,12 @@ class KeywordDTO:
         )
 
     def _validate_not_full_state(self, executor_name: str) -> None:
-        """PFO/GAP + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
+        """PFO/GAP + active: принудительно свести режим к ``MIN_CPA``.
+
+        FULL ключи не трогаем. OFF тоже оставляем без изменений: ``NOT_FULL_ACTIVATE``
+        не должен оживлять выключенные ключи. Эта команда используется только для
+        активных NO-CH/PFO/GAP ключей, которым далее нужны NF-migrate и NF-plan-fact.
+        """
         if self.data_tier == KeywordV3DataTier.FULL:
             return
         if self.current_mode == KeywordStrategyMode.OFF:

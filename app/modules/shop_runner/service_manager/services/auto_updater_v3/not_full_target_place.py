@@ -74,10 +74,15 @@ def adjust_not_full_target_place_for_plan_fact(
     fact_pay_for_order: float,
     resolve: float,
 ) -> int | None:
-    """Применить ±1 к ``current_target_place`` для NOT FULL MIN; ``None`` если no-op.
+    """Применить ±1 к ``current_target_place`` для активных PFO/GAP ключей.
 
-    Сброс ``target_place`` в ``0`` не выполняется: NOT FULL управляется только
-    миграцией с нуля и plan-fact шагом в пределах legacy диапазона.
+    Эта функция не инициализирует ключ и не сбрасывает его в ``0``. Её задача —
+    только plan-fact коррекция уже активного NO-CH ключа, который прошёл NF
+    validate/migrate. ``FULL`` ключи и выключенные ``OFF`` ключи сюда не попадают.
+
+    Returns:
+        Новый ``target_place`` или ``None``, если шаг не нужен или ключ не
+        подходит под NF-plan-fact контур.
     """
     if keyword.data_tier == KeywordV3DataTier.FULL:
         return None

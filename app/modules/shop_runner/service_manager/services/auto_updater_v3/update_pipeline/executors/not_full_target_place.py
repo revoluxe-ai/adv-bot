@@ -20,17 +20,23 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class NotFullTargetPlaceMigrateExecutor:
-    """NOT FULL MIN: первая инициализация ``target_place`` текущей позицией WB."""
+    """Инициализировать ``target_place`` для активных PFO/GAP ключей.
+
+    Фаза нужна только на первом заходе NF-ключа, когда target_place ещё нулевой.
+    Она берёт округлённую текущую позицию WB и не трогает FULL, а также не
+    оживляет ``OFF``. В результате plan-fact видит уже стартовую позицию и дальше
+    может делать только ±1, не подменяя bootstrap.
+    """
 
     phase_name = "not_full_target_place_migrate"
     _skip_reason: str | None = None
 
     def execute(self, context: UpdateContext) -> None:
-        """Заполнить пустой ``target_place`` для NOT FULL ключей без CH-профиля.
+        """Заполнить пустой ``target_place`` для активных PFO/GAP ключей.
 
-        Значение ``0`` означает отсутствие целевой позиции для NF-регулятора.
-        На первом тике берём текущую позицию WB и не делаем plan-fact шаг в этой
-        фазе; следующий executor увидит уже инициализированный target_place.
+        Если у ключа уже есть target_place или он не находится в ``MIN_CPA``, фаза
+        ничего не меняет. Это защищает OFF/ladder-ключи от случайной инициализации
+        и сохраняет первый шаг как чистый bootstrap.
         """
         self._skip_reason = None
         for dto in context.keywords:
@@ -54,7 +60,12 @@ class NotFullTargetPlaceMigrateExecutor:
 
 
 class NotFullTargetPlacePlanFactExecutor:
-    """NOT FULL MIN: ±1 ``target_place`` по fact/resolve при изменении plan/fact и views."""
+    """Корректировать ``target_place`` для активных PFO/GAP ключей по plan-fact.
+
+    Фаза вызывается только после NF validate и NF migrate. Она не инициализирует
+    ключ и не сбрасывает его в ``0``: её роль — подстроить уже стартовавший NF
+    ключ на ±1 относительно факта и ``resolve``.
+    """
 
     phase_name = "not_full_target_place_plan_fact"
     _skip_reason: str | None = None
@@ -63,11 +74,11 @@ class NotFullTargetPlacePlanFactExecutor:
         self._next_state_manager = NextStateManager(NotFullTargetPlacePlanFactExecutor)
 
     def execute(self, context: UpdateContext) -> None:
-        """Применить NF plan-fact логику к ключам без CH-профиля.
+        """Применить NF plan-fact логику к активным PFO/GAP ключам.
 
-        После общего gate на актуальность plan/fact/views двигаем
-        ``target_place`` на ±1 по соотношению fact/resolve. Сброс в ``0`` для
-        NOT FULL здесь не выполняется.
+        Сначала проверяем общий gate plan/fact/views. Затем обновляем только
+        ключи, которые уже были инициализированы migrate-фазой или имеют
+        существующий NF target_place. ``FULL`` и ``OFF`` ключи не затрагиваются.
         """
         self._skip_reason = plan_fact_target_place_skip_reason(context.adv_state)
         if self._skip_reason is not None:

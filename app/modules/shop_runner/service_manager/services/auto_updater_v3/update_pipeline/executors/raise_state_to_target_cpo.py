@@ -24,8 +24,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 class RaiseStateToTargetCpoExecutor:
     """Поднять ключ до max ступени с ``cpo < min(resolve, raise_cpo_ceiling)``; DOWN запрещён.
 
-    При overspend (``guard_condition``) потолок — ``raise_cpo_ceiling`` (fact CPO).
-    Per-keyword skip в зоне стабилизации только если ``kw.pay_for_order > resolve``.
+    Фаза работает только по FULL ключам: для PFO/GAP её контур закрыт NF
+    validate/migrate/plan-fact. При overspend (``guard_condition``) потолок —
+    ``raise_cpo_ceiling`` (fact CPO). Per-keyword skip в зоне стабилизации только
+    если ``kw.pay_for_order > resolve``.
     """
 
     phase_name = "raise_state_to_target_cpo"

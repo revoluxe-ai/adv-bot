@@ -17,7 +17,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class SkipUpTargetPlaceExecutor:
-    """Если следующий шаг вверх на том же ``target_place`` — max режим alias-группы."""
+    """Схлопнуть alias-UP на том же ``target_place`` для FULL ключей.
+
+    PFO/GAP сюда не попадают: для них трафик регулируется NF migrate/plan-fact
+    и отдельными bootstrap-enable фазами, а не ladder alias logic.
+    """
 
     phase_name = "skip_up_same_target_place"
     _skip_reason: str | None = None

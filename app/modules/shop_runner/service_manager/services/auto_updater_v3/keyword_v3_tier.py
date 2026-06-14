@@ -14,7 +14,15 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
 
 
 class KeywordV3DataTier(str, Enum):
-    """Операционный tier ключа V3: FULL / PFO / GAP."""
+    """Операционный tier ключа V3.
+
+    FULL означает, что у ключа уже есть CH-профиль и дальнейшие ladder-решения
+    должны опираться на него. PFO означает отсутствие профиля при наличии
+    operational ``pay_for_order``: такие ключи живут в NF-потоке, но могут
+    участвовать в plan-fact регулировке. GAP означает отсутствие и профиля, и
+    operational ``pay_for_order``: это отдельная зона bootstrap/enable без
+    NF-миграции.
+    """
 
     FULL = "full"
     PFO = "pfo"
@@ -26,10 +34,14 @@ def resolve_keyword_v3_data_tier(
     position_profile: list[PositionProfilePoint] | None,
     keyword: CalculatedKeyword,
 ) -> KeywordV3DataTier:
-    """Определить tier по наличию CH-профиля и operational ``pay_for_order``.
+    """Определить операционный tier ключа.
 
-    FULL — есть профиль позиций; PFO — профиля нет, но есть положительный
-    ``pay_for_order``; GAP — нет ни профиля, ни operational ``pay_for_order``.
+    Классификация нужна как SSOT для NF-веток и bootstrap-веток:
+    - ``FULL``: есть непустой CH-профиль, значит ключ должен жить по ladder;
+    - ``PFO``: профиля нет, но есть положительный operational ``pay_for_order``;
+      это активный NO-CH/NF-кейс, где допустимы migrate и plan-fact шаги;
+    - ``GAP``: профиля нет и ``pay_for_order`` не задан или невалиден, значит
+      ключ попадает в enable/bootstrap-контур, а не в NF-регулятор.
     """
     if bool(position_profile):
         return KeywordV3DataTier.FULL
