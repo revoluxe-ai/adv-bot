@@ -36,7 +36,7 @@ class NotFullTargetPlacePlanFactExecutor:
             if not dto.calculated_keyword.pay_for_order:
                 dto.current_target_place = NextTargetPlace(
                     new_target_place=0,
-                    executor_name=self.__name__
+                    executor_name=self.__class__.__name__,
                 )
                 continue
             self._next_state_manager.adjust_not_full_target_place_plan_fact(
