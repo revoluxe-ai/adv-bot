@@ -21,7 +21,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_p
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
     campaign_cpo_over_max,
     cmp_over_threshold,
-    cmp_within_max,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
