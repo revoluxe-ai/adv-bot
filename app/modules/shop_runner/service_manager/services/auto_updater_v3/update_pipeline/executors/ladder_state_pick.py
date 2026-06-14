@@ -99,7 +99,7 @@ def pick_max_ladder_state_at_or_below_cpo(
     def _fits(cpo: float) -> bool:
         if strict_ceiling:
             return ladder_cpo_within_ceiling(cpo, threshold)
-        return cpo <= threshold
+        return cpo < threshold
 
     candidates = [
         state
