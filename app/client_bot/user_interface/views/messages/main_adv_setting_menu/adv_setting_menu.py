@@ -1,3 +1,5 @@
+"""Главное меню настроек РК с кнопками для UI и управлением активностью."""
+
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
@@ -151,7 +153,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
-        self._fact_pay_for_order_ch: float | None = None
 
 
     @staticmethod
@@ -312,7 +313,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._plan_set = cost_metrics.plan_set
         self._plan_fact_ch_max_ts_str = cost_metrics.plan_fact_ch_ts_msk
         self._campaign_sales_state = cost_metrics.campaign_sales_state
-        self._fact_pay_for_order_ch = cost_metrics.fact_pay_for_order
 
         self._reason_auto = await self._redis_campaign_activity_reason_manager.get(
             self.adv.adv_id, "auto"
@@ -674,8 +674,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboard.get_adv_setting_keyboard(
-           self.wb_user_cabinet, self.adv, self.in_favorites_user,
-           fact_pay_for_order=getattr(self, "_fact_pay_for_order_ch", None),
+            self.wb_user_cabinet, self.adv, self.in_favorites_user
         )
 
     @staticmethod

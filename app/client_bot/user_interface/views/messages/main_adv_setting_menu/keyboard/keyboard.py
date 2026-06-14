@@ -1,4 +1,6 @@
 
+"""Клавиатура главного меню настроек кампании."""
+
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -53,18 +55,14 @@ def get_adv_setting_keyboard(
     wb_user_cabinet: WBUserCabinet,
     adv_setting: AdvSetting,
     in_favorites: bool,
-    *,
-    fact_pay_for_order: float | None = None,
 ):
+    """Собрать inline-клавиатуру главного меню настроек кампании."""
     builder = InlineKeyboardBuilder()
 
     """План продаж"""
     from .buttoms import sales_plan_button
     _ = builder.row(
-        sales_plan_button.get(
-            adv_setting,
-            fact_pay_for_order=fact_pay_for_order,
-        )
+        sales_plan_button.get(adv_setting)
     )
 
 

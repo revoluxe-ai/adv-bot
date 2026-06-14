@@ -1,3 +1,5 @@
+"""Клавиатура Telegram-меню настройки плана продаж."""
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -11,26 +13,24 @@ from . import callbacks
 
 
 class KeyboardsGetter:
+    """Собирает кнопки для редактирования плана продаж кампании."""
+
     def __set_data(
         self,
         adv: AdvSetting,
-        *,
-        fact_pay_for_order: float | None = None,
     ):
         self._adv = adv
         self._adv_id = adv.adv_id
         self._plan_for_sales_for_day = adv.plan_for_sales_for_day
         self._target_price_for_order = adv.target_price_for_order
         self._max_price_for_order = adv.max_price_for_order
-        self._fact_pay_for_order = fact_pay_for_order
 
     def get_keyboard(
         self,
         adv: AdvSetting,
-        *,
-        fact_pay_for_order: float | None = None,
     ) -> InlineKeyboardMarkup:
-        self.__set_data(adv, fact_pay_for_order=fact_pay_for_order)
+        """Собрать inline-клавиатуру с текущими плановыми параметрами."""
+        self.__set_data(adv)
         builder = InlineKeyboardBuilder()
 
         setting_plan_for_sales_for_day_button = (

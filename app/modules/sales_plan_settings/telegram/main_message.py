@@ -1,3 +1,5 @@
+"""Telegram-экран настройки плана продаж без лишних UI-параметров."""
+
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup
@@ -8,28 +10,22 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
-)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .keyboards import KeyboardsGetter
 
 
 class SalesPlanSettingsMenuMessage(TextWithKeyboard):
+    """Собирает текст и клавиатуру для редактирования плана продаж."""
+
     def __init__(self, bot: Bot, chat_id: int, adv_id, state: FSMContext):
         self._adv_id = adv_id
-        self._fact_pay_for_order: float | None = None
 
         super().__init__(bot, chat_id)
 
     async def __call__(self):
         adv: AdvSetting = await self._get_adv(self._adv_id)
         self._adv = adv
-        summary = await PlanFactReader().get_latest_plan_fact(adv.adv_id)
-        self._fact_pay_for_order = (
-            summary.fact_pay_for_order if summary is not None else None
-        )
         await super().__call__()
 
     @property
@@ -42,10 +38,7 @@ class SalesPlanSettingsMenuMessage(TextWithKeyboard):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         keyboard_getter = KeyboardsGetter()
-        keyboard = keyboard_getter.get_keyboard(
-            self._adv,
-            fact_pay_for_order=self._fact_pay_for_order,
-        )
+        keyboard = keyboard_getter.get_keyboard(self._adv)
         return keyboard
 
     @staticmethod

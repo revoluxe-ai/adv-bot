@@ -1,3 +1,5 @@
+"""Кнопка настройки плана продаж в меню кампании."""
+
 from aiogram.types import InlineKeyboardButton
 
 from app.client_bot.user_interface.views.messages.utils.sales_plan import get_plan_set_status
@@ -5,8 +7,8 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
 )
-def get(adv_setting: AdvSetting, *, fact_pay_for_order: float | None = None) -> InlineKeyboardButton:
-    """Кнопка «План продаж»."""
+def get(adv_setting: AdvSetting) -> InlineKeyboardButton:
+    """Показать кнопку «План продаж» для текущей РК."""
     status = get_plan_set_status(adv_setting)
     prefix_status_str = "🎯" if status else "⛔"
     post_fix_status_str = "" if status else "Не установлен"
