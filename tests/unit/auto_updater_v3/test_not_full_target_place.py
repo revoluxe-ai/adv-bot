@@ -331,6 +331,31 @@ def test_plan_fact_executor_per_key_on_overspend() -> None:
 
 
 @pytest.mark.unit
+def test_plan_fact_executor_does_not_reset_expensive_key_without_campaign_overspend() -> None:
+    expensive = _not_full_dto(
+        ks_id=1,
+        target_place=10,
+        position=10.0,
+        pay_for_order=850.0,
+    )
+    from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context
+
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[expensive]),
+        adv_state=_legacy_context(
+            fact_pay_for_order=50.0,
+            max_pay_for_order=500.0,
+            resolve=100.0,
+            guard_condition=True,
+        ).adv_state,
+    )
+    ex = NotFullTargetPlacePlanFactExecutor()
+    ex.execute(ctx)
+    assert ex.skip_reason is None
+    assert expensive.current_target_place == 9
+
+
+@pytest.mark.unit
 def test_plan_fact_executor_skips_unchanged_gate() -> None:
     dto = _not_full_dto(target_place=10, position=10.0)
     from tests.unit.auto_updater_v3.test_update_pipeline import _legacy_context

@@ -7,6 +7,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
+    campaign_cpo_exceeds_max,
     plan_fact_target_place_skip_reason,
     reset_not_full_target_place_on_overspend,
 )
@@ -32,11 +33,13 @@ class NotFullTargetPlacePlanFactExecutor:
         fact = float(state.fact_pay_for_order)  # type: ignore[arg-type]
         resolve = float(state.resolve)
         max_pay_for_order = float(state.max_pay_for_order)
+        campaign_overspend = campaign_cpo_exceeds_max(state)
         for dto in context.keywords:
             if not dto.is_not_full():
                 continue
-            if reset_not_full_target_place_on_overspend(
-                dto, max_pay=max_pay_for_order
+            if campaign_overspend and reset_not_full_target_place_on_overspend(
+                dto,
+                max_pay=max_pay_for_order,
             ):
                 dto.current_target_place = NextTargetPlace(
                     new_target_place=0,
