@@ -139,7 +139,9 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 универсальный reset для no-CH ключа. Сейчас это разделено на два независимых
 контракта:
 
-1. `PFO` либо проходит NF bootstrap и дальше живёт на plan-fact ``±1``.
+1. `PFO` либо проходит NF bootstrap и дальше живёт на plan-fact ``±1``. Если
+   migrate не создал стартовую позицию, plan-fact не имеет права bootstrap-ить
+   ключ сам: ``0`` остаётся sentinel до отдельной migrate-инициализации.
 2. `GAP` ждёт отдельного enable/reset контура и не может быть обнулён через
    NF plan-fact только потому, что у отдельного ключа локально PFO хуже плана.
 
