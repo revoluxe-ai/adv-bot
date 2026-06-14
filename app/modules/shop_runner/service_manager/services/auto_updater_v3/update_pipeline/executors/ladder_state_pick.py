@@ -91,15 +91,15 @@ def pick_max_ladder_state_at_or_below_cpo(
     """Максимальная по агрессии ступень MIN/OPT/MAX под потолком ``ceiling``.
 
     Args:
-        strict_ceiling: ``True`` для plan max (``cpo < ceiling``); иначе resolve
-            (``cpo <= ceiling``).
+        strict_ceiling: ``True`` для plan max (строго ``cpo < ceiling`` через
+            ``ladder_cpo_within_ceiling``); иначе resolve-ветка с ``cpo <= ceiling``.
     """
     threshold = float(ceiling)
 
     def _fits(cpo: float) -> bool:
         if strict_ceiling:
             return ladder_cpo_within_ceiling(cpo, threshold)
-        return cpo < threshold
+        return cpo <= threshold
 
     candidates = [
         state

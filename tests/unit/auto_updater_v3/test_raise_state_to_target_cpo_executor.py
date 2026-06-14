@@ -146,6 +146,15 @@ def test_pick_max_ladder_state_at_or_below_cpo_picks_highest_passing() -> None:
 
 
 @pytest.mark.unit
+def test_pick_max_ladder_state_at_or_below_cpo_includes_equal_ceiling() -> None:
+    dto = _dto()
+    winner = pick_max_ladder_state_at_or_below_cpo(dto, 400.0)
+    assert winner is not None
+    assert winner.strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert winner.cpo == 400.0
+
+
+@pytest.mark.unit
 def test_pick_max_ladder_state_at_or_below_cpo_returns_none_when_all_above() -> None:
     dto = _dto()
     assert pick_max_ladder_state_at_or_below_cpo(dto, 250.0) is None
