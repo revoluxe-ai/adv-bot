@@ -6,9 +6,6 @@ from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import select
 
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
 

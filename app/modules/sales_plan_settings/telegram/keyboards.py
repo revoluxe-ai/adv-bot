@@ -4,9 +4,6 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot.user_interface.views.callbacks import Adv as ReturnToAdvCallback
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 from . import callbacks
