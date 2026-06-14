@@ -32,7 +32,6 @@ class PreamblePipelineRunResult:
     cap_down_count: int = 0  # legacy: фаза B удалена, поле не заполняется
     not_full_target_place_migrate_count: int = 0
     validate_not_full_count: int = 0
-    not_full_target_place_overspend_reset_count: int = 0
     not_full_target_place_plan_fact_count: int = 0
     validate_count: int = 0
     raise_state_count: int = 0

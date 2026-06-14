@@ -96,10 +96,6 @@ def summarize_phase_zero_actions(
         "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
         "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
-        "not_full_target_place_overspend_reset": lambda: _note_not_full_tp_overspend(
-            fact_pay_for_order=fact_pay_for_order,
-            max_pay_for_order=max_pay_for_order,
-        ),
         "not_full_target_place_plan_fact": lambda: _note_not_full_tp_plan_fact(
             plan_fact_changed=plan_fact_changed,
             views_changed=views_changed,
@@ -170,20 +166,6 @@ def _note_validate_not_full(prepared: PreparedListLike) -> str:
     return "нет NOT FULL active ключей"
 
 
-def _note_not_full_tp_overspend(
-    *,
-    fact_pay_for_order: float | None,
-    max_pay_for_order: float | None,
-) -> str:
-    if fact_pay_for_order is None or max_pay_for_order is None:
-        return "нет fact/max для overspend"
-    if cmp_within_max(float(fact_pay_for_order), float(max_pay_for_order)):
-        return "CPO РК строго ниже MAX"
-    if not campaign_cpo_over_max(float(fact_pay_for_order), float(max_pay_for_order)):
-        return "fact CPO на MAX (не overspend)"
-    return "fact CPO > MAX — сброс tp NOT FULL MIN в 0"
-
-
 def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
     if not prepared:
         return "нет operable ключей"
@@ -191,7 +173,7 @@ def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
         if mode == KeywordStrategyMode.OFF:
             continue
         if not bool(ctx.position_profile):
-            return "есть NOT FULL MIN с tp=0 для миграции на pos−1"
+            return "есть NOT FULL MIN с tp=0 для миграции на текущую позицию"
     return "нет кандидатов migrate (tp≠0 или нет позиции)"
 
 

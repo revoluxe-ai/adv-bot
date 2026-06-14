@@ -4,7 +4,7 @@
 ``HardStatusValidateExecutor`` (preamble фаза V) — авто (1) → ``OFF``.
 
 Ограничение mode по tier без CH-профиля — **NF** (``NotFullValidateExecutor`` + tp migrate/plan-fact):
-нет ``position_profile`` → MIN; ``target_place`` — migrate (0→pos−1) и plan-fact ±1. Legacy ``cap_down``
+нет ``position_profile`` → MIN; ``target_place`` — migrate (0→current) и plan-fact ±1. Legacy ``cap_down``
 не используется (есть профиль → лестница из CH). См. ``docks/V3_UPDATER_VALIDATION.md``.
 """
 

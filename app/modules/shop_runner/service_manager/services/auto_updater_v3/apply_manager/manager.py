@@ -131,18 +131,9 @@ class ApplyManager:
                     build_target_place_fallback_zero_by_keyword_id,
                 )
 
-                from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
-                    campaign_overspend_from_plan_fact,
-                )
-
-                overspend = campaign_overspend_from_plan_fact(
-                    tick_input.fact.pay_for_order,
-                    float(tick_input.plan.max_pay_for_order),
-                )
                 tick.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                     all_contexts,
                     campaign_orders_per_cart_7d=tick_input.campaign_orders_per_cart_7d,
-                    campaign_overspend=overspend,
                 )
 
         post_gate_actions = select_v3_post_gate_actions(
@@ -170,18 +161,9 @@ class ApplyManager:
             )
             tick.all_contexts = all_contexts
             tick.contexts = filter_operable_v3_contexts(all_contexts)
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
-                campaign_overspend_from_plan_fact,
-            )
-
-            overspend = campaign_overspend_from_plan_fact(
-                tick_input.fact.pay_for_order,
-                float(tick_input.plan.max_pay_for_order),
-            )
             tick.sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                 all_contexts,
                 campaign_orders_per_cart_7d=tick_input.campaign_orders_per_cart_7d,
-                campaign_overspend=overspend,
             )
 
         plan_fact_cached = False

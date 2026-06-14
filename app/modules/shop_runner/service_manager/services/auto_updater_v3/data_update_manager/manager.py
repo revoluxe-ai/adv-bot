@@ -142,18 +142,9 @@ class DataUpdateManager:
             )
 
             campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(adv)
-            from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
-                campaign_overspend_from_plan_fact,
-            )
-
-            overspend = campaign_overspend_from_plan_fact(
-                fact.pay_for_order if fact is not None else None,
-                float(plan.max_pay_for_order),
-            )
             sync_fallback_by_id = build_target_place_fallback_zero_by_keyword_id(
                 all_contexts,
                 campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-                campaign_overspend=overspend,
             )
 
         if (

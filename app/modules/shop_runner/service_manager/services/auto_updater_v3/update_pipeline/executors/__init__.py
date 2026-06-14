@@ -1,6 +1,6 @@
 """Executors preamble NORMAL для ``UpdatePipeline``.
 
-Порядок: V → NF → skip_up → raise → reset → S → R → enable → pfo_off → cal.
+Порядок: V → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R → enable → pfo_off → cal.
 
 **Нет отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``):**
 
@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     HardStatusValidateExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_target_place import (
+    NotFullTargetPlaceMigrateExecutor,
     NotFullTargetPlacePlanFactExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.not_full_validate import (
@@ -58,6 +59,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     return [
         HardStatusValidateExecutor(),
         NotFullValidateExecutor(),
+        NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
         SkipUpTargetPlaceExecutor(),
         RaiseStateToTargetCpoExecutor(),
@@ -74,6 +76,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
 __all__ = [
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
+    "NotFullTargetPlaceMigrateExecutor",
     "NotFullTargetPlacePlanFactExecutor",
     "NotFullValidateExecutor",
     "PayForOrderGapEnableExecutor",

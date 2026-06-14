@@ -44,10 +44,6 @@ _PHASE_LOG: dict[str, tuple[str, str]] = {
         "not_full_target_place_migrate_count",
     ),
     "validate_not_full_state": ("v3 VALIDATE_NOT_FULL", "validate_not_full_count"),
-    "not_full_target_place_overspend_reset": (
-        "v3 NOT_FULL_TP_OVERSPEND",
-        "not_full_target_place_overspend_reset_count",
-    ),
     "not_full_target_place_plan_fact": (
         "v3 NOT_FULL_TP_PLAN_FACT",
         "not_full_target_place_plan_fact_count",
@@ -264,7 +260,6 @@ class UpdatePipelineManager:
                 setattr(stats, stat_field, getattr(stats, stat_field) + len(actions))
             elif stat_field in (
                 "not_full_target_place_migrate_count",
-                "not_full_target_place_overspend_reset_count",
                 "not_full_target_place_plan_fact_count",
             ):
                 tp_touched = _count_target_place_steps_for_executor(

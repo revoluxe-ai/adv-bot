@@ -231,7 +231,6 @@ def build_target_place_fallback_zero_by_keyword_id(
     contexts: list["KeywordV3Context"],
     *,
     campaign_orders_per_cart_7d: float | None = None,
-    campaign_overspend: bool = False,
 ) -> dict[int, bool]:
     """Построить карту принудительного сброса ``target_place`` в 0 по ключам V3.
 
@@ -252,12 +251,9 @@ def build_target_place_fallback_zero_by_keyword_id(
     1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
     2. **NOT FULL active** — нет ``position_profile`` (нет CH-профиля / collapsed
        ladder), но ``strategy_mode != OFF``:
-       - ``True``, если ``campaign_overspend=True`` (факт CPO кампании выше
-         ``plan.max_pay_for_order``; согласовано с ``NF_overspend_reset`` /
-         ``campaign_cpo_exceeds_max`` в ``not_full_target_place``);
-       - иначе ``False`` — sync **не** форсит 0; ``target_place`` для NOT FULL
-         управляется отдельно (preamble NF_migrate / NF_plan_fact_tp и сохранение
-         из ledger в ``_preserve_not_full_target_place_from_ledger``).
+       всегда ``False`` — sync **не** форсит 0; ``target_place`` для NOT FULL
+       управляется отдельно (preamble NF_migrate / NF_plan_fact_tp и сохранение
+       из ledger в ``_preserve_not_full_target_place_from_ledger``).
     3. **Остальные случаи** — ``elig.target_place_fallback_zero`` из
        ``resolve_keyword_v3_eligibility``, но только если ``strategy_mode != OFF``:
 
@@ -271,8 +267,7 @@ def build_target_place_fallback_zero_by_keyword_id(
     Карта согласована с ``build_eligibility_map`` для контекстов **с** профилем
     (FULL/PFO/NO_DATA без ветки NOT FULL). Для NOT FULL active поведение
     намеренно расходится: eligibility может давать ``target_place_fallback_zero=True``,
-    но sync ждёт ``campaign_overspend`` (см. тесты
-    ``test_build_target_place_fallback_zero_not_full_*``).
+    но sync не должен сбрасывать такой ключ в ``0``.
 
     Args:
         contexts: Все ``KeywordV3Context`` тика (managed + operable); общий
@@ -280,11 +275,6 @@ def build_target_place_fallback_zero_by_keyword_id(
         campaign_orders_per_cart_7d: Пробрасывается в ``resolve_keyword_v3_eligibility``
             (зарезервировано для campaign-level CPO; сейчас не меняет tier внутри
             eligibility, но сохраняет единый контракт вызова с preamble/sync).
-        campaign_overspend: Флаг перерасхода кампании по plan/fact CPO; влияет
-            только на NOT FULL active ключи (ветка 2). Вычисляется через
-            ``campaign_overspend_from_plan_fact`` в ``orchestrator`` /
-            ``DataUpdateManager``.
-
     Returns:
         Словарь ``keyword_setting_original_id → force_zero``. Отсутствующий ``ks_id``
         в sync трактуется как ``False`` (``.get(ks_id, False)``). Побочных эффектов
@@ -293,7 +283,7 @@ def build_target_place_fallback_zero_by_keyword_id(
     См. также:
         ``sync_keyword_target_places_v3`` — потребитель карты при ``CAMPAIGN_NORMAL``;
         ``KeywordV3Eligibility.target_place_fallback_zero`` — источник флага для
-        ключей с профилем; ``not_full_target_place`` — overspend-сброс для NOT FULL.
+        ключей с профилем.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
@@ -313,7 +303,7 @@ def build_target_place_fallback_zero_by_keyword_id(
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
         if not bool(ctx.position_profile) and mode != KeywordStrategyMode.OFF:
-            out[int(ks_id)] = campaign_overspend
+            out[int(ks_id)] = False
             continue
         out[int(ks_id)] = (
             elig.target_place_fallback_zero and mode != KeywordStrategyMode.OFF

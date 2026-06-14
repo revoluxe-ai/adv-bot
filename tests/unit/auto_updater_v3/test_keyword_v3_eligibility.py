@@ -183,17 +183,12 @@ def test_build_target_place_fallback_zero_not_full_active_false() -> None:
 
 @pytest.mark.unit
 def test_build_target_place_fallback_zero_not_full_overspend_true() -> None:
-    """NOT FULL active при fact CPO > MAX: sync force tp=0."""
+    """NOT FULL active при fact CPO > MAX: sync не форсит tp=0."""
     kw = _calculated_kw_fixture(
         ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
     )
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
-    assert (
-        build_target_place_fallback_zero_by_keyword_id(
-            [ctx], campaign_overspend=True
-        ).get(6)
-        is True
-    )
+    assert build_target_place_fallback_zero_by_keyword_id([ctx]).get(6) is False
 
 
 @pytest.mark.unit

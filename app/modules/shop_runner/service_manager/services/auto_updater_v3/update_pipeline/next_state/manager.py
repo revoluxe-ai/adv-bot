@@ -64,14 +64,12 @@ class NextStateManager:
         *,
         fact_pay_for_order: float,
         resolve: float,
-        max_pay_for_order: float,
     ) -> None:
         """±1 ``target_place`` по plan-fact CPO vs resolve для NOT FULL MIN."""
         new_place = adjust_not_full_target_place_for_plan_fact(
             keyword,
             fact_pay_for_order=fact_pay_for_order,
             resolve=resolve,
-            max_pay_for_order=max_pay_for_order,
         )
         if new_place is None:
             return
