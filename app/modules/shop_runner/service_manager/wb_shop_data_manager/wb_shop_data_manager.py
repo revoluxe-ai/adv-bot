@@ -296,6 +296,13 @@ class WBShopDataManager:
             skip_plan_fact: не ходить в ClickHouse за plan_fact_stats. Используется
                 для корутин, где факт подгружается отдельно, например
                 ``update_cluster_bids``.
+
+        Важно:
+            Это точка, где должен быть синхронизирован auto common budget.
+            Если здесь не пересчитать ``common_budget_daily_limit`` по актуальным
+            plan-fact данным при включённом ``auto_common_budget``, downstream
+            продолжит работать с устаревшим in-memory лимитом и общий бюджет
+            не применится.
         """
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()

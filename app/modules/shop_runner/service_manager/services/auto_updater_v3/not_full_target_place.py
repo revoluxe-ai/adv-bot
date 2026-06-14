@@ -115,7 +115,13 @@ def adjust_not_full_target_place_for_plan_fact(
     resolve: float,
     max_pay_for_order: float,
 ) -> int | None:
-    """Применить ±1 к ``current_target_place`` для NOT FULL MIN; ``None`` если no-op."""
+    """Применить ±1 к ``current_target_place`` для NOT FULL MIN; ``None`` если no-op.
+
+    Для ключей без CH-профиля факт на границе ``max_pay_for_order`` считается
+    safety-stop: здесь мы сразу уводим ``target_place`` в ``0``, чтобы не продолжать
+    бустить ключ, который уже упёрся в плановый потолок без профиля для тонкой
+    bid-регуляции.
+    """
     if not keyword.is_not_full():
         return None
     if keyword.current_mode != KeywordStrategyMode.MIN_CPA:
