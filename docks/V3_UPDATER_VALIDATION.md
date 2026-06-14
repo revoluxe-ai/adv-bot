@@ -84,6 +84,60 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 Ключевое следствие: NF-ветка больше не делает “reset в 0”, не подменяет bootstrap и не пытается смешивать ladder-контур FULL с no-CH контуром PFO/GAP. Весь bootstrap для активных no-CH ключей идёт через NF validate → NF migrate → NF plan-fact, а всё ladder-управление остаётся у FULL.
 
+### Пошаговый сценарий работы
+
+Чтобы не путать контракт, удобнее смотреть на него как на три независимых сценария:
+
+#### 1. FULL key
+
+Если у ключа есть `position_profile`, то это **FULL**. Он сразу попадает в ladder-контур:
+
+1. `validate_not_full_state` его не трогает, потому что NF-контур не должен
+   переформатировать ladder-ключ.
+2. `not_full_target_place_migrate` его игнорирует, потому что bootstrap
+   `target_place` нужен только no-CH ключам.
+3. `not_full_target_place_plan_fact` его игнорирует, потому что plan-fact ±1
+   относится только к PFO/GAP.
+4. Далее работают `skip_up`, `raise`, `reset`, `shelf_cleanup`,
+   `rebalance`, `calibration` и другие ladder-фазы.
+
+Итог: FULL живёт только по профилю, и NF bootstrap не может случайно
+переписать его `target_place`.
+
+#### 2. PFO key
+
+Если `position_profile` нет, но есть operational `pay_for_order`, то это
+**PFO**. Такой ключ уже активен, но ещё не имеет CH-профиля, поэтому ему нужен
+NF bootstrap:
+
+1. `validate_not_full_state` переводит ключ в `MIN_CPA`, но не ставит
+   `target_place`.
+2. `not_full_target_place_migrate` видит `target_place=0` и превращает его в
+   стартовую WB-позицию. Это первый bootstrap, а не коррекция.
+3. `not_full_target_place_plan_fact` в тот же тик не двигает только что
+   созданную стартовую позицию. На следующих тиках он уже делает `±1` по
+   `fact/resolve`.
+4. Sync-слой больше не сбрасывает такой ключ в `0`, даже если где-то выше
+   обнаружен overspend.
+
+Итог: PFO ключ получает bootstrap в preamble и потом живёт в NF-контуре без
+overspend-reset.
+
+#### 3. GAP key
+
+Если нет ни `position_profile`, ни operational `pay_for_order`, то это
+**GAP**. Он ещё не готов к NF bootstrap:
+
+1. `validate_not_full_state` может оставить его в активном NF-контуре только
+   если дальше есть смысл работать с ключом.
+2. `not_full_target_place_migrate` не должен подменять bootstrap-enable и
+   искусственно задавать стартовую позицию, пока у ключа нет operational PFO.
+3. После появления PFO этот ключ становится похож на сценарий PFO и уже
+   проходит NF migrate / plan-fact.
+
+Итог: GAP — это не “пустой FULL”, а отдельная bootstrap-зона, где нельзя
+автоматически делать NF target_place bootstrap так, будто ключ уже активен.
+
 Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 
 ## Structured logs
