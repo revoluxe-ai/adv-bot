@@ -26,6 +26,13 @@ class NotFullTargetPlacePlanFactExecutor:
         self._next_state_manager = NextStateManager(NotFullTargetPlacePlanFactExecutor)
 
     def execute(self, context: UpdateContext) -> None:
+        """Применить NF plan-fact логику к ключам без CH-профиля.
+
+        Сначала проверяется общий gate на актуальность plan/fact/views. Затем:
+        - при campaign overspend и NOT FULL MIN ключе с ``PFO > max`` сбрасываем
+          ``target_place`` в 0;
+        - иначе двигаем ``target_place`` на ±1 по соотношению fact/resolve.
+        """
         self._skip_reason = plan_fact_target_place_skip_reason(context.adv_state)
         if self._skip_reason is not None:
             return
