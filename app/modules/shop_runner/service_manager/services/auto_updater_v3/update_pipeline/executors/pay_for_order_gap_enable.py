@@ -57,6 +57,10 @@ class PayForOrderGapEnableExecutor:
     состояние, не инициализирует PFO bootstrap и не меняет смысл target_place
     для NF-контуров. Его роль — взять один разрешённый GAP-ключ и перевести его
     из OFF в MIN_CPA, чтобы дальше он уже мог жить в отдельном GAP-контуре.
+
+    Это intentionally gradual-контур: на одном тике включается только один
+    кандидат. Так мы избегаем массового перевода всей GAP-группы в MIN_CPA и
+    сохраняем предсказуемость поведения при колебаниях campaign fact/resolution.
     """
 
     phase_name = "pay_for_order_gap_enable"
@@ -82,7 +86,13 @@ class PayForOrderGapEnableExecutor:
 
 
 def _phase_skip_reason(adv_state: AdvState) -> str | None:
-    """Skip если нет fact, resolve недоступен или campaign уже в headroom-зоне."""
+    """Skip если нет fact, resolve недоступен или campaign уже в headroom-зоне.
+
+    Здесь мы не решаем судьбу конкретного GAP-кандидата, а только проверяем,
+    можно ли вообще запускать enable-фазу в этом тике. Если входные метрики ещё
+    не готовы или campaign уже слишком близка к потолку, фаза не должна
+    стартовать.
+    """
     if float(adv_state.resolve) <= 0:
         return "resolve_invalid"
     if adv_state.fact_pay_for_order is None:
@@ -104,6 +114,10 @@ def _pick_gap_enable_candidate(
 
     Это намеренно один кандидат на тик: GAP-контур должен включаться постепенно,
     без массового перехода всей группы в MIN_CPA.
+
+    Стабильный порядок нужен для повторяемости: если на тике несколько GAP-
+    кандидатов одновременно подходят по условиям, мы всегда выберем один и тот
+    же по deterministic sort-key. Это важно для дебага, репортов и регрессий.
     """
     candidates: list[KeywordDTO] = []
     for dto in keywords:

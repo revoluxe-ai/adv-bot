@@ -30,6 +30,11 @@ class NotFullValidateExecutor:
     последующему NF bootstrap. Здесь не должно быть ни bootstrap позиции, ни
     overspend-reset, ни логики GAP enable. Если ключ не PFO, он просто проходит
     мимо.
+
+    На уровне продукта это выглядит так:
+    сначала upstream определяет tier, затем validate подтверждает, что активный
+    no-CH ключ готов работать как PFO, и только после этого migrate может
+    взять его текущую WB-позицию как стартовый target_place.
     """
 
     phase_name = "validate_not_full_state"
@@ -44,6 +49,10 @@ class NotFullValidateExecutor:
         Validate не создает target_place и не занимается GAP. Он лишь
         нормализует режим до ``MIN_CPA`` для тех ключей, которые уже доказали,
         что они operational no-CH PFO.
+
+        После этого ключ ещё не имеет стартовой позиции. Это намеренно: NF
+        bootstrap разнесён на две фазы, и именно validate делает первую часть
+        работы, а migrate вторую.
         """
         self._skip_reason = None
         for dto in context.keywords:
