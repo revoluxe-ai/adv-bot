@@ -27,6 +27,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.target_place_matrix import (
     TargetPlaceMatrix,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+    resolve_keyword_v3_data_tier,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -109,9 +113,13 @@ class KeywordDTO:
         """Плоская проекция матрицы для planner/collector."""
         return self.target_place_matrix.states
 
-    def is_not_full(self) -> bool:
-        """NOT FULL: нет CH-матрицы (``position_profile`` пуст)."""
-        return not bool(self.position_profile)
+    @property
+    def data_tier(self) -> KeywordV3DataTier:
+        """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``."""
+        return resolve_keyword_v3_data_tier(
+            position_profile=self.position_profile,
+            keyword=self.calculated_keyword,
+        )
 
     def is_no_data_singleton(self) -> bool:
         """NO DATA singleton: единственный synthetic MIN_CPA-state с fact pay_for_order."""
@@ -122,8 +130,8 @@ class KeywordDTO:
         )
 
     def _validate_not_full_state(self, executor_name: str) -> None:
-        """NOT FULL + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
-        if not self.is_not_full():
+        """PFO/GAP + active: единственно допустимо MIN_CPA (tp — NF_migrate / plan_fact)."""
+        if self.data_tier == KeywordV3DataTier.FULL:
             return
         if self.current_mode == KeywordStrategyMode.OFF:
             return
