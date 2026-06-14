@@ -154,6 +154,14 @@ class NotFullTargetPlacePlanFactExecutor:
     ``target_place`` всё ещё равен ``0``, plan-fact не имеет права “поднять”
     этот sentinel в рабочее значение. Иначе корректор начнёт подменять сам
     bootstrap и нарушит контракт разделения фаз.
+
+    Решение проблемы здесь очень простое и очень жёсткое:
+
+    - bootstrap делает только migrate;
+    - plan-fact работает только по уже инициализированному PFO;
+    - ``0`` остаётся sentinel и не превращается в “первую настоящую позицию”;
+    - any overspend logic вынесена из этого executor-а в отдельные campaign-
+      level gates.
     """
 
     phase_name = "not_full_target_place_plan_fact"
