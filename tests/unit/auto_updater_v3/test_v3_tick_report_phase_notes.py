@@ -68,6 +68,7 @@ def test_enable_gap_fact_above_max() -> None:
         max_pay_for_order=550.0,
     )
     assert "max" in note
+    assert "overspend, enable не нужен" not in note
 
 
 @pytest.mark.unit

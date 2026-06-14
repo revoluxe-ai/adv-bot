@@ -294,11 +294,6 @@ def _note_enable_gap(
         return "fact pay_for_order недоступен"
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
-    if (
-        max_pay_for_order is not None
-        and float(fact_pay_for_order) > float(max_pay_for_order)
-    ):
-        return "fact > max (overspend, enable не нужен)"
     if max_pay_for_order is not None and float(max_pay_for_order) > 0:
         if cmp_over_threshold(
             float(fact_pay_for_order),
