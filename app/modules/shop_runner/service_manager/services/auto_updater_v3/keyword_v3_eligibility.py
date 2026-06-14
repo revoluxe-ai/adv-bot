@@ -233,9 +233,67 @@ def build_target_place_fallback_zero_by_keyword_id(
     campaign_orders_per_cart_7d: float | None = None,
     campaign_overspend: bool = False,
 ) -> dict[int, bool]:
-    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
+    """Построить карту принудительного сброса ``target_place`` в 0 по ключам V3.
 
-    При ``campaign_overspend`` NOT FULL active → force 0 (согласовано с NF_overspend_reset).
+    Используется на этапе подготовки тика V3 (``orchestrator``, ``DataUpdateManager``,
+    ``ApplyManager``) и передаётся в ``sync_keyword_target_places_v3`` как
+    ``target_place_fallback_zero_by_keyword_id`` при режиме кампании
+    ``CampaignMode.NORMAL`` (в отличие от ``force_all_target_place_zero`` для
+    ``CampaignMode.NO_DATA``).
+
+    Для каждого ключа с ``keyword_setting_original_id > 0`` вычисляет, нужно ли при
+    синхронизации в PostgreSQL записать ``KeywordSetting.target_place = 0``
+    (``NO_DATA_TARGET_PLACE_FALLBACK``) вместо расчёта по ladder-профилю позиций.
+    Значение ``True`` означает «force 0» только для **управляемых** ключей
+    (``hard_status`` managed) — фильтр применяется уже в ``sync_keyword_target_places_v3``.
+
+    Алгоритм (по приоритету для одного ``KeywordV3Context``):
+
+    1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
+    2. **NOT FULL active** — нет ``position_profile`` (нет CH-профиля / collapsed
+       ladder), но ``strategy_mode != OFF``:
+       - ``True``, если ``campaign_overspend=True`` (факт CPO кампании выше
+         ``plan.max_pay_for_order``; согласовано с ``NF_overspend_reset`` /
+         ``campaign_cpo_exceeds_max`` в ``not_full_target_place``);
+       - иначе ``False`` — sync **не** форсит 0; ``target_place`` для NOT FULL
+         управляется отдельно (preamble NF_migrate / NF_plan_fact_tp и сохранение
+         из ledger в ``_preserve_not_full_target_place_from_ledger``).
+    3. **Остальные случаи** — ``elig.target_place_fallback_zero`` из
+       ``resolve_keyword_v3_eligibility``, но только если ``strategy_mode != OFF``:
+
+       - ``KeywordV3DecisionTier.FULL`` → ``target_place_fallback_zero=False`` →
+         ``False`` в карте: позиция считается по полному CH-профилю;
+       - ``KEYWORD_PFO`` / ``KEYWORD_NO_DATA`` → ``target_place_fallback_zero=True`` →
+         ``True`` в карте: нет достаточных данных для ladder, min-bid fallback;
+       - ``OFF`` → всегда ``False``, даже если tier NO_DATA/PFO в eligibility
+         (ключ выключен — sync не перезаписывает ``target_place`` через fallback).
+
+    Карта согласована с ``build_eligibility_map`` для контекстов **с** профилем
+    (FULL/PFO/NO_DATA без ветки NOT FULL). Для NOT FULL active поведение
+    намеренно расходится: eligibility может давать ``target_place_fallback_zero=True``,
+    но sync ждёт ``campaign_overspend`` (см. тесты
+    ``test_build_target_place_fallback_zero_not_full_*``).
+
+    Args:
+        contexts: Все ``KeywordV3Context`` тика (managed + operable); общий
+            ``CampaignV3DecisionCache`` строится один раз на список.
+        campaign_orders_per_cart_7d: Пробрасывается в ``resolve_keyword_v3_eligibility``
+            (зарезервировано для campaign-level CPO; сейчас не меняет tier внутри
+            eligibility, но сохраняет единый контракт вызова с preamble/sync).
+        campaign_overspend: Флаг перерасхода кампании по plan/fact CPO; влияет
+            только на NOT FULL active ключи (ветка 2). Вычисляется через
+            ``campaign_overspend_from_plan_fact`` в ``orchestrator`` /
+            ``DataUpdateManager``.
+
+    Returns:
+        Словарь ``keyword_setting_original_id → force_zero``. Отсутствующий ``ks_id``
+        в sync трактуется как ``False`` (``.get(ks_id, False)``). Побочных эффектов
+        нет (только чтение контекстов и eligibility).
+
+    См. также:
+        ``sync_keyword_target_places_v3`` — потребитель карты при ``CAMPAIGN_NORMAL``;
+        ``KeywordV3Eligibility.target_place_fallback_zero`` — источник флага для
+        ключей с профилем; ``not_full_target_place`` — overspend-сброс для NOT FULL.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
