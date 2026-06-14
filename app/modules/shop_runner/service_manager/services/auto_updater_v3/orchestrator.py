@@ -145,7 +145,7 @@ async def process_adv_v3(
         tick_report.set_aggression_before(keywords)
         if complex_adv.auto_add_only_relevant_phrase:
             keywords = only_relevant_phrase_filter(keywords)
-        tick_data: TickData = await data_mgr.load(
+        tick_data = await data_mgr.load(
             complex_adv,
             keywords=keywords,
             wb_shop_data_manager=wb_shop_data_manager,
