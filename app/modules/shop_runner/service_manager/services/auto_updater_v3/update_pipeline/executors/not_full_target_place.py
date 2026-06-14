@@ -32,10 +32,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 class NotFullTargetPlaceMigrateExecutor:
     """Инициализировать ``target_place`` для активных PFO/GAP ключей.
 
-    Фаза нужна только на первом заходе NF-ключа, когда target_place ещё нулевой.
-    Она берёт округлённую текущую позицию WB и не трогает FULL, а также не
-    оживляет ``OFF``. В результате plan-fact видит уже стартовую позицию и дальше
-    может делать только ±1, не подменяя bootstrap.
+    Это первая NF bootstrap-фаза. Её смысл не в оптимизации ставки и не в
+    ladder-выборе, а в том, чтобы перевести no-CH ключ из состояния
+    ``target_place=0`` в состояние «есть стартовая точка регулировки».
+
+    Почему это нужно:
+    - до migrate у активного PFO/GAP ключа ``target_place=0`` означает не
+      целевую позицию, а отсутствие инициализации;
+    - после migrate ключ получает округлённую текущую WB-позицию и дальше уже
+      может участвовать в NF plan-fact как полноценный регулируемый элемент;
+    - FULL, OFF и ключи с уже заполненным target_place остаются без изменений.
+
+    Таким образом, migrate отделяет bootstrap от дальнейшей коррекции и не
+    смешивает no-CH контур с ladder-контуром.
     """
 
     phase_name = "not_full_target_place_migrate"
@@ -44,9 +53,16 @@ class NotFullTargetPlaceMigrateExecutor:
     def execute(self, context: UpdateContext) -> None:
         """Заполнить пустой ``target_place`` для активных PFO/GAP ключей.
 
-        Если у ключа уже есть target_place или он не находится в ``MIN_CPA``, фаза
-        ничего не меняет. Это защищает OFF/ladder-ключи от случайной инициализации
-        и сохраняет первый шаг как чистый bootstrap.
+        Шаг выполняется только если одновременно соблюдены все условия:
+
+        - ключ относится к PFO/GAP tier, а не к FULL;
+        - текущий режим уже ``MIN_CPA``;
+        - ``target_place`` ещё не инициализирован (равен ``0``).
+
+        Если любое из условий не выполнено, migrate не делает ничего. Это
+        гарантирует, что OFF не будет случайно «оживлён», FULL не попадёт в NF
+        bootstrap, а повторные тики не будут перетирать уже выбранный стартовый
+        target_place.
         """
         self._skip_reason = None
         for dto in context.keywords:
@@ -72,9 +88,15 @@ class NotFullTargetPlaceMigrateExecutor:
 class NotFullTargetPlacePlanFactExecutor:
     """Корректировать ``target_place`` для активных PFO/GAP ключей по plan-fact.
 
-    Фаза вызывается только после NF validate и NF migrate. Она не инициализирует
-    ключ и не сбрасывает его в ``0``: её роль — подстроить уже стартовавший NF
-    ключ на ±1 относительно факта и ``resolve``.
+    Это вторая NF фаза после bootstrap. Она не должна решать задачи инициализации,
+    не должна сбрасывать target_place в 0 и не должна подменять ladder-логики
+    FULL-ветки. Её единственная ответственность — после NF validate/migrate
+    двигать уже стартовавший PFO/GAP ключ на ``±1`` относительно
+    ``fact_pay_for_order`` и ``resolve``.
+
+    Важно: если ключ только что прошёл migrate, plan-fact в этом же тике его не
+    двигает. Так первый тик остаётся чистым bootstrap, а не bootstrap + correction
+    одновременно.
     """
 
     phase_name = "not_full_target_place_plan_fact"
@@ -86,9 +108,17 @@ class NotFullTargetPlacePlanFactExecutor:
     def execute(self, context: UpdateContext) -> None:
         """Применить NF plan-fact логику к активным PFO/GAP ключам.
 
-        Сначала проверяем общий gate plan/fact/views. Затем обновляем только
-        ключи, которые уже были инициализированы migrate-фазой или имеют
-        существующий NF target_place. ``FULL`` и ``OFF`` ключи не затрагиваются.
+        Алгоритм:
+
+        1. Проверить общий gate план/факт/views.
+        2. Пропустить FULL-ключи, потому что они живут в ladder-контуре.
+        3. Пропустить ключи, которые только что были инициализированы migrate
+           в этом же тике: их стартовая позиция должна сохраниться без
+           немедленной коррекции.
+        4. Для остальных PFO/GAP ключей применить plan-fact шаг ``±1``.
+
+        Тем самым эта фаза поддерживает NF-контур, но не выполняет bootstrap и
+        не вмешивается в OFF / FULL.
         """
         self._skip_reason = plan_fact_target_place_skip_reason(context.adv_state)
         if self._skip_reason is not None:

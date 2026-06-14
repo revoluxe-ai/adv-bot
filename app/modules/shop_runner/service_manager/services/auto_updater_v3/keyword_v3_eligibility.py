@@ -250,8 +250,12 @@ def build_target_place_fallback_zero_by_keyword_id(
     no-CH ключи получают стартовый ``target_place``. Для PFO/GAP ключей карта
     всегда возвращает ``False``: bootstrap и дальнейшая коррекция происходят в
     preamble-фазах ``NotFullValidateExecutor`` → ``NotFullTargetPlaceMigrateExecutor``
-    → ``NotFullTargetPlacePlanFactExecutor``. Sync-слой только сохраняет уже
-    подготовленное значение и не пытается заново инициализировать NF ключ.
+    → ``NotFullTargetPlacePlanFactExecutor``.
+
+    То есть sync-слой здесь выполняет только сохранение уже подготовленного
+    состояния. Он не должен заново инициализировать no-CH ключ, не должен
+    подменять bootstrap-логику NF и не должен делать overspend-reset в 0 для
+    PFO/GAP.
 
     Алгоритм (по приоритету для одного ``KeywordV3Context``):
 
@@ -260,7 +264,8 @@ def build_target_place_fallback_zero_by_keyword_id(
        ladder), но ``strategy_mode != OFF``:
        всегда ``False`` — sync **не** форсит 0; ``target_place`` для PFO/GAP
        управляется отдельно в preamble (validate → migrate → plan-fact), а sync
-       только уважает уже подготовленное значение из ledger/Redis.
+       только уважает уже подготовленное значение из ledger/Redis. Это ключевой
+       контракт: bootstrap no-CH ключа больше не происходит на стадии sync.
     3. **Остальные случаи** — ``elig.target_place_fallback_zero`` из
        ``resolve_keyword_v3_eligibility``, но только если ``strategy_mode != OFF``:
 
@@ -275,7 +280,8 @@ def build_target_place_fallback_zero_by_keyword_id(
     (FULL/PFO/NO_DATA без ветки PFO/GAP active). Для PFO/GAP поведение
     намеренно расходится: eligibility может давать ``target_place_fallback_zero=True``,
     но sync не должен сбрасывать такой ключ в ``0`` — этот контур обслуживается
-    отдельно NF pipeline-ом.
+    отдельно NF pipeline-ом. Это сделано специально, чтобы один и тот же
+    bootstrap-контракт не реализовывался в двух местах с разной семантикой.
 
     Args:
         contexts: Все ``KeywordV3Context`` тика (managed + operable); общий

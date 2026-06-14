@@ -161,7 +161,10 @@ def _note_validate_not_full(prepared: PreparedListLike) -> str:
         if mode == KeywordStrategyMode.OFF:
             continue
         if not bool(ctx.position_profile):
-            return "PFO/GAP active уже MIN (tp — migrate / plan-fact)"
+            return (
+                "PFO/GAP active уже MIN: ключ прошёл NF validate и готов к "
+                "bootstrap target_place через migrate"
+            )
     return "нет PFO/GAP active ключей"
 
 
@@ -172,7 +175,10 @@ def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
         if mode == KeywordStrategyMode.OFF:
             continue
         if not bool(ctx.position_profile):
-            return "есть PFO/GAP MIN с tp=0 для bootstrap на текущую позицию"
+            return (
+                "есть PFO/GAP MIN с tp=0: первый bootstrap текущей позиции WB "
+                "для no-CH ключа"
+            )
     return "нет кандидатов migrate (tp≠0, FULL или OFF)"
 
 

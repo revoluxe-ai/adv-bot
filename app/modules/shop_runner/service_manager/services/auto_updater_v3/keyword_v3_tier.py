@@ -1,15 +1,31 @@
 """SSOT tier ключа V3.
 
-Модуль отвечает за единую классификацию operational-состояния ключа, чтобы
-планировщик, NF-поток, bootstrap-ветки и sync-слой не использовали разрозненные
-эвристики вроде ``position_profile is None``.
+Модуль вводит единую операционную классификацию ключа, чтобы разные части
+updater-а не принимали собственные решения на основе косвенных признаков вроде
+``position_profile is None`` или ``target_place == 0``. Это особенно важно для
+NF-контуров: после рефакторинга они больше не должны интерпретировать
+отсутствие CH-профиля как «можно сбросить всё в 0», а должны различать bootstrap
+активного no-CH ключа и полностью пустой GAP-зоны.
 
-В этой модели есть три tier:
-- ``FULL`` — есть CH-профиль, ключ должен жить по ladder-контракту;
-- ``PFO`` — профиля нет, но есть operational ``pay_for_order``; это активный
-  no-CH ключ для NF validate/migrate/plan-fact;
-- ``GAP`` — нет ни CH-профиля, ни operational ``pay_for_order``; это bootstrap
-  контур, где NF-инициализация не должна подменять enable/bootstrap логику.
+Семантика tier-ов:
+
+- ``FULL`` — у ключа есть CH-профиль. Такой ключ живёт в ladder-контуре: здесь
+  работают raise, skip_up, rebalancing, calibration и все операции, которые
+  опираются на CPO ступеней из профиля.
+- ``PFO`` — CH-профиля нет, но есть operational ``pay_for_order``. Это активный
+  no-CH ключ: он должен пройти NF validate, затем получить bootstrap
+  ``target_place`` от текущей WB-позиции, а после этого регулироваться только
+  plan-fact шагом ``±1``.
+- ``GAP`` — нет ни CH-профиля, ни operational ``pay_for_order``. Это не NF
+  регулирование, а bootstrap/enable контур: ключ ещё не готов к NF-инициализации
+  и не должен получать искусственный bootstrap-``target_place``.
+
+Эта классификация нужна как SSOT для:
+
+- NF validate / migrate / plan-fact;
+- ladder-веток, которые должны работать только по ``FULL``;
+- sync-слоя, где no-CH ключи нельзя заново инициализировать через fallback;
+- отчётности и документации, чтобы различать bootstrap PFO/GAP и ladder FULL.
 """
 
 from __future__ import annotations
@@ -28,12 +44,24 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile
 class KeywordV3DataTier(str, Enum):
     """Операционный tier ключа V3.
 
-    FULL означает, что у ключа уже есть CH-профиль и дальнейшие ladder-решения
-    должны опираться на него. PFO означает отсутствие профиля при наличии
-    operational ``pay_for_order``: такие ключи живут в NF-потоке, но могут
-    участвовать в plan-fact регулировке. GAP означает отсутствие и профиля, и
-    operational ``pay_for_order``: это отдельная зона bootstrap/enable без
-    NF-миграции.
+    Атрибут ``data_tier`` у ``KeywordDTO`` и этот enum — это один и тот же
+    продуктовый контракт: FULL / PFO / GAP описывают не режим ключа, а его
+    операционную готовность к разным веткам updater-а.
+
+    ``FULL``:
+        Есть CH-профиль. Такие ключи должны продолжать путь по ladder-профилю,
+        а NF-фазы для них не выполняют bootstrap или plan-fact коррекцию.
+
+    ``PFO``:
+        CH-профиля нет, но есть operational ``pay_for_order``. Это активный
+        no-CH ключ, для которого допустим NF-контур: validate переводит ключ в
+        ``MIN_CPA``, migrate инициализирует стартовый ``target_place``, а
+        plan-fact поддерживает его далее.
+
+    ``GAP``:
+        Нет CH-профиля и нет operational ``pay_for_order``. Это зона bootstrap/
+        enable: ключ ещё нельзя считать NF-активным, поэтому он не должен
+        проходить через NF bootstrap как будто у него уже есть PFO.
     """
 
     FULL = "full"
@@ -48,12 +76,17 @@ def resolve_keyword_v3_data_tier(
 ) -> KeywordV3DataTier:
     """Определить операционный tier ключа.
 
-    Классификация нужна как SSOT для NF-веток и bootstrap-веток:
-    - ``FULL``: есть непустой CH-профиль, значит ключ должен жить по ladder;
-    - ``PFO``: профиля нет, но есть положительный operational ``pay_for_order``;
-      это активный NO-CH/NF-кейс, где допустимы migrate и plan-fact шаги;
-    - ``GAP``: профиля нет и ``pay_for_order`` не задан или невалиден, значит
-      ключ попадает в enable/bootstrap-контур, а не в NF-регулятор.
+    Возвращаемое значение используется как SSOT для всего NF/ladder контуров:
+
+    - если есть непустой CH-профиль, ключ считается ``FULL`` и дальше должен
+      жить в ladder-ветке;
+    - если профиля нет, но operational ``pay_for_order`` положительный, ключ
+      относится к ``PFO`` и может проходить NF validate → migrate → plan-fact;
+    - если нет ни профиля, ни operational PFO, ключ относится к ``GAP`` и
+      должен идти через bootstrap/enable механику, а не через NF bootstrap.
+
+    Здесь намеренно не пытаемся интерпретировать ``OFF``/``MIN_CPA``/прочие
+    режимы: функция классифицирует только наличие данных, а не текущий режим.
     """
     if bool(position_profile):
         return KeywordV3DataTier.FULL
