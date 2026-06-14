@@ -65,13 +65,21 @@ class NextStateManager:
         fact_pay_for_order: float,
         resolve: float,
     ) -> None:
-        """±1 ``target_place`` по plan-fact CPO vs resolve для NOT FULL MIN."""
+        """±1 ``target_place`` по plan-fact CPO vs resolve для NOT FULL MIN.
+
+        Это последняя защита NF plan-fact от старого reset-в-0 бага. Даже если
+        helper когда-нибудь ошибочно вернёт ``0``, этот слой мутации не запишет
+        его в DTO: plan-fact имеет право только корректировать уже существующую
+        рабочую позицию, а не выполнять reset или bootstrap.
+        """
         new_place = adjust_not_full_target_place_for_plan_fact(
             keyword,
             fact_pay_for_order=fact_pay_for_order,
             resolve=resolve,
         )
         if new_place is None:
+            return
+        if new_place == 0:
             return
         keyword.current_target_place = NextTargetPlace(
             new_target_place=new_place,

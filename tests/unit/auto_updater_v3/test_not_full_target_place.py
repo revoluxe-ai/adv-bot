@@ -40,6 +40,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
     NotFullTargetPlacePlanFactExecutor,
     build_normal_preamble_executors,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state import (
+    manager as next_state_manager_module,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
+    NextStateManager,
+)
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
 
 
@@ -239,6 +245,32 @@ def test_plan_fact_executor_does_not_reset_tp_zero_on_overspend() -> None:
     ex.execute(ctx)
     assert ex.skip_reason is None
     assert ctx.keywords[0].current_target_place == 15
+
+
+@pytest.mark.unit
+def test_next_state_manager_refuses_zero_from_nf_plan_fact_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Даже ошибочный helper не должен превратить NF plan-fact в reset-в-0."""
+    dto = _not_full_dto(target_place=14, position=14.0, pay_for_order=850.0)
+
+    def _broken_plan_fact_helper(*_args: object, **_kwargs: object) -> int:
+        return 0
+
+    monkeypatch.setattr(
+        next_state_manager_module,
+        "adjust_not_full_target_place_for_plan_fact",
+        _broken_plan_fact_helper,
+    )
+    NextStateManager(
+        NotFullTargetPlacePlanFactExecutor,
+    ).adjust_not_full_target_place_plan_fact(
+        dto,
+        fact_pay_for_order=800.0,
+        resolve=100.0,
+    )
+
+    assert dto.current_target_place == 14
 
 
 @pytest.mark.unit
