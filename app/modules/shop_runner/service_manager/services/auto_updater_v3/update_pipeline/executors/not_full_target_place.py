@@ -1,4 +1,14 @@
-"""NF: миграция и plan-fact регулировка ``target_place`` для ключей без CH-профиля."""
+"""NF bootstrap и plan-fact регулировка ``target_place`` для no-CH ключей.
+
+Модуль содержит две соседние фазы NF-контуры:
+- ``NotFullTargetPlaceMigrateExecutor``: первый bootstrap ``target_place`` из
+  текущей WB-позиции для активных PFO/GAP ключей;
+- ``NotFullTargetPlacePlanFactExecutor``: последующая коррекция на ``±1`` по
+  fact/resolve после bootstrap.
+
+Обе фазы работают только для no-CH контуров. FULL ladder-ключи проходят мимо,
+а ``OFF`` не инициализируется NF-логикой.
+"""
 
 from __future__ import annotations
 

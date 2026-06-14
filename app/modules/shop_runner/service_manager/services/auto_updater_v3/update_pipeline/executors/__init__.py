@@ -1,14 +1,28 @@
 """Executors preamble NORMAL для ``UpdatePipeline``.
 
-Порядок: V → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R → enable → pfo_off → cal.
+Этот модуль задаёт канонический порядок in-place фаз NORMAL-контента и тем
+самым фиксирует продуктовый контракт между ladder-контуром FULL и no-CH
+контуром PFO/GAP.
 
-**Нет отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``):**
+Порядок фаз:
+V → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R → enable →
+pfo_off → cal.
 
-- нет CH-профиля (PFO или GAP) → **NF** (`NotFullValidateExecutor`): active → MIN;
-  ``target_place`` — migrate + plan-fact (`NotFullTargetPlace*Executor``);
-- есть CH-профиля → лестница и CPO из профиля (FULL); отдельный cap по ``max_allowed_mode`` не нужен.
+Смысл разбиения:
+- **NF** (`NotFullValidateExecutor`) переводит активные PFO/GAP ключи в
+  ``MIN_CPA`` и оставляет ``OFF`` без изменений;
+- **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) инициализирует стартовый
+  ``target_place`` текущей WB-позицией только для активных PFO/GAP ключей с
+  нулевым target_place;
+- **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) выполняет только
+  ``±1`` по fact/resolve после bootstrap, не затрагивая FULL и не делая reset
+  в ``0``;
+- **skip_up / raise / reset / shelf / rebalance / calibration** обслуживают
+  исключительно FULL ladder-контур.
 
-См. ``docks/V3_UPDATER_VALIDATION.md`` § «Cap-down (legacy B) — намеренно удалён».
+Отдельной фазы ``cap_down`` (legacy ``CapDownExecutor`` / ``plan_mode_cap_down``)
+здесь нет: её контракт полностью заменён явным делением на FULL и PFO/GAP.
+Подробности и обоснование — в ``docks/V3_UPDATER_VALIDATION.md``.
 """
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.base import (

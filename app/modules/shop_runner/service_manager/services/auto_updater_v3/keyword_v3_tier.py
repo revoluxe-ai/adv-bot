@@ -1,4 +1,16 @@
-"""SSOT tier ключа V3: FULL / PFO / NO DATA по ``CalculatedKeyword.pay_for_order`` и CH+conv."""
+"""SSOT tier ключа V3.
+
+Модуль отвечает за единую классификацию operational-состояния ключа, чтобы
+планировщик, NF-поток, bootstrap-ветки и sync-слой не использовали разрозненные
+эвристики вроде ``position_profile is None``.
+
+В этой модели есть три tier:
+- ``FULL`` — есть CH-профиль, ключ должен жить по ladder-контракту;
+- ``PFO`` — профиля нет, но есть operational ``pay_for_order``; это активный
+  no-CH ключ для NF validate/migrate/plan-fact;
+- ``GAP`` — нет ни CH-профиля, ни operational ``pay_for_order``; это bootstrap
+  контур, где NF-инициализация не должна подменять enable/bootstrap логику.
+"""
 
 from __future__ import annotations
 

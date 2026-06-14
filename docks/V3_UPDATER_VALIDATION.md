@@ -46,8 +46,9 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 | Ситуация | Кто обрабатывает |
 |----------|------------------|
-| Нет CH-профиля (`position_profile` пуст), PFO или GAP | **NF** — active → ``MIN_CPA``; tp: migrate ``0→round(pos)−1``, plan-fact ±1 (gate fact+views) |
-| Есть CH-профиль | Лестница M/O/C и CPO из профиля (**FULL**); режим берётся из профиля, cap по tier не режет |
+| Есть CH-профиль | **FULL** — ladder-контур: M/O/C, raise/skip_up/rebalance/calibration работают по профилю; NF-фазы не вмешиваются |
+| Нет CH-профиля, но есть operational ``pay_for_order`` | **PFO** — NF-контур: validate → migrate (bootstrap target_place из текущей WB-позиции) → plan-fact (±1); дальше ключ может жить как активный MIN_CPA без CH-профиля |
+| Нет CH-профиля и нет operational ``pay_for_order`` | **GAP** — bootstrap/enable-контур: OFF → GAP enable / NO DATA bootstrap; NF migrate не инициализирует такой ключ до появления операционного PFO |
 | UP/realloc/calibration | ``can_target_mode(eligibility, mode)`` — tier без профиля не даёт OPT/MAX |
 
 **Не восстанавливать** ``CapDownExecutor`` без изменения продуктового контракта «есть профиль →
@@ -59,11 +60,11 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 Фазы NORMAL (только `allows_ladder_phases`, in-place executors):
 
 1. **V** (`HardStatusValidateExecutor`) — авто hard_status=1 → OFF.
-2. **NF** (`NotFullValidateExecutor`) — NOT FULL active → MIN (tp не сбрасывается в 0); **до migrate**, иначе migrate не видит MIN_CPA.
-3. **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) — NOT FULL MIN + tp=0 → текущая позиция WB.
-4. **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) — tp ±1 по fact vs 0.9×resolve; gate: plan/fact и views; без сброса в 0 при overspend.
-5. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place (NOT FULL пропуск).
-6. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve по ladder CPO (NOT FULL пропуск).
+2. **NF** (`NotFullValidateExecutor`) — активные PFO/GAP ключи переводятся в ``MIN_CPA``; ``OFF`` не оживляется, FULL не трогается.
+3. **NF_migrate** (`NotFullTargetPlaceMigrateExecutor`) — первый bootstrap NF-ключа: если ``target_place=0``, берём текущую WB-позицию и записываем её как стартовую ``target_place``. Это нужно только для активных PFO/GAP ключей.
+4. **NF_plan_fact** (`NotFullTargetPlacePlanFactExecutor`) — после bootstrap делает только ``±1`` по сравнению ``fact_pay_for_order`` и ``resolve``; не инициализирует ключ и не сбрасывает его в 0.
+5. **skip_up** (`SkipUpTargetPlaceExecutor`) — alias UP на том же target_place. Работает только в FULL-контуре, потому что NF/PFO/GAP не имеют права идти в ladder alias-ветку.
+6. **raise** (`RaiseStateToTargetCpoExecutor`) — UP до resolve CPO по ladder. Работает только в FULL-контуре.
 7. **reset** (`ResetOverMaxCpoOnOverspendExecutor`) — сброс ключей с CPO > max при overspend (лестница).
 8. **S** (`ShelfCleanupExecutor`) — shelf active + rec FAIL: **while** на ключе — effective DOWN / OFF до PASS или OFF (счётчик ladder-шагов); затем **столько же** UP-итераций min CPO из list2 (`run_potential_up_steps`), пересборка списков каждый шаг.
 10. **R** (`RebalanceExecutor`) — симметричный DOWN max-CPO + UP min-CPO (до 50 циклов).
@@ -72,6 +73,16 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 13. **calibration** (`ResolveCalibrationExecutor`) — CAL UP/DOWN через `run_calibration_*`; gate plan/fact AND views.
 14. **Post-gate** — `select_v3_post_gate_actions` → DO_NOTHING (shelf в preamble S).
 15. **Snapshots** — `ChangePlanFact` + `ChangePlanFactViews`.
+
+### Детальный контракт FULL / PFO / GAP
+
+Раньше NF-логика опиралась на размытое «нет CH-профиля» и helper `is_not_full()`. После рефакторинга это разбито на три явных operational tier:
+
+- **FULL** — есть `position_profile`; ключ живёт по ladder и обслуживается фазами `skip_up`, `raise`, `reset`, `shelf_cleanup`, `rebalance`, `calibration`. NF validate/migrate/plan-fact сюда не лезут.
+- **PFO** — `position_profile` отсутствует, но есть operational `pay_for_order`; это активный no-CH ключ, который должен пройти NF validate, затем bootstrap target_place в migrate, затем plan-fact ±1.
+- **GAP** — нет `position_profile` и нет operational `pay_for_order`; это bootstrap/enable зона. Такие ключи не должны получить NF bootstrap-позицию, пока не появится operational PFO.
+
+Ключевое следствие: NF-ветка больше не делает “reset в 0”, не подменяет bootstrap и не пытается смешивать ladder-контур FULL с no-CH контуром PFO/GAP. Весь bootstrap для активных no-CH ключей идёт через NF validate → NF migrate → NF plan-fact, а всё ladder-управление остаётся у FULL.
 
 Prod-хелперы (бывший `rollout_planner.py`): `resolve_threshold.py`, `ladder_tick_helpers.py`.
 

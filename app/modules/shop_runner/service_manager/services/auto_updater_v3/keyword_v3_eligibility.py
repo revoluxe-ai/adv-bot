@@ -246,14 +246,21 @@ def build_target_place_fallback_zero_by_keyword_id(
     Значение ``True`` означает «force 0» только для **управляемых** ключей
     (``hard_status`` managed) — фильтр применяется уже в ``sync_keyword_target_places_v3``.
 
+    После рефакторинга NF bootstrap эта карта больше не является местом, где
+    no-CH ключи получают стартовый ``target_place``. Для PFO/GAP ключей карта
+    всегда возвращает ``False``: bootstrap и дальнейшая коррекция происходят в
+    preamble-фазах ``NotFullValidateExecutor`` → ``NotFullTargetPlaceMigrateExecutor``
+    → ``NotFullTargetPlacePlanFactExecutor``. Sync-слой только сохраняет уже
+    подготовленное значение и не пытается заново инициализировать NF ключ.
+
     Алгоритм (по приоритету для одного ``KeywordV3Context``):
 
     1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
-    2. **NOT FULL active** — нет ``position_profile`` (нет CH-профиля / collapsed
+    2. **PFO/GAP active** — нет ``position_profile`` (нет CH-профиля / collapsed
        ladder), но ``strategy_mode != OFF``:
-       всегда ``False`` — sync **не** форсит 0; ``target_place`` для NOT FULL
-       управляется отдельно (preamble NF_migrate / NF_plan_fact_tp и сохранение
-       из ledger в ``_preserve_not_full_target_place_from_ledger``).
+       всегда ``False`` — sync **не** форсит 0; ``target_place`` для PFO/GAP
+       управляется отдельно в preamble (validate → migrate → plan-fact), а sync
+       только уважает уже подготовленное значение из ledger/Redis.
     3. **Остальные случаи** — ``elig.target_place_fallback_zero`` из
        ``resolve_keyword_v3_eligibility``, но только если ``strategy_mode != OFF``:
 
@@ -265,9 +272,10 @@ def build_target_place_fallback_zero_by_keyword_id(
          (ключ выключен — sync не перезаписывает ``target_place`` через fallback).
 
     Карта согласована с ``build_eligibility_map`` для контекстов **с** профилем
-    (FULL/PFO/NO_DATA без ветки NOT FULL). Для NOT FULL active поведение
+    (FULL/PFO/NO_DATA без ветки PFO/GAP active). Для PFO/GAP поведение
     намеренно расходится: eligibility может давать ``target_place_fallback_zero=True``,
-    но sync не должен сбрасывать такой ключ в ``0``.
+    но sync не должен сбрасывать такой ключ в ``0`` — этот контур обслуживается
+    отдельно NF pipeline-ом.
 
     Args:
         contexts: Все ``KeywordV3Context`` тика (managed + operable); общий
