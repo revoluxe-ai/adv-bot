@@ -275,3 +275,40 @@ async def test_page_to_date_range_and_total_pages() -> None:
         total_pages = await manager.get_total_pages(adv_setting_mock, page_size=14)
 
     assert total_pages == 2
+
+
+@pytest.mark.asyncio
+async def test_earliest_stat_date_uses_latest_required_source() -> None:
+    """Если карточная история начинается раньше кампании, граница страниц не должна уезжать назад."""
+    today = datetime.datetime.now().date()
+    common_earliest = today - datetime.timedelta(days=60)
+    adv_earliest = today - datetime.timedelta(days=27)
+
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.nmids = [1]
+    adv_setting_mock.adv_id = 2
+    adv_setting_mock.search_adv_id = 3
+
+    with patch.object(
+        manager,
+        "_get_min_date",
+        new=AsyncMock(side_effect=[common_earliest, adv_earliest]),
+    ):
+        earliest_date = await manager.get_earliest_stat_date(adv_setting_mock)
+
+    assert earliest_date == adv_earliest
+
+
+@pytest.mark.asyncio
+async def test_earliest_stat_date_returns_none_without_auto_adv() -> None:
+    """Без auto adv_id экран не должен делать ClickHouse-запросы для границы страниц."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.nmids = [1]
+    adv_setting_mock.adv_id = None
+    adv_setting_mock.search_adv_id = 3
+
+    with patch.object(manager, "_get_min_date", new=AsyncMock()) as get_min_date_mock:
+        earliest_date = await manager.get_earliest_stat_date(adv_setting_mock)
+
+    assert earliest_date is None
+    get_min_date_mock.assert_not_awaited()

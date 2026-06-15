@@ -149,11 +149,13 @@ class CommonStatDataManager:
         concatenated_result = full_wb_adv_stat.concatenate_stats(
             auto_adv_stat, auction_adv_stat
         )
-        concatenated_result.sort(key=lambda x: x.date)
+        concatenated_result.sort(key=lambda x: x.date, reverse=True)
         return concatenated_result
 
     async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
-        """Возвращает самую раннюю дату, доступную для страницы статистики."""
+        """Возвращает первую дату, когда для дневной статистики есть все источники."""
+        if adv_setting.adv_id is None:
+            return None
         candidate_dates: list[date] = []
 
         nmid = adv_setting.nmids[0] if adv_setting.nmids else None
@@ -185,7 +187,7 @@ class CommonStatDataManager:
 
         if not candidate_dates:
             return None
-        return min(candidate_dates)
+        return max(candidate_dates)
 
     async def get_total_pages(
         self, adv_setting: AdvSetting, page_size: int = 14
