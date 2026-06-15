@@ -131,6 +131,15 @@ class SettingKeywords(CallbackData, prefix="setting_keywords"):
     reset_filter: bool = False
 
 
+class KeywordsDailyStats(CallbackData, prefix="kw_daily_stats"):
+    """Пагинация дневной статистики на странице ключей."""
+
+    adv_original_id: int
+    page: int = 1
+    keywords_page: int = 1
+    sort_mode: str = "by_adv"
+
+
 class SettingKeyword(CallbackData, prefix="setting_keyword"):
     keyword_setting_original_id: int
 

@@ -1,3 +1,5 @@
+"""ClickHouse helpers for daily common-card statistics."""
+
 import logging
 import time
 from datetime import datetime, timedelta
@@ -78,6 +80,66 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
     end_date = datetime.now()
     start_date = end_date - timedelta(days=last_days)
 
+    query = """
+    SELECT
+        toDate(date) AS stat_date,
+        SUM(open_card) AS open_card,
+        SUM(add_to_cart) AS add_to_cart,
+        SUM(orders) AS orders,
+        SUM(orders_sum) AS orders_sum,
+        SUM(buy_outs) AS buy_outs
+    FROM wb_common_stat
+    WHERE nmid = %(nmid)s
+      AND date BETWEEN %(start_date)s AND %(end_date)s
+      AND version = (
+        SELECT MAX(version)
+        FROM wb_common_stat AS inner_stat
+        WHERE inner_stat.nmid = %(nmid)s
+          AND inner_stat.date = wb_common_stat.date
+      )
+    GROUP BY stat_date
+    ORDER BY stat_date DESC
+    """
+
+    params = {
+        "nmid": nmid,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
+    }
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(query, parameters=params)
+
+    stats: list[CommonCardStat] = []
+    for row in result.result_rows:
+        stat = CommonCardStat(
+            nmid=nmid,
+            open_card=row[1],
+            add_to_cart=row[2],
+            orders=row[3],
+            orders_sum=row[4],
+            buy_outs=row[5],
+        )
+        stat.date = row[0]
+        stats.append(stat)
+
+    return stats
+
+
+async def get_stats_by_date_range(
+    nmid: int, start_date: datetime, end_date: datetime
+) -> list[CommonCardStat]:
+    """
+    Возвращает статистику по дням за заданный диапазон дат.
+
+    Args:
+        nmid: Артикул товара.
+        start_date: Начало диапазона включительно.
+        end_date: Конец диапазона включительно.
+
+    Returns:
+        list[CommonCardStat]: Статистика по дням в обратном хронологическом порядке.
+    """
     query = """
     SELECT
         toDate(date) AS stat_date,
