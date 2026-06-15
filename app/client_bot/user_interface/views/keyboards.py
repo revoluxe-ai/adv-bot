@@ -357,6 +357,7 @@ def get_keywords_setting_keyboard(
     sort_mode: str = "default",
     image_mode: str = "graphic",
 ):
+    """Клавиатура списка ключей на странице кампании."""
     from . import keyword_statuses_util as k_util
 
     def sorting_keywords(
@@ -584,6 +585,19 @@ def get_keywords_setting_keyboard(
     bottoms.append(
         [
             InlineKeyboardButton(
+                text="Статистика по дням",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_setting.id,
+                    page=1,
+                    keywords_page=page,
+                ).pack(),
+            )
+        ]
+    )
+
+    bottoms.append(
+        [
+            InlineKeyboardButton(
                 text="К настройкам АРК",
                 callback_data=callbacks.Adv(adv_original_id=adv_setting.id).pack(),
             )
@@ -591,6 +605,55 @@ def get_keywords_setting_keyboard(
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
+
+
+def get_keywords_daily_stats_keyboard(
+    adv_original_id: int,
+    page: int,
+    total_pages: int,
+    keywords_page: int,
+) -> InlineKeyboardMarkup:
+    """Клавиатура экрана дневной статистики ключей."""
+    builder = InlineKeyboardBuilder()
+    current_page = min(max(page, 1), max(total_pages, 1))
+    nav_buttons: list[InlineKeyboardButton] = []
+
+    if total_pages > 1 and current_page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_original_id,
+                    page=current_page - 1,
+                    keywords_page=keywords_page,
+                ).pack(),
+            )
+        )
+    if total_pages > 1 and current_page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_original_id,
+                    page=current_page + 1,
+                    keywords_page=keywords_page,
+                ).pack(),
+            )
+        )
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    builder.row(
+        InlineKeyboardButton(
+            text="К списку ключевых слов",
+            callback_data=callbacks.SettingKeywords(
+                adv_original_id=adv_original_id,
+                type="by_adv",
+                page=keywords_page,
+            ).pack(),
+        )
+    )
+    return builder.as_markup()
 
 
 def get_keyword_setting_keyboard(
