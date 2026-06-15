@@ -127,6 +127,9 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     key_mv = edit_header("min_views_for_ml_predict")
     assert key_mv in row
     row[key_mv] = 47
+    key_v3_step = edit_header("keyword_calibration_max_step")
+    assert key_v3_step in row
+    row[key_v3_step] = 7
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
         updated = await apply_adv_excel_rows(
@@ -141,6 +144,7 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
         await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
     ).scalar_one()
     assert fresh.min_views_for_ml_predict == 47
+    assert fresh.keyword_calibration_max_step == 7
 
 
 @pytest.mark.asyncio

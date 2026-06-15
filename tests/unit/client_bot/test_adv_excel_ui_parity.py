@@ -44,6 +44,7 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "sales_predict_method": "app/client_bot/user_interface/handlers/sales_predict_method_toggle.py",
     "automatic_version": "app/modules/shop_runner/service_manager/auto_updater_version_toggle/telegram/handlers.py",
     "aggressiveness": "app/modules/shop_runner/service_manager/v3_rollout_aggressiveness_toggle/telegram/handlers.py",
+    "keyword_calibration_max_step": "app/modules/v3_calibration_step_setting/telegram_handler.py",
     "white_list_mode": "app/client_bot/user_interface/handlers/white_list_mode_toggle.py",
     "individual_keywords_target_place_mode": "app/client_bot/user_interface/handlers/individual_keywords_target_place_toggle.py",
     "target_position_mode": "app/client_bot/user_interface/handlers/target_position_mode_toggle.py",
