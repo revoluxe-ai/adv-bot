@@ -60,6 +60,15 @@ def test_edit_header_aggressiveness_uses_orm_field_name() -> None:
 
 
 @pytest.mark.unit
+def test_edit_header_keyword_calibration_step_uses_orm_field_name() -> None:
+    h = edit_header("keyword_calibration_max_step")
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "keyword_calibration_max_step"
+    assert s == "INT"
+
+
+@pytest.mark.unit
 def test_parse_header_edit_bool() -> None:
     k, f, s = parse_header("EDIT__bot_active__BOOL")
     assert k == "EDIT"
@@ -119,7 +128,7 @@ def test_enum_names_for_field_strategy() -> None:
 
 @pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 2
+    assert EXCEL_TEMPLATE_VERSION == 3
 
 
 @pytest.mark.unit
