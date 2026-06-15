@@ -128,15 +128,25 @@ def _apply_numeric_validation(
     if data_row_count <= 0:
         return
     last_row = data_start_row + data_row_count - 1
-    kpi_fields = {"plan_for_sales_for_day", "target_price_for_order", "max_price_for_order"}
+    numeric_rules: dict[str, tuple[str, str, str | None]] = {
+        "plan_for_sales_for_day": ("decimal", "greaterThanOrEqual", "1"),
+        "target_price_for_order": ("decimal", "greaterThanOrEqual", "1"),
+        "max_price_for_order": ("decimal", "greaterThanOrEqual", "1"),
+        "auto_shelf_max_bid_rub": ("decimal", "greaterThanOrEqual", "1"),
+        "auto_shelf_min_bid_distance_rub": ("decimal", "greaterThanOrEqual", "1"),
+        "auto_shelf_target_test_impressions": ("decimal", "greaterThanOrEqual", "1"),
+        "auto_shelf_target_test_observation_minutes": ("decimal", "greaterThanOrEqual", "60"),
+        "auto_shelf_test_share": ("decimal", "greaterThan", "0"),
+    }
     for col_idx, name in enumerate(headers, start=1):
         _kind, field, _suffix = parse_header(name)
-        if field not in kpi_fields:
+        if field not in numeric_rules:
             continue
+        dv_type, operator, formula1 = numeric_rules[field]
         dv = DataValidation(
-            type="decimal",
-            operator="greaterThanOrEqual",
-            formula1="1",
+            type=dv_type,
+            operator=operator,
+            formula1=formula1,
             allow_blank=True,
         )
         ws.add_data_validation(dv)

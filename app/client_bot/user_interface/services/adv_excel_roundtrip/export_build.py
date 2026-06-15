@@ -17,11 +17,17 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EXCEL_TEMPLATE_VERSION,
+    EDITABLE_SHELF_BID_CONTROL_COLUMNS,
     column_header,
     edit_header,
+    ordered_edit_fields,
     serialize_cell_value,
+    serialize_shelf_bid_control_cell,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
+    AutoShelfBidControlSettings,
+)
 from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
@@ -91,9 +97,7 @@ async def _fact_snapshot(adv: AdvSetting) -> tuple[float | None, float | None]:
 
 
 def _ordered_edit_fields() -> list[str]:
-    from app.client_bot.user_interface.services.adv_excel_roundtrip import schema as _schema
-
-    return sorted(_schema.EDITABLE_ADV_SETTING_COLUMNS)
+    return ordered_edit_fields()
 
 
 def _base_ro_columns() -> list[str]:
@@ -151,6 +155,14 @@ async def build_adv_excel_export(
                 if offer_id:
                     offer_by_nmid[int(nmid)] = str(offer_id)
 
+        shelf_settings_by_nmid: dict[int, AutoShelfBidControlSettings] = {}
+        if nmids_for_lookup:
+            stmt_shelf = select(AutoShelfBidControlSettings).where(
+                AutoShelfBidControlSettings.nmid.in_(nmids_for_lookup)
+            )
+            for settings in (await session.execute(stmt_shelf)).scalars().all():
+                shelf_settings_by_nmid[int(settings.nmid)] = settings
+
     active = [a for a in advs if is_active_adv(a)]
     headers = _base_ro_columns() + [edit_header(f) for f in _ordered_edit_fields()]
 
@@ -172,6 +184,9 @@ async def build_adv_excel_export(
         offer_id, export_issue = _offer_id_and_export_issue(
             adv, first_nmid=nmid, offer_by_nmid=offer_by_nmid
         )
+        shelf_settings: AutoShelfBidControlSettings | None = None
+        if nmid is not None and len(adv.nmids or []) == 1:
+            shelf_settings = shelf_settings_by_nmid.get(int(nmid))
         row: dict[str, Any] = {
             column_header("RO", "excel_template_version"): EXCEL_TEMPLATE_VERSION,
             column_header("RO", "snapshot_at"): now,
@@ -197,6 +212,21 @@ async def build_adv_excel_export(
             else "",
         }
         for field in _ordered_edit_fields():
+            if field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+                if shelf_settings is None:
+                    row[edit_header(field)] = ""
+                    continue
+                value_by_field = {
+                    "auto_shelf_max_bid_rub": shelf_settings.max_bid_minor,
+                    "auto_shelf_test_share": shelf_settings.test_share,
+                    "auto_shelf_target_test_impressions": shelf_settings.target_test_impressions,
+                    "auto_shelf_target_test_observation_minutes": shelf_settings.target_test_observation_minutes,
+                    "auto_shelf_min_bid_distance_rub": shelf_settings.min_bid_distance_minor,
+                }
+                row[edit_header(field)] = serialize_shelf_bid_control_cell(
+                    field, value_by_field[field]
+                )
+                continue
             row[edit_header(field)] = serialize_cell_value(field, getattr(adv, field))
         rows.append(row)
         if progress_callback is not None:

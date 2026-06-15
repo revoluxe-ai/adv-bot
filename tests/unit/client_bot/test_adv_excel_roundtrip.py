@@ -16,6 +16,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     enum_names_for_field,
     parse_edit_value,
     parse_header,
+    serialize_shelf_bid_control_cell,
 )
 from app.client_bot.user_interface.handlers.adv_excel_roundtrip import _ProgressReporter
 from app.client_bot.user_interface.services.adv_excel_roundtrip.export_build import (
@@ -128,7 +129,34 @@ def test_enum_names_for_field_strategy() -> None:
 
 @pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 3
+    assert EXCEL_TEMPLATE_VERSION == 4
+
+
+@pytest.mark.unit
+def test_edit_header_auto_shelf_max_bid_uses_technical_field_name() -> None:
+    h = edit_header("auto_shelf_max_bid_rub")
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "auto_shelf_max_bid_rub"
+    assert s == "INT"
+
+
+@pytest.mark.unit
+def test_parse_edit_shelf_max_bid_to_minor_units() -> None:
+    assert parse_edit_value("auto_shelf_max_bid_rub", 600) == 60_000
+    assert parse_edit_value("auto_shelf_min_bid_distance_rub", "1") == 100
+
+
+@pytest.mark.unit
+def test_parse_edit_shelf_test_share_accepts_percent_input() -> None:
+    assert parse_edit_value("auto_shelf_test_share", "10") == pytest.approx(0.1)
+    assert parse_edit_value("auto_shelf_test_share", 0.1) == pytest.approx(0.1)
+
+
+@pytest.mark.unit
+def test_serialize_edit_shelf_values_converts_minor_units_to_rubles() -> None:
+    assert serialize_shelf_bid_control_cell("auto_shelf_max_bid_rub", 60_000) == 600.0
+    assert serialize_shelf_bid_control_cell("auto_shelf_min_bid_distance_rub", 100) == 1.0
 
 
 @pytest.mark.unit

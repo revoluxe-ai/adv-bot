@@ -25,17 +25,31 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.active_adv impor
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EDITABLE_ADV_SETTING_COLUMNS,
+    EDITABLE_SHELF_BID_CONTROL_COLUMNS,
     EXCEL_TEMPLATE_VERSION,
     ExcelColumnKind,
     column_header,
     edit_header,
+    header_type_suffix,
     parse_edit_value,
     technical_column_header,
 )
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
+    AutoShelfBidControlSettings,
+)
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+    DEFAULT_CURRENCY,
+    DEFAULT_MAX_BID_MINOR,
+    DEFAULT_MIN_BID_DISTANCE_MINOR,
+    DEFAULT_TARGET_TEST_IMPRESSIONS,
+    DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
+    DEFAULT_TEST_SHARE,
+)
 
 _sm = get_async_session_maker
 ProgressCallback = Callable[[int, int], Awaitable[None] | None]
@@ -111,6 +125,44 @@ def _row_value(
         return row[ui_h]
     tech_h = technical_column_header(kind, field, suffix)
     return row.get(tech_h)
+
+
+def _row_has_non_blank_shelf_value(row: dict[str, Any]) -> bool:
+    for field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+        if not _is_blank(
+            _row_value(
+                row,
+                kind="EDIT",
+                field=field,
+                suffix=header_type_suffix(field),
+            )
+        ):
+            return True
+    return False
+
+
+async def _get_or_create_default_shelf_settings(
+    session: Any, *, nmid: int
+) -> AutoShelfBidControlSettings:
+    """Вернуть shelf-настройки по nmid, создавая строку с product-дефолтами."""
+    stmt = select(AutoShelfBidControlSettings).where(
+        AutoShelfBidControlSettings.nmid == nmid
+    )
+    settings = (await session.execute(stmt)).scalar_one_or_none()
+    if settings is not None:
+        return settings
+    settings = AutoShelfBidControlSettings(
+        nmid=nmid,
+        max_bid_minor=DEFAULT_MAX_BID_MINOR,
+        currency=DEFAULT_CURRENCY,
+        min_bid_distance_minor=DEFAULT_MIN_BID_DISTANCE_MINOR,
+        target_test_impressions=DEFAULT_TARGET_TEST_IMPRESSIONS,
+        target_test_observation_minutes=DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
+        test_share=DEFAULT_TEST_SHARE,
+    )
+    session.add(settings)
+    await session.flush()
+    return settings
 
 
 class AdvExcelImportError(Exception):
@@ -224,6 +276,53 @@ async def apply_adv_excel_rows(
                         f"Строка {i}, колонка {h}: значение должно быть >= 1"
                     )
                 setattr(adv, field, val)
+
+            shelf_enabled_field = "auto_shelf_bid_control_enabled"
+            shelf_enabled = False
+            shelf_enabled_header = edit_header(shelf_enabled_field)
+            if shelf_enabled_header in row and not _is_blank(row[shelf_enabled_header]):
+                try:
+                    shelf_enabled = bool(
+                        parse_edit_value(shelf_enabled_field, row[shelf_enabled_header])
+                    )
+                except ValueError as e:
+                    raise AdvExcelImportError(
+                        f"Строка {i}, колонка {shelf_enabled_header}: {e}"
+                    ) from e
+
+            if shelf_enabled or _row_has_non_blank_shelf_value(row):
+                if len(adv.nmids or []) != 1:
+                    raise AdvExcelImportError(
+                        f"Строка {i}: bid control Excel поддерживает только РК с одним NMID"
+                    )
+                nmid = int(adv.nmids[0])
+                shelf_settings = await _get_or_create_default_shelf_settings(
+                    session, nmid=nmid
+                )
+                shelf_settings.currency = DEFAULT_CURRENCY
+                for field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+                    h = edit_header(field)
+                    if h not in row:
+                        continue
+                    raw = row[h]
+                    if _is_blank(raw):
+                        continue
+                    try:
+                        val = parse_edit_value(field, raw)
+                    except ValueError as e:
+                        raise AdvExcelImportError(
+                            f"Строка {i}, колонка {h}: {e}"
+                        ) from e
+                    if field == "auto_shelf_test_share":
+                        shelf_settings.test_share = float(val)
+                    elif field == "auto_shelf_target_test_impressions":
+                        shelf_settings.target_test_impressions = int(val)
+                    elif field == "auto_shelf_target_test_observation_minutes":
+                        shelf_settings.target_test_observation_minutes = int(val)
+                    elif field == "auto_shelf_max_bid_rub":
+                        shelf_settings.max_bid_minor = int(val)
+                    elif field == "auto_shelf_min_bid_distance_rub":
+                        shelf_settings.min_bid_distance_minor = int(val)
 
             updated += 1
             if progress_callback is not None:
