@@ -28,7 +28,8 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # Версия шаблона: при несовпадении импорт отклоняется.
 # v2: EDIT-колонка агрессивности V3 — техключ ``aggressiveness`` (ранее ``v3_rollout_aggressiveness``).
 # v3: добавлена EDIT-колонка для cap шагов калибратора V3 — ``keyword_calibration_max_step``.
-EXCEL_TEMPLATE_VERSION = 3
+# v4: добавлены колонки биддера полок ``auto_shelf_bid_control``.
+EXCEL_TEMPLATE_VERSION = 4
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
@@ -54,6 +55,7 @@ READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
 EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
     {
         "bot_active",
+        "auto_shelf_bid_control_enabled",
         "max_cpm",
         "min_views_for_ml_predict",
         "clusters_mode",
@@ -96,6 +98,20 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "max_place",
     }
 )
+
+
+EDITABLE_SHELF_BID_CONTROL_COLUMNS: tuple[str, ...] = (
+    "auto_shelf_max_bid_rub",
+    "auto_shelf_test_share",
+    "auto_shelf_target_test_impressions",
+    "auto_shelf_target_test_observation_minutes",
+    "auto_shelf_min_bid_distance_rub",
+)
+
+
+def ordered_edit_fields() -> list[str]:
+    """Порядок EDIT-колонок в Excel: AdvSetting, затем биддер полок."""
+    return sorted(EDITABLE_ADV_SETTING_COLUMNS) + list(EDITABLE_SHELF_BID_CONTROL_COLUMNS)
 
 
 def column_header(kind: ExcelColumnKind, field: str, suffix: str = "") -> str:
@@ -146,6 +162,15 @@ def parse_header(name: str) -> tuple[ExcelColumnKind | None, str, str]:
 
 def python_type_for_column(field: str) -> type | None:
     """Ожидаемый Python-тип значения колонки (для сериализации/валидации)."""
+    shelf_types: dict[str, type] = {
+        "auto_shelf_max_bid_rub": int,
+        "auto_shelf_test_share": float,
+        "auto_shelf_target_test_impressions": int,
+        "auto_shelf_target_test_observation_minutes": int,
+        "auto_shelf_min_bid_distance_rub": int,
+    }
+    if field in shelf_types:
+        return shelf_types[field]
     mapper = AdvSetting.__mapper__
     col = mapper.columns.get(field)
     if col is None:
@@ -209,6 +234,12 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "max_price_for_order": "Максимальная себестоимость",
     "strategy": "Стратегия",
     "bot_active": "Бот включен",
+    "auto_shelf_bid_control_enabled": "Управление ставкой полок",
+    "auto_shelf_max_bid_rub": "Максимальная ставка полок, ₽",
+    "auto_shelf_test_share": "Доля теста полок",
+    "auto_shelf_target_test_impressions": "Показов на тест полок",
+    "auto_shelf_target_test_observation_minutes": "Мин. минут теста полок",
+    "auto_shelf_min_bid_distance_rub": "Шаг между тестовыми ставками полок, ₽",
     "max_cpm": "Максимальный CPM",
     "min_views_for_ml_predict": "Мин. просмотров для ML-прогноза",
     "clusters_mode": "Кластерный режим",
@@ -255,6 +286,8 @@ def display_name_for_field(field: str) -> str:
 def serialize_cell_value(field: str, value: Any) -> Any:
     if value is None:
         return ""
+    if field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+        return serialize_shelf_bid_control_cell(field, value)
     ec = enum_class_for_field(field)
     if ec is not None and isinstance(value, Enum):
         return value.name
@@ -277,6 +310,8 @@ def parse_bool_cell(raw: Any) -> bool:
 def parse_edit_value(field: str, raw: Any) -> Any:
     if raw is None or (isinstance(raw, float) and str(raw) == "nan"):
         raise ValueError("Пустая ячейка")
+    if field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+        return parse_shelf_bid_control_edit_value(field, raw)
     py_t = python_type_for_column(field)
     ec = enum_class_for_field(field)
     if ec is not None:
@@ -311,3 +346,58 @@ def parse_edit_value(field: str, raw: Any) -> Any:
         return float(s)
 
     return str(raw).strip()
+
+
+def parse_shelf_bid_control_edit_value(field: str, raw: Any) -> Any:
+    """Разобрать EDIT-значение для биддера полок."""
+    if field not in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
+        raise ValueError(f"Неизвестное поле биддера полок: {field}")
+
+    def _parse_positive_number(text_value: Any, *, integer_only: bool) -> int | float:
+        if isinstance(text_value, bool):
+            raise ValueError("Некорректное число")
+        if isinstance(text_value, int | float):
+            parsed_value = float(text_value)
+        else:
+            text = str(text_value).strip().replace(",", ".")
+            if not text:
+                raise ValueError("Пустое значение")
+            parsed_value = float(text)
+        if integer_only:
+            value = int(parsed_value)
+            if value <= 0:
+                raise ValueError("Значение должно быть больше 0")
+            return value
+        if parsed_value <= 0:
+            raise ValueError("Значение должно быть больше 0")
+        return parsed_value
+
+    if field in {"auto_shelf_max_bid_rub", "auto_shelf_min_bid_distance_rub"}:
+        return int(_parse_positive_number(raw, integer_only=True)) * 100
+    if field == "auto_shelf_target_test_impressions":
+        return int(_parse_positive_number(raw, integer_only=True))
+    if field == "auto_shelf_target_test_observation_minutes":
+        value = int(_parse_positive_number(raw, integer_only=True))
+        if value < 60:
+            raise ValueError("Минимальное время теста должно быть не меньше 60 минут.")
+        return value
+    if field == "auto_shelf_test_share":
+        parsed = _parse_positive_number(raw, integer_only=False)
+        assert isinstance(parsed, float)
+        if parsed > 1:
+            parsed = parsed / 100
+        if parsed <= 0 or parsed > 0.49:
+            raise ValueError("Доля теста должна быть больше 0 и не больше 49%.")
+        return float(parsed)
+    raise ValueError(f"Неизвестное поле биддера полок: {field}")
+
+
+def serialize_shelf_bid_control_cell(field: str, value: Any) -> Any:
+    """Сериализовать значение биддера полок для Excel."""
+    if value is None:
+        return ""
+    if field in {"auto_shelf_max_bid_rub", "auto_shelf_min_bid_distance_rub"}:
+        return int(value) / 100
+    if field == "auto_shelf_test_share":
+        return float(value)
+    return value

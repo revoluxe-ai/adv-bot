@@ -8,11 +8,13 @@ import pytest
 
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EDITABLE_ADV_SETTING_COLUMNS,
+    EDITABLE_SHELF_BID_CONTROL_COLUMNS,
 )
 
 
-UI_HANDLER_BY_FIELD: dict[str, str] = {
+ADV_UI_HANDLER_BY_FIELD: dict[str, str] = {
     "bot_active": "app/client_bot/user_interface/handlers/adv_setting.py",
+    "auto_shelf_bid_control_enabled": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
     "max_cpm": "app/client_bot/user_interface/handlers/cpm_builder.py",
     "min_views_for_ml_predict": "app/client_bot/user_interface/handlers/min_views_for_ml_predict_ctr.py",
     "clusters_mode": "app/client_bot/user_interface/handlers/clusters.py",
@@ -55,13 +57,26 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "max_place": "app/client_bot/user_interface/handlers/cpm_builder.py",
 }
 
+SHELF_UI_HANDLER_BY_FIELD: dict[str, str] = {
+    "auto_shelf_max_bid_rub": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_test_share": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_target_test_impressions": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_target_test_observation_minutes": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_min_bid_distance_rub": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+}
+
 
 @pytest.mark.unit
 def test_excel_editable_fields_match_ui_mapping() -> None:
-    assert set(EDITABLE_ADV_SETTING_COLUMNS) == set(UI_HANDLER_BY_FIELD)
+    assert set(EDITABLE_ADV_SETTING_COLUMNS) == set(ADV_UI_HANDLER_BY_FIELD)
+
+
+@pytest.mark.unit
+def test_excel_shelf_fields_match_ui_mapping() -> None:
+    assert set(EDITABLE_SHELF_BID_CONTROL_COLUMNS) == set(SHELF_UI_HANDLER_BY_FIELD)
 
 
 @pytest.mark.unit
 def test_ui_mapping_files_exist() -> None:
-    for path in UI_HANDLER_BY_FIELD.values():
+    for path in {**ADV_UI_HANDLER_BY_FIELD, **SHELF_UI_HANDLER_BY_FIELD}.values():
         assert Path(path).exists(), f"UI handler not found: {path}"

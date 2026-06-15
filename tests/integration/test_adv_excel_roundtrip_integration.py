@@ -23,6 +23,9 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     edit_header,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
+    AutoShelfBidControlSettings,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from tests.factories.adv_factory import AdvSettingFactory
@@ -100,6 +103,19 @@ async def excel_shop_bundle(async_session: AsyncSession) -> dict[str, object]:
     async_session.add(adv)
     await async_session.flush()
 
+    async_session.add(
+        AutoShelfBidControlSettings(
+            nmid=int(adv.nmids[0]),
+            max_bid_minor=50_000,
+            currency="RUB",
+            min_bid_distance_minor=100,
+            target_test_impressions=500,
+            target_test_observation_minutes=60,
+            test_share=0.1,
+        )
+    )
+    await async_session.flush()
+
     return {"user": user, "wb_user_cabinet": wuc, "adv": adv}
 
 
@@ -130,6 +146,12 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     key_v3_step = edit_header("keyword_calibration_max_step")
     assert key_v3_step in row
     row[key_v3_step] = 7
+    row[edit_header("auto_shelf_bid_control_enabled")] = "TRUE"
+    row[edit_header("auto_shelf_max_bid_rub")] = 600
+    row[edit_header("auto_shelf_min_bid_distance_rub")] = 2
+    row[edit_header("auto_shelf_target_test_impressions")] = 700
+    row[edit_header("auto_shelf_target_test_observation_minutes")] = 120
+    row[edit_header("auto_shelf_test_share")] = 10
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
         updated = await apply_adv_excel_rows(
@@ -145,6 +167,20 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     ).scalar_one()
     assert fresh.min_views_for_ml_predict == 47
     assert fresh.keyword_calibration_max_step == 7
+    assert fresh.auto_shelf_bid_control_enabled is True
+
+    shelf = (
+        await async_session.execute(
+            select(AutoShelfBidControlSettings).where(
+                AutoShelfBidControlSettings.nmid == int(adv.nmids[0])
+            )
+        )
+    ).scalar_one()
+    assert shelf.max_bid_minor == 60_000
+    assert shelf.min_bid_distance_minor == 200
+    assert shelf.target_test_impressions == 700
+    assert shelf.target_test_observation_minutes == 120
+    assert shelf.test_share == pytest.approx(0.1)
 
 
 @pytest.mark.asyncio
