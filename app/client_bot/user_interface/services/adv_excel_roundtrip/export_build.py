@@ -184,6 +184,9 @@ async def build_adv_excel_export(
         offer_id, export_issue = _offer_id_and_export_issue(
             adv, first_nmid=nmid, offer_by_nmid=offer_by_nmid
         )
+        shelf_settings: AutoShelfBidControlSettings | None = None
+        if nmid is not None and len(adv.nmids or []) == 1:
+            shelf_settings = shelf_settings_by_nmid.get(int(nmid))
         row: dict[str, Any] = {
             column_header("RO", "excel_template_version"): EXCEL_TEMPLATE_VERSION,
             column_header("RO", "snapshot_at"): now,
@@ -210,16 +213,15 @@ async def build_adv_excel_export(
         }
         for field in _ordered_edit_fields():
             if field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
-                if nmid is None or int(nmid) not in shelf_settings_by_nmid:
+                if shelf_settings is None:
                     row[edit_header(field)] = ""
                     continue
-                settings = shelf_settings_by_nmid[int(nmid)]
                 value_by_field = {
-                    "auto_shelf_max_bid_rub": settings.max_bid_minor,
-                    "auto_shelf_test_share": settings.test_share,
-                    "auto_shelf_target_test_impressions": settings.target_test_impressions,
-                    "auto_shelf_target_test_observation_minutes": settings.target_test_observation_minutes,
-                    "auto_shelf_min_bid_distance_rub": settings.min_bid_distance_minor,
+                    "auto_shelf_max_bid_rub": shelf_settings.max_bid_minor,
+                    "auto_shelf_test_share": shelf_settings.test_share,
+                    "auto_shelf_target_test_impressions": shelf_settings.target_test_impressions,
+                    "auto_shelf_target_test_observation_minutes": shelf_settings.target_test_observation_minutes,
+                    "auto_shelf_min_bid_distance_rub": shelf_settings.min_bid_distance_minor,
                 }
                 row[edit_header(field)] = serialize_shelf_bid_control_cell(
                     field, value_by_field[field]

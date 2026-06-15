@@ -228,6 +228,12 @@ async def test_adv_excel_import_adv_fields_ignore_multi_or_empty_nmid(
     row = next(
         item for item in rows if item[column_header("RO", "adv_setting_id")] == adv.id
     )
+    if nmid_count != 1:
+        assert row[edit_header("auto_shelf_max_bid_rub")] == ""
+        assert row[edit_header("auto_shelf_test_share")] == ""
+        assert row[edit_header("auto_shelf_target_test_impressions")] == ""
+        assert row[edit_header("auto_shelf_target_test_observation_minutes")] == ""
+        assert row[edit_header("auto_shelf_min_bid_distance_rub")] == ""
     row[edit_header("min_views_for_ml_predict")] = 19
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
@@ -243,6 +249,56 @@ async def test_adv_excel_import_adv_fields_ignore_multi_or_empty_nmid(
         await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
     ).scalar_one()
     assert fresh.min_views_for_ml_predict == 19
+
+
+@pytest.mark.asyncio
+async def test_adv_excel_import_shelf_fields_without_enabled_flag(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """Shelf-поля должны применяться даже без явного enabled-флага."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+    adv = excel_shop_bundle["adv"]
+    assert isinstance(adv, AdvSetting)
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+
+    row = rows[0]
+    row[edit_header("auto_shelf_max_bid_rub")] = 600
+    row[edit_header("auto_shelf_test_share")] = 10
+    row[edit_header("auto_shelf_target_test_impressions")] = 800
+    row[edit_header("auto_shelf_target_test_observation_minutes")] = 120
+    row[edit_header("auto_shelf_min_bid_distance_rub")] = 3
+
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=rows,
+        )
+
+    assert updated == 1
+    await async_session.commit()
+    shelf = (
+        await async_session.execute(
+            select(AutoShelfBidControlSettings).where(
+                AutoShelfBidControlSettings.nmid == int(adv.nmids[0])
+            )
+        )
+    ).scalar_one()
+    assert shelf.max_bid_minor == 60_000
+    assert shelf.test_share == pytest.approx(0.1)
+    assert shelf.target_test_impressions == 800
+    assert shelf.target_test_observation_minutes == 120
+    assert shelf.min_bid_distance_minor == 300
 
 
 @pytest.mark.asyncio

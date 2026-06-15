@@ -30,6 +30,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     ExcelColumnKind,
     column_header,
     edit_header,
+    header_type_suffix,
     parse_edit_value,
     technical_column_header,
 )
@@ -128,7 +129,14 @@ def _row_value(
 
 def _row_has_non_blank_shelf_value(row: dict[str, Any]) -> bool:
     for field in EDITABLE_SHELF_BID_CONTROL_COLUMNS:
-        if not _is_blank(_row_value(row, kind="EDIT", field=field)):
+        if not _is_blank(
+            _row_value(
+                row,
+                kind="EDIT",
+                field=field,
+                suffix=header_type_suffix(field),
+            )
+        ):
             return True
     return False
 
