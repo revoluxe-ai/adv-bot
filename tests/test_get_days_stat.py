@@ -9,6 +9,8 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
     CommonStatDataManager,
     DaysStatTextOptions,
 )
+from app.client_bot.user_interface.views import keyboards
+from app.client_bot.user_interface.views import callbacks
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
@@ -312,3 +314,109 @@ async def test_earliest_stat_date_returns_none_without_auto_adv() -> None:
 
     assert earliest_date is None
     get_min_date_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_days_page_sorts_newest_first_without_affecting_inline_stats() -> None:
+    """Экран по кнопке должен быть newest-first, но это не влияет на встроенный блок."""
+    today = datetime.datetime.now().date()
+    yesterday = today - datetime.timedelta(days=1)
+
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.nmids = [1]
+    adv_setting_mock.adv_id = 2
+    adv_setting_mock.search_adv_id = 3
+    adv_setting_mock.plan_for_sales_for_day = None
+    adv_setting_mock.target_price_for_order = None
+    adv_setting_mock.max_price_for_order = None
+
+    today_stat = SmallFullAdvStatPerDay(
+        date=today,
+        views=100,
+        clicks=10,
+        spend=100.0,
+        added_to_cart=1,
+        orders=1,
+        sum_price=0.0,
+    )
+    yesterday_stat = SmallFullAdvStatPerDay(
+        date=yesterday,
+        views=100,
+        clicks=10,
+        spend=100.0,
+        added_to_cart=1,
+        orders=1,
+        sum_price=0.0,
+    )
+    today_card = CommonCardStat(
+        nmid=1, open_card=100, add_to_cart=2, orders=1, orders_sum=0, buy_outs=0
+    )
+    yesterday_card = CommonCardStat(
+        nmid=1, open_card=100, add_to_cart=2, orders=1, orders_sum=0, buy_outs=0
+    )
+    today_card.date = today
+    yesterday_card.date = yesterday
+
+    with (
+        patch.object(manager, "get_total_pages", new=AsyncMock(return_value=1)),
+        patch.object(
+            manager,
+            "get_earliest_stat_date",
+            new=AsyncMock(return_value=yesterday),
+        ),
+        patch.object(
+            manager,
+            "_load_daily_stat_data",
+            new=AsyncMock(
+                return_value=(
+                    [yesterday_stat, today_stat],
+                    [yesterday_card, today_card],
+                    {today: 0, yesterday: 0},
+                    {today: 0, yesterday: 0},
+                    {today: 0, yesterday: 0},
+                    {today: 0, yesterday: 0},
+                    {today: 0, yesterday: 0},
+                )
+            ),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.is_rec_system_shelf_mode_operational",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        text, current_page, total_pages = await manager.get_days_static_text_page(
+            adv_setting_mock,
+            1,
+            options=DaysStatTextOptions(
+                show_forecast=False,
+                show_clicks_warning=False,
+                show_organic_pct=True,
+            ),
+        )
+
+    lines = [
+        line
+        for line in text.splitlines()
+        if line.startswith(today.strftime("%d.%m.%Y"))
+        or line.startswith(yesterday.strftime("%d.%m.%Y"))
+    ]
+    assert current_page == 1
+    assert total_pages == 1
+    assert lines[0].startswith(today.strftime("%d.%m.%Y"))
+    assert lines[1].startswith(yesterday.strftime("%d.%m.%Y"))
+
+
+def test_daily_stats_keyboard_preserves_sort_mode() -> None:
+    """Кнопка возврата должна вести в тот же режим списка ключей."""
+    markup = keyboards.get_keywords_daily_stats_keyboard(
+        adv_original_id=10,
+        page=1,
+        total_pages=3,
+        keywords_page=7,
+        sort_mode="only_out_index",
+    )
+
+    back_button = markup.inline_keyboard[-1][0]
+    callback_data = callbacks.SettingKeywords.unpack(back_button.callback_data)
+    assert callback_data.type == "only_out_index"
+    assert callback_data.page == 7

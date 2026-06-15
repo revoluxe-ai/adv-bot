@@ -149,7 +149,7 @@ class CommonStatDataManager:
         concatenated_result = full_wb_adv_stat.concatenate_stats(
             auto_adv_stat, auction_adv_stat
         )
-        concatenated_result.sort(key=lambda x: x.date, reverse=True)
+        concatenated_result.sort(key=lambda x: x.date)
         return concatenated_result
 
     async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
@@ -240,6 +240,8 @@ class CommonStatDataManager:
         ) = await self._load_daily_stat_data(adv_setting, start_date, end_date)
         if not concatenate_stat or not common_card_stat:
             return "", current_page, total_pages
+
+        concatenate_stat.sort(key=lambda x: x.date, reverse=True)
 
         text = "\n\nСтатистика по дням:\n"
         text += await self._get_days_static_text(

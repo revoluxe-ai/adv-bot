@@ -22,12 +22,14 @@ class KeywordsDailyStatsScreen(TextWithKeyboard):
         adv_setting: AdvSetting,
         page: int,
         keywords_page: int,
+        sort_mode: str,
         page_size: int = 14,
     ) -> None:
         super().__init__(bot, chat_id)
         self._adv_setting = adv_setting
         self._page = page
         self._keywords_page = keywords_page
+        self._sort_mode = sort_mode
         self._page_size = page_size
         self._manager = CommonStatDataManager()
         self._text = ""
@@ -74,5 +76,6 @@ class KeywordsDailyStatsScreen(TextWithKeyboard):
             page,
             total_pages,
             self._keywords_page,
+            self._sort_mode,
         )
         return await super().__call__(*args, **kwargs)

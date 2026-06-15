@@ -468,6 +468,7 @@ async def keywords_daily_stats(
             adv_setting=adv_setting,
             page=callback_data.page,
             keywords_page=callback_data.keywords_page,
+            sort_mode=callback_data.sort_mode,
         )()
     return
 

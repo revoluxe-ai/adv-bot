@@ -590,6 +590,7 @@ def get_keywords_setting_keyboard(
                     adv_original_id=adv_setting.id,
                     page=1,
                     keywords_page=page,
+                    sort_mode=sort_mode,
                 ).pack(),
             )
         ]
@@ -612,6 +613,7 @@ def get_keywords_daily_stats_keyboard(
     page: int,
     total_pages: int,
     keywords_page: int,
+    sort_mode: str,
 ) -> InlineKeyboardMarkup:
     """Клавиатура экрана дневной статистики ключей."""
     builder = InlineKeyboardBuilder()
@@ -626,6 +628,7 @@ def get_keywords_daily_stats_keyboard(
                     adv_original_id=adv_original_id,
                     page=current_page - 1,
                     keywords_page=keywords_page,
+                    sort_mode=sort_mode,
                 ).pack(),
             )
         )
@@ -637,6 +640,7 @@ def get_keywords_daily_stats_keyboard(
                     adv_original_id=adv_original_id,
                     page=current_page + 1,
                     keywords_page=keywords_page,
+                    sort_mode=sort_mode,
                 ).pack(),
             )
         )
@@ -648,7 +652,7 @@ def get_keywords_daily_stats_keyboard(
             text="К списку ключевых слов",
             callback_data=callbacks.SettingKeywords(
                 adv_original_id=adv_original_id,
-                type="by_adv",
+                type=sort_mode,
                 page=keywords_page,
             ).pack(),
         )
