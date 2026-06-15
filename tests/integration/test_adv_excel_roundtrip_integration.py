@@ -184,6 +184,68 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("nmid_count", [0, 2])
+async def test_adv_excel_import_adv_fields_ignore_multi_or_empty_nmid(
+    async_session: AsyncSession,
+    excel_shop_bundle: dict[str, object],
+    nmid_count: int,
+) -> None:
+    """Импорт обычных AdvSetting-полей не должен зависеть от shelf-control NMID guard."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+
+    adv = cast(
+        AdvSetting,
+        AdvSettingFactory.build(
+            wb_cabinet=wuc.wb_cabinet,
+            name=f"Excel guard adv {nmid_count}",
+            bot_active=True,
+            active_status="started",
+            adv_id=610_000 + nmid_count,
+            min_views_for_ml_predict=11,
+        ),
+    )
+    adv.nmids = []
+    if nmid_count == 2:
+        adv.nmids = [
+            210_000 + (uuid.uuid4().int % 10_000),
+            220_000 + (uuid.uuid4().int % 10_000),
+        ]
+    adv.search_adv_id = 710_000 + nmid_count
+    async_session.add(adv)
+    await async_session.flush()
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+
+    row = next(
+        item for item in rows if item[column_header("RO", "adv_setting_id")] == adv.id
+    )
+    row[edit_header("min_views_for_ml_predict")] = 19
+
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=[row],
+        )
+
+    assert updated == 1
+    await async_session.commit()
+    fresh = (
+        await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
+    ).scalar_one()
+    assert fresh.min_views_for_ml_predict == 19
+
+
+@pytest.mark.asyncio
 async def test_adv_excel_export_import_auto_common_budget_flag(
     async_session: AsyncSession, excel_shop_bundle: dict[str, object]
 ) -> None:

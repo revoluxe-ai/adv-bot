@@ -248,11 +248,6 @@ async def apply_adv_excel_rows(
                     f"Строка {i}: RO__nmid не совпадает с данными сервера"
                 )
 
-            if len(adv.nmids or []) != 1:
-                raise AdvExcelImportError(
-                    f"Строка {i}: bid control Excel поддерживает только РК с одним NMID"
-                )
-
             for field in sorted(EDITABLE_ADV_SETTING_COLUMNS):
                 h = edit_header(field)
                 if h not in row:
@@ -288,6 +283,10 @@ async def apply_adv_excel_rows(
                     ) from e
 
             if shelf_enabled or _row_has_non_blank_shelf_value(row):
+                if len(adv.nmids or []) != 1:
+                    raise AdvExcelImportError(
+                        f"Строка {i}: bid control Excel поддерживает только РК с одним NMID"
+                    )
                 nmid = int(adv.nmids[0])
                 shelf_settings = await _get_or_create_default_shelf_settings(
                     session, nmid=nmid
