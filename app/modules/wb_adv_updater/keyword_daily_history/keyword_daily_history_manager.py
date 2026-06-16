@@ -31,7 +31,12 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
         adv_setting: AdvSetting,
         page: int,
         page_size: int = 7,
-    ) -> tuple[list[KeywordDailyStat], int, int, date | None]:
+    ) -> tuple[
+        list[KeywordDailyStat],
+        int,
+        int,
+        tuple[date, date] | None,
+    ]:
         """Возвращает страницу дневной истории по ключу.
 
         Args:
@@ -56,7 +61,7 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
             earliest_date=earliest_date,
         )
         if page_range is None:
-            return [], current_page, total_pages, earliest_date
+            return [], current_page, total_pages, None
 
         start_date, end_date = page_range
         rows = await self._load_history_rows(
@@ -65,7 +70,7 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
             start_date=start_date,
             end_date=end_date,
         )
-        return rows, current_page, total_pages, earliest_date
+        return rows, current_page, total_pages, page_range
 
     async def get_earliest_date(
         self,

@@ -11,9 +11,6 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import keyboards
-from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.date_pagination import (
-    page_to_date_range,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.keyword_daily_history import KeywordDailyHistoryManager
 from app.modules.wb_adv_updater.keyword_daily_history.dto import KeywordDailyStat
@@ -106,16 +103,11 @@ class KeywordDailyHistoryScreen(TextWithKeyboard):
             keyword_setting: KeywordSetting = result.scalar_one()
             adv_setting: AdvSetting = keyword_setting.adv_setting
 
-        stats, current_page, total_pages, earliest_date = await self._manager.get_history_page(
+        stats, current_page, total_pages, page_range = await self._manager.get_history_page(
             keyword_setting,
             adv_setting,
             self._page,
             self._page_size,
-        )
-        page_range = page_to_date_range(
-            current_page,
-            page_size=self._page_size,
-            earliest_date=earliest_date,
         )
         self._text = build_keyword_daily_history_text(
             keyword_setting.text,

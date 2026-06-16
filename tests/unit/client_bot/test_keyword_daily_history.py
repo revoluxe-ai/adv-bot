@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,6 +23,9 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_d
     format_keyword_daily_stat_block,
 )
 from app.modules.wb_adv_updater.keyword_daily_history.dto import KeywordDailyStat
+from app.modules.wb_adv_updater.keyword_daily_history.keyword_daily_history_manager import (
+    KeywordDailyHistoryManager,
+)
 
 
 @pytest.mark.unit
@@ -130,3 +134,38 @@ def test_date_pagination_helpers_clamp_dates() -> None:
         today=date(2026, 6, 16),
     )
     assert page_range == (date(2026, 6, 3), date(2026, 6, 9))
+
+
+@pytest.mark.asyncio
+async def test_history_manager_returns_page_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Менеджер должен возвращать диапазон, который использовал для выборки."""
+    manager = KeywordDailyHistoryManager()
+
+    keyword_setting = MagicMock()
+    keyword_setting.text = "купить товар"
+    adv_setting = MagicMock()
+    adv_setting.nmids = [111]
+    adv_setting.adv_id = 10
+    adv_setting.search_adv_id = None
+    adv_setting.id = 2
+
+    async def fake_get_earliest_date(*args, **kwargs) -> date:
+        return date(2026, 6, 1)
+
+    async def fake_load_rows(*args, **kwargs) -> list[KeywordDailyStat]:
+        return []
+
+    monkeypatch.setattr(manager, "get_earliest_date", fake_get_earliest_date)
+    monkeypatch.setattr(manager, "_load_history_rows", fake_load_rows)
+
+    stats, current_page, total_pages, page_range = await manager.get_history_page(
+        keyword_setting,
+        adv_setting,
+        page=1,
+        page_size=7,
+    )
+
+    assert stats == []
+    assert current_page == 1
+    assert total_pages == 3
+    assert page_range == (date(2026, 6, 10), date(2026, 6, 16))
