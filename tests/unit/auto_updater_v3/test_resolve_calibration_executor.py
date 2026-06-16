@@ -59,6 +59,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
     ResolveCalibrationExecutor,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
+    RaiseStateToTargetCpoExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
 )
@@ -566,6 +569,31 @@ def test_calibration_up_min_from_list2() -> None:
     ResolveCalibrationExecutor().execute(ctx)
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.OPTIMUM
     assert len(ctx.keywords[0].next_state) == 1
+
+
+@pytest.mark.unit
+def test_calibration_disabled_skips_without_actions() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=10,
+    )
+    ctx = _ctx(
+        dto,
+        adv_state=_cal_adv_state(
+            calibration_direct=CalibrationDirect.LOOSEN,
+            max_effective_steps=0,
+        ),
+    )
+    executor = ResolveCalibrationExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "calibration_steps_disabled"
+    assert ctx.keywords[0].next_state == []
+    assert ctx.keywords[0].history_target_place == []
+    assert ctx.adv_state.max_effective_steps == 0
+    assert ctx.adv_state.calibration_phase_extra["effective_steps"] == 0
+    assert ctx.adv_state.calibration_phase_extra["applied_steps"] is None
 
 
 @pytest.mark.unit

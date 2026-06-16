@@ -719,3 +719,25 @@ def test_raise_state_executor_in_preamble() -> None:
     assert phases.index("raise_state_to_target_cpo") == (
         phases.index("skip_up_same_target_place") + 1
     )
+
+
+@pytest.mark.unit
+def test_raise_state_executor_works_when_calibration_disabled() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=10,
+    )
+    adv_state = replace(
+        _adv_state(),
+        max_effective_steps=0,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.next_state

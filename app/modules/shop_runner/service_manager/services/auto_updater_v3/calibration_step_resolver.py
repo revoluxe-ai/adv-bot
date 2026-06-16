@@ -47,7 +47,7 @@ def classify_calibration_direct(
 
 
 def resolve_effective_calibration_steps(
-    base_max: int,
+    base_max: int | None,
     *,
     prev: CalibrationStepState | None,
     current_direct: CalibrationDirect,
@@ -63,8 +63,15 @@ def resolve_effective_calibration_steps(
         Бюджет ladder-шагов CAL UP/DOWN за тик (смена ``target_place`` или OFF↔active;
         alias M/O/C на одном place не считаются), как ``effective_step`` у биддера по смыслу cap.
     """
-    cap = max(1, int(base_max))
-    if prev is None:
+    if base_max is None:
+        cap = 1
+    else:
+        cap = int(base_max)
+        if cap == 0:
+            return 0
+        if cap < 0:
+            cap = 1
+    if prev is None or prev.effective_steps <= 0:
         return 1
     if prev.direct == current_direct:
         return min(max(1, prev.effective_steps) + 1, cap)

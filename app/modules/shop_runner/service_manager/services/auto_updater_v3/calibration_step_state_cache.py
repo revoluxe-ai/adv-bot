@@ -41,7 +41,7 @@ class V3CalibrationStepState(AdvSettingRedisCache, RedisCacheBase, prefix="V3Cal
                 raw,
             )
             return None
-        if effective_steps < 1:
+        if effective_steps < 0:
             return None
         return CalibrationStepState(effective_steps=effective_steps, direct=direct)
 

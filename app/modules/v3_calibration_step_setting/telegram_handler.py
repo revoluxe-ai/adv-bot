@@ -54,7 +54,7 @@ async def change_v3_calibration_step(
     if callback.message is not None:
         await callback.message.answer(
             f"Введите макс. число effective ladder-шагов калибратора V3 "
-            f"(от 1 до {MAX_CALIBRATION_STEP}):"
+            f"(от 0 до {MAX_CALIBRATION_STEP}):"
         )
 
 
@@ -77,12 +77,13 @@ async def set_v3_calibration_step(
         await start_registration(message, bot, state)
         return
     if text is None or not text.isdigit():
-        await message.answer("Введите целое положительное число")
+        await message.answer("Введите целое число от 0 до 50")
         return
     new_step = int(text)
-    if new_step < 1 or new_step > MAX_CALIBRATION_STEP:
+    if new_step < 0 or new_step > MAX_CALIBRATION_STEP:
         await message.answer(
-            f"Введите целое положительное число от 1 до {MAX_CALIBRATION_STEP}"
+            f"Введите целое число от 0 до {MAX_CALIBRATION_STEP}. "
+            "0 — отключить калибратор."
         )
         return
     async with sm(read_only=False) as session:
@@ -94,6 +95,6 @@ async def set_v3_calibration_step(
         await session.commit()
     await message.answer(
         f"Макс. шаг калибратора V3 изменён на {new_step} "
-        "(первый тик — 1 effective step, далее ×2/÷2 до этого cap)."
+        "(0 — отключить калибратор; далее ×2/÷2 до этого cap)."
     )
     await state.set_state(None)
