@@ -26,6 +26,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     OPERABLE_LADDER_STAGES,
+    allowed_up_ladder_states,
     current_aggression_rank,
     ladder_aggression_rank,
     mode_catalog_from_dto,
@@ -89,10 +90,11 @@ class StatesListGenerator:
                 if binding is not None:
                     current_active.append(binding)
 
-            for state in _operable_ladder_states(dto):
+            for state in allowed_up_ladder_states(
+                dto,
+                max_target_mode=self._adv_state.policy.max_target_mode,
+            ):
                 if not _state_above_rank(state, rank):
-                    continue
-                if not _target_mode_allowed(state.strategy_mode, self._adv_state):
                     continue
                 if state.cpo is None:
                     continue
@@ -121,16 +123,6 @@ def _is_calibration_off_no_data(dto: KeywordDTO, adv_state: AdvState) -> bool:
     if elig is None or elig.data_tier != KeywordDataTier.KEYWORD_NO_DATA:
         return False
     return is_keyword_no_data(dto.calculated_keyword)
-
-
-def _operable_ladder_states(dto: KeywordDTO) -> tuple[KeywordV3LadderState, ...]:
-    return tuple(
-        state
-        for state in dto.ladder_states
-        if state.stage in OPERABLE_LADDER_STAGES
-    )
-
-
 def _current_binding(dto: KeywordDTO, adv_state: AdvState) -> StateBinding | None:
     """Текущая active-ступень для list1 (не OFF, известный CPO)."""
     state = resolve_current_ladder_state(dto)
@@ -148,10 +140,6 @@ def _state_above_rank(
     current_rank: tuple[int, int],
 ) -> bool:
     return ladder_aggression_rank(state) > current_rank
-
-
-def _target_mode_allowed(mode: KeywordStrategyMode, adv_state: AdvState) -> bool:
-    return int(mode) <= int(adv_state.policy.max_target_mode)
 
 
 def _shelf_filter_active(adv_state: AdvState) -> bool:

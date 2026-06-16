@@ -8,6 +8,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_re
 
 EXECUTOR_TO_PHASE_ID: dict[str, str] = {
     "HardStatusValidateExecutor": "validate_state_by_hard_status",
+    "ClampStateToAggressionExecutor": "clamp_state_to_aggression",
     "NotFullTargetPlaceMigrateExecutor": "not_full_target_place_migrate",
     "NotFullValidateExecutor": "validate_not_full_state",
     "NotFullTargetPlacePlanFactExecutor": "not_full_target_place_plan_fact",
@@ -35,6 +36,7 @@ IGNORED_EXECUTOR_NAMES: frozenset[str] = frozenset(
 # Короткие метки для цепочки ключa (audit Redis).
 EXECUTOR_SHORT_LABEL: dict[str, str] = {
     "HardStatusValidateExecutor": "V",
+    "ClampStateToAggressionExecutor": "cap",
     "NotFullTargetPlaceMigrateExecutor": "NFm",
     "NotFullValidateExecutor": "NF",
     "NotFullTargetPlacePlanFactExecutor": "NFp",

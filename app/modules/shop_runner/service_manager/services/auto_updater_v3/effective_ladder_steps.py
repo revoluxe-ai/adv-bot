@@ -233,12 +233,17 @@ def logical_modes_at_target_place_above(
 def resolve_alias_collapse_up_at_same_target_place(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
+    *,
+    max_target_mode: KeywordStrategyMode | None = None,
 ) -> KeywordStrategyMode | None:
     """Схлопнуть alias UP на текущем ``target_place`` до max ``mode_level`` в группе.
 
     Срабатывает только если ``step_up(current)`` ведёт на тот же ``target_place``,
     что и текущий режим. Не поднимает ключ на новый place (в отличие от
     ``resolve_next_effective_step_up``).
+
+    Если задан ``max_target_mode``, группа дополнительно отсекается по
+    aggression cap, чтобы alias-collapse не мог перескочить выше policy.
     """
     if current in (
         KeywordStrategyMode.OFF,
@@ -260,6 +265,10 @@ def resolve_alias_collapse_up_at_same_target_place(
     if not mode_candidates_same_effective_target(cur_c, nxt_c):
         return None
     group = logical_modes_at_target_place_above(current, place, catalog)
+    if max_target_mode is not None:
+        group = tuple(
+            mode for mode in group if mode_level(mode) <= mode_level(max_target_mode)
+        )
     if not group:
         return None
     target = max(group, key=mode_level)

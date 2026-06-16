@@ -227,7 +227,14 @@ def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> 
         ladder_states=states,
     )
     adv = _adv_state(fact=700.0, max_cpo=max_cpo, guard_condition=False)
-    adv = replace(adv, resolve=800.0)
+    adv = replace(
+        adv,
+        resolve=800.0,
+        policy=replace(
+            adv.policy,
+            max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+        ),
+    )
     ctx = _context([dto], adv)
     RaiseStateToTargetCpoExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION

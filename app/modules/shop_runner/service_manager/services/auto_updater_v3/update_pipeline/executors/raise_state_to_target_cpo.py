@@ -53,7 +53,10 @@ class RaiseStateToTargetCpoExecutor:
                 continue
 
             state = pick_max_ladder_state_at_or_below_cpo(
-                dto, target_cpo, strict_ceiling=True
+                dto,
+                target_cpo,
+                strict_ceiling=True,
+                max_target_mode=adv.policy.max_target_mode,
             )
             if state is None:
                 continue

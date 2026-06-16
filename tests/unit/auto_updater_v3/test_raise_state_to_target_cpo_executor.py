@@ -27,6 +27,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
     build_normal_preamble_executors,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_state_to_aggression import (
+    ClampStateToAggressionExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     has_operable_cpo,
     pick_max_ladder_state_at_or_below_cpo,
@@ -168,6 +171,18 @@ def test_pick_max_ladder_state_at_or_below_cpo_returns_none_when_no_operable_cpo
 
 
 @pytest.mark.unit
+def test_pick_max_ladder_state_at_or_below_cpo_respects_aggression_cap() -> None:
+    dto = _dto()
+    winner = pick_max_ladder_state_at_or_below_cpo(
+        dto,
+        500.0,
+        max_target_mode=KeywordStrategyMode.MIN_CPA,
+    )
+    assert winner is not None
+    assert winner.strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
 def test_apply_ladder_state_sets_mode_and_target_place() -> None:
     dto = _dto()
     state = next(
@@ -218,6 +233,26 @@ def test_raise_state_executor_mutates_matching_keywords_only() -> None:
     RaiseStateToTargetCpoExecutor().execute(ctx)
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.OPTIMUM
     assert ctx.keywords[1].next_state == []
+
+
+@pytest.mark.unit
+def test_raise_state_executor_respects_policy_cap() -> None:
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=700.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.OPTIMUM,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.target_place == 20
 
 
 @pytest.mark.unit
@@ -380,6 +415,97 @@ def test_raise_state_caps_at_fact_ceiling_on_overspend() -> None:
     assert cheap.current_mode == KeywordStrategyMode.OPTIMUM
     assert expensive.current_mode == KeywordStrategyMode.MIN_CPA
     assert expensive.next_state == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("mode", "cap", "expected_mode", "expected_place"),
+    [
+        (
+            KeywordStrategyMode.MAX_CONVERSION,
+            KeywordStrategyMode.MIN_CPA,
+            KeywordStrategyMode.MIN_CPA,
+            10,
+        ),
+        (
+            KeywordStrategyMode.OPTIMUM,
+            KeywordStrategyMode.MIN_CPA,
+            KeywordStrategyMode.MIN_CPA,
+            10,
+        ),
+        (
+            KeywordStrategyMode.MAX_CONVERSION,
+            KeywordStrategyMode.OPTIMUM,
+            KeywordStrategyMode.OPTIMUM,
+            20,
+        ),
+    ],
+)
+def test_clamp_state_to_aggression_executor_downgrades_above_cap(
+    mode: KeywordStrategyMode,
+    cap: KeywordStrategyMode,
+    expected_mode: KeywordStrategyMode,
+    expected_place: int,
+) -> None:
+    dto = _dto(mode=mode)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(AdvState.empty().policy, max_target_mode=cap),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    ClampStateToAggressionExecutor().execute(ctx)
+    assert dto.current_mode == expected_mode
+    assert dto.target_place == expected_place
+    assert dto.next_state[-1].executor_name == "ClampStateToAggressionExecutor"
+
+
+@pytest.mark.unit
+def test_clamp_state_to_aggression_executor_noop_when_already_within_cap() -> None:
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.OPTIMUM,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    ClampStateToAggressionExecutor().execute(ctx)
+    assert dto.next_state == []
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_clamp_state_to_aggression_executor_skips_when_cap_state_missing() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=None, opt_cpo=400.0, max_cpo=600.0),
+    )
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.MIN_CPA,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    executor = ClampStateToAggressionExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "missing_cap_ladder_state"
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.next_state == []
 
 
 @pytest.mark.unit

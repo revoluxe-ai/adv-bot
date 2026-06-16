@@ -194,6 +194,30 @@ def test_resolver_noop_for_off_and_max() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("cap", "expected"),
+    [
+        (KeywordStrategyMode.MIN_CPA, None),
+        (KeywordStrategyMode.OPTIMUM, KeywordStrategyMode.OPTIMUM),
+        (KeywordStrategyMode.MAX_CONVERSION, KeywordStrategyMode.MAX_CONVERSION),
+    ],
+)
+def test_resolver_alias_same_place_respects_aggression_cap(
+    cap: KeywordStrategyMode,
+    expected: KeywordStrategyMode | None,
+) -> None:
+    cat = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    assert (
+        resolve_alias_collapse_up_at_same_target_place(
+            KeywordStrategyMode.MIN_CPA,
+            cat,
+            max_target_mode=cap,
+        )
+        == expected
+    )
+
+
+@pytest.mark.unit
 def test_nsm_skip_up_applies_max_on_alias_group() -> None:
     nsm = NextStateManager(SkipUpTargetPlaceExecutor)
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
@@ -225,7 +249,14 @@ def test_skip_up_executor_mutates_only_alias_keywords() -> None:
         mode=KeywordStrategyMode.MIN_CPA,
         ladder=_ladder_states_distinct_places(2),
     )
-    adv_state = replace(AdvState.empty(), resolve=500.0)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+        ),
+    )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto_alias, dto_distinct]),
         adv_state=adv_state,
@@ -246,6 +277,44 @@ def test_skip_up_executor_mutates_only_alias_keywords() -> None:
 
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.MAX_CONVERSION
     assert ctx.keywords[1].next_state == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("cap", "expected_mode", "expected_next_state_len"),
+    [
+        (
+            KeywordStrategyMode.MIN_CPA,
+            KeywordStrategyMode.MIN_CPA,
+            0,
+        ),
+        (
+            KeywordStrategyMode.OPTIMUM,
+            KeywordStrategyMode.OPTIMUM,
+            1,
+        ),
+    ],
+)
+def test_skip_up_executor_respects_policy_cap(
+    cap: KeywordStrategyMode,
+    expected_mode: KeywordStrategyMode,
+    expected_next_state_len: int,
+) -> None:
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=cap,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    SkipUpTargetPlaceExecutor().execute(ctx)
+    assert dto.current_mode == expected_mode
+    assert len(dto.next_state) == expected_next_state_len
 
 
 @pytest.mark.unit

@@ -36,7 +36,11 @@ class SkipUpTargetPlaceExecutor:
             if dto.data_tier != KeywordV3DataTier.FULL:
                 continue
             catalog = state_candidates_by_mode_for_ctx(dto.context, ladder_inputs)
-            self._next_state_manager.skip_up_same_target_place(dto, catalog)
+            self._next_state_manager.skip_up_same_target_place(
+                dto,
+                catalog,
+                max_target_mode=context.adv_state.policy.max_target_mode,
+            )
 
     @property
     def skip_reason(self) -> str | None:

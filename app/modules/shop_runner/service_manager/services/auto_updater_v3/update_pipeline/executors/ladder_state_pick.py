@@ -50,6 +50,46 @@ def has_operable_cpo(dto: KeywordDTO) -> bool:
     )
 
 
+def valid_ladder_state_for_mode(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+) -> KeywordV3LadderState | None:
+    """Первая валидная ladder-ступень для ``mode`` с известным CPO.
+
+    Используется как безопасная точка выбора cap-state: если ступень есть, но
+    она невалидна или без CPO, то cap нельзя применять как реальный action.
+    """
+    for state in dto.ladder_states:
+        if (
+            state.strategy_mode == mode
+            and state.is_valid
+            and state.cpo is not None
+        ):
+            return state
+    return None
+
+
+def allowed_up_ladder_states(
+    dto: KeywordDTO,
+    *,
+    max_target_mode: KeywordStrategyMode,
+) -> tuple[KeywordV3LadderState, ...]:
+    """Валидные M/O/C-ступени, разрешённые aggression cap'ом для UP-пулов.
+
+    Матрица ladder остаётся полной для чтения и DOWN-контуров; этот helper
+    ограничивает только UP-кандидатов по policy cap.
+    """
+    cap_level = mode_level(max_target_mode)
+    return tuple(
+        state
+        for state in dto.ladder_states
+        if state.cpo is not None
+        and state.is_valid
+        and state.stage in _OPERABLE_LADDER_STAGES
+        and mode_level(state.strategy_mode) <= cap_level
+    )
+
+
 def ladder_state_for_mode(
     dto: KeywordDTO,
     mode: KeywordStrategyMode,
@@ -87,12 +127,15 @@ def pick_max_ladder_state_at_or_below_cpo(
     ceiling: float,
     *,
     strict_ceiling: bool = False,
+    max_target_mode: KeywordStrategyMode | None = None,
 ) -> KeywordV3LadderState | None:
     """Максимальная по агрессии ступень MIN/OPT/MAX под потолком ``ceiling``.
 
     Args:
         strict_ceiling: ``True`` для plan max (строго ``cpo < ceiling`` через
             ``ladder_cpo_within_ceiling``); иначе resolve-ветка с ``cpo <= ceiling``.
+        max_target_mode: Дополнительный cap на агрессию. Нужен для early clamp и
+            UP executors, чтобы не выбрать state выше policy.max_target_mode.
     """
     threshold = float(ceiling)
 
@@ -101,13 +144,20 @@ def pick_max_ladder_state_at_or_below_cpo(
             return ladder_cpo_within_ceiling(cpo, threshold)
         return cpo <= threshold
 
-    candidates = [
-        state
-        for state in dto.ladder_states
-        if state.cpo is not None
-        and state.stage in _OPERABLE_LADDER_STAGES
-        and _fits(float(state.cpo))
-    ]
+    candidates: list[KeywordV3LadderState] = []
+    for state in allowed_up_ladder_states(
+        dto,
+        max_target_mode=(
+            max_target_mode
+            if max_target_mode is not None
+            else KeywordStrategyMode.MAX_CONVERSION
+        ),
+    ):
+        cpo = state.cpo
+        if cpo is None:
+            continue
+        if _fits(float(cpo)):
+            candidates.append(state)
     if not candidates:
         return None
     return max(candidates, key=lambda state: mode_level(state.strategy_mode))
