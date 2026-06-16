@@ -3,7 +3,12 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import select
+
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.rebind_wb_adv_ids_history import (
+    get_rebound_wb_adv_ids,
+)
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
@@ -16,6 +21,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
+from app.utils.db.session_maker import get_async_session_maker as sm
 from app.shared.domains.wb.utils.rec_system_shelf_mode import (
     is_rec_system_shelf_mode_operational,
     should_show_clicks_warning,
@@ -128,22 +134,26 @@ class CommonStatDataManager:
         self, adv_setting: AdvSetting, start_date: date, end_date: date
     ) -> list[SmallFullAdvStatPerDay]:
         """Получает объединенную статистику по РК за диапазон дат."""
-        auto_adv_id = adv_setting.adv_id
-        auction_adv_id = adv_setting.search_adv_id
-        if auto_adv_id is None:
+        auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
+            adv_setting
+        )
+        if not auto_adv_ids and not auction_adv_ids:
             return []
 
         start_dt = datetime.combine(start_date, datetime.min.time())
         end_dt = datetime.combine(end_date, datetime.min.time())
 
-        auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auto_adv_id], start_dt, end_dt
-        )
-        if auction_adv_id is None:
+        if not auto_adv_ids:
+            auto_adv_stat: list[SmallFullAdvStatPerDay] = []
+        else:
+            auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
+                auto_adv_ids, start_dt, end_dt
+            )
+        if not auction_adv_ids:
             auction_adv_stat: list[SmallFullAdvStatPerDay] = []
         else:
             auction_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-                [auction_adv_id], start_dt, end_dt
+                auction_adv_ids, start_dt, end_dt
             )
 
         concatenated_result = full_wb_adv_stat.concatenate_stats(
@@ -152,44 +162,122 @@ class CommonStatDataManager:
         concatenated_result.sort(key=lambda x: x.date)
         return concatenated_result
 
-    async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
-        """Возвращает первую дату, когда для дневной статистики есть все источники.
+    async def _collect_adv_ids_for_stats(
+        self, adv_setting: AdvSetting
+    ) -> tuple[list[int], list[int]]:
+        """adv_id текущей РК и её перепривязок — только они участвуют в метриках экрана.
 
-        Для каждого источника берётся MIN(date) только по актуальной version —
-        так же, как в запросах загрузки дневных рядов. Иначе в CH остаются старые
-        даты без свежих строк, пагинация рисует лишние страницы, а при переходе
-        на них данных нет.
+        Общий WB id в auto и auction убирается из auto, чтобы ``concatenate_stats``
+        не удваивал метрики; при этом id остаётся в auction.
         """
-        if adv_setting.adv_id is None:
-            return None
-        candidate_dates: list[date] = []
+        auto_ids: set[int] = set()
+        auction_ids: set[int] = set()
+
+        if adv_setting.adv_id is not None:
+            auto_ids.add(adv_setting.adv_id)
+        if adv_setting.search_adv_id is not None:
+            auction_ids.add(adv_setting.search_adv_id)
+
+        rebound_auto, rebound_auction = await get_rebound_wb_adv_ids(adv_setting.id)
+        auto_ids.update(rebound_auto)
+        auction_ids.update(rebound_auction)
+        auto_ids -= auction_ids
+
+        return sorted(auto_ids), sorted(auction_ids)
+
+    async def _collect_historical_adv_ids(
+        self, adv_setting: AdvSetting
+    ) -> tuple[list[int], list[int]]:
+        """Расширенный набор adv_id для границы пагинации (siblings, кластеры CH).
+
+        Не использовать для суммирования spend/views: соседние кампании того же
+        артикула дадут завышенные метрики на экране одной РК.
+        """
+        auto_ids_list, auction_ids_list = await self._collect_adv_ids_for_stats(
+            adv_setting
+        )
+        auto_ids = set(auto_ids_list)
+        auction_ids = set(auction_ids_list)
 
         nmid = adv_setting.nmids[0] if adv_setting.nmids else None
         if nmid is not None:
+            pg_auto, pg_auction = await self._get_pg_sibling_adv_ids(
+                adv_setting.wb_cabinet_id, nmid
+            )
+            auto_ids.update(pg_auto)
+            auction_ids.update(pg_auction)
+            auto_ids.update(await self._get_cluster_adv_ids_for_nmid(nmid))
+
+        auto_ids -= auction_ids
+        return sorted(auto_ids), sorted(auction_ids)
+
+    async def _get_pg_sibling_adv_ids(
+        self, wb_cabinet_id: int, nmid: int
+    ) -> tuple[set[int], set[int]]:
+        """Все adv_id / search_adv_id из AdvSetting того же кабинета и артикула."""
+        auto_ids: set[int] = set()
+        auction_ids: set[int] = set()
+        async with sm(read_only=True) as session:
+            stmt = select(AdvSetting.adv_id, AdvSetting._search_adv_id).where(  # noqa: SLF001
+                AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                AdvSetting.nmids == [nmid],
+            )
+            result = await session.execute(stmt)
+            for adv_id, search_adv_id in result.all():
+                if adv_id is not None:
+                    auto_ids.add(adv_id)
+                if search_adv_id is not None:
+                    auction_ids.add(search_adv_id)
+        return auto_ids, auction_ids
+
+    async def _get_cluster_adv_ids_for_nmid(self, nmid: int) -> set[int]:
+        """adv_id из clusters_adv_stats — подхватывает старые авто-РК после rebind."""
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                result = await client.query(
+                    """
+                    SELECT DISTINCT adv_id
+                    FROM default_db.clusters_adv_stats
+                    WHERE nmid = %(nmid)s
+                    """,
+                    parameters={"nmid": nmid},
+                )
+        if not result or not result.result_rows:
+            return set()
+        return {int(row[0]) for row in result.result_rows}
+
+    async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
+        """Возвращает нижнюю границу пагинации дневной статистики.
+
+        Берётся более поздняя из минимальных дат воронки (wb_common_stat) и рекламы
+        (full_adv_wb_stat). Пересечение по дням (INNER JOIN) не используется: при
+        разрыве в воронке оно сдвигает границу вперёд и скрывает дни, где реклама
+        уже есть. adv_id для рекламы — расширенный набор (rebind, siblings, кластеры).
+        """
+        if adv_setting.adv_id is None:
+            return None
+
+        nmid = adv_setting.nmids[0] if adv_setting.nmids else None
+        auto_adv_ids, auction_adv_ids = await self._collect_historical_adv_ids(
+            adv_setting
+        )
+        all_adv_ids = sorted(set(auto_adv_ids) | set(auction_adv_ids))
+        if not all_adv_ids:
+            return None
+
+        candidate_dates: list[date] = []
+        if nmid is not None:
             common_date = await self._get_min_date(
                 """
-                SELECT MIN(stat_date)
-                FROM (
-                    SELECT toDate(date) AS stat_date
-                    FROM wb_common_stat
-                    WHERE nmid = %(nmid)s
-                      AND version = (
-                        SELECT MAX(version)
-                        FROM wb_common_stat AS inner_stat
-                        WHERE inner_stat.nmid = %(nmid)s
-                          AND inner_stat.date = wb_common_stat.date
-                      )
-                    GROUP BY stat_date
-                )
+                SELECT MIN(toDate(date))
+                FROM wb_common_stat
+                WHERE nmid = %(nmid)s
                 """,
                 {"nmid": nmid},
             )
             if common_date is not None:
                 candidate_dates.append(common_date)
 
-        adv_ids = [adv_setting.adv_id]
-        if adv_setting.search_adv_id is not None:
-            adv_ids.append(adv_setting.search_adv_id)
         adv_date = await self._get_min_date(
             """
             SELECT MIN(date)
@@ -204,7 +292,7 @@ class CommonStatDataManager:
                 GROUP BY date
             )
             """,
-            {"adv_ids": adv_ids},
+            {"adv_ids": all_adv_ids},
         )
         if adv_date is not None:
             candidate_dates.append(adv_date)
@@ -313,6 +401,10 @@ class CommonStatDataManager:
         """Загружает все дневные источники для одного диапазона дат."""
         if not adv_setting.nmids or adv_setting.adv_id is None:
             return ([], [], {}, {}, {}, {}, {})
+        auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
+            adv_setting
+        )
+        auto_ids_for_auto_slot = auto_adv_ids or auction_adv_ids
         concatenate_stat = await self.get_concatinated_stats_for_range(
             adv_setting, start_date, end_date
         )
@@ -323,9 +415,8 @@ class CommonStatDataManager:
             nmid, start_dt, end_dt
         )
 
-        auto_adv_id = adv_setting.adv_id
         auto_views_by_day = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auto_adv_id], start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
         auto_views_by_day_map: dict[date, int] = {
             stat.date: stat.views for stat in auto_views_by_day
@@ -335,14 +426,14 @@ class CommonStatDataManager:
         }
 
         keywords_views_by_day = await full_wb_adv_stat.get_keywords_views_by_days(
-            [auto_adv_id], start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
         keywords_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
-            [auto_adv_id], start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
-        adv_ids_for_cluster_keywords: list[int] = [auto_adv_id]
-        if adv_setting.search_adv_id:
-            adv_ids_for_cluster_keywords.append(adv_setting.search_adv_id)
+        adv_ids_for_cluster_keywords = sorted(
+            set(auto_ids_for_auto_slot) | set(auction_adv_ids)
+        )
         cluster_keyword_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
             adv_ids_for_cluster_keywords, start_dt, end_dt
         )

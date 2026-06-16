@@ -365,6 +365,168 @@ async def test_days_page_second_window_loads_when_earliest_allows() -> None:
 
 
 @pytest.mark.asyncio
+async def test_collect_adv_ids_for_stats_excludes_siblings_and_clusters() -> None:
+    """Метрики экрана не должны включать соседние кампании того же артикула."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    adv_setting_mock.adv_id = 32824944
+    adv_setting_mock.search_adv_id = 29734515
+    adv_setting_mock.nmids = [10749810]
+    adv_setting_mock.wb_cabinet_id = 1
+
+    with (
+        patch.object(
+            manager,
+            "_get_pg_sibling_adv_ids",
+            new=AsyncMock(return_value=({99999999}, {88888888})),
+        ),
+        patch.object(
+            manager,
+            "_get_cluster_adv_ids_for_nmid",
+            new=AsyncMock(return_value={11111111}),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.get_rebound_wb_adv_ids",
+            new=AsyncMock(return_value=({22222222}, {33333333})),
+        ),
+    ):
+        auto_ids, auction_ids = await manager._collect_adv_ids_for_stats(
+            adv_setting_mock
+        )
+
+    assert auto_ids == [22222222, 32824944]
+    assert auction_ids == [29734515, 33333333]
+
+
+@pytest.mark.asyncio
+async def test_collect_adv_ids_shared_id_keeps_auction_only() -> None:
+    """Один WB id в обоих слотах не должен терять id после дедупликации."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    adv_setting_mock.adv_id = 55555555
+    adv_setting_mock.search_adv_id = 55555555
+
+    with patch(
+        "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.get_rebound_wb_adv_ids",
+        new=AsyncMock(return_value=(set(), set())),
+    ):
+        auto_ids, auction_ids = await manager._collect_adv_ids_for_stats(
+            adv_setting_mock
+        )
+
+    assert auto_ids == []
+    assert auction_ids == [55555555]
+
+
+@pytest.mark.asyncio
+async def test_concatinated_stats_shared_id_uses_auction_set() -> None:
+    """При пустом auto и id только в auction метрики рекламы не отбрасываются."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    test_date = datetime.datetime.now().date()
+    auction_stat = SmallFullAdvStatPerDay(
+        date=test_date,
+        views=50,
+        clicks=5,
+        spend=500,
+        added_to_cart=2,
+        orders=1,
+        sum_price=1000,
+    )
+
+    with (
+        patch.object(
+            manager,
+            "_collect_adv_ids_for_stats",
+            new=AsyncMock(return_value=([], [55555555])),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.full_wb_adv_stat.get_daily_stats_by_last_days",
+            new=AsyncMock(return_value=[auction_stat]),
+        ) as get_daily_mock,
+    ):
+        result = await manager.get_concatinated_stats_for_range(
+            adv_setting_mock,
+            test_date,
+            test_date,
+        )
+
+    assert result == [auction_stat]
+    get_daily_mock.assert_awaited_once()
+    assert get_daily_mock.await_args.args[0] == [55555555]
+
+
+@pytest.mark.asyncio
+async def test_collect_historical_adv_ids_merges_rebound_and_current() -> None:
+    """Дневная статистика должна видеть старые adv_id после перепривязки."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    adv_setting_mock.adv_id = 32824944
+    adv_setting_mock.search_adv_id = 29734515
+    adv_setting_mock.nmids = [10749810]
+    adv_setting_mock.wb_cabinet_id = 1
+
+    with (
+        patch.object(
+            manager,
+            "_get_pg_sibling_adv_ids",
+            new=AsyncMock(return_value=({32824944}, {29734515})),
+        ),
+        patch.object(
+            manager,
+            "_get_cluster_adv_ids_for_nmid",
+            new=AsyncMock(return_value={11111111}),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.get_rebound_wb_adv_ids",
+            new=AsyncMock(return_value=({22222222}, {33333333})),
+        ),
+    ):
+        auto_ids, auction_ids = await manager._collect_historical_adv_ids(
+            adv_setting_mock
+        )
+
+    assert auto_ids == [11111111, 22222222, 32824944]
+    assert auction_ids == [29734515, 33333333]
+
+
+@pytest.mark.asyncio
+async def test_earliest_stat_date_ignores_overlap_gap_not_max_of_mins() -> None:
+    """При разрыве в воронке INNER JOIN даёт дату позже max(MIN воронки, MIN рекламы)."""
+    today = datetime.datetime.now().date()
+    common_earliest = today - datetime.timedelta(days=60)
+    adv_earliest = today - datetime.timedelta(days=40)
+
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.nmids = [1]
+    adv_setting_mock.adv_id = 2
+    adv_setting_mock.search_adv_id = 3
+
+    async def min_date_side_effect(
+        query: str, parameters: dict[str, object]
+    ) -> datetime.date:
+        if "wb_common_stat" in query:
+            return common_earliest
+        return adv_earliest
+
+    with (
+        patch.object(
+            manager,
+            "_collect_historical_adv_ids",
+            new=AsyncMock(return_value=([2], [3])),
+        ),
+        patch.object(
+            manager,
+            "_get_min_date",
+            new=AsyncMock(side_effect=min_date_side_effect),
+        ),
+    ):
+        earliest_date = await manager.get_earliest_stat_date(adv_setting_mock)
+
+    assert earliest_date == adv_earliest
+
+
+@pytest.mark.asyncio
 async def test_earliest_stat_date_uses_latest_required_source() -> None:
     """Если карточная история начинается раньше кампании, граница страниц не должна уезжать назад."""
     today = datetime.datetime.now().date()
@@ -376,10 +538,17 @@ async def test_earliest_stat_date_uses_latest_required_source() -> None:
     adv_setting_mock.adv_id = 2
     adv_setting_mock.search_adv_id = 3
 
-    with patch.object(
-        manager,
-        "_get_min_date",
-        new=AsyncMock(side_effect=[common_earliest, adv_earliest]),
+    with (
+        patch.object(
+            manager,
+            "_collect_historical_adv_ids",
+            new=AsyncMock(return_value=([2], [3])),
+        ),
+        patch.object(
+            manager,
+            "_get_min_date",
+            new=AsyncMock(return_value=adv_earliest),
+        ),
     ):
         earliest_date = await manager.get_earliest_stat_date(adv_setting_mock)
 
