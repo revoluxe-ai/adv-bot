@@ -14,9 +14,8 @@ from app.client_bot.user_interface.views.callbacks import (
 from app.client_bot.user_interface.views.keyboards import (
     get_keyword_daily_history_keyboard,
 )
-from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.date_pagination import (
-    get_total_pages,
-    page_to_date_range,
+from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend import (
+    date_pagination,
 )
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_daily_history_message import (
     build_keyword_daily_history_text,
@@ -125,9 +124,14 @@ def test_history_keyboard_paginates_and_keeps_back_button() -> None:
 def test_date_pagination_helpers_clamp_dates() -> None:
     """Пагинация дат должна давать предсказуемые границы страниц."""
     earliest_date = date(2026, 6, 1)
-    assert get_total_pages(earliest_date, page_size=7, today=date(2026, 6, 16)) == 3
+    assert (
+        date_pagination.get_total_pages(
+            earliest_date, page_size=7, today=date(2026, 6, 16)
+        )
+        == 3
+    )
 
-    page_range = page_to_date_range(
+    page_range = date_pagination.page_to_date_range(
         2,
         page_size=7,
         earliest_date=earliest_date,
@@ -140,6 +144,18 @@ def test_date_pagination_helpers_clamp_dates() -> None:
 async def test_history_manager_returns_page_range(monkeypatch: pytest.MonkeyPatch) -> None:
     """Менеджер должен возвращать диапазон, который использовал для выборки."""
     manager = KeywordDailyHistoryManager()
+
+    class _FixedDatetime:
+        @staticmethod
+        def now() -> object:
+            class _Now:
+                @staticmethod
+                def date() -> date:
+                    return date(2026, 6, 16)
+
+            return _Now()
+
+    monkeypatch.setattr(date_pagination, "datetime", _FixedDatetime)
 
     keyword_setting = MagicMock()
     keyword_setting.text = "купить товар"
