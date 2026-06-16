@@ -133,15 +133,14 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
                 result: QueryResult = await client.query(query, parameters=params)
 
         history: list[KeywordDailyStat] = []
-        for obj in result.named_results():  # pyright: ignore[reportUnknownMemberType]
+        for obj in result.named_results():  # pyright: ignore
             history.append(KeywordDailyStat.model_validate(obj))
         return history
 
     async def _collect_adv_ids(self, adv_setting: AdvSetting) -> list[int]:
         """Собирает current/rebind adv_id для фильтрации ClickHouse."""
         adv_ids: set[int] = set()
-        if adv_setting.adv_id is not None:
-            adv_ids.add(adv_setting.adv_id)
+        adv_ids.add(adv_setting.adv_id)
         if adv_setting.search_adv_id is not None:
             adv_ids.add(adv_setting.search_adv_id)
 
