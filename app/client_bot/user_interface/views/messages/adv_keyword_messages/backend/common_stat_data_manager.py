@@ -134,7 +134,7 @@ class CommonStatDataManager:
         self, adv_setting: AdvSetting, start_date: date, end_date: date
     ) -> list[SmallFullAdvStatPerDay]:
         """Получает объединенную статистику по РК за диапазон дат."""
-        auto_adv_ids, auction_adv_ids = await self._collect_historical_adv_ids(
+        auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
             adv_setting
         )
         if not auto_adv_ids:
@@ -159,10 +159,10 @@ class CommonStatDataManager:
         concatenated_result.sort(key=lambda x: x.date)
         return concatenated_result
 
-    async def _collect_historical_adv_ids(
+    async def _collect_adv_ids_for_stats(
         self, adv_setting: AdvSetting
     ) -> tuple[list[int], list[int]]:
-        """Собирает auto и auction adv_id, включая перепривязки и CH-кластеры."""
+        """adv_id текущей РК и её перепривязок — только они участвуют в метриках экрана."""
         auto_ids: set[int] = set()
         auction_ids: set[int] = set()
 
@@ -170,6 +170,27 @@ class CommonStatDataManager:
             auto_ids.add(adv_setting.adv_id)
         if adv_setting.search_adv_id is not None:
             auction_ids.add(adv_setting.search_adv_id)
+
+        rebound_auto, rebound_auction = await get_rebound_wb_adv_ids(adv_setting.id)
+        auto_ids.update(rebound_auto)
+        auction_ids.update(rebound_auction)
+        auto_ids -= auction_ids
+
+        return sorted(auto_ids), sorted(auction_ids)
+
+    async def _collect_historical_adv_ids(
+        self, adv_setting: AdvSetting
+    ) -> tuple[list[int], list[int]]:
+        """Расширенный набор adv_id для границы пагинации (siblings, кластеры CH).
+
+        Не использовать для суммирования spend/views: соседние кампании того же
+        артикула дадут завышенные метрики на экране одной РК.
+        """
+        auto_ids_list, auction_ids_list = await self._collect_adv_ids_for_stats(
+            adv_setting
+        )
+        auto_ids = set(auto_ids_list)
+        auction_ids = set(auction_ids_list)
 
         nmid = adv_setting.nmids[0] if adv_setting.nmids else None
         if nmid is not None:
@@ -180,11 +201,7 @@ class CommonStatDataManager:
             auction_ids.update(pg_auction)
             auto_ids.update(await self._get_cluster_adv_ids_for_nmid(nmid))
 
-        rebound_auto, rebound_auction = await get_rebound_wb_adv_ids(adv_setting.id)
-        auto_ids.update(rebound_auto)
-        auction_ids.update(rebound_auction)
         auto_ids -= auction_ids
-
         return sorted(auto_ids), sorted(auction_ids)
 
     async def _get_pg_sibling_adv_ids(
@@ -223,10 +240,12 @@ class CommonStatDataManager:
         return {int(row[0]) for row in result.result_rows}
 
     async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
-        """Возвращает первую дату, когда для дневной статистики есть все источники.
+        """Возвращает нижнюю границу пагинации дневной статистики.
 
-        Граница — первый день пересечения воронки (wb_common_stat) и рекламы
-        (full_adv_wb_stat). adv_id включают историю перепривязок и кластеры.
+        Берётся более поздняя из минимальных дат воронки (wb_common_stat) и рекламы
+        (full_adv_wb_stat). Пересечение по дням (INNER JOIN) не используется: при
+        разрыве в воронке оно сдвигает границу вперёд и скрывает дни, где реклама
+        уже есть. adv_id для рекламы — расширенный набор (rebind, siblings, кластеры).
         """
         if adv_setting.adv_id is None:
             return None
@@ -238,31 +257,6 @@ class CommonStatDataManager:
         all_adv_ids = sorted(set(auto_adv_ids) | set(auction_adv_ids))
         if not all_adv_ids:
             return None
-
-        if nmid is not None:
-            overlap_date = await self._get_min_date(
-                """
-                SELECT MIN(common_stat.d)
-                FROM (
-                    SELECT toDate(date) AS d
-                    FROM wb_common_stat
-                    WHERE nmid = %(nmid)s
-                    GROUP BY d
-                ) AS common_stat
-                INNER JOIN (
-                    SELECT DISTINCT date AS d
-                    FROM (
-                        SELECT adv_id, date
-                        FROM default_db.full_adv_wb_stat
-                        WHERE adv_id IN %(adv_ids)s
-                        GROUP BY adv_id, date
-                    )
-                ) AS adv_stat ON common_stat.d = adv_stat.d
-                """,
-                {"nmid": nmid, "adv_ids": all_adv_ids},
-            )
-            if overlap_date is not None:
-                return overlap_date
 
         candidate_dates: list[date] = []
         if nmid is not None:
@@ -400,7 +394,7 @@ class CommonStatDataManager:
         """Загружает все дневные источники для одного диапазона дат."""
         if not adv_setting.nmids or adv_setting.adv_id is None:
             return ([], [], {}, {}, {}, {}, {})
-        auto_adv_ids, auction_adv_ids = await self._collect_historical_adv_ids(
+        auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
             adv_setting
         )
         concatenate_stat = await self.get_concatinated_stats_for_range(
