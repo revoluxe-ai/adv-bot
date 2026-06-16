@@ -48,6 +48,11 @@ class ResolveCalibrationExecutor:
         state = context.adv_state
         assert state.calibration_direct is not None
 
+        if state.max_effective_steps <= 0:
+            self._skip_reason = "calibration_steps_disabled"
+            self._reset_step(context)
+            return
+
         conflict = _direction_conflict_reason(context)
         if conflict is not None:
             self._skip_reason = conflict

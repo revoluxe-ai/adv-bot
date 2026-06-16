@@ -35,6 +35,30 @@ def test_resolve_first_tick_always_one() -> None:
 
 
 @pytest.mark.unit
+def test_resolve_none_uses_default_behavior() -> None:
+    assert (
+        resolve_effective_calibration_steps(
+            None,
+            prev=None,
+            current_direct=CalibrationDirect.TIGHTEN,
+        )
+        == 1
+    )
+
+
+@pytest.mark.unit
+def test_resolve_zero_cap_returns_zero() -> None:
+    assert (
+        resolve_effective_calibration_steps(
+            0,
+            prev=None,
+            current_direct=CalibrationDirect.LOOSEN,
+        )
+        == 0
+    )
+
+
+@pytest.mark.unit
 def test_resolve_same_direct_doubles_capped() -> None:
     prev = CalibrationStepState(effective_steps=2, direct=CalibrationDirect.TIGHTEN)
     assert (

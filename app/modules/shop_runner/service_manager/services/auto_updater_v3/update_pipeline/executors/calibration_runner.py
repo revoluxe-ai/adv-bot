@@ -104,7 +104,9 @@ def run_calibration_down(
         Счётчик фактически применённых ladder-шагов и служебные итоги цикла.
     """
     ceiling = float(resolve)
-    step_budget = max(1, int(max_steps))
+    step_budget = max(0, int(max_steps))
+    if step_budget == 0:
+        return PotentialUpRunResult(step_budget=0, stop_reason="zero_budget")
     generator = StatesListGenerator(context.adv_state, for_calibration=True)
     eligibility = context.adv_state.eligibility_by_ks_id
 
@@ -220,7 +222,7 @@ def run_calibration_up(
     """CAL UP: до ``max_steps`` ladder UP из list2 (alias на том же ``target_place`` не считаются)."""
     return run_potential_up_steps(
         context,
-        max_steps=max(1, int(max_steps)),
+        max_steps=max(0, int(max_steps)),
         nsm=nsm,
         for_calibration=True,
     )

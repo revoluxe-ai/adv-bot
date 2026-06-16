@@ -386,6 +386,8 @@ def _note_resolve_calibration(
     ladder_inputs: LadderInputs | None,
     max_effective_steps: int,
 ) -> str:
+    if max_effective_steps <= 0:
+        return "калибровка отключена"
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
     direct = calibration_direct

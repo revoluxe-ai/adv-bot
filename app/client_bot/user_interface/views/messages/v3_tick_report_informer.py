@@ -47,6 +47,7 @@ _SKIP_REASON_RU: dict[str, str] = {
     "shelf_inactive": "полка неактивна",
     "fact_le_max": "fact ≤ max",
     "guard_applied": "guard уже применён",
+    "calibration_steps_disabled": "калибровка отключена",
     "plan_fact_unchanged": "plan/fact не изменились",
     "views_unchanged": "views не изменились",
     "plan_fact_unchanged_and_views_unchanged": "plan/fact и views не изменились",
