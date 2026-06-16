@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
     resolve_alias_collapse_up_at_same_target_place,
+    resolve_alias_collapse_up_state_at_same_target_place,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordDTO,
@@ -138,6 +139,46 @@ def _ladder_states_distinct_places(ks_id: int) -> tuple[KeywordV3LadderState, ..
     )
 
 
+def _ladder_states_duplicate_optimum(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
+    return (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            target_position=40,
+            cpo=300.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OPTIMUM,
+            strategy_mode=KeywordStrategyMode.OPTIMUM,
+            target_position=10,
+            cpo=400.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OPTIMUM,
+            strategy_mode=KeywordStrategyMode.OPTIMUM,
+            target_position=40,
+            cpo=410.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=50,
+            cpo=600.0,
+        ),
+    )
+
+
 def _dto(
     *,
     ks_id: int = 1,
@@ -218,6 +259,21 @@ def test_resolver_alias_same_place_respects_aggression_cap(
 
 
 @pytest.mark.unit
+def test_resolver_alias_same_place_returns_concrete_state_on_current_place() -> None:
+    states = _ladder_states_duplicate_optimum(1)
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA, ladder=states)
+    cat = _fake_catalog_places(min_place=40, opt_place=40, max_place=50)
+    state = resolve_alias_collapse_up_state_at_same_target_place(
+        dto,
+        KeywordStrategyMode.MIN_CPA,
+        cat,
+    )
+    assert state is not None
+    assert state.strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert int(state.target_position) == 40
+
+
+@pytest.mark.unit
 def test_nsm_skip_up_applies_max_on_alias_group() -> None:
     nsm = NextStateManager(SkipUpTargetPlaceExecutor)
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
@@ -280,6 +336,38 @@ def test_skip_up_executor_mutates_only_alias_keywords() -> None:
 
 
 @pytest.mark.unit
+def test_skip_up_executor_uses_same_target_place_row_when_duplicates_exist() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states_duplicate_optimum(1),
+    )
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    catalog = _fake_catalog_places(min_place=40, opt_place=40, max_place=50)
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.skip_up_target_place.state_candidates_by_mode_for_ctx",
+        return_value=catalog,
+    ):
+        SkipUpTargetPlaceExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 40
+    assert dto.next_state[-1].new_mode.to_strategy_mode() == KeywordStrategyMode.OPTIMUM
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     ("cap", "expected_mode", "expected_next_state_len"),
     [
@@ -312,7 +400,12 @@ def test_skip_up_executor_respects_policy_cap(
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    SkipUpTargetPlaceExecutor().execute(ctx)
+    catalog = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.skip_up_target_place.state_candidates_by_mode_for_ctx",
+        return_value=catalog,
+    ):
+        SkipUpTargetPlaceExecutor().execute(ctx)
     assert dto.current_mode == expected_mode
     assert len(dto.next_state) == expected_next_state_len
 
