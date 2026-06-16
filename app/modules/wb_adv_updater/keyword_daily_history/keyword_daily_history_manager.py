@@ -50,7 +50,7 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
             страниц и минимальной даты данных.
         """
         if not adv_setting.nmids:
-            return [], max(page, 1), 1, None
+            return [], 1, 1, None
 
         earliest_date = await self.get_earliest_date(keyword_setting, adv_setting)
         total_pages = get_total_pages(earliest_date, page_size=page_size)

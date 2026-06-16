@@ -185,3 +185,29 @@ async def test_history_manager_returns_page_range(monkeypatch: pytest.MonkeyPatc
     assert current_page == 1
     assert total_pages == 3
     assert page_range == (date(2026, 6, 10), date(2026, 6, 16))
+
+
+@pytest.mark.asyncio
+async def test_history_manager_clamps_page_when_no_nmids() -> None:
+    """Без nmids менеджер не должен сохранять чужой номер страницы."""
+    manager = KeywordDailyHistoryManager()
+
+    keyword_setting = MagicMock()
+    keyword_setting.text = "купить товар"
+    adv_setting = MagicMock()
+    adv_setting.nmids = []
+    adv_setting.adv_id = 10
+    adv_setting.search_adv_id = None
+    adv_setting.id = 2
+
+    stats, current_page, total_pages, page_range = await manager.get_history_page(
+        keyword_setting,
+        adv_setting,
+        page=9,
+        page_size=7,
+    )
+
+    assert stats == []
+    assert current_page == 1
+    assert total_pages == 1
+    assert page_range is None
