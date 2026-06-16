@@ -153,7 +153,13 @@ class CommonStatDataManager:
         return concatenated_result
 
     async def get_earliest_stat_date(self, adv_setting: AdvSetting) -> date | None:
-        """Возвращает первую дату, когда для дневной статистики есть все источники."""
+        """Возвращает первую дату, когда для дневной статистики есть все источники.
+
+        Для каждого источника берётся MIN(date) только по актуальной version —
+        так же, как в запросах загрузки дневных рядов. Иначе в CH остаются старые
+        даты без свежих строк, пагинация рисует лишние страницы, а при переходе
+        на них данных нет.
+        """
         if adv_setting.adv_id is None:
             return None
         candidate_dates: list[date] = []
@@ -162,9 +168,19 @@ class CommonStatDataManager:
         if nmid is not None:
             common_date = await self._get_min_date(
                 """
-                SELECT MIN(date)
-                FROM wb_common_stat
-                WHERE nmid = %(nmid)s
+                SELECT MIN(stat_date)
+                FROM (
+                    SELECT toDate(date) AS stat_date
+                    FROM wb_common_stat
+                    WHERE nmid = %(nmid)s
+                      AND version = (
+                        SELECT MAX(version)
+                        FROM wb_common_stat AS inner_stat
+                        WHERE inner_stat.nmid = %(nmid)s
+                          AND inner_stat.date = wb_common_stat.date
+                      )
+                    GROUP BY stat_date
+                )
                 """,
                 {"nmid": nmid},
             )
@@ -177,8 +193,16 @@ class CommonStatDataManager:
         adv_date = await self._get_min_date(
             """
             SELECT MIN(date)
-            FROM default_db.full_adv_wb_stat
-            WHERE adv_id IN %(adv_ids)s
+            FROM (
+                SELECT date
+                FROM (
+                    SELECT adv_id, date
+                    FROM default_db.full_adv_wb_stat
+                    WHERE adv_id IN %(adv_ids)s
+                    GROUP BY adv_id, date
+                )
+                GROUP BY date
+            )
             """,
             {"adv_ids": adv_ids},
         )
@@ -201,16 +225,28 @@ class CommonStatDataManager:
         return max(1, (delta_days + page_size - 1) // page_size)
 
     @staticmethod
-    def page_to_date_range(page: int, page_size: int = 14) -> tuple[date, date]:
+    def page_to_date_range(
+        page: int,
+        page_size: int = 14,
+        earliest_date: date | None = None,
+        today: date | None = None,
+    ) -> tuple[date, date] | None:
         """Возвращает диапазон дат для страницы статистики.
 
         Page 1 соответствует последним `page_size` дням, page 2 — предыдущим
-        `page_size` дням и так далее.
+        `page_size` дням и так далее. Если окно целиком раньше `earliest_date`
+        или после обрезки start > end, возвращает None.
         """
-        today = datetime.now().date()
+        today = today or datetime.now().date()
         shift_days = (max(page, 1) - 1) * page_size
         end_date = today - timedelta(days=shift_days)
+        if earliest_date is not None and end_date < earliest_date:
+            return None
         start_date = end_date - timedelta(days=page_size - 1)
+        if earliest_date is not None and start_date < earliest_date:
+            start_date = earliest_date
+        if start_date > end_date:
+            return None
         return start_date, end_date
 
     async def get_days_static_text_page(
@@ -225,9 +261,12 @@ class CommonStatDataManager:
         total_pages = await self.get_total_pages(adv_setting, page_size=page_size)
         current_page = min(max(page, 1), total_pages)
         earliest_date = await self.get_earliest_stat_date(adv_setting)
-        start_date, end_date = self.page_to_date_range(current_page, page_size)
-        if earliest_date is not None and start_date < earliest_date:
-            start_date = earliest_date
+        page_range = self.page_to_date_range(
+            current_page, page_size, earliest_date=earliest_date
+        )
+        if page_range is None:
+            return "", current_page, total_pages
+        start_date, end_date = page_range
 
         (
             concatenate_stat,

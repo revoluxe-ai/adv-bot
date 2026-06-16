@@ -56,12 +56,13 @@ class KeywordsDailyStatsScreen(TextWithKeyboard):
             ),
             page_size=self._page_size,
         )
-        start_date, end_date = self._manager.page_to_date_range(page, self._page_size)
         earliest_date = await self._manager.get_earliest_stat_date(self._adv_setting)
-        if earliest_date is not None and start_date < earliest_date:
-            start_date = earliest_date
+        page_range = self._manager.page_to_date_range(
+            page, self._page_size, earliest_date=earliest_date
+        )
 
-        if text:
+        if text and page_range is not None:
+            start_date, end_date = page_range
             body = text.removeprefix("\n\nСтатистика по дням:\n")
             self._text = (
                 f"Статистика по дням (стр. {page}/{total_pages})\n"
