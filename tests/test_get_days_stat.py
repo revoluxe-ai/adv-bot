@@ -399,6 +399,64 @@ async def test_collect_adv_ids_for_stats_excludes_siblings_and_clusters() -> Non
 
 
 @pytest.mark.asyncio
+async def test_collect_adv_ids_shared_id_keeps_auction_only() -> None:
+    """Один WB id в обоих слотах не должен терять id после дедупликации."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    adv_setting_mock.adv_id = 55555555
+    adv_setting_mock.search_adv_id = 55555555
+
+    with patch(
+        "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.get_rebound_wb_adv_ids",
+        new=AsyncMock(return_value=(set(), set())),
+    ):
+        auto_ids, auction_ids = await manager._collect_adv_ids_for_stats(
+            adv_setting_mock
+        )
+
+    assert auto_ids == []
+    assert auction_ids == [55555555]
+
+
+@pytest.mark.asyncio
+async def test_concatinated_stats_shared_id_uses_auction_set() -> None:
+    """При пустом auto и id только в auction метрики рекламы не отбрасываются."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    test_date = datetime.datetime.now().date()
+    auction_stat = SmallFullAdvStatPerDay(
+        date=test_date,
+        views=50,
+        clicks=5,
+        spend=500,
+        added_to_cart=2,
+        orders=1,
+        sum_price=1000,
+    )
+
+    with (
+        patch.object(
+            manager,
+            "_collect_adv_ids_for_stats",
+            new=AsyncMock(return_value=([], [55555555])),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.full_wb_adv_stat.get_daily_stats_by_last_days",
+            new=AsyncMock(return_value=[auction_stat]),
+        ) as get_daily_mock,
+    ):
+        result = await manager.get_concatinated_stats_for_range(
+            adv_setting_mock,
+            test_date,
+            test_date,
+        )
+
+    assert result == [auction_stat]
+    get_daily_mock.assert_awaited_once()
+    assert get_daily_mock.await_args.args[0] == [55555555]
+
+
+@pytest.mark.asyncio
 async def test_collect_historical_adv_ids_merges_rebound_and_current() -> None:
     """Дневная статистика должна видеть старые adv_id после перепривязки."""
     adv_setting_mock = AsyncMock()

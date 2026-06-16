@@ -137,15 +137,18 @@ class CommonStatDataManager:
         auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
             adv_setting
         )
-        if not auto_adv_ids:
+        if not auto_adv_ids and not auction_adv_ids:
             return []
 
         start_dt = datetime.combine(start_date, datetime.min.time())
         end_dt = datetime.combine(end_date, datetime.min.time())
 
-        auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            auto_adv_ids, start_dt, end_dt
-        )
+        if not auto_adv_ids:
+            auto_adv_stat: list[SmallFullAdvStatPerDay] = []
+        else:
+            auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
+                auto_adv_ids, start_dt, end_dt
+            )
         if not auction_adv_ids:
             auction_adv_stat: list[SmallFullAdvStatPerDay] = []
         else:
@@ -162,7 +165,11 @@ class CommonStatDataManager:
     async def _collect_adv_ids_for_stats(
         self, adv_setting: AdvSetting
     ) -> tuple[list[int], list[int]]:
-        """adv_id текущей РК и её перепривязок — только они участвуют в метриках экрана."""
+        """adv_id текущей РК и её перепривязок — только они участвуют в метриках экрана.
+
+        Общий WB id в auto и auction убирается из auto, чтобы ``concatenate_stats``
+        не удваивал метрики; при этом id остаётся в auction.
+        """
         auto_ids: set[int] = set()
         auction_ids: set[int] = set()
 
@@ -397,6 +404,7 @@ class CommonStatDataManager:
         auto_adv_ids, auction_adv_ids = await self._collect_adv_ids_for_stats(
             adv_setting
         )
+        auto_ids_for_auto_slot = auto_adv_ids or auction_adv_ids
         concatenate_stat = await self.get_concatinated_stats_for_range(
             adv_setting, start_date, end_date
         )
@@ -408,7 +416,7 @@ class CommonStatDataManager:
         )
 
         auto_views_by_day = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            auto_adv_ids, start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
         auto_views_by_day_map: dict[date, int] = {
             stat.date: stat.views for stat in auto_views_by_day
@@ -418,13 +426,14 @@ class CommonStatDataManager:
         }
 
         keywords_views_by_day = await full_wb_adv_stat.get_keywords_views_by_days(
-            auto_adv_ids, start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
         keywords_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
-            auto_adv_ids, start_dt, end_dt
+            auto_ids_for_auto_slot, start_dt, end_dt
         )
-        adv_ids_for_cluster_keywords = list(auto_adv_ids)
-        adv_ids_for_cluster_keywords.extend(auction_adv_ids)
+        adv_ids_for_cluster_keywords = sorted(
+            set(auto_ids_for_auto_slot) | set(auction_adv_ids)
+        )
         cluster_keyword_clicks_by_day = await full_wb_adv_stat.get_keywords_clicks_by_days(
             adv_ids_for_cluster_keywords, start_dt, end_dt
         )
