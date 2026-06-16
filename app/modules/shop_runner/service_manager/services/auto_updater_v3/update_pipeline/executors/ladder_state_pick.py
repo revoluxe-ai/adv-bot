@@ -264,6 +264,28 @@ def pick_max_valid_ladder_state_at_or_below_cpo(
     return max(candidates, key=lambda state: mode_level(state.strategy_mode))
 
 
+def has_ch_backed_economic_ladder(dto: KeywordDTO) -> bool:
+    """``True`` для реальной CH-backed ladder-матрицы с экономически значимым state.
+
+    Predicate нужен для FULL CH economic activation: ключ может быть routed как
+    PFO/NO_CONV из-за отсутствия own conv, но если у него есть CH profile и хотя
+    бы один реальный ladder-state с CPO, он должен оставаться eligible для
+    ``OFF -> MIN_CPA`` в ``RaiseStateToTargetCpoExecutor``.
+
+    No-CH/PFO sentinel ``target_place=0`` и synthetic NO DATA singleton сюда не
+    попадают, потому что у них нет CH profile.
+    """
+    if not dto.position_profile:
+        return False
+    if dto.is_no_data_singleton():
+        return False
+    return any(
+        state.cpo is not None
+        and state.stage in _OPERABLE_LADDER_STAGES
+        for state in dto.ladder_states
+    )
+
+
 def ladder_aggression_rank(state: KeywordV3LadderState) -> tuple[int, int]:
     """Ранг ступени: ``(mode_level, -target_position)``; OFF → ``(-1, -1)``."""
     if state.strategy_mode == KeywordStrategyMode.OFF:

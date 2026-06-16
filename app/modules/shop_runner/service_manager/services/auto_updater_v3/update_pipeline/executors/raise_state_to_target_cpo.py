@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_pfo_gates import (
     should_skip_keyword_raise_to_target_cpo,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
+    mode_level,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+    KeywordDTO,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
+    KeywordV3LadderState,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.update_context import (
     UpdateContext,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
-    KeywordV3DataTier,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     current_aggression_rank,
+    has_ch_backed_economic_ladder,
     ladder_aggression_rank,
     pick_max_valid_ladder_state_at_or_below_cpo,
 )
@@ -47,7 +55,7 @@ class RaiseStateToTargetCpoExecutor:
                 target_cpo = min(target_cpo, float(ceiling))
 
         for dto in context.keywords:
-            if dto.data_tier != KeywordV3DataTier.FULL:
+            if not has_ch_backed_economic_ladder(dto):
                 continue
             if should_skip_keyword_raise_to_target_cpo(dto, adv):
                 continue
@@ -67,3 +75,25 @@ class RaiseStateToTargetCpoExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
+
+
+def _pick_cap_aware_ladder_state(
+    dto: KeywordDTO,
+    target_cpo: float,
+    *,
+    max_target_mode: KeywordStrategyMode,
+) -> KeywordV3LadderState | None:
+    """Выбрать максимальный CH-backed state под resolve и cap агрессии."""
+    cap_level = mode_level(max_target_mode)
+
+    candidates = [
+        state
+        for state in dto.ladder_states
+        if state.cpo is not None
+        and state.strategy_mode != KeywordStrategyMode.OFF
+        and mode_level(state.strategy_mode) <= cap_level
+        and state.cpo <= target_cpo
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda state: mode_level(state.strategy_mode))
