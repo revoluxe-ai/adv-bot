@@ -27,7 +27,10 @@ from app.shared.domains.wb.utils.rec_system_shelf_mode import (
     should_show_clicks_warning,
     warning_suffix,
 )
-from .date_pagination import get_total_pages, page_to_date_range
+from app.modules.wb_adv_updater.keyword_daily_history.date_pagination import (
+    get_total_pages,
+    page_to_date_range,
+)
 
 
 @dataclass(frozen=True)

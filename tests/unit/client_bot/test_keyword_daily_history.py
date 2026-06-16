@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.callbacks import (
 from app.client_bot.user_interface.views.keyboards import (
     get_keyword_daily_history_keyboard,
 )
-from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend import (
+from app.modules.wb_adv_updater.keyword_daily_history import (
     date_pagination,
 )
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_daily_history_message import (

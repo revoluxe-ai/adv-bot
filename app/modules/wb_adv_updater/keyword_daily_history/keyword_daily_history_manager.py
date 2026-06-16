@@ -12,14 +12,13 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSett
 from app.modules.common_slaves.wildberries.rebind_wb_adv_ids_history import (
     get_rebound_wb_adv_ids,
 )
-from app.modules.wb_adv_updater.keyword_daily_history.dto import KeywordDailyStat
-from app.utils.ch_semaphore import anti_ch_crash_semaphore
-from app.utils.click_house.client import get_clickhouse_client as get_client
-
-from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.date_pagination import (
+from app.modules.wb_adv_updater.keyword_daily_history.date_pagination import (
     get_total_pages,
     page_to_date_range,
 )
+from app.modules.wb_adv_updater.keyword_daily_history.dto import KeywordDailyStat
+from app.utils.ch_semaphore import anti_ch_crash_semaphore
+from app.utils.click_house.client import get_clickhouse_client as get_client
 
 
 class KeywordDailyHistoryManager(BaseClickHouseManager):

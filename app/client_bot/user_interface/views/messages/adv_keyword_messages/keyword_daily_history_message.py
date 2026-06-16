@@ -11,6 +11,9 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import keyboards
+from app.modules.wb_adv_updater.keyword_daily_history.date_pagination import (
+    page_to_date_range,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.keyword_daily_history import KeywordDailyHistoryManager
 from app.modules.wb_adv_updater.keyword_daily_history.dto import KeywordDailyStat
