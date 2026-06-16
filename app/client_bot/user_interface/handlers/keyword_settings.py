@@ -24,6 +24,9 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.keywords_daily_stats_message import (
     KeywordsDailyStatsScreen,
 )
+from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_daily_history_message import (
+    KeywordDailyHistoryScreen,
+)
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -680,6 +683,28 @@ async def setting_keyword(
     await messages.KeywordSettingMessage(
         bot, chat_id, keyword_setting_original_id, page
     )()
+    return
+
+
+@router.callback_query(callbacks.KeywordDailyHistory.filter())
+async def keyword_daily_history(
+    callback: CallbackQuery,
+    callback_data: callbacks.KeywordDailyHistory,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Открывает дневную историю по одному ключевому запросу."""
+    await callback.answer()
+    assert callback.message
+    await state.set_state(state=None)
+
+    async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
+        await KeywordDailyHistoryScreen(
+            bot=bot,
+            chat_id=callback.message.chat.id,
+            keyword_setting_original_id=callback_data.keyword_setting_original_id,
+            page=callback_data.page,
+        )()
     return
 
 

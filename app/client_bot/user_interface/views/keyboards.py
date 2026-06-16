@@ -660,6 +660,50 @@ def get_keywords_daily_stats_keyboard(
     return builder.as_markup()
 
 
+def get_keyword_daily_history_keyboard(
+    keyword_setting_original_id: int,
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """Клавиатура для постраничной истории одного ключа."""
+    builder = InlineKeyboardBuilder()
+    current_page = min(max(page, 1), max(total_pages, 1))
+    nav_buttons: list[InlineKeyboardButton] = []
+
+    if total_pages > 1 and current_page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=current_page - 1,
+                ).pack(),
+            )
+        )
+    if total_pages > 1 and current_page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=current_page + 1,
+                ).pack(),
+            )
+        )
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    builder.row(
+        InlineKeyboardButton(
+            text="К настройкам ключа",
+            callback_data=callbacks.SettingKeyword(
+                keyword_setting_original_id=keyword_setting_original_id,
+            ).pack(),
+        )
+    )
+    return builder.as_markup()
+
+
 def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     adv_setting: AdvSetting,
@@ -780,6 +824,18 @@ def get_keyword_setting_keyboard(
                 text=f"Целевая позиция: {target_place_value} ({source_text}) — Изменить",
                 callback_data=callbacks.ChangeKeywordTargetPlace(
                     keyword_setting_original_id=keyword_setting_original_id,
+                ).pack(),
+            )
+        ]
+    )
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="📅 История по дням",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=1,
                 ).pack(),
             )
         ]

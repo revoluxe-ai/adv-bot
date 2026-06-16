@@ -144,6 +144,13 @@ class SettingKeyword(CallbackData, prefix="setting_keyword"):
     keyword_setting_original_id: int
 
 
+class KeywordDailyHistory(CallbackData, prefix="kw_day_hist"):
+    """Пагинация дневной истории по одному ключу."""
+
+    keyword_setting_original_id: int
+    page: int = 1
+
+
 class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status"):
     new_hard_status: int
     keyword_setting_original_id: int

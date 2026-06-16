@@ -27,6 +27,7 @@ from app.shared.domains.wb.utils.rec_system_shelf_mode import (
     should_show_clicks_warning,
     warning_suffix,
 )
+from .date_pagination import get_total_pages, page_to_date_range
 
 
 @dataclass(frozen=True)
@@ -306,11 +307,7 @@ class CommonStatDataManager:
     ) -> int:
         """Подсчитывает количество страниц дневной статистики."""
         earliest_date = await self.get_earliest_stat_date(adv_setting)
-        if earliest_date is None:
-            return 1
-        today = datetime.now().date()
-        delta_days = (today - earliest_date).days + 1
-        return max(1, (delta_days + page_size - 1) // page_size)
+        return get_total_pages(earliest_date, page_size=page_size)
 
     @staticmethod
     def page_to_date_range(
@@ -325,17 +322,12 @@ class CommonStatDataManager:
         `page_size` дням и так далее. Если окно целиком раньше `earliest_date`
         или после обрезки start > end, возвращает None.
         """
-        today = today or datetime.now().date()
-        shift_days = (max(page, 1) - 1) * page_size
-        end_date = today - timedelta(days=shift_days)
-        if earliest_date is not None and end_date < earliest_date:
-            return None
-        start_date = end_date - timedelta(days=page_size - 1)
-        if earliest_date is not None and start_date < earliest_date:
-            start_date = earliest_date
-        if start_date > end_date:
-            return None
-        return start_date, end_date
+        return page_to_date_range(
+            page,
+            page_size=page_size,
+            earliest_date=earliest_date,
+            today=today,
+        )
 
     async def get_days_static_text_page(
         self,
