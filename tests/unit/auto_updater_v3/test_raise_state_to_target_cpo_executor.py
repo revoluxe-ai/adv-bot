@@ -123,6 +123,7 @@ def _dto(
 
 
 def _ladder_states_duplicate_optimum_cap(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
+    """OPT@3 раньше в matrix, OPT@11 на current place — regression для clamp."""
     return (
         KeywordV3LadderState(
             keyword_setting_id=ks_id,
@@ -135,28 +136,28 @@ def _ladder_states_duplicate_optimum_cap(ks_id: int) -> tuple[KeywordV3LadderSta
             keyword_setting_id=ks_id,
             stage=V3LadderStageKind.MIN_CPA,
             strategy_mode=KeywordStrategyMode.MIN_CPA,
-            target_position=40,
+            target_position=11,
             cpo=300.0,
         ),
         KeywordV3LadderState(
             keyword_setting_id=ks_id,
             stage=V3LadderStageKind.OPTIMUM,
             strategy_mode=KeywordStrategyMode.OPTIMUM,
-            target_position=10,
+            target_position=3,
             cpo=400.0,
         ),
         KeywordV3LadderState(
             keyword_setting_id=ks_id,
             stage=V3LadderStageKind.OPTIMUM,
             strategy_mode=KeywordStrategyMode.OPTIMUM,
-            target_position=40,
+            target_position=11,
             cpo=410.0,
         ),
         KeywordV3LadderState(
             keyword_setting_id=ks_id,
             stage=V3LadderStageKind.MAX_CONVERSION,
             strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
-            target_position=40,
+            target_position=11,
             cpo=600.0,
         ),
     )
@@ -608,7 +609,7 @@ def test_clamp_state_to_aggression_executor_picks_cap_row_on_current_target_plac
     dto = _dto(
         mode=KeywordStrategyMode.MAX_CONVERSION,
         ladder=_ladder_states_duplicate_optimum_cap(1),
-        target_place=40,
+        target_place=11,
     )
     adv_state = replace(
         AdvState.empty(),
@@ -624,7 +625,7 @@ def test_clamp_state_to_aggression_executor_picks_cap_row_on_current_target_plac
     )
     ClampStateToAggressionExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
-    assert dto.current_target_place == 40
+    assert dto.current_target_place == 11
     assert dto.history_target_place == []
     assert dto.next_state[-1].new_mode.to_strategy_mode() == KeywordStrategyMode.OPTIMUM
 

@@ -134,6 +134,8 @@ def resolve_cap_ladder_state_for_clamp(
     ):
         return None
 
+    # Явный fallback: cap-row на current place отсутствует — берём первый valid
+    # global row; target_place может измениться только в этом случае.
     return valid_ladder_state_for_mode(dto, cap)
 
 
