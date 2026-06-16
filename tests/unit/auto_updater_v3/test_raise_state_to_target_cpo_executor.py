@@ -95,6 +95,7 @@ def _dto(
     mode: KeywordStrategyMode = KeywordStrategyMode.MIN_CPA,
     ladder: tuple[KeywordV3LadderState, ...] | None = None,
     target_pfo: float | None = None,
+    target_place: int | None = None,
 ) -> KeywordDTO:
     conv = (
         _conv_for_pay_for_order(target_pfo)
@@ -111,7 +112,54 @@ def _dto(
     )
     ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
     states = ladder if ladder is not None else _ladder_states(ks_id)
+    if target_place is None:
+        for state in states:
+            if state.strategy_mode == mode and state.cpo is not None:
+                target_place = int(state.target_position)
+                break
+    if target_place is not None:
+        kw.keyword_setting.target_place = target_place
     return KeywordDTO.from_context(ctx, ladder_states=states)
+
+
+def _ladder_states_duplicate_optimum_cap(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
+    return (
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            target_position=40,
+            cpo=300.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OPTIMUM,
+            strategy_mode=KeywordStrategyMode.OPTIMUM,
+            target_position=10,
+            cpo=400.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.OPTIMUM,
+            strategy_mode=KeywordStrategyMode.OPTIMUM,
+            target_position=40,
+            cpo=410.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=ks_id,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=40,
+            cpo=600.0,
+        ),
+    )
 
 
 def _adv_state(
@@ -553,6 +601,113 @@ def test_clamp_state_to_aggression_executor_skips_when_cap_state_missing() -> No
     assert executor.skip_reason == "missing_cap_ladder_state"
     assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
     assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_clamp_state_to_aggression_executor_picks_cap_row_on_current_target_place() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states_duplicate_optimum_cap(1),
+        target_place=40,
+    )
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.OPTIMUM,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    ClampStateToAggressionExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 40
+    assert dto.history_target_place == []
+    assert dto.next_state[-1].new_mode.to_strategy_mode() == KeywordStrategyMode.OPTIMUM
+
+
+@pytest.mark.unit
+def test_clamp_state_to_aggression_executor_falls_back_when_same_place_cap_missing() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        target_place=30,
+    )
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.OPTIMUM,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    ClampStateToAggressionExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.target_place == 20
+
+
+@pytest.mark.unit
+def test_clamp_state_to_aggression_executor_skips_sentinel_zero_without_relocation() -> None:
+    ladder = (
+        KeywordV3LadderState(
+            keyword_setting_id=1,
+            stage=V3LadderStageKind.OFF,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_position=0,
+            cpo=None,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=1,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=0,
+            cpo=None,
+            is_valid=False,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=1,
+            stage=V3LadderStageKind.MIN_CPA,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            target_position=10,
+            cpo=300.0,
+        ),
+        KeywordV3LadderState(
+            keyword_setting_id=1,
+            stage=V3LadderStageKind.MAX_CONVERSION,
+            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+            target_position=30,
+            cpo=600.0,
+        ),
+    )
+    dto = _dto(
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=ladder,
+        target_place=0,
+    )
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=500.0,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.MIN_CPA,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    executor = ClampStateToAggressionExecutor()
+    executor.execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.current_target_place == 0
+    assert dto.next_state == []
+    assert executor.skip_reason == "missing_cap_ladder_state"
 
 
 @pytest.mark.unit

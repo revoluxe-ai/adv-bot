@@ -12,7 +12,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
     UpdateContext,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
-    valid_ladder_state_for_mode,
+    resolve_cap_ladder_state_for_clamp,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
@@ -40,7 +40,7 @@ class ClampStateToAggressionExecutor:
         for dto in context.keywords:
             if dto.current_mode <= cap:
                 continue
-            cap_state = valid_ladder_state_for_mode(dto, cap)
+            cap_state = resolve_cap_ladder_state_for_clamp(dto, cap)
             if cap_state is None:
                 missing_cap_state = True
                 continue

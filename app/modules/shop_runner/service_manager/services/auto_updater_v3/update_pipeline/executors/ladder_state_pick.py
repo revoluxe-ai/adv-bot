@@ -56,8 +56,8 @@ def valid_ladder_state_for_mode(
 ) -> KeywordV3LadderState | None:
     """Первая валидная ladder-ступень для ``mode`` с известным CPO.
 
-    Используется как безопасная точка выбора cap-state: если ступень есть, но
-    она невалидна или без CPO, то cap нельзя применять как реальный action.
+    Используется как fallback, когда same-place cap-state недоступен.
+    Для clamp предпочтителен ``resolve_cap_ladder_state_for_clamp``.
     """
     for state in dto.ladder_states:
         if (
@@ -67,6 +67,74 @@ def valid_ladder_state_for_mode(
         ):
             return state
     return None
+
+
+def valid_ladder_state_for_mode_at_target_place(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+    target_place: int,
+) -> KeywordV3LadderState | None:
+    """Валидная ladder-ступень для ``mode`` на конкретном ``target_place``.
+
+    Не ищет глобально по matrix: нужен для clamp/alias, где важно не прыгнуть
+    на другой place при выборе row с тем же mode.
+    """
+    place = int(target_place)
+    for state in dto.ladder_states:
+        if (
+            state.strategy_mode == mode
+            and int(state.target_position) == place
+            and state.is_valid
+            and state.cpo is not None
+        ):
+            return state
+    return None
+
+
+def resolve_cap_ladder_state_for_clamp(
+    dto: KeywordDTO,
+    cap: KeywordStrategyMode,
+) -> KeywordV3LadderState | None:
+    """Cap-state для clamp: same-place first, иначе global fallback.
+
+    При ``current_target_place == 0`` и ladder-row текущего mode на place 0
+    (NO_CH/PFO sentinel) global fallback не применяется — clamp не должен
+    неожиданно увести ключ с ``target_place=0``.
+    """
+    operational_place = int(dto.current_target_place)
+    current_state = resolve_current_ladder_state(dto)
+
+    effective_place: int | None = None
+    if operational_place > 0:
+        effective_place = operational_place
+    elif current_state is not None:
+        state_place = int(current_state.target_position)
+        if state_place == 0 and any(
+            state.strategy_mode == dto.current_mode
+            and int(state.target_position) == 0
+            for state in dto.ladder_states
+        ):
+            effective_place = 0
+        elif state_place > 0:
+            effective_place = state_place
+
+    if effective_place is not None:
+        same_place = valid_ladder_state_for_mode_at_target_place(
+            dto,
+            cap,
+            effective_place,
+        )
+        if same_place is not None:
+            return same_place
+
+    if (
+        operational_place == 0
+        and current_state is not None
+        and int(current_state.target_position) == 0
+    ):
+        return None
+
+    return valid_ladder_state_for_mode(dto, cap)
 
 
 def allowed_up_ladder_states(
