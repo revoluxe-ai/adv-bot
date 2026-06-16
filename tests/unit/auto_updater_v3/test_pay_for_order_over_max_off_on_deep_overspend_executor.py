@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """Unit: PayForOrderOverMaxOffOnDeepOverspendExecutor и campaign_pfo_gates."""
 
 from __future__ import annotations
@@ -31,6 +32,15 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    SelectionPolicy,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
     build_normal_preamble_executors,
 )
@@ -40,7 +50,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
     RaiseStateToTargetCpoExecutor,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order, _sample_profile
+from tests.unit.test_auto_updater_v3 import (  # pyright: ignore[reportPrivateUsage]
+    _calc_kw,
+    _conv_for_pay_for_order,
+    _sample_profile,
+)
 
 
 def _ladder_states(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
@@ -227,12 +241,12 @@ def test_pfo_off_skips_when_current_ladder_cpo_at_or_below_max_after_raise() -> 
         ladder_states=states,
     )
     adv = _adv_state(fact=700.0, max_cpo=max_cpo, guard_condition=False)
+    adv = replace(adv, resolve=800.0)
     adv = replace(
         adv,
-        resolve=800.0,
-        policy=replace(
-            adv.policy,
-            max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+        policy=SelectionPolicy.from_aggressiveness(
+            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+            aggressiveness=V3RolloutAggressiveness.MAX,
         ),
     )
     ctx = _context([dto], adv)

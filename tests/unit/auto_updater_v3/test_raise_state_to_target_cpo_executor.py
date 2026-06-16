@@ -24,6 +24,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+    V3RolloutAggressiveness,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
+    ShelfClickMode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
+    SelectionPolicy,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    KeywordDataTier,
+    resolve_keyword_v3_eligibility,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
     build_normal_preamble_executors,
 )
@@ -45,6 +58,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.campaign_p
     is_campaign_in_raise_stabilization_zone,
     raise_state_resolve_stabilization_floor,
     should_skip_keyword_raise_to_target_cpo,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+    KeywordStatusReason,
 )
 
 from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order, _sample_profile
@@ -178,6 +195,26 @@ def _adv_state(
         fact_pay_for_order=fact_pay_for_order,
         resolve_valid=resolve_valid,
         guard_condition=guard_condition,
+    )
+
+
+def _cap_adv_state(
+    *,
+    resolve: float,
+    max_pay_for_order: float = 550.0,
+    fact_pay_for_order: float | None = None,
+    aggressiveness: V3RolloutAggressiveness,
+) -> AdvState:
+    return replace(
+        AdvState.empty(),
+        resolve=resolve,
+        max_pay_for_order=max_pay_for_order,
+        fact_pay_for_order=fact_pay_for_order,
+        resolve_valid=True,
+        policy=SelectionPolicy.from_aggressiveness(
+            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+            aggressiveness=aggressiveness,
+        ),
     )
 
 
@@ -515,200 +552,247 @@ def test_raise_state_caps_at_fact_ceiling_on_overspend() -> None:
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("mode", "cap", "expected_mode", "expected_place"),
+    ("aggressiveness", "expected_mode"),
     [
-        (
-            KeywordStrategyMode.MAX_CONVERSION,
-            KeywordStrategyMode.MIN_CPA,
-            KeywordStrategyMode.MIN_CPA,
-            10,
-        ),
-        (
-            KeywordStrategyMode.OPTIMUM,
-            KeywordStrategyMode.MIN_CPA,
-            KeywordStrategyMode.MIN_CPA,
-            10,
-        ),
-        (
-            KeywordStrategyMode.MAX_CONVERSION,
-            KeywordStrategyMode.OPTIMUM,
-            KeywordStrategyMode.OPTIMUM,
-            20,
-        ),
+        (V3RolloutAggressiveness.MIN, KeywordStrategyMode.MIN_CPA),
+        (V3RolloutAggressiveness.MID, KeywordStrategyMode.OPTIMUM),
+        (V3RolloutAggressiveness.MAX, KeywordStrategyMode.MAX_CONVERSION),
     ],
 )
-def test_clamp_state_to_aggression_executor_downgrades_above_cap(
-    mode: KeywordStrategyMode,
-    cap: KeywordStrategyMode,
+def test_raise_state_uses_ch_backed_ladder_even_without_own_conv(
+    aggressiveness: V3RolloutAggressiveness,
     expected_mode: KeywordStrategyMode,
-    expected_place: int,
 ) -> None:
-    dto = _dto(mode=mode)
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(AdvState.empty().policy, max_target_mode=cap),
+    kw = _calc_kw(
+        ks_id=1,
+        text="ch-backed",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        views=0,
+        conv=0.05,
+        hard_status=2,
+        status=KeywordStatus.BAD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        cpm_set_bid=510,
     )
-    ctx = UpdateContextManager().from_prepared(
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    elig = resolve_keyword_v3_eligibility(ctx, [ctx])
+    assert elig.data_tier == KeywordDataTier.KEYWORD_PFO
+    dto = KeywordDTO.from_context(
+        ctx,
+        ladder_states=(
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=11,
+                cpo=185.82,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=26,
+                cpo=172.06,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MAX_CONVERSION,
+                strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                target_position=5,
+                cpo=228.41,
+            ),
+        ),
+    )
+    adv_state = _cap_adv_state(
+        resolve=280.0,
+        fact_pay_for_order=272.76,
+        aggressiveness=aggressiveness,
+    )
+    ctx_update = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    ClampStateToAggressionExecutor().execute(ctx)
+    executor = RaiseStateToTargetCpoExecutor()
+    executor.execute(ctx_update)
+
     assert dto.current_mode == expected_mode
-    assert dto.target_place == expected_place
-    assert dto.next_state[-1].executor_name == "ClampStateToAggressionExecutor"
+    assert dto.current_target_place == {
+        KeywordStrategyMode.MIN_CPA: 11,
+        KeywordStrategyMode.OPTIMUM: 26,
+        KeywordStrategyMode.MAX_CONVERSION: 5,
+    }[expected_mode]
+    assert len(dto.next_state) == 1
+    assert dto.current_mode != KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit
-def test_clamp_state_to_aggression_executor_noop_when_already_within_cap() -> None:
-    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(
-            AdvState.empty().policy,
-            max_target_mode=KeywordStrategyMode.OPTIMUM,
+def test_raise_state_allows_real_ch_state_with_target_position_zero() -> None:
+    kw = _calc_kw(
+        ks_id=11,
+        text="ch-zero-place",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        views=0,
+        conv=0.05,
+        hard_status=2,
+        status=KeywordStatus.BAD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        cpm_set_bid=510,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    dto = KeywordDTO.from_context(
+        ctx,
+        ladder_states=(
+            KeywordV3LadderState(
+                keyword_setting_id=11,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=11,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=0,
+                cpo=185.82,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=11,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=26,
+                cpo=172.06,
+            ),
         ),
     )
-    ctx = UpdateContextManager().from_prepared(
+    adv_state = _cap_adv_state(
+        resolve=280.0,
+        fact_pay_for_order=272.76,
+        aggressiveness=V3RolloutAggressiveness.MIN,
+    )
+    ctx_update = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    ClampStateToAggressionExecutor().execute(ctx)
-    assert dto.next_state == []
+    RaiseStateToTargetCpoExecutor().execute(ctx_update)
+
     assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.current_target_place == 0
+    assert len(dto.next_state) == 1
 
 
 @pytest.mark.unit
-def test_clamp_state_to_aggression_executor_skips_when_cap_state_missing() -> None:
-    dto = _dto(
-        mode=KeywordStrategyMode.MAX_CONVERSION,
-        ladder=_ladder_states(1, min_cpo=None, opt_cpo=400.0, max_cpo=600.0),
+def test_raise_state_does_not_touch_no_ch_pfo_sentinel() -> None:
+    kw = _calc_kw(
+        ks_id=2,
+        text="no-ch-pfo",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        views=0,
+        conv=0.05,
+        hard_status=2,
+        status=KeywordStatus.BAD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        cpm_set_bid=510,
     )
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(
-            AdvState.empty().policy,
-            max_target_mode=KeywordStrategyMode.MIN_CPA,
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    dto = KeywordDTO.from_context(
+        ctx,
+        ladder_states=(
+            KeywordV3LadderState(
+                keyword_setting_id=2,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=2,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=11,
+                cpo=185.82,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=2,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=26,
+                cpo=172.06,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=2,
+                stage=V3LadderStageKind.MAX_CONVERSION,
+                strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                target_position=5,
+                cpo=228.41,
+            ),
         ),
     )
-    ctx = UpdateContextManager().from_prepared(
+    adv_state = _cap_adv_state(
+        resolve=280.0,
+        fact_pay_for_order=272.76,
+        aggressiveness=V3RolloutAggressiveness.MIN,
+    )
+    ctx_update = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    executor = ClampStateToAggressionExecutor()
-    executor.execute(ctx)
-    assert executor.skip_reason == "missing_cap_ladder_state"
-    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    RaiseStateToTargetCpoExecutor().execute(ctx_update)
+
+    assert dto.current_mode == KeywordStrategyMode.OFF
     assert dto.next_state == []
 
 
 @pytest.mark.unit
-def test_clamp_state_to_aggression_executor_picks_cap_row_on_current_target_place() -> None:
-    dto = _dto(
-        mode=KeywordStrategyMode.MAX_CONVERSION,
-        ladder=_ladder_states_duplicate_optimum_cap(1),
-        target_place=11,
+def test_raise_state_does_not_touch_no_data_singleton() -> None:
+    kw = _calc_kw(
+        ks_id=3,
+        text="no-data",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        views=0,
+        conv=0.0,
+        hard_status=2,
+        status=KeywordStatus.BAD,
+        reason=KeywordStatusReason.WHITE_LIST,
+        cpm_set_bid=510,
     )
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(
-            AdvState.empty().policy,
-            max_target_mode=KeywordStrategyMode.OPTIMUM,
-        ),
-    )
-    ctx = UpdateContextManager().from_prepared(
-        KeywordsPreparedList(keywords=[dto]),
-        adv_state=adv_state,
-    )
-    ClampStateToAggressionExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
-    assert dto.current_target_place == 11
-    assert dto.history_target_place == []
-    assert dto.next_state[-1].new_mode.to_strategy_mode() == KeywordStrategyMode.OPTIMUM
-
-
-@pytest.mark.unit
-def test_clamp_state_to_aggression_executor_falls_back_when_same_place_cap_missing() -> None:
-    dto = _dto(
-        mode=KeywordStrategyMode.MAX_CONVERSION,
-        target_place=30,
-    )
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(
-            AdvState.empty().policy,
-            max_target_mode=KeywordStrategyMode.OPTIMUM,
-        ),
-    )
-    ctx = UpdateContextManager().from_prepared(
-        KeywordsPreparedList(keywords=[dto]),
-        adv_state=adv_state,
-    )
-    ClampStateToAggressionExecutor().execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
-    assert dto.target_place == 20
-
-
-@pytest.mark.unit
-def test_clamp_state_to_aggression_executor_skips_sentinel_zero_without_relocation() -> None:
-    ladder = (
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    singleton = (
         KeywordV3LadderState(
-            keyword_setting_id=1,
-            stage=V3LadderStageKind.OFF,
-            strategy_mode=KeywordStrategyMode.OFF,
-            target_position=0,
-            cpo=None,
-        ),
-        KeywordV3LadderState(
-            keyword_setting_id=1,
-            stage=V3LadderStageKind.MAX_CONVERSION,
-            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
-            target_position=0,
-            cpo=None,
-            is_valid=False,
-        ),
-        KeywordV3LadderState(
-            keyword_setting_id=1,
+            keyword_setting_id=3,
             stage=V3LadderStageKind.MIN_CPA,
             strategy_mode=KeywordStrategyMode.MIN_CPA,
-            target_position=10,
-            cpo=300.0,
-        ),
-        KeywordV3LadderState(
-            keyword_setting_id=1,
-            stage=V3LadderStageKind.MAX_CONVERSION,
-            strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
-            target_position=30,
-            cpo=600.0,
+            target_position=0,
+            cpo=280.0,
+            synthetic_no_data=True,
         ),
     )
-    dto = _dto(
-        mode=KeywordStrategyMode.MAX_CONVERSION,
-        ladder=ladder,
-        target_place=0,
+    dto = KeywordDTO.from_context(ctx, ladder_states=singleton)
+    assert dto.is_no_data_singleton() is True
+    adv_state = _cap_adv_state(
+        resolve=280.0,
+        fact_pay_for_order=272.76,
+        aggressiveness=V3RolloutAggressiveness.MIN,
     )
-    adv_state = replace(
-        AdvState.empty(),
-        resolve=500.0,
-        policy=replace(
-            AdvState.empty().policy,
-            max_target_mode=KeywordStrategyMode.MIN_CPA,
-        ),
-    )
-    ctx = UpdateContextManager().from_prepared(
+    ctx_update = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[dto]),
         adv_state=adv_state,
     )
-    executor = ClampStateToAggressionExecutor()
-    executor.execute(ctx)
-    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
-    assert dto.current_target_place == 0
+    RaiseStateToTargetCpoExecutor().execute(ctx_update)
+
+    assert dto.current_mode == KeywordStrategyMode.OFF
     assert dto.next_state == []
-    assert executor.skip_reason == "missing_cap_ladder_state"
 
 
 @pytest.mark.unit
