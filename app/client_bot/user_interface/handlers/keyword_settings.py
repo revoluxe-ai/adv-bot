@@ -696,7 +696,6 @@ async def keyword_daily_history(
     """Открывает дневную историю по одному ключевому запросу."""
     await callback.answer()
     assert callback.message
-    await state.set_state(state=None)
 
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         await KeywordDailyHistoryScreen(
