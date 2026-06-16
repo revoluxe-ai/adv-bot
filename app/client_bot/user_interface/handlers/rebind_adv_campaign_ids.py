@@ -20,6 +20,9 @@ from sqlalchemy.orm import joinedload
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.rebind_wb_adv_ids_history import (
+    append_rebound_wb_adv_id,
+)
 from app.modules.connect_existing_advs.candidates_service import (
     classify_wb_campaign_for_rebind,
 )
@@ -396,6 +399,12 @@ async def _apply_rebind_message(
                 await message.answer("Кампания не найдена.")
                 await state.clear()
                 return
+            if expected_kind == "auto":
+                old_id = adv.adv_id
+            else:
+                old_id = adv.search_adv_id
+            if old_id is not None and old_id != new_id:
+                await append_rebound_wb_adv_id(adv_oid, expected_kind, old_id)
             field_setter(adv, new_id)
             await session.commit()
     except IntegrityError:

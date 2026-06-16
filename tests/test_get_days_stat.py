@@ -365,6 +365,40 @@ async def test_days_page_second_window_loads_when_earliest_allows() -> None:
 
 
 @pytest.mark.asyncio
+async def test_collect_historical_adv_ids_merges_rebound_and_current() -> None:
+    """Дневная статистика должна видеть старые adv_id после перепривязки."""
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.id = 99
+    adv_setting_mock.adv_id = 32824944
+    adv_setting_mock.search_adv_id = 29734515
+    adv_setting_mock.nmids = [10749810]
+    adv_setting_mock.wb_cabinet_id = 1
+
+    with (
+        patch.object(
+            manager,
+            "_get_pg_sibling_adv_ids",
+            new=AsyncMock(return_value=({32824944}, {29734515})),
+        ),
+        patch.object(
+            manager,
+            "_get_cluster_adv_ids_for_nmid",
+            new=AsyncMock(return_value={11111111}),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.get_rebound_wb_adv_ids",
+            new=AsyncMock(return_value=({22222222}, {33333333})),
+        ),
+    ):
+        auto_ids, auction_ids = await manager._collect_historical_adv_ids(
+            adv_setting_mock
+        )
+
+    assert auto_ids == [11111111, 22222222, 32824944]
+    assert auction_ids == [29734515, 33333333]
+
+
+@pytest.mark.asyncio
 async def test_earliest_stat_date_uses_latest_required_source() -> None:
     """Если карточная история начинается раньше кампании, граница страниц не должна уезжать назад."""
     today = datetime.datetime.now().date()
@@ -376,10 +410,17 @@ async def test_earliest_stat_date_uses_latest_required_source() -> None:
     adv_setting_mock.adv_id = 2
     adv_setting_mock.search_adv_id = 3
 
-    with patch.object(
-        manager,
-        "_get_min_date",
-        new=AsyncMock(side_effect=[common_earliest, adv_earliest]),
+    with (
+        patch.object(
+            manager,
+            "_collect_historical_adv_ids",
+            new=AsyncMock(return_value=([2], [3])),
+        ),
+        patch.object(
+            manager,
+            "_get_min_date",
+            new=AsyncMock(return_value=adv_earliest),
+        ),
     ):
         earliest_date = await manager.get_earliest_stat_date(adv_setting_mock)
 
