@@ -133,6 +133,7 @@ def test_build_normal_preamble_executors_order() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
     assert names == [
         "validate_state_by_hard_status",
+        "clamp_state_to_aggression",
         "validate_not_full_state",
         "not_full_target_place_migrate",
         "not_full_target_place_plan_fact",

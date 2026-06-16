@@ -14,7 +14,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     current_aggression_rank,
     ladder_aggression_rank,
-    pick_max_ladder_state_at_or_below_cpo,
+    pick_max_valid_ladder_state_at_or_below_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
     NextStateManager,
@@ -52,8 +52,11 @@ class RaiseStateToTargetCpoExecutor:
             if should_skip_keyword_raise_to_target_cpo(dto, adv):
                 continue
 
-            state = pick_max_ladder_state_at_or_below_cpo(
-                dto, target_cpo, strict_ceiling=True
+            state = pick_max_valid_ladder_state_at_or_below_cpo(
+                dto,
+                target_cpo,
+                strict_ceiling=True,
+                max_target_mode=adv.policy.max_target_mode,
             )
             if state is None:
                 continue

@@ -8,7 +8,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     ModeCandidate,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.effective_ladder_steps import (
-    resolve_alias_collapse_up_at_same_target_place,
+    resolve_alias_collapse_up_state_at_same_target_place,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     KeywordDTO,
@@ -23,9 +23,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.not_full_target_place import (
     adjust_not_full_target_place_for_plan_fact,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
-    ladder_state_for_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operable_keywords import (
     HARD_STATUS_AUTO_MODE,
@@ -136,15 +133,20 @@ class NextStateManager:
         self,
         keyword: KeywordDTO,
         catalog: dict[AggressionTargetMode, ModeCandidate],
+        *,
+        max_target_mode: KeywordStrategyMode | None = None,
     ) -> None:
-        """Alias UP на текущем ``target_place`` → max режим группы через ``apply_ladder_state``."""
-        target_mode = resolve_alias_collapse_up_at_same_target_place(
+        """Alias UP на текущем ``target_place`` → max режим группы через ``apply_ladder_state``.
+
+        ``max_target_mode`` ограничивает alias-collapse сверху, чтобы UP bypass
+        не мог перескочить выше policy cap.
+        """
+        state = resolve_alias_collapse_up_state_at_same_target_place(
+            keyword,
             keyword.current_mode,
             catalog,
+            max_target_mode=max_target_mode,
         )
-        if target_mode is None:
-            return
-        state = ladder_state_for_mode(keyword, target_mode)
         if state is None:
             return
         keyword.apply_ladder_state(state, executor_name=self._executor_name)

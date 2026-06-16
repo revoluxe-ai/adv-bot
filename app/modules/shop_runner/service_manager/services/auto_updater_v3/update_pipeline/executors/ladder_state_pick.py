@@ -50,6 +50,116 @@ def has_operable_cpo(dto: KeywordDTO) -> bool:
     )
 
 
+def valid_ladder_state_for_mode(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+) -> KeywordV3LadderState | None:
+    """Первая валидная ladder-ступень для ``mode`` с известным CPO.
+
+    Используется как fallback, когда same-place cap-state недоступен.
+    Для clamp предпочтителен ``resolve_cap_ladder_state_for_clamp``.
+    """
+    for state in dto.ladder_states:
+        if (
+            state.strategy_mode == mode
+            and state.is_valid
+            and state.cpo is not None
+        ):
+            return state
+    return None
+
+
+def valid_ladder_state_for_mode_at_target_place(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+    target_place: int,
+) -> KeywordV3LadderState | None:
+    """Валидная ladder-ступень для ``mode`` на конкретном ``target_place``.
+
+    Не ищет глобально по matrix: нужен для clamp/alias, где важно не прыгнуть
+    на другой place при выборе row с тем же mode.
+    """
+    place = int(target_place)
+    for state in dto.ladder_states:
+        if (
+            state.strategy_mode == mode
+            and int(state.target_position) == place
+            and state.is_valid
+            and state.cpo is not None
+        ):
+            return state
+    return None
+
+
+def resolve_cap_ladder_state_for_clamp(
+    dto: KeywordDTO,
+    cap: KeywordStrategyMode,
+) -> KeywordV3LadderState | None:
+    """Cap-state для clamp: same-place first, иначе global fallback.
+
+    При ``current_target_place == 0`` и ladder-row текущего mode на place 0
+    (NO_CH/PFO sentinel) global fallback не применяется — clamp не должен
+    неожиданно увести ключ с ``target_place=0``.
+    """
+    operational_place = int(dto.current_target_place)
+    current_state = resolve_current_ladder_state(dto)
+
+    effective_place: int | None = None
+    if operational_place > 0:
+        effective_place = operational_place
+    elif current_state is not None:
+        state_place = int(current_state.target_position)
+        if state_place == 0 and any(
+            state.strategy_mode == dto.current_mode
+            and int(state.target_position) == 0
+            for state in dto.ladder_states
+        ):
+            effective_place = 0
+        elif state_place > 0:
+            effective_place = state_place
+
+    if effective_place is not None:
+        same_place = valid_ladder_state_for_mode_at_target_place(
+            dto,
+            cap,
+            effective_place,
+        )
+        if same_place is not None:
+            return same_place
+
+    if (
+        operational_place == 0
+        and current_state is not None
+        and int(current_state.target_position) == 0
+    ):
+        return None
+
+    # Явный fallback: cap-row на current place отсутствует — берём первый valid
+    # global row; target_place может измениться только в этом случае.
+    return valid_ladder_state_for_mode(dto, cap)
+
+
+def allowed_up_ladder_states(
+    dto: KeywordDTO,
+    *,
+    max_target_mode: KeywordStrategyMode,
+) -> tuple[KeywordV3LadderState, ...]:
+    """Валидные M/O/C-ступени, разрешённые aggression cap'ом для UP-пулов.
+
+    Матрица ladder остаётся полной для чтения и DOWN-контуров; этот helper
+    ограничивает только UP-кандидатов по policy cap.
+    """
+    cap_level = mode_level(max_target_mode)
+    return tuple(
+        state
+        for state in dto.ladder_states
+        if state.cpo is not None
+        and state.is_valid
+        and state.stage in _OPERABLE_LADDER_STAGES
+        and mode_level(state.strategy_mode) <= cap_level
+    )
+
+
 def ladder_state_for_mode(
     dto: KeywordDTO,
     mode: KeywordStrategyMode,
@@ -88,11 +198,15 @@ def pick_max_ladder_state_at_or_below_cpo(
     *,
     strict_ceiling: bool = False,
 ) -> KeywordV3LadderState | None:
-    """Максимальная по агрессии ступень MIN/OPT/MAX под потолком ``ceiling``.
+    """Максимальная operable ladder-ступень под потолком ``ceiling``.
 
     Args:
         strict_ceiling: ``True`` для plan max (строго ``cpo < ceiling`` через
             ``ladder_cpo_within_ceiling``); иначе resolve-ветка с ``cpo <= ceiling``.
+
+    Helper не применяет aggression cap и не требует ``is_valid``.
+    Он нужен для DOWN / overspend trim, где важен operable target даже если
+    состояние ещё не было валидировано для UP-пула.
     """
     threshold = float(ceiling)
 
@@ -107,6 +221,43 @@ def pick_max_ladder_state_at_or_below_cpo(
         if state.cpo is not None
         and state.stage in _OPERABLE_LADDER_STAGES
         and _fits(float(state.cpo))
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda state: mode_level(state.strategy_mode))
+
+
+def pick_max_valid_ladder_state_at_or_below_cpo(
+    dto: KeywordDTO,
+    ceiling: float,
+    *,
+    strict_ceiling: bool = False,
+    max_target_mode: KeywordStrategyMode | None = None,
+) -> KeywordV3LadderState | None:
+    """Максимальная валидная ladder-ступень под потолком ``ceiling`` для UP.
+
+    Helper сохраняет aggression cap и требует ``is_valid=True``.
+    Его используют UP executors и UP pools; DOWN trim остаётся на
+    ``pick_max_ladder_state_at_or_below_cpo``.
+    """
+    threshold = float(ceiling)
+
+    def _fits(cpo: float) -> bool:
+        if strict_ceiling:
+            return ladder_cpo_within_ceiling(cpo, threshold)
+        return cpo <= threshold
+
+    candidates = [
+        state
+        for state in allowed_up_ladder_states(
+            dto,
+            max_target_mode=(
+                max_target_mode
+                if max_target_mode is not None
+                else KeywordStrategyMode.MAX_CONVERSION
+            ),
+        )
+        if state.cpo is not None and _fits(float(state.cpo))
     ]
     if not candidates:
         return None

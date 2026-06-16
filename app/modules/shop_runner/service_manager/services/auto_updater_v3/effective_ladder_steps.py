@@ -56,6 +56,9 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
         KeywordDTO,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
+        KeywordV3LadderState,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -233,12 +236,17 @@ def logical_modes_at_target_place_above(
 def resolve_alias_collapse_up_at_same_target_place(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
+    *,
+    max_target_mode: KeywordStrategyMode | None = None,
 ) -> KeywordStrategyMode | None:
     """Схлопнуть alias UP на текущем ``target_place`` до max ``mode_level`` в группе.
 
     Срабатывает только если ``step_up(current)`` ведёт на тот же ``target_place``,
     что и текущий режим. Не поднимает ключ на новый place (в отличие от
     ``resolve_next_effective_step_up``).
+
+    Если задан ``max_target_mode``, группа дополнительно отсекается по
+    aggression cap, чтобы alias-collapse не мог перескочить выше policy.
     """
     if current in (
         KeywordStrategyMode.OFF,
@@ -260,12 +268,71 @@ def resolve_alias_collapse_up_at_same_target_place(
     if not mode_candidates_same_effective_target(cur_c, nxt_c):
         return None
     group = logical_modes_at_target_place_above(current, place, catalog)
+    if max_target_mode is not None:
+        group = tuple(
+            mode for mode in group if mode_level(mode) <= mode_level(max_target_mode)
+        )
     if not group:
         return None
     target = max(group, key=mode_level)
     if mode_level(target) <= mode_level(current):
         return None
     return target
+
+
+def resolve_alias_collapse_up_state_at_same_target_place(
+    dto: KeywordDTO,
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    *,
+    max_target_mode: KeywordStrategyMode | None = None,
+) -> KeywordV3LadderState | None:
+    """Конкретная ladder-ступень alias-up на том же ``target_place``.
+
+    В отличие от ``resolve_alias_collapse_up_at_same_target_place`` не ищет state
+    глобально по mode: возвращает именно row из alias-группы текущего place.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+        resolve_current_ladder_state,
+    )
+
+    current_state = resolve_current_ladder_state(dto)
+    if (
+        current_state is None
+        or current_state.strategy_mode != current
+        or current_state.strategy_mode in (
+            KeywordStrategyMode.OFF,
+            KeywordStrategyMode.MAX_CONVERSION,
+        )
+        or not current_state.is_valid
+    ):
+        return None
+    current_place = int(current_state.target_position)
+    nxt = step_up(current)
+    if nxt is None:
+        return None
+    nxt_c = candidate_for_strategy_mode(nxt, catalog)
+    if nxt_c is None or not nxt_c.is_valid:
+        return None
+    nxt_place = target_place_from_mode_candidate(nxt_c)
+    if nxt_place is None or int(nxt_place) != current_place:
+        return None
+    cap_level = (
+        mode_level(max_target_mode) if max_target_mode is not None else None
+    )
+    candidates = [
+        state
+        for state in dto.ladder_states
+        if state.strategy_mode in _LADDER_MODES
+        and state.is_valid
+        and state.cpo is not None
+        and int(state.target_position) == current_place
+        and mode_level(state.strategy_mode) > mode_level(current)
+        and (cap_level is None or mode_level(state.strategy_mode) <= cap_level)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda state: mode_level(state.strategy_mode))
 
 
 def resolve_next_effective_step_up(

@@ -5,7 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
+    RedisCalculatedKeywordsCacheManager,
+    _CALCULATED_KEYWORDS_EMPTY_FIELD,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager import (
     ApplyManager,
     V3ApplyInput,
@@ -18,10 +23,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_campaig
 )
 
 
-@pytest.mark.integration
+@pytest.mark.unit
 @pytest.mark.asyncio
-async def test_apply_runs_post_gate_flush_and_redis() -> None:
-    """Post-gate → flush → plan/fact/views Redis."""
+async def test_apply_runs_post_gate_flush_and_redis(fake_redis: FakeRedis) -> None:
+    """Post-gate → flush → plan/fact/views Redis (через fakeredis, без живого Redis)."""
     complex_adv = MagicMock()
     complex_adv.adv_id = 5
     complex_adv.shelf_promotion_active = False
@@ -30,6 +35,7 @@ async def test_apply_runs_post_gate_flush_and_redis() -> None:
     ledger = MagicMock()
     ledger.apply_in_memory = MagicMock()
     ledger.flush_to_db = AsyncMock(return_value=True)
+    ledger.keywords = []
 
     plan = MagicMock()
     fact = MagicMock()
@@ -75,6 +81,7 @@ async def test_apply_runs_post_gate_flush_and_redis() -> None:
             "sync_target_places_if_needed",
             new=AsyncMock(return_value=False),
         ),
+        patch.object(RedisCalculatedKeywordsCacheManager, "_client", fake_redis),
     ):
         result = await ApplyManager().apply(
             V3ApplyInput(
@@ -93,6 +100,9 @@ async def test_apply_runs_post_gate_flush_and_redis() -> None:
     calibration_cache.set_state.assert_awaited_once()
     assert result.flushed_to_db is True
     assert result.plan_fact_cached is True
+    redis_key = "calculated_keywords:5"
+    cached = await fake_redis.hgetall(redis_key)
+    assert cached.get(_CALCULATED_KEYWORDS_EMPTY_FIELD) == "1"
 
 
 @pytest.mark.unit

@@ -581,7 +581,7 @@ def test_plan_fact_executor_no_tp_zero_without_pfo_when_not_min_cpa() -> None:
 @pytest.mark.unit
 def test_preamble_includes_nf_tp_phases() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
-    assert names[1:4] == [
+    assert names[2:5] == [
         "validate_not_full_state",
         "not_full_target_place_migrate",
         "not_full_target_place_plan_fact",

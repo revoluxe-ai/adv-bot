@@ -8,6 +8,7 @@
 разделяют разные уровни ответственности.
 
 - сначала идут phase-gates, которые только подготавливают режим;
+- затем идёт clamp фаза, которая понижает ключи выше aggression cap;
 - затем идут bootstrap-фазы, которые один раз инициализируют target_place;
 - затем идут коррекции, которые двигают уже инициализированный target_place;
 - отдельно живут ladder-only фазы для FULL;
@@ -15,8 +16,8 @@
   участвовать в NF bootstrap.
 
 Порядок фаз:
-V → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R → enable →
-pfo_off → cal.
+V → clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R →
+enable → pfo_off → cal.
 
 Смысл разбиения:
 - **NF** (`NotFullValidateExecutor`) переводит активные PFO ключи в
@@ -45,6 +46,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.cost_reallocation import (
     RebalanceExecutor,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_state_to_aggression import (
+    ClampStateToAggressionExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
@@ -86,6 +90,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     """Стандартный порядок NORMAL preamble (без legacy ``cap_down`` — см. module docstring)."""
     return [
         HardStatusValidateExecutor(),
+        ClampStateToAggressionExecutor(),
         NotFullValidateExecutor(),
         NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
@@ -102,6 +107,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
 
 
 __all__ = [
+    "ClampStateToAggressionExecutor",
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
     "NotFullTargetPlaceMigrateExecutor",

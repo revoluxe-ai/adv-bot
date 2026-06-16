@@ -93,6 +93,10 @@ def summarize_phase_zero_actions(
     """
     handlers = {
         "validate_state_by_hard_status": lambda: "нет ключей с hard_status=1",
+        "clamp_state_to_aggression": lambda: _note_clamp_state_to_aggression(
+            prepared,
+            policy=policy,
+        ),
         "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
         "not_full_target_place_plan_fact": lambda: _note_not_full_tp_plan_fact(
@@ -167,6 +171,18 @@ def _note_validate_not_full(prepared: PreparedListLike) -> str:
                 "enable/reset контуре и в NF validate не попадает"
             )
     return "нет PFO active ключей"
+
+
+def _note_clamp_state_to_aggression(
+    prepared: PreparedListLike,
+    *,
+    policy: SelectionPolicy | None,
+) -> str:
+    if policy is None:
+        return "policy cap недоступен"
+    if not prepared:
+        return "нет operable ключей"
+    return "нет ключей выше aggression cap"
 
 
 def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:

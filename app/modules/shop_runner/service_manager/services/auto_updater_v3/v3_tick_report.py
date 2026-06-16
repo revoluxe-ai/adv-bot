@@ -309,6 +309,7 @@ class V3TickReportSnapshot(BaseModel):
 PHASE_TITLES: dict[str, tuple[str, str]] = {
     "filter": ("0 · Фильтр operable", "—"),
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
+    "clamp_state_to_aggression": ("1a · clamp · aggression cap", "DOWN"),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "validate_not_full_state": (
         "2 · NF · validate PFO",
