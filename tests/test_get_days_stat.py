@@ -261,6 +261,7 @@ async def test_page_to_date_range_and_total_pages() -> None:
     """Проверяем расчёт окон по 14 дней и количество страниц по самой ранней дате."""
     today = datetime.datetime.now().date()
     start_date, end_date = manager.page_to_date_range(2, 14)
+    assert start_date is not None and end_date is not None
     assert start_date == today - datetime.timedelta(days=27)
     assert end_date == today - datetime.timedelta(days=14)
 
@@ -277,6 +278,90 @@ async def test_page_to_date_range_and_total_pages() -> None:
         total_pages = await manager.get_total_pages(adv_setting_mock, page_size=14)
 
     assert total_pages == 2
+
+
+def test_page_to_date_range_returns_none_when_window_before_earliest() -> None:
+    """Страница не должна открывать окно раньше earliest_date."""
+    today = datetime.date(2026, 6, 16)
+    earliest = datetime.date(2026, 6, 3)
+
+    page1 = manager.page_to_date_range(1, 14, earliest_date=earliest, today=today)
+    assert page1 == (datetime.date(2026, 6, 3), today)
+
+    page2 = manager.page_to_date_range(2, 14, earliest_date=earliest, today=today)
+    assert page2 is None
+
+
+@pytest.mark.asyncio
+async def test_days_page_second_window_loads_when_earliest_allows() -> None:
+    """Вторая страница должна грузить данные, если окно попадает в историю РК."""
+    today = datetime.datetime.now().date()
+    earliest = today - datetime.timedelta(days=27)
+
+    adv_setting_mock = AsyncMock()
+    adv_setting_mock.nmids = [1]
+    adv_setting_mock.adv_id = 2
+    adv_setting_mock.search_adv_id = 3
+    adv_setting_mock.plan_for_sales_for_day = None
+    adv_setting_mock.target_price_for_order = None
+    adv_setting_mock.max_price_for_order = None
+
+    page2_start, page2_end = manager.page_to_date_range(2, 14, earliest_date=earliest)
+    assert page2_start is not None and page2_end is not None
+
+    stat = SmallFullAdvStatPerDay(
+        date=page2_end,
+        views=100,
+        clicks=10,
+        spend=100.0,
+        added_to_cart=1,
+        orders=1,
+        sum_price=0.0,
+    )
+    card = CommonCardStat(
+        nmid=1, open_card=100, add_to_cart=2, orders=1, orders_sum=0, buy_outs=0
+    )
+    card.date = page2_end
+
+    with (
+        patch.object(manager, "get_total_pages", new=AsyncMock(return_value=2)),
+        patch.object(
+            manager, "get_earliest_stat_date", new=AsyncMock(return_value=earliest)
+        ),
+        patch.object(
+            manager,
+            "_load_daily_stat_data",
+            new=AsyncMock(
+                return_value=(
+                    [stat],
+                    [card],
+                    {page2_end: 0},
+                    {page2_end: 0},
+                    {page2_end: 0},
+                    {page2_end: 0},
+                    {page2_end: 0},
+                )
+            ),
+        ),
+        patch(
+            "app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager.is_rec_system_shelf_mode_operational",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        text, current_page, total_pages = await manager.get_days_static_text_page(
+            adv_setting_mock,
+            2,
+            options=DaysStatTextOptions(
+                show_forecast=False,
+                show_clicks_warning=False,
+                show_organic_pct=True,
+            ),
+        )
+
+    assert current_page == 2
+    assert total_pages == 2
+    assert text
+    assert page2_end.strftime("%d.%m.%Y") in text
 
 
 @pytest.mark.asyncio
