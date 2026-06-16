@@ -52,7 +52,12 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
         if not adv_setting.nmids:
             return [], 1, 1, None
 
-        earliest_date = await self.get_earliest_date(keyword_setting, adv_setting)
+        adv_ids = await self._collect_adv_ids(adv_setting)
+        earliest_date = await self.get_earliest_date(
+            keyword_setting,
+            adv_setting,
+            adv_ids=adv_ids,
+        )
         total_pages = get_total_pages(earliest_date, page_size=page_size)
         current_page = min(max(page, 1), total_pages)
         page_range = page_to_date_range(
@@ -67,6 +72,7 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
         rows = await self._load_history_rows(
             keyword_setting=keyword_setting,
             adv_setting=adv_setting,
+            adv_ids=adv_ids,
             start_date=start_date,
             end_date=end_date,
         )
@@ -76,12 +82,14 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
         self,
         keyword_setting: KeywordSetting,
         adv_setting: AdvSetting,
+        adv_ids: list[int] | None = None,
     ) -> date | None:
         """Возвращает первую дату, доступную для истории по ключу."""
         if not adv_setting.nmids:
             return None
         query = self._get_query("get_keyword_earliest_date")
-        adv_ids = await self._collect_adv_ids(adv_setting)
+        if adv_ids is None:
+            adv_ids = await self._collect_adv_ids(adv_setting)
         if not adv_ids:
             return None
         params = self._build_query_params(
@@ -104,12 +112,14 @@ class KeywordDailyHistoryManager(BaseClickHouseManager):
         adv_setting: AdvSetting,
         start_date: date,
         end_date: date,
+        adv_ids: list[int] | None = None,
     ) -> list[KeywordDailyStat]:
         """Выгружает строки истории за один диапазон дат."""
         if not adv_setting.nmids:
             return []
         query = self._get_query("get_keyword_daily_history")
-        adv_ids = await self._collect_adv_ids(adv_setting)
+        if adv_ids is None:
+            adv_ids = await self._collect_adv_ids(adv_setting)
         if not adv_ids:
             return []
         params = self._build_query_params(
