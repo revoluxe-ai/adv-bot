@@ -33,6 +33,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
     has_operable_cpo,
     pick_max_ladder_state_at_or_below_cpo,
+    pick_max_valid_ladder_state_at_or_below_cpo,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.raise_state_to_target_cpo import (
     RaiseStateToTargetCpoExecutor,
@@ -173,13 +174,59 @@ def test_pick_max_ladder_state_at_or_below_cpo_returns_none_when_no_operable_cpo
 @pytest.mark.unit
 def test_pick_max_ladder_state_at_or_below_cpo_respects_aggression_cap() -> None:
     dto = _dto()
-    winner = pick_max_ladder_state_at_or_below_cpo(
+    winner = pick_max_valid_ladder_state_at_or_below_cpo(
         dto,
         500.0,
         max_target_mode=KeywordStrategyMode.MIN_CPA,
     )
     assert winner is not None
     assert winner.strategy_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_pick_max_valid_ladder_state_excludes_invalid_operable_state() -> None:
+    dto = _dto(
+        ladder=(
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=10,
+                cpo=300.0,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=20,
+                cpo=400.0,
+                is_valid=False,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MAX_CONVERSION,
+                strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                target_position=30,
+                cpo=800.0,
+            ),
+        )
+    )
+    winner = pick_max_valid_ladder_state_at_or_below_cpo(
+        dto,
+        500.0,
+        strict_ceiling=True,
+        max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+    )
+    assert winner is not None
+    assert winner.strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert winner.is_valid is True
 
 
 @pytest.mark.unit

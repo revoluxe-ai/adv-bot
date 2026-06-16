@@ -127,15 +127,16 @@ def pick_max_ladder_state_at_or_below_cpo(
     ceiling: float,
     *,
     strict_ceiling: bool = False,
-    max_target_mode: KeywordStrategyMode | None = None,
 ) -> KeywordV3LadderState | None:
-    """Максимальная по агрессии ступень MIN/OPT/MAX под потолком ``ceiling``.
+    """Максимальная operable ladder-ступень под потолком ``ceiling``.
 
     Args:
         strict_ceiling: ``True`` для plan max (строго ``cpo < ceiling`` через
             ``ladder_cpo_within_ceiling``); иначе resolve-ветка с ``cpo <= ceiling``.
-        max_target_mode: Дополнительный cap на агрессию. Нужен для early clamp и
-            UP executors, чтобы не выбрать state выше policy.max_target_mode.
+
+    Helper не применяет aggression cap и не требует ``is_valid``.
+    Он нужен для DOWN / overspend trim, где важен operable target даже если
+    состояние ещё не было валидировано для UP-пула.
     """
     threshold = float(ceiling)
 
@@ -144,20 +145,50 @@ def pick_max_ladder_state_at_or_below_cpo(
             return ladder_cpo_within_ceiling(cpo, threshold)
         return cpo <= threshold
 
-    candidates: list[KeywordV3LadderState] = []
-    for state in allowed_up_ladder_states(
-        dto,
-        max_target_mode=(
-            max_target_mode
-            if max_target_mode is not None
-            else KeywordStrategyMode.MAX_CONVERSION
-        ),
-    ):
-        cpo = state.cpo
-        if cpo is None:
-            continue
-        if _fits(float(cpo)):
-            candidates.append(state)
+    candidates = [
+        state
+        for state in dto.ladder_states
+        if state.cpo is not None
+        and state.stage in _OPERABLE_LADDER_STAGES
+        and _fits(float(state.cpo))
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda state: mode_level(state.strategy_mode))
+
+
+def pick_max_valid_ladder_state_at_or_below_cpo(
+    dto: KeywordDTO,
+    ceiling: float,
+    *,
+    strict_ceiling: bool = False,
+    max_target_mode: KeywordStrategyMode | None = None,
+) -> KeywordV3LadderState | None:
+    """Максимальная валидная ladder-ступень под потолком ``ceiling`` для UP.
+
+    Helper сохраняет aggression cap и требует ``is_valid=True``.
+    Его используют UP executors и UP pools; DOWN trim остаётся на
+    ``pick_max_ladder_state_at_or_below_cpo``.
+    """
+    threshold = float(ceiling)
+
+    def _fits(cpo: float) -> bool:
+        if strict_ceiling:
+            return ladder_cpo_within_ceiling(cpo, threshold)
+        return cpo <= threshold
+
+    candidates = [
+        state
+        for state in allowed_up_ladder_states(
+            dto,
+            max_target_mode=(
+                max_target_mode
+                if max_target_mode is not None
+                else KeywordStrategyMode.MAX_CONVERSION
+            ),
+        )
+        if state.cpo is not None and _fits(float(state.cpo))
+    ]
     if not candidates:
         return None
     return max(candidates, key=lambda state: mode_level(state.strategy_mode))
