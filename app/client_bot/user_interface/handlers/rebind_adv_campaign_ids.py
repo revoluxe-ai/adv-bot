@@ -392,6 +392,7 @@ async def _apply_rebind_message(
                 )
                 return
 
+    rebound_old_id: int | None = None
     try:
         async with sm(read_only=False) as session:
             adv = await session.get(AdvSetting, adv_oid)
@@ -404,9 +405,11 @@ async def _apply_rebind_message(
             else:
                 old_id = adv.search_adv_id
             if old_id is not None and old_id != new_id:
-                await append_rebound_wb_adv_id(adv_oid, expected_kind, old_id)
+                rebound_old_id = old_id
             field_setter(adv, new_id)
             await session.commit()
+        if rebound_old_id is not None:
+            await append_rebound_wb_adv_id(adv_oid, expected_kind, rebound_old_id)
     except IntegrityError:
         logger.warning(
             "rebind adv_id integrity error adv_setting_id=%s new_id=%s expected_kind=%s",

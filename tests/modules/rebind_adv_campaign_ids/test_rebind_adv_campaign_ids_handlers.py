@@ -232,6 +232,69 @@ async def test_apply_auto_wb_validation_failed() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_auto_skips_redis_history_when_commit_fails() -> None:
+    """История rebind в Redis пишется только после успешного commit в Postgres."""
+    from sqlalchemy.exc import IntegrityError
+
+    bot = MagicMock()
+    state = MagicMock(spec=FSMContext)
+    state.get_data = AsyncMock(
+        return_value={
+            "adv_setting_original_id": 1,
+            "wb_user_cabinet_original_id": 10,
+        }
+    )
+    state.clear = AsyncMock()
+
+    adv = _adv_mock(adv_id=100, search_adv_id=200)
+    adv_row = MagicMock()
+    adv_row.adv_id = 100
+    adv_row.search_adv_id = 200
+    msg = _make_message(text="555")
+
+    with (
+        patch(f"{MODULE}.sm") as mock_sm,
+        patch(
+            f"{MODULE}._validate_wb_campaign_kind",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ),
+        patch(
+            f"{MODULE}.append_rebound_wb_adv_id",
+            new_callable=AsyncMock,
+        ) as append_mock,
+    ):
+        session_read = MagicMock()
+        session_read.__aenter__ = AsyncMock(return_value=session_read)
+        session_read.__aexit__ = AsyncMock(return_value=None)
+
+        session_write = MagicMock()
+        session_write.__aenter__ = AsyncMock(return_value=session_write)
+        session_write.__aexit__ = AsyncMock(return_value=None)
+        session_write.get = AsyncMock(return_value=adv_row)
+        session_write.commit = AsyncMock(
+            side_effect=IntegrityError("insert", {}, Exception())
+        )
+
+        result_read = MagicMock()
+        result_read.scalar_one_or_none.return_value = adv
+        dup_result = MagicMock()
+        dup_result.scalar_one_or_none.return_value = None
+        session_read.execute = AsyncMock(
+            side_effect=[result_read, dup_result]
+        )
+
+        mock_sm.side_effect = [session_read, session_read, session_write]
+
+        await rebind_adv_campaign_ids.apply_auto_adv_id(msg, bot, state)
+
+    append_mock.assert_not_awaited()
+    msg.answer.assert_called_once()
+    assert "не удалось сохранить" in msg.answer.call_args[0][0].lower()
+
+
+@pytest.mark.unit
 def test_classify_wb_campaign_for_rebind_excluded_status() -> None:
     from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models.get_adverts_adverts_item_status import (  # noqa: E501
         GetAdvertsAdvertsItemStatus,
