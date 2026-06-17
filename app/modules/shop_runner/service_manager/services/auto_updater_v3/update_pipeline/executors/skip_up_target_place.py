@@ -40,6 +40,7 @@ class SkipUpTargetPlaceExecutor:
                 dto,
                 catalog,
                 max_target_mode=context.adv_state.policy.max_target_mode,
+                resolve=float(context.adv_state.resolve),
             )
 
     @property

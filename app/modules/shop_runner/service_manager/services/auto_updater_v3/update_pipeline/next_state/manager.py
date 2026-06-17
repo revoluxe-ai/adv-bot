@@ -135,17 +135,20 @@ class NextStateManager:
         catalog: dict[AggressionTargetMode, ModeCandidate],
         *,
         max_target_mode: KeywordStrategyMode | None = None,
+        resolve: float | None = None,
     ) -> None:
         """Alias UP на текущем ``target_place`` → max режим группы через ``apply_ladder_state``.
 
         ``max_target_mode`` ограничивает alias-collapse сверху, чтобы UP bypass
-        не мог перескочить выше policy cap.
+        не мог перескочить выше policy cap. ``resolve`` ограничивает тот же
+        alias-collapse по экономическому ceiling.
         """
         state = resolve_alias_collapse_up_state_at_same_target_place(
             keyword,
             keyword.current_mode,
             catalog,
             max_target_mode=max_target_mode,
+            resolve=resolve,
         )
         if state is None:
             return

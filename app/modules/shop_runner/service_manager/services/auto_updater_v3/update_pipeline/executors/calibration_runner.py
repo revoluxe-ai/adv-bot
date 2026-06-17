@@ -163,7 +163,10 @@ def run_potential_up_steps(
     nsm: NextStateManager,
     for_calibration: bool = False,
 ) -> PotentialUpRunResult:
-    """До ``max_steps`` ladder UP: min CPO из list2; alias на том же ``target_place`` не считаются."""
+    """До ``max_steps`` ladder UP: min CPO из list2.
+
+    Alias на том же ``target_place`` не считаются.
+    """
     step_budget = max(0, int(max_steps))
     if step_budget == 0:
         return PotentialUpRunResult(step_budget=0, stop_reason="zero_budget")
@@ -219,7 +222,7 @@ def run_calibration_up(
     max_steps: int,
     nsm: NextStateManager,
 ) -> PotentialUpRunResult:
-    """CAL UP: до ``max_steps`` ladder UP из list2 (alias на том же ``target_place`` не считаются)."""
+    """CAL UP: до ``max_steps`` ladder UP из list2."""
     return run_potential_up_steps(
         context,
         max_steps=max(0, int(max_steps)),
@@ -333,7 +336,7 @@ def plan_calibration_trim_actions(
     )
     context = update_context_from_prepared(prepared, adv_state=adv_state)
     nsm = NextStateManager(ResolveCalibrationExecutor)
-    run_calibration_down(
+    _ = run_calibration_down(
         context,
         resolve=float(resolve),
         max_steps=max_effective_steps,
@@ -418,14 +421,14 @@ def plan_calibration_actions(
     context = update_context_from_prepared(prepared, adv_state=adv_state)
     nsm = NextStateManager(ResolveCalibrationExecutor)
     if calibration_direct == CalibrationDirect.TIGHTEN:
-        run_calibration_down(
+        _ = run_calibration_down(
             context,
             resolve=float(resolve),
             max_steps=max_effective_steps,
             nsm=nsm,
         )
     else:
-        run_calibration_up(
+        _ = run_calibration_up(
             context,
             max_steps=max_effective_steps,
             nsm=nsm,

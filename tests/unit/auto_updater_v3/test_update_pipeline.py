@@ -149,4 +149,5 @@ def test_build_normal_preamble_executors_order() -> None:
         "pay_for_order_gap_enable",
         "pay_for_order_over_max_off_on_deep_overspend",
         "resolve_calibration",
+        "clamp_states_to_resolve_when_no_effective_steps",
     ]

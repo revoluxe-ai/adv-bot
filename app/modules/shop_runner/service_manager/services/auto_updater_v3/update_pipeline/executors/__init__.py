@@ -17,7 +17,7 @@
 
 Порядок фаз:
 V → clamp → resolve_clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise →
-reset → S → R → enable → pfo_off → cal.
+reset → S → R → enable → pfo_off → cal → resolve_clamp.
 
 Смысл разбиения:
 - **NF** (`NotFullValidateExecutor`) переводит активные PFO ключи в
@@ -29,7 +29,9 @@ reset → S → R → enable → pfo_off → cal.
   ``±1`` по fact/resolve после bootstrap, не затрагивая FULL и не делая reset
   в ``0``;
 - **skip_up / raise / reset / shelf / rebalance / calibration** обслуживают
-  исключительно FULL ladder-контур.
+  исключительно FULL ladder-контур;
+- финальный ``resolve_clamp`` в конце pipeline гарантирует, что later UP-фазы не
+  вернут state выше current resolve.
 
 В итоге этот модуль работает как “карта движений” для NORMAL pipeline: он
 объясняет, где начинается PFO bootstrap, где заканчивается NF-коррекция и где
@@ -107,6 +109,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
         PayForOrderGapEnableExecutor(),
         PayForOrderOverMaxOffOnDeepOverspendExecutor(),
         ResolveCalibrationExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(),
     ]
 
 
