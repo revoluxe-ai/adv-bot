@@ -94,6 +94,7 @@ async def _send_main_screen(
     service: AutoShelfBidControlTelegramService,
     adv_setting_original_id: int,
 ) -> None:
+    await service.apply_main_bid_refresh_if_needed(adv_setting_original_id)
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_control_message(view)
     keyboard = build_auto_shelf_bid_control_keyboard(view, adv_setting_original_id)
