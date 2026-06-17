@@ -238,6 +238,7 @@ def resolve_alias_collapse_up_at_same_target_place(
     catalog: dict[AggressionTargetMode, ModeCandidate],
     *,
     max_target_mode: KeywordStrategyMode | None = None,
+    resolve: float | None = None,
 ) -> KeywordStrategyMode | None:
     """Схлопнуть alias UP на текущем ``target_place`` до max ``mode_level`` в группе.
 
@@ -247,6 +248,7 @@ def resolve_alias_collapse_up_at_same_target_place(
 
     Если задан ``max_target_mode``, группа дополнительно отсекается по
     aggression cap, чтобы alias-collapse не мог перескочить выше policy.
+    Если задан ``resolve``, группа также отсекается по текущему economic ceiling.
     """
     if current in (
         KeywordStrategyMode.OFF,
@@ -272,6 +274,16 @@ def resolve_alias_collapse_up_at_same_target_place(
         group = tuple(
             mode for mode in group if mode_level(mode) <= mode_level(max_target_mode)
         )
+    if resolve is not None:
+        resolved_group: list[KeywordStrategyMode] = []
+        for mode in group:
+            candidate = _candidate_for_strategy_mode(catalog, mode)
+            if candidate is None or candidate.predicted_cpa is None:
+                continue
+            if float(candidate.predicted_cpa) > float(resolve):
+                continue
+            resolved_group.append(mode)
+        group = tuple(resolved_group)
     if not group:
         return None
     target = max(group, key=mode_level)
@@ -286,6 +298,7 @@ def resolve_alias_collapse_up_state_at_same_target_place(
     catalog: dict[AggressionTargetMode, ModeCandidate],
     *,
     max_target_mode: KeywordStrategyMode | None = None,
+    resolve: float | None = None,
 ) -> KeywordV3LadderState | None:
     """Конкретная ladder-ступень alias-up на том же ``target_place``.
 
@@ -329,10 +342,19 @@ def resolve_alias_collapse_up_state_at_same_target_place(
         and int(state.target_position) == current_place
         and mode_level(state.strategy_mode) > mode_level(current)
         and (cap_level is None or mode_level(state.strategy_mode) <= cap_level)
+        and (resolve is None or float(state.cpo) <= float(resolve))
     ]
     if not candidates:
         return None
     return max(candidates, key=lambda state: mode_level(state.strategy_mode))
+
+
+def _candidate_for_strategy_mode(
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    mode: KeywordStrategyMode,
+) -> ModeCandidate | None:
+    """Helper for alias-collapse filters to avoid repeated catalog lookups."""
+    return candidate_for_strategy_mode(mode, catalog)
 
 
 def resolve_next_effective_step_up(

@@ -32,7 +32,7 @@ class V3KeywordChangeEntry(BaseModel):
 
 
 class V3ExecutorPhaseBreakdown(BaseModel):
-    """Агрегат действий одного executor (мапится на phase_id отчёта)."""
+    """Агрегат действий одной phase_id отчёта V3."""
 
     phase_id: str
     executor_name: str

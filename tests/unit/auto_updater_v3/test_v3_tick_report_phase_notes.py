@@ -14,6 +14,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibratio
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     build_prepared_from_contexts,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+    KeywordV3Context,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_phase_notes import (
     summarize_phase_zero_actions,
 )
@@ -117,3 +120,42 @@ def test_calibration_loosen_operable_at_ceiling() -> None:
         max_effective_steps=1,
     )
     assert "следующим шагом UP" in note
+
+
+@pytest.mark.unit
+def test_resolve_clamp_zero_actions_reports_neutral_reason() -> None:
+    kw = _calc_kw(
+        ks_id=1,
+        text="kw",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        hard_status=2,
+    )
+    prepared = build_prepared_from_contexts([KeywordV3Context(keyword=kw, position_profile=[])])
+    note = summarize_phase_zero_actions(
+        "clamp_states_to_resolve_when_no_effective_steps",
+        prepared=prepared,
+        resolve=550.0,
+        max_effective_steps=1,
+    )
+    assert "effective steps включены" not in note
+    assert "изменений по resolve не требуется" in note
+
+
+@pytest.mark.unit
+def test_final_resolve_clamp_uses_same_zero_action_note() -> None:
+    kw = _calc_kw(
+        ks_id=2,
+        text="kw2",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        hard_status=2,
+    )
+    prepared = build_prepared_from_contexts([KeywordV3Context(keyword=kw, position_profile=[])])
+    note = summarize_phase_zero_actions(
+        "final_clamp_states_to_resolve",
+        prepared=prepared,
+        resolve=550.0,
+        max_effective_steps=1,
+    )
+    assert "изменений по resolve не требуется" in note

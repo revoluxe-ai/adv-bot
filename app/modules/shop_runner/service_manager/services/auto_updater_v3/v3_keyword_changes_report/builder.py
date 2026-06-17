@@ -31,6 +31,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword
     V3KeywordStepRecord,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
+    PHASE_TITLES,
     mode_aggression_points,
 )
 
@@ -218,8 +219,9 @@ def build_keyword_changes_snapshot(
             "rebalance": 0,
         }
     )
-    keywords_by_executor: dict[str, set[int]] = defaultdict(set)
-    executor_keyword_modes: dict[str, dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]]] = (
+    keywords_by_phase: dict[str, set[int]] = defaultdict(set)
+    phase_executor_names: dict[str, str] = {}
+    phase_keyword_modes: dict[str, dict[int, tuple[KeywordStrategyMode, KeywordStrategyMode]]] = (
         defaultdict(dict)
     )
     entries: list[V3KeywordChangeEntry] = []
@@ -239,17 +241,20 @@ def build_keyword_changes_snapshot(
                 continue
             mode_before = prior
             new_mode = step.new_mode.to_strategy_mode()
+            phase_id = step.phase_id or phase_id_for_executor(step.executor_name)
+            if phase_id not in phase_executor_names:
+                phase_executor_names[phase_id] = step.executor_name
             action = step_to_action(ks_id, dto=dto, prior_mode=prior, step=step)
             if action is not None:
                 _increment_breakdown(
                     buckets,
-                    executor_name=step.executor_name,
+                    executor_name=phase_id,
                     action=action.action,
-                    keyword_touched=keywords_by_executor[step.executor_name],
+                    keyword_touched=keywords_by_phase[phase_id],
                     ks_id=ks_id,
                 )
             _track_executor_keyword_mode(
-                executor_keyword_modes[step.executor_name],
+                phase_keyword_modes[phase_id],
                 ks_id=ks_id,
                 mode_before_step=mode_before,
                 mode_after_step=new_mode,
@@ -258,21 +263,23 @@ def build_keyword_changes_snapshot(
 
     by_phase: list[V3ExecutorPhaseBreakdown] = []
     for executor_name, counts in sorted(buckets.items()):
-        phase_id = phase_id_for_executor(executor_name)
-        ended_off, ended_on = _executor_outcome_counts(
-            executor_keyword_modes[executor_name]
-        )
+        phase_id = executor_name
+        ended_off, ended_on = _executor_outcome_counts(phase_keyword_modes[phase_id])
+        meta = PHASE_TITLES.get(phase_id)
+        title_ru = title_ru_for_phase(phase_id)
+        if meta is not None:
+            title_ru = meta[0]
         by_phase.append(
             V3ExecutorPhaseBreakdown(
                 phase_id=phase_id,
-                executor_name=executor_name,
-                title_ru=title_ru_for_phase(phase_id),
+                executor_name=phase_executor_names.get(phase_id, phase_id),
+                title_ru=title_ru,
                 planned=counts["planned"],
                 up=counts["up"],
                 down=counts["down"],
                 force_off=counts["force_off"],
                 rebalance=counts["rebalance"],
-                keywords_touched=len(keywords_by_executor[executor_name]),
+                keywords_touched=len(keywords_by_phase[phase_id]),
                 ended_off=ended_off,
                 ended_on=ended_on,
             )

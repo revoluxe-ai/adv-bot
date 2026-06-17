@@ -285,6 +285,26 @@ def test_nsm_skip_up_applies_max_on_alias_group() -> None:
 
 
 @pytest.mark.unit
+def test_nsm_skip_up_noop_when_alias_group_above_resolve() -> None:
+    nsm = NextStateManager(SkipUpTargetPlaceExecutor)
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    cat = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    nsm.skip_up_same_target_place(dto, cat, resolve=250.0)
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_nsm_skip_up_ignores_resolve_when_resolve_invalid() -> None:
+    nsm = NextStateManager(SkipUpTargetPlaceExecutor)
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    cat = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    nsm.skip_up_same_target_place(dto, cat, resolve=None)
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.target_place == 40
+
+
+@pytest.mark.unit
 def test_nsm_skip_up_noop_when_no_alias() -> None:
     nsm = NextStateManager(SkipUpTargetPlaceExecutor)
     dto = _dto(
@@ -332,6 +352,7 @@ def test_skip_up_executor_mutates_only_alias_keywords() -> None:
         SkipUpTargetPlaceExecutor().execute(ctx)
 
     assert ctx.keywords[0].current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert ctx.keywords[0].current_target_place == 40
     assert ctx.keywords[1].next_state == []
 
 
@@ -391,6 +412,7 @@ def test_skip_up_executor_respects_policy_cap(
     dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
     adv_state = replace(
         AdvState.empty(),
+        resolve=500.0,
         policy=replace(
             AdvState.empty().policy,
             max_target_mode=cap,
@@ -408,6 +430,32 @@ def test_skip_up_executor_respects_policy_cap(
         SkipUpTargetPlaceExecutor().execute(ctx)
     assert dto.current_mode == expected_mode
     assert len(dto.next_state) == expected_next_state_len
+
+
+@pytest.mark.unit
+def test_skip_up_executor_ignores_resolve_when_resolve_invalid() -> None:
+    dto = _dto(mode=KeywordStrategyMode.MIN_CPA)
+    adv_state = replace(
+        AdvState.empty(),
+        resolve=250.0,
+        resolve_valid=False,
+        policy=replace(
+            AdvState.empty().policy,
+            max_target_mode=KeywordStrategyMode.MAX_CONVERSION,
+        ),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+    catalog = _fake_catalog_places(min_place=40, opt_place=40, max_place=40)
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.skip_up_target_place.state_candidates_by_mode_for_ctx",
+        return_value=catalog,
+    ):
+        SkipUpTargetPlaceExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.target_place == 40
 
 
 @pytest.mark.unit

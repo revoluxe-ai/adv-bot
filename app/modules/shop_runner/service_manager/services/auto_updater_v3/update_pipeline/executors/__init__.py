@@ -16,8 +16,8 @@
   участвовать в NF bootstrap.
 
 Порядок фаз:
-V → clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R →
-enable → pfo_off → cal.
+V → clamp → resolve_clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise →
+reset → S → R → enable → pfo_off → cal → resolve_clamp.
 
 Смысл разбиения:
 - **NF** (`NotFullValidateExecutor`) переводит активные PFO ключи в
@@ -29,7 +29,10 @@ enable → pfo_off → cal.
   ``±1`` по fact/resolve после bootstrap, не затрагивая FULL и не делая reset
   в ``0``;
 - **skip_up / raise / reset / shelf / rebalance / calibration** обслуживают
-  исключительно FULL ladder-контур.
+  исключительно FULL ladder-контур;
+- финальный ``resolve_clamp`` в конце pipeline гарантирует, что later UP-фазы не
+  вернут state выше current resolve, но получает отдельный ``phase_id`` для
+  отчётности;
 
 В итоге этот модуль работает как “карта движений” для NORMAL pipeline: он
 объясняет, где начинается PFO bootstrap, где заканчивается NF-коррекция и где
@@ -49,6 +52,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_state_to_aggression import (
     ClampStateToAggressionExecutor,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_states_to_resolve_when_no_effective_steps import (
+    ClampStatesToResolveWhenNoEffectiveStepsExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
@@ -91,6 +97,9 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     return [
         HardStatusValidateExecutor(),
         ClampStateToAggressionExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(
+            phase_name="clamp_states_to_resolve_when_no_effective_steps",
+        ),
         NotFullValidateExecutor(),
         NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
@@ -103,11 +112,15 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
         PayForOrderGapEnableExecutor(),
         PayForOrderOverMaxOffOnDeepOverspendExecutor(),
         ResolveCalibrationExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(
+            phase_name="final_clamp_states_to_resolve",
+        ),
     ]
 
 
 __all__ = [
     "ClampStateToAggressionExecutor",
+    "ClampStatesToResolveWhenNoEffectiveStepsExecutor",
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
     "NotFullTargetPlaceMigrateExecutor",

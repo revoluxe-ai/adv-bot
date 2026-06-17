@@ -123,3 +123,53 @@ def test_merge_appends_phase_missing_in_collector() -> None:
     assert len(merged.phases) == 1
     assert merged.phases[0].phase_id == "skip_up_same_target_place"
     assert merged.phases[0].down == 1
+
+
+@pytest.mark.unit
+def test_merge_keeps_distinct_clamp_phase_ids() -> None:
+    base = V3TickReportSnapshot(
+        tick_at=datetime(2026, 6, 3, tzinfo=UTC),
+        adv_id=1,
+        campaign_mode="NORMAL",
+        phases=[
+            V3PhaseStats(
+                phase_id="clamp_states_to_resolve_when_no_effective_steps",
+                title_ru="1b · clamp · resolve when steps=0",
+                planned=1,
+                down=1,
+            ),
+            V3PhaseStats(
+                phase_id="final_clamp_states_to_resolve",
+                title_ru="1c · clamp · final resolve safety",
+                planned=1,
+                down=1,
+            ),
+        ],
+    )
+    audit = V3KeywordChangesSnapshot(
+        tick_at=datetime(2026, 6, 3, tzinfo=UTC),
+        adv_id=1,
+        by_phase=[
+            V3ExecutorPhaseBreakdown(
+                phase_id="clamp_states_to_resolve_when_no_effective_steps",
+                executor_name="ClampStatesToResolveWhenNoEffectiveStepsExecutor",
+                down=1,
+                planned=1,
+                keywords_touched=1,
+            ),
+            V3ExecutorPhaseBreakdown(
+                phase_id="final_clamp_states_to_resolve",
+                executor_name="ClampStatesToResolveWhenNoEffectiveStepsExecutor",
+                down=1,
+                planned=1,
+                keywords_touched=1,
+            ),
+        ],
+    )
+
+    merged = merge_keyword_changes_into_tick_snapshot(base, audit)
+    assert {p.phase_id for p in merged.phases} == {
+        "clamp_states_to_resolve_when_no_effective_steps",
+        "final_clamp_states_to_resolve",
+    }
+    assert sum(p.down for p in merged.phases) == 2

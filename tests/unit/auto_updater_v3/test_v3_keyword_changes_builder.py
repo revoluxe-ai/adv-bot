@@ -115,6 +115,29 @@ def test_build_snapshot_aggregates_by_executor() -> None:
 
 
 @pytest.mark.unit
+def test_build_snapshot_splits_clamp_runs_by_phase_id() -> None:
+    early = _dto(11)
+    early.current_mode = NextState(
+        new_mode=KeywordMode.OFF,
+        executor_name="ClampStatesToResolveWhenNoEffectiveStepsExecutor",
+        phase_id="clamp_states_to_resolve_when_no_effective_steps",
+    )
+
+    final = _dto(12)
+    final.current_mode = NextState(
+        new_mode=KeywordMode.OFF,
+        executor_name="ClampStatesToResolveWhenNoEffectiveStepsExecutor",
+        phase_id="final_clamp_states_to_resolve",
+    )
+
+    snap = build_keyword_changes_snapshot([early, final], adv_id=7)
+    by_phase = {p.phase_id: p for p in snap.by_phase}
+    assert by_phase["clamp_states_to_resolve_when_no_effective_steps"].force_off == 1
+    assert by_phase["final_clamp_states_to_resolve"].force_off == 1
+    assert len(snap.by_phase) == 2
+
+
+@pytest.mark.unit
 def test_multi_step_keyword_two_executors() -> None:
     dto = _dto(10, mode=KeywordStrategyMode.OFF)
     dto.current_mode = NextState(

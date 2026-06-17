@@ -97,6 +97,16 @@ def summarize_phase_zero_actions(
             prepared,
             policy=policy,
         ),
+        "clamp_states_to_resolve_when_no_effective_steps": lambda: _note_clamp_states_to_resolve_when_no_effective_steps(
+            prepared,
+            resolve=resolve,
+            max_effective_steps=max_effective_steps,
+        ),
+        "final_clamp_states_to_resolve": lambda: _note_clamp_states_to_resolve_when_no_effective_steps(
+            prepared,
+            resolve=resolve,
+            max_effective_steps=max_effective_steps,
+        ),
         "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
         "not_full_target_place_plan_fact": lambda: _note_not_full_tp_plan_fact(
@@ -183,6 +193,21 @@ def _note_clamp_state_to_aggression(
     if not prepared:
         return "нет operable ключей"
     return "нет ключей выше aggression cap"
+
+
+def _note_clamp_states_to_resolve_when_no_effective_steps(
+    prepared: PreparedListLike,
+    *,
+    resolve: float | None,
+    max_effective_steps: int,
+) -> str:
+    if resolve is None or float(resolve) <= 0:
+        return "resolve недоступен"
+    if not prepared:
+        return "нет operable ключей"
+    if max_effective_steps != 0:
+        return "изменений по resolve не требуется"
+    return "нет активных ключей дороже resolve"
 
 
 def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:
