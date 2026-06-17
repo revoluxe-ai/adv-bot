@@ -97,7 +97,7 @@ class ClustersAdvStatUpdater:
                 "original_adv_id=%s complex_advs_count=%s stats_count=%s",
                 getattr(complex_advs[0], "shop_id", None),
                 getattr(first_stat, "adv_id", None),
-                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)), # pyright:ignore
                 len(complex_advs),
                 len(stats),
             )
@@ -114,7 +114,7 @@ class ClustersAdvStatUpdater:
                 "exception_type=%s exception_message=%s timestamp_not_updated=true",
                 getattr(complex_advs[0], "shop_id", None),
                 getattr(first_stat, "adv_id", None),
-                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)), # pyright:ignore
                 len(complex_advs),
                 len(stats),
                 elapsed_sec,
@@ -135,7 +135,7 @@ class ClustersAdvStatUpdater:
                 "timestamp_not_updated=true",
                 getattr(complex_advs[0], "shop_id", None),
                 getattr(first_stat, "adv_id", None),
-                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)), # pyright:ignore
                 len(complex_advs),
                 len(stats),
                 time.perf_counter() - started_at,
@@ -148,7 +148,7 @@ class ClustersAdvStatUpdater:
                 "updated_original_adv_ids_count=%s duration_sec=%.3f",
                 getattr(complex_advs[0], "shop_id", None),
                 getattr(first_stat, "adv_id", None),
-                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)), # pyright:ignore
                 len(complex_advs),
                 len(stats),
                 len(success_adv_original_ids),

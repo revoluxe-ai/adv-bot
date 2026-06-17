@@ -31,6 +31,7 @@ class PreamblePipelineRunResult:
     ladder_inputs: LadderInputs
     cap_down_count: int = 0  # legacy: фаза B удалена, поле не заполняется
     clamp_count: int = 0
+    resolve_clamp_count: int = 0
     not_full_target_place_migrate_count: int = 0
     validate_not_full_count: int = 0
     not_full_target_place_plan_fact_count: int = 0
