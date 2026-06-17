@@ -201,6 +201,7 @@ def test_ch_downgrades_to_off_when_no_economic_state_exists() -> None:
     ctx = _context(dto, adv_state=_adv_state(resolve=500.0))
     ClampStatesToResolveWhenNoEffectiveStepsExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF
+    assert dto.target_place is None
 
 
 @pytest.mark.unit
@@ -439,6 +440,7 @@ def test_pfo_active_above_resolve_goes_off() -> None:
     ctx = _context(dto, adv_state=_adv_state(resolve=500.0))
     ClampStatesToResolveWhenNoEffectiveStepsExecutor().execute(ctx)
     assert dto.current_mode == KeywordStrategyMode.OFF
+    assert dto.target_place == 0
 
 
 @pytest.mark.unit

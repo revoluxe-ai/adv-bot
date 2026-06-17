@@ -71,7 +71,14 @@ class ClampStatesToResolveWhenNoEffectiveStepsExecutor:
                 cap_level=cap_level,
             )
             if target_state is None:
-                self._next_state_manager.force_off(dto)
+                off_state = pick_off_ladder_state(dto)
+                if off_state is not None:
+                    self._next_state_manager.raise_state_to_target_cpo(
+                        dto,
+                        off_state,
+                    )
+                else:
+                    self._next_state_manager.force_off(dto)
                 continue
             self._next_state_manager.raise_state_to_target_cpo(dto, target_state)
 
