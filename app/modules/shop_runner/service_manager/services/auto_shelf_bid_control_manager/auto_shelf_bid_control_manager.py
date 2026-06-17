@@ -559,6 +559,11 @@ class AutoShelfBidControlManager:
         target_test_observation_hours = self._target_observation_hours_from_minutes(
             target_test_observation_minutes
         )
+        bid_universe = build_bid_universe(
+            min_bid_minor,
+            int(settings_obj.max_bid_minor),
+            bid_unit_minor=100,
+        )
         if coverage_snapshot is None:
             coverage_snapshot = await self._build_coverage_snapshot(
                 nmid=complex_adv.main_nmid,
@@ -572,7 +577,7 @@ class AutoShelfBidControlManager:
             )
         _coverages, _current_layer, covered_anchor_count, next_test_bid = coverage_snapshot
         should_continue_test = (
-            int(settings_obj.max_bid_minor) > int(min_bid_minor)
+            len(bid_universe) > 1
             and covered_anchor_count < 2
             and next_test_bid is not None
             and next_test_bid != state.current_test_bid_minor
