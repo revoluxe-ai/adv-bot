@@ -4,15 +4,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Protocol, cast
 
 from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager import (
     WBModifier,
 )
 from app.core.redis_manager_v2.redis_client import RedisClient
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
     ComplexAdv,
+)
+from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost_from_summary
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
 )
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
@@ -20,6 +28,10 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 )
 
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
+from .auto_shelf_bid_control_manager import (
+    AutoShelfBidControlManager,
+    MainBidRefreshResult,
+)
 from .auto_shelf_bid_control_view_provider import AutoShelfBidControlViewProvider
 from .auto_shelf_bid_setter import AutoShelfBidSetter
 from .bid_units import format_bid_minor_for_telegram, rubles_to_bid_minor
@@ -44,6 +56,30 @@ class _ModuleResourcesProtocol(Protocol):
 
 class _DIContainerProtocol(Protocol):
     module_resources: _ModuleResourcesProtocol
+
+
+@dataclass(slots=True)
+class _TelegramBidSetterAdapter:
+    """Adapter, который прокидывает Telegram PATCH через существующий setter path."""
+
+    service: "AutoShelfBidControlTelegramService"
+    adv: AdvSetting
+    nmid: int
+
+    async def set_bid(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        bid_minor: int,
+        currency: str,
+    ) -> None:
+        set_bid = getattr(self.service, "_set_bid")
+        await set_bid(
+            adv=self.adv,
+            nmid=self.nmid,
+            bid_minor=int(bid_minor),
+            currency=currency,
+        )
 
 
 @dataclass(slots=True)
@@ -73,6 +109,93 @@ class AutoShelfBidControlTelegramService:
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Построить текущее состояние экрана управления."""
         return await self._view_provider.build_view(adv_setting_original_id)
+
+    async def apply_main_bid_refresh_if_needed(
+        self,
+        adv_setting_original_id: int,
+    ) -> MainBidRefreshResult:
+        """Применить main bid refresh до чтения view и вернуть результат."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        nmid = self._get_single_nmid_or_raise(adv)
+        state = await self._repository.get_state(nmid)
+        if state is None:
+            return MainBidRefreshResult.SKIPPED_NOT_MAIN
+        if state.current_mode != "main":
+            return MainBidRefreshResult.SKIPPED_NOT_MAIN
+        if not bool(adv.auto_shelf_bid_control_enabled):
+            return MainBidRefreshResult.SKIPPED_DISABLED
+        settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
+        min_bid_minor = await self._view_provider._fetch_wb_min_bid_minor(  # type: ignore[attr-defined]
+            int(adv_setting_original_id),
+            nmid,
+        )
+        if min_bid_minor is None:
+            return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+        actual_bid_minor = None
+        cached_bid = await self._bid_cache.get_bid(
+            auto_adv_id=int(adv.adv_id),
+            nmid=nmid,
+        )
+        if cached_bid is not None:
+            actual_bid_minor = int(cached_bid.bid_minor)
+        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
+        complex_adv_like = SimpleNamespace(
+            main_nmid=nmid,
+            auto_adv_id=int(adv.adv_id),
+            nmids=[nmid],
+            bot_active=bool(getattr(adv, "bot_active", True)),
+            auto_adv_active_status=bool(getattr(adv, "auto_adv_active_status", True)),
+            auto_shelf_bid_control_enabled=bool(adv.auto_shelf_bid_control_enabled),
+            auto_shelf_bid_control_strategy=(
+                adv.auto_shelf_bid_control_strategy
+                or AutoShelfBidControlStrategy.PLAN_DISTANCE
+            ),
+            adv_setting=adv,
+            original_max_cpo=float(adv.max_price_for_order or 0.0),
+            fact_pay_for_order=(
+                plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
+            ),
+            resolve_cpo=resolve_target_cost_from_summary(
+                plan_fact_summary,
+                plan_orders=int(adv.plan_for_sales_for_day or 0),
+                plan_target_pay_for_order=adv.target_price_for_order,
+                plan_max_pay_for_order=adv.max_price_for_order,
+            ),
+        )
+        manager = AutoShelfBidControlManager(
+            bid_cache_manager=self._bid_cache,
+            wb_bid_setter=cast(
+                AutoShelfBidSetter,
+                _TelegramBidSetterAdapter(self, adv, nmid),
+            ),
+            repository=self._repository,
+            analytics_repository=self._view_provider._analytics,  # type: ignore[attr-defined]
+        )
+        refresh_result = await manager.apply_main_bid_refresh_if_needed(
+            complex_adv_like,  # type: ignore[arg-type]
+            state=state,
+            min_bid_minor=int(min_bid_minor),
+            max_bid_minor=int(settings_obj.max_bid_minor),
+            actual_bid_minor=actual_bid_minor,
+            now=datetime.now(UTC),
+        )
+        if (
+            refresh_result
+            in {
+                MainBidRefreshResult.NO_CHANGE,
+                MainBidRefreshResult.SKIPPED_NO_DESIRED_BID,
+            }
+            and state.current_mode == "main"
+        ):
+            await manager._reconcile_expected_bid_for_current_mode(  # pyright: ignore[reportPrivateUsage]
+                complex_adv_like,  # type: ignore[arg-type]
+                state=state,
+                actual_bid_minor=actual_bid_minor,
+                min_bid_minor=int(min_bid_minor),
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                now=datetime.now(UTC),
+            )
+        return refresh_result
 
     async def enable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Включить управление ставкой; при отсутствии settings создать default."""

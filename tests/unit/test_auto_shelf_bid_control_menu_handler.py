@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -82,6 +83,48 @@ def _view() -> AutoShelfBidControlViewDTO:
         fact_cpo=None,
         resolve_cpo=None,
     )
+
+
+@pytest.mark.asyncio
+async def test_send_main_screen_applies_refresh_before_build_view(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    service = type("FakeService", (), {})()
+    service.apply_main_bid_refresh_if_needed = AsyncMock(
+        side_effect=lambda *_args, **_kwargs: calls.append("apply")
+    )
+    service.build_view = AsyncMock(
+        side_effect=lambda *_args, **_kwargs: (
+            calls.append("build"),
+            _view(),
+        )[1]
+    )
+    callback_message = FakeMessage(text="main")
+    callback_message.answer = AsyncMock(
+        side_effect=lambda text, **_: calls.append(f"answer:{text}")
+    )
+    callback = SimpleNamespace(message=callback_message)
+    monkeypatch.setattr(
+        handler,
+        "render_auto_shelf_bid_control_message",
+        lambda *_: "rendered",
+    )
+    monkeypatch.setattr(
+        handler,
+        "build_auto_shelf_bid_control_keyboard",
+        lambda *_: object(),
+    )
+
+    await handler._send_main_screen(
+        callback,
+        service=service,  # pyright: ignore[reportArgumentType]
+        adv_setting_original_id=1,
+    )
+
+    assert calls[0] == "apply"
+    assert calls[1] == "build"
+    assert calls[2] == "answer:rendered"
 
 
 @pytest.mark.asyncio
