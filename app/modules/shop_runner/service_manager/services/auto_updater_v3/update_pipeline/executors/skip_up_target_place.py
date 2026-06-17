@@ -32,6 +32,11 @@ class SkipUpTargetPlaceExecutor:
     def execute(self, context: UpdateContext) -> None:
         self._skip_reason = None
         ladder_inputs = context.adv_state.ladder_inputs
+        resolve = (
+            float(context.adv_state.resolve)
+            if context.adv_state.resolve_valid
+            else None
+        )
         for dto in context.keywords:
             if dto.data_tier != KeywordV3DataTier.FULL:
                 continue
@@ -40,7 +45,7 @@ class SkipUpTargetPlaceExecutor:
                 dto,
                 catalog,
                 max_target_mode=context.adv_state.policy.max_target_mode,
-                resolve=float(context.adv_state.resolve),
+                resolve=resolve,
             )
 
     @property
