@@ -42,7 +42,7 @@ class ClustersAdvStatUpdater:
                 time.perf_counter() - started_at,
             )
             return set()
-
+        # TODO: Почистить тут дебаг логи
         today = date.today()
         if diag_enabled:
             logger.debug(
