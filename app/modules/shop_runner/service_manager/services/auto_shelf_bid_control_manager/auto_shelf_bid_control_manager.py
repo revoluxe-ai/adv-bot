@@ -1387,6 +1387,20 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            != AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            state.last_reason = ControlReason.BEST_BID_NOT_FOUND
+            _ = await self._repository.save_state(state)
+            logger.warning(
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
+                auto_adv_id,
+                nmid,
+                state.last_reason,
+                complex_adv.auto_shelf_bid_control_strategy,
+            )
+            return None
         state.current_mode = "main"
         state.main_started_at = now
         state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
