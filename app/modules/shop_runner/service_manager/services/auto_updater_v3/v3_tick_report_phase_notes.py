@@ -196,13 +196,13 @@ def _note_clamp_states_to_resolve_when_no_effective_steps(
     resolve: float | None,
     max_effective_steps: int,
 ) -> str:
-    if max_effective_steps != 0:
-        return "effective steps включены"
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
     if not prepared:
         return "нет operable ключей"
-    return "нет активных ключей дороже resolve при steps=0"
+    if max_effective_steps != 0:
+        return "изменений по resolve не требуется"
+    return "нет активных ключей дороже resolve"
 
 
 def _note_not_full_tp_migrate(prepared: PreparedListLike) -> str:

@@ -106,6 +106,7 @@ def _resolve_clamp_target(
             state
             for state in dto.ladder_states
             if state.strategy_mode != KeywordStrategyMode.OFF
+            and state.is_valid
             and state.cpo is not None
             and float(state.cpo) <= float(resolve)
             and state.stage in OPERABLE_LADDER_STAGES

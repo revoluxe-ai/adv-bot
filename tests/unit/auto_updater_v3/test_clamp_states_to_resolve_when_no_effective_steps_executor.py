@@ -224,6 +224,88 @@ def test_ch_respects_aggression_cap_when_candidate_is_higher() -> None:
 
 
 @pytest.mark.unit
+def test_ch_invalid_state_below_resolve_is_not_selected() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.OPTIMUM,
+        ladder=(
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=10,
+                cpo=300.0,
+                is_valid=False,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=20,
+                cpo=650.0,
+            ),
+        ),
+        position_profile=_sample_profile(),
+        target_place=20,
+    )
+    ctx = _context(dto, adv_state=_adv_state(resolve=500.0))
+    ClampStatesToResolveWhenNoEffectiveStepsExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OFF
+
+
+@pytest.mark.unit
+def test_ch_prefers_valid_candidate_over_invalid_one() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=(
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OFF,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_position=0,
+                cpo=None,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MIN_CPA,
+                strategy_mode=KeywordStrategyMode.MIN_CPA,
+                target_position=10,
+                cpo=300.0,
+                is_valid=False,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.OPTIMUM,
+                strategy_mode=KeywordStrategyMode.OPTIMUM,
+                target_position=20,
+                cpo=350.0,
+            ),
+            KeywordV3LadderState(
+                keyword_setting_id=1,
+                stage=V3LadderStageKind.MAX_CONVERSION,
+                strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+                target_position=30,
+                cpo=800.0,
+            ),
+        ),
+        position_profile=_sample_profile(),
+        target_place=30,
+    )
+    ctx = _context(dto, adv_state=_adv_state(resolve=500.0))
+    ClampStatesToResolveWhenNoEffectiveStepsExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 20
+
+
+@pytest.mark.unit
 def test_pfo_active_above_resolve_goes_off() -> None:
     dto = _dto(
         ks_id=2,
