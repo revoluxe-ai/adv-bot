@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 _PHASE_LOG: dict[str, tuple[str, str]] = {
     "validate_state_by_hard_status": ("v3 VALIDATE_HARD_STATUS", "validate_count"),
     "clamp_state_to_aggression": ("v3 CLAMP_STATE_TO_AGGRESSION", "clamp_count"),
+    "clamp_states_to_resolve_when_no_effective_steps": (
+        "v3 CLAMP_STATES_TO_RESOLVE",
+        "resolve_clamp_count",
+    ),
     "not_full_target_place_migrate": (
         "v3 NOT_FULL_TP_MIGRATE",
         "not_full_target_place_migrate_count",

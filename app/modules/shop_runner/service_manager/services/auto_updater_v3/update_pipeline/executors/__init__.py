@@ -16,8 +16,8 @@
   участвовать в NF bootstrap.
 
 Порядок фаз:
-V → clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise → reset → S → R →
-enable → pfo_off → cal.
+V → clamp → resolve_clamp → NF → NF_migrate → NF_plan_fact → skip_up → raise →
+reset → S → R → enable → pfo_off → cal.
 
 Смысл разбиения:
 - **NF** (`NotFullValidateExecutor`) переводит активные PFO ключи в
@@ -49,6 +49,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_state_to_aggression import (
     ClampStateToAggressionExecutor,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_states_to_resolve_when_no_effective_steps import (
+    ClampStatesToResolveWhenNoEffectiveStepsExecutor,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.hard_status_validate import (
     HardStatusValidateExecutor,
@@ -91,6 +94,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     return [
         HardStatusValidateExecutor(),
         ClampStateToAggressionExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(),
         NotFullValidateExecutor(),
         NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
@@ -108,6 +112,7 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
 
 __all__ = [
     "ClampStateToAggressionExecutor",
+    "ClampStatesToResolveWhenNoEffectiveStepsExecutor",
     "RebalanceExecutor",
     "HardStatusValidateExecutor",
     "NotFullTargetPlaceMigrateExecutor",

@@ -1,5 +1,7 @@
 """Unit: UpdatePipeline и executors."""
 
+# pyright: reportPrivateUsage=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownMemberType=false, reportArgumentType=false, reportCallIssue=false
+
 from __future__ import annotations
 
 import pytest
@@ -134,6 +136,7 @@ def test_build_normal_preamble_executors_order() -> None:
     assert names == [
         "validate_state_by_hard_status",
         "clamp_state_to_aggression",
+        "clamp_states_to_resolve_when_no_effective_steps",
         "validate_not_full_state",
         "not_full_target_place_migrate",
         "not_full_target_place_plan_fact",

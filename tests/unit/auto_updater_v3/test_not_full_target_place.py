@@ -1,5 +1,7 @@
 """Unit: NOT FULL target_place migrate и plan-fact executors."""
 
+# pyright: reportPrivateUsage=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportCallIssue=false
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -581,7 +583,7 @@ def test_plan_fact_executor_no_tp_zero_without_pfo_when_not_min_cpa() -> None:
 @pytest.mark.unit
 def test_preamble_includes_nf_tp_phases() -> None:
     names = [ex.phase_name for ex in build_normal_preamble_executors()]
-    assert names[2:5] == [
+    assert names[3:6] == [
         "validate_not_full_state",
         "not_full_target_place_migrate",
         "not_full_target_place_plan_fact",

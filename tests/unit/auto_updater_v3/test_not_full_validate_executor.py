@@ -1,5 +1,7 @@
 """Unit: validate_not_full_state executor и NOT FULL DTO."""
 
+# pyright: reportPrivateUsage=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportCallIssue=false
+
 from __future__ import annotations
 
 import pytest
@@ -147,7 +149,7 @@ def test_nsm_validate_not_full_state() -> None:
 @pytest.mark.unit
 def test_not_full_validate_executor_third_in_preamble() -> None:
     executors = build_normal_preamble_executors()
-    assert executors[2].phase_name == "validate_not_full_state"
+    assert executors[3].phase_name == "validate_not_full_state"
 
 
 @pytest.mark.unit
