@@ -103,11 +103,7 @@ def _resolve_clamp_target(
     resolve: float,
     cap_level: int,
 ) -> KeywordV3LadderState | None:
-    """Best reachable state at or below the live resolve ceiling.
-
-    The helper keeps the search strictly downward: candidates must not exceed
-    the current active mode and must remain inside the policy cap.
-    """
+    """Best reachable CH-backed state at or below the live resolve ceiling."""
     if bool(dto.position_profile):
         current_state = resolve_current_ladder_state(dto)
         if current_state is None:
@@ -133,10 +129,3 @@ def _resolve_clamp_target(
                 -int(state.target_position),
             ),
         )
-
-    pfo = keyword_pfo_value(dto.calculated_keyword)
-    if pfo is None:
-        return None
-    if float(pfo) <= float(resolve):
-        return None
-    return pick_off_ladder_state(dto)
