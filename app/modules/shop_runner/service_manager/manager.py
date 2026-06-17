@@ -3,6 +3,7 @@
 import asyncio
 import functools
 import logging
+import os
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
@@ -114,6 +115,12 @@ logger = logging.getLogger(__name__)
 
 # Если после кеша и WB API минимальная ставка по поиску неизвестна — emergency normquery.
 STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB = 150
+
+
+def _cluster_stats_diagnostic_enabled() -> bool:
+    """Включает подробные DEBUG-логи для cluster freshness path."""
+    value = os.environ.get("CLUSTER_STATS_DIAGNOSTIC_ENABLED", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 T = TypeVar("T")
 
@@ -904,6 +911,8 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
 
+        diag_enabled = _cluster_stats_diagnostic_enabled()
+        started_at = time.perf_counter()
         wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(
             _wb_manager_hub=wb_manager_hub
@@ -914,16 +923,76 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
-        updated_original_adv_ids = await updater.update_today_stats(
-            complex_advs
-        )
+        if diag_enabled:
+            logger.debug(
+                "cluster_stats_diagnostic step=start shop_id=%s complex_advs_count=%s",
+                self.shop_id,
+                len(complex_advs),
+            )
+        if not complex_advs:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.warning(
+                "cluster_stats_diagnostic step=empty shop_id=%s complex_advs_count=0 "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "timestamp_not_updated=true",
+                self.shop_id,
+                elapsed_sec,
+            )
+            return None
+        try:
+            updated_original_adv_ids = await updater.update_today_stats(
+                complex_advs
+            )
+        except Exception as exc:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.exception(
+                "cluster_stats_diagnostic step=error shop_id=%s complex_advs_count=%s "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "exception_type=%s exception_message=%s timestamp_not_updated=true",
+                self.shop_id,
+                len(complex_advs),
+                elapsed_sec,
+                type(exc).__name__,
+                exc,
+            )
+            raise
+        if not updated_original_adv_ids:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.warning(
+                "cluster_stats_diagnostic step=skipped shop_id=%s "
+                "complex_advs_count=%s updated_original_adv_ids_count=0 "
+                "duration_sec=%.3f timestamp_not_updated=true",
+                self.shop_id,
+                len(complex_advs),
+                elapsed_sec,
+            )
+            return None
+        if diag_enabled:
+            logger.debug(
+                "cluster_stats_diagnostic step=end shop_id=%s complex_advs_count=%s "
+                "updated_original_adv_ids_count=%s",
+                self.shop_id,
+                len(complex_advs),
+                len(updated_original_adv_ids),
+            )
         for adv_orig_id in updated_original_adv_ids:
-            await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
-        logger.info(
-            "heartbeat update_clusters_adv_stats_today shop_id=%s updated=%s",
-            self.shop_id,
-            len(updated_original_adv_ids),
-        )
+            try:
+                await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
+            except Exception as exc:
+                elapsed_sec = time.perf_counter() - started_at
+                logger.exception(
+                    "cluster_stats_diagnostic step=error shop_id=%s "
+                    "original_adv_id=%s updated_original_adv_ids_count=%s "
+                    "duration_sec=%.3f exception_type=%s exception_message=%s "
+                    "timestamp_not_updated=true",
+                    self.shop_id,
+                    adv_orig_id,
+                    len(updated_original_adv_ids),
+                    elapsed_sec,
+                    type(exc).__name__,
+                    exc,
+                )
+                raise
 
         return None
 

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import time
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from datetime import date, timedelta
@@ -14,6 +16,12 @@ from .click_house_clusters_stat_manager import click_house_clusters_stat_manager
 logger = logging.getLogger(__name__)
 
 
+def _cluster_stats_diagnostic_enabled() -> bool:
+    """Включает подробные DEBUG-логи для cluster freshness path."""
+    value = os.environ.get("CLUSTER_STATS_DIAGNOSTIC_ENABLED", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 
 class ClustersAdvStatUpdater:
     def __init__(self, wb_manager_hub: "WBManagerHub"):
@@ -25,11 +33,44 @@ class ClustersAdvStatUpdater:
 
         Предназначен для частого вызова в отдельной корутине.
         """
+        diag_enabled = _cluster_stats_diagnostic_enabled()
+        started_at = time.perf_counter()
         if not complex_advs:
+            logger.warning(
+                "cluster_stats_diagnostic step=empty shop_id=%s complex_advs_count=0 "
+                "stats_count=0 updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "timestamp_not_updated=true",
+                getattr(complex_advs[0], "shop_id", None) if complex_advs else None,
+                time.perf_counter() - started_at,
+            )
             return set()
 
         today = date.today()
-        stats = await self._get_stats_for_day(complex_advs, today)
+        if diag_enabled:
+            logger.debug(
+                "cluster_stats_diagnostic step=start shop_id=%s complex_advs_count=%s",
+                complex_advs[0].shop_id if complex_advs else None,
+                len(complex_advs),
+            )
+        try:
+            stats = await self._get_stats_for_day(complex_advs, today)
+        except Exception as exc:
+            elapsed_sec = time.perf_counter() - started_at
+            first_adv = complex_advs[0]
+            logger.exception(
+                "cluster_stats_diagnostic step=error shop_id=%s adv_id=%s "
+                "original_adv_id=%s complex_advs_count=%s stats_count=0 "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "exception_type=%s exception_message=%s timestamp_not_updated=true",
+                getattr(first_adv, "shop_id", None),
+                getattr(first_adv, "adv_id", None),
+                getattr(first_adv, "original_adv_setting_id", None),
+                len(complex_advs),
+                elapsed_sec,
+                type(exc).__name__,
+                exc,
+            )
+            raise
         adv_ids_to_ids: dict[int, int] = {}
         for adv in complex_advs:
             if adv_id := adv.adv_id:
@@ -37,14 +78,86 @@ class ClustersAdvStatUpdater:
             if adv_id := adv.search_adv_id:
                 adv_ids_to_ids[adv_id] = adv.original_adv_setting_id
 
+        if not stats:
+            first_adv = complex_advs[0]
+            logger.warning(
+                "cluster_stats_diagnostic step=empty shop_id=%s adv_id=%s "
+                "original_adv_id=%s complex_advs_count=%s stats_count=0 "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "timestamp_not_updated=true",
+                getattr(first_adv, "shop_id", None),
+                getattr(first_adv, "adv_id", None),
+                getattr(first_adv, "original_adv_setting_id", None),
+                len(complex_advs),
+                time.perf_counter() - started_at,
+            )
+            return set()
+
         if stats:
-            await ch.update_clusters_adv_stats(stats)
-            logger.info("Обновлена статистика за сегодня: %d записей", len(stats))
-            await self._create_keyword_setting(complex_advs, stats)
+            if diag_enabled:
+                first_stat = stats[0]
+                logger.debug(
+                    "cluster_stats_diagnostic step=before_ch_insert shop_id=%s adv_id=%s "
+                    "original_adv_id=%s complex_advs_count=%s stats_count=%s",
+                    getattr(complex_advs[0], "shop_id", None),
+                    getattr(first_stat, "adv_id", None),
+                    adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                    len(complex_advs),
+                    len(stats),
+                )
+            try:
+                await ch.update_clusters_adv_stats(stats)
+                await self._create_keyword_setting(complex_advs, stats)
+            except Exception as exc:
+                elapsed_sec = time.perf_counter() - started_at
+                first_stat = stats[0]
+                logger.exception(
+                    "cluster_stats_diagnostic step=error shop_id=%s adv_id=%s "
+                    "original_adv_id=%s complex_advs_count=%s stats_count=%s "
+                    "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                    "exception_type=%s exception_message=%s timestamp_not_updated=true",
+                    getattr(complex_advs[0], "shop_id", None),
+                    getattr(first_stat, "adv_id", None),
+                    adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                    len(complex_advs),
+                    len(stats),
+                    elapsed_sec,
+                    type(exc).__name__,
+                    exc,
+                )
+                raise
             success_adv_original_ids: set[int] = set()
             for stat in stats:
                 original_adv_id: int = adv_ids_to_ids[stat.adv_id]
                 success_adv_original_ids.add(original_adv_id)
+            if not success_adv_original_ids:
+                first_stat = stats[0]
+                logger.warning(
+                    "cluster_stats_diagnostic step=skipped shop_id=%s adv_id=%s "
+                    "original_adv_id=%s complex_advs_count=%s stats_count=%s "
+                    "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                    "timestamp_not_updated=true",
+                    getattr(complex_advs[0], "shop_id", None),
+                    getattr(first_stat, "adv_id", None),
+                    adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                    len(complex_advs),
+                    len(stats),
+                    time.perf_counter() - started_at,
+                )
+            elif diag_enabled:
+                first_stat = stats[0]
+                logger.debug(
+                    "cluster_stats_diagnostic step=end shop_id=%s adv_id=%s "
+                    "original_adv_id=%s complex_advs_count=%s stats_count=%s "
+                    "updated_original_adv_ids_count=%s duration_sec=%.3f",
+                    getattr(complex_advs[0], "shop_id", None),
+                    getattr(first_stat, "adv_id", None),
+                    adv_ids_to_ids.get(getattr(first_stat, "adv_id", None)),
+                    len(complex_advs),
+                    len(stats),
+                    len(success_adv_original_ids),
+                    time.perf_counter() - started_at,
+                )
             return success_adv_original_ids
         return set()
 
