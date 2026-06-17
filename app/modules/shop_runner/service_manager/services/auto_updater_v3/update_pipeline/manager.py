@@ -44,6 +44,10 @@ _PHASE_LOG: dict[str, tuple[str, str]] = {
         "v3 CLAMP_STATES_TO_RESOLVE",
         "resolve_clamp_count",
     ),
+    "final_clamp_states_to_resolve": (
+        "v3 FINAL_CLAMP_STATES_TO_RESOLVE",
+        "resolve_clamp_count",
+    ),
     "not_full_target_place_migrate": (
         "v3 NOT_FULL_TP_MIGRATE",
         "not_full_target_place_migrate_count",

@@ -31,7 +31,8 @@ reset → S → R → enable → pfo_off → cal → resolve_clamp.
 - **skip_up / raise / reset / shelf / rebalance / calibration** обслуживают
   исключительно FULL ladder-контур;
 - финальный ``resolve_clamp`` в конце pipeline гарантирует, что later UP-фазы не
-  вернут state выше current resolve.
+  вернут state выше current resolve, но получает отдельный ``phase_id`` для
+  отчётности;
 
 В итоге этот модуль работает как “карта движений” для NORMAL pipeline: он
 объясняет, где начинается PFO bootstrap, где заканчивается NF-коррекция и где
@@ -96,7 +97,9 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
     return [
         HardStatusValidateExecutor(),
         ClampStateToAggressionExecutor(),
-        ClampStatesToResolveWhenNoEffectiveStepsExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(
+            phase_name="clamp_states_to_resolve_when_no_effective_steps",
+        ),
         NotFullValidateExecutor(),
         NotFullTargetPlaceMigrateExecutor(),
         NotFullTargetPlacePlanFactExecutor(),
@@ -109,7 +112,9 @@ def build_normal_preamble_executors() -> list[PreambleExecutor]:
         PayForOrderGapEnableExecutor(),
         PayForOrderOverMaxOffOnDeepOverspendExecutor(),
         ResolveCalibrationExecutor(),
-        ClampStatesToResolveWhenNoEffectiveStepsExecutor(),
+        ClampStatesToResolveWhenNoEffectiveStepsExecutor(
+            phase_name="final_clamp_states_to_resolve",
+        ),
     ]
 
 

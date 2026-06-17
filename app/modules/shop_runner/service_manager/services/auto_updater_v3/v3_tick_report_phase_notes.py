@@ -102,6 +102,11 @@ def summarize_phase_zero_actions(
             resolve=resolve,
             max_effective_steps=max_effective_steps,
         ),
+        "final_clamp_states_to_resolve": lambda: _note_clamp_states_to_resolve_when_no_effective_steps(
+            prepared,
+            resolve=resolve,
+            max_effective_steps=max_effective_steps,
+        ),
         "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
         "not_full_target_place_plan_fact": lambda: _note_not_full_tp_plan_fact(

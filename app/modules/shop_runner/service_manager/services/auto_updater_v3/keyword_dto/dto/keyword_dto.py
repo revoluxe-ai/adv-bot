@@ -87,7 +87,10 @@ class KeywordDTO:
     def current_mode(self, step: NextState) -> None:
         """Append перехода или validate-команда ``NOT_FULL_ACTIVATE``."""
         if step.new_mode is KeywordMode.NOT_FULL_ACTIVATE:
-            self._validate_not_full_state(step.executor_name)
+            self._validate_not_full_state(
+                step.executor_name,
+                phase_id=step.phase_id,
+            )
             return
         strategy = step.new_mode.to_strategy_mode()
         if strategy == self.current_mode:
@@ -177,7 +180,12 @@ class KeywordDTO:
             and states[0].synthetic_no_data
         )
 
-    def _validate_not_full_state(self, executor_name: str) -> None:
+    def _validate_not_full_state(
+        self,
+        executor_name: str,
+        *,
+        phase_id: str | None = None,
+    ) -> None:
         """PFO + active: принудительно свести режим к ``MIN_CPA``.
 
         Эта валидация — только входной gate для NF bootstrap. Она отвечает за
@@ -210,6 +218,7 @@ class KeywordDTO:
             self.current_mode = NextState(
                 new_mode=KeywordMode.MIN_CPA,
                 executor_name=executor_name,
+                phase_id=phase_id,
             )
 
     def apply_ladder_state(
@@ -217,11 +226,13 @@ class KeywordDTO:
         state: KeywordV3LadderState,
         *,
         executor_name: str,
+        phase_id: str | None = None,
     ) -> None:
         """Сменить режим и ``target_place`` атомарно из ladder-state."""
         self.current_mode = NextState(
             new_mode=KeywordMode.from_strategy_mode(state.strategy_mode),
             executor_name=executor_name,
+            phase_id=phase_id,
         )
         target_place = (
             None

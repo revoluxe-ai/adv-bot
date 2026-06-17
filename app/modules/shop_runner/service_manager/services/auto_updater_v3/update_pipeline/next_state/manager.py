@@ -32,8 +32,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 class NextStateManager:
     """Операции in-place над ``KeywordDTO``; ``executor_name`` пишется в каждый ``NextState``."""
 
-    def __init__(self, executor_class: type) -> None:
+    def __init__(self, executor_class: type, *, phase_id: str | None = None) -> None:
         self._executor_name = executor_class.__name__
+        self._phase_id = phase_id or getattr(executor_class, "phase_name", self._executor_name)
 
     @property
     def executor_name(self) -> str:
@@ -46,6 +47,7 @@ class NextStateManager:
         keyword.current_mode = NextState(
             new_mode=KeywordMode.OFF,
             executor_name=self._executor_name,
+            phase_id=self._phase_id,
         )
 
     def validate_not_full_state(self, keyword: KeywordDTO) -> None:
@@ -53,6 +55,7 @@ class NextStateManager:
         keyword.current_mode = NextState(
             new_mode=KeywordMode.NOT_FULL_ACTIVATE,
             executor_name=self._executor_name,
+            phase_id=self._phase_id,
         )
 
     def adjust_not_full_target_place_plan_fact(
@@ -94,6 +97,7 @@ class NextStateManager:
         keyword.current_mode = NextState(
             new_mode=KeywordMode.MIN_CPA,
             executor_name=self._executor_name,
+            phase_id=self._phase_id,
         )
         setting = keyword.calculated_keyword.keyword_setting
         setting.strategy_mode = KeywordStrategyMode.MIN_CPA
@@ -111,7 +115,11 @@ class NextStateManager:
         """Применить ladder-state; ``None`` — no-op."""
         if state is None:
             return
-        keyword.apply_ladder_state(state, executor_name=self._executor_name)
+        keyword.apply_ladder_state(
+            state,
+            executor_name=self._executor_name,
+            phase_id=self._phase_id,
+        )
 
     def set_keyword_strategy_mode(
         self,
@@ -122,6 +130,7 @@ class NextStateManager:
         keyword.current_mode = NextState(
             new_mode=KeywordMode.from_strategy_mode(mode),
             executor_name=self._executor_name,
+            phase_id=self._phase_id,
         )
 
     def force_off(self, keyword: KeywordDTO) -> None:
@@ -152,4 +161,8 @@ class NextStateManager:
         )
         if state is None:
             return
-        keyword.apply_ladder_state(state, executor_name=self._executor_name)
+        keyword.apply_ladder_state(
+            state,
+            executor_name=self._executor_name,
+            phase_id=self._phase_id,
+        )

@@ -314,6 +314,10 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
         "1b · clamp · resolve when steps=0",
         "DOWN, OFF",
     ),
+    "final_clamp_states_to_resolve": (
+        "1c · clamp · final resolve safety",
+        "DOWN, OFF",
+    ),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
     "validate_not_full_state": (
         "2 · NF · validate PFO",

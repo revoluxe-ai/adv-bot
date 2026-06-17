@@ -11,7 +11,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 
 @dataclass(frozen=True, slots=True)
 class NextState:
-    """Запись перехода режима: ``KeywordMode`` и имя executor."""
+    """Запись перехода режима с атрибуцией executor и phase_id.
+
+    ``executor_name`` остаётся техническим именем класса для reason/debug, а
+    ``phase_id`` используется для отчёта и post-hoc audit. Если ``phase_id`` не
+    задан, downstream-код может восстановить его из ``executor_name``.
+    """
 
     new_mode: KeywordMode
     executor_name: str
+    phase_id: str | None = None

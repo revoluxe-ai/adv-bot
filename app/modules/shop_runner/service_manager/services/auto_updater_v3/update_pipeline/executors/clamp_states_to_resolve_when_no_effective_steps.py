@@ -32,14 +32,20 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class ClampStatesToResolveWhenNoEffectiveStepsExecutor:
-    """Clamp active states to the current ``resolve`` ceiling."""
+    """Clamp active states to the current ``resolve`` ceiling.
+
+    Экземпляр может переопределять ``phase_name`` для отчёта, не меняя сам
+    экономический clamp-контракт.
+    """
 
     phase_name = "clamp_states_to_resolve_when_no_effective_steps"
     _skip_reason: str | None = None
 
-    def __init__(self) -> None:
+    def __init__(self, *, phase_name: str | None = None) -> None:
+        self.phase_name = phase_name or type(self).phase_name
         self._next_state_manager = NextStateManager(
-            ClampStatesToResolveWhenNoEffectiveStepsExecutor
+            ClampStatesToResolveWhenNoEffectiveStepsExecutor,
+            phase_id=self.phase_name,
         )
 
     def execute(self, context: UpdateContext) -> None:
