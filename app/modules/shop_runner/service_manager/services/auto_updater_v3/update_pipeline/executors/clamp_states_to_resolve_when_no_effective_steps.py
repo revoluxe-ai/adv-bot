@@ -58,7 +58,11 @@ class ClampStatesToResolveWhenNoEffectiveStepsExecutor:
                 continue
 
             current_cost = _current_effective_cost(dto)
-            if current_cost is None or current_cost <= resolve:
+            if not bool(dto.position_profile):
+                if current_cost is None or current_cost > resolve:
+                    self._next_state_manager.force_off(dto)
+                continue
+            if current_cost is not None and current_cost <= resolve:
                 continue
 
             target_state = _resolve_clamp_target(
