@@ -71,7 +71,10 @@ from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
-from ..bidder.bidder_func import run_bidder_process_for_adv
+from ..bidder.bidder_func import (
+    build_v3_safety_cap_by_keyword_setting_original_id,
+    run_bidder_process_for_adv,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
@@ -361,11 +364,24 @@ class CoroutinesManager:
         logger.debug("Все ставки обновлены для магазина %s", self.shop_id)
         return None
 
-    @staticmethod
-    async def __run_bidder_process_for_adv(complex_adv:  ComplexAdv, wb_api: WBApi) -> None:
+    async def __run_bidder_process_for_adv(
+        self, complex_adv: ComplexAdv, wb_api: WBApi
+    ) -> None:
         adv_setting: AdvSetting = complex_adv.adv_setting
         keywords = await complex_adv.get_keywords()
-        await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
+        v3_safety_cap_by_keyword_setting_original_id = (
+            await build_v3_safety_cap_by_keyword_setting_original_id(
+                complex_adv,
+                keywords,
+                wb_shop_data_manager=self._wb_shop_data_manager,
+            )
+        )
+        await run_bidder_process_for_adv(
+            adv_setting,
+            wb_api,
+            keywords,
+            v3_safety_cap_by_keyword_setting_original_id=v3_safety_cap_by_keyword_setting_original_id,
+        )
 
     @while_coroutine_decorator(60 * 5, 5)
     async def update_common_sale_stat(self) -> None:
