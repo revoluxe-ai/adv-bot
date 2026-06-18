@@ -137,19 +137,14 @@ class UpdateClusterBidsManager:
         return await self._get_bidder_update_data(advs, map_datas)
 
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
-        trace = ShopBatchPhaseTrace.from_complex_advs(
-            coroutine=_COROUTINE_CLUSTER_BIDS, advs=advs
+        local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
+        remote_data: BidderUpdateData = await self._get_data_from_wb_api(
+            advs, local_data
         )
-        with trace.phase("manager_get_local_data"):
-            local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
-        with trace.phase("manager_get_remote_data"):
-            remote_data: BidderUpdateData = await self._get_data_from_wb_api(
-                advs, local_data
-            )
-        with trace.phase("manager_get_predict_bids_data"):
-            predict_bids_data: dict[
-                int, (dict[int, dict[str, dict[int, int]]] | None)
-            ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
+
+        predict_bids_data: dict[
+            int, (dict[int, dict[str, dict[int, int]]] | None)
+        ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -551,15 +546,7 @@ class UpdateClusterBidsManager:
                 else:
                     target_position = adv.target_place
                     snap_to_min = False
-                v3_managed = (
-                    adv.auto_updater_version == 3
-                    and is_v3_keyword_eligible_for_cluster_bidding(
-                        hard_status=int(kw.hard_status),
-                        strategy_mode=kw.strategy_mode
-                    )
-                    if adv.auto_updater_version == 3
-                    else False
-                )
+                v3_managed = adv.auto_updater_version == 3
                 map_data = AdvIdItemCalculateData(
                     search_adv_id=search_adv_id,
                     adv_id=adv.adv_id,
