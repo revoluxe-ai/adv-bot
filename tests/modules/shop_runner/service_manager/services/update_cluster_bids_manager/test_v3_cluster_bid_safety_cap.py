@@ -137,6 +137,35 @@ def _apply(
 
 
 @pytest.mark.unit
+def test_cap_clamp_direct_vs_candidate_not_reference() -> None:
+    """Cap 3000→897: direct DOWN от candidate, даже если reference (stats) ниже cap."""
+    cell = _cell()
+    result = _apply(
+        command=UpdateBidsCommand(
+            new_bids=[
+                NewBid(
+                    new_bid=3000,
+                    search_adv_id=SEARCH_ADV_ID,
+                    nmid=NMID,
+                    cluster=CLUSTER,
+                    bidder_keyword_status=BidderKeywordStatus.GOOD,
+                    step=10,
+                    direct=DirectEnum.UP,
+                )
+            ]
+        ),
+        cells={cell},
+        fact_datas={ADV_ID: _fact(600.0)},
+        plan_datas={ADV_ID: _plan(max_pay_for_order=500)},
+        cap_index={(SEARCH_ADV_ID, NMID, CLUSTER): CAP_BID},
+        stored_bids={},
+        calculation_inputs=[_calc_input(671)],
+    )
+    assert result.new_bids[0].new_bid == CAP_BID
+    assert result.new_bids[0].direct == DirectEnum.DOWN
+
+
+@pytest.mark.unit
 def test_clamps_high_candidate_when_reference_already_at_cap() -> None:
     """Stored/reference уже на cap, но candidate выше — всё равно clamp до cap."""
     cell = _cell()

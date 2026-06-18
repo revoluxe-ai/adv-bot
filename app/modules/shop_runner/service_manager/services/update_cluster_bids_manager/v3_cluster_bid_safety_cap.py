@@ -69,6 +69,15 @@ CellKey = tuple[int, int, str]
 _PREDICT_PROFILES_MAX_CONCURRENT = 16
 
 
+def _cap_direct_vs_baseline(*, outgoing_bid: int, baseline_bid: int) -> DirectEnum:
+    """Направление cap-clamp относительно ставки, которую реально меняем (candidate / reference)."""
+    if outgoing_bid < baseline_bid:
+        return DirectEnum.DOWN
+    if outgoing_bid > baseline_bid:
+        return DirectEnum.UP
+    return DirectEnum.DOWN
+
+
 def resolve_reference_bid_for_cap(
     *,
     search_adv_id: int,
@@ -312,6 +321,7 @@ def apply_v3_cluster_bid_safety_cap(
         current_state = strategy_mode.name if strategy_mode is not None else None
 
         if existing is not None:
+            baseline_bid = existing.new_bid
             new_bid = NewBid(
                 search_adv_id=existing.search_adv_id,
                 nmid=existing.nmid,
@@ -319,10 +329,9 @@ def apply_v3_cluster_bid_safety_cap(
                 new_bid=outgoing_bid,
                 bidder_keyword_status=existing.bidder_keyword_status,
                 step=existing.step,
-                direct=(
-                    DirectEnum.DOWN
-                    if outgoing_bid < reference_bid
-                    else existing.direct
+                direct=_cap_direct_vs_baseline(
+                    outgoing_bid=outgoing_bid,
+                    baseline_bid=baseline_bid,
                 ),
             )
         else:
@@ -333,7 +342,10 @@ def apply_v3_cluster_bid_safety_cap(
                 new_bid=outgoing_bid,
                 bidder_keyword_status=BidderKeywordStatus.GOOD,
                 step=max(1, cell.step),
-                direct=DirectEnum.DOWN,
+                direct=_cap_direct_vs_baseline(
+                    outgoing_bid=outgoing_bid,
+                    baseline_bid=reference_bid,
+                ),
             )
 
         outgoing_by_key[cell_key] = new_bid
