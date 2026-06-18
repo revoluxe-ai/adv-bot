@@ -1,7 +1,10 @@
 """Fallback мин. CPM (руб.) при cache miss или невалидном значении из Redis/WB.
 
-Используется на путях расчёта ставок и UI, не при загрузке/refresh кеша min_bids.
-Значения берутся из ``settings.MIN_BID_AUTO_DEFAULT`` / ``MIN_BID_SEARCH_DEFAULT``.
+Используется на путях расчёта ставок и UI, не при загрузке/refresh кеша min_bids
+(``read_min_bids_cache_only``, ``apply_defaults=False``).
+
+Значения из ``settings.MIN_BID_AUTO_DEFAULT`` / ``MIN_BID_SEARCH_DEFAULT``;
+встроенные default при пустом env: **100** (auto), **300** (search).
 """
 
 from __future__ import annotations

@@ -866,7 +866,8 @@ class Settings:
     def MIN_BID_AUTO_DEFAULT(self) -> int:
         """Мин. CPM (руб.) для авто/полок при cache miss и в расчётах fallback.
 
-        Env: ``MIN_BID_AUTO_DEFAULT`` (default 100).
+        Env: ``MIN_BID_AUTO_DEFAULT``. Пустое или отсутствующее значение → **100** (руб.).
+        Не используется при refresh/backfill min_bids в Redis (там raw miss).
         """
         value = os.environ.get("MIN_BID_AUTO_DEFAULT")
         if value is None or not str(value).strip():
@@ -877,7 +878,9 @@ class Settings:
     def MIN_BID_SEARCH_DEFAULT(self) -> int:
         """Мин. CPM (руб.) для поиска/аукциона при cache miss и в расчётах fallback.
 
-        Env: ``MIN_BID_SEARCH_DEFAULT`` (default 100).
+        Env: ``MIN_BID_SEARCH_DEFAULT``. Пустое или отсутствующее значение → **300** (руб.).
+        Пути: cluster bids, stats_stale emergency, UI/cooldown. Не подставляется при
+        ``read_min_bids_cache_only`` / backfill (``apply_defaults=False``).
         """
         value = os.environ.get("MIN_BID_SEARCH_DEFAULT")
         if value is None or not str(value).strip():

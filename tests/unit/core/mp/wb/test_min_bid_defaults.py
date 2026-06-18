@@ -47,6 +47,13 @@ def test_resolve_auto_min_bid_rub_invalid_uses_default() -> None:
     assert resolve_auto_min_bid_rub(7, min_bids) == 100
 
 
+def test_resolve_search_min_bid_rub_builtin_default_when_env_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MIN_BID_SEARCH_DEFAULT", raising=False)
+    assert resolve_search_min_bid_rub(99, None) == 300
+
+
 def test_apply_min_bid_defaults_for_advs_partial_fill(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch

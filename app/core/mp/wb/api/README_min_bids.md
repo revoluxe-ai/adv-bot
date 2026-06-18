@@ -45,7 +45,28 @@ SHOP_RUNNER_MAX_CONCURRENT_MIN_BIDS_REQUESTS=4
 MIN_BIDS_MAX_ATTEMPTS=10
 MIN_BIDS_RATE_LIMIT=5  # запросов
 MIN_BIDS_RATE_INTERVAL=60  # секунд
+
+# Fallback CPM (руб.) при cache miss на расчётах/UI — не при WB refresh/backfill
+MIN_BID_AUTO_DEFAULT=100    # auto/полки; пустой env → 100
+MIN_BID_SEARCH_DEFAULT=300    # search/аукцион; пустой env → 300
 ```
+
+## Fallback при cache miss (расчёты / UI)
+
+Если в Redis нет min_bid для nmid, на **hot path** (cluster bids, emergency при stale stats,
+cooldown, UI) подставляется env или встроенный default:
+
+| Env | Встроенный default | Размещение |
+|-----|-------------------|------------|
+| ``MIN_BID_AUTO_DEFAULT`` | 100 руб. | авто / полки |
+| ``MIN_BID_SEARCH_DEFAULT`` | 300 руб. | поиск / аукцион |
+
+Пустая строка в env трактуется как «не задано» → встроенный default.
+
+**Не** подставляется: ``read_min_bids_cache_only``, backfill miss-detection
+(``WBManager.get_min_bids(..., apply_defaults=False)``), запись в Redis после WB API.
+
+Реализация: ``app/core/mp/wb/min_bid_defaults.py``, свойства в ``settings_master.py``.
 
 ## Redis v2: cache-only чтение (shop-runner / warmup)
 
