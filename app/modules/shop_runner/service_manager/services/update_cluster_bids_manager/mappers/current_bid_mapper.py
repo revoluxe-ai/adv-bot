@@ -9,5 +9,5 @@ class CurrentBidMapper:
         }
 
     def get_current_bid(self, item_map: AdvIdItemCalculateData) -> int | None:
-        key = (item_map.adv_id, item_map.nmid, item_map.cluster)
+        key = (item_map.search_adv_id, item_map.nmid, item_map.cluster)
         return self._bid_index.get(key)

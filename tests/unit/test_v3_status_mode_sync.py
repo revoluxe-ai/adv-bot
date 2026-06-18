@@ -141,10 +141,14 @@ def test_repaired_strategy_mode_for_v3_fixes_fixed_to_max_conv() -> None:
         (1, KeywordStrategyMode.OFF, None, False),
         (1, KeywordStrategyMode.MIN_CPA, None, False),
         (2, KeywordStrategyMode.MIN_CPA, None, True),
+        (2, KeywordStrategyMode.OPTIMUM, None, True),
         (2, KeywordStrategyMode.OFF, None, False),
         (4, KeywordStrategyMode.MIN_CPA, Strategy.MIN_CPO, True),
         (4, KeywordStrategyMode.MAX_CONVERSION, Strategy.MAX_CONV, True),
-        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, False),
+        # ФФ с любым активным mode — eligible; adv.strategy не участвует в cluster bids.
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.OPTIMUM, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.OFF, Strategy.MIN_CPO, False),
     ],
 )
 def test_is_v3_keyword_eligible_for_cluster_bidding(

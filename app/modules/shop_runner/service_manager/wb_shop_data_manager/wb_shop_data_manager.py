@@ -461,6 +461,7 @@ class WBShopDataManager:
             cached = await wb_manager.get_min_bids_cache_only(
                 [complex_adv],
                 context="v3_min_bids_check",
+                apply_defaults=False,
             )
             return nmid in cached.search
 

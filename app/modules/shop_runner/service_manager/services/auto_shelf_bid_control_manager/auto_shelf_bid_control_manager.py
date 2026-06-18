@@ -21,6 +21,8 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
     AutoShelfBidRecommendationReadService,
 )
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.core.mp.wb.min_bid_defaults import default_min_bid_rub, resolve_auto_min_bid_rub
+from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -340,13 +342,12 @@ class AutoShelfBidControlManager:
         """Минимальная ставка WB (auto/полки) в ``bid_minor`` (копейки).
 
         ``AdvMinNmidsBids.auto`` — legacy CPM в рублях; конвертируем ×100.
+        При miss — ``settings.MIN_BID_AUTO_DEFAULT``.
         """
-        if min_bids is None:
-            return None
-        value = min_bids.auto.get(nmid)
-        if value is None or int(value) <= 0:
-            return None
-        return wb_min_cpm_rub_to_bid_minor(int(value))
+        rub = resolve_auto_min_bid_rub(nmid, min_bids)
+        if rub <= 0:
+            rub = default_min_bid_rub(AdvPlacementType.AUTO_ADV)
+        return wb_min_cpm_rub_to_bid_minor(int(rub))
 
     @staticmethod
     def _resolve_min_bid_minor(complex_adv: ComplexAdv, nmid: int) -> int | None:

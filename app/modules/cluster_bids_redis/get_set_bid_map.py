@@ -35,7 +35,7 @@ async def get_set_bid_map(
     )
 
     keys = [
-        ClusterBidKey(adv_id=search_adv_id, nmid=nmid, cluster=text)
+        ClusterBidKey(search_adv_id=search_adv_id, nmid=nmid, cluster=text)
         for nmid in nmids
         for text in texts
     ]
@@ -47,7 +47,7 @@ async def get_set_bid_map(
     set_bid_map: dict[str, tuple[float, datetime | None]] = {}
     for text in texts:
         for nmid in nmids:
-            k = ClusterBidKey(adv_id=search_adv_id, nmid=nmid, cluster=text)
+            k = ClusterBidKey(search_adv_id=search_adv_id, nmid=nmid, cluster=text)
             if k in bids:
                 set_bid_map[text] = (float(bids[k]), set_bid_date)
                 break

@@ -104,7 +104,7 @@ class WBModifier:
         # Конвертируем NewBid в SetNormqueryBidsCommandItem
         converted_bids = [
             SetNormqueryBidsCommandItem(
-                advert_id=bid.adv_id,
+                advert_id=bid.search_adv_id,
                 nm_id=bid.nmid,
                 norm_query=bid.cluster,
                 bid=bid.new_bid,

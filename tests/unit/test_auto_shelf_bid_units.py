@@ -30,6 +30,10 @@ def test_resolve_wb_min_bid_minor_from_adv_min_nmids_bids() -> None:
     assert AutoShelfBidControlManager.resolve_wb_min_bid_minor(min_bids, 10749810) == 12_000
 
 
+def test_resolve_wb_min_bid_minor_fallback_when_missing() -> None:
+    assert AutoShelfBidControlManager.resolve_wb_min_bid_minor(None, 10749810) == 10_000
+
+
 def test_format_bid_minor_for_telegram() -> None:
     assert format_bid_minor_for_telegram(20_000) == "200 ₽"
     assert format_bid_minor_for_telegram(100) == "1 ₽"

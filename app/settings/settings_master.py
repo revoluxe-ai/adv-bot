@@ -862,6 +862,30 @@ class Settings:
             return None
         return str(value).strip()
 
+    @property
+    def MIN_BID_AUTO_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для авто/полок при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_AUTO_DEFAULT``. Пустое или отсутствующее значение → **100** (руб.).
+        Не используется при refresh/backfill min_bids в Redis (там raw miss).
+        """
+        value = os.environ.get("MIN_BID_AUTO_DEFAULT")
+        if value is None or not str(value).strip():
+            return 100  # значение в рублях
+        return int(str(value).strip())
+
+    @property
+    def MIN_BID_SEARCH_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для поиска/аукциона при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_SEARCH_DEFAULT``. Пустое или отсутствующее значение → **300** (руб.).
+        Пути: cluster bids, stats_stale emergency, UI/cooldown. Не подставляется при
+        ``read_min_bids_cache_only`` / backfill (``apply_defaults=False``).
+        """
+        value = os.environ.get("MIN_BID_SEARCH_DEFAULT")
+        if value is None or not str(value).strip():
+            return 300  # значение в рублях
+        return int(str(value).strip())
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 
