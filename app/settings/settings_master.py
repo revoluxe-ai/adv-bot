@@ -862,6 +862,19 @@ class Settings:
             return None
         return str(value).strip()
 
+    @property
+    def MIN_BID_AUTO_DEFAULT(self):
+        value = os.environ.get("MIN_BID_AUTO_DEFAULT")
+        if value is None or not str(value).strip():
+            return 100 # значение в рублях
+        return int(str(value).strip())
+
+    @property
+    def MIN_BID_SEARCH_DEFAULT(self):
+        value = os.environ.get("MIN_BID_SEARCH_DEFAULT")
+        if value is None or not str(value).strip():
+            return 100 # значение в рублях
+        return int(str(value).strip())
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 
