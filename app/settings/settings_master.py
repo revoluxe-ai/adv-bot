@@ -863,17 +863,25 @@ class Settings:
         return str(value).strip()
 
     @property
-    def MIN_BID_AUTO_DEFAULT(self):
+    def MIN_BID_AUTO_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для авто/полок при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_AUTO_DEFAULT`` (default 100).
+        """
         value = os.environ.get("MIN_BID_AUTO_DEFAULT")
         if value is None or not str(value).strip():
-            return 100 # значение в рублях
+            return 100  # значение в рублях
         return int(str(value).strip())
 
     @property
-    def MIN_BID_SEARCH_DEFAULT(self):
+    def MIN_BID_SEARCH_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для поиска/аукциона при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_SEARCH_DEFAULT`` (default 100).
+        """
         value = os.environ.get("MIN_BID_SEARCH_DEFAULT")
         if value is None or not str(value).strip():
-            return 100 # значение в рублях
+            return 300  # значение в рублях
         return int(str(value).strip())
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

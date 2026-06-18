@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.core.mp.wb.min_bid_defaults import default_min_bid_rub, resolve_search_min_bid_rub
+from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
     AboveTargetCooldownEntry,
 )
@@ -41,13 +43,18 @@ COOLDOWN_RETEST_DISPLAY_TAG = "Т"
 def max_search_min_bid_for_complex_nmids(
     nmids: list[int], min_bids: AdvMinNmidsBids | None
 ) -> int | None:
-    """Максимум мин. CPM поиска по артикулам комплекса; None если нечего сравнивать."""
-    if not nmids or min_bids is None or not min_bids.search:
+    """Максимум мин. CPM поиска по артикулам комплекса.
+
+    При пустом/невалидном кеше — ``settings.MIN_BID_SEARCH_DEFAULT`` (руб.).
+    """
+    if not nmids:
         return None
-    values = [min_bids.search.get(nmid, 0) for nmid in nmids]
+    if min_bids is None or not min_bids.search:
+        return default_min_bid_rub(AdvPlacementType.SEARCH_ADV)
+    values = [resolve_search_min_bid_rub(nmid, min_bids) for nmid in nmids]
     m = max(values)
     if m <= 0:
-        return None
+        return default_min_bid_rub(AdvPlacementType.SEARCH_ADV)
     return m
 
 

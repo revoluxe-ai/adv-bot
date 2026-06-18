@@ -113,10 +113,6 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
-# Если после кеша и WB API минимальная ставка по поиску неизвестна — emergency normquery.
-STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB = 150
-
-
 def _cluster_stats_diagnostic_enabled() -> bool:
     """Включает подробные DEBUG-логи для cluster freshness path."""
     value = os.environ.get("CLUSTER_STATS_DIAGNOSTIC_ENABLED", "")
@@ -1345,9 +1341,9 @@ class CoroutinesManager:
                     self.shop_id,
                     complex_adv.adv_id,
                     nmid,
-                    STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB,
+                    settings.MIN_BID_SEARCH_DEFAULT,
                 )
-                min_bid = STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB
+                min_bid = int(settings.MIN_BID_SEARCH_DEFAULT)
             else:
                 min_bid = int(raw_min)
             new_bids.append(

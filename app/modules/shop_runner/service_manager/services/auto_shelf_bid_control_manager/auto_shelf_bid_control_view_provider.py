@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
+from app.core.mp.wb.min_bid_defaults import default_min_bid_rub
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
@@ -87,7 +88,15 @@ class AutoShelfBidControlViewProvider:
             auto_cpm, _search_cpm = legacy
             if int(auto_cpm) > 0:
                 return wb_min_cpm_rub_to_bid_minor(int(auto_cpm))
-        return None
+        default_rub = default_min_bid_rub(AdvPlacementType.AUTO_ADV)
+        logger.warning(
+            "min_bids using default context=auto_shelf_bid_control_view "
+            "placement=%s nmid=%s default_rub=%s",
+            AdvPlacementType.AUTO_ADV.value,
+            nmid,
+            default_rub,
+        )
+        return wb_min_cpm_rub_to_bid_minor(default_rub)
 
     @staticmethod
     def _target_main_impressions(test_impressions: int, test_share: float) -> int | None:
