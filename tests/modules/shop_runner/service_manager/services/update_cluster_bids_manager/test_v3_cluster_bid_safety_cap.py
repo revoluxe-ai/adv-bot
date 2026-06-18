@@ -137,6 +137,37 @@ def _apply(
 
 
 @pytest.mark.unit
+def test_clamps_high_candidate_when_reference_already_at_cap() -> None:
+    """Stored/reference уже на cap, но candidate выше — всё равно clamp до cap."""
+    cell = _cell()
+    result = _apply(
+        command=UpdateBidsCommand(new_bids=[_new_bid(3000)]),
+        cells={cell},
+        fact_datas={ADV_ID: _fact(600.0)},
+        plan_datas={ADV_ID: _plan(max_pay_for_order=500)},
+        cap_index={(SEARCH_ADV_ID, NMID, CLUSTER): CAP_BID},
+        stored_bids={ClusterBidKey(SEARCH_ADV_ID, NMID, CLUSTER): CAP_BID},
+        calculation_inputs=[_calc_input(671)],
+    )
+    assert result.new_bids[0].new_bid == CAP_BID
+
+
+@pytest.mark.unit
+def test_no_op_when_stored_and_candidate_already_at_cap() -> None:
+    """reference и candidate уже на cap — лишний WB write не нужен."""
+    cell = _cell()
+    result = _apply(
+        command=UpdateBidsCommand(new_bids=[_new_bid(CAP_BID)]),
+        cells={cell},
+        fact_datas={ADV_ID: _fact(600.0)},
+        plan_datas={ADV_ID: _plan(max_pay_for_order=500)},
+        cap_index={(SEARCH_ADV_ID, NMID, CLUSTER): CAP_BID},
+        stored_bids={ClusterBidKey(SEARCH_ADV_ID, NMID, CLUSTER): CAP_BID},
+    )
+    assert result.new_bids[0].new_bid == CAP_BID
+
+
+@pytest.mark.unit
 def test_auto_search_id_split_caps_outgoing_bid() -> None:
     """Fact/max по Auto adv_id; исходящая ставка — Search adv_id."""
     cell = _cell()

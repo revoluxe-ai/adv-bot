@@ -305,8 +305,6 @@ def apply_v3_cluster_bid_safety_cap(
             continue
 
         outgoing_bid = cap_bid
-        if outgoing_bid == reference_bid:
-            continue
 
         fact = fact_datas[cell.adv_id]
         plan = plan_datas[cell.adv_id]
