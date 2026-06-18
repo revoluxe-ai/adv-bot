@@ -47,8 +47,8 @@ async def test_replace_from_api_persists_and_get_bids(
         assert json.loads(s) == {"bid": dto.bid}
 
     keys = [
-        ClusterBidKey(adv_id=1, nmid=100, cluster="q1"),
-        ClusterBidKey(adv_id=2, nmid=200, cluster="q2"),
+        ClusterBidKey(search_adv_id=1, nmid=100, cluster="q1"),
+        ClusterBidKey(search_adv_id=2, nmid=200, cluster="q2"),
     ]
     got = await redis_api_cluster_bids_manager.get_bids(keys)
     assert got[keys[0]] == 42
@@ -66,7 +66,7 @@ async def test_api_keys_do_not_overlap_cluster_bid_state(
     await state_mgr.remember_bids(
         [
             ClusterBidEntry(
-                adv_id=1,
+                search_adv_id=1,
                 nmid=50,
                 cluster="c",
                 new_bid=7,

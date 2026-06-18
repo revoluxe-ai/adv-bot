@@ -25,7 +25,7 @@ from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keywor
 @pytest.mark.unit
 def test_snap_to_min_returns_min_when_current_above_min() -> None:
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=200,
@@ -47,7 +47,7 @@ def test_snap_to_min_returns_min_when_current_above_min() -> None:
 @pytest.mark.unit
 def test_snap_to_min_returns_none_when_already_at_min() -> None:
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=50,
@@ -65,7 +65,7 @@ def test_snap_to_min_returns_none_when_already_at_min() -> None:
 @pytest.mark.unit
 def test_snap_to_min_returns_none_when_min_bid_missing() -> None:
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=200,
@@ -83,7 +83,7 @@ def test_snap_to_min_returns_none_when_min_bid_missing() -> None:
 @pytest.mark.unit
 def test_snap_to_min_raises_to_min_when_current_below_min() -> None:
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=30,
@@ -105,7 +105,7 @@ def test_snap_to_min_raises_to_min_when_current_below_min() -> None:
 def test_snap_to_min_uses_platform_min_when_min_exceeds_user_max() -> None:
     """Same as snap semantics: WB minimum wins over user max_cpm."""
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=200,
@@ -127,7 +127,7 @@ def test_snap_to_min_uses_platform_min_when_min_exceeds_user_max() -> None:
 def test_snap_to_min_result_independent_of_target_position() -> None:
     """В snap-ветке итог не зависит от target_position (None vs экстремум)."""
     common = dict(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=200,
@@ -149,7 +149,7 @@ def test_snap_to_min_result_independent_of_target_position() -> None:
 def test_normal_mode_returns_none_when_target_position_missing() -> None:
     """Обычный режим без target_position: не считаем ставку (как при отсутствии min_bid)."""
     inp = CalculationInput(
-        adv_id=42,
+        search_adv_id=42,
         nmid=7,
         cluster="cluster_x",
         current_bid=100,
@@ -168,7 +168,7 @@ def test_normal_mode_returns_none_when_target_position_missing() -> None:
 def test_normal_path_after_max_clamp_snaps_up_to_min_when_min_above_max() -> None:
     """If max clamp would sit below platform min, raise to min (align with snap branch)."""
     inp = CalculationInput(
-        adv_id=1,
+        search_adv_id=1,
         nmid=99,
         cluster="kw",
         current_bid=280,

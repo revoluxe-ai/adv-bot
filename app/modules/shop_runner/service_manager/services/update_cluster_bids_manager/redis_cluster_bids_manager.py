@@ -29,7 +29,7 @@ class RedisClusterBidsManager(BaseRedisManager):
         ttl = self._resolve_ttl()
         async with self._client.write_pipeline() as pipeline:  # type: ignore[reportUnknownMemberType]
             for bid in bids:
-                key = self._get_key(bid.adv_id, bid.nmid, bid.cluster)
+                key = self._get_key(bid.search_adv_id, bid.nmid, bid.cluster)
                 if ttl is not None:
                     pipeline.set(key, bid.new_bid, ex=ttl)
                 else:

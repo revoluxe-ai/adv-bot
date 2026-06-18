@@ -42,7 +42,7 @@ def _sample_command() -> UpdateBidsCommand:
         new_bids=[
             NewBid(
                 new_bid=100,
-                adv_id=1,
+                search_adv_id=1,
                 nmid=2,
                 cluster="test",
                 bidder_keyword_status=BidderKeywordStatus.GOOD,
@@ -68,7 +68,7 @@ async def test_apply_command_remember_bids_after_statuses_error() -> None:
     cluster_bids_manager.remember_bids.assert_awaited_once()
     entries = cluster_bids_manager.remember_bids.await_args.args[0]
     assert len(entries) == 1
-    assert entries[0].adv_id == 1
+    assert entries[0].search_adv_id == 1
     assert entries[0].cluster == "test"
 
 

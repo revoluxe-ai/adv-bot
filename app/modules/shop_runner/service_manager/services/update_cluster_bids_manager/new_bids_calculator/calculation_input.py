@@ -20,7 +20,7 @@ class CalculationInput:
     но итог не остаётся ниже ``min_bid``, если оно известно (см. ``new_bid_calculate``).
     """
 
-    adv_id: int
+    search_adv_id: int
     nmid: int
     cluster: str
     current_bid: int

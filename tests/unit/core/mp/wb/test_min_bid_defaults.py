@@ -1,7 +1,6 @@
 """Unit-тесты fallback мин. CPM из settings."""
 
 from __future__ import annotations
-
 import logging
 from unittest.mock import MagicMock
 
@@ -27,12 +26,17 @@ def _make_adv(*, nmids: list[int], auto_id: int, search_id: int | None = None) -
     return adv
 
 
-def test_default_min_bid_rub_from_settings() -> None:
+def test_default_min_bid_rub_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MIN_BID_AUTO_DEFAULT", "100")
+    monkeypatch.setenv("MIN_BID_SEARCH_DEFAULT", "500")
     assert default_min_bid_rub(AdvPlacementType.AUTO_ADV) == 100
-    assert default_min_bid_rub(AdvPlacementType.SEARCH_ADV) == 100
+    assert default_min_bid_rub(AdvPlacementType.SEARCH_ADV) == 500
 
 
-def test_resolve_search_min_bid_rub_uses_cache_then_default() -> None:
+def test_resolve_search_min_bid_rub_uses_cache_then_default(
+        monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MIN_BID_SEARCH_DEFAULT", "100")
     min_bids = AdvMinNmidsBids(auto={}, search={7: 55})
     assert resolve_search_min_bid_rub(7, min_bids) == 55
     assert resolve_search_min_bid_rub(8, min_bids) == 100
@@ -45,17 +49,21 @@ def test_resolve_auto_min_bid_rub_invalid_uses_default() -> None:
 
 def test_apply_min_bid_defaults_for_advs_partial_fill(
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("MIN_BID_AUTO_DEFAULT", "100")
+    monkeypatch.setenv("MIN_BID_SEARCH_DEFAULT", "500")
+
     advs = [_make_adv(nmids=[7, 8], auto_id=300, search_id=301)]
-    raw = AdvMinNmidsBids(auto={7: 50}, search={7: 60})
+    raw = AdvMinNmidsBids(auto={}, search={7: 60})
 
     with caplog.at_level(logging.WARNING):
         out = apply_min_bid_defaults_for_advs(raw, advs, context="unit_test")
 
-    assert out.auto == {7: 50, 8: 100}
-    assert out.search == {7: 60, 8: 100}
+    assert out.auto == {7: 100, 8: 100}
+    assert out.search == {7: 60, 8: 500}
     default_logs = [r for r in caplog.records if "min_bids using default" in r.getMessage()]
-    assert len(default_logs) == 2
+    assert len(default_logs) == 3
 
 
 def test_apply_min_bid_defaults_replaces_invalid_values() -> None:

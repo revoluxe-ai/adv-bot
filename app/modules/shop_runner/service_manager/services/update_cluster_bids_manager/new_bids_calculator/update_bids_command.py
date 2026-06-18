@@ -14,7 +14,7 @@ class NewBid:
     """Одна новая ставка по кластеру; правила min/max — в ``new_bid_calculate``."""
 
     new_bid: int
-    adv_id: int
+    search_adv_id: int
     nmid: int
     cluster: str
     bidder_keyword_status: BidderKeywordStatus

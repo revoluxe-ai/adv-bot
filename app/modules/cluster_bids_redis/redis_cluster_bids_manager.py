@@ -13,16 +13,16 @@ from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
 
 @dataclass(frozen=True)
 class ClusterBidKey:
-    adv_id: int
+    search_adv_id: int
     nmid: int
     cluster: str
 
 
 @dataclass(frozen=True)
 class ClusterBidEntry:
-    """Single bid to store: adv_id, nmid, cluster, new_bid."""
+    """Single bid to store: search_adv_id, nmid, cluster, new_bid."""
 
-    adv_id: int
+    search_adv_id: int
     nmid: int
     cluster: str
     new_bid: int
@@ -85,7 +85,7 @@ class RedisClusterBidsManager(BaseRedisManager):
         ttl = self._resolve_ttl()
         async with self._client.write_pipeline() as pipeline:  # type: ignore[reportUnknownMemberType]
             for bid in bids:
-                key = self._get_key(bid.adv_id, bid.nmid, bid.cluster)
+                key = self._get_key(bid.search_adv_id, bid.nmid, bid.cluster)
                 payload: dict[str, Any] = {
                     "new_bid": bid.new_bid,
                     "step": bid.step,
@@ -105,7 +105,7 @@ class RedisClusterBidsManager(BaseRedisManager):
             return {}
         async with self._client.read_pipeline() as pipeline:  # pyright: ignore
             for key in keys:
-                redis_key = self._get_key(key.adv_id, key.nmid, key.cluster)
+                redis_key = self._get_key(key.search_adv_id, key.nmid, key.cluster)
                 pipeline.get(redis_key)
             raw_results: list[str | None] = await pipeline.execute()  # pyright: ignore
         bids: dict[ClusterBidKey, int] = {}
@@ -122,7 +122,7 @@ class RedisClusterBidsManager(BaseRedisManager):
             return {}
         async with self._client.read_pipeline() as pipeline:  # pyright: ignore
             for key in keys:
-                redis_key = self._get_key(key.adv_id, key.nmid, key.cluster)
+                redis_key = self._get_key(key.search_adv_id, key.nmid, key.cluster)
                 pipeline.get(redis_key)
             raw_results: list[str | None] = await pipeline.execute()  # pyright: ignore
         states: dict[ClusterBidKey, ClusterBidState] = {}

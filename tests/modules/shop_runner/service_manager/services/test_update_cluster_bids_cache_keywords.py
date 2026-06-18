@@ -172,7 +172,8 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
     )
 
     map_data = AdvIdItemCalculateData(
-        adv_id=100,
+        search_adv_id=100,
+        adv_id=1,
         nmid=1,
         cluster="q1",
         current_position=1.0,
@@ -180,6 +181,9 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
         max_cpm=500,
         step=10,
         current_cpm=None,
+        keyword_setting_original_id=1,
+        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        snap_to_min_bid_no_keyword_target=False,
     )
     adv = MagicMock()
     adv.auction_adv_id = 100

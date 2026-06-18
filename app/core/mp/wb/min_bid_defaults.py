@@ -39,6 +39,7 @@ def resolve_auto_min_bid_rub(nmid: int, min_bids: AdvMinNmidsBids | None) -> int
     if min_bids is not None:
         cached = min_bids.auto.get(nmid)
         if _is_valid_min_bid_rub(cached):
+            assert cached is not None
             return int(cached)
     return default_min_bid_rub(AdvPlacementType.AUTO_ADV)
 
@@ -48,6 +49,7 @@ def resolve_search_min_bid_rub(nmid: int, min_bids: AdvMinNmidsBids | None) -> i
     if min_bids is not None:
         cached = min_bids.search.get(nmid)
         if _is_valid_min_bid_rub(cached):
+            assert cached is not None
             return int(cached)
     return default_min_bid_rub(AdvPlacementType.SEARCH_ADV)
 
