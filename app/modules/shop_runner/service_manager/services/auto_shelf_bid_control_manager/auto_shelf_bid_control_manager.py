@@ -1420,6 +1420,23 @@ class AutoShelfBidControlManager:
             != AutoShelfBidControlStrategy.PLAN_DISTANCE
         ):
             if snapshot.qualified_tested_bids_count < 2:
+                next_test_bid = snapshot.fresh_next_test_bid_minor
+                if next_test_bid is None:
+                    next_test_bid = state.current_test_bid_minor
+                if next_test_bid is None:
+                    state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+                    _ = await self._repository.save_state(state)
+                    logger.warning(
+                        "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s qualified_count=%s blocked=no_test_bid",
+                        auto_adv_id,
+                        nmid,
+                        state.last_reason,
+                        complex_adv.auto_shelf_bid_control_strategy,
+                        snapshot.qualified_tested_bids_count,
+                    )
+                    return None
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
                 state.current_mode = "test"
                 state.main_started_at = None
                 state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS

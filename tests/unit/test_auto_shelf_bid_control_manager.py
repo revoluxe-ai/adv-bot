@@ -3011,6 +3011,188 @@ async def test_handle_main_mode_cycle_metric_stops_with_best_bid_not_found_when_
 
 
 @pytest.mark.asyncio
+async def test_cycle_metric_main_finished_insufficient_qualified_revert_resets_test_started_at(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CYCLE_METRIC main finished + <2 qualified: test segment re-init with fresh test_started_at."""
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=999_999)
+    analytics.get_first_available_bid_bucket_start = AsyncMock(
+        return_value=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
+    )
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._maybe_continue_main_exploration = AsyncMock(return_value=(False, None))  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
+    now = datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC)
+    old_test_started = now - timedelta(hours=12)
+    state = MagicMock(
+        current_test_bid_minor=20_000,
+        current_mode="main",
+        current_cycle_started_at=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
+        test_started_at=old_test_started,
+        main_started_at=now - timedelta(hours=10),
+        current_main_bid_minor=25_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        target_main_impressions=10,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    snapshot = AutoShelfBidControlDecisionSnapshot(
+        nmid=111,
+        auto_adv_id=222,
+        current_mode="main",
+        actual_bid_minor=25_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+        fresh_best_main_bid_minor=25_000,
+        fresh_next_test_bid_minor=None,
+        expected_bid_minor=25_000,
+        bid_sync_status=BidSyncStatus.SYNCED,
+        can_count_progress=True,
+        qualified_tested_bids_count=1,
+        computed_at=now,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=now):
+        await manager._handle_main_mode(
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=12_000,
+            actual_bid_minor=25_000,
+            snapshot=snapshot,
+        )
+
+    assert state.current_mode == "test"
+    assert state.current_test_bid_minor == 20_000
+    assert state.test_started_at == now
+    assert state.test_started_at != old_test_started
+    assert state.main_started_at is None
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.last_reason != ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    repository.save_state.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    manager._set_target_bid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cycle_metric_main_finished_insufficient_qualified_no_test_bid_blocks_without_test_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CYCLE_METRIC main finished + <2 qualified + no test bid: block без test switch."""
+    analytics = MagicMock()
+    analytics.get_impressions = AsyncMock(return_value=999_999)
+    analytics.get_first_available_bid_bucket_start = AsyncMock(
+        return_value=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
+    )
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._set_target_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._maybe_continue_main_exploration = AsyncMock(return_value=(False, None))  # type: ignore[method-assign]
+    selector_mock = MagicMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
+    now = datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC)
+    state = MagicMock(
+        current_test_bid_minor=None,
+        current_mode="main",
+        current_cycle_started_at=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
+        test_started_at=now - timedelta(hours=12),
+        main_started_at=now - timedelta(hours=10),
+        current_main_bid_minor=25_000,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=10,
+        target_test_observation_minutes=60,
+        target_main_impressions=10,
+        test_share=0.1,
+        max_bid_minor=50_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=111,
+        auto_adv_id=222,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    snapshot = AutoShelfBidControlDecisionSnapshot(
+        nmid=111,
+        auto_adv_id=222,
+        current_mode="main",
+        actual_bid_minor=25_000,
+        min_bid_minor=12_000,
+        max_bid_minor=50_000,
+        fresh_best_main_bid_minor=25_000,
+        fresh_next_test_bid_minor=None,
+        expected_bid_minor=25_000,
+        bid_sync_status=BidSyncStatus.SYNCED,
+        can_count_progress=True,
+        qualified_tested_bids_count=1,
+        computed_at=now,
+    )
+
+    with patch.object(AutoShelfBidControlManager, "_now", return_value=now):
+        await manager._handle_main_mode(
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=12_000,
+            actual_bid_minor=25_000,
+            snapshot=snapshot,
+        )
+
+    assert state.current_mode == "main"
+    assert state.current_test_bid_minor is None
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.last_reason != ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    repository.save_state.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    manager._set_target_bid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_handle_main_mode_waits_when_main_started_at_missing() -> None:
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
