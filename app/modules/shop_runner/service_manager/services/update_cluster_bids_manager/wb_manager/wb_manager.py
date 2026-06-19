@@ -35,7 +35,6 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +129,9 @@ class WBManager(WBBaseManager):
     ) -> AdvMinNmidsBids:
         """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path).
 
+        Возвращает только закэшированные ячейки; miss не подставляет ``MIN_BID_*_DEFAULT``
+        (дефолты — ``apply_min_bid_defaults_for_advs`` при ``apply_defaults=True``).
+
         При miss ячейки — ``logger.warning`` (ожидаемо до ``preload_min_bids_cache_miss`` /
         snapshot). ERROR оставлен для ``refresh_min_bids_cache*`` (сбой WB). Ops: перенести
         алерты с ERROR ``min_bids cache miss`` на WARNING + подстроку (см. docks).
@@ -152,15 +154,20 @@ class WBManager(WBBaseManager):
             for nmid in item.nmids:
                 cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)
                 cpm = cached_map.get(cell)
+                if cpm is None:
+                    logger.warning(
+                        "min_bids cache miss shop_id=%s context=%s adv_id=%s "
+                        "placement=%s nmid=%s",
+                        shop_id,
+                        context,
+                        item.adv_id,
+                        item.placement_type.value,
+                        nmid,
+                    )
+                    continue
                 if item.placement_type == AdvPlacementType.AUTO_ADV:
-                    if cpm is None:
-                        cpm = settings.MIN_BID_AUTO_DEFAULT
-                        logger.warning(':min_bids cache miss: auto_adv_id=%s nmid=%s, use default', item.adv_id, nmid)
                     hits_auto[nmid] = cpm
                 elif item.placement_type == AdvPlacementType.SEARCH_ADV:
-                    if cpm is None:
-                        cpm = settings.MIN_BID_SEARCH_DEFAULT
-                        logger.warning(':min_bids cache miss: search_adv_id=%s nmid=%s, use default', item.adv_id, nmid)
                     hits_search[nmid] = cpm
 
         return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
