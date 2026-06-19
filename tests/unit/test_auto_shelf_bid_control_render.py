@@ -357,6 +357,7 @@ def test_render_ranking_consistency_shows_clamp_reason() -> None:
 
     assert "Лучшая ставка: 500 ₽" in message
     assert "clamp_to_range: 57000 -> 50000" in message
+    assert message.count("clamp_to_range: 57000 -> 50000") == 1
 
 
 def test_render_disabled_shows_recommended_main_without_dash() -> None:
@@ -429,6 +430,28 @@ def test_insufficient_qualified_bids_render() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     assert "Лучшая ставка: — (недостаточно протестированных ставок)" in message
+    assert message.count("недостаточно протестированных ставок") == 1
     assert "Лучшая ставка: 480 ₽" not in message
     assert "Лучшая ставка: 570 ₽" not in message
     assert "Следующая тестовая ставка: 250 ₽" in message
+
+
+def test_render_main_target_explanation_not_duplicated_when_main_bid_missing() -> None:
+    """main_target_explanation рендерится ровно один раз при отсутствии main bid."""
+    explanation = "недостаточно протестированных ставок"
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        has_state=True,
+        current_mode="test",
+        fresh_best_main_bid_minor=None,
+        recommended_main_bid_minor=None,
+        fresh_next_test_bid_minor=25_000,
+        qualified_tested_bids_count=1,
+        main_target_explanation=explanation,
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert f"Лучшая ставка: — ({explanation})" in message
+    assert message.count(explanation) == 1
+    assert f"({explanation})\n({explanation})" not in message

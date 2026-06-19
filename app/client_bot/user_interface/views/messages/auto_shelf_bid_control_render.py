@@ -476,6 +476,11 @@ def _render_main_bid_line(view: AutoShelfBidControlViewDTO) -> str:
     if main_bid is None:
         explanation = view.main_target_explanation or "недостаточно протестированных ставок"
         return f"Лучшая ставка: — ({explanation})\n"
+    if view.main_target_explanation:
+        return (
+            f"Лучшая ставка: {format_bid(main_bid, view.currency)} "
+            f"({view.main_target_explanation})\n"
+        )
     return f"Лучшая ставка: {format_bid(main_bid, view.currency)}\n"
 
 
@@ -507,11 +512,6 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Режим сейчас: {view.current_mode or '—'}\n"
         f"Текущая ставка WB: {format_bid(view.actual_bid_minor, view.currency)}\n"
         + _render_main_bid_line(view)
-        + (
-            f"({view.main_target_explanation})\n"
-            if view.main_target_explanation
-            else ""
-        )
         + f"Следующая тестовая ставка: {format_bid(view.fresh_next_test_bid_minor, view.currency)}\n\n"
         + "Диапазон теста:\n"
         f"Минимальная ставка WB: {format_bid(view.min_bid_minor, view.currency)}\n"
