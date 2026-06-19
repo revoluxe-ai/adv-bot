@@ -35,6 +35,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -155,16 +156,25 @@ class WBManager(WBBaseManager):
                 cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)
                 cpm = cached_map.get(cell)
                 if cpm is None:
-                    logger.warning(
-                        "min_bids cache miss shop_id=%s context=%s adv_id=%s "
-                        "placement=%s nmid=%s",
-                        shop_id,
-                        context,
-                        item.adv_id,
-                        item.placement_type.value,
-                        nmid,
-                    )
-                    continue
+                    if settings.CAN_MIN_BID_DEFAULT:
+                        placement = item.placement_type
+                        if placement == AdvPlacementType.AUTO_ADV:
+                            cpm = settings.MIN_BID_AUTO_DEFAULT
+                        elif placement == AdvPlacementType.SEARCH_ADV:
+                            cpm = settings.MIN_BID_SEARCH_DEFAULT
+                        else:
+                            raise ValueError(f"Unknown placement {placement}")
+                    else:
+                        logger.warning(
+                            "min_bids cache miss shop_id=%s context=%s adv_id=%s "
+                            "placement=%s nmid=%s",
+                            shop_id,
+                            context,
+                            item.adv_id,
+                            item.placement_type.value,
+                            nmid,
+                        )
+                        continue
                 if item.placement_type == AdvPlacementType.AUTO_ADV:
                     hits_auto[nmid] = cpm
                 elif item.placement_type == AdvPlacementType.SEARCH_ADV:
