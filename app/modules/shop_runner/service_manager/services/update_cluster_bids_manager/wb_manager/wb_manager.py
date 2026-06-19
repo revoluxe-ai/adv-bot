@@ -155,12 +155,12 @@ class WBManager(WBBaseManager):
                 if item.placement_type == AdvPlacementType.AUTO_ADV:
                     if cpm is None:
                         cpm = settings.MIN_BID_AUTO_DEFAULT
-                        logger.warning(':min_bids cache miss: auto_adv_id=%s nmid=%s', item.adv_id, nmid)
+                        logger.warning(':min_bids cache miss: auto_adv_id=%s nmid=%s, use default', item.adv_id, nmid)
                     hits_auto[nmid] = cpm
                 elif item.placement_type == AdvPlacementType.SEARCH_ADV:
                     if cpm is None:
                         cpm = settings.MIN_BID_SEARCH_DEFAULT
-                        logger.warning(':min_bids cache miss: search_adv_id=%s nmid=%s', item.adv_id, nmid)
+                        logger.warning(':min_bids cache miss: search_adv_id=%s nmid=%s, use default', item.adv_id, nmid)
                     hits_search[nmid] = cpm
 
         return AdvMinNmidsBids(auto=hits_auto, search=hits_search)
