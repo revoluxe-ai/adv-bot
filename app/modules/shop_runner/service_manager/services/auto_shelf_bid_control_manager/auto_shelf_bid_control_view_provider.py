@@ -52,12 +52,10 @@ from .bid_units import (
 )
 from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
 from .dto.decision_snapshot_dto import (
-    parse_plan_ranked_top_bid_minor,
     resolve_bid_sync_detail,
     resolve_bid_sync_status,
     resolve_expected_bid_minor,
     resolve_primary_status,
-    resolve_recommended_main_bid_minor,
     snapshot_can_count_progress,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
@@ -988,29 +986,21 @@ class AutoShelfBidControlViewProvider:
             )
 
         control_enabled = bool(adv.auto_shelf_bid_control_enabled)
-        max_bid_for_recommendation = (
-            int(settings_obj.max_bid_minor) if settings_obj is not None else None
-        )
-        recommended_main_bid_minor = resolve_recommended_main_bid_minor(
-            rec_bid_recommendation,
-            min_bid_minor=min_bid_minor_value,
-            max_bid_minor=max_bid_for_recommendation,
-        )
+        recommended_main_bid_minor: int | None = None
         main_target_explanation: str | None = None
-        if recommended_main_bid_minor is not None and rec_bid_recommendation is not None:
-            ranked_top = parse_plan_ranked_top_bid_minor(rec_bid_recommendation)
-            if ranked_top is not None and recommended_main_bid_minor != ranked_top:
-                main_target_explanation = (
-                    f"clamp_to_range: {ranked_top} -> {recommended_main_bid_minor}"
-                )
-
         recommended_next_test_bid_minor = coverage_selected_next_test_bid_minor
-        fresh_best_main_bid_minor = recommended_main_bid_minor
+        fresh_best_main_bid_minor: int | None = None
         fresh_next_test_bid_minor = recommended_next_test_bid_minor
+        qualified_tested_bids_count: int | None = None
+        snapshot_min_bid_minor = min_bid_minor_value
+        if snapshot_min_bid_minor is None and cycle_bid_stats:
+            snapshot_min_bid_minor = min(
+                int(item.bid_minor) for item in cycle_bid_stats
+            )
         if (
             state is not None
             and settings_obj is not None
-            and min_bid_minor_value is not None
+            and snapshot_min_bid_minor is not None
             and nmid
             and inspect.iscoroutinefunction(
                 getattr(self._analytics, "fetch_rec_bid_ctr_by_bid_for_nmid", None)
@@ -1053,10 +1043,17 @@ class AutoShelfBidControlViewProvider:
                     complex_adv_like,
                     settings_obj=settings_obj,
                     state=state,
-                    min_bid_minor=min_bid_minor_value,
+                    min_bid_minor=snapshot_min_bid_minor,
                     actual_bid_minor=actual_bid_minor,
                     control_enabled=control_enabled,
                     bid_units_confirmed=bid_units_confirmed,
+                )
+                if decision_snapshot.rec_bid_recommendation is not None:
+                    rec_bid_recommendation = decision_snapshot.rec_bid_recommendation
+                recommended_main_bid_minor = decision_snapshot.fresh_best_main_bid_minor
+                fresh_best_main_bid_minor = decision_snapshot.fresh_best_main_bid_minor
+                qualified_tested_bids_count = (
+                    decision_snapshot.qualified_tested_bids_count
                 )
                 if decision_snapshot.fresh_next_test_bid_minor is not None:
                     recommended_next_test_bid_minor = (
@@ -1165,4 +1162,5 @@ class AutoShelfBidControlViewProvider:
             can_count_progress=can_count_progress,
             main_target_explanation=main_target_explanation,
             legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
+            qualified_tested_bids_count=qualified_tested_bids_count,
         )

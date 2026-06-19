@@ -140,7 +140,7 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
     repository.save_state = AsyncMock(side_effect=lambda saved_state: saved_state)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
@@ -230,7 +230,7 @@ async def test_build_view_handles_missing_coverage_as_zero_rows(
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
@@ -313,7 +313,7 @@ async def test_build_view_plan_distance_matches_manager_selected_next_bid(
     repository.save_state = AsyncMock(side_effect=lambda saved_state: saved_state)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
@@ -391,7 +391,7 @@ async def test_build_view_sorts_coverage_rows_by_plan_ranked_then_selected_then_
     repository.save_state = AsyncMock(side_effect=lambda saved_state: saved_state)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
@@ -585,7 +585,7 @@ async def test_build_view_uses_wb_min_bid_not_actual_bid(
     repository.get_state = AsyncMock(return_value=None)
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
     provider = AutoShelfBidControlViewProvider(
@@ -1212,7 +1212,7 @@ async def test_build_view_rec_bid_recommendation_fail_soft(
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
     analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
@@ -1399,6 +1399,71 @@ def _plan_ranked_rec_view() -> dict[str, object]:
     }
 
 
+def _two_qualified_cycle_bid_stats() -> list[object]:
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    return [
+        BidStatsDTO(
+            bid_minor=57_000,
+            currency="RUB",
+            mode=None,
+            last_interval_at=None,
+            impressions=500,
+            clicks=20,
+            carts=2,
+            orders=1,
+            spend=100.0,
+            cart_cpa=5.0,
+            ctr=0.04,
+            cart_cr=0.1,
+        ),
+        BidStatsDTO(
+            bid_minor=48_000,
+            currency="RUB",
+            mode=None,
+            last_interval_at=None,
+            impressions=500,
+            clicks=15,
+            carts=1,
+            orders=0,
+            spend=90.0,
+            cart_cpa=6.0,
+            ctr=0.03,
+            cart_cr=0.05,
+        ),
+    ]
+
+
+def _patch_plan_distance_rec_for_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    rec_view: dict[str, object] | None = None,
+) -> None:
+    """Изолировать snapshot build от ClickHouse и rec-bid read service."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
+        AutoShelfBidControlManager,
+    )
+
+    view = rec_view or _plan_ranked_rec_view()
+    monkeypatch.setattr(
+        AutoShelfBidControlManager,
+        "_fetch_plan_distance_rec_result",
+        AsyncMock(return_value={"view": view, "best_plan_bid": view.get("best_plan_bid")}),
+    )
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_decision_snapshot_builder.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+
 @pytest.mark.asyncio
 async def test_build_view_disabled_keeps_recommended_main_without_actual_or_min_bid(
     monkeypatch: pytest.MonkeyPatch,
@@ -1436,9 +1501,11 @@ async def test_build_view_disabled_keeps_recommended_main_without_actual_or_min_
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
     analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.05)
 
@@ -1453,12 +1520,7 @@ async def test_build_view_disabled_keeps_recommended_main_without_actual_or_min_
         return_value={"view": _plan_ranked_rec_view()}
     )  # type: ignore[attr-defined]
 
-    mock_plan_fact_reader = MagicMock()
-    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
-        lambda: mock_plan_fact_reader,
-    )
+    _patch_plan_distance_rec_for_snapshot(monkeypatch)
 
     view = await provider.build_view(adv_setting_original_id=1)
 
@@ -1509,9 +1571,11 @@ async def test_build_view_enabled_main_keeps_recommended_without_actual_bid(
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
 
     analytics = MagicMock()
-    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_bid_stats = AsyncMock(return_value=_two_qualified_cycle_bid_stats())
     analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
     analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
     analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.05)
 
@@ -1526,12 +1590,7 @@ async def test_build_view_enabled_main_keeps_recommended_without_actual_bid(
         return_value={"view": _plan_ranked_rec_view()}
     )  # type: ignore[attr-defined]
 
-    mock_plan_fact_reader = MagicMock()
-    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
-        lambda: mock_plan_fact_reader,
-    )
+    _patch_plan_distance_rec_for_snapshot(monkeypatch)
 
     view = await provider.build_view(adv_setting_original_id=1)
 

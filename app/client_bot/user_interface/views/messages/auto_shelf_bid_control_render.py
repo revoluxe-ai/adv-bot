@@ -469,10 +469,13 @@ def _format_last_event(view: AutoShelfBidControlViewDTO) -> str:
 
 
 def _render_main_bid_line(view: AutoShelfBidControlViewDTO) -> str:
-    """Лучшая свежая main-ставка (не expected_enforced и не stored state)."""
+    """Лучшая свежая main-ставка (только из snapshot recommendation)."""
     main_bid = view.recommended_main_bid_minor
     if main_bid is None:
         main_bid = view.fresh_best_main_bid_minor
+    if main_bid is None:
+        explanation = view.main_target_explanation or "недостаточно протестированных ставок"
+        return f"Лучшая ставка: — ({explanation})\n"
     return f"Лучшая ставка: {format_bid(main_bid, view.currency)}\n"
 
 

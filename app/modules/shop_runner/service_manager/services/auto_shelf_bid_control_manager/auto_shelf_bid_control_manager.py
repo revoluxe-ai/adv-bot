@@ -83,6 +83,7 @@ class ControlReason:
     CYCLE_COMPLETED = "cycle_completed"
     BEST_BID_SELECTED = "best_bid_selected"
     BEST_BID_NOT_FOUND = "best_bid_not_found"
+    INSUFFICIENT_QUALIFIED_TESTED_BIDS = "insufficient_qualified_tested_bids"
     SET_BID_OK = "set_bid_ok"
     SET_BID_FAILED = "set_bid_failed"
     EXTERNAL_BID_CHANGED_REAPPLY = "external_bid_changed_reapply"
@@ -694,41 +695,9 @@ class AutoShelfBidControlManager:
             or not getattr(complex_adv, "auto_shelf_bid_control_enabled", False)
         ):
             return MainBidRefreshResult.SKIPPED_DISABLED
-        desired_main_bid = await self._choose_main_bid_by_strategy(
-            complex_adv=complex_adv,
-            currency=state.currency,
-            current_cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=None,
-            actual_bid_minor=actual_bid_minor,
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=max_bid_minor,
-        )
-        if desired_main_bid is None:
-            return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
-        desired_main_bid = self._clamp_bid_minor(
-            int(desired_main_bid),
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=max_bid_minor,
-        )
-        if state.current_main_bid_minor is not None and int(
-            state.current_main_bid_minor
-        ) == int(desired_main_bid):
-            return MainBidRefreshResult.NO_CHANGE
-        state.current_mode = "main"
-        state.current_main_bid_minor = desired_main_bid
-        state.main_started_at = now
-        state.last_reason = ControlReason.MAIN_BID_REFRESHED
-        _ = await self._repository.save_state(state)
-        logger.info(
-            "auto_shelf_bid_control_main_bid_refreshed auto_adv_id=%s nmid=%s previous_main_bid=%s new_main_bid=%s reason=%s",
-            complex_adv.auto_adv_id,
-            complex_adv.main_nmid,
-            actual_bid_minor,
-            desired_main_bid,
-            state.last_reason,
-        )
-        return MainBidRefreshResult.APPLIED
+        # Main refresh требует worker snapshot с fresh_best_main_bid_minor;
+        # strategy fallback через _choose_main_bid_by_strategy запрещён.
+        return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
 
     async def _choose_best_bid_with_fallback(
         self,
@@ -1135,25 +1104,21 @@ class AutoShelfBidControlManager:
 
         best_bid = snapshot.fresh_best_main_bid_minor
         if best_bid is None:
-            best_bid = await self._choose_main_bid_by_strategy(
-                complex_adv=complex_adv,
-                currency=state.currency,
-                current_cycle_started_at=state.current_cycle_started_at,
-                previous_cycle_started_at=state.previous_cycle_started_at,
-                current_main_bid_minor=None,
-                actual_bid_minor=actual_bid_minor,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=int(settings_obj.max_bid_minor),
-            )
-        if best_bid is None:
-            state.last_reason = ControlReason.BEST_BID_NOT_FOUND
+            next_test_bid = snapshot.fresh_next_test_bid_minor
+            if next_test_bid is not None and next_test_bid != test_bid:
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+            state.current_mode = "test"
+            state.main_started_at = None
+            state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
             _ = await self._repository.save_state(state)
-            logger.warning(
-                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
+            logger.info(
+                "auto_shelf_bid_control_continue_test_insufficient_qualified auto_adv_id=%s nmid=%s qualified_count=%s next_test_bid=%s reason=%s",
                 auto_adv_id,
                 nmid,
+                snapshot.qualified_tested_bids_count,
+                state.current_test_bid_minor,
                 state.last_reason,
-                complex_adv.auto_shelf_bid_control_strategy,
             )
             return None
         state.current_main_bid_minor = best_bid
@@ -1180,7 +1145,6 @@ class AutoShelfBidControlManager:
         actual_bid_minor: int,
         snapshot: AutoShelfBidControlDecisionSnapshot | None = None,
     ) -> None:
-        snapshot_provided = snapshot is not None
         if snapshot is None:
             snapshot = snapshot_from_state_fallback(
                 complex_adv=complex_adv,
@@ -1212,38 +1176,37 @@ class AutoShelfBidControlManager:
             _ = await self._repository.save_state(state)
 
         max_bid = int(settings_obj.max_bid_minor)
+        if snapshot.fresh_best_main_bid_minor is None:
+            next_test_bid = snapshot.fresh_next_test_bid_minor
+            if next_test_bid is None and state.current_mode == "test":
+                next_test_bid = state.current_test_bid_minor
+            if next_test_bid is not None:
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+            state.current_mode = "test"
+            state.main_started_at = None
+            state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+            _ = await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_revert_main_to_test_insufficient_qualified auto_adv_id=%s nmid=%s qualified_count=%s next_test_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                snapshot.qualified_tested_bids_count,
+                state.current_test_bid_minor,
+                state.last_reason,
+            )
+            return None
+
+        main_bid_value = self._clamp_bid_minor(
+            int(snapshot.fresh_best_main_bid_minor),
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid,
+        )
+        state.current_main_bid_minor = main_bid_value
+        if state.main_started_at is None:
+            state.main_started_at = now
+
         fresh_worker_snapshot = snapshot.computed_at is not None
-        if snapshot_provided or fresh_worker_snapshot:
-            main_bid_value = snapshot.fresh_best_main_bid_minor
-            if main_bid_value is None:
-                main_bid_value = snapshot.expected_bid_minor
-            if main_bid_value is None:
-                main_bid_value = self._middle_bid(min_bid_minor, max_bid)
-            else:
-                main_bid_value = self._clamp_bid_minor(
-                    int(main_bid_value),
-                    min_bid_minor=min_bid_minor,
-                    max_bid_minor=max_bid,
-                )
-            state.current_main_bid_minor = main_bid_value
-            if state.main_started_at is None:
-                state.main_started_at = now
-        else:
-            main_bid_value = state.current_main_bid_minor
-            if main_bid_value is None:
-                main_bid_value = self._middle_bid(min_bid_minor, max_bid)
-                state.current_main_bid_minor = main_bid_value
-                state.main_started_at = state.main_started_at or now
-            else:
-                clamped_main = self._clamp_bid_minor(
-                    main_bid_value,
-                    min_bid_minor=min_bid_minor,
-                    max_bid_minor=max_bid,
-                )
-                if clamped_main != int(main_bid_value):
-                    main_bid_value = clamped_main
-                    state.current_main_bid_minor = main_bid_value
-            assert state.current_main_bid_minor is not None
 
         main_coverage_snapshot: tuple[list[BidCoverage], int, int, int | None] | None = None
         bootstrap_continue, main_coverage_snapshot = await self._maybe_continue_main_exploration(
@@ -1290,34 +1253,10 @@ class AutoShelfBidControlManager:
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=max_bid,
                 now=now,
-                expected_bid_minor=state.current_main_bid_minor,
+                expected_bid_minor=snapshot.expected_bid_minor,
             ):
                 return None
-        if state.main_started_at is None:
-            if not can_set_observation_waiting_reason(
-                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
-                snapshot=snapshot,
-            ):
-                await self._block_observation_progress(
-                    state=state,
-                    control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
-                    snapshot=snapshot,
-                )
-                return None
-            state.main_started_at = now
-            state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
-            _ = await self._repository.save_state(state)
-            logger.info(
-                "auto_shelf_bid_control_main_bootstrap_started_at auto_adv_id=%s nmid=%s mode=%s main_bid=%s reason=%s",
-                auto_adv_id,
-                nmid,
-                state.current_mode,
-                state.current_main_bid_minor,
-                state.last_reason,
-            )
-            return None
-        assert state.current_main_bid_minor is not None
-        main_bid: int = int(state.current_main_bid_minor)
+        main_bid: int = main_bid_value
         main_started_at = state.main_started_at
         main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
         target_main_observation_minutes = self._calc_target_main_observation_minutes(
@@ -1470,14 +1409,20 @@ class AutoShelfBidControlManager:
             complex_adv.auto_shelf_bid_control_strategy
             != AutoShelfBidControlStrategy.PLAN_DISTANCE
         ):
-            state.last_reason = ControlReason.BEST_BID_NOT_FOUND
+            if snapshot.qualified_tested_bids_count < 2:
+                state.current_mode = "test"
+                state.main_started_at = None
+                state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+            else:
+                state.last_reason = ControlReason.BEST_BID_NOT_FOUND
             _ = await self._repository.save_state(state)
             logger.warning(
-                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s",
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s qualified_count=%s",
                 auto_adv_id,
                 nmid,
                 state.last_reason,
                 complex_adv.auto_shelf_bid_control_strategy,
+                snapshot.qualified_tested_bids_count,
             )
             return None
         state.current_mode = "main"

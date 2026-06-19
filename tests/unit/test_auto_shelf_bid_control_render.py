@@ -408,3 +408,27 @@ def test_render_enabled_no_actual_shows_recommended_not_not_applied() -> None:
     assert "Лучшая ставка: 570 ₽" in message
     assert "НЕ применена" not in message
     assert "не применена" not in message.lower()
+
+
+def test_insufficient_qualified_bids_render() -> None:
+    """Render: no stale best bid, insufficient reason, next test bid shown."""
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        has_state=True,
+        current_mode="test",
+        current_main_bid_minor=48_000,
+        actual_bid_minor=20_000,
+        fresh_best_main_bid_minor=None,
+        recommended_main_bid_minor=None,
+        fresh_next_test_bid_minor=25_000,
+        recommended_next_test_bid_minor=25_000,
+        qualified_tested_bids_count=1,
+        main_target_explanation="недостаточно протестированных ставок",
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: — (недостаточно протестированных ставок)" in message
+    assert "Лучшая ставка: 480 ₽" not in message
+    assert "Лучшая ставка: 570 ₽" not in message
+    assert "Следующая тестовая ставка: 250 ₽" in message

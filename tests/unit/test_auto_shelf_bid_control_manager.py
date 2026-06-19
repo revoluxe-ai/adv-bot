@@ -88,6 +88,42 @@ def _configure_plan_distance_test_transition(
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=current_main_bid_minor)  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     manager._closed_layers_for_bid_at = AsyncMock(side_effect=[0, 1])  # type: ignore[method-assign]
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=current_test_bid_minor,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            ),
+            BidStatsDTO(
+                bid_minor=current_main_bid_minor,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=15,
+                carts=1,
+                orders=0,
+                spend=90.0,
+                cart_cpa=6.0,
+                ctr=0.03,
+                cart_cr=0.05,
+            ),
+        ]
+    )
     manager._build_coverage_snapshot = AsyncMock(
         return_value=([], 0, covered_anchor_count, next_test_bid)
     )  # type: ignore[method-assign]
@@ -188,6 +224,46 @@ def _synced_progress_snapshot(
         expected_bid_minor=expected_bid_minor,
         bid_sync_status=BidSyncStatus.SYNCED,
         can_count_progress=True,
+        qualified_tested_bids_count=2,
+        computed_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+    )
+
+
+def _qualified_main_worker_snapshot(
+    *,
+    mode: str,
+    actual_bid_minor: int,
+    fresh_main_bid_minor: int,
+    fresh_next_test_bid_minor: int | None = None,
+    qualified_tested_bids_count: int = 2,
+    nmid: int = 111,
+    auto_adv_id: int = 222,
+    min_bid_minor: int = 12_000,
+    max_bid_minor: int = 50_000,
+) -> AutoShelfBidControlDecisionSnapshot:
+    """Worker snapshot с qualified tested bids для main-path."""
+    if fresh_next_test_bid_minor is None:
+        fresh_next_test_bid_minor = actual_bid_minor if mode == "test" else None
+    expected_bid_minor = resolve_expected_bid_minor(
+        current_mode=mode,
+        fresh_best_main_bid_minor=fresh_main_bid_minor,
+        fresh_next_test_bid_minor=fresh_next_test_bid_minor,
+        control_enabled=True,
+    )
+    bid_sync_status = resolve_bid_sync_status(actual_bid_minor, expected_bid_minor)
+    return AutoShelfBidControlDecisionSnapshot(
+        nmid=nmid,
+        auto_adv_id=auto_adv_id,
+        current_mode=mode,
+        actual_bid_minor=actual_bid_minor,
+        min_bid_minor=min_bid_minor,
+        max_bid_minor=max_bid_minor,
+        fresh_best_main_bid_minor=fresh_main_bid_minor,
+        fresh_next_test_bid_minor=fresh_next_test_bid_minor,
+        expected_bid_minor=expected_bid_minor,
+        bid_sync_status=bid_sync_status,
+        can_count_progress=snapshot_can_count_progress(bid_sync_status),
+        qualified_tested_bids_count=qualified_tested_bids_count,
         computed_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
     )
 
@@ -1201,13 +1277,19 @@ async def test_handle_test_mode_switches_to_main_after_closed_layers_advance() -
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=25_000,
+            fresh_main_bid_minor=33_000,
+            fresh_next_test_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 33_000
     assert analytics.get_first_available_bid_bucket_start.await_count == 2
     assert analytics.get_bid_coverages.await_count == 2
-    manager._choose_best_bid_with_fallback.assert_awaited_once()
+    manager._choose_best_bid_with_fallback.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -1284,8 +1366,8 @@ async def test_handle_test_mode_plan_distance_falls_back_to_known_main_bid(
     )
 
     assert state.current_mode == "test"
-    assert state.last_reason == ControlReason.BEST_BID_NOT_FOUND
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     repository.save_state.assert_awaited()
 
@@ -1397,13 +1479,21 @@ async def test_handle_test_mode_plan_distance_single_bid_universe_goes_to_main()
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 18_000
     assert state.main_started_at is not None
     assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -1424,6 +1514,14 @@ async def test_handle_test_mode_plan_distance_keeps_testing_with_single_anchor_o
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "test"
@@ -1450,13 +1548,21 @@ async def test_handle_test_mode_plan_distance_switches_to_main_when_two_anchors_
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 18_000
     assert state.main_started_at is not None
     assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -1477,13 +1583,21 @@ async def test_handle_test_mode_plan_distance_allows_main_when_next_test_bid_mat
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 18_000
     assert state.main_started_at is not None
     assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -1564,13 +1678,21 @@ async def test_handle_test_mode_plan_distance_allows_main_after_two_anchors(
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.current_mode == "main"
     assert state.current_main_bid_minor == 18_000
     assert state.main_started_at is not None
     selector_mock.assert_called_once()
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -1646,9 +1768,9 @@ async def test_handle_test_mode_plan_distance_returns_best_bid_not_found_without
         actual_bid_minor=20_000,
     )
 
-    assert state.last_reason == ControlReason.BEST_BID_NOT_FOUND
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
     assert state.current_mode == "test"
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     repository.save_state.assert_awaited_once()
 
@@ -1867,12 +1989,19 @@ async def test_handle_main_mode_plan_distance_resets_when_selected_bid_changes(
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=12_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=12_000,
+            expected_bid_minor=16_000,
+            fresh_best_main_bid_minor=16_000,
+        ),
     )
 
     assert state.current_main_bid_minor == 16_000
     assert state.current_mode == "main"
     assert state.main_started_at is not None
-    assert state.last_reason == ControlReason.MAIN_BID_REFRESHED
+    assert state.last_reason != ControlReason.MAIN_BID_REFRESHED
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
@@ -1932,13 +2061,20 @@ async def test_handle_main_mode_keeps_cycle_and_test_state_when_plan_bid_changes
             state=state,
             min_bid_minor=12_000,
             actual_bid_minor=12_000,
+            snapshot=_synced_progress_snapshot(
+                mode="main",
+                actual_bid_minor=12_000,
+                expected_bid_minor=24_000,
+                fresh_best_main_bid_minor=24_000,
+            ),
         )
 
     assert state.current_main_bid_minor == 24_000
-    assert state.main_started_at == now
     assert state.current_cycle_started_at == t1
     assert state.test_started_at == t2
     assert state.current_test_bid_minor == 45_000
+    assert state.last_reason != ControlReason.MAIN_BID_REFRESHED
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     assert_cycle_state_valid(state)
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
@@ -2000,15 +2136,21 @@ async def test_handle_main_mode_repairs_corrupted_cycle_start_before_plan_bid_ch
             state=state,
             min_bid_minor=12_000,
             actual_bid_minor=12_000,
+            snapshot=_synced_progress_snapshot(
+                mode="main",
+                actual_bid_minor=12_000,
+                expected_bid_minor=24_000,
+                fresh_best_main_bid_minor=24_000,
+            ),
         )
 
     assert state.current_main_bid_minor == 24_000
-    assert state.main_started_at == now
     assert state.current_cycle_started_at == previous_cycle
     assert state.test_started_at == test_started
     assert state.current_test_bid_minor == 45_000
     assert_cycle_state_valid(state)
-    assert state.last_reason == ControlReason.MAIN_BID_REFRESHED
+    assert state.last_reason != ControlReason.MAIN_BID_REFRESHED
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
@@ -2068,6 +2210,12 @@ async def test_handle_main_mode_repairs_missing_previous_cycle_start_before_plan
             state=state,
             min_bid_minor=12_000,
             actual_bid_minor=12_000,
+            snapshot=_synced_progress_snapshot(
+                mode="main",
+                actual_bid_minor=12_000,
+                expected_bid_minor=24_000,
+                fresh_best_main_bid_minor=24_000,
+            ),
         )
 
     assert state.current_cycle_started_at == test_started
@@ -2075,7 +2223,8 @@ async def test_handle_main_mode_repairs_missing_previous_cycle_start_before_plan
     assert state.current_test_bid_minor == 45_000
     assert_cycle_state_valid(state)
     repository.save_state.assert_awaited()
-    assert state.last_reason == ControlReason.MAIN_BID_REFRESHED
+    assert state.last_reason != ControlReason.MAIN_BID_REFRESHED
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
 
@@ -2149,6 +2298,12 @@ async def test_handle_main_mode_does_not_save_state_when_cycle_is_valid() -> Non
             state=state,
             min_bid_minor=12_000,
             actual_bid_minor=12_000,
+            snapshot=_synced_progress_snapshot(
+                mode="main",
+                actual_bid_minor=12_000,
+                expected_bid_minor=24_000,
+                fresh_best_main_bid_minor=24_000,
+            ),
         )
 
     repository.save_state.assert_awaited()
@@ -2220,6 +2375,11 @@ async def test_handle_main_mode_plan_distance_continues_when_selected_bid_unchan
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=12_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=12_000,
+            expected_bid_minor=12_000,
+        ),
     )
 
     assert state.current_mode == "main"
@@ -2404,6 +2564,11 @@ async def test_handle_main_mode_plan_distance_waits_for_impressions_before_rec_f
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=25_000,
+            expected_bid_minor=25_000,
+        ),
     )
 
     assert state.last_reason == ControlReason.MAIN_WAITING_IMPRESSIONS
@@ -2502,6 +2667,13 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=20_500,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=20_500,
+            expected_bid_minor=20_500,
+            fresh_best_main_bid_minor=20_500,
+            fresh_next_test_bid_minor=33_000,
+        ),
     )
 
     assert state.current_mode == "test"
@@ -2613,6 +2785,11 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=25_000,
+            expected_bid_minor=25_000,
+        ),
     )
 
     assert state.current_mode == "main"
@@ -2628,8 +2805,7 @@ async def test_handle_main_mode_plan_distance_continues_safe_main_when_no_next_t
     )
     analytics.get_bid_coverages.assert_not_awaited()
     selector_mock.assert_called_once()
-    manager._choose_main_bid_by_strategy.assert_called_once()
-    repository.save_state.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
 
@@ -2718,6 +2894,11 @@ async def test_handle_main_mode_plan_distance_keeps_main_bid_and_restarts_window
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=25_000,
+            expected_bid_minor=25_000,
+        ),
     )
 
     assert state.current_mode == "main"
@@ -2733,7 +2914,7 @@ async def test_handle_main_mode_plan_distance_keeps_main_bid_and_restarts_window
     )
     analytics.get_bid_coverages.assert_not_awaited()
     selector_mock.assert_called_once()
-    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
     repository.save_state.assert_awaited_once()
@@ -2802,13 +2983,28 @@ async def test_handle_main_mode_cycle_metric_stops_with_best_bid_not_found_when_
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=AutoShelfBidControlDecisionSnapshot(
+            nmid=111,
+            auto_adv_id=222,
+            current_mode="main",
+            actual_bid_minor=25_000,
+            min_bid_minor=12_000,
+            max_bid_minor=50_000,
+            fresh_best_main_bid_minor=None,
+            fresh_next_test_bid_minor=None,
+            expected_bid_minor=25_000,
+            bid_sync_status=BidSyncStatus.SYNCED,
+            can_count_progress=True,
+            qualified_tested_bids_count=0,
+            computed_at=now,
+        ),
     )
 
-    assert state.current_mode == "main"
-    assert state.last_reason == ControlReason.BEST_BID_NOT_FOUND
-    assert state.main_started_at == now - timedelta(hours=10)
+    assert state.current_mode == "test"
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.main_started_at is None
     assert state.current_cycle_started_at == datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
-    selector_mock.assert_called_once()
+    selector_mock.assert_not_called()
     repository.save_state.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
@@ -2994,6 +3190,11 @@ async def test_handle_main_mode_uses_main_started_at_even_if_cycle_is_recent() -
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=25_000,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=25_000,
+            expected_bid_minor=25_000,
+        ),
     )
 
     assert state.last_reason == ControlReason.MAIN_WAITING_IMPRESSIONS
@@ -3043,11 +3244,10 @@ async def test_apply_main_bid_refresh_if_needed_applies_refresh_and_updates_stat
         now=now,
     )
 
-    assert result == MainBidRefreshResult.APPLIED
-    assert state.current_main_bid_minor == 60_000
-    assert state.main_started_at == now
-    assert state.last_reason == ControlReason.MAIN_BID_REFRESHED
-    repository.save_state.assert_awaited()
+    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+    assert state.current_main_bid_minor == 20_500
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    repository.save_state.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
 
@@ -3091,7 +3291,8 @@ async def test_apply_main_bid_refresh_if_needed_returns_no_change_when_target_sa
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.NO_CHANGE
+    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
 
@@ -3135,9 +3336,10 @@ async def test_apply_main_bid_refresh_if_needed_clamps_desired_bid() -> None:
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.APPLIED
-    assert state.current_main_bid_minor == 50_000
-    repository.save_state.assert_awaited()
+    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+    assert state.current_main_bid_minor == 20_500
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    repository.save_state.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
 
@@ -3298,6 +3500,13 @@ async def test_handle_main_mode_bootstrap_exploration_switches_to_test_before_re
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=20_500,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=20_500,
+            expected_bid_minor=20_500,
+            fresh_best_main_bid_minor=20_500,
+            fresh_next_test_bid_minor=25_000,
+        ),
     )
 
     assert state.current_mode == "test"
@@ -3348,9 +3557,9 @@ async def test_handle_main_mode_historical_manual_force_main_does_not_block_refr
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.APPLIED
-    assert state.current_main_bid_minor == 60_000
-    assert state.last_reason == ControlReason.MAIN_BID_REFRESHED
+    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+    assert state.current_main_bid_minor == 20_500
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -3358,6 +3567,8 @@ async def test_handle_main_mode_retries_refreshed_bid_after_setter_failure() -> 
     analytics = MagicMock()
     analytics.get_impressions = AsyncMock(return_value=999_999)
     analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
     repository = MagicMock()
     repository.save_state = AsyncMock()
     manager = AutoShelfBidControlManager(
@@ -3367,8 +3578,7 @@ async def test_handle_main_mode_retries_refreshed_bid_after_setter_failure() -> 
         analytics_repository=analytics,
     )
     manager._choose_main_bid_by_strategy = AsyncMock(return_value=60_000)  # type: ignore[method-assign]
-    failing_save = AsyncMock(side_effect=RuntimeError("save failed"))
-    repository.save_state = failing_save  # type: ignore[method-assign]
+    manager._maybe_continue_main_exploration = AsyncMock(return_value=(False, None))  # type: ignore[method-assign]
     manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
     state = MagicMock(
         current_test_bid_minor=20_000,
@@ -3399,15 +3609,15 @@ async def test_handle_main_mode_retries_refreshed_bid_after_setter_failure() -> 
         resolve_cpo=None,
     )
 
-    with pytest.raises(RuntimeError):
-        _ = await manager.apply_main_bid_refresh_if_needed(
-            complex_adv,
-            state=cast(Any, state),
-            min_bid_minor=12_000,
-            max_bid_minor=70_000,
-            actual_bid_minor=20_500,
-            now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
-        )
+    result = await manager.apply_main_bid_refresh_if_needed(
+        complex_adv,
+        state=cast(Any, state),
+        min_bid_minor=12_000,
+        max_bid_minor=70_000,
+        actual_bid_minor=20_500,
+        now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
+    )
+    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
 
     state.current_main_bid_minor = 20_500
     repository.save_state = AsyncMock()
@@ -3417,6 +3627,12 @@ async def test_handle_main_mode_retries_refreshed_bid_after_setter_failure() -> 
         state=state,
         min_bid_minor=12_000,
         actual_bid_minor=20_500,
+        snapshot=_synced_progress_snapshot(
+            mode="main",
+            actual_bid_minor=20_500,
+            expected_bid_minor=20_500,
+            fresh_best_main_bid_minor=20_500,
+        ),
     )
     repository.save_state.assert_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
@@ -4430,6 +4646,14 @@ async def test_mode_transition_does_not_bypass_bid_units_gate(
         state=state,
         min_bid_minor=8_000,
         actual_bid_minor=8_000,
+        snapshot=_qualified_main_worker_snapshot(
+            mode="test",
+            actual_bid_minor=8_000,
+            fresh_main_bid_minor=18_000,
+            fresh_next_test_bid_minor=8_000,
+            min_bid_minor=8_000,
+            max_bid_minor=20_000,
+        ),
     )
 
     assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
@@ -4627,3 +4851,505 @@ async def test_worker_mode_transition_uses_snapshot_expected_not_state_bid(
     manager._persist_state_then_set_bid.assert_not_awaited()
     manager._set_target_bid.assert_not_awaited()
     wb_bid_setter.set_bid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_enabled_control_without_best_bid_does_not_enforce_stale_main_from_state() -> None:
+    """Main mode в state, но <2 qualified bids: handler возвращает в test без setter."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._maybe_continue_main_exploration = AsyncMock(return_value=(False, None))  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="main",
+        current_main_bid_minor=48_000,
+        current_test_bid_minor=20_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        main_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        test_started_at=None,
+        currency="RUB",
+        last_reason=None,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=20_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            )
+        ]
+    )
+    manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 25_000))  # type: ignore[method-assign]
+
+    snapshot = await manager.build_decision_snapshot(
+        complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=20_000,
+        control_enabled=True,
+    )
+
+    assert snapshot.fresh_best_main_bid_minor is None
+    assert snapshot.expected_bid_minor is None
+
+    await manager._handle_main_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=20_000,
+        snapshot=snapshot,
+    )
+
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_not_awaited()
+    assert state.current_mode == "test"
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+
+
+@pytest.mark.asyncio
+async def test_no_best_bid_sync_applies_next_test_bid_via_centralized_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """<2 qualified bids: setter получает next_test_bid через apply_bid_sync."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    repository = MagicMock()
+    repository.get_settings = AsyncMock()
+    repository.repair_settings_units = AsyncMock()
+    repository.update_state_reason = AsyncMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._get_actual_bid = AsyncMock(return_value=20_000)  # type: ignore[method-assign]
+    manager._resolve_min_bid_minor = MagicMock(return_value=10_000)  # type: ignore[method-assign]
+    manager._is_eligible = MagicMock(return_value=(True, ControlReason.SETTINGS_UPDATED))  # type: ignore[method-assign]
+    manager._handle_test_mode = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="test",
+        current_test_bid_minor=20_000,
+        current_main_bid_minor=48_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        test_started_at=datetime(2026, 6, 13, 11, 0, 0, tzinfo=UTC),
+        main_started_at=None,
+        currency="RUB",
+        last_reason=None,
+    )
+    repository.get_state = AsyncMock(return_value=state)
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+        currency="RUB",
+    )
+    repository.get_settings.return_value = settings_obj
+    repository.repair_settings_units.return_value = settings_obj
+    complex_adv = SimpleNamespace(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=20_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            )
+        ]
+    )
+    manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 25_000))  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", "true")
+
+    with patch.object(
+        AutoShelfBidControlManager,
+        "_now",
+        return_value=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC),
+    ):
+        await manager.update(complex_adv)
+
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=25_000,
+        currency="RUB",
+    )
+    manager._handle_test_mode.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_main_mode_with_one_qualified_switches_to_test() -> None:
+    """mode=main + 1 qualified: revert to test, setter не получает stale 48000."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="main",
+        current_main_bid_minor=48_000,
+        current_test_bid_minor=20_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        main_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        test_started_at=None,
+        currency="RUB",
+        last_reason=ControlReason.MAIN_WAITING_OBSERVATION_TIME,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=48_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            )
+        ]
+    )
+    manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 50_000))  # type: ignore[method-assign]
+    manager._fetch_plan_distance_rec_result = AsyncMock(  # type: ignore[method-assign]
+        return_value={
+            "view": {
+                "plan_ranked": [{"bid": 57_000, "plan_distance_score": 0.1}],
+                "best_plan_bid": 48_000,
+            },
+            "best_plan_bid": 48_000,
+        }
+    )
+
+    snapshot = await manager.build_decision_snapshot(
+        complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=48_000,
+        control_enabled=True,
+    )
+
+    assert snapshot.fresh_best_main_bid_minor is None
+    assert snapshot.expected_bid_minor is None
+
+    await manager._handle_main_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=48_000,
+        snapshot=snapshot,
+    )
+
+    assert state.current_mode == "test"
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.main_started_at is None
+    assert state.current_test_bid_minor == 50_000
+    assert state.last_reason != ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_zero_qualified_bids_starts_test_not_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """0 qualified: test path, expected/enforced = next_test_bid, no main from stale state."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    repository = MagicMock()
+    repository.get_settings = AsyncMock()
+    repository.repair_settings_units = AsyncMock()
+    repository.update_state_reason = AsyncMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._get_actual_bid = AsyncMock(return_value=48_000)  # type: ignore[method-assign]
+    manager._resolve_min_bid_minor = MagicMock(return_value=10_000)  # type: ignore[method-assign]
+    manager._is_eligible = MagicMock(return_value=(True, ControlReason.SETTINGS_UPDATED))  # type: ignore[method-assign]
+    manager._handle_test_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=57_000)  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="test",
+        current_test_bid_minor=48_000,
+        current_main_bid_minor=48_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        test_started_at=datetime(2026, 6, 13, 11, 0, 0, tzinfo=UTC),
+        main_started_at=None,
+        currency="RUB",
+        last_reason=None,
+    )
+    repository.get_state = AsyncMock(return_value=state)
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+        currency="RUB",
+    )
+    repository.get_settings.return_value = settings_obj
+    repository.repair_settings_units.return_value = settings_obj
+    complex_adv = SimpleNamespace(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=48_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=10,
+                clicks=0,
+                carts=0,
+                orders=0,
+                spend=10.0,
+                cart_cpa=0.0,
+                ctr=0.01,
+                cart_cr=0.0,
+            )
+        ]
+    )
+    manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 50_000))  # type: ignore[method-assign]
+    manager._fetch_plan_distance_rec_result = AsyncMock(  # type: ignore[method-assign]
+        return_value={
+            "view": {"plan_ranked": [{"bid": 57_000}], "best_plan_bid": 57_000},
+            "best_plan_bid": 57_000,
+        }
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", "true")
+
+    with patch.object(
+        AutoShelfBidControlManager,
+        "_now",
+        return_value=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC),
+    ):
+        await manager.update(complex_adv)
+
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._handle_main_mode.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=50_000,
+        currency="RUB",
+    )
+
+
+@pytest.mark.asyncio
+async def test_one_qualified_bid_continues_test_not_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1 qualified: no main, strategy not used, test continues with next_test_bid."""
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    repository = MagicMock()
+    repository.get_settings = AsyncMock()
+    repository.repair_settings_units = AsyncMock()
+    repository.update_state_reason = AsyncMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._get_actual_bid = AsyncMock(return_value=48_000)  # type: ignore[method-assign]
+    manager._resolve_min_bid_minor = MagicMock(return_value=10_000)  # type: ignore[method-assign]
+    manager._is_eligible = MagicMock(return_value=(True, ControlReason.SETTINGS_UPDATED))  # type: ignore[method-assign]
+    manager._handle_test_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=57_000)  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="test",
+        current_test_bid_minor=48_000,
+        current_main_bid_minor=48_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        test_started_at=datetime(2026, 6, 13, 11, 0, 0, tzinfo=UTC),
+        main_started_at=None,
+        currency="RUB",
+        last_reason=None,
+    )
+    repository.get_state = AsyncMock(return_value=state)
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+        currency="RUB",
+    )
+    repository.get_settings.return_value = settings_obj
+    repository.repair_settings_units.return_value = settings_obj
+    complex_adv = SimpleNamespace(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+    )
+    manager._analytics.get_bid_stats = AsyncMock(  # type: ignore[method-assign]
+        return_value=[
+            BidStatsDTO(
+                bid_minor=48_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            )
+        ]
+    )
+    manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 50_000))  # type: ignore[method-assign]
+    manager._fetch_plan_distance_rec_result = AsyncMock(  # type: ignore[method-assign]
+        return_value={
+            "view": {"plan_ranked": [{"bid": 57_000}], "best_plan_bid": 57_000},
+            "best_plan_bid": 57_000,
+        }
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.repair_state_test_bid_minor",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", "true")
+
+    with patch.object(
+        AutoShelfBidControlManager,
+        "_now",
+        return_value=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC),
+    ):
+        await manager.update(complex_adv)
+
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._handle_main_mode.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_awaited_once_with(
+        complex_adv,
+        bid_minor=50_000,
+        currency="RUB",
+    )

@@ -27,12 +27,21 @@ from app.settings import settings
 from .dto.decision_snapshot_dto import (
     AutoShelfBidControlDecisionSnapshot,
     cast_rec_dict,
-    parse_plan_ranked_top_bid_minor,
     resolve_bid_sync_status,
     resolve_expected_bid_minor,
-    resolve_recommended_main_bid_minor,
     snapshot_can_count_progress,
     snapshot_from_state_fallback,
+)
+from .dto.optimization_metric import resolve_optimization_metric
+from .qualified_tested_bids import (
+    INSUFFICIENT_QUALIFIED_TESTED_BIDS_EXPLANATION,
+    build_cycle_metric_rec_recommendation,
+    collect_qualified_tested_bid_minors,
+    count_qualified_tested_bids,
+    filter_rec_recommendation_to_qualified_bids,
+    has_sufficient_qualified_tested_bids,
+    rank_qualified_tested_bid_stats,
+    resolve_main_bid_from_qualified_ranking,
 )
 from .rec_bid_plan_context import build_rec_bid_plan_context
 
@@ -115,53 +124,106 @@ async def build_decision_snapshot(
     max_bid_minor = int(settings_obj.max_bid_minor)
     if bid_units_confirmed is None:
         bid_units_confirmed = settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED
+    target_test_impressions = int(settings_obj.target_test_impressions)
     target_test_observation_minutes = manager._target_observation_minutes_or_default(
         settings_obj.target_test_observation_minutes
     )
     target_test_observation_hours = manager._target_observation_hours_from_minutes(
         target_test_observation_minutes
     )
+    optimization_metric = resolve_optimization_metric(
+        complex_adv.fact_pay_for_order,
+        complex_adv.resolve_cpo,
+    )
+
+    cycle_bid_stats = await manager._analytics.get_bid_stats(
+        nmid=complex_adv.main_nmid,
+        from_ts=state.current_cycle_started_at,
+        currency=state.currency,
+    )
+    qualified_tested_bids_count = count_qualified_tested_bids(
+        cycle_bid_stats,
+        target_test_impressions=target_test_impressions,
+        metric=optimization_metric,
+    )
+    sufficient_qualified_tested = has_sufficient_qualified_tested_bids(
+        cycle_bid_stats,
+        target_test_impressions=target_test_impressions,
+        metric=optimization_metric,
+    )
+
     rec_bid_recommendation: dict[str, object] | None = None
     best_plan_bid_minor: int | None = None
-    ranked_top_bid_minor: int | None = None
     fresh_best_main_bid_minor: int | None = None
     main_target_explanation: str | None = None
 
-    if (
+    if not sufficient_qualified_tested:
+        fresh_best_main_bid_minor = None
+        best_plan_bid_minor = None
+        main_target_explanation = (
+            main_target_explanation or INSUFFICIENT_QUALIFIED_TESTED_BIDS_EXPLANATION
+        )
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            == AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            rec_result = await manager._fetch_plan_distance_rec_result(complex_adv)
+            if rec_result is not None:
+                rec_bid_recommendation = cast_rec_dict(
+                    rec_result.get("view", rec_result)
+                )
+        else:
+            ranked_stats = rank_qualified_tested_bid_stats(
+                cycle_bid_stats,
+                target_test_impressions=target_test_impressions,
+                metric=optimization_metric,
+            )
+            if ranked_stats:
+                rec_bid_recommendation = build_cycle_metric_rec_recommendation(
+                    ranked_stats
+                )
+    elif (
         complex_adv.auto_shelf_bid_control_strategy
         == AutoShelfBidControlStrategy.PLAN_DISTANCE
     ):
         rec_result = await manager._fetch_plan_distance_rec_result(complex_adv)
         if rec_result is not None:
-            rec_bid_recommendation = cast_rec_dict(rec_result.get("view", rec_result))
+            raw_rec = cast_rec_dict(rec_result.get("view", rec_result))
             best_plan_raw = rec_result.get("best_plan_bid")
             if isinstance(best_plan_raw, int) and not isinstance(best_plan_raw, bool):
                 best_plan_bid_minor = int(best_plan_raw)
-            ranked_top_bid_minor = parse_plan_ranked_top_bid_minor(rec_bid_recommendation)
-            fresh_best_main_bid_minor = resolve_recommended_main_bid_minor(
+            qualified_bids = collect_qualified_tested_bid_minors(
+                cycle_bid_stats,
+                target_test_impressions=target_test_impressions,
+                metric=optimization_metric,
+            )
+            rec_bid_recommendation = filter_rec_recommendation_to_qualified_bids(
+                raw_rec,
+                qualified_bids,
+            )
+            fresh_best_main_bid_minor, _ranked_top, clamp_explanation = (
+                resolve_main_bid_from_qualified_ranking(
+                    rec_bid_recommendation,
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+            main_target_explanation = clamp_explanation
+    else:
+        ranked_stats = rank_qualified_tested_bid_stats(
+            cycle_bid_stats,
+            target_test_impressions=target_test_impressions,
+            metric=optimization_metric,
+        )
+        rec_bid_recommendation = build_cycle_metric_rec_recommendation(ranked_stats)
+        fresh_best_main_bid_minor, _ranked_top, clamp_explanation = (
+            resolve_main_bid_from_qualified_ranking(
                 rec_bid_recommendation,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=max_bid_minor,
             )
-            if (
-                ranked_top_bid_minor is not None
-                and fresh_best_main_bid_minor is not None
-                and fresh_best_main_bid_minor != ranked_top_bid_minor
-            ):
-                main_target_explanation = (
-                    f"clamp_to_range: {ranked_top_bid_minor} -> {fresh_best_main_bid_minor}"
-                )
-    else:
-        fresh_best_main_bid_minor = await manager._choose_main_bid_by_strategy(
-            complex_adv=complex_adv,
-            currency=state.currency,
-            current_cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=None,
-            actual_bid_minor=actual_bid_minor,
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=max_bid_minor,
         )
+        main_target_explanation = clamp_explanation
 
     _coverages, _current_layer, _covered_anchor_count, coverage_next_test = (
         await manager._build_coverage_snapshot(
@@ -169,21 +231,16 @@ async def build_decision_snapshot(
             currency=state.currency,
             min_bid_minor=min_bid_minor,
             max_bid_minor=max_bid_minor,
-            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_impressions=target_test_impressions,
             target_test_observation_hours=target_test_observation_hours,
             min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
             date_to=now,
         )
     )
-    cycle_bid_stats = await manager._analytics.get_bid_stats(
-        nmid=complex_adv.main_nmid,
-        from_ts=state.current_cycle_started_at,
-        currency=state.currency,
-    )
     covered_bids = [
         item.bid_minor
         for item in cycle_bid_stats
-        if item.impressions >= int(settings_obj.target_test_impressions)
+        if item.impressions >= target_test_impressions
     ]
     legacy_cycle_next_test_bid_minor = manager.choose_next_test_bid(
         min_bid=min_bid_minor,
@@ -226,6 +283,7 @@ async def build_decision_snapshot(
         legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
         coverage_selected_next_test_bid_minor=coverage_next_test,
         rec_bid_recommendation=rec_bid_recommendation,
+        qualified_tested_bids_count=qualified_tested_bids_count,
         computed_at=now,
     )
 

@@ -232,6 +232,7 @@ class AutoShelfBidControlDecisionSnapshot:
     coverage_bid_rows: list[CoverageLayerBidDTO] = field(
         default_factory=_empty_coverage_bid_rows
     )
+    qualified_tested_bids_count: int = 0
     computed_at: datetime | None = None
 
     @property
@@ -264,8 +265,9 @@ def snapshot_from_state_fallback(
 ) -> AutoShelfBidControlDecisionSnapshot:
     """Legacy fallback только когда handler вызван без worker snapshot (snapshot is None).
 
-    ``expected_bid_minor`` для sync-guard берётся из ``state.current_*_bid_minor``;
-    ``fresh_*`` остаются None — progression не подменяется.
+    ``expected_bid_minor`` для sync-guard: test-mode legacy fallback на
+    ``state.current_test_bid_minor``; для main — только ``fresh_best_main_bid_minor``
+    (без ``state.current_main_bid_minor``).
     """
     fresh_main = None
     fresh_test = None
@@ -276,9 +278,7 @@ def snapshot_from_state_fallback(
         control_enabled=control_enabled,
     )
     if expected is None and control_enabled:
-        if state.current_mode == "main":
-            expected = getattr(state, "current_main_bid_minor", None)
-        elif state.current_mode == "test":
+        if state.current_mode == "test":
             expected = getattr(state, "current_test_bid_minor", None)
     status = resolve_bid_sync_status(actual_bid_minor, expected)
     return AutoShelfBidControlDecisionSnapshot(
@@ -293,5 +293,6 @@ def snapshot_from_state_fallback(
         expected_bid_minor=expected,
         bid_sync_status=status,
         can_count_progress=snapshot_can_count_progress(status),
+        qualified_tested_bids_count=0,
         computed_at=None,
     )

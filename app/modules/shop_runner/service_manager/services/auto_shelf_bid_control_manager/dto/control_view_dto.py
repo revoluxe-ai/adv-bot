@@ -113,6 +113,7 @@ class AutoShelfBidControlViewDTO:
     fresh_best_main_bid_minor: int | None = None
     fresh_next_test_bid_minor: int | None = None
     recommended_main_bid_minor: int | None = None
+    qualified_tested_bids_count: int | None = None
     recommended_next_test_bid_minor: int | None = None
     expected_enforced_bid_minor: int | None = None
     primary_status: str | None = None
