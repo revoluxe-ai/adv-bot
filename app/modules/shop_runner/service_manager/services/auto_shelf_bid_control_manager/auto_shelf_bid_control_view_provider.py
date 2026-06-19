@@ -488,9 +488,8 @@ class AutoShelfBidControlViewProvider:
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Собрать DTO для read-only Telegram экрана."""
         app_dry_run = self._app_dry_run()
-        bid_units_confirmed = bool(
-            getattr(settings, "AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", False)
-        )
+        bid_units_confirmed = settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED
+
         adv = await self._repository.get_adv_setting_by_original_id(adv_setting_original_id)
         if adv is None:
             return AutoShelfBidControlViewDTO(
