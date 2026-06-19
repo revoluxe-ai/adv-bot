@@ -11,6 +11,7 @@ from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager impor
     WBModifier,
 )
 from app.core.redis_manager_v2.redis_client import RedisClient
+from app.settings import settings
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
 )
@@ -87,6 +88,11 @@ class AutoShelfBidControlTelegramError(Exception):
     """Пользовательская ошибка сценария Telegram-управления."""
 
     message: str
+
+
+_BID_UNITS_GATE_ERROR = (
+    "Gate ставок не подтверждён: AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED=false"
+)
 
 
 class AutoShelfBidControlTelegramService:
@@ -187,14 +193,25 @@ class AutoShelfBidControlTelegramService:
             }
             and state.current_mode == "main"
         ):
-            await manager._reconcile_expected_bid_for_current_mode(  # pyright: ignore[reportPrivateUsage]
+            snapshot = await manager.build_decision_snapshot(
                 complex_adv_like,  # type: ignore[arg-type]
+                settings_obj=settings_obj,
                 state=state,
-                actual_bid_minor=actual_bid_minor,
                 min_bid_minor=int(min_bid_minor),
-                max_bid_minor=int(settings_obj.max_bid_minor),
-                now=datetime.now(UTC),
+                actual_bid_minor=actual_bid_minor,
+                control_enabled=bool(adv.auto_shelf_bid_control_enabled),
             )
+            if snapshot.expected_bid_minor is not None:
+                await manager.apply_bid_sync_from_snapshot(
+                    complex_adv_like,  # type: ignore[arg-type]
+                    state=state,
+                    snapshot=snapshot,
+                    control_enabled=bool(adv.auto_shelf_bid_control_enabled),
+                    bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
+                    min_bid_minor=int(min_bid_minor),
+                    max_bid_minor=int(settings_obj.max_bid_minor),
+                    now=datetime.now(UTC),
+                )
         return refresh_result
 
     async def enable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
@@ -335,6 +352,7 @@ class AutoShelfBidControlTelegramService:
                 "Нельзя сбросить цикл: max ставка ниже минимальной ставки WB."
             )
         middle_bid = int(round((int(min_bid) + max_bid) / 2))
+        self._require_bid_units_confirmed_for_manual_set()
         now = datetime.now(UTC)
         state = await self._repository.get_state(nmid)
         if state is None:
@@ -381,6 +399,7 @@ class AutoShelfBidControlTelegramService:
             raise AutoShelfBidControlTelegramError(
                 "Нельзя вернуть main-ставку: рабочая ставка ещё не определена."
             )
+        self._require_bid_units_confirmed_for_manual_set()
         settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
         now = datetime.now(UTC)
         state.current_mode = "main"
@@ -394,6 +413,12 @@ class AutoShelfBidControlTelegramService:
             currency=settings_obj.currency,
         )
         return await self.build_view(adv_setting_original_id)
+
+    @staticmethod
+    def _require_bid_units_confirmed_for_manual_set() -> None:
+        """Запретить ручной PATCH WB-ставки, пока gate единиц ставок не подтверждён."""
+        if not settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED:
+            raise AutoShelfBidControlTelegramError(_BID_UNITS_GATE_ERROR)
 
     @staticmethod
     def _parse_positive_int(value: str, error_message: str) -> int:

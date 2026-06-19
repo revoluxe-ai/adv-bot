@@ -886,6 +886,21 @@ class Settings:
         if value is None or not str(value).strip():
             return 300  # значение в рублях
         return int(str(value).strip())
+    @property
+    def AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED(self) -> bool:
+        value = os.environ.get("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        else:
+            raise ValueError(': AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED must be true or false')
+
+
+
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 

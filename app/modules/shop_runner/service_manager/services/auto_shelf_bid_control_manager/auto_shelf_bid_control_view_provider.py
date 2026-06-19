@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import cast
+from typing import Any, cast
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.mp.wb.min_bid_defaults import default_min_bid_rub
@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
     AutoShelfBidRecommendationReadService,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
 )
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_min_bids_cache_manager import (
     MinBidsCacheManager,
@@ -27,6 +30,7 @@ from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
 )
 from .auto_shelf_bid_control_manager import AutoShelfBidControlManager
+from .auto_shelf_bid_setter import AutoShelfBidSetter
 from .bid_coverage_selector import (
     BidCoverage,
     build_bid_universe,
@@ -47,6 +51,11 @@ from .bid_units import (
     wb_min_cpm_rub_to_bid_minor,
 )
 from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
+from .dto.decision_snapshot_dto import (
+    resolve_bid_sync_detail,
+    resolve_expected_bid_minor,
+    resolve_primary_status,
+)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -488,9 +497,8 @@ class AutoShelfBidControlViewProvider:
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Собрать DTO для read-only Telegram экрана."""
         app_dry_run = self._app_dry_run()
-        bid_units_confirmed = bool(
-            getattr(settings, "AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", False)
-        )
+        bid_units_confirmed = settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED
+
         adv = await self._repository.get_adv_setting_by_original_id(adv_setting_original_id)
         if adv is None:
             return AutoShelfBidControlViewDTO(
@@ -744,13 +752,13 @@ class AutoShelfBidControlViewProvider:
             test_bid_minor = state.current_test_bid_minor
             if test_bid_minor is None:
                 test_bid_minor = actual_bid_minor
-            assert test_bid_minor is not None
-            test_impressions = await self._analytics.get_impressions(
-                nmid=nmid,
-                from_ts=test_from_ts,
-                currency=currency,
-                bid_minor=test_bid_minor,
-            )
+            if test_bid_minor is not None:
+                test_impressions = await self._analytics.get_impressions(
+                    nmid=nmid,
+                    from_ts=test_from_ts,
+                    currency=currency,
+                    bid_minor=test_bid_minor,
+                )
         elif nmid and actual_bid_minor is not None:
             test_impressions = await self._analytics.get_impressions(
                 nmid=nmid,
@@ -766,14 +774,14 @@ class AutoShelfBidControlViewProvider:
             main_bid_minor = state.current_main_bid_minor
             if main_bid_minor is None:
                 main_bid_minor = actual_bid_minor
-            assert main_bid_minor is not None
-            main_impressions = await self._analytics.get_impressions(
-                nmid=nmid,
-                from_ts=main_started_at,
-                currency=currency,
-                bid_minor=main_bid_minor,
-                mode="main",
-            )
+            if main_bid_minor is not None:
+                main_impressions = await self._analytics.get_impressions(
+                    nmid=nmid,
+                    from_ts=main_started_at,
+                    currency=currency,
+                    bid_minor=main_bid_minor,
+                    mode="main",
+                )
 
         if nmid:
             try:
@@ -975,6 +983,110 @@ class AutoShelfBidControlViewProvider:
                 selected_next_test_bid_minor=coverage_selected_next_test_bid_minor,
             )
 
+        control_enabled = bool(adv.auto_shelf_bid_control_enabled)
+        recommended_main_bid_minor: int | None = None
+        main_target_explanation: str | None = None
+        recommended_next_test_bid_minor = coverage_selected_next_test_bid_minor
+        fresh_best_main_bid_minor: int | None = None
+        fresh_next_test_bid_minor = recommended_next_test_bid_minor
+        qualified_tested_bids_count: int | None = None
+        can_count_progress = False
+        snapshot_min_bid_minor = min_bid_minor_value
+        if snapshot_min_bid_minor is None and cycle_bid_stats:
+            snapshot_min_bid_minor = min(
+                int(item.bid_minor) for item in cycle_bid_stats
+            )
+        if (
+            state is not None
+            and settings_obj is not None
+            and snapshot_min_bid_minor is not None
+            and nmid
+            and inspect.iscoroutinefunction(
+                getattr(self._analytics, "fetch_rec_bid_ctr_by_bid_for_nmid", None)
+            )
+        ):
+            try:
+                snapshot_manager = AutoShelfBidControlManager(
+                    bid_cache_manager=self._bid_cache,
+                    wb_bid_setter=AutoShelfBidSetter(
+                        wb_modifier=cast(Any, object()),
+                        bid_cache_manager=None,
+                    ),
+                    repository=self._repository,
+                    analytics_repository=self._analytics,
+                )
+                complex_adv_like = cast(
+                    ComplexAdv,
+                    type(
+                        "_ViewComplexAdv",
+                        (),
+                        {
+                            "main_nmid": nmid,
+                            "auto_adv_id": auto_adv_id,
+                            "nmids": [nmid],
+                            "bot_active": bool(getattr(adv, "bot_active", True)),
+                            "auto_adv_active_status": bool(
+                                getattr(adv, "auto_adv_active_status", True)
+                            ),
+                            "auto_shelf_bid_control_enabled": control_enabled,
+                            "auto_shelf_bid_control_strategy": adv.auto_shelf_bid_control_strategy,
+                            "adv_setting": adv,
+                            "fact_pay_for_order": fact_cpo,
+                            "resolve_cpo": resolve_cpo,
+                            "original_max_cpo": getattr(adv, "original_max_cpo", None),
+                            "min_nmids_bids": None,
+                        },
+                    )(),
+                )
+                decision_snapshot = await snapshot_manager.build_decision_snapshot(
+                    complex_adv_like,
+                    settings_obj=settings_obj,
+                    state=state,
+                    min_bid_minor=snapshot_min_bid_minor,
+                    actual_bid_minor=actual_bid_minor,
+                    control_enabled=control_enabled,
+                    bid_units_confirmed=bid_units_confirmed,
+                )
+                if decision_snapshot.rec_bid_recommendation is not None:
+                    rec_bid_recommendation = decision_snapshot.rec_bid_recommendation
+                recommended_main_bid_minor = decision_snapshot.fresh_best_main_bid_minor
+                fresh_best_main_bid_minor = decision_snapshot.fresh_best_main_bid_minor
+                qualified_tested_bids_count = (
+                    decision_snapshot.qualified_tested_bids_count
+                )
+                if decision_snapshot.fresh_next_test_bid_minor is not None:
+                    recommended_next_test_bid_minor = (
+                        decision_snapshot.fresh_next_test_bid_minor
+                    )
+                    fresh_next_test_bid_minor = recommended_next_test_bid_minor
+                    next_test_bid_minor = recommended_next_test_bid_minor
+                if decision_snapshot.main_target_explanation is not None:
+                    main_target_explanation = decision_snapshot.main_target_explanation
+                can_count_progress = decision_snapshot.can_count_progress
+            except Exception:
+                logger.warning(
+                    "decision_snapshot_failed nmid=%s adv_setting_original_id=%s",
+                    nmid,
+                    adv_setting_original_id,
+                    exc_info=True,
+                )
+
+        expected_enforced_bid_minor = resolve_expected_bid_minor(
+            current_mode=(state.current_mode if state else None),
+            fresh_best_main_bid_minor=recommended_main_bid_minor,
+            fresh_next_test_bid_minor=recommended_next_test_bid_minor,
+            control_enabled=control_enabled,
+        )
+        bid_sync_detail = resolve_bid_sync_detail(
+            actual_bid_minor,
+            expected_enforced_bid_minor,
+            control_enabled=control_enabled,
+        )
+        primary_status = resolve_primary_status(
+            control_enabled=control_enabled,
+            last_reason=(state.last_reason if state else None),
+        )
+
         return AutoShelfBidControlViewDTO(
             nmid=nmid,
             auto_adv_id=auto_adv_id,
@@ -1037,5 +1149,15 @@ class AutoShelfBidControlViewProvider:
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
             best_plan_bid_minor=best_plan_bid_minor,
+            fresh_best_main_bid_minor=fresh_best_main_bid_minor,
+            fresh_next_test_bid_minor=fresh_next_test_bid_minor,
+            recommended_main_bid_minor=recommended_main_bid_minor,
+            recommended_next_test_bid_minor=recommended_next_test_bid_minor,
+            expected_enforced_bid_minor=expected_enforced_bid_minor,
+            primary_status=primary_status,
+            bid_sync_detail=bid_sync_detail,
+            can_count_progress=can_count_progress,
+            main_target_explanation=main_target_explanation,
             legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
+            qualified_tested_bids_count=qualified_tested_bids_count,
         )

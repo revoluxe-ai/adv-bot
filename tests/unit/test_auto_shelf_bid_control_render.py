@@ -130,6 +130,8 @@ def test_render_main_message_without_rec_bid_recommendation() -> None:
 def test_render_main_message_with_rec_bid_recommendation() -> None:
     view = replace(
         _view(enabled=True, has_settings=True),
+        fresh_best_main_bid_minor=35_000,
+        fresh_next_test_bid_minor=20_500,
         rec_bid_recommendation={
             "best_expected_bid": 35000,
             "best_plan_bid": 35000,
@@ -199,8 +201,8 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     assert "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a" in message
-    assert "best_expected_bid: 350 \u20bd" in message
-    assert "best_plan_bid: 350 \u20bd" in message
+    assert "best_expected_bid:" not in message
+    assert "best_plan_bid:" not in message
     assert "hours: 7" in message
     assert "bids: 3" in message
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
@@ -237,7 +239,8 @@ def test_render_main_message_rejects_bool_best_plan_bid() -> None:
 
     message = render_auto_shelf_bid_control_message(view)
 
-    assert "best_plan_bid: —" in message
+    assert "best_plan_bid:" not in message
+    assert "Лучшая плановая ставка:" not in message
     assert "bid: —" in message
     assert "ctr: 1.10%" in message
     assert "best_plan_bid: 1 ₽" not in message
@@ -250,6 +253,8 @@ def test_render_main_message_rejects_bool_best_plan_bid() -> None:
 def test_render_main_message_with_coverage_layers_block() -> None:
     view = replace(
         _view(enabled=True, has_settings=True),
+        fresh_best_main_bid_minor=37_500,
+        fresh_next_test_bid_minor=33_900,
         next_test_bid_minor=33_900,
         legacy_cycle_next_test_bid_minor=40_250,
         current_main_bid_minor=20_500,
@@ -303,3 +308,150 @@ def test_render_main_message_with_coverage_layers_block() -> None:
     assert "selected_next_test_bid: 339 ₽" in message
     assert "402.50 ₽" not in message
     assert "Подробный список: в пагинированном просмотрщике." in message
+
+
+def test_render_has_no_conflicting_historical_best_lines() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        enabled=False,
+        actual_bid_minor=57_000,
+        fresh_best_main_bid_minor=57_000,
+        fresh_next_test_bid_minor=41_000,
+        current_main_bid_minor=48_000,
+        cycle_best_bid_minor=48_000,
+        global_best_bid_minor=20_500,
+        best_plan_bid_minor=48_000,
+        rec_bid_recommendation={
+            "plan_ranked": [
+                {"bid": 57_000, "plan_distance_score": 0.1},
+                {"bid": 48_000, "plan_distance_score": 0.2},
+                {"bid": 20_500, "plan_distance_score": 0.3},
+            ],
+        },
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: 570 ₽" in message
+    assert "Следующая тестовая ставка: 410 ₽" in message
+    assert "Top-3 plan_ranked:" in message
+    assert "Лучшая ставка цикла" not in message
+    assert "Лучшая глобальная ставка" not in message
+    assert "Лучшая плановая ставка" not in message
+    assert "Рабочая ставка main: 480 ₽" not in message
+    assert "best_expected_bid" not in message
+    assert "best_plan_bid" not in message
+
+
+def test_render_ranking_consistency_shows_clamp_reason() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        fresh_best_main_bid_minor=50_000,
+        main_target_explanation="clamp_to_range: 57000 -> 50000",
+        rec_bid_recommendation={
+            "plan_ranked": [{"bid": 57_000}],
+        },
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: 500 ₽" in message
+    assert "clamp_to_range: 57000 -> 50000" in message
+    assert message.count("clamp_to_range: 57000 -> 50000") == 1
+
+
+def test_render_disabled_shows_recommended_main_without_dash() -> None:
+    view = replace(
+        _view(enabled=False, has_settings=True),
+        has_state=True,
+        recommended_main_bid_minor=57_000,
+        fresh_best_main_bid_minor=57_000,
+        primary_status="disabled",
+        current_main_bid_minor=48_000,
+        last_reason="main_waiting_observation_time",
+        main_elapsed_minutes=10,
+        target_main_observation_minutes=540,
+        warnings=["no_actual_bid", "no_min_bid"],
+        rec_bid_recommendation={
+            "plan_ranked": [
+                {"bid": 57_000},
+                {"bid": 54_000},
+                {"bid": 48_000},
+            ],
+        },
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: 570 ₽" in message
+    assert "Лучшая ставка: —" not in message
+    assert "main_waiting_observation_time" not in message.split("Последнее событие:")[1].split(
+        "Предупреждения:"
+    )[0]
+    assert "disabled" in message
+
+
+def test_render_enabled_no_actual_shows_recommended_not_not_applied() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        has_state=True,
+        recommended_main_bid_minor=57_000,
+        fresh_best_main_bid_minor=57_000,
+        expected_enforced_bid_minor=57_000,
+        bid_sync_detail="no_actual_bid",
+        actual_bid_minor=None,
+        warnings=["no_actual_bid"],
+        rec_bid_recommendation={"plan_ranked": [{"bid": 57_000}]},
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: 570 ₽" in message
+    assert "НЕ применена" not in message
+    assert "не применена" not in message.lower()
+
+
+def test_insufficient_qualified_bids_render() -> None:
+    """Render: no stale best bid, insufficient reason, next test bid shown."""
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        has_state=True,
+        current_mode="test",
+        current_main_bid_minor=48_000,
+        actual_bid_minor=20_000,
+        fresh_best_main_bid_minor=None,
+        recommended_main_bid_minor=None,
+        fresh_next_test_bid_minor=25_000,
+        recommended_next_test_bid_minor=25_000,
+        qualified_tested_bids_count=1,
+        main_target_explanation="недостаточно протестированных ставок",
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert "Лучшая ставка: — (недостаточно протестированных ставок)" in message
+    assert message.count("недостаточно протестированных ставок") == 1
+    assert "Лучшая ставка: 480 ₽" not in message
+    assert "Лучшая ставка: 570 ₽" not in message
+    assert "Следующая тестовая ставка: 250 ₽" in message
+
+
+def test_render_main_target_explanation_not_duplicated_when_main_bid_missing() -> None:
+    """main_target_explanation рендерится ровно один раз при отсутствии main bid."""
+    explanation = "недостаточно протестированных ставок"
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        has_state=True,
+        current_mode="test",
+        fresh_best_main_bid_minor=None,
+        recommended_main_bid_minor=None,
+        fresh_next_test_bid_minor=25_000,
+        qualified_tested_bids_count=1,
+        main_target_explanation=explanation,
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    assert f"Лучшая ставка: — ({explanation})" in message
+    assert message.count(explanation) == 1
+    assert f"({explanation})\n({explanation})" not in message
