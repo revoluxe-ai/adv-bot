@@ -900,8 +900,8 @@ class Settings:
             raise ValueError(': AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED must be true or false')
 
     @property
-    def CAN_MIN_BID_DEFAULT(self) -> bool:
-        value = os.environ.get("CAN_MIN_BID_DEFAULT")
+    def CAN_NOT_CACHE_DATA(self) -> bool:
+        value = os.environ.get("CAN_NOT_CACHE_DATA")
         if value is None:
             return False
         value = value.strip().lower()

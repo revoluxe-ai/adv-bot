@@ -156,7 +156,7 @@ class WBManager(WBBaseManager):
                 cell: MinBidsV2Cell = (item.adv_id, item.placement_type, nmid)
                 cpm = cached_map.get(cell)
                 if cpm is None:
-                    if settings.CAN_MIN_BID_DEFAULT:
+                    if settings.CAN_NOT_CACHE_DATA:
                         placement = item.placement_type
                         if placement == AdvPlacementType.AUTO_ADV:
                             cpm = settings.MIN_BID_AUTO_DEFAULT

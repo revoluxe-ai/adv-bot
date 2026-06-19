@@ -42,6 +42,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     run_tasks,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.settings import settings
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -75,24 +76,20 @@ class WBShopDataManager:
     @single_run()
     async def __get_calculated_keywords(
         self,
-        complex_adv: ComplexAdv,
-        *,
-        cache_only: bool = True,
+        complex_adv: ComplexAdv
     ) -> list[CalculatedKeyword]:
         """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
 
         Raises:
             ShopRunnerKeywordsCacheMissError: hash отсутствует.
         """
-        if not cache_only:
-            raise RuntimeError(
-                "__get_calculated_keywords(cache_only=False) отключён: "
-                "полный пересчёт — snapshot updater warmup или fetch_keywords_from_database."
-            )
         from app.modules.shop_runner.required_data_miss import (
             fetch_calculated_keywords_from_redis,
         )
-
+        if settings.CAN_NOT_CACHE_DATA:
+            from app.modules.wb_adv_updater.calculated_keywords_manager import CalculatedKeywordsManager
+            calc_kw_manager = CalculatedKeywordsManager()
+            return await calc_kw_manager.get_calculated_keywords(complex_adv)
         return await fetch_calculated_keywords_from_redis(
             complex_adv.adv_id,
             shop_id=complex_adv.shop_id or self.shop_id,
