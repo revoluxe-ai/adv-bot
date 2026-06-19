@@ -660,11 +660,7 @@ class AutoShelfBidControlManager:
         state.test_started_at = now
         state.main_started_at = None
         state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=next_test_bid,
-        )
+        _ = await self._repository.save_state(state)
         logger.info(
             "auto_shelf_bid_control_continue_test_coverage_bootstrap auto_adv_id=%s nmid=%s covered_anchor_count=%s next_test_bid=%s reason=%s",
             complex_adv.auto_adv_id,
@@ -723,11 +719,7 @@ class AutoShelfBidControlManager:
         state.current_main_bid_minor = desired_main_bid
         state.main_started_at = now
         state.last_reason = ControlReason.MAIN_BID_REFRESHED
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=desired_main_bid,
-        )
+        _ = await self._repository.save_state(state)
         logger.info(
             "auto_shelf_bid_control_main_bid_refreshed auto_adv_id=%s nmid=%s previous_main_bid=%s new_main_bid=%s reason=%s",
             complex_adv.auto_adv_id,
@@ -1130,11 +1122,7 @@ class AutoShelfBidControlManager:
                 state.test_started_at = now
                 state.main_started_at = None
                 state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
-                await self._persist_state_then_set_bid(
-                    complex_adv,
-                    state=state,
-                    bid_minor=next_test_bid,
-                )
+                _ = await self._repository.save_state(state)
                 logger.info(
                     "auto_shelf_bid_control_continue_test_coverage_bootstrap auto_adv_id=%s nmid=%s covered_anchor_count=%s next_test_bid=%s reason=%s",
                     auto_adv_id,
@@ -1172,11 +1160,7 @@ class AutoShelfBidControlManager:
         state.current_mode = "main"
         state.main_started_at = now
         state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=best_bid,
-        )
+        _ = await self._repository.save_state(state)
         logger.info(
             "auto_shelf_bid_control_switch_to_main auto_adv_id=%s nmid=%s main_bid=%s reason=%s",
             auto_adv_id,
@@ -1473,11 +1457,7 @@ class AutoShelfBidControlManager:
             state.test_started_at = now
             state.main_started_at = None
             state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
-            await self._persist_state_then_set_bid(
-                complex_adv,
-                state=state,
-                bid_minor=next_test_bid,
-            )
+            _ = await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
                 auto_adv_id,
