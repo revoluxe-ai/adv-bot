@@ -53,10 +53,8 @@ from .bid_units import (
 from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
 from .dto.decision_snapshot_dto import (
     resolve_bid_sync_detail,
-    resolve_bid_sync_status,
     resolve_expected_bid_minor,
     resolve_primary_status,
-    snapshot_can_count_progress,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -992,6 +990,7 @@ class AutoShelfBidControlViewProvider:
         fresh_best_main_bid_minor: int | None = None
         fresh_next_test_bid_minor = recommended_next_test_bid_minor
         qualified_tested_bids_count: int | None = None
+        can_count_progress = False
         snapshot_min_bid_minor = min_bid_minor_value
         if snapshot_min_bid_minor is None and cycle_bid_stats:
             snapshot_min_bid_minor = min(
@@ -1063,6 +1062,7 @@ class AutoShelfBidControlViewProvider:
                     next_test_bid_minor = recommended_next_test_bid_minor
                 if decision_snapshot.main_target_explanation is not None:
                     main_target_explanation = decision_snapshot.main_target_explanation
+                can_count_progress = decision_snapshot.can_count_progress
             except Exception:
                 logger.warning(
                     "decision_snapshot_failed nmid=%s adv_setting_original_id=%s",
@@ -1081,9 +1081,6 @@ class AutoShelfBidControlViewProvider:
             actual_bid_minor,
             expected_enforced_bid_minor,
             control_enabled=control_enabled,
-        )
-        can_count_progress = snapshot_can_count_progress(
-            resolve_bid_sync_status(actual_bid_minor, expected_enforced_bid_minor)
         )
         primary_status = resolve_primary_status(
             control_enabled=control_enabled,

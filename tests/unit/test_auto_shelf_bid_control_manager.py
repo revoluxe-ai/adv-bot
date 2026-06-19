@@ -188,7 +188,11 @@ def _snapshot_from_reconcile_state(
         fresh_next_test_bid_minor=fresh_test,
         expected_bid_minor=expected,
         bid_sync_status=status,
-        can_count_progress=snapshot_can_count_progress(status),
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected,
+            actual_bid_minor=actual_bid_minor,
+            bid_sync_status=status,
+        ),
         computed_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
     )
 
@@ -212,6 +216,7 @@ def _synced_progress_snapshot(
         fresh_best_main_bid_minor = (
             expected_bid_minor if mode == "main" else None
         )
+    bid_sync_status = BidSyncStatus.SYNCED
     return AutoShelfBidControlDecisionSnapshot(
         nmid=nmid,
         auto_adv_id=auto_adv_id,
@@ -222,8 +227,12 @@ def _synced_progress_snapshot(
         fresh_best_main_bid_minor=fresh_best_main_bid_minor,
         fresh_next_test_bid_minor=fresh_next_test_bid_minor,
         expected_bid_minor=expected_bid_minor,
-        bid_sync_status=BidSyncStatus.SYNCED,
-        can_count_progress=True,
+        bid_sync_status=bid_sync_status,
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            bid_sync_status=bid_sync_status,
+        ),
         qualified_tested_bids_count=2,
         computed_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
     )
@@ -262,7 +271,11 @@ def _qualified_main_worker_snapshot(
         fresh_next_test_bid_minor=fresh_next_test_bid_minor,
         expected_bid_minor=expected_bid_minor,
         bid_sync_status=bid_sync_status,
-        can_count_progress=snapshot_can_count_progress(bid_sync_status),
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            bid_sync_status=bid_sync_status,
+        ),
         qualified_tested_bids_count=qualified_tested_bids_count,
         computed_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
     )
@@ -3845,7 +3858,11 @@ def _fresh_main_snapshot(
         fresh_next_test_bid_minor=fresh_test,
         expected_bid_minor=expected,
         bid_sync_status=status,
-        can_count_progress=snapshot_can_count_progress(status),
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected,
+            actual_bid_minor=actual,
+            bid_sync_status=status,
+        ),
     )
 
 

@@ -160,8 +160,17 @@ def resolve_bid_sync_status(
     return BidSyncStatus.PENDING
 
 
-def snapshot_can_count_progress(bid_sync_status: BidSyncStatus) -> bool:
-    """Прогресс test/main считается только при синхронизированной ставке."""
+def snapshot_can_count_progress(
+    *,
+    expected_bid_minor: int | None,
+    actual_bid_minor: int | None,
+    bid_sync_status: BidSyncStatus,
+) -> bool:
+    """Прогресс test/main считается только при полной sync-готовности."""
+    if expected_bid_minor is None:
+        return False
+    if actual_bid_minor is None:
+        return False
     return bid_sync_status == BidSyncStatus.SYNCED
 
 
@@ -292,7 +301,11 @@ def snapshot_from_state_fallback(
         fresh_next_test_bid_minor=fresh_test,
         expected_bid_minor=expected,
         bid_sync_status=status,
-        can_count_progress=snapshot_can_count_progress(status),
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected,
+            actual_bid_minor=actual_bid_minor,
+            bid_sync_status=status,
+        ),
         qualified_tested_bids_count=0,
         computed_at=None,
     )

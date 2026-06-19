@@ -71,8 +71,63 @@ def test_bid_sync_status_synced_only_when_actual_matches_expected() -> None:
     assert (
         resolve_bid_sync_status(48_000, 57_000) == BidSyncStatus.PENDING
     )
-    assert snapshot_can_count_progress(BidSyncStatus.SYNCED) is True
-    assert snapshot_can_count_progress(BidSyncStatus.PENDING) is False
+    assert (
+        resolve_bid_sync_status(48_000, None) == BidSyncStatus.SYNCED
+    )
+    assert snapshot_can_count_progress(
+        expected_bid_minor=57_000,
+        actual_bid_minor=57_000,
+        bid_sync_status=BidSyncStatus.SYNCED,
+    ) is True
+    assert snapshot_can_count_progress(
+        expected_bid_minor=57_000,
+        actual_bid_minor=48_000,
+        bid_sync_status=BidSyncStatus.PENDING,
+    ) is False
+    assert snapshot_can_count_progress(
+        expected_bid_minor=None,
+        actual_bid_minor=48_000,
+        bid_sync_status=BidSyncStatus.SYNCED,
+    ) is False
+
+
+def test_snapshot_expected_none_synced_but_cannot_count_progress() -> None:
+    status = resolve_bid_sync_status(48_000, None)
+    assert status == BidSyncStatus.SYNCED
+    assert (
+        snapshot_can_count_progress(
+            expected_bid_minor=None,
+            actual_bid_minor=48_000,
+            bid_sync_status=status,
+        )
+        is False
+    )
+
+
+def test_snapshot_actual_none_cannot_count_progress() -> None:
+    status = resolve_bid_sync_status(None, 50_000)
+    assert status == BidSyncStatus.PENDING
+    assert (
+        snapshot_can_count_progress(
+            expected_bid_minor=50_000,
+            actual_bid_minor=None,
+            bid_sync_status=status,
+        )
+        is False
+    )
+
+
+def test_snapshot_expected_actual_match_can_count_progress() -> None:
+    status = resolve_bid_sync_status(50_000, 50_000)
+    assert status == BidSyncStatus.SYNCED
+    assert (
+        snapshot_can_count_progress(
+            expected_bid_minor=50_000,
+            actual_bid_minor=50_000,
+            bid_sync_status=status,
+        )
+        is True
+    )
 
 
 def test_resolve_recommended_main_bid_minor_from_plan_ranked_without_min_bid() -> None:

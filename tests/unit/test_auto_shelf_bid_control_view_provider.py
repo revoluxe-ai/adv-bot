@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, UTC
+from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
@@ -1599,3 +1600,94 @@ async def test_build_view_enabled_main_keeps_recommended_without_actual_bid(
     assert view.bid_sync_detail == "no_actual_bid"
     assert view.can_count_progress is False
     assert "no_actual_bid" in view.warnings
+
+
+@pytest.mark.asyncio
+async def test_view_provider_expected_none_can_count_progress_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """enabled main + <2 qualified: snapshot expected None -> can_count_progress False."""
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.auto_shelf_bid_control_strategy = AutoShelfBidControlStrategy.PLAN_DISTANCE
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.target_test_observation_minutes = 60
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 80_000
+    settings_obj.min_bid_distance_minor = 100
+
+    state = MagicMock(
+        current_mode="main",
+        current_main_bid_minor=48_000,
+        current_test_bid_minor=41_000,
+        current_cycle_started_at=datetime(2026, 6, 10, 23, 27, 51, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        main_started_at=datetime(2026, 6, 10, 23, 27, 51, tzinfo=UTC),
+        test_started_at=None,
+        last_reason="main_waiting_observation_time",
+    )
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=state)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.bid_stats_dto import (
+        BidStatsDTO,
+    )
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(
+        return_value=[
+            BidStatsDTO(
+                bid_minor=48_000,
+                currency="RUB",
+                mode=None,
+                last_interval_at=None,
+                impressions=500,
+                clicks=20,
+                carts=2,
+                orders=1,
+                spend=100.0,
+                cart_cpa=5.0,
+                ctr=0.04,
+                cart_cr=0.1,
+            )
+        ]
+    )
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.get_impressions = AsyncMock(return_value=0)
+    analytics.get_first_available_bid_bucket_start = AsyncMock(return_value=None)
+    analytics.get_bid_coverages = AsyncMock(return_value=[])
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.05)
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(
+        return_value=SimpleNamespace(bid_minor=48_000)
+    )  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=12_000)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={"view": _plan_ranked_rec_view()}
+    )  # type: ignore[attr-defined]
+
+    _patch_plan_distance_rec_for_snapshot(monkeypatch)
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.expected_enforced_bid_minor is None
+    assert view.fresh_best_main_bid_minor is None
+    assert view.qualified_tested_bids_count == 1
+    assert view.can_count_progress is False

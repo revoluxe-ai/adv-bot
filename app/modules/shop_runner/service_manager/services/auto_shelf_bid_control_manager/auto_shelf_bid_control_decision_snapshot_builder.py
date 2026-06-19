@@ -277,7 +277,11 @@ async def build_decision_snapshot(
         fresh_next_test_bid_minor=fresh_next_test_bid_minor,
         expected_bid_minor=expected_bid_minor,
         bid_sync_status=bid_sync_status,
-        can_count_progress=snapshot_can_count_progress(bid_sync_status),
+        can_count_progress=snapshot_can_count_progress(
+            expected_bid_minor=expected_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            bid_sync_status=bid_sync_status,
+        ),
         main_target_explanation=main_target_explanation,
         best_plan_bid_minor=best_plan_bid_minor,
         legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
