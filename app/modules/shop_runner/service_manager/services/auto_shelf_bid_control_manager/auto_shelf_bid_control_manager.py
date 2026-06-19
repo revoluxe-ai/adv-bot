@@ -1178,11 +1178,21 @@ class AutoShelfBidControlManager:
         max_bid = int(settings_obj.max_bid_minor)
         if snapshot.fresh_best_main_bid_minor is None:
             next_test_bid = snapshot.fresh_next_test_bid_minor
-            if next_test_bid is None and state.current_mode == "test":
+            if next_test_bid is None:
                 next_test_bid = state.current_test_bid_minor
-            if next_test_bid is not None:
-                state.current_test_bid_minor = next_test_bid
-                state.test_started_at = now
+            if next_test_bid is None:
+                state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+                _ = await self._repository.save_state(state)
+                logger.info(
+                    "auto_shelf_bid_control_revert_main_blocked_no_test_bid auto_adv_id=%s nmid=%s qualified_count=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    snapshot.qualified_tested_bids_count,
+                    state.last_reason,
+                )
+                return None
+            state.current_test_bid_minor = next_test_bid
+            state.test_started_at = now
             state.current_mode = "test"
             state.main_started_at = None
             state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS

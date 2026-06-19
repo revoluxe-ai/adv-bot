@@ -5146,6 +5146,153 @@ async def test_main_mode_with_one_qualified_switches_to_test() -> None:
 
 
 @pytest.mark.asyncio
+async def test_main_mode_insufficient_bids_uses_existing_current_test_bid_when_fresh_next_missing() -> None:
+    """main + no best + no fresh_next: fallback на state.current_test_bid_minor."""
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="main",
+        current_main_bid_minor=48_000,
+        current_test_bid_minor=50_000,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        main_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        test_started_at=None,
+        currency="RUB",
+        last_reason=ControlReason.MAIN_WAITING_OBSERVATION_TIME,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+    )
+    snapshot = AutoShelfBidControlDecisionSnapshot(
+        nmid=30369094,
+        auto_adv_id=35018182,
+        current_mode="main",
+        actual_bid_minor=48_000,
+        min_bid_minor=10_000,
+        max_bid_minor=80_000,
+        fresh_best_main_bid_minor=None,
+        fresh_next_test_bid_minor=None,
+        expected_bid_minor=None,
+        bid_sync_status=BidSyncStatus.MISMATCH_NOT_APPLIED,
+        can_count_progress=False,
+        qualified_tested_bids_count=1,
+        computed_at=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC),
+    )
+
+    await manager._handle_main_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=48_000,
+        snapshot=snapshot,
+    )
+
+    assert state.current_mode == "test"
+    assert state.current_test_bid_minor == 50_000
+    assert state.main_started_at is None
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.last_reason != ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_not_awaited()
+    repository.save_state.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_main_mode_insufficient_bids_without_any_test_bid_blocks_cleanly() -> None:
+    """main + no best + no test bid: block без setter и без main waiting."""
+    repository = MagicMock()
+    repository.save_state = AsyncMock()
+    wb_bid_setter = MagicMock()
+    wb_bid_setter.set_bid = AsyncMock()
+    manager = AutoShelfBidControlManager(
+        bid_cache_manager=MagicMock(),
+        wb_bid_setter=wb_bid_setter,
+        repository=repository,
+        analytics_repository=MagicMock(),
+    )
+    manager._persist_state_then_set_bid = AsyncMock()  # type: ignore[method-assign]
+    manager._choose_main_bid_by_strategy = AsyncMock()  # type: ignore[method-assign]
+    state = MagicMock(
+        current_mode="main",
+        current_main_bid_minor=48_000,
+        current_test_bid_minor=None,
+        current_cycle_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        previous_cycle_started_at=None,
+        main_started_at=datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC),
+        test_started_at=None,
+        currency="RUB",
+        last_reason=ControlReason.MAIN_WAITING_OBSERVATION_TIME,
+    )
+    settings_obj = MagicMock(
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        test_share=0.1,
+        max_bid_minor=80_000,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=30369094,
+        auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
+    )
+    snapshot = AutoShelfBidControlDecisionSnapshot(
+        nmid=30369094,
+        auto_adv_id=35018182,
+        current_mode="main",
+        actual_bid_minor=48_000,
+        min_bid_minor=10_000,
+        max_bid_minor=80_000,
+        fresh_best_main_bid_minor=None,
+        fresh_next_test_bid_minor=None,
+        expected_bid_minor=None,
+        bid_sync_status=BidSyncStatus.MISMATCH_NOT_APPLIED,
+        can_count_progress=False,
+        qualified_tested_bids_count=1,
+        computed_at=datetime(2026, 6, 13, 12, 5, 0, tzinfo=UTC),
+    )
+
+    await manager._handle_main_mode(
+        complex_adv=complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=48_000,
+        snapshot=snapshot,
+    )
+
+    assert state.current_mode == "main"
+    assert state.current_main_bid_minor == 48_000
+    assert state.last_reason == ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+    assert state.last_reason != ControlReason.MAIN_WAITING_OBSERVATION_TIME
+    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    manager._persist_state_then_set_bid.assert_not_awaited()
+    wb_bid_setter.set_bid.assert_not_awaited()
+    repository.save_state.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_zero_qualified_bids_starts_test_not_main(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
