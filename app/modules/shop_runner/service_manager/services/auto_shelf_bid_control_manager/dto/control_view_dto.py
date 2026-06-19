@@ -110,5 +110,14 @@ class AutoShelfBidControlViewDTO:
         default_factory=lambda: cast(list[CoverageLayerBidDTO], [])
     )
     best_plan_bid_minor: int | None = None
+    fresh_best_main_bid_minor: int | None = None
+    fresh_next_test_bid_minor: int | None = None
+    recommended_main_bid_minor: int | None = None
+    recommended_next_test_bid_minor: int | None = None
+    expected_enforced_bid_minor: int | None = None
+    primary_status: str | None = None
+    bid_sync_detail: str | None = None
+    can_count_progress: bool = False
+    main_target_explanation: str | None = None
     rec_bid_recommendation: dict[str, object] | None = None
     legacy_cycle_next_test_bid_minor: int | None = None

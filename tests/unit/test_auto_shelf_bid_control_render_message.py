@@ -149,15 +149,3 @@ def test_render_shows_main_waiting_observation_progress() -> None:
     assert "Main: 31572 / 18000 показов" in text
 
 
-def test_render_shows_optimization_metric_cpc() -> None:
-    """Отображение метрики оптимизации CPC."""
-    view = _view_with_bid_point(optimization_metric=OptimizationMetric.CPC)
-    text = render_auto_shelf_bid_control_message(view)
-    assert "Оптимизация: CPC" in text
-
-
-def test_render_shows_optimization_metric_ctr() -> None:
-    """Отображение метрики оптимизации CTR."""
-    view = _view_with_bid_point(optimization_metric=OptimizationMetric.CTR)
-    text = render_auto_shelf_bid_control_message(view)
-    assert "Оптимизация: CTR" in text

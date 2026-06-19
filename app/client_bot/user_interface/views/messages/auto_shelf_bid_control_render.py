@@ -215,13 +215,10 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
 
     return (
         "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a\n"
-        f"best_expected_bid: {_format_rec_bid_best_bid(recommendation_dict.get('best_expected_bid'))}\n"
-        f"best_plan_bid: {_format_rec_bid_best_bid(recommendation_dict.get('best_plan_bid'))}\n"
         f"hours: {hour_observation_count}\n"
         f"bids: {bid_count}\n\n"
         "Top-3 plan_ranked:\n"
         f"{plan_ranked_text}\n\n"
-
     )
 
 
@@ -464,6 +461,21 @@ def _format_main_waiting_reason(view: AutoShelfBidControlViewDTO) -> str:
     )
 
 
+def _format_last_event(view: AutoShelfBidControlViewDTO) -> str:
+    """Последнее событие: при выключенном control не показываем active last_reason."""
+    if view.primary_status == "disabled":
+        return "disabled"
+    return _format_main_waiting_reason(view)
+
+
+def _render_main_bid_line(view: AutoShelfBidControlViewDTO) -> str:
+    """Лучшая свежая main-ставка (не expected_enforced и не stored state)."""
+    main_bid = view.recommended_main_bid_minor
+    if main_bid is None:
+        main_bid = view.fresh_best_main_bid_minor
+    return f"Лучшая ставка: {format_bid(main_bid, view.currency)}\n"
+
+
 def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> str:
     """Собрать основной экран управления ставкой в полках."""
     state_missing = (
@@ -490,18 +502,14 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Gate ставок: {gate_text}\n\n"
         f"{state_missing}"
         f"Режим сейчас: {view.current_mode or '—'}\n"
-        f"Оптимизация: {optimization_text}\n"
         f"Текущая ставка WB: {format_bid(view.actual_bid_minor, view.currency)}\n"
-        f"Рабочая ставка main: {format_bid(view.current_main_bid_minor, view.currency)}\n"
-        f"Тестовая ставка test: {format_bid(view.current_test_bid_minor, view.currency)}\n"
-        f"Лучшая ставка цикла: {format_bid(view.cycle_best_bid_minor, view.currency)}\n"
-        f"Лучшая глобальная ставка: {format_bid(view.global_best_bid_minor, view.currency)}\n"
-        f"Следующая тестовая ставка: {format_bid(view.next_test_bid_minor, view.currency)}\n\n"
+        + _render_main_bid_line(view)
         + (
-            f"Лучшая плановая ставка: {format_bid(view.best_plan_bid_minor, view.currency)}\n\n"
-            if view.best_plan_bid_minor is not None
+            f"({view.main_target_explanation})\n"
+            if view.main_target_explanation
             else ""
         )
+        + f"Следующая тестовая ставка: {format_bid(view.fresh_next_test_bid_minor, view.currency)}\n\n"
         + "Диапазон теста:\n"
         f"Минимальная ставка WB: {format_bid(view.min_bid_minor, view.currency)}\n"
         f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
@@ -516,7 +524,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
         f"Main начат: {_format_cycle_timestamp(view.main_started_at)}\n\n"
         f"{coverage_layer_text}\n\n"
         "Последнее событие:\n"
-        f"{_format_main_waiting_reason(view)}\n\n"
+        f"{_format_last_event(view)}\n\n"
         "Предупреждения:\n"
         f"{_warnings_to_text(view)}"
         f"{rec_bid_block}"
