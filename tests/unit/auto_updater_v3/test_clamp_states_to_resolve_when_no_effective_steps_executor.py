@@ -123,14 +123,18 @@ def _adv_state(
     *,
     resolve: float = 500.0,
     max_effective_steps: int = 0,
+    configured_keyword_calibration_max_step: int = 0,
     aggressiveness: V3RolloutAggressiveness = V3RolloutAggressiveness.MAX,
 ) -> AdvState:
-    """Build an ``AdvState`` with the live resolve and calibration budget."""
+    """Build an ``AdvState`` with the live resolve and calibration settings."""
     return replace(
         AdvState.empty(),
         resolve=resolve,
         resolve_valid=True,
         max_effective_steps=max_effective_steps,
+        configured_keyword_calibration_max_step=(
+            configured_keyword_calibration_max_step
+        ),
         policy=SelectionPolicy.from_aggressiveness(
             click_mode=ShelfClickMode.ORGANIC_DOMINANT,
             aggressiveness=aggressiveness,
@@ -474,7 +478,52 @@ def test_pfo_active_within_resolve_is_unchanged() -> None:
 
 
 @pytest.mark.unit
-def test_enabled_effective_steps_still_clamp_above_resolve_states() -> None:
+def test_configured_steps_gt_zero_skips_even_when_runtime_effective_is_zero() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=650.0, max_cpo=800.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=_adv_state(
+            resolve=500.0,
+            max_effective_steps=0,
+            configured_keyword_calibration_max_step=20,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_configured_steps_gt_zero_skips_when_runtime_effective_positive() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=650.0, max_cpo=800.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=_adv_state(
+            resolve=500.0,
+            max_effective_steps=20,
+            configured_keyword_calibration_max_step=20,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_configured_zero_clamps_even_when_runtime_effective_positive() -> None:
     dto = _dto(
         ks_id=1,
         mode=KeywordStrategyMode.MAX_CONVERSION,
@@ -483,10 +532,104 @@ def test_enabled_effective_steps_still_clamp_above_resolve_states() -> None:
     )
     ctx = _context(
         dto,
-        adv_state=_adv_state(resolve=500.0, max_effective_steps=2),
+        adv_state=_adv_state(
+            resolve=500.0,
+            max_effective_steps=20,
+            configured_keyword_calibration_max_step=0,
+        ),
     )
     executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
     executor.execute(ctx)
     assert executor.skip_reason is None
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
     assert dto.current_target_place == 20
+
+
+@pytest.mark.unit
+def test_configured_default_one_skips_without_explicit_zero() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=650.0, max_cpo=800.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=replace(
+            _adv_state(resolve=500.0, max_effective_steps=0),
+            configured_keyword_calibration_max_step=1,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_adv_32824944_like_scenario_skips_clamp() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=800.0, max_cpo=900.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=_adv_state(
+            resolve=750.0,
+            max_effective_steps=20,
+            configured_keyword_calibration_max_step=20,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_final_clamp_instance_skips_when_configured_gt_zero() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=650.0, max_cpo=800.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=_adv_state(
+            resolve=500.0,
+            configured_keyword_calibration_max_step=20,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor(
+        phase_name="final_clamp_states_to_resolve",
+    )
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_enabled_effective_steps_do_not_trigger_clamp_when_configured_gt_zero() -> None:
+    dto = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=350.0, max_cpo=800.0),
+        position_profile=_sample_profile(),
+    )
+    ctx = _context(
+        dto,
+        adv_state=_adv_state(
+            resolve=500.0,
+            max_effective_steps=2,
+            configured_keyword_calibration_max_step=20,
+        ),
+    )
+    executor = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    executor.execute(ctx)
+    assert executor.skip_reason == "configured_steps_gt_0"
+    assert dto.current_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert dto.next_state == []

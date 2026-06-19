@@ -66,6 +66,7 @@ def summarize_phase_zero_actions(
     shelf_active: bool = False,
     calibration_direct: CalibrationDirect | str | None = None,
     max_effective_steps: int = 1,
+    configured_keyword_calibration_max_step: int = 1,
     policy: SelectionPolicy | None = None,
     **_: Any,
 ) -> str:
@@ -86,6 +87,7 @@ def summarize_phase_zero_actions(
         shelf_active: полка включена в РК.
         calibration_direct: ветка калибровки UP или DOWN (``CalibrationDirect``).
         max_effective_steps: adaptive cap калибровки.
+        configured_keyword_calibration_max_step: пользовательский cap шагов калибратора.
         policy: SelectionPolicy для passing/realloc (опционально).
 
     Returns:
@@ -100,12 +102,16 @@ def summarize_phase_zero_actions(
         "clamp_states_to_resolve_when_no_effective_steps": lambda: _note_clamp_states_to_resolve_when_no_effective_steps(
             prepared,
             resolve=resolve,
-            max_effective_steps=max_effective_steps,
+            configured_keyword_calibration_max_step=(
+                configured_keyword_calibration_max_step
+            ),
         ),
         "final_clamp_states_to_resolve": lambda: _note_clamp_states_to_resolve_when_no_effective_steps(
             prepared,
             resolve=resolve,
-            max_effective_steps=max_effective_steps,
+            configured_keyword_calibration_max_step=(
+                configured_keyword_calibration_max_step
+            ),
         ),
         "not_full_target_place_migrate": lambda: _note_not_full_tp_migrate(prepared),
         "validate_not_full_state": lambda: _note_validate_not_full(prepared),
@@ -199,14 +205,14 @@ def _note_clamp_states_to_resolve_when_no_effective_steps(
     prepared: PreparedListLike,
     *,
     resolve: float | None,
-    max_effective_steps: int,
+    configured_keyword_calibration_max_step: int,
 ) -> str:
     if resolve is None or float(resolve) <= 0:
         return "resolve недоступен"
     if not prepared:
         return "нет operable ключей"
-    if max_effective_steps != 0:
-        return "изменений по resolve не требуется"
+    if configured_keyword_calibration_max_step != 0:
+        return "configured max_step > 0, clamp пропущен"
     return "нет активных ключей дороже resolve"
 
 

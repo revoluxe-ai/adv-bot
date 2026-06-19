@@ -1,8 +1,9 @@
 """Preamble clamp for active states against the live ``resolve`` ceiling.
 
-The executor keeps the economic invariant centralized: active keyword states
-must stay at or below the current campaign ``resolve``. ``max_effective_steps``
-remains a separate calibration-budget concern.
+When ``AdvSetting.keyword_calibration_max_step`` (configured) is ``0``, active
+keyword states with predicted CPO above ``resolve`` are downgraded or turned OFF.
+When configured steps are greater than zero, this executor skips — runtime
+``max_effective_steps`` is not used for this gate.
 """
 
 from __future__ import annotations
@@ -32,10 +33,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 
 
 class ClampStatesToResolveWhenNoEffectiveStepsExecutor:
-    """Clamp active states to the current ``resolve`` ceiling.
+    """Clamp active states to ``resolve`` only when configured calibration steps are zero.
 
-    Экземпляр может переопределять ``phase_name`` для отчёта, не меняя сам
-    экономический clamp-контракт.
+    Экземпляр может переопределять ``phase_name`` для отчёта (1b preamble / 1c
+    final), не меняя gate по ``configured_keyword_calibration_max_step``.
     """
 
     phase_name = "clamp_states_to_resolve_when_no_effective_steps"
@@ -49,11 +50,15 @@ class ClampStatesToResolveWhenNoEffectiveStepsExecutor:
         )
 
     def execute(self, context: UpdateContext) -> None:
-        """Downgrade over-resolve active states to the best reachable economic state."""
+        """Downgrade over-resolve active states when configured calibration steps are zero."""
         self._skip_reason = None
         state = context.adv_state
         if not state.resolve_valid or float(state.resolve) <= 0:
             self._skip_reason = "resolve_invalid"
+            return
+
+        if state.configured_keyword_calibration_max_step != 0:
+            self._skip_reason = "configured_steps_gt_0"
             return
 
         resolve = float(state.resolve)

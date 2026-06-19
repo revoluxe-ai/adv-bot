@@ -49,6 +49,7 @@ class AdvState:
     guard_condition: bool
     calibration_direct: CalibrationDirect | None
     max_effective_steps: int
+    configured_keyword_calibration_max_step: int
     calibration_phase_extra: dict[str, Any] = field(
         default_factory=lambda: dict[str, Any]()
     )
@@ -132,4 +133,5 @@ class AdvState:
             guard_condition=False,
             calibration_direct=None,
             max_effective_steps=1,
+            configured_keyword_calibration_max_step=1,
         )

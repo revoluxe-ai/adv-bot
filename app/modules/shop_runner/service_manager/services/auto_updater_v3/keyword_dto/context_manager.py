@@ -177,5 +177,8 @@ class UpdateContextManager:
             guard_condition=guard_condition,
             calibration_direct=tick_input.calibration_direct,
             max_effective_steps=tick_input.max_effective_steps,
+            configured_keyword_calibration_max_step=(
+                tick_input.configured_keyword_calibration_max_step
+            ),
             calibration_phase_extra=dict(tick_input.calibration_phase_extra),
         )

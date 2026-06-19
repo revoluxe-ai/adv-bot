@@ -117,6 +117,7 @@ async def test_load_builds_tick_input_for_normal() -> None:
     assert tick_data.tick_input is not None
     assert tick_data.tick_input.fact is fact
     assert tick_data.fact_source == "dto"
+    assert tick_data.tick_input.configured_keyword_calibration_max_step == 8
 
 
 @pytest.mark.unit

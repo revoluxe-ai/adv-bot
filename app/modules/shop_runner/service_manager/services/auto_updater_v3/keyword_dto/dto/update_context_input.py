@@ -45,6 +45,7 @@ class UpdateContextInput:
     views_equal: bool = True
     calibration_direct: CalibrationDirect | None = None
     max_effective_steps: int = 1
+    configured_keyword_calibration_max_step: int = 1
     calibration_phase_extra: dict[str, Any] = field(
         default_factory=lambda: dict[str, Any]()
     )

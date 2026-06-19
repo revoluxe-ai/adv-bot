@@ -311,11 +311,11 @@ PHASE_TITLES: dict[str, tuple[str, str]] = {
     "validate_state_by_hard_status": ("1 · V · validate hard_status", "OFF"),
     "clamp_state_to_aggression": ("1a · clamp · aggression cap", "DOWN"),
     "clamp_states_to_resolve_when_no_effective_steps": (
-        "1b · clamp · resolve when steps=0",
+        "1b · clamp · resolve when configured steps=0",
         "DOWN, OFF",
     ),
     "final_clamp_states_to_resolve": (
-        "1c · clamp · final resolve safety",
+        "1c · clamp · final resolve safety when configured steps=0",
         "DOWN, OFF",
     ),
     "no_data_bootstrap": ("2 · DATA_BOOTSTRAP", "UP"),
