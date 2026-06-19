@@ -36,7 +36,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
     ComplexAdv,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -129,6 +128,9 @@ class WBManager(WBBaseManager):
         context: str = "",
     ) -> AdvMinNmidsBids:
         """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path).
+
+        Возвращает только закэшированные ячейки; miss не подставляет ``MIN_BID_*_DEFAULT``
+        (дефолты — ``apply_min_bid_defaults_for_advs`` при ``apply_defaults=True``).
 
         При miss ячейки — ``logger.warning`` (ожидаемо до ``preload_min_bids_cache_miss`` /
         snapshot). ERROR оставлен для ``refresh_min_bids_cache*`` (сбой WB). Ops: перенести
