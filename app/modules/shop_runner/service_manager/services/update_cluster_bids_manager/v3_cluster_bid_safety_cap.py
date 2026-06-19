@@ -15,10 +15,8 @@ from typing import TYPE_CHECKING
 
 from app.modules.cluster_bids_redis import ClusterBidKey
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.modules.predict_keywords_target_place.clickhouse_manager.dto import BidPosition
-from app.modules.predict_keywords_target_place.di import (
-    PredictKeywordsTargetPlaceContainer,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     aggression_target_for_stored_mode,
 )
@@ -179,8 +177,7 @@ async def build_v3_matrix_cap_index(
     if not cells_by_adv_id:
         return {}
 
-    container = PredictKeywordsTargetPlaceContainer()
-    predictor = container.predict_keywords_target_place()
+    predictor = build_predict_keywords_target_place()
     cap_index: dict[CellKey, int] = {}
     sem = asyncio.Semaphore(_PREDICT_PROFILES_MAX_CONCURRENT)
 
