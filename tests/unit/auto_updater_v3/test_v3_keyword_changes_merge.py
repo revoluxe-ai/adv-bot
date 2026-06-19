@@ -134,13 +134,13 @@ def test_merge_keeps_distinct_clamp_phase_ids() -> None:
         phases=[
             V3PhaseStats(
                 phase_id="clamp_states_to_resolve_when_no_effective_steps",
-                title_ru="1b · clamp · resolve when steps=0",
+                title_ru="1b · clamp · resolve when configured steps=0",
                 planned=1,
                 down=1,
             ),
             V3PhaseStats(
                 phase_id="final_clamp_states_to_resolve",
-                title_ru="1c · clamp · final resolve safety",
+                title_ru="1c · clamp · final resolve safety when configured steps=0",
                 planned=1,
                 down=1,
             ),

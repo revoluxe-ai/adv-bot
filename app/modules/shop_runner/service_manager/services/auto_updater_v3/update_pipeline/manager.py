@@ -169,6 +169,9 @@ def _phase_outcome_note(
         views_changed=state.views_changed,
         calibration_direct=state.calibration_direct,
         max_effective_steps=state.max_effective_steps,
+        configured_keyword_calibration_max_step=(
+            state.configured_keyword_calibration_max_step
+        ),
     )
 
 

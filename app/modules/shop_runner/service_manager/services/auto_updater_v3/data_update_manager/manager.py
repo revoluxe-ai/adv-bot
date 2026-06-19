@@ -252,6 +252,9 @@ class DataUpdateManager:
                 views_equal=views_equal,
                 calibration_direct=current_calibration_direct,
                 max_effective_steps=effective_calibration_steps,
+                configured_keyword_calibration_max_step=int(
+                    complex_adv.keyword_calibration_max_step
+                ),
                 calibration_phase_extra=calibration_phase_extra,
             )
         elif (

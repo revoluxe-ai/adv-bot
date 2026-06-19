@@ -56,6 +56,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors import (
     build_normal_preamble_executors,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.clamp_states_to_resolve_when_no_effective_steps import (
+    ClampStatesToResolveWhenNoEffectiveStepsExecutor,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.resolve_calibration import (
     ResolveCalibrationExecutor,
 )
@@ -65,7 +68,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
 )
-from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order
+from tests.unit.test_auto_updater_v3 import _calc_kw, _conv_for_pay_for_order, _sample_profile
 
 
 def _ladder_states(
@@ -706,3 +709,38 @@ def test_generator_calibration_includes_off_no_data_in_list2() -> None:
 def test_calibration_executor_in_preamble() -> None:
     phases = [e.phase_name for e in build_normal_preamble_executors()]
     assert "resolve_calibration" in phases
+
+
+@pytest.mark.unit
+def test_clamp_skip_with_configured_steps_does_not_block_calibration_up() -> None:
+    """adv 32824944-like: configured=20 skips clamp; LOOSEN UP is not blocked."""
+    kw = _calc_kw(
+        ks_id=1,
+        text="kw1",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        hard_status=2,
+    )
+    kw.keyword_setting.target_place = 10
+    dto = KeywordDTO.from_context(
+        KeywordV3Context(keyword=kw, position_profile=_sample_profile()),
+        ladder_states=_ladder_states(1, min_cpo=300.0, opt_cpo=800.0, max_cpo=900.0),
+    )
+    adv = _cal_adv_state(
+        resolve=750.0,
+        max_pay_for_order=750.0,
+        fact_pay_for_order=636.0,
+        calibration_direct=CalibrationDirect.LOOSEN,
+        max_effective_steps=1,
+        configured_keyword_calibration_max_step=20,
+    )
+    ctx = _ctx(dto, adv_state=adv)
+    clamp = ClampStatesToResolveWhenNoEffectiveStepsExecutor()
+    clamp.execute(ctx)
+    assert clamp.skip_reason == "configured_steps_gt_0"
+    assert dto.next_state == []
+    calibration = ResolveCalibrationExecutor()
+    calibration.execute(ctx)
+    assert calibration.skip_reason != "prior_safety_blocks_reverse_up"
+    assert len(dto.next_state) == 1
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM

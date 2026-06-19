@@ -30,9 +30,9 @@ reset → S → R → enable → pfo_off → cal → resolve_clamp.
   в ``0``;
 - **skip_up / raise / reset / shelf / rebalance / calibration** обслуживают
   исключительно FULL ladder-контур;
-- финальный ``resolve_clamp`` в конце pipeline гарантирует, что later UP-фазы не
-  вернут state выше current resolve, но получает отдельный ``phase_id`` для
-  отчётности;
+- финальный ``resolve_clamp`` (1c) использует тот же executor, что и 1b: clamp
+  только при ``keyword_calibration_max_step == 0``; при configured steps > 0 обе
+  фазы пропускаются;
 
 В итоге этот модуль работает как “карта движений” для NORMAL pipeline: он
 объясняет, где начинается PFO bootstrap, где заканчивается NF-коррекция и где

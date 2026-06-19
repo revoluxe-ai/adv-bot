@@ -136,10 +136,9 @@ def test_resolve_clamp_zero_actions_reports_neutral_reason() -> None:
         "clamp_states_to_resolve_when_no_effective_steps",
         prepared=prepared,
         resolve=550.0,
-        max_effective_steps=1,
+        configured_keyword_calibration_max_step=20,
     )
-    assert "effective steps включены" not in note
-    assert "изменений по resolve не требуется" in note
+    assert "configured max_step > 0" in note
 
 
 @pytest.mark.unit
@@ -156,6 +155,6 @@ def test_final_resolve_clamp_uses_same_zero_action_note() -> None:
         "final_clamp_states_to_resolve",
         prepared=prepared,
         resolve=550.0,
-        max_effective_steps=1,
+        configured_keyword_calibration_max_step=20,
     )
-    assert "изменений по resolve не требуется" in note
+    assert "configured max_step > 0" in note
