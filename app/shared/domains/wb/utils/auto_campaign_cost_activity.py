@@ -1,4 +1,10 @@
-"""Unified cost-based activity decision for auto campaigns."""
+"""Единое решение об активности автокампании по среднему CPO vs resolve.
+
+При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
+автокампанию на паузу, UI показывает предупреждение.
+
+При включённом ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +27,14 @@ from app.shared.domains.wb.utils.cost_resolver import (
 
 if TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import AdvSetting
+
+
+def _cost_rule_controls_auto_campaign(adv_setting: AdvSetting) -> bool:
+    """True, если cost-rule (пауза автокампании по среднему CPO) применяется.
+
+    Не применяется при ``auto_shelf_bid_control_enabled``.
+    """
+    return not adv_setting.auto_shelf_bid_control_enabled
 
 
 @dataclass(frozen=True)
@@ -75,13 +89,12 @@ async def get_auto_campaign_cost_activity_metrics(
         else None
     )
     is_active: bool | None
-    if adv_setting.auto_shelf_bid_control_enabled:
+    if not _cost_rule_controls_auto_campaign(adv_setting):
         is_active = True
+    elif target_cost is None or avg_cost is None:
+        is_active = None
     else:
-        if target_cost is None or avg_cost is None:
-            is_active = None
-        else:
-            is_active = avg_cost <= target_cost
+        is_active = avg_cost <= target_cost
 
     campaign_sales_state: SalesStates | None = None
     if plan is not None:
