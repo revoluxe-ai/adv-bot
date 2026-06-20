@@ -103,6 +103,12 @@ from .services.v3_status_mode_sync import (
     is_v3_campaign,
     keyword_strategy_mode_for_adv_strategy,
 )
+from .services.update_cluster_bids_manager.cluster_bid_trace import (
+    is_trace_cell,
+    is_trace_enabled,
+    log_cluster_bid_trace,
+    trace_target_defaults,
+)
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     NewBid,
@@ -262,9 +268,48 @@ class CoroutinesManager:
             assert state is not None
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=False,
+                        stale_reason="stale_over_6h",
+                        stats_freshness_kind=kind,
+                    )
             elif state.is_fresh:
                 fresh.append(adv)
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=True,
+                        stale_reason="",
+                        stats_freshness_kind=kind,
+                    )
             else:
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=False,
+                        stale_reason=state.reason,
+                        stats_freshness_kind=kind,
+                    )
                 logger.debug(
                     "Automation skipped by stale stats: shop_id=%s adv_id=%s op=%s reason=%s",
                     self.shop_id,
@@ -1030,15 +1075,44 @@ class CoroutinesManager:
             tasks_manager=self._tasks_manager,
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
-        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+        all_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
-        advs = [adv for adv in advs if adv.bot_active]
+        trace_defaults = trace_target_defaults()
+        trace_adv_id = trace_defaults.get("adv_id")
+        trace_adv = next(
+            (adv for adv in all_advs if adv.adv_id == trace_adv_id),
+            None,
+        ) if trace_adv_id is not None else None
+        if trace_adv_id is not None and is_trace_cell(
+            shop_id=self.shop_id, adv_id=trace_adv_id
+        ):
+            log_cluster_bid_trace(
+                step="tick_enter",
+                shop_id=self.shop_id,
+                adv_id=trace_adv_id,
+                in_complex_advs=trace_adv is not None,
+                bot_active=trace_adv.bot_active if trace_adv is not None else None,
+                bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
+            )
+        advs = [adv for adv in all_advs if adv.bot_active]
         advs = [
             adv
             for adv in advs
             if adv.bidder_active
         ]
+        if trace_adv_id is not None and is_trace_cell(
+            shop_id=self.shop_id, adv_id=trace_adv_id
+        ):
+            log_cluster_bid_trace(
+                step="tick_pre_stale",
+                shop_id=self.shop_id,
+                adv_id=trace_adv_id,
+                passed_bot_active=trace_adv.bot_active if trace_adv is not None else None,
+                passed_bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
+                in_bot_bidder_filtered=trace_adv is not None
+                and trace_adv.adv_id in {adv.adv_id for adv in advs},
+            )
 
         advs_filtred, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="update_cluster_bids"

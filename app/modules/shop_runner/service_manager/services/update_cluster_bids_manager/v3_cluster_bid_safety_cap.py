@@ -51,6 +51,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from .cluster_bid_trace import is_trace_cell, is_trace_enabled, log_cluster_bid_trace
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import (
     BidderKeywordStatus,
 )
@@ -283,12 +284,44 @@ def apply_v3_cluster_bid_safety_cap(
         if not cell.v3_managed:
             continue
         cell_key: tuple[int, int, str]= (cell.search_adv_id, cell.nmid, cell.cluster)
+        trace_cell = (
+            is_trace_enabled()
+            and is_trace_cell(
+                adv_id=cell.adv_id,
+                search_adv_id=cell.search_adv_id,
+                nmid=cell.nmid,
+                ks_id=cell.keyword_setting_original_id,
+                key=cell.cluster,
+            )
+        )
         skip = _overspend_reason(cell.adv_id, fact_datas, plan_datas)
         if skip is not None:
+            if trace_cell:
+                log_cluster_bid_trace(
+                    step="safety_cap",
+                    adv_id=cell.adv_id,
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    ks_id=cell.keyword_setting_original_id,
+                    key=cell.cluster,
+                    action="skip",
+                    skip_reason=skip,
+                )
             continue
 
         cap_bid = cap_index.get(cell_key)
         if cap_bid is None:
+            if trace_cell:
+                log_cluster_bid_trace(
+                    step="safety_cap",
+                    adv_id=cell.adv_id,
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    ks_id=cell.keyword_setting_original_id,
+                    key=cell.cluster,
+                    action="skip",
+                    skip_reason="no_cap_bid",
+                )
             continue
 
         calc_input = calc_by_key.get(cell_key)
@@ -302,12 +335,38 @@ def apply_v3_cluster_bid_safety_cap(
             calculation_input=calc_input,
         )
         if reference_bid is None:
+            if trace_cell:
+                log_cluster_bid_trace(
+                    step="safety_cap",
+                    adv_id=cell.adv_id,
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    ks_id=cell.keyword_setting_original_id,
+                    key=cell.cluster,
+                    action="skip",
+                    skip_reason="no_reference_bid",
+                )
             continue
 
         existing = outgoing_by_key.get(cell_key)
         candidate_bid = existing.new_bid if existing is not None else None
         effective = candidate_bid if candidate_bid is not None else reference_bid
         if effective <= cap_bid:
+            if trace_cell:
+                log_cluster_bid_trace(
+                    step="safety_cap",
+                    adv_id=cell.adv_id,
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    ks_id=cell.keyword_setting_original_id,
+                    key=cell.cluster,
+                    action="pass",
+                    skip_reason="already_under_cap",
+                    candidate_bid=candidate_bid,
+                    cap_bid=cap_bid,
+                    reference_bid=reference_bid,
+                    outgoing_bid=effective,
+                )
             continue
 
         outgoing_bid = cap_bid
@@ -346,6 +405,23 @@ def apply_v3_cluster_bid_safety_cap(
             )
 
         outgoing_by_key[cell_key] = new_bid
+        if trace_cell:
+            log_cluster_bid_trace(
+                step="safety_cap",
+                adv_id=cell.adv_id,
+                search_adv_id=cell.search_adv_id,
+                nmid=cell.nmid,
+                ks_id=cell.keyword_setting_original_id,
+                key=cell.cluster,
+                action="clamp",
+                candidate_bid=candidate_bid,
+                cap_bid=cap_bid,
+                reference_bid=reference_bid,
+                outgoing_bid=outgoing_bid,
+                fact_pay_for_order=fact.pay_for_order,
+                max_pay_for_order=plan.max_pay_for_order,
+                current_state=current_state,
+            )
         logger.info(
             "v3_cluster_bid_safety_cap_applied",
             extra={
