@@ -60,12 +60,13 @@ async def test_patch_auto_adv_bids_kopecks_uses_recommendations_when_combined_di
     mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
         return_value=[
             SimpleNamespace(
+                bid_type="manual",
                 settings=SimpleNamespace(
                     placements=SimpleNamespace(
                         recommendations=True,
                         search=False,
                     )
-                )
+                ),
             )
         ]
     )
@@ -74,4 +75,63 @@ async def test_patch_auto_adv_bids_kopecks_uses_recommendations_when_combined_di
     assert (
         body.bids[0].nm_bids[0].placement
         == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_patch_auto_adv_bids_kopecks_unified_uses_combined(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    """unified РК не принимает placement=recommendations → invalid target type recom."""
+    from types import SimpleNamespace
+
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[
+            SimpleNamespace(
+                bid_type="unified",
+                settings=SimpleNamespace(
+                    placements=SimpleNamespace(
+                        recommendations=True,
+                        search=True,
+                    )
+                ),
+            )
+        ]
+    )
+    await wb_modifier.patch_auto_adv_bids_kopecks(adv_id=35757631, nm_bid_kopecks={1: 31000})
+    (body,) = mock_promotion_manager.patch_adv_v1_bids.call_args[0]
+    assert (
+        body.bids[0].nm_bids[0].placement
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_patch_auto_adv_bids_kopecks_manual_search_only_uses_search(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    from types import SimpleNamespace
+
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[
+            SimpleNamespace(
+                bid_type="manual",
+                settings=SimpleNamespace(
+                    placements=SimpleNamespace(
+                        recommendations=False,
+                        search=True,
+                    )
+                ),
+            )
+        ]
+    )
+    await wb_modifier.patch_auto_adv_bids_kopecks(adv_id=123, nm_bid_kopecks={1: 5000})
+    (body,) = mock_promotion_manager.patch_adv_v1_bids.call_args[0]
+    assert (
+        body.bids[0].nm_bids[0].placement
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.SEARCH
     )
