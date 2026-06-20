@@ -968,12 +968,13 @@ class CPMSetting(TextWithKeyboard):
         if adv_setting is None:
             raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
         self.adv_setting = adv_setting
-        adv_id = adv_setting.adv_id
+        search_adv_id = adv_setting.search_adv_id
         nmids = adv_setting.nmids or []
         self._last_saved_bids = {}
-        self._last_saved_bids = await self._redis_common_bid_value_manager.get_bids(
-            adv_id, nmids
-        )
+        if search_adv_id is not None and nmids:
+            self._last_saved_bids = await self._redis_common_bid_value_manager.get_bids(
+                search_adv_id, nmids
+            )
         await super().__call__()
 
     @property

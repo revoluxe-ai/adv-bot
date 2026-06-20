@@ -7,11 +7,14 @@ from .adv_protocol import AdvProtocol
 class RedisClusterBidsTimestampManager(BaseRedisManager):
     prefix = "last_cluster_bids_update_timestamp"
 
-    def _get_key(self, adv: AdvProtocol) -> str:
-        return f'{self.prefix}:{adv.adv_id}'
+    def _get_key(self, search_adv_id: int) -> str:
+        return f"{self.prefix}:{search_adv_id}"
 
     async def get(self, adv: AdvProtocol) -> datetime.datetime | None:
-        key = self._get_key(adv)
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is None:
+            return None
+        key = self._get_key(search_adv_id)
         value = await self._client.get(key)
         if value is None:
             return None
@@ -19,7 +22,10 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
         return value_dt
 
     async def set(self, adv: AdvProtocol) -> None:
-        key: str = self._get_key(adv)
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is None:
+            raise ValueError("adv.search_adv_id is None")
+        key: str = self._get_key(search_adv_id)
         value_str = datetime.datetime.now().isoformat()
         _ = await self._client.set(key, value_str)
         return None

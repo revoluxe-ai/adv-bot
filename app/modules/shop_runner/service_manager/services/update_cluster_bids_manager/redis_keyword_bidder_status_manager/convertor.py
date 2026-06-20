@@ -21,10 +21,14 @@ def update_bids_command_to_redis_command(update_bids_command: "UpdateBidsCommand
 
 
 def dto_to_redis_commands(adv: "ComplexAdv", texts: list[str]) -> list[RedisCommand]:
+    """Ключи bidder-keyword-status совпадают с write-path: search_adv_id × cluster."""
+    search_adv_id = adv.search_adv_id
+    if search_adv_id is None:
+        return []
     redis_commands: list[RedisCommand] = []
     for text in texts:
         redis_command = RedisCommand(
-            adv_id=adv.adv_id,
+            adv_id=search_adv_id,
             text=text,
             bidder_keyword_status=None,
         )

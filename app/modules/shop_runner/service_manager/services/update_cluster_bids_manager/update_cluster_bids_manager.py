@@ -75,6 +75,40 @@ def _max_workers_for(handler_count: int, cap: int) -> int:
     return max(1, min(handler_count, cap))
 
 
+def _normalize_cluster_bids_to_search_adv_id(
+    fresh: list[NormqueryBidDTO],
+    sub_advs: list[ComplexAdv],
+    needed_search_adv_ids: set[int],
+) -> dict[ClusterBidKey, NormqueryBidDTO]:
+    """Приводит WB normquery bids к ключам search auction РК.
+
+    Legacy-ответы с auto ``advert_id`` маппятся через ``auto_adv_id → auction_adv_id``.
+    """
+    auto_to_search = {
+        adv.auto_adv_id: adv.auction_adv_id
+        for adv in sub_advs
+        if adv.auction_adv_id is not None
+    }
+    by_key: dict[ClusterBidKey, NormqueryBidDTO] = {}
+    for bid in fresh:
+        search_id = bid.advert_id
+        if search_id not in needed_search_adv_ids:
+            mapped = auto_to_search.get(bid.advert_id)
+            if mapped is None:
+                continue
+            search_id = mapped
+        key = ClusterBidKey(
+            search_adv_id=search_id, nmid=bid.nm_id, cluster=bid.norm_query
+        )
+        by_key[key] = NormqueryBidDTO(
+            advert_id=search_id,
+            nm_id=bid.nm_id,
+            norm_query=bid.norm_query,
+            bid=bid.bid,
+        )
+    return by_key
+
+
 _PREDICT_BIDS_MAX_CONCURRENT = 16
 
 """
@@ -395,18 +429,18 @@ class UpdateClusterBidsManager:
                     )
                 else:
                     with trace.phase("cluster_bids_wb_fallback_redis_write"):
+                        by_key = _normalize_cluster_bids_to_search_adv_id(
+                            fresh, sub_advs, needed_adv_ids
+                        )
+                        normalized_fresh = list(by_key.values())
                         try:
                             _ = await self._redis_api_cluster_bids_manager.replace_from_api(
-                                fresh
+                                normalized_fresh
                             )
                         except Exception:
                             logger.exception(
                                 "Cluster bid: failed to write WB fallback to Redis API cache"
                             )
-                    by_key = {
-                        ClusterBidKey(b.advert_id, b.nm_id, b.norm_query): b
-                        for b in fresh
-                    }
                     for mk in missing_keys:
                         dto = by_key.get(mk)
                         if dto is not None:

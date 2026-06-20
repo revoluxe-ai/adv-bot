@@ -282,8 +282,10 @@ async def set_common_bid_manual_apply(
             redis_bid_value = RedisCommonBidValueManager(redis_client)
             redis_bid_ts = RedisCommonBidTimestampManager(redis_client)
             bid_values = {nmid: bid_value for nmid in nmids}
-            await redis_bid_value.set_bids(adv_setting.adv_id, bid_values)
-            await redis_bid_ts.set(adv_setting.adv_id)
+            search_adv_id = adv_setting.search_adv_id
+            if search_adv_id is not None:
+                await redis_bid_value.set_bids(search_adv_id, bid_values)
+                await redis_bid_ts.set(search_adv_id)
     except Exception as e:
         logger.exception(
             "update_search_adv_common_cpm failed for adv_setting_id=%s",

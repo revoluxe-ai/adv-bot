@@ -283,9 +283,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self.adv_stat: FullAdvStat | None = adv_stat
         self._traffic_clicks_dto = await self._get_today_traffic_clicks_dto()
 
-        adv_id = self.adv.adv_id
+        search_adv_id = self.adv.search_adv_id
         last_common_bid_update = (
-            await self._redis_common_bid_timestamp_manager.get(adv_id)
+            await self._redis_common_bid_timestamp_manager.get(search_adv_id)
+            if search_adv_id is not None
+            else None
         )
         if last_common_bid_update:
             self.last_common_bid_update_str = last_common_bid_update.strftime(

@@ -98,11 +98,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting.search_adv_id
         )
         redis_manager = RedisCommonBidValueManager(redis_client)
-        adv_id = self._adv_setting.adv_id
+        search_adv_id = self._adv_setting.search_adv_id
         nmids = self._adv_setting.nmids or []
         self._last_saved_bids = {}
-        if adv_id is not None and nmids:
-            self._last_saved_bids = await redis_manager.get_bids(adv_id, nmids)
+        if search_adv_id is not None and nmids:
+            self._last_saved_bids = await redis_manager.get_bids(search_adv_id, nmids)
 
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
