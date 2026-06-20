@@ -1,3 +1,10 @@
+"""Доменный модификатор WB Promotion API для shop-runner и бота.
+
+Auto PATCH ставок (``update_auto_adv_cpm``, ``patch_auto_adv_bids_kopecks``):
+см. блок «Auto bid placement» ниже и ``_patch_auto_adv_with_placement_strategy``.
+Аукционная общая ставка — ``update_search_adv_common_cpm`` / ``set_common_bids`` (``search``).
+"""
+
 from __future__ import annotations
 
 import json
@@ -25,6 +32,24 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Auto bid placement (PATCH /api/advert/v1/bids, только auto-РК)
+# ---------------------------------------------------------------------------
+# Допустимые placement для auto: ``combined`` (unified) и ``recommendations`` (manual
+# полка). ``search`` — только аукцион (``set_common_bids``, AdvType.SEARCH).
+#
+# 1) v2/adverts вернул ``bid_type=unified`` → один PATCH ``combined``.
+#    v2 вернул ``bid_type=manual`` → один PATCH ``recommendations``.
+#    Если WB отклонил placement (400) — **ошибка наружу, без второй попытки**.
+#    Это намеренно: v2 считается источником правды; silent fallback маскирует
+#    рассинхрон данных и неверную конфигурацию РК.
+#
+# 2) v2 miss (пустой ответ) или неизвестный ``bid_type`` → retry по порядку:
+#    ``combined`` → ``recommendations``; только на placement-400 из
+#    ``_AUTO_BID_PLACEMENT_ERROR_MARKERS``. Иная 400 — сразу raise. Обе попытки
+#    failed → raise последней BadRequestError.
+# ---------------------------------------------------------------------------
 
 _AUTO_BID_PLACEMENT_RETRY_ORDER: tuple[
     PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement, ...
@@ -160,8 +185,9 @@ class WBModifier:
     ) -> None:
         """Обновляет CPM auto-РК через PATCH /api/advert/v1/bids (вход в рублях).
 
-        Placement: v2/adverts (``unified``/``manual``) или retry ``combined`` →
-        ``recommendations`` при miss v2 / неизвестном ``bid_type``.
+        Placement — ``_patch_auto_adv_with_placement_strategy`` (см. module docstring).
+        При известном ``bid_type`` из v2 ошибка WB не перехватывается: caller должен
+        увидеть сбой, если placement не подошёл.
         """
         if not nm_bid_pairs:
             return None
@@ -177,9 +203,10 @@ class WBModifier:
         """Placement для auto PATCH по v2/adverts.
 
         Returns:
-            ``combined`` для ``unified``, ``recommendations`` для ``manual``,
-            ``None`` если v2 не вернул кампанию или ``bid_type`` неизвестен —
-            сигнал retry ``combined`` → ``recommendations``.
+            ``combined`` для ``unified``, ``recommendations`` для ``manual`` —
+            вызывающий код делает **один** PATCH без fallback.
+            ``None`` если v2 miss или ``bid_type`` неизвестен — retry в
+            ``_patch_auto_adv_with_placement_strategy``.
 
         Для auto допустимы только ``combined`` и ``recommendations``; ``search`` —
         аукционный путь (``set_common_bids`` / ``AdvType.SEARCH``).
@@ -232,13 +259,23 @@ class WBModifier:
         adv_id: int,
         nm_bid_kopecks: dict[int, int],
     ) -> None:
-        """PATCH auto-ставки: один placement по v2 или retry combined → recommendations.
+        """PATCH auto-ставки с выбором placement.
 
-        Retry только если v2 miss или ``bid_type`` не ``unified``/``manual``.
-        При известном типе — один PATCH; иная 400 — без retry.
+        Ветка A — v2 известен (``unified`` / ``manual``):
+            Один PATCH с placement из ``_resolve_auto_adv_bid_placement``.
+            ``BadRequestError`` пробрасывается без retry — нужна явная ошибка,
+            если v2 и WB расходятся (не подменяем другим placement молча).
+
+        Ветка B — v2 miss или неизвестный ``bid_type`` (resolver вернул ``None``):
+            Перебор ``_AUTO_BID_PLACEMENT_RETRY_ORDER`` (combined → recommendations).
+            Retry только при placement-400 (``_is_auto_bid_placement_error``).
+            После двух неудач — raise последней ошибки.
+
+        Side effects: WB API ``PATCH /api/advert/v1/bids``.
         """
         placement = await self._resolve_auto_adv_bid_placement(adv_id)
         if placement is not None:
+            # Намеренно без try/retry: известный bid_type → fail loud.
             await self._patch_auto_adv_v1_bids(adv_id, nm_bid_kopecks, placement)
             return None
 
@@ -276,7 +313,8 @@ class WBModifier:
     ) -> None:
         """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (shelf control).
 
-        Placement: v2/adverts (``unified``/``manual``) или retry при miss/unknown type.
+        Placement — ``_patch_auto_adv_with_placement_strategy``; при известном v2
+        типе ошибка placement не глотается (см. module docstring).
         """
         if not nm_bid_kopecks:
             return None
