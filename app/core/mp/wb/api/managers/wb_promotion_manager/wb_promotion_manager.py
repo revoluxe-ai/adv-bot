@@ -141,25 +141,57 @@ class WBModifier:
     async def _resolve_shelf_bid_placement(
         self, adv_id: int
     ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement:
-        """Placement для ставки полок: по включённым зонам РК, иначе recommendations."""
-        default = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+        """Placement для PATCH /api/advert/v1/bids (auto shelf control).
+
+        Правила WB (``GET /api/advert/v2/adverts`` → ``bid_type`` + ``settings.placements``):
+
+        - ``unified`` (единая ставка, type 8): только ``combined``. Отдельные
+          ``recommendations`` / ``search`` дают 400 «invalid target type recom/search».
+        - ``manual`` + только рекомендации (полочная auto): ``recommendations``.
+        - ``manual`` + только поиск: ``search``.
+        - ``manual`` + обе зоны: ``recommendations`` (control управляет полкой).
+        """
+        fallback = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
         campaigns = await self._promotion_manager.get_adverts_v2_by_ids([int(adv_id)])
         if not campaigns:
-            return default
-        placements = campaigns[0].settings.placements
-        if placements.recommendations:
+            logger.warning(
+                "shelf_bid_placement_fallback adv_id=%s no v2/adverts row, using %s",
+                adv_id,
+                fallback.value,
+            )
+            return fallback
+
+        campaign = campaigns[0]
+        bid_type = (getattr(campaign, "bid_type", None) or "").lower()
+        if bid_type == "unified":
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+
+        placements = campaign.settings.placements
+        has_recom = bool(placements.recommendations)
+        has_search = bool(placements.search)
+
+        if has_recom and not has_search:
             return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
-        if placements.search:
+        if has_search and not has_recom:
             return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.SEARCH
-        return default
+        if has_recom:
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+
+        logger.warning(
+            "shelf_bid_placement_no_zones adv_id=%s bid_type=%s, using %s",
+            adv_id,
+            bid_type or "?",
+            fallback.value,
+        )
+        return fallback
 
     async def patch_auto_adv_bids_kopecks(
         self, adv_id: int, nm_bid_kopecks: dict[int, int]
     ) -> None:
         """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (control ``bid_minor``).
 
-        Placement не COMBINED: для многих Auto-РК WB отдаёт 400 «combined placement is disabled»;
-        для полок используем recommendations (или search, если рекомендации выключены).
+        Placement выбирается в ``_resolve_shelf_bid_placement``: ``unified`` → ``combined``;
+        ``manual`` полочная → ``recommendations``; search-only → ``search``.
         """
         if not nm_bid_kopecks:
             return None
