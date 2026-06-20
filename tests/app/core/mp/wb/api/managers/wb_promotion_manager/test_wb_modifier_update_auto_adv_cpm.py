@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import PromotionManager
@@ -12,10 +13,28 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 )
 
 
+def _v2_campaign(
+    *,
+    bid_type: str = "unified",
+    recommendations: bool = True,
+    search: bool = True,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        bid_type=bid_type,
+        settings=SimpleNamespace(
+            placements=SimpleNamespace(
+                recommendations=recommendations,
+                search=search,
+            )
+        ),
+    )
+
+
 @pytest.fixture
 def mock_promotion_manager() -> AsyncMock:
     pm = AsyncMock(spec=PromotionManager)
     pm.patch_adv_v1_bids = AsyncMock()
+    pm.get_adverts_v2_by_ids = AsyncMock(return_value=[_v2_campaign()])
     return pm
 
 
@@ -71,13 +90,41 @@ async def test_update_auto_adv_cpm_one_rub_is_100_kopecks(
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_update_auto_adv_cpm_placement_combined(
+async def test_update_auto_adv_cpm_placement_combined_for_unified(
     wb_modifier: WBModifier,
     mock_promotion_manager: AsyncMock,
 ) -> None:
-    """Auto campaign must use COMBINED placement for v1 bids."""
+    """unified auto-РК: placement combined."""
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[_v2_campaign(bid_type="unified")]
+    )
     await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
 
     (body,) = mock_promotion_manager.patch_adv_v1_bids.call_args[0]
     for item in body.bids[0].nm_bids:
         assert item.placement == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_update_auto_adv_cpm_placement_recommendations_for_manual_shelf(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[
+            _v2_campaign(
+                bid_type="manual",
+                recommendations=True,
+                search=False,
+            )
+        ]
+    )
+    await wb_modifier.update_auto_adv_cpm(adv_id=32824944, nm_bid_pairs={1: 10})
+
+    (body,) = mock_promotion_manager.patch_adv_v1_bids.call_args[0]
+    for item in body.bids[0].nm_bids:
+        assert (
+            item.placement
+            == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+        )

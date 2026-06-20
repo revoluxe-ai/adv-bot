@@ -118,8 +118,14 @@ class WBModifier:
     async def update_auto_adv_cpm(
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
-        """Обновляет CPM авто-кампании через PATCH /api/advert/v1/bids (ставки в копейках)."""
-        placement = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+        """Обновляет CPM авто-кампании через PATCH /api/advert/v1/bids (вход в рублях).
+
+        ``placement`` выбирается по v2/adverts (``_resolve_auto_adv_bid_placement``),
+        как в ``patch_auto_adv_bids_kopecks``.
+        """
+        if not nm_bid_pairs:
+            return None
+        placement = await self._resolve_auto_adv_bid_placement(adv_id)
         nm_bids = [
             PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
                 nm_id=nm_id,
@@ -137,11 +143,12 @@ class WBModifier:
             ]
         )
         await self._promotion_manager.patch_adv_v1_bids(body)
+        return None
 
-    async def _resolve_shelf_bid_placement(
+    async def _resolve_auto_adv_bid_placement(
         self, adv_id: int
     ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement:
-        """Placement для PATCH /api/advert/v1/bids (auto shelf control).
+        """Placement для PATCH /api/advert/v1/bids по auto-РК.
 
         Правила WB (``GET /api/advert/v2/adverts`` → ``bid_type`` + ``settings.placements``):
 
@@ -149,13 +156,13 @@ class WBModifier:
           ``recommendations`` / ``search`` дают 400 «invalid target type recom/search».
         - ``manual`` + только рекомендации (полочная auto): ``recommendations``.
         - ``manual`` + только поиск: ``search``.
-        - ``manual`` + обе зоны: ``recommendations`` (control управляет полкой).
+        - ``manual`` + обе зоны: ``recommendations`` (ставка полок / общий auto CPM).
         """
         fallback = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
         campaigns = await self._promotion_manager.get_adverts_v2_by_ids([int(adv_id)])
         if not campaigns:
             logger.warning(
-                "shelf_bid_placement_fallback adv_id=%s no v2/adverts row, using %s",
+                "auto_adv_bid_placement_fallback adv_id=%s no v2/adverts row, using %s",
                 adv_id,
                 fallback.value,
             )
@@ -178,7 +185,7 @@ class WBModifier:
             return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
 
         logger.warning(
-            "shelf_bid_placement_no_zones adv_id=%s bid_type=%s, using %s",
+            "auto_adv_bid_placement_no_zones adv_id=%s bid_type=%s, using %s",
             adv_id,
             bid_type or "?",
             fallback.value,
@@ -190,12 +197,11 @@ class WBModifier:
     ) -> None:
         """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (control ``bid_minor``).
 
-        Placement выбирается в ``_resolve_shelf_bid_placement``: ``unified`` → ``combined``;
-        ``manual`` полочная → ``recommendations``; search-only → ``search``.
+        Placement — ``_resolve_auto_adv_bid_placement`` (v2/adverts).
         """
         if not nm_bid_kopecks:
             return None
-        placement = await self._resolve_shelf_bid_placement(adv_id)
+        placement = await self._resolve_auto_adv_bid_placement(adv_id)
         nm_bids = [
             PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
                 nm_id=int(nm_id),
