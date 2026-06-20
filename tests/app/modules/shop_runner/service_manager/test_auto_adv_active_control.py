@@ -45,7 +45,7 @@ class _FakeAdvSetting:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
-        auto_shelf_bid_control_enabled,
+        auto_shelf_bid_control_enabled: bool = False,
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -56,7 +56,6 @@ class _FakeAdvSetting:
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
         self.sales_predict_method = FactMethods.DIRECT_SALES
-        self.auto_shelf_bid_control_enabled: bool = False
         self.auto_shelf_bid_control_enabled = auto_shelf_bid_control_enabled
 
 
@@ -85,7 +84,7 @@ class _FakeComplexAdv:
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
         auto_adv_bid_control_enable: bool = False,
-        auto_shelf_bid_control_enabled,
+        auto_shelf_bid_control_enabled: bool = False,
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -98,7 +97,7 @@ class _FakeComplexAdv:
             target_price_for_order=target_price_for_order,
             max_price_for_order=max_price_for_order,
             rec_system_mode=rec_system_mode,
-            auto_shelf_bid_control_enable=auto_shelf_bid_control_enabled,
+            auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
         )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
@@ -723,8 +722,8 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_cluster_bidder_does_not_pause_when_avg_cost_above_target():
-    """Кластерный биддер: cost-rule отключён — автокампания не ставится на паузу."""
+async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_target():
+    """auto_shelf_bid_control: cost-rule отключён — автокампания не ставится на паузу."""
     adv = _FakeComplexAdv(
         auto_limit=100,
         auto_status="started",
@@ -910,7 +909,6 @@ async def test_auto_adv_does_not_start_when_no_plan_fact():
         search_status="pause",
         auto_adv_id=22,
         search_adv_id=23,
-        auto_shelf_bid_control_enable=True
     )
 
     wb_modifier = MagicMock()
@@ -967,7 +965,6 @@ async def test_auto_adv_common_budget_does_not_start_when_avg_cost_above_target(
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
-        auto_shelf_bid_control_enable=True
     )
 
     wb_modifier = MagicMock()
