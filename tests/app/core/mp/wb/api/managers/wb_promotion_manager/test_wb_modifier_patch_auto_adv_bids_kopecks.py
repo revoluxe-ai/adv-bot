@@ -119,6 +119,23 @@ async def test_patch_auto_adv_bids_kopecks_unified_uses_combined(
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_patch_auto_adv_bids_kopecks_unknown_bid_type_retries_combined_first(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[_v2_campaign(bid_type="legacy")]
+    )
+    await wb_modifier.patch_auto_adv_bids_kopecks(adv_id=1, nm_bid_kopecks={1: 100})
+    mock_promotion_manager.patch_adv_v1_bids.assert_called_once()
+    assert (
+        _placement_from_call(0, mock_promotion_manager)
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_patch_auto_adv_bids_kopecks_v2_miss_combined_success(
     wb_modifier: WBModifier,
     mock_promotion_manager: AsyncMock,
