@@ -104,8 +104,8 @@ async def test_is_auto_campaign_active_returns_false_when_avg_cost_above_target(
 
 
 @pytest.mark.asyncio
-async def test_is_auto_campaign_active_returns_true_for_cluster_bidder_when_avg_cost_above_target() -> None:
-    """Кластерный биддер без shelf-control: cost-rule отключён."""
+async def test_is_auto_campaign_active_returns_false_for_cluster_bidder_without_shelf_control() -> None:
+    """Кластерный биддер без shelf-control: cost-rule по-прежнему применяется."""
     adv = _FakeAdvSetting(
         107,
         plan_for_sales_for_day=10,
@@ -129,7 +129,7 @@ async def test_is_auto_campaign_active_returns_true_for_cluster_bidder_when_avg_
     ):
         result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
 
-    assert result is True
+    assert result is False
 
 
 @pytest.mark.asyncio
