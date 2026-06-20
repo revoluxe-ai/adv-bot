@@ -83,6 +83,7 @@ def _legacy_context(**adv_overrides: object) -> UpdateContext:
         guard_condition=False,
         calibration_direct=CalibrationDirect.LOOSEN,
         max_effective_steps=1,
+        configured_keyword_calibration_max_step=1,
         calibration_phase_extra={"calibration_direct": "loosen"},
     )
     base.update(adv_overrides)

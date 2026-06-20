@@ -463,7 +463,7 @@ class ComplexAdv:
         if self._calculated_keywords is not None:
             return self._filter_keywords(self._calculated_keywords)
 
-        cached = await self._get_keywords(self, cache_only=True)
+        cached = await self._get_keywords(self)
         # Пустой [] (__empty__ в Redis) не кэшируем на инстансе: snapshot warmup
         # может записать keywords после первого чтения.
         if cached:

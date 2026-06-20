@@ -98,6 +98,12 @@ INBOX
 
 TODAY (WIP<=2)
 
+TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
+- Зачем: prod-логов недостаточно, чтобы понять где пропадает NewBid(560) в update_cluster_bids для exact кейса.
+- Exact case: shop_id=db28efff-f7a9-52f8-8342-f1a58f7d8ed3, adv_id=32824944, search_adv_id=29734515, nmid=10749810, ks_id=17783715, key="антивозрастной матирующий крем".
+- Включение: DEBUG_CLUSTER_BID_TRACE=1 + env DEBUG_CLUSTER_BID_TRACE_* (см. env.sample). No-op при !=1.
+- Batch per-shop: CoroutinesManager → ClusterBidsManagerContainer(shop_id) → WBManager(shop_id); trace shop_id = wb_manager._shop_id, не advs[0].
+- После root cause: выключить env на prod, удалить cluster_bid_trace.py + trace calls + test_cluster_bid_trace.py (или оставить guard под флагом, если решим оставить навсегда).
 
 
 

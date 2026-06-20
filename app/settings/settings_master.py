@@ -899,7 +899,18 @@ class Settings:
         else:
             raise ValueError(': AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED must be true or false')
 
-
+    @property
+    def CAN_NOT_CACHE_DATA(self) -> bool:
+        value = os.environ.get("CAN_NOT_CACHE_DATA")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        else:
+            raise ValueError(': CAN_MIN_BID_DEFAULT must be true or false')
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
