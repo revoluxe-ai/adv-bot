@@ -256,6 +256,7 @@ class DataUpdateManager:
                     complex_adv.keyword_calibration_max_step
                 ),
                 calibration_phase_extra=calibration_phase_extra,
+                v3_substitute_fact_cpo_for_max=bool(adv.substitute_fact_cpo_for_max),
             )
         elif (
             campaign_mode == CampaignMode.NO_DATA
@@ -268,6 +269,7 @@ class DataUpdateManager:
                 fact=fact,
                 raw_profiles=raw_profiles,
                 campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+                v3_substitute_fact_cpo_for_max=bool(adv.substitute_fact_cpo_for_max),
             )
 
         return TickData(

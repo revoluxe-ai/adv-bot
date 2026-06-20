@@ -25,6 +25,9 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.import_apply imp
     apply_adv_excel_rows,
     verify_user_owns_wb_user_cabinet,
 )
+from app.modules.sales_plan_settings.v3_raise_max_cpo import (
+    format_v3_raise_max_auto_disable_message,
+)
 from app.client_bot.user_interface.views import callbacks
 
 router = Router()
@@ -182,7 +185,7 @@ async def import_adv_excel_file(
     )
     await progress.start()
     _headers, rows = read_adv_excel_upload(content)
-    n = await apply_adv_excel_rows(
+    n, max_cpo_decrease_effects = await apply_adv_excel_rows(
         telegram_user_id=message.from_user.id,
         expected_wb_user_cabinet_id=int(wb_uc_id),
         rows=rows,
@@ -191,6 +194,13 @@ async def import_adv_excel_file(
 
     await state.clear()
     await message.answer(f"Готово. Обновлено кампаний: {n}.")
+    for effect in max_cpo_decrease_effects[:10]:
+        await message.answer(format_v3_raise_max_auto_disable_message(effect))
+    extra = len(max_cpo_decrease_effects) - 10
+    if extra > 0:
+        await message.answer(
+            f"Авто max CPO (V3 Raise) отключено ещё для {extra} РК из-за уменьшения max себестоимости."
+        )
     from app.modules.shop_menu.message import ShopMenu
 
     await ShopMenu(bot, chat_id, state, int(wb_uc_id))()

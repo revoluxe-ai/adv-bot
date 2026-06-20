@@ -29,7 +29,8 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # v2: EDIT-колонка агрессивности V3 — техключ ``aggressiveness`` (ранее ``v3_rollout_aggressiveness``).
 # v3: добавлена EDIT-колонка для cap шагов калибратора V3 — ``keyword_calibration_max_step``.
 # v4: добавлены колонки биддера полок ``auto_shelf_bid_control``.
-EXCEL_TEMPLATE_VERSION = 4
+# v5: EDIT-колонка ``substitute_fact_cpo_for_max`` (V3 Raise MAX).
+EXCEL_TEMPLATE_VERSION = 5
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
@@ -96,6 +97,7 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "updater_common_bid_in_search_adv_active_status",
         "use_incremental_stats",
         "max_place",
+        "substitute_fact_cpo_for_max",
     }
 )
 
@@ -276,6 +278,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "updater_common_bid_in_search_adv_active_status": "Обновление общей ставки в поиске",
     "use_incremental_stats": "Использовать инкрементальную статистику",
     "max_place": "Максимальная позиция",
+    "substitute_fact_cpo_for_max": "Авто max CPO (V3 Raise)",
 }
 
 

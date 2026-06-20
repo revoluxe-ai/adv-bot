@@ -36,6 +36,7 @@ class KeyboardsGetter:
         self._plan_for_sales_for_day = adv.plan_for_sales_for_day
         self._target_price_for_order = adv.target_price_for_order
         self._max_price_for_order = adv.max_price_for_order
+        self._v3_substitute_fact_cpo_for_max = bool(adv.substitute_fact_cpo_for_max)
 
     def get_keyboard(
         self,
@@ -62,6 +63,8 @@ class KeyboardsGetter:
 
         setting_max_price_for_order = self.get_setting_max_price_for_order_button()
         builder.row(setting_max_price_for_order)
+
+        builder.row(self.get_v3_raise_max_cpo_toggle_button())
 
         builder.row(
             InlineKeyboardButton(
@@ -117,3 +120,17 @@ class KeyboardsGetter:
         button = InlineKeyboardButton(text=text, callback_data=callback)
 
         return button
+
+    def get_v3_raise_max_cpo_toggle_button(self) -> InlineKeyboardButton:
+        """Тумблер V3 Raise MAX: поднятие operative max до fact CPO при overspend."""
+        if self._v3_substitute_fact_cpo_for_max:
+            text = "Выключить авто max CPO (V3 Raise)"
+            new_status = False
+        else:
+            text = "Включить авто max CPO (V3 Raise)"
+            new_status = True
+        callback = callbacks.V3RaiseMaxCpoToggle(
+            adv_id=self._adv_id,
+            new_status=new_status,
+        ).pack()
+        return InlineKeyboardButton(text=text, callback_data=callback)

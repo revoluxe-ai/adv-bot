@@ -14,6 +14,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     column_header,
     edit_header,
     enum_names_for_field,
+    header_type_suffix,
     parse_edit_value,
     parse_header,
     serialize_shelf_bid_control_cell,
@@ -128,8 +129,15 @@ def test_enum_names_for_field_strategy() -> None:
 
 
 @pytest.mark.unit
+def test_parse_edit_bool_v3_raise_max_cpo() -> None:
+    assert parse_edit_value("substitute_fact_cpo_for_max", "TRUE") is True
+    assert parse_edit_value("substitute_fact_cpo_for_max", "FALSE") is False
+    assert header_type_suffix("substitute_fact_cpo_for_max") == "BOOL"
+
+
+@pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 4
+    assert EXCEL_TEMPLATE_VERSION == 5
 
 
 @pytest.mark.unit

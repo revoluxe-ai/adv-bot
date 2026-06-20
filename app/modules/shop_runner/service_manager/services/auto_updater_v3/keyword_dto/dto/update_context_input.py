@@ -49,3 +49,4 @@ class UpdateContextInput:
     calibration_phase_extra: dict[str, Any] = field(
         default_factory=lambda: dict[str, Any]()
     )
+    v3_substitute_fact_cpo_for_max: bool = False

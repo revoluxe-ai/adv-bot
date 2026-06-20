@@ -154,7 +154,7 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     row[edit_header("auto_shelf_test_share")] = 10
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
-        updated = await apply_adv_excel_rows(
+        updated, _effects = await apply_adv_excel_rows(
             telegram_user_id=int(user.user_telegram_id),
             expected_wb_user_cabinet_id=wuc.id,
             rows=rows,
@@ -237,7 +237,7 @@ async def test_adv_excel_import_adv_fields_ignore_multi_or_empty_nmid(
     row[edit_header("min_views_for_ml_predict")] = 19
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
-        updated = await apply_adv_excel_rows(
+        updated, _effects = await apply_adv_excel_rows(
             telegram_user_id=int(user.user_telegram_id),
             expected_wb_user_cabinet_id=wuc.id,
             rows=[row],
@@ -279,7 +279,7 @@ async def test_adv_excel_import_shelf_fields_without_enabled_flag(
     row[edit_header("auto_shelf_min_bid_distance_rub")] = 3
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
-        updated = await apply_adv_excel_rows(
+        updated, _effects = await apply_adv_excel_rows(
             telegram_user_id=int(user.user_telegram_id),
             expected_wb_user_cabinet_id=wuc.id,
             rows=rows,
@@ -327,7 +327,7 @@ async def test_adv_excel_export_import_auto_common_budget_flag(
 
     mock_sm = MockSessionMaker(async_session)
     with patch(_PATCH_IMPORT_SM, mock_sm):
-        updated = await apply_adv_excel_rows(
+        updated, _effects = await apply_adv_excel_rows(
             telegram_user_id=int(user.user_telegram_id),
             expected_wb_user_cabinet_id=wuc.id,
             rows=rows,
@@ -366,7 +366,7 @@ async def test_adv_excel_import_template_v1_rejected(
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,
@@ -398,7 +398,7 @@ async def test_adv_excel_import_invalid_enum_rejected(
     mock_sm = MockSessionMaker(async_session)
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,
@@ -432,7 +432,7 @@ async def test_adv_excel_import_old_template_version_rejected(
     mock_sm = MockSessionMaker(async_session)
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,

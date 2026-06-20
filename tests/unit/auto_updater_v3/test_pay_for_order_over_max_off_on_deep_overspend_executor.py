@@ -107,6 +107,7 @@ def _dto(
 
 
 def _adv_state(*, fact: float, max_cpo: float = 550.0, guard_condition: bool = False) -> AdvState:
+    use_raise_max = float(fact) > float(max_cpo)
     return replace(
         AdvState.empty(),
         resolve=500.0,
@@ -114,6 +115,7 @@ def _adv_state(*, fact: float, max_cpo: float = 550.0, guard_condition: bool = F
         fact_pay_for_order=fact,
         resolve_valid=True,
         guard_condition=guard_condition,
+        v3_substitute_fact_cpo_for_max=use_raise_max,
     )
 
 

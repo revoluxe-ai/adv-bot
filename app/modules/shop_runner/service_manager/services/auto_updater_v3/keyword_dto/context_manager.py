@@ -181,4 +181,5 @@ class UpdateContextManager:
                 tick_input.configured_keyword_calibration_max_step
             ),
             calibration_phase_extra=dict(tick_input.calibration_phase_extra),
+            v3_substitute_fact_cpo_for_max=tick_input.v3_substitute_fact_cpo_for_max,
         )
