@@ -3,7 +3,7 @@
 При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
 автокампанию на паузу, UI показывает предупреждение.
 
-При включённом ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
+При ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
 """
 
 from __future__ import annotations
