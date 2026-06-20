@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
-from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
     is_auto_campaign_active,
@@ -37,7 +36,7 @@ class _FakeAdvSetting:
         plan_for_sales_for_day: int | None,
         target_price_for_order: int | float | None,
         max_price_for_order: int | float | None,
-        auto_shelf_bid_control_enabled: bool
+        auto_shelf_bid_control_enabled: bool = False,
     ) -> None:
         self.adv_id = adv_id
         self.plan_for_sales_for_day = plan_for_sales_for_day
@@ -100,14 +99,14 @@ async def test_is_auto_campaign_active_returns_false_when_avg_cost_above_target(
 
 
 @pytest.mark.asyncio
-async def test_is_auto_campaign_active_returns_true_for_cluster_bidder_when_avg_cost_above_target() -> None:
-    """Кластерный биддер: cost-rule отключён, is_active=True даже при avg_cost > resolve."""
+async def test_is_auto_campaign_active_returns_true_for_shelf_bid_control_when_avg_cost_above_target() -> None:
+    """auto_shelf_bid_control: cost-rule отключён, is_active=True даже при avg_cost > resolve."""
     adv = _FakeAdvSetting(
         105,
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
-        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+        auto_shelf_bid_control_enabled=True,
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(
@@ -128,14 +127,14 @@ async def test_is_auto_campaign_active_returns_true_for_cluster_bidder_when_avg_
 
 
 @pytest.mark.asyncio
-async def test_get_auto_campaign_cost_activity_metrics_cluster_bidder_keeps_metrics_when_cost_high() -> None:
-    """Кластерный биддер: метрики target/avg считаются, is_active=True при превышении resolve."""
+async def test_get_auto_campaign_cost_activity_metrics_shelf_bid_control_keeps_metrics_when_cost_high() -> None:
+    """auto_shelf_bid_control: метрики target/avg считаются, is_active=True при превышении resolve."""
     adv = _FakeAdvSetting(
         106,
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
-        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+        auto_shelf_bid_control_enabled=True,
     )
     reader = SimpleNamespace(
         get_latest_plan_fact=AsyncMock(

@@ -1,10 +1,9 @@
 """Единое решение об активности автокампании по среднему CPO vs resolve.
 
-Для старого CPM-биддера: при ``avg_cost > resolve`` кампания считается
-неактивной — watchdog ставит автокампанию на паузу, UI показывает предупреждение.
+При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
+автокампанию на паузу, UI показывает предупреждение.
 
-Для кластерного биддера (``bidder_coroutine_type == UPDATE_CLUSTER_BIDS``)
-cost-rule отключён.
+При включённом ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ if TYPE_CHECKING:
 def _cost_rule_controls_auto_campaign(adv_setting: AdvSetting) -> bool:
     """True, если cost-rule (пауза автокампании по среднему CPO) применяется.
 
-    Не применяется только для нового биддера (``auto_shelf_bid_control_enabled``).
+    Не применяется при ``auto_shelf_bid_control_enabled``.
     """
     return not adv_setting.auto_shelf_bid_control_enabled
 
@@ -90,9 +89,7 @@ async def get_auto_campaign_cost_activity_metrics(
         else None
     )
     is_active: bool | None
-    if adv_setting.auto_shelf_bid_control_enabled:
-        is_active = True
-    elif not _cost_rule_controls_auto_campaign(adv_setting):
+    if not _cost_rule_controls_auto_campaign(adv_setting):
         is_active = True
     elif target_cost is None or avg_cost is None:
         is_active = None
