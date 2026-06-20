@@ -39,7 +39,7 @@ from app.modules.cluster_bids_redis import (
 )
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from .wb_manager import WBManager
-from app.modules.plan_fact.provider import PlanFactProvider
+
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -939,6 +939,7 @@ class UpdateClusterBidsManager:
             logger.error("Ошибка batch-получения факта из CH: %s", error)
             return {}
         adv_to_fact_map: dict[int, FactData] = {}
+        from app.modules.plan_fact.provider import PlanFactProvider
         for adv in advs:
             fact = PlanFactProvider.fact_data_from_plan_fact_summary(
                 summaries_by_adv_id.get(adv.adv_id),
@@ -951,6 +952,7 @@ class UpdateClusterBidsManager:
     @staticmethod
     def _get_plan_data(advs: list[ComplexAdv]) -> dict[int, PlanData]:
         plan_datas_map: dict[int, PlanData] = {}
+        from app.modules.plan_fact.provider import PlanFactProvider
         for adv in advs:
             plan = PlanFactProvider.get_plan_data(adv.adv_setting)
             if plan is not None:
