@@ -168,6 +168,31 @@ def format_error_detail(exc: BaseException | None) -> str | None:
     return detail
 
 
+def _resolve_trace_identity(
+    *,
+    shop_id: str | None,
+    adv_id: int | None,
+    search_adv_id: int | None,
+    nmid: int | None,
+    ks_id: int | None,
+    key: str | None,
+) -> dict[str, Any]:
+    """Подставить в фильтр недостающие id из env (DTO-path: search/nmid/key без adv/ks)."""
+    defaults = trace_target_defaults()
+
+    def _pick(actual: Any, field: str) -> Any:
+        return actual if actual is not None else defaults.get(field)
+
+    return {
+        "shop_id": _pick(shop_id, "shop_id"),
+        "adv_id": _pick(adv_id, "adv_id"),
+        "search_adv_id": _pick(search_adv_id, "search_adv_id"),
+        "nmid": _pick(nmid, "nmid"),
+        "ks_id": _pick(ks_id, "ks_id"),
+        "key": _pick(key, "key"),
+    }
+
+
 def log_cluster_bid_trace(
     *,
     step: str,
@@ -180,28 +205,29 @@ def log_cluster_bid_trace(
     **fields: Any,
 ) -> None:
     """Структурированный INFO-лог одной точки pipeline (только exact match)."""
-    if not is_trace_cell(
+    identity = _resolve_trace_identity(
         shop_id=shop_id,
         adv_id=adv_id,
         search_adv_id=search_adv_id,
         nmid=nmid,
         ks_id=ks_id,
         key=key,
-    ):
+    )
+    if not is_trace_cell(**identity):
         return
     parts: list[str] = ["[cluster_bid_trace]", f"step={step}"]
-    if shop_id is not None:
-        parts.append(f"shop_id={shop_id}")
-    if adv_id is not None:
-        parts.append(f"adv_id={adv_id}")
-    if search_adv_id is not None:
-        parts.append(f"search_adv_id={search_adv_id}")
-    if nmid is not None:
-        parts.append(f"nmid={nmid}")
-    if ks_id is not None:
-        parts.append(f"ks_id={ks_id}")
-    if key is not None:
-        parts.append(f"key={key}")
+    if identity["shop_id"] is not None:
+        parts.append(f"shop_id={identity['shop_id']}")
+    if identity["adv_id"] is not None:
+        parts.append(f"adv_id={identity['adv_id']}")
+    if identity["search_adv_id"] is not None:
+        parts.append(f"search_adv_id={identity['search_adv_id']}")
+    if identity["nmid"] is not None:
+        parts.append(f"nmid={identity['nmid']}")
+    if identity["ks_id"] is not None:
+        parts.append(f"ks_id={identity['ks_id']}")
+    if identity["key"] is not None:
+        parts.append(f"key={identity['key']}")
     for field_name, value in fields.items():
         parts.append(f"{field_name}={_sanitize_field(field_name, value)}")
     logger.info(" ".join(parts))

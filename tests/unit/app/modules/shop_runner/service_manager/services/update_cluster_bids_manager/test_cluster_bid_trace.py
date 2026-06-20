@@ -105,6 +105,30 @@ def test_is_trace_bid_cell_matches_without_dto_adv_id(
     ) is False
 
 
+def test_log_fills_missing_identity_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """DTO-path: только search/nmid/key — adv_id/ks_id/shop_id из env для фильтра и вывода."""
+    _set_trace_env(monkeypatch)
+
+    with caplog.at_level(logging.INFO):
+        log_cluster_bid_trace(
+            step="new_bid_calculate",
+            search_adv_id=29734515,
+            nmid=10749810,
+            key="антивозрастной матирующий крем",
+            result="created",
+            new_bid=560,
+        )
+
+    assert "[cluster_bid_trace]" in caplog.text
+    assert "step=new_bid_calculate" in caplog.text
+    assert "ks_id=17783715" in caplog.text
+    assert "adv_id=32824944" in caplog.text
+    assert "new_bid=560" in caplog.text
+
+
 @pytest.mark.parametrize(
     ("kwargs",),
     [
