@@ -50,6 +50,26 @@ def test_resolve_flag_disabled_on_max_decrease() -> None:
 
 
 @pytest.mark.unit
+def test_skip_excel_substitute_fact_cpo_when_max_decreased_auto_disabled() -> None:
+    from app.modules.sales_plan_settings.v3_raise_max_cpo import (
+        skip_excel_substitute_fact_cpo_for_max,
+    )
+
+    assert skip_excel_substitute_fact_cpo_for_max(
+        field="substitute_fact_cpo_for_max",
+        raise_max_auto_disabled=True,
+    ) is True
+    assert skip_excel_substitute_fact_cpo_for_max(
+        field="substitute_fact_cpo_for_max",
+        raise_max_auto_disabled=False,
+    ) is False
+    assert skip_excel_substitute_fact_cpo_for_max(
+        field="max_price_for_order",
+        raise_max_auto_disabled=True,
+    ) is False
+
+
+@pytest.mark.unit
 def test_format_auto_disable_message() -> None:
     _, effect = resolve_flag_after_max_cpo_decrease(
         old_max=200,

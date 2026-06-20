@@ -58,3 +58,17 @@ def format_v3_raise_max_toggle_message(*, enabled: bool) -> str:
     if enabled:
         return "Авто max CPO (V3 Raise) включено."
     return "Авто max CPO (V3 Raise) отключено."
+
+
+def skip_excel_substitute_fact_cpo_for_max(
+    *,
+    field: str,
+    raise_max_auto_disabled: bool,
+) -> bool:
+    """Пропустить EDIT ``substitute_fact_cpo_for_max``, если max CPO уже сбросил флаг.
+
+    Excel import применяет колонки в sorted-порядке: ``max_price_for_order`` идёт
+    раньше ``substitute_fact_cpo_for_max``. Без skip ячейка TRUE из выгрузки
+    повторно включит V3 Raise после авто-выключения при уменьшении max.
+    """
+    return raise_max_auto_disabled and field == "substitute_fact_cpo_for_max"

@@ -45,6 +45,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.modules.sales_plan_settings.v3_raise_max_cpo import (
     MaxCpoDecreaseSideEffect,
     resolve_flag_after_max_cpo_decrease,
+    skip_excel_substitute_fact_cpo_for_max,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
     DEFAULT_CURRENCY,
@@ -261,6 +262,7 @@ async def apply_adv_excel_rows(
                     f"Строка {i}: RO__nmid не совпадает с данными сервера"
                 )
 
+            raise_max_auto_disabled = False
             for field in sorted(EDITABLE_ADV_SETTING_COLUMNS):
                 h = edit_header(field)
                 if h not in row:
@@ -293,6 +295,12 @@ async def apply_adv_excel_rows(
                     adv.substitute_fact_cpo_for_max = new_flag
                     if side_effect is not None:
                         max_cpo_decrease_effects.append(side_effect)
+                        raise_max_auto_disabled = True
+                    continue
+                if skip_excel_substitute_fact_cpo_for_max(
+                    field=field,
+                    raise_max_auto_disabled=raise_max_auto_disabled,
+                ):
                     continue
                 setattr(adv, field, val)
 
