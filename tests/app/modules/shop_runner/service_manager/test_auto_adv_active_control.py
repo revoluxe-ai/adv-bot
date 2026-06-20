@@ -731,8 +731,8 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_cluster_bidder_does_not_pause_when_avg_cost_above_target():
-    """Кластерный биддер: cost-rule отключён — автокампания не ставится на паузу."""
+async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_target():
+    """auto_shelf_bid_control_enabled: cost-rule отключён — автокампания не на паузе."""
     adv = _FakeComplexAdv(
         auto_limit=100,
         auto_status="started",
@@ -742,8 +742,7 @@ async def test_auto_adv_cluster_bidder_does_not_pause_when_avg_cost_above_target
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
-        auto_shelf_bid_control_enabled=False,
-        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+        auto_shelf_bid_control_enabled=True,
     )
 
     wb_modifier = MagicMock()
