@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import PromotionManager
+from app.core.mp.wb.api.excs import BadRequestError
 from app.core.mp.wb.api.managers.wb_promotion_manager.wb_promotion_manager import WBModifier
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
@@ -30,6 +33,10 @@ def _v2_campaign(
     )
 
 
+def _placement_error(detail: str) -> BadRequestError:
+    return BadRequestError(json.dumps({"detail": detail}))
+
+
 @pytest.fixture
 def mock_promotion_manager() -> AsyncMock:
     pm = AsyncMock(spec=PromotionManager)
@@ -49,6 +56,11 @@ def _nm_bids_to_map(body: object) -> dict[int, int]:
     bids_item = body.bids[0]
     assert hasattr(bids_item, "nm_bids")
     return {item.nm_id: item.bid_kopecks for item in bids_item.nm_bids}
+
+
+def _placement_from_call(call_index: int, mock_pm: AsyncMock) -> object:
+    (body,) = mock_pm.patch_adv_v1_bids.call_args_list[call_index][0]
+    return body.bids[0].nm_bids[0].placement
 
 
 @pytest.mark.asyncio
@@ -128,3 +140,73 @@ async def test_update_auto_adv_cpm_placement_recommendations_for_manual_shelf(
             item.placement
             == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_update_auto_adv_cpm_v2_miss_combined_success(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(return_value=[])
+    await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
+    mock_promotion_manager.patch_adv_v1_bids.assert_called_once()
+    assert (
+        _placement_from_call(0, mock_promotion_manager)
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_update_auto_adv_cpm_v2_miss_retries_to_recommendations(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(return_value=[])
+    mock_promotion_manager.patch_adv_v1_bids = AsyncMock(
+        side_effect=[
+            _placement_error("combined placement is disabled"),
+            None,
+        ]
+    )
+    await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
+    assert mock_promotion_manager.patch_adv_v1_bids.await_count == 2
+    assert (
+        _placement_from_call(1, mock_promotion_manager)
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_update_auto_adv_cpm_v2_miss_both_placements_raise(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(return_value=[])
+    last_err = _placement_error("invalid target type recom")
+    mock_promotion_manager.patch_adv_v1_bids = AsyncMock(
+        side_effect=[
+            _placement_error("combined placement is disabled"),
+            last_err,
+        ]
+    )
+    with pytest.raises(BadRequestError) as exc_info:
+        await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
+    assert exc_info.value is last_err
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_update_auto_adv_cpm_v2_miss_non_placement_error_no_retry(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(return_value=[])
+    mock_promotion_manager.patch_adv_v1_bids = AsyncMock(
+        side_effect=BadRequestError(json.dumps({"detail": "invalid bid value"}))
+    )
+    with pytest.raises(BadRequestError, match="invalid bid value"):
+        await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
+    mock_promotion_manager.patch_adv_v1_bids.assert_awaited_once()
