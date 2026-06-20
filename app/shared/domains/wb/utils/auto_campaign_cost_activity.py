@@ -3,7 +3,9 @@
 При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
 автокампанию на паузу, UI показывает предупреждение.
 
-При включённом ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
+Cost-rule не применяется, если включён кластерный биддер
+(``bidder_coroutine_type == UPDATE_CLUSTER_BIDS``) или
+``auto_shelf_bid_control_enabled``.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
     SalesStates,
@@ -30,11 +33,12 @@ if TYPE_CHECKING:
 
 
 def _cost_rule_controls_auto_campaign(adv_setting: AdvSetting) -> bool:
-    """True, если cost-rule (пауза автокампании по среднему CPO) применяется.
-
-    Не применяется при ``auto_shelf_bid_control_enabled``.
-    """
-    return not adv_setting.auto_shelf_bid_control_enabled
+    """True, если cost-rule (пауза автокампании по среднему CPO) применяется."""
+    if adv_setting.auto_shelf_bid_control_enabled:
+        return False
+    if adv_setting.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
+        return False
+    return True
 
 
 @dataclass(frozen=True)
