@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
 )
@@ -46,6 +47,9 @@ class _FakeAdvSetting:
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
         auto_shelf_bid_control_enabled: bool = False,
+        bidder_coroutine_type: BidderCoroutineType = (
+            BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        ),
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -57,6 +61,7 @@ class _FakeAdvSetting:
         self.rec_system_mode = rec_system_mode
         self.sales_predict_method = FactMethods.DIRECT_SALES
         self.auto_shelf_bid_control_enabled = auto_shelf_bid_control_enabled
+        self.bidder_coroutine_type = bidder_coroutine_type
 
 
 class _FakeSearchAdv:
@@ -85,6 +90,9 @@ class _FakeComplexAdv:
         rec_system_mode: bool = True,
         auto_adv_bid_control_enable: bool = False,
         auto_shelf_bid_control_enabled: bool = False,
+        bidder_coroutine_type: BidderCoroutineType = (
+            BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        ),
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -98,6 +106,7 @@ class _FakeComplexAdv:
             max_price_for_order=max_price_for_order,
             rec_system_mode=rec_system_mode,
             auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
+            bidder_coroutine_type=bidder_coroutine_type,
         )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
@@ -722,8 +731,8 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_target():
-    """auto_shelf_bid_control: cost-rule отключён — автокампания не ставится на паузу."""
+async def test_auto_adv_cluster_bidder_does_not_pause_when_avg_cost_above_target():
+    """Кластерный биддер: cost-rule отключён — автокампания не ставится на паузу."""
     adv = _FakeComplexAdv(
         auto_limit=100,
         auto_status="started",
@@ -733,7 +742,8 @@ async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_tar
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
-        auto_shelf_bid_control_enabled=True
+        auto_shelf_bid_control_enabled=False,
+        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
     )
 
     wb_modifier = MagicMock()
