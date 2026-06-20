@@ -160,8 +160,8 @@ class WBModifier:
     ) -> None:
         """Обновляет CPM auto-РК через PATCH /api/advert/v1/bids (вход в рублях).
 
-        Placement: v2/adverts или retry ``combined`` → ``recommendations`` при miss v2.
-        Аукцион (search) — отдельный путь ``update_search_adv_common_cpm``.
+        Placement: v2/adverts (``unified``/``manual``) или retry ``combined`` →
+        ``recommendations`` при miss v2 / неизвестном ``bid_type``.
         """
         if not nm_bid_pairs:
             return None
@@ -178,7 +178,8 @@ class WBModifier:
 
         Returns:
             ``combined`` для ``unified``, ``recommendations`` для ``manual``,
-            ``None`` если v2 не вернул кампанию (сигнал retry-ветки).
+            ``None`` если v2 не вернул кампанию или ``bid_type`` неизвестен —
+            сигнал retry ``combined`` → ``recommendations``.
 
         Для auto допустимы только ``combined`` и ``recommendations``; ``search`` —
         аукционный путь (``set_common_bids`` / ``AdvType.SEARCH``).
@@ -191,7 +192,15 @@ class WBModifier:
         bid_type = (getattr(campaigns[0], "bid_type", None) or "").lower()
         if bid_type == "unified":
             return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
-        return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+        if bid_type == "manual":
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+
+        logger.warning(
+            "auto_adv_bid_placement_unknown_bid_type adv_id=%s bid_type=%s",
+            adv_id,
+            bid_type or "?",
+        )
+        return None
 
     async def _patch_auto_adv_v1_bids(
         self,
@@ -225,7 +234,8 @@ class WBModifier:
     ) -> None:
         """PATCH auto-ставки: один placement по v2 или retry combined → recommendations.
 
-        При miss v2 перебираются только два auto-invariant; иная 400 — без retry.
+        Retry только если v2 miss или ``bid_type`` не ``unified``/``manual``.
+        При известном типе — один PATCH; иная 400 — без retry.
         """
         placement = await self._resolve_auto_adv_bid_placement(adv_id)
         if placement is not None:
@@ -266,7 +276,7 @@ class WBModifier:
     ) -> None:
         """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (shelf control).
 
-        Placement: v2/adverts или retry ``combined`` → ``recommendations`` при miss v2.
+        Placement: v2/adverts (``unified``/``manual``) или retry при miss/unknown type.
         """
         if not nm_bid_kopecks:
             return None

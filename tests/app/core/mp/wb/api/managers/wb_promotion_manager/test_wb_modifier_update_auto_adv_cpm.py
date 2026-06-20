@@ -144,6 +144,23 @@ async def test_update_auto_adv_cpm_placement_recommendations_for_manual_shelf(
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_update_auto_adv_cpm_unknown_bid_type_retries_combined_first(
+    wb_modifier: WBModifier,
+    mock_promotion_manager: AsyncMock,
+) -> None:
+    mock_promotion_manager.get_adverts_v2_by_ids = AsyncMock(
+        return_value=[_v2_campaign(bid_type="")]
+    )
+    await wb_modifier.update_auto_adv_cpm(adv_id=1, nm_bid_pairs={1: 10})
+    mock_promotion_manager.patch_adv_v1_bids.assert_called_once()
+    assert (
+        _placement_from_call(0, mock_promotion_manager)
+        == PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_update_auto_adv_cpm_v2_miss_combined_success(
     wb_modifier: WBModifier,
     mock_promotion_manager: AsyncMock,
