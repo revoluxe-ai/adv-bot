@@ -8,6 +8,7 @@ import pytest
 
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.cluster_bid_trace import (
     format_error_detail,
+    is_trace_bid_cell,
     is_trace_cell,
     is_trace_enabled,
     log_cluster_bid_trace,
@@ -82,6 +83,26 @@ def test_exact_match_allows_log(monkeypatch: pytest.MonkeyPatch, caplog: pytest.
     assert "[cluster_bid_trace]" in caplog.text
     assert "step=new_bid_calculate" in caplog.text
     assert "new_bid=560" in caplog.text
+
+
+def test_is_trace_bid_cell_matches_without_dto_adv_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CalculationInput/NewBid path: adv_id/ks_id только из env."""
+    _set_trace_env(monkeypatch)
+
+    assert is_trace_bid_cell(
+        shop_id="db28efff-f7a9-52f8-8342-f1a58f7d8ed3",
+        search_adv_id=29734515,
+        nmid=10749810,
+        key="антивозрастной матирующий крем",
+    )
+    assert is_trace_bid_cell(
+        shop_id="db28efff-f7a9-52f8-8342-f1a58f7d8ed3",
+        search_adv_id=29734515,
+        nmid=10749810,
+        key="другой ключ",
+    ) is False
 
 
 @pytest.mark.parametrize(

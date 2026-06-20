@@ -54,6 +54,7 @@ from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
 from .cluster_bid_trace import (
     format_error_detail,
+    is_trace_bid_cell,
     is_trace_cell,
     is_trace_enabled,
     log_cluster_bid_trace,
@@ -184,7 +185,7 @@ class UpdateClusterBidsManager:
             calc_match = sum(
                 1
                 for ci in calculation_inputs
-                if is_trace_cell(
+                if is_trace_bid_cell(
                     shop_id=shop_id,
                     search_adv_id=ci.search_adv_id,
                     nmid=ci.nmid,
@@ -194,7 +195,7 @@ class UpdateClusterBidsManager:
             cmd_match = sum(
                 1
                 for nb in new_bids_command.new_bids
-                if is_trace_cell(
+                if is_trace_bid_cell(
                     shop_id=shop_id,
                     search_adv_id=nb.search_adv_id,
                     nmid=nb.nmid,
@@ -785,7 +786,7 @@ class UpdateClusterBidsManager:
             matching_bids = [
                 b
                 for b in update_bids_command.new_bids
-                if is_trace_cell(
+                if is_trace_bid_cell(
                     shop_id=shop_id,
                     search_adv_id=b.search_adv_id,
                     nmid=b.nmid,
@@ -883,9 +884,11 @@ class UpdateClusterBidsManager:
 
         new_bids: list[NewBid] = []
         trace_on = is_trace_enabled()
+        trace_shop_id = trace_target_defaults().get("shop_id")
         for input_dto in calculation_inputs:
             new_bid: NewBid | None = new_bid_calculate(input_dto)
-            if trace_on and is_trace_cell(
+            if trace_on and is_trace_bid_cell(
+                shop_id=trace_shop_id,
                 search_adv_id=input_dto.search_adv_id,
                 nmid=input_dto.nmid,
                 key=input_dto.cluster,

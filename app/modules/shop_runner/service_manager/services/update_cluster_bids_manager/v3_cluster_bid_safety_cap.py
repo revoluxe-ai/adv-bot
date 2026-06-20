@@ -51,7 +51,12 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
-from .cluster_bid_trace import is_trace_cell, is_trace_enabled, log_cluster_bid_trace
+from .cluster_bid_trace import (
+    is_trace_cell,
+    is_trace_enabled,
+    log_cluster_bid_trace,
+    trace_target_defaults,
+)
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import (
     BidderKeywordStatus,
 )
@@ -279,6 +284,8 @@ def apply_v3_cluster_bid_safety_cap(
     outgoing_by_key: dict[CellKey, NewBid] = {
         (nb.search_adv_id, nb.nmid, nb.cluster): nb for nb in command.new_bids
     }
+    trace_defaults = trace_target_defaults()
+    trace_shop_id = trace_defaults.get("shop_id")
 
     for cell in map_datas:
         if not cell.v3_managed:
@@ -287,6 +294,7 @@ def apply_v3_cluster_bid_safety_cap(
         trace_cell = (
             is_trace_enabled()
             and is_trace_cell(
+                shop_id=trace_shop_id,
                 adv_id=cell.adv_id,
                 search_adv_id=cell.search_adv_id,
                 nmid=cell.nmid,

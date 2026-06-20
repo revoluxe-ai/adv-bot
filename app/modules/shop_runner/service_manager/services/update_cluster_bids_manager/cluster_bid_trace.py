@@ -113,6 +113,30 @@ def is_trace_cell(
     return True
 
 
+def is_trace_bid_cell(
+    *,
+    shop_id: str | None,
+    search_adv_id: int,
+    nmid: int,
+    key: str,
+) -> bool:
+    """Сопоставление CalculationInput/NewBid с env-фильтром exact cell.
+
+    У DTO нет auto ``adv_id`` / ``ks_id`` — берём из env при проверке search/nmid/key.
+    """
+    defaults = trace_target_defaults()
+    if not defaults:
+        return False
+    return is_trace_cell(
+        shop_id=shop_id,
+        adv_id=defaults.get("adv_id"),
+        search_adv_id=search_adv_id,
+        nmid=nmid,
+        ks_id=defaults.get("ks_id"),
+        key=key,
+    )
+
+
 def _sanitize_field(name: str, value: Any) -> str:
     if value is None:
         return "null"
