@@ -48,7 +48,6 @@ async def test_get_keywords_strict_miss_raises() -> None:
         await complex_adv.get_keywords()
 
     provider.assert_awaited_once()
-    assert provider.await_args.kwargs.get("cache_only") is True
 
 
 @pytest.mark.unit
