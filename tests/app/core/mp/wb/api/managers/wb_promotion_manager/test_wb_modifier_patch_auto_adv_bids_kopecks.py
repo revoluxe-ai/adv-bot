@@ -24,6 +24,7 @@ def _nm_bids_to_map(body: object) -> dict[int, int]:
 def mock_promotion_manager() -> AsyncMock:
     pm = AsyncMock(spec=PromotionManager)
     pm.patch_adv_v1_bids = AsyncMock()
+    pm.get_adverts_v2_by_ids = AsyncMock(return_value=[])
     return pm
 
 
