@@ -138,6 +138,11 @@ def _adv_state(
     max_pay_for_order: float = 95.0,
     guard_condition: bool = False,
 ) -> AdvState:
+    use_raise_max = (
+        guard_condition
+        and fact_pay_for_order is not None
+        and float(fact_pay_for_order) > float(max_pay_for_order)
+    )
     return replace(
         AdvState.empty(),
         resolve=resolve,
@@ -145,6 +150,7 @@ def _adv_state(
         fact_pay_for_order=fact_pay_for_order,
         max_pay_for_order=max_pay_for_order,
         guard_condition=guard_condition,
+        v3_substitute_fact_cpo_for_max=use_raise_max,
         eligibility_by_ks_id=eligibility or {1: _pfo_elig()},
     )
 

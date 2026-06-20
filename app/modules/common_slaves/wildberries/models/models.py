@@ -575,6 +575,15 @@ class AdvSetting(BaseTable):
     target_price_for_order = mapped_column(Float, nullable=True, default=None)
 
     max_price_for_order: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    substitute_fact_cpo_for_max: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment=(
+            "V3 Raise MAX: in-memory max=fact CPO when fact>db max (per tick, no persist)"
+        ),
+    )
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
         Boolean, nullable=True, default=True, server_default="true"

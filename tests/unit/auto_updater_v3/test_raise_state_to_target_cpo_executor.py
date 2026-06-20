@@ -187,6 +187,7 @@ def _adv_state(
     fact_pay_for_order: float | None = None,
     resolve_valid: bool = True,
     guard_condition: bool = False,
+    v3_substitute_fact_cpo_for_max: bool = False,
 ) -> AdvState:
     return replace(
         AdvState.empty(),
@@ -195,6 +196,7 @@ def _adv_state(
         fact_pay_for_order=fact_pay_for_order,
         resolve_valid=resolve_valid,
         guard_condition=guard_condition,
+        v3_substitute_fact_cpo_for_max=v3_substitute_fact_cpo_for_max,
     )
 
 
@@ -539,6 +541,7 @@ def test_raise_state_caps_at_fact_ceiling_on_overspend() -> None:
         max_pay_for_order=500.0,
         fact_pay_for_order=800.0,
         guard_condition=True,
+        v3_substitute_fact_cpo_for_max=True,
     )
     ctx = UpdateContextManager().from_prepared(
         KeywordsPreparedList(keywords=[cheap, expensive]),

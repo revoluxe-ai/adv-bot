@@ -42,6 +42,10 @@ from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import 
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
+from app.modules.sales_plan_settings.v3_raise_max_cpo import (
+    MaxCpoDecreaseSideEffect,
+    resolve_flag_after_max_cpo_decrease,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
     DEFAULT_CURRENCY,
     DEFAULT_MAX_BID_MINOR,
@@ -180,8 +184,8 @@ async def apply_adv_excel_rows(
     expected_wb_user_cabinet_id: int,
     rows: list[dict[str, Any]],
     progress_callback: ProgressCallback | None = None,
-) -> int:
-    """Применить строки Excel и вернуть число обновлённых РК.
+) -> tuple[int, list[MaxCpoDecreaseSideEffect]]:
+    """Применить строки Excel и вернуть число обновлённых РК и side-effects V3 Raise MAX.
 
     Контракт по ошибкам:
     - при любой проблеме выбрасывается `AdvExcelImportError`;
@@ -205,6 +209,7 @@ async def apply_adv_excel_rows(
         )
 
     updated = 0
+    max_cpo_decrease_effects: list[MaxCpoDecreaseSideEffect] = []
     async with _sm(read_only=False) as session:
         wuc_check = await session.get(WBUserCabinet, expected_wb_user_cabinet_id)
         if not wuc_check:
@@ -275,6 +280,20 @@ async def apply_adv_excel_rows(
                     raise AdvExcelImportError(
                         f"Строка {i}, колонка {h}: значение должно быть >= 1"
                     )
+                if field == "max_price_for_order":
+                    old_max = adv.max_price_for_order
+                    new_max = int(val)
+                    new_flag, side_effect = resolve_flag_after_max_cpo_decrease(
+                        old_max=old_max,
+                        new_max=new_max,
+                        current_flag=bool(adv.substitute_fact_cpo_for_max),
+                        adv_id=int(adv.adv_id),
+                    )
+                    setattr(adv, field, new_max)
+                    adv.substitute_fact_cpo_for_max = new_flag
+                    if side_effect is not None:
+                        max_cpo_decrease_effects.append(side_effect)
+                    continue
                 setattr(adv, field, val)
 
             shelf_enabled_field = "auto_shelf_bid_control_enabled"
@@ -332,4 +351,4 @@ async def apply_adv_excel_rows(
 
         await session.commit()
 
-    return updated
+    return updated, max_cpo_decrease_effects

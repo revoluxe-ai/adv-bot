@@ -130,8 +130,9 @@ def test_overspend_resets_expensive_ladder_cheap_trim() -> None:
         ladder_states=expensive_states,
     )
     adv = replace(
-        _adv_state(fact=800.0, max_cpo=500.0),
+        _adv_state(fact=800.0, max_cpo=500.0, guard_condition=True),
         guard_condition=True,
+        v3_substitute_fact_cpo_for_max=True,
     )
     ctx = _context([cheap, expensive], adv)
     ResetOverMaxCpoOnOverspendExecutor().execute(ctx)

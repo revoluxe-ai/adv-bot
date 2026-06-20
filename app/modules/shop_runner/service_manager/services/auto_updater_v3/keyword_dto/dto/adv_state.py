@@ -54,10 +54,14 @@ class AdvState:
         default_factory=lambda: dict[str, Any]()
     )
     guard_applied: bool = False
+    v3_substitute_fact_cpo_for_max: bool = False
 
     @property
     def raise_cpo_ceiling(self) -> float | None:
         """SSOT потолка для raise/preamble overspend-контуров.
+
+        При ``substitute_fact_cpo_for_max=True`` (V3 Raise MAX) потолок —
+        ``max(fact, plan.max)``; иначе только plan max из БД.
 
         Свойство возвращает per-campaign ceiling, который используют
         preamble-executors и связанные gates. Здесь намеренно нет отдельного
@@ -67,7 +71,9 @@ class AdvState:
         """
         if self.fact_pay_for_order is None:
             return None
-        return  max(self.fact_pay_for_order, self.max_pay_for_order)
+        if not self.v3_substitute_fact_cpo_for_max:
+            return float(self.max_pay_for_order)
+        return max(float(self.fact_pay_for_order), float(self.max_pay_for_order))
 
 
     @property
