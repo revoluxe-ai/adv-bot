@@ -12,7 +12,7 @@ class WBCabinetFactory(SQLAlchemyModelFactory):
         model = WBCabinet
         sqlalchemy_session = None
 
-    id = factory.Sequence(lambda n: n + 1)
+    id = factory.Sequence(lambda n: n + 1_000_000)
     shop_id = factory.LazyFunction(lambda: fake.uuid4())
     active = True
     expiration_time = factory.LazyFunction(lambda: fake.date_time_between(start_date="now", end_date="+30d"))
@@ -37,28 +37,39 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
         model = AdvSetting
         sqlalchemy_session = None
 
-    max_place = factory.LazyFunction(lambda: fake.random_int(5, 100))
+    adv_id = factory.Sequence(lambda n: 1_000_000 + n)
+    _search_adv_id = factory.LazyAttribute(lambda o: o.adv_id)
 
-    adv_id = factory.LazyFunction(lambda: fake.random_int(1000, 9999))
+    max_place = factory.LazyFunction(lambda: fake.random_int(5, 100))
     name = factory.LazyFunction(lambda: fake.sentence(nb_words=3))
     max_cpm = factory.LazyFunction(lambda: fake.random_int(50, 3000))
     plan_for_sales_for_day = factory.LazyFunction(lambda: fake.random_int(10, 50))
+
     target_price_for_order = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=50, max_value=500), 2)
     )
-    max_price_for_order = factory.LazyAttribute(
-        lambda o: round(fake.pyfloat(min_value=o.target_price_for_order + 10, max_value=o.target_price_for_order + 400), 2)
-    )
-    active_status = "started"
-    wb_cabinet_id = 1
 
-    # поля, которые управляют поведением ComplexAdv
+    max_price_for_order = factory.LazyAttribute(
+        lambda o: round(
+            fake.pyfloat(
+                min_value=o.target_price_for_order + 10,
+                max_value=o.target_price_for_order + 400,
+            ),
+            2,
+        )
+    )
+
+    active_status = "started"
+    wb_cabinet_id = None
+
     auto_update_white_list = True
     auto_update_target_place = True
     auto_update_exponent = True
     automatic_version = 2
     aggressiveness = 3
-    exponent_predict_ctr = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0.5, max_value=2.0), 3))
+    exponent_predict_ctr = factory.LazyFunction(
+        lambda: round(fake.pyfloat(min_value=0.5, max_value=2.0), 3)
+    )
     auto_add_only_relevant_phrase = factory.LazyFunction(lambda: fake.boolean())
 
 
