@@ -57,7 +57,7 @@ class WBCabinetAccess:
 
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: int | str,
-) -> WBCabinetAccess:
+) -> WBCabinetAccess | None:
 
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
@@ -71,7 +71,7 @@ async def get_access_for_wb_cabinet(
         wb_cabinet_id = wb_cabinet_id_or_shop_id
 
     shop_id_for_deactivate: str | None = None
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
 
         if wb_cabinet is None:
