@@ -319,15 +319,6 @@ async def process_cabinet_api(
         await state.set_state(states.CabinetRegistration.api)
         return None
 
-    if validation_result.is_read_only:
-        logger.info("Token is read-only for user %s", user_telegram_id)
-        _= await bot.send_message(
-            chat_id,
-            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
-        )
-        await state.set_state(states.CabinetRegistration.api)
-        return None
-
     if validation_result.is_expired:
         logger.info("Token is expired for user %s", user_telegram_id)
         _= await bot.send_message(
@@ -472,11 +463,6 @@ async def process_cabinet_api(
         access.wb_cabinet = wb_cabinet
         access.wb_user_cabinet = wb_user_cabinet
         # Обновляем данные магазина
-        wb_api = WBApi(access, client_session)
-
-        shop_updater = ShopDataUpdater(wb_api)
-        _ = await shop_updater.update_advs_data()
-
         # Показываем список кабинетов пользователя
         stmt_for_wb_user_cabinet = (
             select(WBUserCabinet)
@@ -490,6 +476,14 @@ async def process_cabinet_api(
         shop_ids_with_active_tokens = await get_shop_ids_with_complete_token_status(
             shop_ids
         )
+
+        if validation_result.is_read_only:
+
+            await bot.send_message(
+                chat_id, ("""ВНИМАНИЕ! Добавлен токен с правами "Только для чтения".\n\n"""
+                          """Данные права позволяют использовать бот только для аналитических функций.\n\n""")
+            )
+            await asyncio.sleep(3)
 
         await ShopChoice(
             bot, chat_id, list(wb_user_cabinets), shop_ids_with_active_tokens
