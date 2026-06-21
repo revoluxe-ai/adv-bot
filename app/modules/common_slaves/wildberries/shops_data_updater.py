@@ -114,7 +114,9 @@ class ShopDataUpdater:
 
         adv_ids: list[int] = []
         async with sm(read_only=True) as session:
-           adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(session)
+           adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(session,
+                                                                                 self.wb_cabinet.id
+                                                                                 )
         for adv_setting in adv_settings:
             if adv_setting.adv_id is not None:
                 adv_ids.append(adv_setting.adv_id)
@@ -189,11 +191,13 @@ class ShopDataUpdater:
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         logger.debug("Обновление карточек в базе завершено")
 
-    async def get_adv_setting_by_wb_cabinet_active_filter(self, session) -> typing.Sequence[AdvSetting]:
+
+    @staticmethod
+    async def get_adv_setting_by_wb_cabinet_active_filter(session, wb_cabinet_id) -> typing.Sequence[models.AdvSetting]:
         stmt = (
             select(models.AdvSetting)
             .where(
-                models.AdvSetting.wb_cabinet_id == self.wb_cabinet.id,
+                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
                 models.AdvSetting._search_adv_id.is_not(None)
             )
             .options(
