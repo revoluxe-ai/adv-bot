@@ -96,7 +96,7 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def _get_active_advs(self) -> list[AdvSetting]:
+    async def _get_advs(self) -> list[AdvSetting]:
         shop_id = self.shop_id
         stmt = (
             select(AdvSetting)
@@ -302,7 +302,7 @@ class WBShopDataManager:
             не применится.
         """
         adv_settings: list[AdvSetting] = cast(
-            list[AdvSetting], await self._get_active_advs()
+            list[AdvSetting], await self._get_advs()
         )
         self._set_auto_commom_budget(adv_settings)
         search_adv_ids: set[int] = {
