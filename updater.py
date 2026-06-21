@@ -37,7 +37,7 @@ run_own_process_list: list[AsyncEntry] = [
     run_main_coroutines,
     # # # TODO: привести все процессы к единому интерфейсу
     run_runtime,
-    snapshot_data_updater.run,
+    snapshot_data_updater.run, # здесь кеш сделать для всего
 ]
 
 
