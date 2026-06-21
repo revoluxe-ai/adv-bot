@@ -8,6 +8,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
+from app.client_bot.user_interface.states import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from . import models, wb_db_manager
@@ -113,22 +114,7 @@ class ShopDataUpdater:
 
         adv_ids: list[int] = []
         async with sm(read_only=True) as session:
-            stmt = (
-                select(models.AdvSetting)
-                .where(
-                    models.AdvSetting.wb_cabinet_id == self.wb_cabinet.id,
-                    models.AdvSetting.bot_active.is_(True),
-                )
-                .options(
-                    load_only(
-                        models.AdvSetting.name,
-                        models.AdvSetting.adv_id,
-                        models.AdvSetting._search_adv_id,
-                    )
-                )
-            )
-            result = await session.execute(stmt)
-            adv_settings = result.unique().scalars().all()
+           adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(session)
         for adv_setting in adv_settings:
             if adv_setting.adv_id is not None:
                 adv_ids.append(adv_setting.adv_id)
@@ -202,3 +188,23 @@ class ShopDataUpdater:
         cards = await wb_api.get_all_cards()
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         logger.debug("Обновление карточек в базе завершено")
+
+    async def get_adv_setting_by_wb_cabinet_active_filter(self, session) -> typing.Sequence[AdvSetting]:
+        stmt = (
+            select(models.AdvSetting)
+            .where(
+                models.AdvSetting.wb_cabinet_id == self.wb_cabinet.id,
+                models.AdvSetting._search_adv_id.is_not(None)
+            )
+            .options(
+                load_only(
+                    models.AdvSetting.name,
+                    models.AdvSetting.adv_id,
+                    models.AdvSetting._search_adv_id,
+                )
+            )
+        )
+        result = await session.execute(stmt)
+        adv_settings = result.unique().scalars().all()
+        return adv_settings
+
