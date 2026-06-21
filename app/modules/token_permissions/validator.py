@@ -19,6 +19,7 @@ class TokenPermissionsValidator:
         "Контент": "https://content-api.wildberries.ru/ping",
         "Аналитика": "https://seller-analytics-api.wildberries.ru/ping",
         "Продвижение": "https://advert-api.wildberries.ru/ping",
+        "Статистика": "https://statistics-api.wildberries.ru/ping"
     }
 
     def __init__(self, http_session: ClientSession | None = None):
@@ -34,7 +35,7 @@ class TokenPermissionsValidator:
         api_key: str,
         *,
         mode: Literal["claims_only", "claims_plus_api"] = "claims_plus_api",
-    ) -> ValidationResult:
+    ) -> ValidationResult | None:
         """Validate token and its permissions.
 
         Args:
@@ -60,7 +61,7 @@ class TokenPermissionsValidator:
                     expires=None,
                     permissions={},
                 )
-            
+
             # Now safely access properties
             shop_id = wb_token.get_shop_id_from_token()
             is_personal = wb_token.is_personal
@@ -94,7 +95,7 @@ class TokenPermissionsValidator:
             temp_session = ClientSession()
 
         try:
-            for right_name in ["Контент", "Аналитика", "Продвижение"]:
+            for right_name in ["Контент", "Аналитика", "Продвижение", "Статистика"]:
                 has_claim = right_name in jwt_categories
                 api_success = None
 

@@ -16,7 +16,7 @@ class PermissionStatus:
     @property
     def is_available(self) -> bool:
         """Check if permission is available.
-        
+
         Logic:
         - If no API probe was performed (api_probe_success is None), rely on JWT claim.
         - If API probe succeeded (True), permission is confirmed available.
@@ -46,7 +46,7 @@ class ValidationResult:
     def missing_required(self) -> set[str]:
         """Get set of missing required permissions."""
         from .validator import TokenPermissionsValidator
-        
+
         required = TokenPermissionsValidator.REQUIRED_RIGHTS
         available = {name for name, perm in self.permissions.items() if perm.is_available}
         return required - available
@@ -57,7 +57,6 @@ class ValidationResult:
         return (
             self.is_valid_jwt
             and self.is_personal
-            and not self.is_read_only
             and not self.is_expired
             and len(self.missing_required) == 0
         )
