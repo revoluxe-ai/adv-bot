@@ -121,6 +121,17 @@ def test_select_cycle_bid_points_for_viewer_all_with_impressions_sorted_by_cpc()
     assert [p.bid_minor for p in selected] == [30_000, 10_000, 20_000]
 
 
+def test_select_cycle_bid_points_for_viewer_zero_click_cpc_goes_last() -> None:
+    base = datetime(2026, 5, 25, 10, 0, 0, tzinfo=timezone.utc)
+    points = [
+        _point(10_000, impressions=600, is_covered=True, at=base, clicks=10, cart_cpa=30.0),
+        _point(20_000, impressions=600, is_covered=True, at=base.replace(hour=14), clicks=0, cart_cpa=float("inf")),
+        _point(30_000, impressions=600, is_covered=True, at=base.replace(hour=16), clicks=12, cart_cpa=10.0),
+    ]
+    selected = select_cycle_bid_points_for_viewer(points, optimization_metric=OptimizationMetric.CPC)
+    assert [p.bid_minor for p in selected] == [30_000, 10_000, 20_000]
+
+
 def test_bid_point_viewer_page_count() -> None:
     assert bid_point_viewer_page_count(0) == 0
     assert bid_point_viewer_page_count(1) == 1

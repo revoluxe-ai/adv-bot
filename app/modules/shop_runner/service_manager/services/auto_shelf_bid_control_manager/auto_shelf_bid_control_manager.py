@@ -689,9 +689,37 @@ class AutoShelfBidControlManager:
             or not getattr(complex_adv, "auto_shelf_bid_control_enabled", False)
         ):
             return MainBidRefreshResult.SKIPPED_DISABLED
-        # Main refresh требует worker snapshot с fresh_best_main_bid_minor;
-        # strategy fallback через _choose_main_bid_by_strategy запрещён.
-        return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+        desired_bid_minor = await self._choose_main_bid_by_strategy(
+            complex_adv=complex_adv,
+            currency=state.currency,
+            current_cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=state.previous_cycle_started_at,
+            current_main_bid_minor=state.current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
+        if desired_bid_minor is None:
+            return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+        clamped_bid_minor = self._clamp_bid_minor(
+            int(desired_bid_minor),
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
+        if (
+            state.current_main_bid_minor == clamped_bid_minor
+            and actual_bid_minor == clamped_bid_minor
+        ):
+            return MainBidRefreshResult.NO_CHANGE
+        state.current_main_bid_minor = clamped_bid_minor
+        state.main_started_at = now
+        state.last_reason = ControlReason.MAIN_BID_REFRESHED
+        await self._persist_state_then_set_bid(
+            complex_adv,
+            state=state,
+            bid_minor=clamped_bid_minor,
+        )
+        return MainBidRefreshResult.APPLIED
 
     async def _choose_best_bid_with_fallback(
         self,
@@ -773,12 +801,42 @@ class AutoShelfBidControlManager:
                 currency=currency,
                 cycle_started_at=current_cycle_started_at,
                 previous_cycle_started_at=previous_cycle_started_at,
-                current_main_bid_minor=None,
+                current_main_bid_minor=current_main_bid_minor,
                 actual_bid_minor=actual_bid_minor,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=max_bid_minor,
                 fact_cpo=complex_adv.fact_pay_for_order,
                 resolve_cpo=complex_adv.resolve_cpo,
+            )
+        if strategy == AutoShelfBidControlStrategy.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
+                nmid=complex_adv.main_nmid,
+                from_ts=report_day_start_utc(),
+                currency=currency,
+            )
+            return (
+                None
+                if best is None
+                else self._clamp_bid_minor(
+                    int(best.bid_minor),
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+        if strategy == AutoShelfBidControlStrategy.CPC:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=complex_adv.main_nmid,
+                from_ts=report_day_start_utc(),
+                currency=currency,
+            )
+            return (
+                None
+                if best is None
+                else self._clamp_bid_minor(
+                    int(best.bid_minor),
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
             )
 
         rec_result = await self._fetch_plan_distance_rec_result(complex_adv)

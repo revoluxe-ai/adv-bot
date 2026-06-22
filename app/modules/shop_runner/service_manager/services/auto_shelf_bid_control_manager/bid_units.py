@@ -31,13 +31,16 @@ DEFAULT_MIN_BID_DISTANCE_MINOR = 100
 
 
 def cpc_from_totals(spend: float, clicks: int) -> float:
-    """CPC для отображения в UI: ``spend / max(clicks, 1)``.
+    """CPC для отображения в UI: ``spend / clicks`` или ``+inf`` при ``clicks == 0``.
 
-    Нулевые клики дают ``spend/1`` только в строках просмотрщика.
+    Нулевые клики дают ``+inf`` только для display/sorting в UI.
     Выбор ``best``/``global_best`` в SQL требует только ``clicks > 0``
     (см. get_best_bid_by_cart_cpa.sql); порог покрытия — только для ✅ в UI.
     """
-    return spend / max(int(clicks), 1)
+    normalized_clicks = int(clicks)
+    if normalized_clicks <= 0:
+        return float("inf")
+    return spend / normalized_clicks
 
 
 def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:

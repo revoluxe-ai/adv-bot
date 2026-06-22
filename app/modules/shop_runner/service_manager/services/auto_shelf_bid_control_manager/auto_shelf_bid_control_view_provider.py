@@ -61,6 +61,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.settings import settings
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
+    resolve_auto_shelf_bid_control_strategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1148,6 +1151,9 @@ class AutoShelfBidControlViewProvider:
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
+            auto_shelf_bid_control_strategy=resolve_auto_shelf_bid_control_strategy(
+                getattr(adv, "auto_shelf_bid_control_strategy", None)
+            ),
             best_plan_bid_minor=best_plan_bid_minor,
             fresh_best_main_bid_minor=fresh_best_main_bid_minor,
             fresh_next_test_bid_minor=fresh_next_test_bid_minor,
