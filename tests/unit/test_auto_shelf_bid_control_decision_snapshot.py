@@ -426,6 +426,8 @@ def _cycle_metric_manager(
     )
     manager._build_coverage_snapshot = AsyncMock(return_value=([], 0, 0, 41_000))  # type: ignore[method-assign]
     manager._analytics.get_bid_stats = AsyncMock(return_value=cycle_stats)  # type: ignore[method-assign]
+    manager._analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    manager._analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)  # type: ignore[method-assign]
     return manager
 
 
@@ -473,6 +475,9 @@ async def test_decision_snapshot_two_qualified_tested_bids_selects_ranked_best()
             _cycle_bid_stat(48_000, cart_cpa=6.0, ctr=0.03),
         ]
     )
+    manager._analytics.get_best_bid_by_cart_cpa = AsyncMock(  # type: ignore[method-assign]
+        return_value=_cycle_bid_stat(57_000, cart_cpa=4.0, ctr=0.05)
+    )
     state = MagicMock()
     state.current_mode = "main"
     state.currency = "RUB"
@@ -505,6 +510,92 @@ async def test_decision_snapshot_two_qualified_tested_bids_selects_ranked_best()
     assert snapshot.rec_bid_recommendation is not None
     assert snapshot.rec_bid_recommendation["plan_ranked"][0]["bid"] == 57_000
     assert snapshot.expected_bid_minor == 57_000
+
+
+@pytest.mark.asyncio
+async def test_decision_snapshot_ctr_strategy_uses_strategy_resolver_for_main_bid() -> None:
+    manager = _cycle_metric_manager(
+        [
+            _cycle_bid_stat(57_000, cart_cpa=4.0, ctr=0.05),
+            _cycle_bid_stat(48_000, cart_cpa=6.0, ctr=0.03),
+        ]
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=48_000)  # type: ignore[method-assign]
+    state = MagicMock()
+    state.current_mode = "main"
+    state.currency = "RUB"
+    state.current_cycle_started_at = MagicMock()
+    state.previous_cycle_started_at = None
+    state.current_main_bid_minor = 57_000
+    settings_obj = MagicMock(
+        max_bid_minor=80_000,
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=1,
+        auto_adv_id=2,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CTR,
+    )
+
+    snapshot = await manager.build_decision_snapshot(
+        complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=57_000,
+        control_enabled=True,
+    )
+
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    assert snapshot.fresh_best_main_bid_minor == 48_000
+    assert snapshot.rec_bid_recommendation is not None
+    assert snapshot.rec_bid_recommendation["plan_ranked"][0]["bid"] == 57_000
+
+
+@pytest.mark.asyncio
+async def test_decision_snapshot_cpc_strategy_uses_strategy_resolver_for_main_bid() -> None:
+    manager = _cycle_metric_manager(
+        [
+            _cycle_bid_stat(57_000, impressions=500, clicks=20, cart_cpa=4.0, ctr=0.05),
+            _cycle_bid_stat(48_000, impressions=500, clicks=15, cart_cpa=6.0, ctr=0.03),
+        ]
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=57_000)  # type: ignore[method-assign]
+    state = MagicMock()
+    state.current_mode = "main"
+    state.currency = "RUB"
+    state.current_cycle_started_at = MagicMock()
+    state.previous_cycle_started_at = None
+    state.current_main_bid_minor = 48_000
+    settings_obj = MagicMock(
+        max_bid_minor=80_000,
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=1,
+        auto_adv_id=2,
+        fact_pay_for_order=None,
+        resolve_cpo=None,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CPC,
+    )
+
+    snapshot = await manager.build_decision_snapshot(
+        complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=48_000,
+        control_enabled=True,
+    )
+
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    assert snapshot.fresh_best_main_bid_minor == 57_000
 
 
 def _plan_distance_rec_view() -> dict[str, object]:
