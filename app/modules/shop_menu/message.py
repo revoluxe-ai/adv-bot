@@ -129,23 +129,24 @@ def build_shop_main_keyboard(
         )
     )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Массовые операции с РК",
-            callback_data=ShopMassAdvOpsMenu(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+    if ui_mode == "paid":
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Массовые операции с РК",
+                callback_data=ShopMassAdvOpsMenu(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Выгрузить все РК в Excel",
-            callback_data=ExportShopAdvExcel(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Выгрузить все РК в Excel",
+                callback_data=ExportShopAdvExcel(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
 
     if _is_admin_user(getattr(wb_user_cabinet.user, "user_telegram_id", None)):
         _ = builder.row(
@@ -157,14 +158,15 @@ def build_shop_main_keyboard(
             )
         )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Загрузить настройки из Excel",
-            callback_data=ImportShopAdvExcel(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+    if ui_mode == "paid":
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Загрузить настройки из Excel",
+                callback_data=ImportShopAdvExcel(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
 
     _ = builder.row(
         InlineKeyboardButton(
