@@ -2,8 +2,8 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from typing import cast
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import (
     NormqueryBidDTO,
@@ -21,7 +21,6 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
-    PlanFactSummary,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -98,22 +97,32 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def _get_advs(self) -> list[AdvSetting]:
+    async def _get_advs(self, only_bot_active: bool) -> list[AdvSetting]:
         shop_id = self.shop_id
+        async with sm(read_only=True) as session:
+            return await self.__get_advs(session, shop_id, only_bot_active)
+
+    @staticmethod
+    async def __get_advs(session: AsyncSession,
+                         shop_id: str,
+                         only_bot_active: bool) -> list[AdvSetting]:
         stmt = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .where(WBCabinet.shop_id == shop_id,
-                    AdvSetting.active_status != 'done',
-                    AdvSetting.bot_active.is_(True),)
+                   AdvSetting.active_status != 'done', )
         )
-        async with sm() as session:
-            result = await session.execute(stmt)
-            advs: Sequence[AdvSetting] = result.scalars().all()
+
+        if only_bot_active:
+            stmt = stmt.where(AdvSetting.bot_active.is_(True))
+
+        result = await session.execute(stmt)
+        advs: Sequence[AdvSetting] = result.scalars().all()
         adv_settings_list = list(advs)
         if not adv_settings_list:
             raise NotFoundActiveAdvCompany("Нет активных кампаний")
         return adv_settings_list
+
 
     @staticmethod
     async def __get_adv_id_to_search_adv_map(
@@ -288,6 +297,7 @@ class WBShopDataManager:
         self,
         *,
         skip_plan_fact: bool = False,
+        only_bot_active: bool,
     ) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
@@ -295,6 +305,7 @@ class WBShopDataManager:
             skip_plan_fact: не ходить в ClickHouse за plan_fact_stats. Используется
                 для корутин, где факт подгружается отдельно, например
                 ``update_cluster_bids``.
+            only_bot_active: Вернуть только AdvSetting.bot_active=True.
 
         Важно:
             Это точка, где должен быть синхронизирован auto common budget.
@@ -303,9 +314,8 @@ class WBShopDataManager:
             продолжит работать с устаревшим in-memory лимитом и общий бюджет
             не применится.
         """
-        adv_settings: list[AdvSetting] = cast(
-            list[AdvSetting], await self._get_advs()
-        )
+        adv_settings: list[AdvSetting] = await self._get_advs(only_bot_active)
+
         self._set_auto_commom_budget(adv_settings)
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
@@ -352,6 +362,7 @@ class WBShopDataManager:
     async def get_complex_advs(
         self,
         *,
+        only_bot_active:bool = True,
         load_extras: bool = True,
         skip_plan_fact: bool = False,
     ) -> list["ComplexAdv"]:
@@ -393,7 +404,9 @@ class WBShopDataManager:
         # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
         #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
         # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
-        pre_complex_advs: list[PreComplexAdv] = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
+        pre_complex_advs: list[PreComplexAdv] = await self.get_pre_complex_advs(
+            only_bot_active=only_bot_active,
+            skip_plan_fact=skip_plan_fact)
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(

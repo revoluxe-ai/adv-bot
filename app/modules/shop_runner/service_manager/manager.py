@@ -350,6 +350,7 @@ class CoroutinesManager:
     async def refresh_stats_freshness_cache(self) -> None:
         """Фоновое обновление Redis-кеша классификации свежести статы (CH → Redis)."""
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+            only_bot_active=False,
             load_extras=False
         )
         if not advs:
@@ -442,9 +443,11 @@ class CoroutinesManager:
         )
 
     @while_coroutine_decorator(60 * 5, 5)
-    async def update_common_sale_stat(self) -> None:
+    async def update_common_sale_stat(self, only_bot_active: bool) -> None:
         # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N РК)
-        advs = await self._wb_shop_data_manager.get_complex_advs(load_extras=False)
+        advs = await self._wb_shop_data_manager.get_complex_advs(
+            only_bot_active=only_bot_active,
+            load_extras=False)
         if not advs:
             return None
         from .services.common_sale_stat_updater import (
@@ -476,11 +479,14 @@ class CoroutinesManager:
         for stat in stats:
             await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
+    async def update_full_adv_stat(self, only_bot_active: bool) -> None:
+        return await self._update_full_adv_stat(only_bot_active)
 
     @while_coroutine_decorator(5 * 60, 1)
-    async def update_full_adv_stat(self) -> None:
+    async def _update_full_adv_stat(self,  only_bot_active: bool) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
+            load_extras=False,
+            only_bot_active=False,
         )
         all_adv_ids: set[int] = set()
         for adv in advs:
@@ -1095,6 +1101,7 @@ class CoroutinesManager:
             container.clusters_adv_stat_updater()
         )
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
+            only_bot_active=False,
             load_extras=False
         )
         if diag_enabled:
@@ -1177,6 +1184,7 @@ class CoroutinesManager:
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
+            only_bot_active=False,
             load_extras=False
         )
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
@@ -1266,7 +1274,8 @@ class CoroutinesManager:
         redis_api_cluster_bids_manager = container.redis_api_cluster_bids_manager()
 
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
+            load_extras=False,
+            only_bot_active=False,
         )
         advs = [adv for adv in advs if adv.bot_active]
         if not advs:
