@@ -56,6 +56,7 @@ class CoverageLayerBidDTO:
     expected_daily_clicks: float | None = None
     expected_daily_orders: float | None = None
     expected_order_cost_rub: float | None = None
+    ctr: float | None = None
     plan_distance_score: float | None = None
 
 

@@ -74,6 +74,7 @@ def _coverage_point(
     expected_daily_clicks: float | None = None,
     expected_daily_orders: float | None = None,
     expected_order_cost_rub: float | None = None,
+    ctr: float | None = None,
     plan_distance_score: float | None = None,
     status_text: str | None = None,
     label: str = "bid",
@@ -90,6 +91,7 @@ def _coverage_point(
         expected_daily_clicks=expected_daily_clicks,
         expected_daily_orders=expected_daily_orders,
         expected_order_cost_rub=expected_order_cost_rub,
+        ctr=ctr,
         plan_distance_score=plan_distance_score,
         status_text=status_text,
     )
@@ -266,6 +268,7 @@ def test_render_bid_point_viewer_shows_forecast_and_status() -> None:
         expected_daily_clicks=1_629.63,
         expected_daily_orders=48.89,
         expected_order_cost_rub=222.2,
+        ctr=0.03,
         plan_distance_score=0.3,
         status_text="eligible",
     )
@@ -274,11 +277,12 @@ def test_render_bid_point_viewer_shows_forecast_and_status() -> None:
     assert "прогноз кликов/сутки: 1 630" in text
     assert "прогноз заказов/сутки: 48.89" in text
     assert "CPO: 222.20 ₽" in text
+    assert "CTR: 3.00%" in text
     assert "score: 0.300" in text
     assert "status: eligible" in text
 
 
-def test_render_bid_point_viewer_keeps_missing_forecast_as_dash() -> None:
+def test_render_bid_point_viewer_omits_missing_forecast_fields() -> None:
     point = _coverage_point(
         20_500,
         impressions=165,
@@ -288,10 +292,11 @@ def test_render_bid_point_viewer_keeps_missing_forecast_as_dash() -> None:
         status_text="covered",
     )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
-    assert "прогноз показов/сутки: —" in text
-    assert "прогноз кликов/сутки: —" in text
-    assert "прогноз заказов/сутки: —" in text
-    assert "CPO: —" in text
+    assert "прогноз показов/сутки:" not in text
+    assert "прогноз кликов/сутки:" not in text
+    assert "прогноз заказов/сутки:" not in text
+    assert "CPO:" not in text
+    assert "CTR:" not in text
     assert "status: covered" in text
 
 
