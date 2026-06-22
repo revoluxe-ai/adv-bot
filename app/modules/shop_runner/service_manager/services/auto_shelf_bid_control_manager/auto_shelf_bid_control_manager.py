@@ -125,8 +125,27 @@ class AutoShelfBidControlManager:
         return datetime.now(UTC)
 
     @staticmethod
+    def _snap_bid_minor_to_unit(
+        bid_minor: int,
+        *,
+        bid_unit_minor: int = 100,
+    ) -> int:
+        """Snap a bid to the bid grid, preferring the lower bid on exact ties."""
+        if bid_unit_minor <= 0:
+            raise ValueError("bid_unit_minor must be positive")
+        value = int(bid_minor)
+        unit = int(bid_unit_minor)
+        remainder = value % unit
+        if remainder == 0:
+            return value
+        lower = value - remainder
+        upper = lower + unit
+        return lower if remainder * 2 <= unit else upper
+
+    @staticmethod
     def _middle_bid(min_bid: int, max_bid: int) -> int:
-        return int(round((min_bid + max_bid) / 2))
+        midpoint = int(round((int(min_bid) + int(max_bid)) / 2))
+        return AutoShelfBidControlManager._snap_bid_minor_to_unit(midpoint)
 
     @staticmethod
     def _clamp_bid_minor(
@@ -393,7 +412,7 @@ class AutoShelfBidControlManager:
         if max_bid not in covered_set:
             candidates.append((abs(max_bid - covered[-1]), max_bid))
         for left, right in zip(covered, covered[1:]):
-            mid = int(round((left + right) / 2))
+            mid = cls._snap_bid_minor_to_unit(int(round((left + right) / 2)))
             if mid in covered_set:
                 continue
             distance = min(abs(mid - left), abs(right - mid))

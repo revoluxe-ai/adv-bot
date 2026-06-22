@@ -786,6 +786,21 @@ def test_choose_next_test_bid_never_returns_already_covered_bid() -> None:
     assert bid not in covered
 
 
+def test_middle_bid_snaps_to_whole_rubles_preferring_lower_on_tie() -> None:
+    bid = AutoShelfBidControlManager._middle_bid(14_100, 22_200)
+    assert bid == 18_100
+
+
+def test_choose_next_test_bid_snaps_gap_midpoint_to_whole_rubles() -> None:
+    bid = AutoShelfBidControlManager.choose_next_test_bid(
+        min_bid=14_100,
+        max_bid=22_200,
+        covered_bids=[14_100, 22_200],
+        min_distance=1,
+    )
+    assert bid == 18_100
+
+
 def test_calc_target_main_impressions_with_valid_share() -> None:
     target = AutoShelfBidControlManager._calc_target_main_impressions(500, 0.1)
     assert target == 4500
