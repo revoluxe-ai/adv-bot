@@ -184,42 +184,21 @@ class AutoShelfBidControlTelegramService:
             repository=self._repository,
             analytics_repository=self._view_provider._analytics,  # type: ignore[attr-defined]
         )
-        refresh_result = await manager.apply_main_bid_refresh_if_needed(
+        # Telegram refresh is intentionally read-only.
+        # We still build the exact same strategy-aware snapshot as the worker
+        # tick, but we do not persist state or PATCH WB from the UI path.
+        # This keeps `cycle_metric -> cpc` compatibility and strategy
+        # explanations aligned without giving screen refresh stronger write
+        # powers than the normal control loop.
+        _ = await manager.build_decision_snapshot(
             complex_adv_like,  # type: ignore[arg-type]
+            settings_obj=settings_obj,
             state=state,
             min_bid_minor=int(min_bid_minor),
-            max_bid_minor=int(settings_obj.max_bid_minor),
             actual_bid_minor=actual_bid_minor,
-            now=datetime.now(UTC),
+            control_enabled=bool(adv.auto_shelf_bid_control_enabled),
         )
-        if (
-            refresh_result
-            in {
-                MainBidRefreshResult.NO_CHANGE,
-                MainBidRefreshResult.SKIPPED_NO_DESIRED_BID,
-            }
-            and state.current_mode == "main"
-        ):
-            snapshot = await manager.build_decision_snapshot(
-                complex_adv_like,  # type: ignore[arg-type]
-                settings_obj=settings_obj,
-                state=state,
-                min_bid_minor=int(min_bid_minor),
-                actual_bid_minor=actual_bid_minor,
-                control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-            )
-            if snapshot.expected_bid_minor is not None:
-                await manager.apply_bid_sync_from_snapshot(
-                    complex_adv_like,  # type: ignore[arg-type]
-                    state=state,
-                    snapshot=snapshot,
-                    control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-                    bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
-                    min_bid_minor=int(min_bid_minor),
-                    max_bid_minor=int(settings_obj.max_bid_minor),
-                    now=datetime.now(UTC),
-                )
-        return refresh_result
+        return MainBidRefreshResult.NO_CHANGE
 
     async def enable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Включить управление ставкой; при отсутствии settings создать default."""
@@ -347,7 +326,7 @@ class AutoShelfBidControlTelegramService:
         adv_setting_original_id: int,
         strategy: AutoShelfBidControlStrategy,
     ) -> AutoShelfBidControlViewDTO:
-        """Persist selected strategy and refresh current main bid only in main mode."""
+        """Persist selected strategy without mutating the live WB bid."""
         adv = await self._get_adv_or_raise(adv_setting_original_id)
         normalized_strategy = (
             AutoShelfBidControlStrategy.CPC
@@ -362,55 +341,10 @@ class AutoShelfBidControlTelegramService:
         state = await self._repository.get_state(nmid)
         if state is None or state.current_mode != "main":
             return await self.build_view(adv_setting_original_id)
-        settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
-        min_bid_minor = await self._view_provider._fetch_wb_min_bid_minor(  # type: ignore[attr-defined]
-            int(adv_setting_original_id),
-            nmid,
-        )
-        if min_bid_minor is None:
-            return await self.build_view(adv_setting_original_id)
-        actual_bid_minor = None
-        cached_bid = await self._bid_cache.get_bid(auto_adv_id=int(adv.adv_id), nmid=nmid)
-        if cached_bid is not None:
-            actual_bid_minor = int(cached_bid.bid_minor)
-        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
-        complex_adv_like = SimpleNamespace(
-            main_nmid=nmid,
-            auto_adv_id=int(adv.adv_id),
-            nmids=[nmid],
-            bot_active=bool(getattr(adv, "bot_active", True)),
-            auto_adv_active_status=bool(getattr(adv, "auto_adv_active_status", True)),
-            auto_shelf_bid_control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-            auto_shelf_bid_control_strategy=normalized_strategy,
-            adv_setting=adv,
-            original_max_cpo=float(adv.max_price_for_order or 0.0),
-            fact_pay_for_order=(
-                plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
-            ),
-            resolve_cpo=resolve_target_cost_from_summary(
-                plan_fact_summary,
-                plan_orders=int(adv.plan_for_sales_for_day or 0),
-                plan_target_pay_for_order=adv.target_price_for_order,
-                plan_max_pay_for_order=adv.max_price_for_order,
-            ),
-        )
-        manager = AutoShelfBidControlManager(
-            bid_cache_manager=self._bid_cache,
-            wb_bid_setter=cast(
-                AutoShelfBidSetter,
-                _TelegramBidSetterAdapter(self, adv, nmid),
-            ),
-            repository=self._repository,
-            analytics_repository=self._view_provider._analytics,  # type: ignore[attr-defined]
-        )
-        _ = await manager.apply_main_bid_refresh_if_needed(
-            complex_adv_like,  # type: ignore[arg-type]
-            state=state,
-            min_bid_minor=int(min_bid_minor),
-            max_bid_minor=int(settings_obj.max_bid_minor),
-            actual_bid_minor=actual_bid_minor,
-            now=datetime.now(UTC),
-        )
+        # Strategy changes become visible in the UI immediately because
+        # `build_view()` rebuilds the snapshot with the new mode. The actual
+        # live bid is left for the next worker tick, which remains the single
+        # authoritative writer for strategy-driven main-bid changes.
         return await self.build_view(adv_setting_original_id)
 
     async def reset_cycle(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
