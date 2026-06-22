@@ -36,7 +36,9 @@ class KeyboardsGetter:
         self._plan_for_sales_for_day = adv.plan_for_sales_for_day
         self._target_price_for_order = adv.target_price_for_order
         self._max_price_for_order = adv.max_price_for_order
-        self._v3_substitute_fact_cpo_for_max = bool(adv.substitute_fact_cpo_for_max)
+        self._v3_substitute_fact_cpo_for_max = bool(
+            getattr(adv, "substitute_fact_cpo_for_max", False)
+        )
 
     def get_keyboard(
         self,
