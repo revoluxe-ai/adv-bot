@@ -22,7 +22,8 @@ async def test_get_adv_setting_by_wb_cabinet_active_filter(
     )
 
     adv_setting = AdvSettingFactory.build(
-        wb_cabinet=wb_cabinet
+        wb_cabinet=wb_cabinet,
+        bot_active=True
 
     )
     try:
@@ -31,10 +32,41 @@ async def test_get_adv_setting_by_wb_cabinet_active_filter(
         adv_settings: Sequence[AdvSetting] = (
             await ShopDataUpdater.get_adv_setting_by_wb_cabinet_active_filter(
                 async_session,
-                wb_cabinet.id,
+                wb_cabinet_id=wb_cabinet.id,
             )
         )
         assert adv_settings
 
     finally:
         await async_session.rollback()
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_adv_setting_by_wb_cabinet_active_filter_not_bot_active(
+    async_session: AsyncSession,
+):
+
+    wb_cabinet = WBCabinetFactory.build(
+    )
+
+    adv_setting = AdvSettingFactory.build(
+        wb_cabinet=wb_cabinet,
+        bot_active=False
+
+    )
+    try:
+        async_session.add(adv_setting)
+        await async_session.flush()
+        adv_settings: Sequence[AdvSetting] = (
+            await ShopDataUpdater.get_adv_setting_by_wb_cabinet_active_filter(
+                async_session,
+                wb_cabinet_id=wb_cabinet.id,
+                only_bot_active=True
+            )
+        )
+        assert not adv_settings
+
+    finally:
+        await async_session.rollback()
+

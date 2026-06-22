@@ -11,9 +11,8 @@ import time
 from collections import Counter
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any
+from typing import Any, ParamSpec, TypeVar, Concatenate, cast
 
-from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
 logger = logging.getLogger(__name__)
@@ -50,12 +49,17 @@ def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> s
     return f"{func_name}:{args}:{frozenset(key_items)}"
 
 
-def single_run() -> (
-    Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
-):
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def single_run() -> Callable[
+    [Callable[Concatenate[Any, P], Awaitable[R]]],
+    Callable[Concatenate[Any, P], Awaitable[R]],
+]:
+    def decorator(func: Callable[Concatenate[Any, P], Awaitable[R]]) -> Callable[Concatenate[Any, P], Awaitable[R]]:
         @wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        async def wrapper(self: Any, *args: P.args, **kwargs: P.kwargs) -> R:
             if not hasattr(self, "_single_run_events"):
                 self._single_run_events = {}
             if not hasattr(self, "_single_run_results"):
@@ -177,6 +181,6 @@ def single_run() -> (
                 results.pop(key, None)
                 self._single_run_call_counter.pop(key, None)
 
-        return wrapper
+        return cast(Callable[Concatenate[Any, P], Awaitable[R]], wrapper)
 
     return decorator

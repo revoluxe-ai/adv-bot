@@ -6,6 +6,7 @@ import typing
 from typing import Protocol
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
 from app.client_bot.user_interface.states import AdvSetting
@@ -193,21 +194,24 @@ class ShopDataUpdater:
 
 
     @staticmethod
-    async def get_adv_setting_by_wb_cabinet_active_filter(session, wb_cabinet_id) -> typing.Sequence[models.AdvSetting]:
+    async def get_adv_setting_by_wb_cabinet_active_filter(session: AsyncSession,
+                                                          *,
+                                                          wb_cabinet_id: int) -> typing.Sequence[models.AdvSetting]:
         stmt = (
             select(models.AdvSetting)
-            .where(
-                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                models.AdvSetting._search_adv_id.is_not(None)
-            )
+
             .options(
                 load_only(
                     models.AdvSetting.name,
                     models.AdvSetting.adv_id,
                     models.AdvSetting._search_adv_id,
                 )
+            ).where(
+                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                models.AdvSetting._search_adv_id.is_not(None)
             )
         )
+
         result = await session.execute(stmt)
         adv_settings = result.unique().scalars().all()
         return adv_settings
