@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.modules.shop_menu.message import ShopMenu
+from app.modules.shop_menu.message import ShopMenu, build_shop_main_keyboard
 from app.modules.token_monitoring.services.token_info_service import (
     TokenInfo,
     TokenStatusReport,
@@ -70,6 +70,93 @@ def test_shop_menu_shows_ui_mode_toggle_for_admin() -> None:
     texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
 
     assert "Режим интерфейса: FREE" in texts
+
+
+def test_shop_menu_hides_ui_mode_toggle_for_non_admin() -> None:
+    """Non-admin shop menu does not include the UI mode toggle."""
+    read_only_token = _build_token(is_read_only=True)
+    token_status = TokenStatusReport(
+        shop_id="shop_123",
+        shop_name="Test Shop",
+        status="Insufficient",
+        all_tokens=[read_only_token],
+        valid_tokens=[],
+        expired_tokens=[],
+        available_permissions=set(),
+        missing_permissions={"РџРѕРґРІРёР¶РµРЅРёРµ"},
+        has_all_required_permissions=False,
+        expiring_tokens=[],
+    )
+
+    shop_menu = _build_shop_menu(token_status)
+    shop_menu._wb_user_cabinet.user.user_telegram_id = 999999
+    texts = [
+        btn.text for row in shop_menu.keyboard.inline_keyboard for btn in row
+    ]
+
+    assert "Режим интерфейса: FREE" not in texts
+
+
+def test_shop_menu_hides_paid_controls_in_free_mode() -> None:
+    """Free mode hides management/export buttons but keeps navigation."""
+    shop = _build_shop_menu(
+        TokenStatusReport(
+            shop_id="shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[],
+            valid_tokens=[],
+            expired_tokens=[],
+            available_permissions=set(),
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[],
+        )
+    )
+    keyboard = build_shop_main_keyboard(
+        shop._wb_user_cabinet,
+        shop._wb_cabinet,
+        ui_mode="free",
+    )
+    texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
+
+    assert "Массовые операции с РК" not in texts
+    assert "Выгрузить все РК в Excel" not in texts
+    assert "Загрузить настройки из Excel" not in texts
+    assert "Автоматические рекламные кампании" in texts
+    assert "➕ Добавить токен/Обновить токены" in texts
+    assert "Деактивировать магазин" in " ".join(texts) or "Активировать магазин" in " ".join(texts)
+    assert "Подключить существующие кампании" in texts
+    assert "Пополнить баланс" in texts
+    assert "Вернуться к списку магазинов" in texts
+
+
+def test_shop_menu_shows_paid_controls_in_paid_mode() -> None:
+    """Paid mode keeps management/export buttons visible."""
+    shop = _build_shop_menu(
+        TokenStatusReport(
+            shop_id="shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[],
+            valid_tokens=[],
+            expired_tokens=[],
+            available_permissions=set(),
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[],
+        )
+    )
+    keyboard = build_shop_main_keyboard(
+        shop._wb_user_cabinet,
+        shop._wb_cabinet,
+        ui_mode="paid",
+    )
+    texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
+
+    assert "Массовые операции с РК" in texts
+    assert "Выгрузить все РК в Excel" in texts
+    assert "Загрузить настройки из Excel" in texts
 
 
 def _build_token(*, is_read_only: bool) -> TokenInfo:
