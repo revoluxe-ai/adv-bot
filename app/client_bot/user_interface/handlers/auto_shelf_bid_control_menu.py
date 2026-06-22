@@ -24,11 +24,13 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     BID_POINT_VIEWER_HEADER,
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    build_auto_shelf_bid_strategy_keyboard,
     bid_point_viewer_page_count,
     build_bid_point_viewer_keyboard,
     clamp_bid_point_page,
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
+    render_auto_shelf_bid_strategy_message,
     render_bid_point_viewer_message,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
@@ -37,6 +39,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager import (
     AutoShelfBidControlTelegramError,
     AutoShelfBidControlTelegramService,
+)
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -110,7 +115,20 @@ async def _send_settings_screen(
 ) -> None:
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_settings_message(view)
-    keyboard = build_auto_shelf_bid_settings_keyboard(adv_setting_original_id)
+    keyboard = build_auto_shelf_bid_settings_keyboard(view, adv_setting_original_id)
+    if callback.message:
+        await callback.message.answer(text, reply_markup=keyboard)
+
+
+async def _send_strategy_screen(
+    callback: CallbackQuery,
+    *,
+    service: AutoShelfBidControlTelegramService,
+    adv_setting_original_id: int,
+) -> None:
+    view = await service.build_view(adv_setting_original_id)
+    text = render_auto_shelf_bid_strategy_message(view)
+    keyboard = build_auto_shelf_bid_strategy_keyboard(view, adv_setting_original_id)
     if callback.message:
         await callback.message.answer(text, reply_markup=keyboard)
 
@@ -194,6 +212,12 @@ async def auto_shelf_bid_control_menu_router(
                 service=service,
                 adv_setting_original_id=adv_setting_original_id,
             )
+        elif action == "strategy_menu":
+            await _send_strategy_screen(
+                callback,
+                service=service,
+                adv_setting_original_id=adv_setting_original_id,
+            )
         elif action == "enable":
             _ = await service.enable(adv_setting_original_id)
             if callback.message:
@@ -273,6 +297,28 @@ async def auto_shelf_bid_control_menu_router(
                     "Введите минимальный шаг между тестовыми ставками, в рублях.\n"
                     "Например: 1"
                 )
+        elif action in {
+            "set_strategy_plan_distance",
+            "set_strategy_ctr",
+            "set_strategy_cpc",
+        }:
+            strategy = {
+                "set_strategy_plan_distance": AutoShelfBidControlStrategy.PLAN_DISTANCE,
+                "set_strategy_ctr": AutoShelfBidControlStrategy.CTR,
+                "set_strategy_cpc": AutoShelfBidControlStrategy.CPC,
+            }[action]
+            _ = await service.set_strategy(adv_setting_original_id, strategy)
+            view = await service.build_view(adv_setting_original_id)
+            text = render_auto_shelf_bid_strategy_message(view)
+            keyboard = build_auto_shelf_bid_strategy_keyboard(
+                view, adv_setting_original_id
+            )
+            if callback.message:
+                try:
+                    await callback.message.edit_text(text, reply_markup=keyboard)
+                except TelegramBadRequest as exc:
+                    if "message is not modified" not in str(exc).lower():
+                        raise
         elif action == "back":
             if callback.message and callback.from_user:
                 await _reload_adv_setting_menu(
@@ -313,7 +359,7 @@ async def _handle_fsm_update(
     await message.answer("Настройка сохранена.")
     view = await service.build_view(int(adv_setting_original_id))
     text = render_auto_shelf_bid_settings_message(view)
-    keyboard = build_auto_shelf_bid_settings_keyboard(int(adv_setting_original_id))
+    keyboard = build_auto_shelf_bid_settings_keyboard(view, int(adv_setting_original_id))
     await message.answer(text, reply_markup=keyboard)
     await state.clear()
 

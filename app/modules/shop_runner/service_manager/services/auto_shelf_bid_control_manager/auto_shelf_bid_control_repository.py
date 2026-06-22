@@ -11,6 +11,9 @@ from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import 
     AutoShelfBidControlSettings,
     AutoShelfBidControlState,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
@@ -181,6 +184,27 @@ class AutoShelfBidControlRepository:
             await session.flush()
             await session.commit()
             return None
+
+    async def update_adv_strategy(
+        self,
+        adv_setting_original_id: int,
+        strategy: AutoShelfBidControlStrategy,
+    ) -> AdvSetting:
+        """Update the main-bid strategy on AdvSetting and return fresh model."""
+        async with get_session_maker() as session:
+            stmt: Select[tuple[AdvSetting]] = (
+                select(AdvSetting)
+                .options(joinedload(AdvSetting.wb_cabinet))
+                .where(AdvSetting.id == adv_setting_original_id)
+            )
+            adv = (await session.execute(stmt)).scalar_one_or_none()
+            if adv is None:
+                raise ValueError("adv_setting_not_found")
+            adv.auto_shelf_bid_control_strategy = strategy
+            await session.flush()
+            await session.refresh(adv)
+            await session.commit()
+            return adv
 
     async def save_state(self, state: AutoShelfBidControlState) -> AutoShelfBidControlState:
         """Создать или обновить state в БД."""

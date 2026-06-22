@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -14,6 +14,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     OptimizationMetric,
+)
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
 )
 
 pytestmark = pytest.mark.unit
@@ -82,6 +85,7 @@ def _view() -> AutoShelfBidControlViewDTO:
         optimization_metric=OptimizationMetric.CPC,
         fact_cpo=None,
         resolve_cpo=None,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
     )
 
 
@@ -213,7 +217,7 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
 
 
 def test_auto_shelf_bid_settings_keyboard_callback_data_fits_telegram_limit() -> None:
-    keyboard = handler.build_auto_shelf_bid_settings_keyboard(1151721977)
+    keyboard = handler.build_auto_shelf_bid_settings_keyboard(_view(), 1151721977)
     callback_data_values = [
         button.callback_data
         for row in keyboard.inline_keyboard
@@ -235,3 +239,83 @@ def test_auto_shelf_bid_control_action_normalization_accepts_compact_and_legacy_
         )
         == "set_target_test_observation_minutes"
     )
+    assert callbacks.normalize_auto_shelf_bid_control_action("sp") == "set_strategy_plan_distance"
+    assert callbacks.normalize_auto_shelf_bid_control_action("sm") == "strategy_menu"
+
+
+@pytest.mark.asyncio
+async def test_send_strategy_screen_uses_strategy_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = type("FakeService", (), {})()
+    service.build_view = AsyncMock(return_value=_view())
+    callback_message = FakeMessage(text="settings")
+    callback_message.answer = AsyncMock()
+    callback = SimpleNamespace(message=callback_message)
+    monkeypatch.setattr(
+        handler,
+        "render_auto_shelf_bid_strategy_message",
+        lambda *_: "strategy",
+    )
+    monkeypatch.setattr(
+        handler,
+        "build_auto_shelf_bid_strategy_keyboard",
+        lambda *_: object(),
+    )
+
+    await handler._send_strategy_screen(
+        callback,
+        service=service,  # pyright: ignore[reportArgumentType]
+        adv_setting_original_id=1,
+    )
+
+    callback_message.answer.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_strategy_switch_updates_strategy_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    callback_message = AsyncMock()
+    callback_message.text = "strategy"
+    callback = SimpleNamespace(
+        message=callback_message,
+        from_user=SimpleNamespace(id=1),
+    )
+    fake_state = AsyncMock()
+    fake_service = type("FakeService", (), {})()
+    fake_service.set_strategy = AsyncMock(return_value=_view())
+    fake_service.build_view = AsyncMock(
+        return_value=replace(
+            _view(),
+            auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CTR,
+        )
+    )
+    monkeypatch.setattr(
+        handler,
+        "AutoShelfBidControlTelegramService",
+        lambda **_: fake_service,
+    )
+    monkeypatch.setattr(
+        handler,
+        "render_auto_shelf_bid_strategy_message",
+        lambda *_: "strategy-updated",
+    )
+    monkeypatch.setattr(
+        handler,
+        "build_auto_shelf_bid_strategy_keyboard",
+        lambda *_: object(),
+    )
+
+    await handler.auto_shelf_bid_control_menu_router(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        callback_data=callbacks.AutoShelfBidControlMenu(
+            action="sc",
+            adv_setting_original_id=1,
+        ),
+        state=fake_state,  # pyright: ignore[reportArgumentType]
+        bot=AsyncMock(),  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    callback_message.edit_text.assert_awaited_once()

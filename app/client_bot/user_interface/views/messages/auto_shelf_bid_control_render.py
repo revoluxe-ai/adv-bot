@@ -20,6 +20,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     CoverageLayerBidDTO,
     OptimizationMetric,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -32,6 +35,8 @@ def format_bid(value: int | None, currency: str = "RUB") -> str:
 def _format_money(value: float | None) -> str:
     if value is None:
         return "—"
+    if value == float("inf"):
+        return "∞"
     return f"{value:.2f}"
 
 
@@ -85,7 +90,10 @@ def _format_rec_bid_rub(value: object) -> str:
     if value is None:
         return "\u2014"
     try:
-        return f"{float(value):.2f} \u20bd"
+        amount = float(value)
+        if amount == float("inf"):
+            return "\u221e \u20bd"
+        return f"{amount:.2f} \u20bd"
     except (TypeError, ValueError):
         return "\u2014"
 
@@ -132,6 +140,8 @@ def _format_rec_bid_number(value: object, *, precision: int) -> str:
 def _format_rec_bid_field_label(field: str) -> str:
     if field == "cpo_rub":
         return "CPO"
+    if field == "cpc":
+        return "CPC"
     return field
 
 
@@ -141,7 +151,7 @@ def _format_rec_bid_value(field: str, value: object) -> str:
         return _format_rec_bid_minor(value)
     if field in {"ctr", "confidence", "own_anchor"}:
         return _format_rec_bid_percent(value)
-    if field in {"expected_order_cost_rub", "resolved_order_cost_rub", "cpo_rub"}:
+    if field in {"expected_order_cost_rub", "resolved_order_cost_rub", "cpo_rub", "cpc"}:
         return _format_rec_bid_rub(value)
     if field == "expected_daily_impressions":
         return _format_rec_bid_int(value)
@@ -160,10 +170,15 @@ def _format_rec_bid_value(field: str, value: object) -> str:
 
 def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
     """Format a compact recommendation row from requested fields."""
-    return " | ".join(
-        f"{_format_rec_bid_field_label(field)}: {_format_rec_bid_value(field, row.get(field))}"
-        for field in fields
-    )
+    parts: list[str] = []
+    for field in fields:
+        value = row.get(field)
+        if value is None:
+            continue
+        parts.append(
+            f"{_format_rec_bid_field_label(field)}: {_format_rec_bid_value(field, value)}"
+        )
+    return " | ".join(parts) if parts else "-"
 
 
 def _format_rec_bid_rows(
@@ -207,6 +222,7 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
             "expected_daily_clicks",
             "expected_daily_orders",
             "cpo_rub",
+            "cpc",
             "ctr",
             "sales_gap",
             "plan_distance_score",
@@ -230,20 +246,34 @@ def _format_coverage_layer_row(row: CoverageLayerBidDTO, currency: str) -> str:
     if row.is_best_plan or row.is_global_best:
         markers.append("⭐️")
     label_text = f" [{row.label}]" if row.label and row.label != "bid" else ""
-    forecast_parts = [
-        f"прогноз показов/сутки: {_format_rec_bid_int(row.expected_daily_impressions)}",
-        f"прогноз кликов/сутки: {_format_rec_bid_int(row.expected_daily_clicks)}",
-        f"прогноз заказов/сутки: {_format_rec_bid_number(row.expected_daily_orders, precision=2)}",
-        f"CPO: {_format_rec_bid_rub(row.expected_order_cost_rub)}",
-        f"score: {_format_rec_bid_number(row.plan_distance_score, precision=3)}",
-    ]
+    forecast_parts: list[str] = []
+    if row.expected_daily_impressions is not None:
+        forecast_parts.append(
+            f"прогноз показов/сутки: {_format_rec_bid_int(row.expected_daily_impressions)}"
+        )
+    if row.expected_daily_clicks is not None:
+        forecast_parts.append(
+            f"прогноз кликов/сутки: {_format_rec_bid_int(row.expected_daily_clicks)}"
+        )
+    if row.expected_daily_orders is not None:
+        forecast_parts.append(
+            f"прогноз заказов/сутки: {_format_rec_bid_number(row.expected_daily_orders, precision=2)}"
+        )
+    if row.expected_order_cost_rub is not None:
+        forecast_parts.append(f"CPO: {_format_rec_bid_rub(row.expected_order_cost_rub)}")
+    if row.ctr is not None:
+        forecast_parts.append(f"CTR: {_format_ctr(row.ctr)}")
+    if row.plan_distance_score is not None:
+        forecast_parts.append(
+            f"score: {_format_rec_bid_number(row.plan_distance_score, precision=3)}"
+        )
     if row.status_text is not None:
         forecast_parts.append(f"status: {row.status_text}")
+    forecast_text = f" | {' | '.join(forecast_parts)}" if forecast_parts else ""
     return (
         f"{' '.join(markers)} {format_bid(row.bid_minor, currency)}{label_text}: "
         f"показы {row.impressions}, валидные часы {row.valid_hours}, "
-        f"closed_layers {row.closed_layers} | "
-        f"{' | '.join(forecast_parts)}"
+        f"closed_layers {row.closed_layers}{forecast_text}"
     )
 
 
@@ -468,6 +498,14 @@ def _format_last_event(view: AutoShelfBidControlViewDTO) -> str:
     return _format_main_waiting_reason(view)
 
 
+def _format_strategy_label(strategy: AutoShelfBidControlStrategy) -> str:
+    if strategy == AutoShelfBidControlStrategy.CTR:
+        return "CTR"
+    if strategy == AutoShelfBidControlStrategy.CPC:
+        return "CPC"
+    return "Best plan"
+
+
 def _render_main_bid_line(view: AutoShelfBidControlViewDTO) -> str:
     """Лучшая свежая main-ставка (только из snapshot recommendation)."""
     main_bid = view.recommended_main_bid_minor
@@ -534,7 +572,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     )
 
 
-def build_auto_shelf_bid_control_keyboard(
+def _deprecated_build_auto_shelf_bid_control_keyboard(
     view: AutoShelfBidControlViewDTO,
     adv_setting_original_id: int,
 ) -> InlineKeyboardMarkup:
@@ -617,13 +655,16 @@ def build_auto_shelf_bid_control_keyboard(
     return builder.as_markup()
 
 
-def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> str:
+def _deprecated_render_auto_shelf_bid_settings_message(
+    view: AutoShelfBidControlViewDTO,
+) -> str:
     """Собрать экран редактирования настроек управления."""
     enabled_text = "да" if view.enabled else "нет"
     dry_run_text = "включён" if view.dry_run else "выключен"
     return (
         "⚙️ Настройки управления ставкой в полках\n\n"
         f"Артикул: {view.nmid}\n\n"
+        f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}\n"
         f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
         f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
         f"Показов на тест: {view.target_test_impressions or '—'}\n"
@@ -634,9 +675,27 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
     )
 
 
-def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> InlineKeyboardMarkup:
+def _deprecated_build_auto_shelf_bid_settings_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
     """Собрать inline-клавиатуру экрана настроек."""
     builder = InlineKeyboardBuilder()
+    for strategy, action in (
+        (AutoShelfBidControlStrategy.PLAN_DISTANCE, "set_strategy_plan_distance"),
+        (AutoShelfBidControlStrategy.CTR, "set_strategy_ctr"),
+        (AutoShelfBidControlStrategy.CPC, "set_strategy_cpc"),
+    ):
+        label = _format_strategy_label(strategy)
+        if view.auto_shelf_bid_control_strategy == strategy:
+            label = f"✅ {label}"
+        builder.button(
+            text=label,
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action(action),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
     builder.button(
         text="Изменить max ставку",
         callback_data=AutoShelfBidControlMenu(
@@ -657,6 +716,280 @@ def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> Inli
             action=compact_auto_shelf_bid_control_action(
                 "set_target_test_impressions"
             ),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить минут теста",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action(
+                "set_target_test_observation_minutes"
+            ),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить шаг между ставками",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Назад к управлению ставкой",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("open"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def render_auto_shelf_bid_strategy_message(view: AutoShelfBidControlViewDTO) -> str:
+    """Собрать отдельный экран выбора режима main bid."""
+    return (
+        "⚙️ Режим main bid\n\n"
+        f"Артикул: {view.nmid}\n"
+        f"Текущий режим: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}\n\n"
+        "Доступные режимы:\n"
+        "- Best plan\n"
+        "- CTR\n"
+        "- CPC"
+    )
+
+
+def _deprecated_v2_build_auto_shelf_bid_settings_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
+    """Собрать inline-клавиатуру экрана настроек."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("strategy_menu"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить max ставку",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_max_bid"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить долю теста",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_test_share"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить показов на тест",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_target_test_impressions"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить минут теста",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action(
+                "set_target_test_observation_minutes"
+            ),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить шаг между ставками",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Назад к управлению ставкой",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("open"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_auto_shelf_bid_strategy_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
+    """Собрать inline-клавиатуру отдельного экрана выбора режима main bid."""
+    builder = InlineKeyboardBuilder()
+    for strategy, action in (
+        (AutoShelfBidControlStrategy.PLAN_DISTANCE, "set_strategy_plan_distance"),
+        (AutoShelfBidControlStrategy.CTR, "set_strategy_ctr"),
+        (AutoShelfBidControlStrategy.CPC, "set_strategy_cpc"),
+    ):
+        label = _format_strategy_label(strategy)
+        if view.auto_shelf_bid_control_strategy == strategy:
+            label = f"✅ {label}"
+        builder.button(
+            text=label,
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action(action),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+    builder.button(
+        text="Назад к управлению ставкой",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("open"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_auto_shelf_bid_control_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
+    """Собрать inline-клавиатуру основного экрана управления."""
+    builder = InlineKeyboardBuilder()
+    if view.enabled:
+        builder.button(
+            text="Выключить управление",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("disable"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text="Настройки",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("settings"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text=f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("strategy_menu"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text="Обновить",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("refresh"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        if view.has_state:
+            builder.button(
+                text="Покрытия цикла",
+                callback_data=AutoShelfBidControlBidPoints(
+                    adv_setting_original_id=adv_setting_original_id,
+                    index=0,
+                ).pack(),
+            )
+        builder.button(
+            text="Сбросить цикл",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("reset_cycle"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text="Вернуть main-ставку",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("force_main"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+    else:
+        builder.button(
+            text="Включить управление",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("enable"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text="Настройки",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("settings"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text=f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("strategy_menu"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+        builder.button(
+            text="Обновить",
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action("refresh"),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
+    builder.button(
+        text="Назад",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("back"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> str:
+    """Собрать экран редактирования настроек управления без выбора режима."""
+    enabled_text = "да" if view.enabled else "нет"
+    dry_run_text = "включён" if view.dry_run else "выключен"
+    return (
+        "⚙️ Настройки управления ставкой в полках\n\n"
+        f"Артикул: {view.nmid}\n\n"
+        f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
+        f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
+        f"Показов на тест: {view.target_test_impressions or '—'}\n"
+        f"Мин. минут теста: {view.target_test_observation_minutes or '—'}\n"
+        f"Шаг между тестовыми ставками: {format_bid(view.min_bid_distance_minor, view.currency)}\n"
+        f"Dry-run (глобально, AUTO_SHELF_BID_CONTROL_DRY_RUN): {dry_run_text}\n\n"
+        f"Управление включено: {enabled_text}"
+    )
+
+
+def build_auto_shelf_bid_settings_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
+    """Собрать inline-клавиатуру экрана настроек без кнопки выбора режима."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="Изменить max ставку",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_max_bid"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить долю теста",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_test_share"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить показов на тест",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_target_test_impressions"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )

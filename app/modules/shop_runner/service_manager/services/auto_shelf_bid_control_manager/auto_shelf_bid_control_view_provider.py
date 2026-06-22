@@ -61,6 +61,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from app.settings import settings
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
+    resolve_auto_shelf_bid_control_strategy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +195,28 @@ class AutoShelfBidControlViewProvider:
         return scores
 
     @staticmethod
+    def _resolve_display_optimization_metric(
+        *,
+        strategy: AutoShelfBidControlStrategy | None,
+        fact_cpo: float | None,
+        resolve_cpo: float | None,
+    ) -> OptimizationMetric:
+        """Resolve the UI metric so display matches the selected strategy.
+
+        Explicit CTR/CPC modes must keep their own metric for all Telegram
+        highlights and "best bid" labels. Legacy `cycle_metric` is normalized
+        to CPC for backward compatibility, so only a missing strategy value may
+        fall back to the historic dynamic metric derived from
+        `fact_cpo/resolve_cpo`.
+        """
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(strategy)
+        if normalized_strategy == AutoShelfBidControlStrategy.CTR:
+            return OptimizationMetric.CTR
+        if normalized_strategy == AutoShelfBidControlStrategy.CPC:
+            return OptimizationMetric.CPC
+        return resolve_optimization_metric(fact_cpo, resolve_cpo)
+
+    @staticmethod
     def _coerce_optional_float(value: object) -> float | None:
         """Convert loosely typed recommendation values into float-compatible data."""
         if value is None or isinstance(value, bool):
@@ -257,6 +282,9 @@ class AutoShelfBidControlViewProvider:
                 "expected_daily_clicks": expected_daily_clicks,
                 "expected_daily_orders": expected_daily_orders,
                 "expected_order_cost_rub": expected_order_cost_rub,
+                "ctr": AutoShelfBidControlViewProvider._coerce_optional_float(
+                    item.get("ctr")
+                ),
                 "plan_distance_score": plan_distance_score,
                 "status_text": item.get("status_text"),
             }
@@ -438,6 +466,9 @@ class AutoShelfBidControlViewProvider:
                 expected_order_cost_rub=AutoShelfBidControlViewProvider._coerce_optional_float(
                     forecast.get("expected_order_cost_rub")
                 ),
+                ctr=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("ctr")
+                ),
                 plan_distance_score=AutoShelfBidControlViewProvider._coerce_optional_float(
                     forecast.get("plan_distance_score")
                 ),
@@ -553,6 +584,9 @@ class AutoShelfBidControlViewProvider:
             warnings.append("single_nmid_guard_skip")
         nmid = nmids[0] if nmids else 0
         auto_adv_id = int(adv.adv_id)
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(
+            getattr(adv, "auto_shelf_bid_control_strategy", None)
+        )
 
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
@@ -569,7 +603,11 @@ class AutoShelfBidControlViewProvider:
             adv.max_price_for_order,
             fact_predict_orders,
         )
-        optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
+        optimization_metric = self._resolve_display_optimization_metric(
+            strategy=normalized_strategy,
+            fact_cpo=fact_cpo,
+            resolve_cpo=resolve_cpo,
+        )
 
         state = await self._repository.get_state(nmid) if nmid else None
         settings_obj = None
@@ -664,6 +702,7 @@ class AutoShelfBidControlViewProvider:
                     previous_cycle_started_at=state.previous_cycle_started_at,
                     fact_cpo=fact_cpo,
                     resolve_cpo=resolve_cpo,
+                    metric=optimization_metric,
                 )
 
         covered_points_count = 0
@@ -1029,7 +1068,7 @@ class AutoShelfBidControlViewProvider:
                                 getattr(adv, "auto_adv_active_status", True)
                             ),
                             "auto_shelf_bid_control_enabled": control_enabled,
-                            "auto_shelf_bid_control_strategy": adv.auto_shelf_bid_control_strategy,
+                            "auto_shelf_bid_control_strategy": normalized_strategy,
                             "adv_setting": adv,
                             "fact_pay_for_order": fact_cpo,
                             "resolve_cpo": resolve_cpo,
@@ -1148,6 +1187,7 @@ class AutoShelfBidControlViewProvider:
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
+            auto_shelf_bid_control_strategy=normalized_strategy,
             best_plan_bid_minor=best_plan_bid_minor,
             fresh_best_main_bid_minor=fresh_best_main_bid_minor,
             fresh_next_test_bid_minor=fresh_next_test_bid_minor,

@@ -74,6 +74,7 @@ def _coverage_point(
     expected_daily_clicks: float | None = None,
     expected_daily_orders: float | None = None,
     expected_order_cost_rub: float | None = None,
+    ctr: float | None = None,
     plan_distance_score: float | None = None,
     status_text: str | None = None,
     label: str = "bid",
@@ -90,6 +91,7 @@ def _coverage_point(
         expected_daily_clicks=expected_daily_clicks,
         expected_daily_orders=expected_daily_orders,
         expected_order_cost_rub=expected_order_cost_rub,
+        ctr=ctr,
         plan_distance_score=plan_distance_score,
         status_text=status_text,
     )
@@ -118,6 +120,17 @@ def test_select_cycle_bid_points_for_viewer_all_with_impressions_sorted_by_cpc()
         _point(40_000, impressions=0, is_covered=False, at=base),
     ]
     selected = select_cycle_bid_points_for_viewer(points)
+    assert [p.bid_minor for p in selected] == [30_000, 10_000, 20_000]
+
+
+def test_select_cycle_bid_points_for_viewer_zero_click_cpc_goes_last() -> None:
+    base = datetime(2026, 5, 25, 10, 0, 0, tzinfo=timezone.utc)
+    points = [
+        _point(10_000, impressions=600, is_covered=True, at=base, clicks=10, cart_cpa=30.0),
+        _point(20_000, impressions=600, is_covered=True, at=base.replace(hour=14), clicks=0, cart_cpa=float("inf")),
+        _point(30_000, impressions=600, is_covered=True, at=base.replace(hour=16), clicks=12, cart_cpa=10.0),
+    ]
+    selected = select_cycle_bid_points_for_viewer(points, optimization_metric=OptimizationMetric.CPC)
     assert [p.bid_minor for p in selected] == [30_000, 10_000, 20_000]
 
 
@@ -255,6 +268,7 @@ def test_render_bid_point_viewer_shows_forecast_and_status() -> None:
         expected_daily_clicks=1_629.63,
         expected_daily_orders=48.89,
         expected_order_cost_rub=222.2,
+        ctr=0.03,
         plan_distance_score=0.3,
         status_text="eligible",
     )
@@ -263,11 +277,12 @@ def test_render_bid_point_viewer_shows_forecast_and_status() -> None:
     assert "прогноз кликов/сутки: 1 630" in text
     assert "прогноз заказов/сутки: 48.89" in text
     assert "CPO: 222.20 ₽" in text
+    assert "CTR: 3.00%" in text
     assert "score: 0.300" in text
     assert "status: eligible" in text
 
 
-def test_render_bid_point_viewer_keeps_missing_forecast_as_dash() -> None:
+def test_render_bid_point_viewer_omits_missing_forecast_fields() -> None:
     point = _coverage_point(
         20_500,
         impressions=165,
@@ -277,10 +292,11 @@ def test_render_bid_point_viewer_keeps_missing_forecast_as_dash() -> None:
         status_text="covered",
     )
     text = render_bid_point_viewer_message(0, [point], page_size=10)
-    assert "прогноз показов/сутки: —" in text
-    assert "прогноз кликов/сутки: —" in text
-    assert "прогноз заказов/сутки: —" in text
-    assert "CPO: —" in text
+    assert "прогноз показов/сутки:" not in text
+    assert "прогноз кликов/сутки:" not in text
+    assert "прогноз заказов/сутки:" not in text
+    assert "CPO:" not in text
+    assert "CTR:" not in text
     assert "status: covered" in text
 
 

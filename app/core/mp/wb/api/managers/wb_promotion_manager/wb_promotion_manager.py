@@ -72,7 +72,7 @@ def _bad_request_message(detail: str | None) -> str:
     try:
         loaded = json.loads(detail)
         if isinstance(loaded, dict):
-            parsed_detail = loaded.get("detail")
+            parsed_detail = loaded.get("detail") # pyright: ignore
             if isinstance(parsed_detail, str):
                 message = parsed_detail
     except json.JSONDecodeError:

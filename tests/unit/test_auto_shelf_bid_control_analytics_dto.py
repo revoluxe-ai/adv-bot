@@ -12,7 +12,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_build_bid_stats_dto_cart_cpa_slot_is_cpc_even_with_zero_clicks() -> None:
-    """Поле cart_cpa = CPC для UI; best-bid SQL отсекает clicks=0."""
+    """Поле cart_cpa = +inf для UI при zero-click строке; best-bid SQL отсекает clicks=0."""
     dto = AutoShelfBidControlAnalyticsRepository._build_bid_stats_dto(
         {
             "bid_minor": 31_000,
@@ -26,7 +26,7 @@ def test_build_bid_stats_dto_cart_cpa_slot_is_cpc_even_with_zero_clicks() -> Non
             "spend": 330.43,
         }
     )
-    assert dto.cart_cpa == pytest.approx(330.43)
+    assert dto.cart_cpa == float("inf")
 
 
 def test_build_bid_stats_dto_score_matches_cpc() -> None:

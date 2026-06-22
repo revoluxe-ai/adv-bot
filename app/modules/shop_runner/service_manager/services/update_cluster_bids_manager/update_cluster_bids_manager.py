@@ -204,7 +204,7 @@ class UpdateClusterBidsManager:
         )
         trace_defaults = trace_target_defaults()
         if trace_defaults:
-            shop_id = self._wb_manager._shop_id
+            shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
             map_match = any(
                 is_trace_cell(
                     shop_id=shop_id,
@@ -487,7 +487,7 @@ class UpdateClusterBidsManager:
         skipped_no_bid = 0
         # Batch per-shop: WBManager/ClusterBidsManagerContainer создаются с одним shop_id;
         # advs здесь — только ComplexAdv этого магазина (см. DOTO/WORKLOG.md DEBUG_CLUSTER_BID_TRACE).
-        trace_shop_id = self._wb_manager._shop_id
+        trace_shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
         trace_on = is_trace_enabled()
         for map_data in maps_data:
             current_bid = mapper.get_current_bid(map_data)
@@ -816,7 +816,7 @@ class UpdateClusterBidsManager:
         adv_ids = list({b.search_adv_id for b in update_bids_command.new_bids})
         trace_defaults = trace_target_defaults()
         if trace_defaults:
-            shop_id = self._wb_manager._shop_id
+            shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
             matching_bids = [
                 b
                 for b in update_bids_command.new_bids
@@ -869,7 +869,7 @@ class UpdateClusterBidsManager:
             if trace_defaults:
                 log_cluster_bid_trace(
                     step="apply_after",
-                    shop_id=self._wb_manager._shop_id,
+                    shop_id=self._wb_manager._shop_id, # pyright: ignore # type: ignore
                     adv_id=trace_defaults.get("adv_id"),
                     search_adv_id=trace_defaults.get("search_adv_id"),
                     nmid=trace_defaults.get("nmid"),
@@ -882,7 +882,7 @@ class UpdateClusterBidsManager:
         if trace_defaults:
             log_cluster_bid_trace(
                 step="apply_after",
-                shop_id=self._wb_manager._shop_id,
+                shop_id=self._wb_manager._shop_id, # pyright: ignore # type: ignore
                 adv_id=trace_defaults.get("adv_id"),
                 search_adv_id=trace_defaults.get("search_adv_id"),
                 nmid=trace_defaults.get("nmid"),

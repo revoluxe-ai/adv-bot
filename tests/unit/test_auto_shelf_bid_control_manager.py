@@ -3439,11 +3439,10 @@ async def test_apply_main_bid_refresh_if_needed_applies_refresh_and_updates_stat
         now=now,
     )
 
-    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
-    assert state.current_main_bid_minor == 20_500
-    manager._choose_main_bid_by_strategy.assert_not_awaited()
-    repository.save_state.assert_not_awaited()
-    manager._persist_state_then_set_bid.assert_not_awaited()
+    assert result == MainBidRefreshResult.APPLIED
+    assert state.current_main_bid_minor == 60_000
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -3486,8 +3485,8 @@ async def test_apply_main_bid_refresh_if_needed_returns_no_change_when_target_sa
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
-    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    assert result == MainBidRefreshResult.NO_CHANGE
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
     manager._persist_state_then_set_bid.assert_not_awaited()
 
 
@@ -3531,11 +3530,10 @@ async def test_apply_main_bid_refresh_if_needed_clamps_desired_bid() -> None:
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
-    assert state.current_main_bid_minor == 20_500
-    manager._choose_main_bid_by_strategy.assert_not_awaited()
-    repository.save_state.assert_not_awaited()
-    manager._persist_state_then_set_bid.assert_not_awaited()
+    assert result == MainBidRefreshResult.APPLIED
+    assert state.current_main_bid_minor == 50_000
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
+    manager._persist_state_then_set_bid.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -3752,9 +3750,9 @@ async def test_handle_main_mode_historical_manual_force_main_does_not_block_refr
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
 
-    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
-    assert state.current_main_bid_minor == 20_500
-    manager._choose_main_bid_by_strategy.assert_not_awaited()
+    assert result == MainBidRefreshResult.APPLIED
+    assert state.current_main_bid_minor == 60_000
+    manager._choose_main_bid_by_strategy.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -3812,10 +3810,11 @@ async def test_handle_main_mode_retries_refreshed_bid_after_setter_failure() -> 
         actual_bid_minor=20_500,
         now=datetime(2026, 6, 16, 10, 0, 0, tzinfo=UTC),
     )
-    assert result == MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+    assert result == MainBidRefreshResult.APPLIED
 
     state.current_main_bid_minor = 20_500
     repository.save_state = AsyncMock()
+    manager._persist_state_then_set_bid.reset_mock()
     await manager._handle_main_mode(
         complex_adv=complex_adv,
         settings_obj=settings_obj,
@@ -4725,6 +4724,7 @@ async def test_initialize_does_not_call_set_target_bid_directly() -> None:
 async def test_first_update_after_initialize_sets_bid_via_centralized_sync_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", "true")
     """Первый tick инициализирует; второй применяет ставку через sync-path."""
     repository = MagicMock()
     repository.get_settings = AsyncMock()
@@ -4866,6 +4866,7 @@ async def test_mode_transition_does_not_bypass_bid_units_gate(
 async def test_mode_transition_defers_bid_apply_to_centralized_sync_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED", "true")
     """После transition setter вызывается только на следующем тике через apply_bid_sync."""
     manager, repository, state, settings_obj, complex_adv = _configure_plan_distance_test_transition(
         min_bid_minor=8_000,

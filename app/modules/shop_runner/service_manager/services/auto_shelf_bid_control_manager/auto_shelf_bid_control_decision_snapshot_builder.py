@@ -32,7 +32,7 @@ from .dto.decision_snapshot_dto import (
     snapshot_can_count_progress,
     snapshot_from_state_fallback,
 )
-from .dto.optimization_metric import resolve_optimization_metric
+from .dto.optimization_metric import OptimizationMetric, resolve_optimization_metric
 from .qualified_tested_bids import (
     INSUFFICIENT_QUALIFIED_TESTED_BIDS_EXPLANATION,
     build_cycle_metric_rec_recommendation,
@@ -46,6 +46,32 @@ from .qualified_tested_bids import (
 from .rec_bid_plan_context import build_rec_bid_plan_context
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_cycle_metric_for_snapshot(
+    complex_adv: ComplexAdv,
+) -> OptimizationMetric:
+    """Resolve ranking metric for snapshot-qualified bids.
+
+    Explicit Auto Shelf strategies must stay explicit even when the
+    day-analytics strategy resolver cannot return a bid. In particular, a
+    fallback in `CTR` mode must keep using CTR-ranked qualified bids, and a
+    fallback in `CPC` mode must keep using CPC-ranked qualified bids, instead
+    of silently switching back to the legacy dynamic metric chosen from
+    `fact_cpo/resolve_cpo`.
+    """
+    strategy = complex_adv.auto_shelf_bid_control_strategy
+    if strategy == AutoShelfBidControlStrategy.CTR:
+        return OptimizationMetric.CTR
+    if strategy in {
+        AutoShelfBidControlStrategy.CPC,
+        AutoShelfBidControlStrategy.CYCLE_METRIC,
+    }:
+        return OptimizationMetric.CPC
+    return resolve_optimization_metric(
+        complex_adv.fact_pay_for_order,
+        complex_adv.resolve_cpo,
+    )
 
 
 async def fetch_plan_distance_rec_result(
@@ -131,10 +157,7 @@ async def build_decision_snapshot(
     target_test_observation_hours = manager._target_observation_hours_from_minutes(
         target_test_observation_minutes
     )
-    optimization_metric = resolve_optimization_metric(
-        complex_adv.fact_pay_for_order,
-        complex_adv.resolve_cpo,
-    )
+    optimization_metric = _resolve_cycle_metric_for_snapshot(complex_adv)
 
     cycle_bid_stats = await manager._analytics.get_bid_stats(
         nmid=complex_adv.main_nmid,
@@ -156,6 +179,7 @@ async def build_decision_snapshot(
     best_plan_bid_minor: int | None = None
     fresh_best_main_bid_minor: int | None = None
     main_target_explanation: str | None = None
+    current_main_bid_minor = getattr(state, "current_main_bid_minor", None)
 
     if not sufficient_qualified_tested:
         fresh_best_main_bid_minor = None
@@ -216,14 +240,35 @@ async def build_decision_snapshot(
             metric=optimization_metric,
         )
         rec_bid_recommendation = build_cycle_metric_rec_recommendation(ranked_stats)
-        fresh_best_main_bid_minor, _ranked_top, clamp_explanation = (
-            resolve_main_bid_from_qualified_ranking(
-                rec_bid_recommendation,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=max_bid_minor,
-            )
+        fresh_best_main_bid_minor = await manager._choose_main_bid_by_strategy(
+            complex_adv=complex_adv,
+            currency=state.currency,
+            current_cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=getattr(state, "previous_cycle_started_at", None),
+            current_main_bid_minor=current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
         )
+        if fresh_best_main_bid_minor is None:
+            _fallback_main_bid_minor, _ranked_top, clamp_explanation = (
+                resolve_main_bid_from_qualified_ranking(
+                    rec_bid_recommendation,
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+        else:
+            _ranked_top = fresh_best_main_bid_minor
+            clamp_explanation = None
         main_target_explanation = clamp_explanation
+        if fresh_best_main_bid_minor is None:
+            fresh_best_main_bid_minor = _fallback_main_bid_minor # pyright: ignore
+            if fresh_best_main_bid_minor is None:
+                main_target_explanation = (
+                    main_target_explanation
+                    or INSUFFICIENT_QUALIFIED_TESTED_BIDS_EXPLANATION
+                )
 
     _coverages, _current_layer, _covered_anchor_count, coverage_next_test = (
         await manager._build_coverage_snapshot(

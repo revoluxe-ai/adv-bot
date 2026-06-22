@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
     ComplexAdv,
+    resolve_auto_shelf_bid_control_strategy,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost_from_summary
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
@@ -121,6 +122,12 @@ class AutoShelfBidControlTelegramService:
         adv_setting_original_id: int,
     ) -> MainBidRefreshResult:
         """Применить main bid refresh до чтения view и вернуть результат."""
+        # Keep Telegram/manual refresh aligned with worker ticks.
+        # Transitional case: even after the migration, legacy `cycle_metric`
+        # can still appear in tests, local dumps, or partially updated
+        # environments. Worker paths normalize it through ComplexAdv
+        # (`cycle_metric -> cpc`), so Telegram must normalize the same way
+        # before building the lightweight complex_adv_like object.
         adv = await self._get_adv_or_raise(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         state = await self._repository.get_state(nmid)
@@ -145,6 +152,9 @@ class AutoShelfBidControlTelegramService:
         if cached_bid is not None:
             actual_bid_minor = int(cached_bid.bid_minor)
         plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(
+            getattr(adv, "auto_shelf_bid_control_strategy", None)
+        )
         complex_adv_like = SimpleNamespace(
             main_nmid=nmid,
             auto_adv_id=int(adv.adv_id),
@@ -152,10 +162,7 @@ class AutoShelfBidControlTelegramService:
             bot_active=bool(getattr(adv, "bot_active", True)),
             auto_adv_active_status=bool(getattr(adv, "auto_adv_active_status", True)),
             auto_shelf_bid_control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-            auto_shelf_bid_control_strategy=(
-                adv.auto_shelf_bid_control_strategy
-                or AutoShelfBidControlStrategy.PLAN_DISTANCE
-            ),
+            auto_shelf_bid_control_strategy=normalized_strategy,
             adv_setting=adv,
             original_max_cpo=float(adv.max_price_for_order or 0.0),
             fact_pay_for_order=(
@@ -177,42 +184,21 @@ class AutoShelfBidControlTelegramService:
             repository=self._repository,
             analytics_repository=self._view_provider._analytics,  # type: ignore[attr-defined]
         )
-        refresh_result = await manager.apply_main_bid_refresh_if_needed(
+        # Telegram refresh is intentionally read-only.
+        # We still build the exact same strategy-aware snapshot as the worker
+        # tick, but we do not persist state or PATCH WB from the UI path.
+        # This keeps `cycle_metric -> cpc` compatibility and strategy
+        # explanations aligned without giving screen refresh stronger write
+        # powers than the normal control loop.
+        _ = await manager.build_decision_snapshot(
             complex_adv_like,  # type: ignore[arg-type]
+            settings_obj=settings_obj,
             state=state,
             min_bid_minor=int(min_bid_minor),
-            max_bid_minor=int(settings_obj.max_bid_minor),
             actual_bid_minor=actual_bid_minor,
-            now=datetime.now(UTC),
+            control_enabled=bool(adv.auto_shelf_bid_control_enabled),
         )
-        if (
-            refresh_result
-            in {
-                MainBidRefreshResult.NO_CHANGE,
-                MainBidRefreshResult.SKIPPED_NO_DESIRED_BID,
-            }
-            and state.current_mode == "main"
-        ):
-            snapshot = await manager.build_decision_snapshot(
-                complex_adv_like,  # type: ignore[arg-type]
-                settings_obj=settings_obj,
-                state=state,
-                min_bid_minor=int(min_bid_minor),
-                actual_bid_minor=actual_bid_minor,
-                control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-            )
-            if snapshot.expected_bid_minor is not None:
-                await manager.apply_bid_sync_from_snapshot(
-                    complex_adv_like,  # type: ignore[arg-type]
-                    state=state,
-                    snapshot=snapshot,
-                    control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-                    bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
-                    min_bid_minor=int(min_bid_minor),
-                    max_bid_minor=int(settings_obj.max_bid_minor),
-                    now=datetime.now(UTC),
-                )
-        return refresh_result
+        return MainBidRefreshResult.NO_CHANGE
 
     async def enable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Включить управление ставкой; при отсутствии settings создать default."""
@@ -333,6 +319,32 @@ class AutoShelfBidControlTelegramService:
         parsed = rubles_to_bid_minor(parsed_rub)
         await self._repository.get_or_create_default_settings(nmid=nmid)
         await self._repository.update_settings(nmid=nmid, min_bid_distance_minor=parsed)
+        return await self.build_view(adv_setting_original_id)
+
+    async def set_strategy(
+        self,
+        adv_setting_original_id: int,
+        strategy: AutoShelfBidControlStrategy,
+    ) -> AutoShelfBidControlViewDTO:
+        """Persist selected strategy without mutating the live WB bid."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        normalized_strategy = (
+            AutoShelfBidControlStrategy.CPC
+            if strategy == AutoShelfBidControlStrategy.CYCLE_METRIC
+            else strategy
+        )
+        adv = await self._repository.update_adv_strategy(
+            adv_setting_original_id,
+            normalized_strategy,
+        )
+        nmid = self._get_single_nmid_or_raise(adv)
+        state = await self._repository.get_state(nmid)
+        if state is None or state.current_mode != "main":
+            return await self.build_view(adv_setting_original_id)
+        # Strategy changes become visible in the UI immediately because
+        # `build_view()` rebuilds the snapshot with the new mode. The actual
+        # live bid is left for the next worker tick, which remains the single
+        # authoritative writer for strategy-driven main-bid changes.
         return await self.build_view(adv_setting_original_id)
 
     async def reset_cycle(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
