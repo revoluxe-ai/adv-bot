@@ -63,6 +63,15 @@ def _is_admin_user(user_telegram_id: int | None) -> bool:
     return is_bot_admin(user_telegram_id)
 
 
+def _has_read_only_only_tokens(token_status: TokenStatusReport) -> bool:
+    """Return True when the shop has only active read-only tokens for analytics."""
+    has_active_read_only_token = any(
+        token.is_read_only and token.is_valid and not token.is_expired
+        for token in token_status.all_tokens
+    )
+    return has_active_read_only_token and not token_status.valid_tokens
+
+
 def build_shop_main_keyboard(
     wb_user_cabinet: WBUserCabinet,
     wb_cabinet: WBCabinet,
@@ -565,6 +574,12 @@ class ShopMenu(TextWithKeyboard):
                             text += f"📅 Токены действуют до {date_str} (через {days_until_break} дн.)\n"
             else:
                 # Missing permissions - show critical status
+                if _has_read_only_only_tokens(token_status):
+                    text += (
+                        "\n⚠️ <b>У этого WB API токена доступны только права чтения.</b>\n\n"
+                        "Бот работает в режиме аналитики: можно смотреть кампании, ключи, историю и статистику.\n\n"
+                        "Автоуправление ставками и кампаниями недоступно. Для управления нужен токен с правами управления продвижением.\n"
+                    )
                 text += "\n🔑 <b>Токены:</b> ❌ <b>Требуется обновление</b>\n"
                 text += f"❌ <b>Отсутствуют права:</b> {', '.join(sorted(token_status.missing_permissions))}\n"
                 text += "🔧 <b>Добавьте новые токены для восстановления работы</b>\n"
